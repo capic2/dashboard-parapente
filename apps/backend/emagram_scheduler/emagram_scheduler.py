@@ -25,6 +25,7 @@ async def run_scheduled_emagram_analysis():
     even if the LLM quota runs out mid-cycle.
     """
     from database import get_db_context
+    from deployment_drain import DeploymentDrainActive, job_admission
     from emagram_multi_source import generate_multi_source_emagram_for_spot
     from llm.exceptions import QuotaExhaustedError
     from models import Site
@@ -91,13 +92,14 @@ async def run_scheduled_emagram_analysis():
 
             try:
                 with get_db_context() as db_session:
-                    result = await generate_multi_source_emagram_for_spot(
-                        site_id=site.id,
-                        db=db_session,
-                        force_refresh=False,
-                        day_index=day_index,
-                        hour=hour,
-                    )
+                    with job_admission():
+                        result = await generate_multi_source_emagram_for_spot(
+                            site_id=site.id,
+                            db=db_session,
+                            force_refresh=False,
+                            day_index=day_index,
+                            hour=hour,
+                        )
 
                 if result.get("success"):
                     success_count += 1
@@ -115,6 +117,9 @@ async def run_scheduled_emagram_analysis():
                     f"✅ Scheduled hourly emagram analysis stopped early (quota exhausted): "
                     f"{success_count} success, {error_count} errors, {skipped_count} skipped"
                 )
+                return
+            except DeploymentDrainActive:
+                logger.info("Stopping scheduled emagram analysis for deployment drain")
                 return
             except Exception as e:
                 logger.error(

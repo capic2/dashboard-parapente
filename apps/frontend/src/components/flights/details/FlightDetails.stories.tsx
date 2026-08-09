@@ -90,6 +90,12 @@ const minimalFlight: Flight = {
   notes: null,
 };
 
+const flightWithGenerationLogs: Flight = {
+  ...fullFlight,
+  video_export_status: 'running',
+  video_export_progress: 78,
+};
+
 const mockGPXData = {
   coordinates: Array.from({ length: 100 }, (_, i) => ({
     lat: 47.2 + i * 0.001,
@@ -263,6 +269,38 @@ Mobile.test('shows compact mobile infos tab by default', async ({ canvas }) => {
     canvas.queryByText(i18n.t('flights.loading3dViewer'))
   ).not.toBeInTheDocument();
 });
+
+export const WithGenerationLogs = meta.story({
+  name: 'With Generation Logs',
+  args: { flight: flightWithGenerationLogs },
+});
+
+WithGenerationLogs.test(
+  'keeps logs out of the main view until their tab is selected',
+  async ({ canvas, userEvent }) => {
+    await expect(
+      canvas.queryByText(i18n.t('flights.generationLogs.title'))
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.getByRole('heading', {
+        name: flightWithGenerationLogs.title ?? '',
+      })
+    ).toBeInTheDocument();
+
+    await userEvent.click(
+      canvas.getByRole('tab', { name: i18n.t('flights.logsTab') })
+    );
+
+    await expect(
+      await canvas.findByText(i18n.t('flights.generationLogs.title'))
+    ).toBeVisible();
+    await expect(
+      canvas.queryByRole('heading', {
+        name: flightWithGenerationLogs.title ?? '',
+      })
+    ).not.toBeInTheDocument();
+  }
+);
 
 export const MobileWithoutGpx = meta.story({
   name: 'Mobile Without GPX',

@@ -14,6 +14,7 @@ import {
   CircleCheck,
   RefreshCw,
 } from 'lucide-react';
+import type { FlightDecisionResponse } from '@dashboard-parapente/shared-types';
 import { useAppSettings } from '../../hooks/settings/useAppSettings';
 import { useWeather } from '../../hooks/weather/useWeather';
 import type { HourlyForecastItem, WeatherData } from '../../types';
@@ -28,14 +29,30 @@ import {
 interface HourlyForecastProps {
   spotId?: string;
   dayIndex?: number;
+  siteOrientation?: string | null;
   weatherData?: WeatherData;
   isLoading?: boolean;
   isError?: boolean;
   canForceRefresh?: boolean;
   isForceRefreshing?: boolean;
   onForceRefresh?: () => void;
+  flightDecision?: FlightDecisionResponse;
 }
 
+type HourlyFlightDecision = FlightDecisionResponse['hourly'][number];
+
+type LaunchWindStatus =
+  | 'face'
+  | 'travers_acceptable'
+  | 'travers_fort'
+  | 'cul'
+  | 'orientation_unknown'
+  | 'not_evaluated';
+
+type LaunchWindEvaluation = {
+  status: LaunchWindStatus;
+  translation_key: string;
+};
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -66,7 +83,9 @@ interface SourceDataTooltipProps extends BaseTooltipProps {
 
 interface ParaIndexTooltipProps extends BaseTooltipProps {
   label: string;
+  score: number;
   paraIndex: number;
+  launchWindLabel?: string;
   wind: number;
   gust: number;
   precipitation: number;
@@ -95,6 +114,12 @@ export interface UiThresholds {
   reasonCloudVeryCloudyMin: number;
   reasonWindModerateMin: number;
 }
+
+type VerdictThresholds = {
+  verdictGoodMin: number;
+  verdictMediumMin: number;
+  verdictLimitMin: number;
+};
 
 type FlyabilityReasonLabels = {
   rain: string;
@@ -133,6 +158,25 @@ const THUNDERSTORM_RISK_RANKS: Record<ThunderstormRisk, number> = {
   eleve: 3,
 };
 
+const CARDINAL_TO_DEGREES: Record<string, number> = {
+  N: 0,
+  NNE: 22.5,
+  NE: 45,
+  ENE: 67.5,
+  E: 90,
+  ESE: 112.5,
+  SE: 135,
+  SSE: 157.5,
+  S: 180,
+  SSW: 202.5,
+  SW: 225,
+  WSW: 247.5,
+  W: 270,
+  WNW: 292.5,
+  NW: 315,
+  NNW: 337.5,
+};
+
 const maxThunderstormRisk = (
   left: ThunderstormRisk,
   right: ThunderstormRisk
@@ -140,6 +184,122 @@ const maxThunderstormRisk = (
   return THUNDERSTORM_RISK_RANKS[left] >= THUNDERSTORM_RISK_RANKS[right]
     ? left
     : right;
+};
+
+const cardinalToDegrees = (direction: string): number | null => {
+  const normalized = direction.trim().toUpperCase();
+  return CARDINAL_TO_DEGREES[normalized] ?? null;
+};
+
+const angleDelta = (a: number, b: number): number =>
+  Math.abs(((a - b + 180) % 360) - 180);
+
+const parseLaunchOrientations = (
+  value: string | null | undefined
+): { label: string; degrees: number }[] => {
+  if (!value) return [];
+
+  return value
+    .toUpperCase()
+    .replace(/[/; ]+/g, ',')
+    .split(',')
+    .map((part: string) => part.trim())
+    .filter(Boolean)
+    .map((label) => ({ label, degrees: cardinalToDegrees(label) }))
+    .filter(
+      (
+        entry
+      ): entry is {
+        label: string;
+        degrees: number;
+      } => entry.degrees !== null
+    )
+    .map((entry) => ({ label: entry.label, degrees: entry.degrees }));
+};
+
+const getLaunchWindEvaluation = (
+  windDirectionDeg: number | null | undefined,
+  orientation: string | null | undefined
+): LaunchWindEvaluation => {
+  if (windDirectionDeg == null) {
+    return {
+      status: 'not_evaluated',
+      translation_key: 'flightDecision.windDecollage.not_evaluated',
+    };
+  }
+
+  const orientations = parseLaunchOrientations(orientation);
+  if (orientations.length === 0) {
+    return {
+      status: 'orientation_unknown',
+      translation_key: 'flightDecision.windDecollage.orientation_unknown',
+    };
+  }
+
+  const selected = orientations
+    .map((candidate) => ({
+      ...candidate,
+      deviation: angleDelta(windDirectionDeg, candidate.degrees),
+    }))
+    .sort((left, right) => left.deviation - right.deviation)[0];
+
+  if (!selected) {
+    return {
+      status: 'orientation_unknown',
+      translation_key: 'flightDecision.windDecollage.orientation_unknown',
+    };
+  }
+
+  if (selected.deviation <= 30) {
+    return {
+      status: 'face',
+      translation_key: 'flightDecision.windDecollage.face',
+    };
+  }
+
+  if (selected.deviation <= 60) {
+    return {
+      status: 'travers_acceptable',
+      translation_key: 'flightDecision.windDecollage.travers_acceptable',
+    };
+  }
+
+  if (selected.deviation <= 100) {
+    return {
+      status: 'travers_fort',
+      translation_key: 'flightDecision.windDecollage.travers_fort',
+    };
+  }
+
+  return { status: 'cul', translation_key: 'flightDecision.windDecollage.cul' };
+};
+
+const capScoreForLaunchWind = (
+  score: number,
+  status: LaunchWindStatus,
+  thresholds: VerdictThresholds
+): number => {
+  const ceilingByStatus: Record<LaunchWindStatus, number | null> = {
+    face: null,
+    travers_acceptable: thresholds.verdictGoodMin - 1,
+    travers_fort: thresholds.verdictMediumMin - 1,
+    cul: thresholds.verdictLimitMin - 1,
+    orientation_unknown: thresholds.verdictGoodMin - 1,
+    not_evaluated: thresholds.verdictGoodMin - 1,
+  };
+
+  const ceiling = ceilingByStatus[status];
+  return ceiling === null ? score : Math.max(0, Math.min(score, ceiling));
+};
+
+const verdictFromScore = (
+  score: number,
+  thresholds: VerdictThresholds
+): HourlyForecastItem['verdict'] => {
+  if (score >= thresholds.verdictGoodMin) return 'bon';
+  if (score >= thresholds.verdictMediumMin) return 'moyen';
+  if (score >= thresholds.verdictLimitMin) return 'limite';
+  return 'mauvais';
 };
 
 const getLiftedIndexRisk = (
@@ -314,6 +474,16 @@ const getVerdictClass = (verdict: string): string => {
   return getVerdictVisual(v).softClassName;
 };
 
+const levelToVerdict = (
+  level: HourlyFlightDecision['level']
+): HourlyForecastItem['verdict'] => {
+  if (level === 'favorable') return 'bon';
+  if (level === 'vigilance') return 'moyen';
+  if (level === 'limite') return 'limite';
+  if (level === 'deconseille') return 'mauvais';
+  return 'N/A';
+};
+
 const formatWindDirectionFromDegrees = (deg: number | null): string => {
   if (deg === null) return '—';
   const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
@@ -394,7 +564,9 @@ const formatTooltipDate = (cachedAt: string, language: string): string =>
 const ParaIndexTooltip = ({
   hour,
   label,
+  score,
   paraIndex,
+  launchWindLabel,
   wind,
   gust,
   precipitation,
@@ -410,8 +582,18 @@ const ParaIndexTooltip = ({
       </div>
       <div className="space-y-2 text-gray-700 dark:text-gray-300">
         <div className="text-lg font-bold text-sky-600 dark:text-sky-400">
-          {paraIndex}/100
+          {score}/100
         </div>
+        {score !== paraIndex && (
+          <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+            {t('weather.hourly.rawParaIndex')}: {paraIndex}/100
+          </div>
+        )}
+        {launchWindLabel && (
+          <div className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+            {t('weather.hourly.launchWind')}: {launchWindLabel}
+          </div>
+        )}
         <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
           <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
             {t('weather.metricsUsed')}
@@ -716,12 +898,14 @@ const SourceDataTooltip = ({
 export default function HourlyForecast({
   spotId,
   dayIndex = 0,
+  siteOrientation,
   weatherData,
   isLoading: isOverrideLoading,
   isError: isOverrideError,
   canForceRefresh = false,
   isForceRefreshing = false,
   onForceRefresh,
+  flightDecision,
 }: HourlyForecastProps) {
   const { t } = useTranslation();
   const {
@@ -733,6 +917,19 @@ export default function HourlyForecast({
   const weather = weatherData ?? fetchedWeather;
   const isLoading = isOverrideLoading ?? isFetchedLoading;
   const hasError = isOverrideError ?? !!error;
+  const hourlyDecisionByHour = useMemo(() => {
+    if (
+      !flightDecision ||
+      flightDecision.site.id !== spotId ||
+      flightDecision.day_index !== dayIndex
+    ) {
+      return new Map<number, HourlyFlightDecision>();
+    }
+
+    return new Map(
+      flightDecision.hourly.map((decision) => [decision.hour, decision])
+    );
+  }, [dayIndex, flightDecision, spotId]);
   const uiThresholds = useMemo<UiThresholds>(
     () => ({
       windLowMax: parseSettingNumber(
@@ -774,6 +971,23 @@ export default function HourlyForecast({
       reasonWindModerateMin: parseSettingNumber(
         appSettings?.ui_reason_wind_moderate_min,
         DEFAULT_UI_THRESHOLDS.reasonWindModerateMin
+      ),
+    }),
+    [appSettings]
+  );
+  const verdictThresholds = useMemo<VerdictThresholds>(
+    () => ({
+      verdictGoodMin: parseSettingNumber(
+        appSettings?.para_verdict_good_min,
+        65
+      ),
+      verdictMediumMin: parseSettingNumber(
+        appSettings?.para_verdict_medium_min,
+        45
+      ),
+      verdictLimitMin: parseSettingNumber(
+        appSettings?.para_verdict_limit_min,
+        30
       ),
     }),
     [appSettings]
@@ -824,14 +1038,55 @@ export default function HourlyForecast({
 
   const flyingHours = weather.hourly_forecast;
 
-  const renderTooltipContent = (type: CellType, data: HourlyForecastItem) => {
+  const getDisplayDecisionForHour = (hour: HourlyForecastItem) => {
+    const hourNumber = Number.parseInt(hour.hour, 10);
+    const backendDecision = hourlyDecisionByHour.get(hourNumber);
+    if (!backendDecision && !siteOrientation) {
+      return undefined;
+    }
+
+    const launchWind = backendDecision
+      ? backendDecision.wind_decollage
+      : getLaunchWindEvaluation(hour.wind_direction_deg, siteOrientation);
+
+    const score = backendDecision
+      ? backendDecision.score_objectif
+      : capScoreForLaunchWind(
+          hour.para_index,
+          launchWind.status as LaunchWindStatus,
+          verdictThresholds
+        );
+
+    const verdict = backendDecision
+      ? levelToVerdict(backendDecision.level)
+      : verdictFromScore(score, verdictThresholds);
+
+    return { backendDecision, launchWind, score, verdict };
+  };
+
+  const renderTooltipContent = (
+    type: CellType,
+    data: HourlyForecastItem,
+    displayDecision?: ReturnType<typeof getDisplayDecisionForHour>
+  ) => {
     switch (type) {
       case 'para-index':
         return (
           <ParaIndexTooltip
             hour={data.hour}
-            label={t('weather.paraIndex')}
+            label={
+              displayDecision
+                ? t('weather.hourly.flightScore')
+                : t('weather.paraIndex')
+            }
+            score={displayDecision?.score ?? data.para_index}
             paraIndex={data.para_index}
+            launchWindLabel={
+              displayDecision?.launchWind &&
+              displayDecision.launchWind.status !== 'face'
+                ? t(displayDecision.launchWind.translation_key)
+                : undefined
+            }
             wind={data.wind_speed || 0}
             gust={
               data.sources?.['open-meteo']?.wind_gust ||
@@ -848,8 +1103,8 @@ export default function HourlyForecast({
           <VerdictTooltip
             hour={data.hour}
             label={t('weather.paraIndex')}
-            verdict={data.verdict}
-            paraIndex={data.para_index}
+            verdict={displayDecision ? displayDecision.verdict : data.verdict}
+            paraIndex={displayDecision?.score ?? data.para_index}
             wind={data.wind_speed || 0}
             gust={
               data.sources?.['open-meteo']?.wind_gust ||
@@ -991,6 +1246,21 @@ export default function HourlyForecast({
       <div className="grid gap-3 md:hidden">
         {flyingHours.length > 0 ? (
           flyingHours.map((hour, index) => {
+            const displayDecision = getDisplayDecisionForHour(hour);
+            const adjustedDecision = displayDecision ?? {
+              score: hour.para_index,
+              verdict: hour.verdict,
+              launchWind: null,
+            };
+            const displayedHour = {
+              ...hour,
+              verdict: adjustedDecision.verdict,
+            };
+            const launchWindLabel =
+              displayDecision?.launchWind &&
+              displayDecision.launchWind.status !== 'face'
+                ? t(displayDecision.launchWind.translation_key)
+                : undefined;
             const cloudCover =
               hour.cloud_cover ??
               hour.sources?.['open-meteo']?.cloud_cover ??
@@ -1002,7 +1272,7 @@ export default function HourlyForecast({
               hour.sources?.['weatherapi']?.wind_gust ??
               null;
             const display = getFlyabilityDisplay(
-              hour,
+              displayedHour,
               uiThresholds,
               flyabilityReasonLabels
             );
@@ -1011,7 +1281,7 @@ export default function HourlyForecast({
             return (
               <article
                 key={index}
-                className={`rounded-2xl border border-slate-200 p-3 shadow-sm dark:border-slate-700 ${getVerdictClass(hour.verdict)}`}
+                className={`rounded-2xl border border-slate-200 p-3 shadow-sm dark:border-slate-700 ${getVerdictClass(displayedHour.verdict)}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -1028,10 +1298,15 @@ export default function HourlyForecast({
                       <FlyabilityIcon className="h-4 w-4" aria-hidden="true" />
                       {display.text}
                     </div>
+                    {launchWindLabel && (
+                      <div className="mt-1 text-xs font-bold text-amber-700 dark:text-amber-300">
+                        {t('weather.hourly.launchWind')}: {launchWindLabel}
+                      </div>
+                    )}
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-black text-sky-600 dark:text-sky-400">
-                      {hour.para_index}
+                      {adjustedDecision.score}
                     </div>
                     <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                       /100
@@ -1212,6 +1487,21 @@ export default function HourlyForecast({
           <tbody className="text-gray-800 dark:text-gray-100">
             {flyingHours.length > 0 ? (
               flyingHours.map((hour, index) => {
+                const displayDecision = getDisplayDecisionForHour(hour);
+                const adjustedDecision = displayDecision ?? {
+                  score: hour.para_index,
+                  verdict: hour.verdict,
+                  launchWind: null,
+                };
+                const displayedHour = {
+                  ...hour,
+                  verdict: adjustedDecision.verdict,
+                };
+                const launchWindLabel =
+                  displayDecision?.launchWind &&
+                  displayDecision.launchWind.status !== 'face'
+                    ? t(displayDecision.launchWind.translation_key)
+                    : undefined;
                 // Prefer top-level cloud_cover, fallback to sources for compatibility
                 const cloudCover =
                   hour.cloud_cover ??
@@ -1229,7 +1519,7 @@ export default function HourlyForecast({
                 return (
                   <tr
                     key={index}
-                    className={`border-b border-gray-100 transition-colors dark:border-gray-700 ${getVerdictClass(hour.verdict)}`}
+                    className={`border-b border-gray-100 transition-colors dark:border-gray-700 ${getVerdictClass(displayedHour.verdict)}`}
                   >
                     <td className="py-2.5 px-2 font-medium text-center">
                       {hour.hour}
@@ -1238,7 +1528,7 @@ export default function HourlyForecast({
                     <td className="py-2.5 px-2 text-center">
                       {(() => {
                         const display = getFlyabilityDisplay(
-                          hour,
+                          displayedHour,
                           uiThresholds,
                           flyabilityReasonLabels
                         );
@@ -1251,18 +1541,30 @@ export default function HourlyForecast({
                               })}
                               className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
                             >
-                              <span
-                                className={`inline-flex items-center justify-center gap-1 font-medium ${display.color}`}
-                              >
-                                <FlyabilityIcon
-                                  className="h-4 w-4"
-                                  aria-hidden="true"
-                                />
-                                {display.text}
+                              <span className="inline-flex flex-col items-center gap-0.5">
+                                <span
+                                  className={`inline-flex items-center justify-center gap-1 font-medium ${display.color}`}
+                                >
+                                  <FlyabilityIcon
+                                    className="h-4 w-4"
+                                    aria-hidden="true"
+                                  />
+                                  {display.text}
+                                </span>
+                                {launchWindLabel && (
+                                  <span className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                                    {t('weather.hourly.launchWind')}:{' '}
+                                    {launchWindLabel}
+                                  </span>
+                                )}
                               </span>
                             </Button>
                             <Tooltip offset={8} className="z-50">
-                              {renderTooltipContent('verdict', hour)}
+                              {renderTooltipContent(
+                                'verdict',
+                                hour,
+                                displayDecision
+                              )}
                             </Tooltip>
                           </TooltipTrigger>
                         );
@@ -1278,11 +1580,15 @@ export default function HourlyForecast({
                           className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-sky-100 dark:hover:bg-sky-900/30 transition-colors"
                         >
                           <strong className="text-sky-600 dark:text-sky-400">
-                            {hour.para_index}/100
+                            {adjustedDecision.score}/100
                           </strong>
                         </Button>
                         <Tooltip offset={8} className="z-50">
-                          {renderTooltipContent('para-index', hour)}
+                          {renderTooltipContent(
+                            'para-index',
+                            hour,
+                            displayDecision ?? undefined
+                          )}
                         </Tooltip>
                       </TooltipTrigger>
                     </td>

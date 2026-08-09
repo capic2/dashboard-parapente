@@ -26,8 +26,11 @@ async def test_generation_persists_failed_analysis_when_screenshots_fail(
     site = _site()
     db_session.add(site)
     db_session.commit()
+    screenshot_calls = 0
 
     async def fail_screenshots(**_kwargs: Any) -> dict[str, Any]:
+        nonlocal screenshot_calls
+        screenshot_calls += 1
         return {
             "success": False,
             "error": "all sources timed out",
@@ -58,6 +61,18 @@ async def test_generation_persists_failed_analysis_when_screenshots_fail(
     assert analysis.forecast_hour == 14
     assert analysis.error_message == "Failed to fetch emagram screenshots"
     assert "meteo-parapente" in (analysis.sources_errors or "")
+
+    second_result = await emagram.generate_multi_source_emagram_for_spot(
+        site_id=site.id,
+        db=db_session,
+        day_index=0,
+        hour=14,
+    )
+
+    assert second_result["analysis_id"] == result["analysis_id"]
+    assert second_result["success"] is False
+    assert screenshot_calls == 1
+    assert db_session.query(EmagramAnalysis).count() == 1
 
 
 @pytest.mark.asyncio

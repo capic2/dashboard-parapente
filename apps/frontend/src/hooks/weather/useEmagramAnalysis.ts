@@ -144,6 +144,7 @@ export function useTriggerEmagram() {
       return api
         .post('emagram/analyze', {
           json: { locale: i18n.language, ...request },
+          timeout: false,
         })
         .json<EmagramAnalysis>();
     },

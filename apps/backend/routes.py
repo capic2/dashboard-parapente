@@ -1,5 +1,6 @@
 import asyncio
 import fnmatch
+import hmac
 import json
 import logging
 import math
@@ -8,6 +9,7 @@ import subprocess
 import uuid
 import xml.etree.ElementTree as ET
 from datetime import date, datetime, timedelta, timezone
+from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
@@ -42,6 +44,13 @@ from auth import (
 )
 from azba_airspace import evaluate_site_azba_constraints, parse_optional_window
 from database import SessionLocal, get_db
+from deployment_drain import (
+    DeploymentDrainActive,
+    DeploymentDrainConflict,
+    DeploymentDrainNotFound,
+    deployment_drain,
+    job_admission,
+)
 from emagram_freshness import get_emagram_cutoff_utc
 from flight_decision import build_flight_decision, normalize_objective
 from flight_summaries import (
@@ -86,6 +95,8 @@ from schemas import EmagramAnalysis as EmagramAnalysisSchema
 from schemas import (
     EmagramAnalysisListItem,
     EmagramTriggerRequest,
+    DeploymentDrainRequest,
+    DeploymentDrainStatus,
     ExternalImportResult,
     FlightCreate,
     FlightDecisionResponse,
@@ -147,12 +158,14 @@ logger = logging.getLogger(__name__)
 
 
 _VIDEO_EXPORT_IN_PROGRESS_STATUSES = {
+    "started",
     "processing",
     "queued",
     "running",
     "initializing",
     "capturing",
     "encoding",
+    "preparing",
 }
 
 _VIDEO_EXPORT_CANCELLABLE_STATUSES = {
@@ -638,11 +651,167 @@ def _get_video_export_jobs_payload(db: Session, active_only: bool = False) -> di
     return {"jobs": jobs}
 
 
+def _active_deployment_job_count(db: Session) -> int:
+    jobs = _get_video_export_jobs_payload(db)["jobs"]
+    return sum(
+        1
+        for job in jobs
+        if job.get("status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
+        or job.get("internal_status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
+    )
+
+
+def _deployment_drain_status(db: Session) -> DeploymentDrainStatus:
+    state = deployment_drain.get_state()
+    # Admissions are registered before jobs become visible in storage. Reading
+    # this counter first prevents a handoff from looking idle between the two.
+    admissions = deployment_drain.admissions_in_progress()
+    active_jobs = _active_deployment_job_count(db)
+    if state is None:
+        return DeploymentDrainStatus(
+            phase="idle",
+            accepting_jobs=True,
+            ready_for_deployment=False,
+            active_jobs=active_jobs,
+            admissions_in_progress=admissions,
+        )
+    return DeploymentDrainStatus(
+        **state,
+        accepting_jobs=False,
+        ready_for_deployment=active_jobs == 0 and admissions == 0,
+        active_jobs=active_jobs,
+        admissions_in_progress=admissions,
+    )
+
+
+def _require_deployment_drain_token(request: Request) -> None:
+    expected_token = config.DEPLOY_DRAIN_TOKEN
+    if not expected_token:
+        raise HTTPException(
+            status_code=503,
+            detail="Deployment drain machine endpoints are not configured",
+        )
+    authorization = request.headers.get("authorization", "")
+    scheme, _, supplied_token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not hmac.compare_digest(supplied_token, expected_token):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid deployment drain bearer token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+def _map_deployment_drain_rejection(function: Any) -> Any:
+    @wraps(function)
+    def wrapped(*args: Any, **kwargs: Any) -> Any:
+        try:
+            return function(*args, **kwargs)
+        except DeploymentDrainActive as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=str(exc),
+                headers={"Retry-After": "300"},
+            ) from exc
+
+    return wrapped
+
+
+def _map_async_deployment_drain_rejection(function: Any) -> Any:
+    @wraps(function)
+    async def wrapped(*args: Any, **kwargs: Any) -> Any:
+        try:
+            return await function(*args, **kwargs)
+        except DeploymentDrainActive as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=str(exc),
+                headers={"Retry-After": "300"},
+            ) from exc
+
+    return wrapped
+
+
 # Public routes: no authentication required (weather, spots read, auth)
 public_router = APIRouter(prefix="/api", tags=["api"])
 
 # Protected routes: require valid JWT token
 router = APIRouter(prefix="/api", tags=["api"], dependencies=[Depends(get_current_user)])
+
+
+@public_router.get(
+    "/deployment-drain/status",
+    response_model=DeploymentDrainStatus,
+    dependencies=[Depends(get_current_user)],
+)
+def get_deployment_drain_status(db: Session = Depends(get_db)) -> DeploymentDrainStatus:
+    return _deployment_drain_status(db)
+
+
+@public_router.put(
+    "/deployment-drain",
+    response_model=DeploymentDrainStatus,
+    dependencies=[Depends(_require_deployment_drain_token)],
+)
+def begin_deployment_drain(
+    payload: DeploymentDrainRequest,
+    db: Session = Depends(get_db),
+) -> DeploymentDrainStatus:
+    try:
+        deployment_drain.begin(payload.deployment_id, payload.target_version, payload.run_url)
+    except DeploymentDrainConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return _deployment_drain_status(db)
+
+
+@public_router.get(
+    "/deployment-drain/{deployment_id}",
+    response_model=DeploymentDrainStatus,
+    dependencies=[Depends(_require_deployment_drain_token)],
+)
+def get_owned_deployment_drain(
+    deployment_id: str,
+    db: Session = Depends(get_db),
+) -> DeploymentDrainStatus:
+    try:
+        deployment_drain.get_owned(deployment_id)
+    except DeploymentDrainNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except DeploymentDrainConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return _deployment_drain_status(db)
+
+
+@public_router.post(
+    "/deployment-drain/{deployment_id}/deploying",
+    response_model=DeploymentDrainStatus,
+    dependencies=[Depends(_require_deployment_drain_token)],
+)
+def mark_deployment_drain_deploying(
+    deployment_id: str,
+    db: Session = Depends(get_db),
+) -> DeploymentDrainStatus:
+    try:
+        deployment_drain.mark_deploying(deployment_id)
+    except DeploymentDrainNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except DeploymentDrainConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return _deployment_drain_status(db)
+
+
+@public_router.delete(
+    "/deployment-drain/{deployment_id}",
+    status_code=204,
+    dependencies=[Depends(_require_deployment_drain_token)],
+)
+def release_deployment_drain(deployment_id: str) -> Response:
+    try:
+        deployment_drain.release(deployment_id)
+    except DeploymentDrainNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except DeploymentDrainConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return Response(status_code=204)
 
 
 def _require_force_refresh_auth(force_refresh: bool, request: Request, db: Session) -> None:
@@ -3777,7 +3946,11 @@ async def preview_intervals_activities(
     request = IntervalsSyncRequest(date_from=date_from, date_to=date_to)
     client = _intervals_client()
     try:
-        activities = await client.list_activities(request.date_from, request.date_to, [])
+        activities = await client.list_activities(
+            request.date_from,
+            request.date_to,
+            config.INTERVALS_ICU_ACTIVITY_TYPES,
+        )
     except Exception as exc:
         _raise_intervals_http_error(exc)
     return IntervalsPreviewResponse(
@@ -4245,7 +4418,8 @@ async def upload_gpx_to_flight(
             from video_export_manual import trigger_auto_export
 
             frontend_url = resolve_frontend_url()
-            trigger_auto_export(flight_id, db, frontend_url)
+            with job_admission():
+                trigger_auto_export(flight_id, db, frontend_url)
         except Exception as e:
             logger.warning(f"Failed to trigger auto video export: {e}")
 
@@ -4386,7 +4560,8 @@ async def create_flight_from_gpx(
             from video_export_manual import trigger_auto_export
 
             frontend_url = resolve_frontend_url()
-            trigger_auto_export(flight_id, db, frontend_url)
+            with job_admission():
+                trigger_auto_export(flight_id, db, frontend_url)
         except Exception as e:
             logger.warning(f"Failed to trigger auto video export: {e}")
 
@@ -4977,6 +5152,7 @@ def _with_gopro_overlay_job_token(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 @router.post("/flights/{flight_id}/export-video")
+@_map_deployment_drain_rejection
 def start_flight_video_export(
     request: Request,
     flight_id: str,
@@ -5040,6 +5216,8 @@ def start_flight_video_export(
                 speed=speed,
                 frontend_url=frontend_url,
             )
+        except DeploymentDrainActive:
+            raise
         except Exception as e:
             fallback_mode = "manual" if selected_mode == "manual_fast" else "stream"
             logger.warning(
@@ -5069,6 +5247,8 @@ def start_flight_video_export(
                     )
                     effective_mode = "stream"
                     _mark_flight_export_processing(db=db, flight=flight, job_id=job_id)
+            except DeploymentDrainActive:
+                raise
             except Exception as fallback_error:
                 logger.error(
                     "Failed to start export for flight %s using %s and fallback %s: %s",
@@ -5110,6 +5290,7 @@ def start_flight_video_export(
 
 
 @router.post("/flights/{flight_id}/generate-video")
+@_map_deployment_drain_rejection
 def generate_flight_video(
     request: Request,
     flight_id: str,
@@ -5151,6 +5332,8 @@ def generate_flight_video(
             update_db=True,
         )
         started_message = "Video generation started (Manual Fast Render)"
+    except DeploymentDrainActive:
+        raise
     except Exception as e:
         logger.warning(
             "⚠️ Manual fast generation failed, falling back to stream for flight %s: %s",
@@ -5414,6 +5597,7 @@ def cancel_video_export(job_id: str):
 
 
 @router.post("/exports/{job_id}/resume")
+@_map_deployment_drain_rejection
 def resume_cancelled_video_export(request: Request, job_id: str):
     """Resume a cancelled or failed manual video export from preserved frames."""
     success = resume_video_export(job_id)
@@ -5520,6 +5704,7 @@ def get_gopro_overlay_dependencies() -> GoproOverlayDependencies:
     "/flights/{flight_id}/gopro-overlay",
     response_model=GoproOverlayJob,
 )
+@_map_async_deployment_drain_rejection
 async def create_flight_gopro_overlay_job(
     flight_id: str,
     video_file: UploadFile | None = File(None),
@@ -5681,6 +5866,7 @@ async def probe_gopro_overlay_video(
     "/gopro-overlays/jobs",
     response_model=GoproOverlayJob,
 )
+@_map_async_deployment_drain_rejection
 async def create_gopro_overlay_render_job(
     video_file: UploadFile = File(...),
     gpx_file: UploadFile = File(...),
@@ -6158,6 +6344,13 @@ async def test_weather_source(
 _pending_emagram_analyses: set[str] = set()
 
 
+async def _run_emagram_analysis_with_admission(**kwargs: Any) -> dict[str, Any]:
+    from emagram_multi_source import generate_multi_source_emagram_for_spot
+
+    with job_admission():
+        return await generate_multi_source_emagram_for_spot(**kwargs)
+
+
 def _redact_emagram_failure_text(value: Any) -> str:
     text = str(value)
     for secret in [
@@ -6205,7 +6398,6 @@ def _auto_emagram_analysis(
     import asyncio
 
     from database import get_db_context
-    from emagram_multi_source import generate_multi_source_emagram_for_spot
 
     key = f"{site_id}:{day_index}:{hour}"
     if key in _pending_emagram_analyses:
@@ -6214,7 +6406,7 @@ def _auto_emagram_analysis(
     try:
         with get_db_context() as db:
             result = asyncio.run(
-                generate_multi_source_emagram_for_spot(
+                _run_emagram_analysis_with_admission(
                     site_id=site_id,
                     db=db,
                     day_index=day_index,
@@ -6230,6 +6422,8 @@ def _auto_emagram_analysis(
                     hour,
                     result.get("error", "unknown error"),
                 )
+    except DeploymentDrainActive:
+        logger.info("Skipped automatic emagram analysis while deployment is draining")
     except Exception as e:
         logger.error(
             f"Auto emagram analysis failed for {site_id} day_index={day_index} hour={hour}: {e}"
@@ -6284,24 +6478,6 @@ async def get_latest_emagram(
         # Filter by forecast target date
         target_date = (datetime.utcnow() + timedelta(days=day_index)).date()
         cutoff_time = get_emagram_cutoff_utc(db=db)
-
-        # For explicit hourly queries on a specific site, return the most recent
-        # attempt regardless of status to stay consistent with /emagram/hours.
-        if site_id and hour is not None:
-            latest_attempt_for_hour = (
-                db.query(EmagramAnalysis)
-                .filter(
-                    EmagramAnalysis.forecast_date == target_date,
-                    EmagramAnalysis.station_code == site_id,
-                    EmagramAnalysis.analysis_method == "llm_vision",
-                    EmagramAnalysis.forecast_hour == hour,
-                    EmagramAnalysis.analysis_datetime >= cutoff_time,
-                )
-                .order_by(EmagramAnalysis.analysis_datetime.desc())
-                .first()
-            )
-            if latest_attempt_for_hour:
-                return latest_attempt_for_hour
 
         analysis_filters = [
             EmagramAnalysis.forecast_date == target_date,
@@ -6676,6 +6852,7 @@ async def export_emagram_csv(
 
 
 @router.post("/emagram/analyze", response_model=EmagramAnalysisSchema, tags=["Emagram"])
+@_map_async_deployment_drain_rejection
 async def trigger_emagram_analysis(
     request: EmagramTriggerRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ):
@@ -6702,10 +6879,6 @@ async def trigger_emagram_analysis(
         }
     """
     try:
-        from emagram_multi_source import (
-            generate_multi_source_emagram_for_spot,
-        )
-
         # Step 1: Find target site
         if request.site_id:
             closest_site = db.query(Site).filter(Site.id == request.site_id).first()
@@ -6812,7 +6985,7 @@ async def trigger_emagram_analysis(
         # Step 3: Generate new analysis
         logger.info(f"Generating emagram for {closest_site.name} (hour={request.hour})...")
 
-        result = await generate_multi_source_emagram_for_spot(
+        result = await _run_emagram_analysis_with_admission(
             site_id=closest_site.id,
             db=db,
             force_refresh=request.force_refresh,
@@ -6823,7 +6996,7 @@ async def trigger_emagram_analysis(
 
         if not result.get("success"):
             raise HTTPException(
-                status_code=500,
+                status_code=503,
                 detail=_emagram_generation_failure_detail(result),
             )
 
@@ -6844,6 +7017,8 @@ async def trigger_emagram_analysis(
 
         return analysis
 
+    except DeploymentDrainActive:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -6915,6 +7090,7 @@ async def get_latest_emagram_for_spot(site_id: str, db: Session = Depends(get_db
 
 
 @router.post("/emagram/spot/{site_id}/refresh", tags=["Emagram"])
+@_map_async_deployment_drain_rejection
 async def refresh_emagram_for_spot(
     site_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ):
@@ -6933,17 +7109,19 @@ async def refresh_emagram_for_spot(
             "estimated_time_seconds": 30
         }
     """
-    from emagram_multi_source import generate_multi_source_emagram_for_spot
-
     # Verify site exists
     site = db.query(Site).filter(Site.id == site_id).first()
     if not site:
         raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
 
     # Add background task
-    background_tasks.add_task(
-        generate_multi_source_emagram_for_spot, site_id=site_id, db=db, force_refresh=True
-    )
+    with job_admission():
+        background_tasks.add_task(
+            _run_emagram_analysis_with_admission,
+            site_id=site_id,
+            db=db,
+            force_refresh=True,
+        )
 
     logger.info(f"🔄 Emagram refresh triggered for {site.name}")
 

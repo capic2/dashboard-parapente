@@ -313,6 +313,9 @@
       "cloudsWithUnit": "Nuages (%)",
       "thermals": "Thermiques",
       "flyability": "Volabilité",
+      "flightScore": "Note de vol corrigée",
+      "rawParaIndex": "Para-Index météo brut",
+      "launchWind": "Vent au décollage",
       "weak": "faible",
       "paraIndexAt": "Conditions de vol {{hour}}",
       "windAt": "Vent {{hour}}",
@@ -984,6 +987,7 @@
     "goproOverlayStarted": "Génération overlay GoPro lancée",
     "goproOverlayStartError": "Impossible de lancer l'overlay GoPro",
     "goproOverlayConfirmCancel": "Êtes-vous sûr de vouloir annuler cette génération d'overlay ?",
+    "goproOverlayConfirmRegenerate": "Êtes-vous sûr de vouloir régénérer cet overlay ? L'overlay existant sera remplacé.",
     "goproOverlayCancelled": "Génération overlay GoPro annulée",
     "goproOverlayCancelError": "Impossible d'annuler l'overlay GoPro",
     "goproOverlayDownloadError": "Impossible de télécharger l'overlay GoPro",
@@ -1017,9 +1021,18 @@
       "goproOverlayTitle": "Overlay GoPro",
       "progress": "Progression",
       "error": "Erreur",
-      "rawLogs": "Logs bruts",
+      "activity": "Journal d’activité",
+      "technicalDetails": "Détails techniques",
+      "lineCount_one": "{{count}} ligne",
+      "lineCount_other": "{{count}} lignes",
       "noLogs": "Aucun log disponible pour le moment.",
-      "noRawLogs": "Aucun log brut disponible ; seul le message courant est exposé.",
+      "noRawLogs": "Aucun événement détaillé n’a encore été reçu ; le statut et les erreurs restent affichés ci-dessus.",
+      "level": {
+        "info": "Information",
+        "success": "Succès",
+        "warning": "Attention",
+        "error": "Erreur"
+      },
       "status": {
         "queued": "En attente",
         "processing": "En cours",
@@ -1052,6 +1065,7 @@
     "gpxFileInput": "Fichier GPX",
     "infoTab": "Infos",
     "replayTab": "Replay",
+    "logsTab": "Logs",
     "backToList": "← Retour",
     "replayUnavailable": "Aucun GPX disponible pour ce vol",
     "viewerExportMissingFlightId": "Aucun identifiant de vol fourni. Utilisez ?flightId=xxx",
@@ -1372,6 +1386,19 @@
       "apiKeyEnvOnly": "La clé API est gérée uniquement dans l'environnement du serveur et n'est jamais affichée ici.",
       "statusError": "Impossible de charger le statut Intervals.icu.",
       "overviewDetail": "{{count}} types d'activité surveillés"
+    },
+    "deployment": {
+      "waitingTitle": "Déploiement en attente",
+      "deployingTitle": "Déploiement en cours",
+      "blockedDetail_one": "{{count}} traitement doit se terminer avant le déploiement.",
+      "blockedDetail_other": "{{count}} traitements doivent se terminer avant le déploiement.",
+      "readyDetail": "Les traitements sont terminés. Le déploiement va démarrer.",
+      "deployingDetail": "Les services de production sont en cours de mise à jour.",
+      "waitingElapsed_one": "Attente depuis {{count}} minute.",
+      "waitingElapsed_other": "Attente depuis {{count}} minutes.",
+      "deployingElapsed_one": "Déploiement démarré il y a {{count}} minute.",
+      "deployingElapsed_other": "Déploiement démarré il y a {{count}} minutes.",
+      "openRun": "Voir dans GitHub Actions"
     }
   }
 }

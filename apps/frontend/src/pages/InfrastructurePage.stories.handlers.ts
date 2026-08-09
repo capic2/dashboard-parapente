@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import type { CacheKeyDetail } from '../hooks/admin/useCache';
 import type { VideoExportJob } from '../hooks/flights/useVideoExportJobs';
+import type { DeploymentDrainStatus } from '../hooks/admin/useDeploymentDrainStatus';
 
 // --- In-memory cache database ---
 
@@ -484,8 +485,50 @@ export const videoExportHandlers = [
   }),
 ];
 
+const idleDeploymentStatus: DeploymentDrainStatus = {
+  phase: 'idle',
+  accepting_jobs: true,
+  ready_for_deployment: false,
+  active_jobs: 0,
+  admissions_in_progress: 0,
+  deployment_id: null,
+  target_version: null,
+  run_url: null,
+  requested_at: null,
+  phase_changed_at: null,
+  expires_at: null,
+};
+
+export const deploymentDrainHandlers = [
+  http.get('*/api/deployment-drain/status', () =>
+    HttpResponse.json(idleDeploymentStatus)
+  ),
+];
+
+export const deploymentWaitingHandlers = [
+  ...intervalsHandlers,
+  ...cacheHandlers,
+  ...videoExportHandlers,
+  http.get('*/api/deployment-drain/status', () =>
+    HttpResponse.json({
+      phase: 'waiting',
+      accepting_jobs: false,
+      ready_for_deployment: false,
+      active_jobs: 2,
+      admissions_in_progress: 0,
+      deployment_id: 'run-123-attempt-1',
+      target_version: '2026.07.29.2',
+      run_url: 'https://github.com/capic2/dashboard-parapente/actions/runs/123',
+      requested_at: new Date(Date.now() - 14 * 60_000).toISOString(),
+      phase_changed_at: new Date(Date.now() - 14 * 60_000).toISOString(),
+      expires_at: new Date(Date.now() + 60 * 60_000).toISOString(),
+    } satisfies DeploymentDrainStatus)
+  ),
+];
+
 export const defaultHandlers = [
   ...intervalsHandlers,
   ...cacheHandlers,
   ...videoExportHandlers,
+  ...deploymentDrainHandlers,
 ];

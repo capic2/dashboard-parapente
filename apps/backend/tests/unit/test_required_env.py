@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pytest
@@ -37,11 +38,40 @@ def test_required_env_accepts_non_empty_variable(monkeypatch):
     assert config.required_env("BACKEND_VALID_PATH") == "/valid/path"
 
 
-def test_video_export_paths_are_fixed():
+def test_video_export_paths_use_legacy_defaults():
     data_root = Path(config.PARAGLIDING_DATA_ROOT)
 
     assert Path(config.VIDEO_EXPORT_DIR) == data_root
-    assert Path(config.VIDEO_TEMP_IMAGES_DIR) == data_root / ".tmp" / "video-frames"
+    assert Path(config.VIDEO_LEGACY_TEMP_IMAGES_DIR) == data_root / ".tmp" / "video-frames"
+    assert Path(config.VIDEO_TEMP_IMAGES_DIR) == Path(
+        os.getenv("BACKEND_VIDEO_TEMP_IMAGES_DIR", config.VIDEO_LEGACY_TEMP_IMAGES_DIR)
+    )
+
+
+def test_configured_storage_dir_treats_blank_as_default(monkeypatch):
+    monkeypatch.setenv("BACKEND_TEST_STORAGE", "  ")
+
+    assert config._configured_storage_dir("BACKEND_TEST_STORAGE", "/safe/default") == (
+        "/safe/default"
+    )
+
+
+def test_configured_storage_dir_rejects_relative_path(monkeypatch):
+    monkeypatch.setenv("BACKEND_TEST_STORAGE", "relative/path")
+
+    with pytest.raises(ValueError, match="must be an absolute path"):
+        config._configured_storage_dir("BACKEND_TEST_STORAGE", "/safe/default")
+
+
+def test_configured_storage_dir_rejects_shared_root(monkeypatch):
+    monkeypatch.setenv("BACKEND_TEST_STORAGE", "/app")
+
+    with pytest.raises(ValueError, match="unsafe shared root"):
+        config._configured_storage_dir(
+            "BACKEND_TEST_STORAGE",
+            "/safe/default",
+            forbidden_roots=(Path("/app"),),
+        )
 
 
 def test_gopro_overlay_paths_are_derived_from_paragliding_root():

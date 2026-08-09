@@ -8,7 +8,7 @@ import json
 import logging
 import time
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from datetime import time as dt_time
 from typing import Any
 
@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 import config
 from emagram_freshness import get_emagram_cutoff_utc, get_emagram_next_update_utc
+from llm.codex_analyzer import analyze_emagram_with_codex
 from llm.exceptions import QuotaExhaustedError
 from llm.emagram_prompt import normalize_analysis_locale
 from llm.gemini_analyzer import analyze_emagram_with_gemini
@@ -44,7 +45,18 @@ PROVIDER_ENV_VARS = {
 }
 
 _LLM_QUOTA_COOLDOWNS: dict[str, float] = {}
+_LLM_UNAVAILABLE_COOLDOWNS: dict[str, float] = {}
 MIN_COMPLETED_EMAGRAM_SOURCES = 2
+_PERMANENT_LLM_FAILURE_MARKERS = (
+    "model_not_found",
+    "` does not exist",
+    "do not have access to it",
+    "model is unavailable",
+    "unavailable for free",
+    "no endpoints found",
+    "http 404",
+    "error code: 404",
+)
 
 
 def _to_float(value: Any) -> float | None:
@@ -239,6 +251,28 @@ def _configured_llm_providers(locale: str | None = None) -> list[dict[str, Any]]
             locale=analysis_locale,
         )
 
+    def codex_provider() -> list[dict[str, Any]]:
+        return [
+            {
+                "key": True,
+                "provider": "codex",
+                "analyzer": "codex",
+                "model": config.CODEX_MODEL or "account-default",
+                "label": "Codex Vision",
+                "free": False,
+                "quota_only": True,
+                "cooldown_key": f"codex:{config.CODEX_MODEL or 'account-default'}",
+                "call": lambda screenshots, site: analyze_emagram_with_codex(
+                    screenshot_paths=screenshots,
+                    spot_name=site.name,
+                    coordinates=(site.latitude, site.longitude),
+                    model_name=config.CODEX_MODEL,
+                    locale=analysis_locale,
+                    timeout_seconds=config.CODEX_TIMEOUT_SECONDS,
+                ),
+            }
+        ]
+
     provider_factories = {
         "groq": groq_provider,
         "openrouter": openrouter_provider,
@@ -247,6 +281,7 @@ def _configured_llm_providers(locale: str | None = None) -> list[dict[str, Any]]
         "huggingface": huggingface_provider,
         "custom_openai": custom_openai_provider,
         "openai_compatible": custom_openai_provider,
+        "codex": codex_provider,
     }
 
     configured = []
@@ -265,7 +300,7 @@ def _configured_llm_providers(locale: str | None = None) -> list[dict[str, Any]]
         key_is_set = any(provider["key"] for provider in provider_trials)
         label = provider_trials[0]["label"] if provider_trials else provider_name
         logger.info(
-            "🔍 Checking %s availability: API Key = %s",
+            "🔍 Checking %s availability: configuration = %s",
             label,
             "SET" if key_is_set else "NOT SET",
         )
@@ -350,6 +385,28 @@ def _mark_llm_trial_quota_exhausted(provider: dict[str, Any]) -> None:
     _LLM_QUOTA_COOLDOWNS[provider["cooldown_key"]] = time.monotonic() + cooldown_seconds
 
 
+def _is_llm_trial_unavailable(provider: dict[str, Any]) -> bool:
+    expires_at = _LLM_UNAVAILABLE_COOLDOWNS.get(provider["cooldown_key"])
+    if not expires_at:
+        return False
+    if expires_at <= time.monotonic():
+        _LLM_UNAVAILABLE_COOLDOWNS.pop(provider["cooldown_key"], None)
+        return False
+    return True
+
+
+def _is_permanent_llm_failure(error: Exception) -> bool:
+    message = str(error).lower()
+    return any(marker in message for marker in _PERMANENT_LLM_FAILURE_MARKERS)
+
+
+def _mark_llm_trial_unavailable(provider: dict[str, Any]) -> None:
+    cooldown_seconds = config.LLM_QUOTA_COOLDOWN_SECONDS
+    if cooldown_seconds <= 0:
+        return
+    _LLM_UNAVAILABLE_COOLDOWNS[provider["cooldown_key"]] = time.monotonic() + cooldown_seconds
+
+
 def _analyze_emagram_with_fallbacks(
     screenshots: list[dict[str, str]], site: Site, locale: str | None = None
 ) -> dict[str, Any]:
@@ -363,13 +420,52 @@ def _analyze_emagram_with_fallbacks(
         env_vars = ", ".join(PROVIDER_ENV_VARS.values())
         return {"success": False, "error": f"No LLM provider configured (set one of {env_vars})"}
 
-    for provider in configured_providers:
+    regular_providers = [
+        provider for provider in configured_providers if not provider.get("quota_only")
+    ]
+    quota_only_providers = [
+        provider for provider in configured_providers if provider.get("quota_only")
+    ]
+    free_trial_keys = {
+        provider["cooldown_key"] for provider in regular_providers if provider["free"]
+    }
+    blocked_free_trials: set[str] = set()
+
+    for provider in regular_providers + quota_only_providers:
+        if provider.get("quota_only") and (
+            not free_trial_keys or blocked_free_trials != free_trial_keys
+        ):
+            analysis_errors.append(
+                f"{provider['provider']}:{provider['model']}: reserved until all configured "
+                "free provider/model trials are exhausted or unavailable"
+            )
+            logger.info(
+                "Skipping %s because some free provider trials remain available",
+                provider["label"],
+            )
+            continue
+
         if _is_llm_trial_on_cooldown(provider):
+            if provider["free"]:
+                blocked_free_trials.add(provider["cooldown_key"])
             cooldown_errors.append(
                 f"{provider['provider']}:{provider['model']} cooling down after quota exhaustion"
             )
             logger.info(
                 "⏳ Skipping %s model %s during quota cooldown",
+                provider["label"],
+                provider["model"],
+            )
+            continue
+
+        if _is_llm_trial_unavailable(provider):
+            if provider["free"]:
+                blocked_free_trials.add(provider["cooldown_key"])
+            cooldown_errors.append(
+                f"{provider['provider']}:{provider['model']} cooling down after model unavailability"
+            )
+            logger.info(
+                "⏳ Skipping unavailable %s model %s",
                 provider["label"],
                 provider["model"],
             )
@@ -392,18 +488,33 @@ def _analyze_emagram_with_fallbacks(
         except QuotaExhaustedError as e:
             quota_errors += 1
             _mark_llm_trial_quota_exhausted(provider)
+            if provider["free"]:
+                blocked_free_trials.add(provider["cooldown_key"])
             analysis_errors.append(
                 f"{provider['provider']}:{provider['model']}: quota exhausted ({e})"
             )
             logger.warning(f"⚠️ {provider['label']} quota exhausted, trying next provider")
         except Exception as e:
             analysis_errors.append(f"{provider['provider']}:{provider['model']}: {e}")
-            logger.warning(f"{provider['label']} analysis failed: {e}")
+            if _is_permanent_llm_failure(e):
+                _mark_llm_trial_unavailable(provider)
+                if provider["free"]:
+                    blocked_free_trials.add(provider["cooldown_key"])
+                logger.warning(
+                    "%s model %s is unavailable, trying next provider",
+                    provider["label"],
+                    provider["model"],
+                )
+            else:
+                logger.warning(f"{provider['label']} analysis failed: {e}")
 
     if providers_tried == 0 and cooldown_errors:
         return {
             "success": False,
-            "error": "All configured LLM providers are cooling down after quota exhaustion",
+            "error": (
+                "All configured LLM providers are cooling down after quota exhaustion "
+                "or model unavailability"
+            ),
             "provider_errors": cooldown_errors,
         }
 
@@ -521,8 +632,6 @@ async def generate_multi_source_emagram_for_spot(
         logger.info(f"🎯 Starting multi-source emagram analysis for {site.name}")
 
         # Compute forecast target date
-        from datetime import timedelta
-
         forecast_date = (datetime.utcnow() + timedelta(days=day_index)).date()
 
         # Step 2: Check for recent analysis (unless force_refresh)
@@ -551,6 +660,31 @@ async def generate_multi_source_emagram_for_spot(
                     f"✅ Found recent analysis from {existing.analysis_datetime}, using cache"
                 )
                 return emagram_analysis_to_dict(existing, db=db)
+
+            failure_cutoff = datetime.utcnow() - timedelta(
+                minutes=config.EMAGRAM_FAILURE_RETRY_MINUTES
+            )
+            failed_filters = [
+                EmagramAnalysis.station_code == site_id,
+                EmagramAnalysis.analysis_method == "llm_vision",
+                EmagramAnalysis.analysis_datetime >= failure_cutoff,
+                EmagramAnalysis.analysis_status == "failed",
+                EmagramAnalysis.forecast_date == forecast_date,
+            ]
+            if hour is not None:
+                failed_filters.append(EmagramAnalysis.forecast_hour == hour)
+            recent_failure = (
+                db.query(EmagramAnalysis)
+                .filter(*failed_filters)
+                .order_by(EmagramAnalysis.analysis_datetime.desc())
+                .first()
+            )
+            if recent_failure:
+                logger.info(
+                    "⏳ Skipping emagram retry after recent failure at %s",
+                    recent_failure.analysis_datetime,
+                )
+                return emagram_analysis_to_dict(recent_failure, db=db)
 
         # Step 3: Fetch screenshots from all sources
         screenshot_result = await fetch_all_emagram_screenshots(

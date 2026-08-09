@@ -1192,6 +1192,10 @@ def test_delete_gopro_overlay_job_removes_terminal_row_and_work_dir(
     work_dir.mkdir(parents=True)
     layout_path = work_dir / "layout.xml"
     layout_path.write_text("<layout />")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+    log_path = gopro_overlay_export._gopro_overlay_log_path(job_id)
+    log_path.parent.mkdir(parents=True)
+    log_path.write_text("Overlay rendering failed\n")
 
     monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
     session = test_db()
@@ -1213,6 +1217,7 @@ def test_delete_gopro_overlay_job_removes_terminal_row_and_work_dir(
                 output_path=str(tmp_path / "final.mp4"),
                 temp_output_path=str(tmp_path / "final.part.mp4"),
                 output_filename="final.mp4",
+                log_path=str(log_path),
             )
         )
         session.add(
@@ -1232,8 +1237,9 @@ def test_delete_gopro_overlay_job_removes_terminal_row_and_work_dir(
 
     assert result is not None
     assert result["deleted"] is True
-    assert result["files_deleted"] == 1
+    assert result["files_deleted"] == 2
     assert not work_dir.exists()
+    assert not log_path.exists()
     assert gopro_overlay_export.get_gopro_overlay_job(job_id) is None
     session = test_db()
     try:
@@ -1243,6 +1249,28 @@ def test_delete_gopro_overlay_job_removes_terminal_row_and_work_dir(
         assert flight.gopro_overlay_status is None
     finally:
         session.close()
+
+
+def test_overlay_log_survives_work_directory_cleanup(tmp_path, monkeypatch):
+    job_id = "job-overlay-persistent-log"
+    work_dir = tmp_path / ".gopro-overlay-work" / job_id
+    work_dir.mkdir(parents=True)
+    layout_path = work_dir / "layout.xml"
+    layout_path.write_text("<layout />")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+    log_path = gopro_overlay_export._gopro_overlay_log_path(job_id)
+    gopro_overlay_export._append_job_log(log_path, "Overlay ready")
+
+    gopro_overlay_export._cleanup_gopro_overlay_temp_files(
+        {
+            "layout_path": str(layout_path),
+            "log_path": str(log_path),
+            "temp_output_path": str(work_dir / "final.part.mp4"),
+        }
+    )
+
+    assert not work_dir.exists()
+    assert "Overlay ready" in log_path.read_text()
 
 
 def test_reconcile_gopro_overlay_flight_refs_clears_missing_active_job(test_db, monkeypatch):
@@ -2231,6 +2259,47 @@ def test_run_job_passes_configured_font(monkeypatch):
         command = popen.call_args.args[0]
         assert "--font" in command
         assert command[command.index("--font") + 1] == "/fonts/LiberationSans-Regular.ttf"
+    finally:
+        gopro_overlay_export._JOBS.pop(job_id, None)
+        gopro_overlay_export._PROCESSES.pop(job_id, None)
+
+
+def test_run_job_passes_configured_overlay_gpu_args(monkeypatch):
+    job_id = "gpu-job"
+    gopro_overlay_export._JOBS[job_id] = {
+        "job_id": job_id,
+        "status": "queued",
+        "progress": 0,
+        "message": "Overlay queued",
+        "gpx_path": "track.gpx",
+        "layout_path": "layout.xml",
+        "video_path": "flight.mp4",
+        "output_path": "overlay.mp4",
+        "pip_path": None,
+        "video_width": None,
+        "video_height": None,
+        "updated_at": "2026-01-01T00:00:00+00:00",
+    }
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_CONFIG_DIR", "/config")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PROFILE", "nnvgpu")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_EXTRA_ARGS", "--double-buffer")
+
+    class FailedProcess:
+        stdout: list[str] = []
+
+        def wait(self) -> int:
+            return 1
+
+    try:
+        with patch("gopro_overlay_export.subprocess.Popen", return_value=FailedProcess()) as popen:
+            gopro_overlay_export._run_job(job_id)
+
+        command = popen.call_args.args[0]
+        assert "--config-dir" in command
+        assert command[command.index("--config-dir") + 1] == "/config"
+        assert "--profile" in command
+        assert command[command.index("--profile") + 1] == "nnvgpu"
+        assert "--double-buffer" in command
     finally:
         gopro_overlay_export._JOBS.pop(job_id, None)
         gopro_overlay_export._PROCESSES.pop(job_id, None)

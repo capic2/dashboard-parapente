@@ -1,0 +1,6 @@
+services:
+  gopro-overlay-worker:
+    gpus: all
+    environment:
+      - BACKEND_GOPRO_OVERLAY_PROFILE=${BACKEND_GOPRO_OVERLAY_PROFILE:-nvgpu}
+      - BACKEND_GOPRO_OVERLAY_EXTRA_ARGS=${BACKEND_GOPRO_OVERLAY_EXTRA_ARGS:---double-buffer}

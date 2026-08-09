@@ -19,7 +19,7 @@ jobs:
   deploy:
     name: Deploy over SSH
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 120
 
     steps:
       - name: Compute deployment version
@@ -199,9 +199,192 @@ jobs:
             ghcr.io/${{ github.repository }}/backend:main
             ghcr.io/${{ github.repository }}/backend:sha-${{ github.sha }}
 
+      - name: Begin production deployment drain
+        id: begin_drain
+        if: steps.build_image.outcome == 'success' && vars.DEPLOY_DRAIN_ENABLED == 'true'
+        continue-on-error: true
+        env:
+          DRAIN_BASE_URL: ${{ secrets.PRODUCTION_DEPLOY_DRAIN_URL }}
+          DRAIN_API_TOKEN: ${{ secrets.DEPLOY_DRAIN_API_TOKEN }}
+          DEPLOYMENT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          TARGET_VERSION: ${{ steps.version.outputs.version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -eu
+
+          if [ -z "$DRAIN_BASE_URL" ]; then
+            echo "Missing PRODUCTION_DEPLOY_DRAIN_URL secret"
+            exit 1
+          fi
+          if [ -z "$DRAIN_API_TOKEN" ]; then
+            echo "Missing DEPLOY_DRAIN_API_TOKEN secret"
+            exit 1
+          fi
+          if ! python -c 'import os, sys; from urllib.parse import urlparse; url = urlparse(os.environ["DRAIN_BASE_URL"]); sys.exit(0 if url.scheme in ("http", "https") and url.netloc and url.path.endswith("/api/deployment-drain") and not url.params and not url.query and not url.fragment else 1)'; then
+            echo "PRODUCTION_DEPLOY_DRAIN_URL must be a full HTTP(S) URL ending in /api/deployment-drain"
+            exit 1
+          fi
+
+          payload=$(python -c 'import json, os; print(json.dumps({"deployment_id": os.environ["DEPLOYMENT_ID"], "target_version": os.environ["TARGET_VERSION"], "run_url": os.environ["RUN_URL"]}))')
+          response=$(curl --show-error --silent --fail-with-body \
+            --connect-timeout 5 --max-time 20 \
+            --request PUT \
+            --header "Authorization: Bearer $DRAIN_API_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data "$payload" \
+            "$DRAIN_BASE_URL")
+
+          if ! parsed=$(python -c 'import json, sys; data=json.load(sys.stdin); phase=data["phase"]; ready=data["ready_for_deployment"]; active=data["active_jobs"]; admissions=data["admissions_in_progress"]; assert phase in ("waiting", "deploying") and type(ready) is bool and type(active) is int and active >= 0 and type(admissions) is int and admissions >= 0; print(f"{phase}\t{str(ready).lower()}\t{active}\t{admissions}")' <<< "$response" 2>/dev/null); then
+            echo "Deployment drain begin returned malformed JSON"
+            exit 1
+          fi
+
+          IFS=$'\t' read -r phase ready active_jobs admissions_in_progress <<< "$parsed"
+          echo "phase=$phase" >> "$GITHUB_OUTPUT"
+          echo "ready_for_deployment=$ready" >> "$GITHUB_OUTPUT"
+          echo "active_jobs=$active_jobs" >> "$GITHUB_OUTPUT"
+          echo "admissions_in_progress=$admissions_in_progress" >> "$GITHUB_OUTPUT"
+          echo "Deployment drain acquired: phase=$phase active_jobs=$active_jobs admissions_in_progress=$admissions_in_progress"
+
+      - name: Wait for production jobs to drain
+        id: wait_drain
+        if: steps.build_image.outcome == 'success' && vars.DEPLOY_DRAIN_ENABLED == 'true' && steps.begin_drain.outcome == 'success'
+        continue-on-error: true
+        env:
+          DRAIN_BASE_URL: ${{ secrets.PRODUCTION_DEPLOY_DRAIN_URL }}
+          DRAIN_API_TOKEN: ${{ secrets.DEPLOY_DRAIN_API_TOKEN }}
+          DEPLOYMENT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          MAX_ATTEMPTS: ${{ vars.DEPLOY_DRAIN_MAX_ATTEMPTS || '120' }}
+          SLEEP_SECONDS: ${{ vars.DEPLOY_DRAIN_SLEEP_SECONDS || '30' }}
+        run: |
+          set -eu
+
+          if [ -z "$DRAIN_BASE_URL" ]; then
+            echo "Missing PRODUCTION_DEPLOY_DRAIN_URL secret"
+            exit 1
+          fi
+          if [ -z "$DRAIN_API_TOKEN" ]; then
+            echo "Missing DEPLOY_DRAIN_API_TOKEN secret"
+            exit 1
+          fi
+          case "$MAX_ATTEMPTS" in
+            ''|*[!0-9]*|0) echo "DEPLOY_DRAIN_MAX_ATTEMPTS must be a positive integer"; exit 1 ;;
+          esac
+          case "$SLEEP_SECONDS" in
+            ''|*[!0-9]*|0) echo "DEPLOY_DRAIN_SLEEP_SECONDS must be a positive integer"; exit 1 ;;
+          esac
+
+          started_at=$(date +%s)
+          max_wait_seconds=$((MAX_ATTEMPTS * SLEEP_SECONDS))
+          deadline=$((started_at + max_wait_seconds))
+          last_active_jobs=unknown
+          last_admissions_in_progress=unknown
+
+          sleep_when_attempts_remain() {
+            if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
+              return
+            fi
+            remaining_seconds=$((deadline - $(date +%s)))
+            if [ "$remaining_seconds" -le 0 ]; then
+              return
+            fi
+            delay=$SLEEP_SECONDS
+            if [ "$delay" -gt "$remaining_seconds" ]; then
+              delay=$remaining_seconds
+            fi
+            sleep "$delay"
+          }
+
+          attempt=1
+          while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
+            remaining_seconds=$((deadline - $(date +%s)))
+            if [ "$remaining_seconds" -le 0 ]; then
+              break
+            fi
+            request_timeout=20
+            if [ "$request_timeout" -gt "$remaining_seconds" ]; then
+              request_timeout=$remaining_seconds
+            fi
+
+            if ! response=$(curl --show-error --silent --fail-with-body \
+              --connect-timeout 5 --max-time "$request_timeout" \
+              --header "Authorization: Bearer $DRAIN_API_TOKEN" \
+              "$DRAIN_BASE_URL/$DEPLOYMENT_ID"); then
+              waited_seconds=$(( $(date +%s) - started_at ))
+              echo "waited_seconds=$waited_seconds" >> "$GITHUB_OUTPUT"
+              echo "::warning::$(date -u +'%Y-%m-%dT%H:%M:%SZ') attempt $attempt/$MAX_ATTEMPTS: drain status request failed active_jobs=$last_active_jobs admissions_in_progress=$last_admissions_in_progress waited_seconds=$waited_seconds; retrying when attempts remain"
+              sleep_when_attempts_remain
+              attempt=$((attempt + 1))
+              continue
+            fi
+
+            if ! parsed=$(python -c 'import json, sys; data=json.load(sys.stdin); phase=data["phase"]; ready=data["ready_for_deployment"]; active=data["active_jobs"]; admissions=data["admissions_in_progress"]; assert phase in ("waiting", "deploying") and type(ready) is bool and type(active) is int and active >= 0 and type(admissions) is int and admissions >= 0; print(f"{phase}\t{str(ready).lower()}\t{active}\t{admissions}")' <<< "$response" 2>/dev/null); then
+              waited_seconds=$(( $(date +%s) - started_at ))
+              echo "waited_seconds=$waited_seconds" >> "$GITHUB_OUTPUT"
+              echo "::warning::$(date -u +'%Y-%m-%dT%H:%M:%SZ') attempt $attempt/$MAX_ATTEMPTS: drain status returned malformed JSON active_jobs=$last_active_jobs admissions_in_progress=$last_admissions_in_progress waited_seconds=$waited_seconds; treating it as not ready and retrying when attempts remain"
+              sleep_when_attempts_remain
+              attempt=$((attempt + 1))
+              continue
+            fi
+
+            IFS=$'\t' read -r phase ready active_jobs admissions_in_progress <<< "$parsed"
+            last_active_jobs=$active_jobs
+            last_admissions_in_progress=$admissions_in_progress
+            waited_seconds=$(( $(date +%s) - started_at ))
+            echo "last_active_jobs=$active_jobs" >> "$GITHUB_OUTPUT"
+            echo "last_admissions_in_progress=$admissions_in_progress" >> "$GITHUB_OUTPUT"
+            echo "waited_seconds=$waited_seconds" >> "$GITHUB_OUTPUT"
+            echo "$(date -u +'%Y-%m-%dT%H:%M:%SZ') attempt $attempt/$MAX_ATTEMPTS: phase=$phase active_jobs=$active_jobs admissions_in_progress=$admissions_in_progress waited_seconds=$waited_seconds"
+
+            if [ "$ready" = "true" ]; then
+              echo "Production is ready for deployment"
+              exit 0
+            fi
+
+            sleep_when_attempts_remain
+            attempt=$((attempt + 1))
+          done
+
+          waited_seconds=$(( $(date +%s) - started_at ))
+          echo "waited_seconds=$waited_seconds" >> "$GITHUB_OUTPUT"
+          echo "$(date -u +'%Y-%m-%dT%H:%M:%SZ') production drain timed out active_jobs=$last_active_jobs admissions_in_progress=$last_admissions_in_progress waited_seconds=$waited_seconds without stopping active jobs"
+          exit 1
+
+      - name: Mark production drain as deploying
+        id: mark_drain_deploying
+        if: steps.build_image.outcome == 'success' && vars.DEPLOY_DRAIN_ENABLED == 'true' && steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success'
+        continue-on-error: true
+        env:
+          DRAIN_BASE_URL: ${{ secrets.PRODUCTION_DEPLOY_DRAIN_URL }}
+          DRAIN_API_TOKEN: ${{ secrets.DEPLOY_DRAIN_API_TOKEN }}
+          DEPLOYMENT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -eu
+
+          if [ -z "$DRAIN_BASE_URL" ]; then
+            echo "Missing PRODUCTION_DEPLOY_DRAIN_URL secret"
+            exit 1
+          fi
+          if [ -z "$DRAIN_API_TOKEN" ]; then
+            echo "Missing DEPLOY_DRAIN_API_TOKEN secret"
+            exit 1
+          fi
+
+          response=$(curl --show-error --silent --fail-with-body \
+            --connect-timeout 5 --max-time 20 \
+            --request POST \
+            --header "Authorization: Bearer $DRAIN_API_TOKEN" \
+            "$DRAIN_BASE_URL/$DEPLOYMENT_ID/deploying")
+
+          if ! phase=$(python -c 'import json, sys; data=json.load(sys.stdin); phase=data["phase"]; ready=data["ready_for_deployment"]; active=data["active_jobs"]; admissions=data["admissions_in_progress"]; assert phase == "deploying" and type(ready) is bool and type(active) is int and active >= 0 and type(admissions) is int and admissions >= 0; print(phase)' <<< "$response" 2>/dev/null); then
+            echo "Mark-deploying response returned malformed JSON"
+            exit 1
+          fi
+          echo "Deployment drain phase: $phase"
+
       - name: Deploy on production server
         id: trigger_deploy
-        if: steps.build_image.outcome == 'success'
+        if: steps.build_image.outcome == 'success' && (vars.DEPLOY_DRAIN_ENABLED != 'true' || (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success'))
         continue-on-error: true
         uses: appleboy/ssh-action@v1.2.5
         with:
@@ -279,16 +462,49 @@ jobs:
             }
 
             configure_compose_cmd() {
+              compose_files="-f docker-compose.yml"
+              if [ -f docker-compose.gpu.yml ]; then
+                compose_files="$compose_files -f docker-compose.gpu.yml"
+                echo "Using GPU compose override"
+              fi
+
               if [ -f stack.env ]; then
-                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" --env-file stack.env "$@"; }
+                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files --env-file stack.env "$@"; }
                 echo "Using stack.env for docker compose"
               elif [ -f .env ]; then
-                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" --env-file .env "$@"; }
+                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files --env-file .env "$@"; }
                 echo "Using .env for docker compose"
               else
-                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" "$@"; }
+                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files "$@"; }
                 echo "No env file found (stack.env/.env), using shell environment"
               fi
+            }
+
+            download_gpu_compose_override() {
+              gpu_url="https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.gpu.yml"
+              if ! gpu_status=$(curl --silent --show-error --location \
+                --output docker-compose.gpu.yml.tmp \
+                --write-out '%{http_code}' \
+                "$gpu_url"); then
+                rm -f docker-compose.gpu.yml.tmp
+                echo "Failed to download GPU compose override"
+                return 1
+              fi
+
+              case "$gpu_status" in
+                200)
+                  mv docker-compose.gpu.yml.tmp docker-compose.gpu.yml
+                  ;;
+                404)
+                  rm -f docker-compose.gpu.yml.tmp docker-compose.gpu.yml
+                  echo "GPU compose override not present at target commit; using CPU compose"
+                  ;;
+                *)
+                  rm -f docker-compose.gpu.yml.tmp
+                  echo "GPU compose override download returned HTTP $gpu_status"
+                  return 1
+                  ;;
+              esac
             }
 
             deploy_from_compose_path() {
@@ -309,6 +525,7 @@ jobs:
               echo "Updating production compose file from $REPO_SLUG@$TARGET_SHA"
               curl -fsSL "https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.yml" -o docker-compose.yml.tmp
               mv docker-compose.yml.tmp docker-compose.yml
+              download_gpu_compose_override
 
               configure_compose_cmd
 
@@ -342,12 +559,39 @@ jobs:
                   curl -fsSL "https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.yml" -o docker-compose.yml.tmp
                   mv docker-compose.yml.tmp docker-compose.yml
 
+                  gpu_url="https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.gpu.yml"
+                  if ! gpu_status=$(curl --silent --show-error --location \
+                    --output docker-compose.gpu.yml.tmp \
+                    --write-out "%{http_code}" \
+                    "$gpu_url"); then
+                    rm -f docker-compose.gpu.yml.tmp
+                    echo "Failed to download GPU compose override"
+                    exit 1
+                  fi
+                  case "$gpu_status" in
+                    200) mv docker-compose.gpu.yml.tmp docker-compose.gpu.yml ;;
+                    404)
+                      rm -f docker-compose.gpu.yml.tmp docker-compose.gpu.yml
+                      echo "GPU compose override not present at target commit; using CPU compose"
+                      ;;
+                    *)
+                      rm -f docker-compose.gpu.yml.tmp
+                      echo "GPU compose override download returned HTTP $gpu_status"
+                      exit 1
+                      ;;
+                  esac
+
+                  compose_files="-f docker-compose.yml"
+                  if [ -f docker-compose.gpu.yml ]; then
+                    compose_files="$compose_files -f docker-compose.gpu.yml"
+                  fi
+
                   if [ -f stack.env ]; then
-                    compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" --env-file stack.env "$@"; }
+                    compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files --env-file stack.env "$@"; }
                   elif [ -f .env ]; then
-                    compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" --env-file .env "$@"; }
+                    compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files --env-file .env "$@"; }
                   else
-                    compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" "$@"; }
+                    compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files "$@"; }
                   fi
 
                   printf "%s" "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
@@ -385,7 +629,7 @@ jobs:
 
       - name: Verify deployed version
         id: verify_deploy
-        if: always() && steps.trigger_deploy.conclusion == 'success'
+        if: always() && steps.trigger_deploy.outcome == 'success'
         continue-on-error: true
         env:
           VERSION_ENDPOINT_URL: ${{ secrets.PRODUCTION_VERSION_URL }}
@@ -431,8 +675,57 @@ jobs:
           echo "Failed to verify deployed version $EXPECTED_VERSION via $VERSION_ENDPOINT_URL"
           exit 1
 
+      - name: Release production deployment drain
+        id: release_drain
+        if: always() && vars.DEPLOY_DRAIN_ENABLED == 'true' && steps.begin_drain.outcome != 'skipped'
+        continue-on-error: true
+        env:
+          DRAIN_BASE_URL: ${{ secrets.PRODUCTION_DEPLOY_DRAIN_URL }}
+          DRAIN_API_TOKEN: ${{ secrets.DEPLOY_DRAIN_API_TOKEN }}
+          DEPLOYMENT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -eu
+
+          if [ -z "$DRAIN_BASE_URL" ]; then
+            echo "Missing PRODUCTION_DEPLOY_DRAIN_URL secret during drain release"
+            exit 1
+          fi
+          if [ -z "$DRAIN_API_TOKEN" ]; then
+            echo "Missing DEPLOY_DRAIN_API_TOKEN secret during drain release"
+            exit 1
+          fi
+
+          max_attempts=60
+          sleep_seconds=5
+          attempt=1
+          while [ "$attempt" -le "$max_attempts" ]; do
+            if http_code=$(curl --show-error --silent --fail-with-body \
+              --connect-timeout 5 --max-time 15 \
+              --request DELETE \
+              --header "Authorization: Bearer $DRAIN_API_TOKEN" \
+              --output /tmp/deployment-drain-release-body \
+              --write-out '%{http_code}' \
+              "$DRAIN_BASE_URL/$DEPLOYMENT_ID"); then
+              :
+            fi
+
+            if [ "$http_code" = "204" ] || [ "$http_code" = "404" ]; then
+              echo "Production deployment drain released (HTTP $http_code)"
+              exit 0
+            fi
+
+            echo "Drain release attempt $attempt/$max_attempts returned HTTP $http_code; API may still be restarting"
+            if [ "$attempt" -lt "$max_attempts" ]; then
+              sleep "$sleep_seconds"
+            fi
+            attempt=$((attempt + 1))
+          done
+
+          echo "Failed to release production deployment drain; lease TTL remains the fallback"
+          exit 1
+
       - name: Cleanup unused Docker images
-        if: steps.trigger_deploy.conclusion == 'success' && steps.verify_deploy.outcome == 'success'
+        if: steps.trigger_deploy.outcome == 'success' && steps.verify_deploy.outcome == 'success' && (vars.DEPLOY_DRAIN_ENABLED != 'true' || steps.release_drain.outcome == 'success')
         continue-on-error: true
         uses: appleboy/ssh-action@v1.2.5
         with:
@@ -487,7 +780,7 @@ jobs:
 
       - name: Label merged PRs with deployed version
         id: label_deployed_prs
-        if: steps.trigger_deploy.conclusion == 'success' && steps.verify_deploy.outcome == 'success'
+        if: steps.trigger_deploy.outcome == 'success' && steps.verify_deploy.outcome == 'success' && (vars.DEPLOY_DRAIN_ENABLED != 'true' || (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success'))
         uses: actions/github-script@v9
         env:
           VERSION_LABEL: ${{ steps.version.outputs.label_name }}
@@ -624,7 +917,7 @@ jobs:
             );
 
       - name: Mark deployment as successful
-        if: steps.trigger_deploy.conclusion == 'success' && steps.verify_deploy.outcome == 'success' && steps.label_deployed_prs.outcome == 'success'
+        if: steps.trigger_deploy.outcome == 'success' && steps.verify_deploy.outcome == 'success' && steps.label_deployed_prs.outcome == 'success' && (vars.DEPLOY_DRAIN_ENABLED != 'true' || (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success'))
         uses: actions/github-script@v9
         env:
           TAG_NAME: ${{ steps.version.outputs.success_tag_name }}
@@ -668,7 +961,18 @@ jobs:
             }
 
       - name: Label merged PRs as non deployed when deployment fails
-        if: steps.build_image.outcome != 'success' || steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success'
+        if: >-
+          always() && (
+            steps.build_image.outcome != 'success' ||
+            steps.trigger_deploy.outcome != 'success' ||
+            steps.verify_deploy.outcome != 'success' ||
+            (vars.DEPLOY_DRAIN_ENABLED == 'true' && (
+              steps.begin_drain.outcome != 'success' ||
+              steps.wait_drain.outcome != 'success' ||
+              steps.mark_drain_deploying.outcome != 'success' ||
+              steps.release_drain.outcome != 'success'
+            ))
+          )
         uses: actions/github-script@v9
         env:
           UNDEPLOYED_LABEL: non déployé
@@ -780,17 +1084,43 @@ jobs:
                 .join(', ')}`
             );
 
-      - name: Confirm
+      - name: Summarize production deployment
         if: always()
         run: |
-          echo "Image build outcome: ${{ steps.build_image.outcome }}"
-          echo "Deployment step conclusion: ${{ steps.trigger_deploy.conclusion }}"
-          echo "Verification step conclusion: ${{ steps.verify_deploy.conclusion }}"
-          echo "Verification step outcome: ${{ steps.verify_deploy.outcome }}"
-          echo "Computed deployment version: ${{ steps.version.outputs.version }}"
+          {
+            echo "## Production deployment summary"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Drain enabled | ${{ vars.DEPLOY_DRAIN_ENABLED == 'true' }} |"
+            echo "| Drain begin | ${{ steps.begin_drain.outcome }} |"
+            echo "| Drain wait | ${{ steps.wait_drain.outcome }} |"
+            echo "| Drain mark deploying | ${{ steps.mark_drain_deploying.outcome }} |"
+            echo "| Drain release | ${{ steps.release_drain.outcome }} |"
+            echo "| Last active jobs | ${{ steps.wait_drain.outputs.last_active_jobs || steps.begin_drain.outputs.active_jobs || 'n/a' }} |"
+            echo "| Last admissions in progress | ${{ steps.wait_drain.outputs.last_admissions_in_progress || steps.begin_drain.outputs.admissions_in_progress || 'n/a' }} |"
+            echo "| Drain wait duration (seconds) | ${{ steps.wait_drain.outputs.waited_seconds || '0' }} |"
+            echo "| Image build | ${{ steps.build_image.outcome }} |"
+            echo "| SSH deployment | ${{ steps.trigger_deploy.outcome }} |"
+            echo "| Version verification | ${{ steps.verify_deploy.outcome }} |"
+            echo "| Deployment labels | ${{ steps.label_deployed_prs.outcome }} |"
+            echo "| Target version | ${{ steps.version.outputs.version }} |"
+            echo "| Run | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Summarize deployment failure
-        if: steps.build_image.outcome != 'success' || steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success'
+        if: >-
+          always() && (
+            steps.build_image.outcome != 'success' ||
+            steps.trigger_deploy.outcome != 'success' ||
+            steps.verify_deploy.outcome != 'success' ||
+            (vars.DEPLOY_DRAIN_ENABLED == 'true' && (
+              steps.begin_drain.outcome != 'success' ||
+              steps.wait_drain.outcome != 'success' ||
+              steps.mark_drain_deploying.outcome != 'success' ||
+              steps.release_drain.outcome != 'success'
+            ))
+          )
         run: |
           {
             echo "## Production deployment failed"
@@ -802,7 +1132,12 @@ jobs:
             echo "| Commit | ${{ github.sha }} |"
             echo "| Deployment version | ${{ steps.version.outputs.version }} |"
             echo "| Image build | ${{ steps.build_image.outcome }} |"
-            echo "| SSH deployment | ${{ steps.trigger_deploy.conclusion }} |"
+            echo "| Drain enabled | ${{ vars.DEPLOY_DRAIN_ENABLED == 'true' }} |"
+            echo "| Drain begin | ${{ steps.begin_drain.outcome }} |"
+            echo "| Drain wait | ${{ steps.wait_drain.outcome }} |"
+            echo "| Drain mark deploying | ${{ steps.mark_drain_deploying.outcome }} |"
+            echo "| Drain release | ${{ steps.release_drain.outcome }} |"
+            echo "| SSH deployment | ${{ steps.trigger_deploy.outcome }} |"
             echo "| Version verification | ${{ steps.verify_deploy.outcome }} |"
             echo "| Run | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |"
             echo ""
@@ -810,7 +1145,18 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Notify deployment failure
-        if: steps.build_image.outcome != 'success' || steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success'
+        if: >-
+          always() && (
+            steps.build_image.outcome != 'success' ||
+            steps.trigger_deploy.outcome != 'success' ||
+            steps.verify_deploy.outcome != 'success' ||
+            (vars.DEPLOY_DRAIN_ENABLED == 'true' && (
+              steps.begin_drain.outcome != 'success' ||
+              steps.wait_drain.outcome != 'success' ||
+              steps.mark_drain_deploying.outcome != 'success' ||
+              steps.release_drain.outcome != 'success'
+            ))
+          )
         continue-on-error: true
         uses: actions/github-script@v9
         env:
@@ -818,7 +1164,12 @@ jobs:
           FAILURE_LABEL: deployment failed
           DEPLOYMENT_VERSION: ${{ steps.version.outputs.version }}
           IMAGE_BUILD: ${{ steps.build_image.outcome }}
-          SSH_DEPLOYMENT: ${{ steps.trigger_deploy.conclusion }}
+          DRAIN_ENABLED: ${{ vars.DEPLOY_DRAIN_ENABLED == 'true' }}
+          DRAIN_BEGIN: ${{ steps.begin_drain.outcome }}
+          DRAIN_WAIT: ${{ steps.wait_drain.outcome }}
+          DRAIN_MARK: ${{ steps.mark_drain_deploying.outcome }}
+          DRAIN_RELEASE: ${{ steps.release_drain.outcome }}
+          SSH_DEPLOYMENT: ${{ steps.trigger_deploy.outcome }}
           VERSION_VERIFICATION: ${{ steps.verify_deploy.outcome }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
@@ -844,6 +1195,11 @@ jobs:
               `| Commit | ${context.sha} |`,
               `| Deployment version | ${process.env.DEPLOYMENT_VERSION} |`,
               `| Image build | ${process.env.IMAGE_BUILD} |`,
+              `| Drain enabled | ${process.env.DRAIN_ENABLED} |`,
+              `| Drain begin | ${process.env.DRAIN_BEGIN} |`,
+              `| Drain wait | ${process.env.DRAIN_WAIT} |`,
+              `| Drain mark deploying | ${process.env.DRAIN_MARK} |`,
+              `| Drain release | ${process.env.DRAIN_RELEASE} |`,
               `| SSH deployment | ${process.env.SSH_DEPLOYMENT} |`,
               `| Version verification | ${process.env.VERSION_VERIFICATION} |`,
               `| Run | ${runUrl} |`,
@@ -880,7 +1236,18 @@ jobs:
             core.info(`Created deployment failure notification issue: ${issue.data.html_url}`);
 
       - name: Fail job when deployment failed
-        if: steps.build_image.outcome != 'success' || steps.trigger_deploy.conclusion != 'success' || steps.verify_deploy.outcome != 'success'
+        if: >-
+          always() && (
+            steps.build_image.outcome != 'success' ||
+            steps.trigger_deploy.outcome != 'success' ||
+            steps.verify_deploy.outcome != 'success' ||
+            (vars.DEPLOY_DRAIN_ENABLED == 'true' && (
+              steps.begin_drain.outcome != 'success' ||
+              steps.wait_drain.outcome != 'success' ||
+              steps.mark_drain_deploying.outcome != 'success' ||
+              steps.release_drain.outcome != 'success'
+            ))
+          )
         run: |
-          echo "Deployment or version verification failed"
+          echo "Deployment, drain coordination, drain cleanup, or version verification failed"
           exit 1

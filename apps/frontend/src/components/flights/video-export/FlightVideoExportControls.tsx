@@ -293,7 +293,12 @@ export function FlightVideoExportControls({
   };
 
   const handleRegenerateVideo = async () => {
-    if (!confirm(t('flights.viewer.confirmRegenerateVideo'))) return;
+    if (
+      hasGeneratedVideo &&
+      !confirm(t('flights.viewer.confirmRegenerateVideo'))
+    ) {
+      return;
+    }
 
     try {
       await startVideoExport();

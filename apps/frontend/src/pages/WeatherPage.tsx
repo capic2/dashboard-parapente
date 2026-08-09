@@ -512,7 +512,7 @@ export default function WeatherPage() {
         isError={selectedSearchTarget ? isSearchWeatherError : undefined}
         siteOrientation={
           isSpotSearchTarget(selectedSearchTarget)
-            ? selectedSearchTarget.spot.orientation
+            ? (selectedSearchTarget.spot.orientation ?? undefined)
             : undefined
         }
       />
@@ -566,12 +566,18 @@ export default function WeatherPage() {
       <HourlyForecast
         spotId={selectedSearchTarget ? undefined : selectedSiteId}
         dayIndex={selectedDayIndex}
+        siteOrientation={
+          isSpotSearchTarget(selectedSearchTarget)
+            ? (selectedSearchTarget.spot.orientation ?? undefined)
+            : (selectedSite?.orientation ?? undefined)
+        }
         weatherData={selectedSearchWeatherData}
         isLoading={selectedSearchTarget ? isSearchWeatherLoading : undefined}
         isError={selectedSearchTarget ? isSearchWeatherError : undefined}
         canForceRefresh={canForceRefresh}
         isForceRefreshing={isForceRefreshing}
         onForceRefresh={handleForceRefresh}
+        flightDecision={flightDecision.data}
       />
     ) : undefined;
 
@@ -645,7 +651,7 @@ export default function WeatherPage() {
               isError={selectedSearchTarget ? isSearchWeatherError : undefined}
               siteOrientation={
                 isSpotSearchTarget(selectedSearchTarget)
-                  ? selectedSearchTarget.spot.orientation
+                  ? (selectedSearchTarget.spot.orientation ?? undefined)
                   : undefined
               }
             />
@@ -685,6 +691,11 @@ export default function WeatherPage() {
           <HourlyForecast
             spotId={selectedSearchTarget ? undefined : selectedSiteId}
             dayIndex={selectedDayIndex}
+            siteOrientation={
+              isSpotSearchTarget(selectedSearchTarget)
+                ? (selectedSearchTarget.spot.orientation ?? undefined)
+                : (selectedSite?.orientation ?? undefined)
+            }
             weatherData={selectedSearchWeatherData}
             isLoading={
               selectedSearchTarget ? isSearchWeatherLoading : undefined
@@ -693,6 +704,7 @@ export default function WeatherPage() {
             canForceRefresh={canForceRefresh}
             isForceRefreshing={isForceRefreshing}
             onForceRefresh={handleForceRefresh}
+            flightDecision={flightDecision.data}
           />
         )}
       </div>
