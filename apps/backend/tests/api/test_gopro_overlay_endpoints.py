@@ -2568,6 +2568,9 @@ def test_run_job_passes_configured_overlay_gpu_args(monkeypatch, tmp_path):
         gopro_overlay_export._PROCESSES.pop(job_id, None)
         render_device_path.unlink(missing_ok=True)
 def test_run_job_skips_gpu_profile_when_render_device_missing(caplog, monkeypatch):
+def test_run_job_falls_back_to_cpu_when_render_device_missing(
+    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
     job_id = "gpu-fallback-job"
     gopro_overlay_export._JOBS[job_id] = {
         "job_id": job_id,
@@ -2596,6 +2599,7 @@ def test_run_job_skips_gpu_profile_when_render_device_missing(caplog, monkeypatc
             "ffmpeg_vaapi": False,
         },
     )
+    monkeypatch.setattr(gopro_overlay_export, "_ffmpeg_can_use_vaapi_device", lambda *_: False)
 
     class FailedProcess:
         stdout: list[str] = []
