@@ -59,7 +59,9 @@ def test_create_gopro_overlay_job_requires_dependencies(client: TestClient):
     assert "gopro_dashboard" in response.json()["detail"]
 
 
-def test_create_gopro_overlay_job_allows_cpu_fallback_when_vaapi_missing(client: TestClient):
+def test_create_gopro_overlay_job_allows_cpu_fallback_when_vaapi_missing(
+    client: TestClient,
+) -> None:
     expected = {
         "job_id": "job-gopro-cpu",
         "status": "queued",
@@ -2052,7 +2054,9 @@ def test_start_gopro_overlay_worker_with_rq_does_not_start_local_thread(monkeypa
     assert enqueued == [True]
 
 
-def test_gopro_overlay_worker_reports_gpu_runtime(monkeypatch, tmp_path):
+def test_gopro_overlay_worker_reports_gpu_runtime(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     render_device = tmp_path / "renderD128"
     render_device.write_bytes(b"")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_RENDER_DEVICE", str(render_device))
@@ -2069,7 +2073,9 @@ def test_gopro_overlay_worker_reports_gpu_runtime(monkeypatch, tmp_path):
     assert "extra_args=--double-buffer" in summary
 
 
-def test_check_gopro_overlay_dependencies_reports_vaapi_support(monkeypatch, tmp_path):
+def test_check_gopro_overlay_dependencies_reports_vaapi_support(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     gopro_bin = tmp_path / "gopro-dashboard.py"
     gopro_bin.write_text("#!/bin/sh\n")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_BIN", str(gopro_bin))
@@ -2101,7 +2107,9 @@ def test_check_gopro_overlay_dependencies_reports_vaapi_support(monkeypatch, tmp
     }
 
 
-def test_gopro_overlay_worker_allows_cpu_fallback_when_render_device_missing(monkeypatch, tmp_path):
+def test_gopro_overlay_worker_allows_cpu_fallback_when_render_device_missing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     render_device = tmp_path / "renderD128"
     monkeypatch.setattr(config, "GOPRO_OVERLAY_RENDER_DEVICE", str(render_device))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PROFILE", "nnvgpu")
@@ -2136,7 +2144,9 @@ def test_gopro_overlay_worker_allows_cpu_fallback_when_render_device_missing(mon
     gopro_overlay_worker.main()
 
 
-def test_gopro_overlay_worker_allows_cpu_fallback_when_vaapi_missing(monkeypatch, tmp_path):
+def test_gopro_overlay_worker_allows_cpu_fallback_when_vaapi_missing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     render_device = tmp_path / "renderD128"
     render_device.write_bytes(b"")
     gopro_bin = tmp_path / "gopro-dashboard.py"
@@ -2151,7 +2161,7 @@ def test_gopro_overlay_worker_allows_cpu_fallback_when_vaapi_missing(monkeypatch
         def __init__(self, stdout: str) -> None:
             self.stdout = stdout
 
-    def fake_run(command, **_kwargs):
+    def fake_run(command: list[str], **_kwargs: object) -> Result:
         if command[-1] == "-encoders":
             return Result(stdout=" V....D libx264\n")
         if command[-1] == "-hwaccels":
@@ -2178,10 +2188,10 @@ def test_gopro_overlay_worker_allows_cpu_fallback_when_vaapi_missing(monkeypatch
     monkeypatch.setattr(gopro_overlay_worker, "get_redis_connection", lambda: object())
 
     class FakeWorker:
-        def __init__(self, *_args, **_kwargs):
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
             pass
 
-        def work(self, with_scheduler: bool = False):
+        def work(self, with_scheduler: bool = False) -> None:
             return None
 
     monkeypatch.setattr(gopro_overlay_worker, "Worker", FakeWorker)
@@ -2287,6 +2297,7 @@ def test_run_job_prepares_inputs_before_starting_process(
             "ffmpeg_vaapi": True,
         },
     )
+    monkeypatch.setattr(gopro_overlay_export, "_ffmpeg_can_use_vaapi_device", lambda *_: True)
     merge_calls = []
 
     def fake_merge(osv_paths, gpx_path, input_dir, **kwargs):
@@ -2363,6 +2374,7 @@ def test_run_job_cleans_temp_files_after_process_failure(
             "ffmpeg_vaapi": True,
         },
     )
+    monkeypatch.setattr(gopro_overlay_export, "_ffmpeg_can_use_vaapi_device", lambda *_: True)
 
     job = create_gopro_overlay_job_from_paths(
         video_path=video_path,
@@ -2449,7 +2461,7 @@ def test_cancelled_queued_job_does_not_start_process():
         gopro_overlay_export._PROCESSES.pop(job_id, None)
 
 
-def test_run_job_passes_configured_font(monkeypatch):
+def test_run_job_passes_configured_font(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     job_id = "font-job"
     gopro_overlay_export._JOBS[job_id] = {
         "job_id": job_id,
@@ -2465,8 +2477,7 @@ def test_run_job_passes_configured_font(monkeypatch):
         "video_height": None,
         "updated_at": "2026-01-01T00:00:00+00:00",
     }
-    render_device_path = Path("/tmp/dashboard-parapente/renderD128")
-    render_device_path.parent.mkdir(parents=True, exist_ok=True)
+    render_device_path = tmp_path / "renderD128"
     render_device_path.write_bytes(b"")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_RENDER_DEVICE", str(render_device_path))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PROFILE", "nvgpu")
@@ -2481,6 +2492,7 @@ def test_run_job_passes_configured_font(monkeypatch):
             "ffmpeg_vaapi": True,
         },
     )
+    monkeypatch.setattr(gopro_overlay_export, "_ffmpeg_can_use_vaapi_device", lambda *_: True)
 
     class FailedProcess:
         stdout: list[str] = []
@@ -2533,6 +2545,7 @@ def test_run_job_passes_configured_overlay_gpu_args(monkeypatch, tmp_path):
             "ffmpeg_vaapi": True,
         },
     )
+    monkeypatch.setattr(gopro_overlay_export, "_ffmpeg_can_use_vaapi_device", lambda *_: True)
 
     class FailedProcess:
         stdout: list[str] = []
@@ -2556,7 +2569,9 @@ def test_run_job_passes_configured_overlay_gpu_args(monkeypatch, tmp_path):
         render_device_path.unlink(missing_ok=True)
 
 
-def test_run_job_falls_back_to_cpu_when_render_device_missing(caplog, monkeypatch):
+def test_run_job_falls_back_to_cpu_when_render_device_missing(
+    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
     job_id = "gpu-fallback-job"
     gopro_overlay_export._JOBS[job_id] = {
         "job_id": job_id,
@@ -2585,6 +2600,7 @@ def test_run_job_falls_back_to_cpu_when_render_device_missing(caplog, monkeypatc
             "ffmpeg_vaapi": False,
         },
     )
+    monkeypatch.setattr(gopro_overlay_export, "_ffmpeg_can_use_vaapi_device", lambda *_: False)
 
     class FailedProcess:
         stdout: list[str] = []
@@ -2641,6 +2657,7 @@ def test_run_job_marks_unexpected_start_error_failed(caplog, monkeypatch):
             "ffmpeg_vaapi": True,
         },
     )
+    monkeypatch.setattr(gopro_overlay_export, "_ffmpeg_can_use_vaapi_device", lambda *_: True)
     try:
         with (
             caplog.at_level(logging.ERROR),

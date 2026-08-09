@@ -1599,9 +1599,13 @@ def _run_job(job_id: str) -> None:
     dependencies = check_gopro_overlay_dependencies()
     gpu_device_path = Path(config.GOPRO_OVERLAY_RENDER_DEVICE)
     gpu_device_present = gpu_device_path.exists()
-    gpu_render_enabled = bool(
-        gpu_device_present and config.GOPRO_OVERLAY_PROFILE and dependencies.get("ffmpeg_vaapi")
+    gpu_device_usable = bool(
+        gpu_device_present
+        and config.GOPRO_OVERLAY_PROFILE
+        and dependencies.get("ffmpeg_vaapi")
+        and _ffmpeg_can_use_vaapi_device(gpu_device_path)
     )
+    gpu_render_enabled = bool(gpu_device_usable)
     render_method = "gpu" if gpu_render_enabled else "cpu"
 
     if gpu_render_enabled:
@@ -2233,3 +2237,36 @@ def _ffmpeg_supports_vaapi() -> bool:
     except (FileNotFoundError, subprocess.SubprocessError, TimeoutError):
         return False
     return "h264_vaapi" in (encoders.stdout or "") and "vaapi" in (hwaccels.stdout or "")
+
+
+def _ffmpeg_can_use_vaapi_device(render_device: Path) -> bool:
+    try:
+        result = subprocess.run(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-vaapi_device",
+                str(render_device),
+                "-f",
+                "lavfi",
+                "-i",
+                "nullsrc=s=16x16:d=0.04",
+                "-frames:v",
+                "1",
+                "-c:v",
+                "h264_vaapi",
+                "-f",
+                "null",
+                "-",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError, TimeoutError):
+        return False
+
+    return result.returncode == 0
