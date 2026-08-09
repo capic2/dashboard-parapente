@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
+from flight_naming import format_automatic_flight_name
 from flight_storage import ensure_flight_directory
 from flight_tracks import TrackPoint, calculate_track_stats, normalize_track
 from intervals_icu import ExternalActivity, IntervalsError
@@ -55,6 +56,17 @@ def _local_departure(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value
     return value.astimezone(PARIS_TIME_ZONE).replace(tzinfo=None)
+
+
+def _update_existing_flight(flight: Flight, activity: ExternalActivity) -> bool:
+    name = format_automatic_flight_name(flight.flight_date, flight.departure_time)
+    changed = (
+        flight.name != name or flight.title != name or flight.external_url != activity.external_url
+    )
+    flight.name = name
+    flight.title = name
+    flight.external_url = activity.external_url
+    return changed
 
 
 def _legacy_track_matches(
@@ -136,12 +148,13 @@ async def import_external_activities(
                 .first()
             )
             if existing:
-                existing.name = activity.name
-                existing.title = activity.name
-                existing.external_url = activity.external_url
+                was_updated = _update_existing_flight(existing, activity)
                 db.commit()
                 summaries.append(_flight_summary(existing))
-                skipped += 1
+                if was_updated:
+                    updated += 1
+                else:
+                    skipped += 1
                 db.rollback()
                 continue
             db.rollback()
@@ -163,7 +176,9 @@ async def import_external_activities(
                     .first()
                 )
                 if existing:
-                    outcome = "skipped"
+                    outcome = (
+                        "updated" if _update_existing_flight(existing, activity) else "skipped"
+                    )
                     pending_summary = _flight_summary(existing)
                 else:
                     legacy = _find_legacy_flight(db, activity, points, stats)
@@ -179,11 +194,12 @@ async def import_external_activities(
                         db.add(flight)
 
                         departure = _local_departure(stats["departure_time"] or activity.start_date)
+                        flight_name = format_automatic_flight_name(departure.date(), departure)
                         flight.external_provider = provider_name
                         flight.external_activity_id = activity.id
                         flight.external_url = activity.external_url
-                        flight.name = activity.name
-                        flight.title = activity.name
+                        flight.name = flight_name
+                        flight.title = flight_name
                         flight.flight_date = departure.date()
                         flight.departure_time = departure
                         flight.site_id = match_site(db, points[0])
@@ -211,6 +227,8 @@ async def import_external_activities(
             summaries.append(pending_summary)
             if outcome == "imported":
                 imported += 1
+            elif outcome == "updated":
+                updated += 1
             else:
                 skipped += 1
         except ValueError as exc:
