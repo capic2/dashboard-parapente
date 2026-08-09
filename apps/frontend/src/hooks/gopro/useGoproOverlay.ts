@@ -14,6 +14,7 @@ export type GoproOverlayJob = {
   progress: number;
   message: string;
   error?: string | null;
+  render_method?: 'cpu' | 'gpu' | null;
   gpx_path?: string | null;
   layout_id: string;
   layout_label: string;

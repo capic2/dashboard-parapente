@@ -61,6 +61,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libegl-mesa0 \
     libgbm1 \
     libgl1-mesa-dri \
+    libva-drm2 \
+    libva2 \
     libgtk-3-0 \
     libnspr4 \
     libnss3 \
@@ -71,6 +73,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxkbcommon0 \
     libxrandr2 \
     mesa-vulkan-drivers \
+    mesa-va-drivers \
     xdg-utils \
     curl \
     ffmpeg \

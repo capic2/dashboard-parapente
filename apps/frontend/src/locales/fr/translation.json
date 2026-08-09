@@ -1019,6 +1019,10 @@
       "description": "Suivi lisible des deux traitements média liés à ce vol.",
       "videoTitle": "Vidéo du vol",
       "goproOverlayTitle": "Overlay GoPro",
+      "method": {
+        "cpu": "CPU",
+        "gpu": "GPU"
+      },
       "progress": "Progression",
       "error": "Erreur",
       "activity": "Journal d’activité",

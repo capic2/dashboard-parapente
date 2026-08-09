@@ -149,6 +149,8 @@ vi.mock('react-i18next', () => ({
         'flights.generationLogs.status.running': 'Running',
         'flights.generationLogs.status.encoding': 'Encoding',
         'flights.generationLogs.status.failed': 'Failed',
+        'flights.generationLogs.method.cpu': 'CPU',
+        'flights.generationLogs.method.gpu': 'GPU',
         'flights.infoTab': 'Info',
         'flights.replayTab': 'Replay',
         'flights.logsTab': 'Logs',
@@ -302,6 +304,7 @@ describe('FlightDetails GoPro overlay action', () => {
       progress: 43,
       message: 'Rendering overlay',
       error: 'Overlay failed on frame 42',
+      render_method: 'gpu',
       layout_id: 'layout',
       layout_label: 'Parapente',
       output_filename: 'final.mp4',
@@ -340,6 +343,7 @@ describe('FlightDetails GoPro overlay action', () => {
 
     expect(videoToggle).toHaveAttribute('aria-expanded', 'true');
     expect(overlayToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByText('GPU')).toBeInTheDocument();
     expect(screen.getByText('Encoding with FFmpeg')).toBeInTheDocument();
     expect(
       screen.queryByText('Overlay failed on frame 42')
@@ -400,6 +404,7 @@ describe('FlightDetails GoPro overlay action', () => {
       progress: 43,
       message: 'Rendering overlay',
       error: null,
+      render_method: 'cpu',
       layout_id: 'layout',
       layout_label: 'Parapente',
       output_filename: 'final.mp4',

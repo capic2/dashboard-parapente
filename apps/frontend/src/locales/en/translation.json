@@ -1015,6 +1015,10 @@
       "description": "Readable tracking for both media jobs linked to this flight.",
       "videoTitle": "Flight video",
       "goproOverlayTitle": "GoPro overlay",
+      "method": {
+        "cpu": "CPU",
+        "gpu": "GPU"
+      },
       "progress": "Progress",
       "error": "Error",
       "activity": "Activity log",

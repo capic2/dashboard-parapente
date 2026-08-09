@@ -20,6 +20,7 @@ type FlightGenerationLogsPanelProps = {
 
 type LogSourceCardProps = {
   title: string;
+  renderMethod?: string | null;
   status: string | null;
   statusLabel: string | null;
   isInProgress: boolean;
@@ -55,6 +56,7 @@ function getStatusTone(status: string | null) {
 
 function LogSourceCard({
   title,
+  renderMethod,
   status,
   statusLabel,
   isInProgress,
@@ -76,6 +78,10 @@ function LogSourceCard({
   const isLive = Boolean(
     status && !['cancelled', 'completed', 'failed'].includes(status)
   );
+  const renderMethodLabel =
+    renderMethod && ['cpu', 'gpu'].includes(renderMethod)
+      ? t(`flights.generationLogs.method.${renderMethod}`)
+      : null;
 
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900/70">
@@ -86,9 +92,16 @@ function LogSourceCard({
         onClick={() => setOpenOverride(!isOpen)}
       >
         <div className="min-w-0">
-          <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            {title}
-          </h4>
+          <div className="flex items-center gap-2">
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {title}
+            </h4>
+            {renderMethodLabel && (
+              <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                {renderMethodLabel}
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {statusLabel && (
@@ -223,6 +236,7 @@ export function FlightGenerationLogsPanel({
           <LogSourceCard
             key={`gopro-${goproOverlayJob?.job_id ?? goproOverlayJobId ?? 'fallback'}`}
             title={t('flights.generationLogs.goproOverlayTitle')}
+            renderMethod={goproOverlayJob?.render_method ?? null}
             status={goproOverlayStatusValue}
             isInProgress={isGoproOverlayInProgress(goproOverlayStatusValue)}
             statusLabel={
