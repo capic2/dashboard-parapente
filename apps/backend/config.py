@@ -264,6 +264,10 @@ VIDEO_TEMP_IMAGES_DIR = _configured_storage_dir(
         Path(PARAGLIDING_DATA_ROOT),
     ),
 )
+VIDEO_ACCELERATOR = os.getenv("BACKEND_VIDEO_ACCELERATOR", "cpu").strip().lower()
+if VIDEO_ACCELERATOR not in {"cpu", "nvidia"}:
+    logger.warning("Unknown BACKEND_VIDEO_ACCELERATOR=%s; using cpu", VIDEO_ACCELERATOR)
+    VIDEO_ACCELERATOR = "cpu"
 
 # ============================================================================
 # GOPRO OVERLAY EXPORT

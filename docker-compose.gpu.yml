@@ -1,9 +1,42 @@
 services:
-  gopro-overlay-worker:
-    devices:
-      - ${VIDEO_WORKER_DRI_RENDER_DEVICE:-/dev/dri/renderD128}:${VIDEO_WORKER_DRI_RENDER_DEVICE:-/dev/dri/renderD128}
+  backend:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     environment:
-      - BACKEND_GOPRO_OVERLAY_RENDER_DEVICE=${VIDEO_WORKER_DRI_RENDER_DEVICE:-/dev/dri/renderD128}
+      - BACKEND_VIDEO_ACCELERATOR=nvidia
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
+      - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-compute,video,graphics,utility}
+
+  backend-worker:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - BACKEND_VIDEO_ACCELERATOR=nvidia
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
+      - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-compute,video,graphics,utility}
+
+  gopro-overlay-worker:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - BACKEND_VIDEO_ACCELERATOR=nvidia
       - BACKEND_GOPRO_OVERLAY_CONFIG_DIR=${BACKEND_GOPRO_OVERLAY_CONFIG_DIR:-/config}
-      - BACKEND_GOPRO_OVERLAY_PROFILE=${BACKEND_GOPRO_OVERLAY_PROFILE:-nvgpu}
+      - BACKEND_GOPRO_OVERLAY_PROFILE=${BACKEND_GOPRO_OVERLAY_PROFILE:-nnvgpu}
       - BACKEND_GOPRO_OVERLAY_EXTRA_ARGS=${BACKEND_GOPRO_OVERLAY_EXTRA_ARGS:---double-buffer}
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
+      - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-compute,video,graphics,utility}

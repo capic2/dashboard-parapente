@@ -15,6 +15,12 @@ from database import SessionLocal
 from deployment_drain import job_admission
 from flight_storage import get_video_output_path
 from models import Flight
+from video_acceleration import (
+    VideoAccelerator,
+    chromium_launch_args,
+    h264_encode_args,
+    select_video_accelerator,
+)
 
 # Storage for export jobs
 export_jobs: dict[str, dict] = {}
@@ -106,6 +112,46 @@ def _cleanup_export_files(*paths: Path | None):
 def _cleanup_temp_dir(temp_dir: Path | None) -> None:
     if temp_dir is not None:
         shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def _stream_transcode_command(
+    webm_file: Path,
+    output_file: Path,
+    accelerator: VideoAccelerator,
+) -> list[str]:
+    return [
+        "ffmpeg",
+        "-i",
+        str(webm_file),
+        *h264_encode_args(
+            accelerator,
+            quality="23",
+            cpu_preset="medium",
+            include_audio=False,
+        ),
+        "-y",
+        str(output_file),
+    ]
+
+
+async def _run_ffmpeg_process(job_id: str, command: list[str]) -> int:
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        while process.poll() is None:
+            if _is_cancelled(job_id):
+                process.kill()
+                process.wait()
+                raise RuntimeError("Export cancelled by user")
+            await asyncio.sleep(1)
+        return process.returncode
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
 
 
 def _job_temp_dir(temp_root: Path, job_id: str) -> Path:
@@ -222,33 +268,17 @@ async def _export_video_playwright(
         # Resolution mapping
         resolutions = {"720p": (1280, 720), "1080p": (1920, 1080), "4K": (3840, 2160)}
         width, height = resolutions.get(quality, (1920, 1080))
+        accelerator = select_video_accelerator(config.VIDEO_ACCELERATOR)
+        if config.VIDEO_ACCELERATOR == "nvidia" and accelerator == "cpu":
+            print("NVIDIA NVENC unavailable; falling back to CPU")
+        else:
+            print(f"Video accelerator selected: {accelerator}")
 
         async with async_playwright() as p:
             # Launch browser with GPU acceleration and increased resources
             browser = await p.chromium.launch(
                 headless=True,
-                args=[
-                    # GPU acceleration
-                    "--enable-gpu",
-                    "--use-gl=egl",
-                    "--enable-webgl",
-                    "--enable-webgl2",
-                    "--ignore-gpu-blocklist",
-                    "--disable-gpu-vsync",
-                    # Performance optimizations
-                    "--disable-dev-shm-usage",  # Use /tmp instead of /dev/shm
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    # Increase memory and resources
-                    "--js-flags=--max-old-space-size=4096",  # 4GB heap for JS
-                    "--disable-background-timer-throttling",  # Don't throttle timers
-                    "--disable-backgrounding-occluded-windows",
-                    "--disable-renderer-backgrounding",
-                    # Better rendering
-                    "--force-device-scale-factor=1",
-                    "--high-dpi-support=1",
-                    "--disable-blink-features=AutomationControlled",  # Appear more like real browser
-                ],
+                args=chromium_launch_args(accelerator),
             )
             context = await browser.new_context(
                 viewport={"width": width, "height": height},
@@ -589,44 +619,22 @@ async def _export_video_playwright(
 
             output_file = _video_output_path(flight_id, timestamp)
 
-            # Convert WebM to MP4
-            ffmpeg_cmd = [
-                "ffmpeg",
-                "-i",
-                str(webm_file),
-                "-c:v",
-                "libx264",
-                "-preset",
-                "medium",
-                "-crf",
-                "23",
-                "-pix_fmt",
-                "yuv420p",
-                "-c:a",
-                "aac",  # Audio codec (even if no audio)
-                "-y",  # Overwrite output file
-                str(output_file),
-            ]
+            ffmpeg_cmd = _stream_transcode_command(webm_file, output_file, accelerator)
 
             print(f"🎬 Converting WebM to MP4: {' '.join(ffmpeg_cmd)}")
-            process = subprocess.Popen(
-                ffmpeg_cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
             try:
-                while process.poll() is None:
-                    if _is_cancelled(job_id):
-                        process.kill()
-                        process.wait()
-                        raise RuntimeError("Export cancelled by user")
-                    await asyncio.sleep(1)
+                return_code = await _run_ffmpeg_process(job_id, ffmpeg_cmd)
             finally:
                 if _is_cancelled(job_id):
                     _cleanup_export_files(webm_file, output_file)
 
-            if process.returncode != 0:
-                raise Exception(f"FFmpeg conversion failed with code {process.returncode}")
+            if return_code != 0 and accelerator == "nvidia":
+                output_file.unlink(missing_ok=True)
+                ffmpeg_cmd = _stream_transcode_command(webm_file, output_file, "cpu")
+                print("NVENC conversion failed; retrying with CPU encoding")
+                return_code = await _run_ffmpeg_process(job_id, ffmpeg_cmd)
+            if return_code != 0:
+                raise Exception(f"FFmpeg conversion failed with code {return_code}")
 
             # Cleanup temporary WebM file
             if webm_file.exists():
