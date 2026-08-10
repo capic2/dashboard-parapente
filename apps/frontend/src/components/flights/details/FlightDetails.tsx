@@ -8,9 +8,11 @@ import {
   TabList,
   TabPanel,
   Tabs,
+  Modal,
 } from '@dashboard-parapente/design-system';
 import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
-import { Edit3, FileUp } from 'lucide-react';
+import { CircleAlert, Edit3, FileUp } from 'lucide-react';
+import { Input, Label, TextField } from 'react-aria-components';
 import {
   useUpdateFlight,
   useUploadGPXToFlight,
@@ -71,6 +73,8 @@ export function FlightDetails({
   const [notesText, setNotesText] = useState(flight.notes ?? '');
   const [activeTab, setActiveTab] = useState<FlightDetailsTab>('infos');
   const [hasOpenedReplay, setHasOpenedReplay] = useState(false);
+  const [isGoproOverlayDialogOpen, setIsGoproOverlayDialogOpen] =
+    useState(false);
   const [goproOverlayJobId, setGoproOverlayJobId] = useState<string | null>(
     null
   );
@@ -145,6 +149,7 @@ export function FlightDetails({
     setEditingNotes(false);
     setGoproOverlayJobId(null);
     setGoproOverlayJobToken(null);
+    setIsGoproOverlayDialogOpen(false);
     setIsCancellingGoproOverlay(false);
     setGoproOverlayGpxOffset('0');
     setDownloadingMedia(null);
@@ -243,12 +248,6 @@ export function FlightDetails({
 
   const handleStartGoproOverlay = async () => {
     if (isGoproOverlayRunning) return;
-    if (
-      hasPersistedGoproOverlay &&
-      !confirm(t('flights.goproOverlayConfirmRegenerate'))
-    ) {
-      return;
-    }
     if (!hasGoproCameraVideo) {
       toast.error(t('flights.goproOverlayNeedsCameraVideo'));
       return;
@@ -261,6 +260,15 @@ export function FlightDetails({
     const requestedFlightId = flight.id;
     const formData = new FormData();
     const normalizedGpxOffset = goproOverlayGpxOffset.trim();
+    if (normalizedGpxOffset) {
+      const parsedOffset = Number(normalizedGpxOffset);
+      if (!Number.isFinite(parsedOffset)) {
+        toast.error(t('flights.goproOverlayInvalidOffset'));
+        return;
+      }
+    }
+
+    setIsGoproOverlayDialogOpen(false);
     if (normalizedGpxOffset) {
       formData.append('gpx_offset', normalizedGpxOffset);
     }
@@ -276,6 +284,14 @@ export function FlightDetails({
       toast.error(
         await getApiErrorMessage(error, t('flights.goproOverlayStartError'))
       );
+    }
+  };
+
+  const handleOpenGoproOverlayDialog = () => {
+    if (createGoproOverlayJob.isPending || isGoproOverlayRunning) return;
+    setIsGoproOverlayDialogOpen(true);
+    if (!goproOverlayGpxOffset.trim()) {
+      setGoproOverlayGpxOffset('0');
     }
   };
 
@@ -383,7 +399,7 @@ export function FlightDetails({
 
   const goproOverlayAction = isGoproOverlayRunning
     ? handleCancelGoproOverlay
-    : handleStartGoproOverlay;
+    : handleOpenGoproOverlayDialog;
   let goproOverlayLabel = t('flights.goproOverlayGenerate');
   let goproOverlayCompactLabel = t('flights.goproOverlayGenerateShort');
   if (isGoproOverlayRunning) {
@@ -486,32 +502,6 @@ export function FlightDetails({
           </div>
 
           <div className="border-t border-gray-200 pt-3 dark:border-gray-700">
-            <label className="mb-3 flex max-w-xs flex-col gap-1 text-sm text-gray-700 dark:text-gray-200">
-              <span className="font-medium">
-                {t('flights.goproOverlayGpxOffsetLabel')}
-              </span>
-              <input
-                type="number"
-                step="0.1"
-                value={goproOverlayGpxOffset}
-                onChange={(event) =>
-                  setGoproOverlayGpxOffset(event.currentTarget.value)
-                }
-                disabled={
-                  isGoproOverlayRunning || createGoproOverlayJob.isPending
-                }
-                className="min-h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-                aria-label={t('flights.goproOverlayGpxOffsetLabel')}
-                aria-describedby="gopro-overlay-gpx-offset-hint"
-              />
-              <span
-                id="gopro-overlay-gpx-offset-hint"
-                className="text-xs text-gray-500 dark:text-gray-400"
-              >
-                {t('flights.goproOverlayGpxOffsetHint')}
-              </span>
-            </label>
-
             <div className="flex flex-wrap gap-2">
               <Button
                 variant="ghost"
@@ -542,6 +532,74 @@ export function FlightDetails({
             onChange={handleGPXUpload}
             className="hidden"
           />
+
+          <Modal
+            isOpen={isGoproOverlayDialogOpen}
+            onClose={() => setIsGoproOverlayDialogOpen(false)}
+            title={t('flights.goproOverlayGenerateTitle')}
+            size="lg"
+          >
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                {t('flights.goproOverlayOffsetDialogDescription')}
+              </p>
+
+              {hasPersistedGoproOverlay && (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"
+                >
+                  <CircleAlert
+                    className="mt-0.5 h-4 w-4 shrink-0"
+                    aria-hidden="true"
+                  />
+                  <span>{t('flights.goproOverlayConfirmRegenerate')}</span>
+                </div>
+              )}
+
+              <TextField className="flex flex-col gap-1">
+                <Label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                  {t('flights.goproOverlayGpxOffsetLabel')}
+                </Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={goproOverlayGpxOffset}
+                  onChange={(event) =>
+                    setGoproOverlayGpxOffset(event.currentTarget.value)
+                  }
+                  className="min-h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                  aria-label={t('flights.goproOverlayGpxOffsetLabel')}
+                  aria-describedby="gopro-overlay-gpx-offset-hint"
+                />
+                <span
+                  id="gopro-overlay-gpx-offset-hint"
+                  className="text-xs text-gray-500 dark:text-gray-400"
+                >
+                  {t('flights.goproOverlayGpxOffsetHint')}
+                </span>
+              </TextField>
+
+              <div className="flex flex-wrap justify-end gap-2 pt-2">
+                <Button
+                  variant="ghost"
+                  className="min-h-10 rounded-lg px-3 py-2 text-sm"
+                  onPress={() => setIsGoproOverlayDialogOpen(false)}
+                >
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  className="min-h-10 rounded-lg px-3 py-2 text-sm"
+                  onPress={() => void handleStartGoproOverlay()}
+                  isDisabled={createGoproOverlayJob.isPending}
+                >
+                  {createGoproOverlayJob.isPending
+                    ? t('flights.goproOverlayStarting')
+                    : t('flights.goproOverlayLaunch')}
+                </Button>
+              </div>
+            </div>
+          </Modal>
 
           {goproOverlayJob && (
             <GoproOverlayJobCard

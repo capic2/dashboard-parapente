@@ -63,6 +63,20 @@ vi.mock('@dashboard-parapente/design-system', async () => {
         {children}
       </button>
     ),
+    Modal: ({
+      children,
+      isOpen,
+      title,
+    }: {
+      children: React.ReactNode;
+      isOpen: boolean;
+      title: string;
+    }) =>
+      isOpen ? (
+        <dialog open aria-label={title}>
+          {children}
+        </dialog>
+      ) : null,
     Tab: ({ children, id }: { children: React.ReactNode; id: string }) => {
       const tabs = React.useContext(MockTabsContext);
       return (
@@ -108,6 +122,15 @@ vi.mock('@dashboard-parapente/design-system', async () => {
 });
 
 vi.mock('react-aria-components', () => ({
+  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => (
+    <input {...props} />
+  ),
+  Label: ({
+    children,
+    ...props
+  }: React.LabelHTMLAttributes<HTMLLabelElement>) => (
+    <label {...props}>{children}</label>
+  ),
   TextArea: (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
     <textarea {...props} />
   ),
@@ -283,10 +306,20 @@ describe('FlightDetails GoPro overlay action', () => {
       />
     );
 
+    fireEvent.click(screen.getByRole('button', { name: /Generate overlay/u }));
+
+    expect(
+      screen.getByRole('dialog', {
+        name: 'flights.goproOverlayGenerateTitle',
+      })
+    ).toBeInTheDocument();
+
     fireEvent.change(screen.getByLabelText('GPX offset (seconds)'), {
       target: { value: '2.5' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /Generate overlay/u }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'flights.goproOverlayLaunch' })
+    );
 
     await waitFor(() => {
       expect(createOverlayMock).toHaveBeenCalled();
@@ -477,8 +510,11 @@ describe('FlightDetails GoPro overlay action', () => {
       screen.getByRole('button', { name: /Regenerate overlay/u })
     );
 
+    fireEvent.click(
+      screen.getByRole('button', { name: 'flights.goproOverlayLaunch' })
+    );
+
     expect(createOverlayMock).toHaveBeenCalled();
-    expect(confirmMock).not.toHaveBeenCalled();
   });
 
   it('regenerates an existing overlay after confirmation', () => {
@@ -499,7 +535,10 @@ describe('FlightDetails GoPro overlay action', () => {
       screen.getByRole('button', { name: /Regenerate overlay/u })
     );
 
-    expect(confirmMock).toHaveBeenCalledWith('Confirm regenerate overlay');
+    fireEvent.click(
+      screen.getByRole('button', { name: 'flights.goproOverlayLaunch' })
+    );
+
     expect(createOverlayMock).toHaveBeenCalled();
   });
 
@@ -508,7 +547,6 @@ describe('FlightDetails GoPro overlay action', () => {
     mockFlight.gopro_overlay_status = 'completed';
     mockFlight.gopro_overlay_file_path = '/exports/final.mp4';
     mockFlight.gopro_overlay_file_exists = true;
-    confirmMock.mockReturnValue(false);
 
     render(
       <FlightDetails
@@ -522,7 +560,6 @@ describe('FlightDetails GoPro overlay action', () => {
       screen.getByRole('button', { name: /Regenerate overlay/u })
     );
 
-    expect(confirmMock).toHaveBeenCalledWith('Confirm regenerate overlay');
     expect(createOverlayMock).not.toHaveBeenCalled();
   });
 });
