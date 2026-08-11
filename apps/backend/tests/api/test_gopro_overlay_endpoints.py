@@ -883,9 +883,8 @@ def test_gopro_overlay_output_resolution_is_rescaled_when_needed(tmp_path, monke
     assert error is None
     assert output_path.read_bytes() == b"scaled"
     command = run.call_args.args[0]
-    assert command[command.index("-vaapi_device") + 1] == str(config.GOPRO_OVERLAY_RENDER_DEVICE)
-    assert command[command.index("-vf") + 1] == "format=nv12,hwupload,scale_vaapi=w=1920:h=1080"
-    assert command[command.index("-c:v") + 1] == "h264_vaapi"
+    assert command[command.index("-vf") + 1] == "scale=w=1920:h=1080:flags=lanczos"
+    assert command[command.index("-c:v") + 1] == "libx264"
 
 
 def test_gopro_overlay_output_resolution_noops_when_size_matches(tmp_path, monkeypatch) -> None:
@@ -1523,17 +1522,15 @@ def test_prepare_pip_video_delays_pip_until_gpx_start(tmp_path, monkeypatch):
     assert prepared.read_bytes() == b"prepared"
     command = commands[0]
     assert "-ss" not in command
-    assert command[command.index("-vaapi_device") + 1] == str(config.GOPRO_OVERLAY_RENDER_DEVICE)
     video_filter = command[command.index("-vf") + 1]
     assert "setpts=PTS-STARTPTS" in video_filter
     assert "tpad=start_mode=add:start_duration=5.000" in video_filter
     assert "tpad=stop_mode=clone:stop_duration=15.000" in video_filter
-    assert video_filter.endswith("format=nv12,hwupload")
-    assert command[command.index("-c:v") + 1] == "h264_vaapi"
+    assert command[command.index("-c:v") + 1] == "libx264"
 
 
-@pytest.mark.parametrize("vaapi_failure", ["nonzero", "timeout"])
-def test_prepare_pip_video_retries_on_cpu_when_vaapi_fails(tmp_path, monkeypatch, vaapi_failure):
+@pytest.mark.parametrize("nvenc_failure", ["nonzero", "timeout"])
+def test_prepare_pip_video_retries_on_cpu_when_nvenc_fails(tmp_path, monkeypatch, nvenc_failure):
     video_path = tmp_path / "camera.mp4"
     gpx_path = tmp_path / "track.gpx"
     pip_path = tmp_path / "pip.mp4"
@@ -1551,6 +1548,7 @@ def test_prepare_pip_video_retries_on_cpu_when_vaapi_fails(tmp_path, monkeypatch
         lambda path: 30.0 if path == video_path else 10.0,
     )
     monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (640, 480))
+    monkeypatch.setattr(gopro_overlay_export, "select_video_accelerator", lambda _: "nvidia")
     monkeypatch.setattr(
         gopro_overlay_export,
         "probe_video_start_time",
@@ -1566,9 +1564,9 @@ def test_prepare_pip_video_retries_on_cpu_when_vaapi_fails(tmp_path, monkeypatch
     def run(command, **_kwargs):
         commands.append(command)
         if len(commands) == 1:
-            if vaapi_failure == "timeout":
+            if nvenc_failure == "timeout":
                 raise gopro_overlay_export.subprocess.TimeoutExpired(command, 600)
-            return Result(1, "Failed to initialise VAAPI connection")
+            return Result(1, "Cannot load libcuda.so.1")
         Path(command[-1]).write_bytes(b"prepared")
         return Result(0)
 
@@ -1580,16 +1578,13 @@ def test_prepare_pip_video_retries_on_cpu_when_vaapi_fails(tmp_path, monkeypatch
 
     assert prepared.read_bytes() == b"prepared"
     assert len(commands) == 2
-    assert commands[0][commands[0].index("-c:v") + 1] == "h264_vaapi"
-    assert "-vaapi_device" not in commands[1]
+    assert commands[0][commands[0].index("-c:v") + 1] == "h264_nvenc"
     assert commands[1][commands[1].index("-c:v") + 1] == "libx264"
     assert "setpts=PTS-STARTPTS" in commands[1][commands[1].index("-vf") + 1]
     log = log_path.read_text()
-    assert "VAAPI PIP preparation failed:" in log
+    assert "NVENC PIP preparation failed:" in log
     expected_detail = (
-        "Failed to initialise VAAPI connection"
-        if vaapi_failure == "nonzero"
-        else "timed out after 600 seconds"
+        "Cannot load libcuda.so.1" if nvenc_failure == "nonzero" else "timed out after 600 seconds"
     )
     assert expected_detail in log
     assert "Retrying PIP preparation with CPU encoding" in log
@@ -1637,9 +1632,8 @@ def test_prepare_pip_video_trims_pip_when_camera_starts_after_gpx(tmp_path, monk
     assert prepared.exists()
     command = commands[0]
     assert command[command.index("-ss") + 1] == "5.000"
-    assert command[command.index("-vaapi_device") + 1] == str(config.GOPRO_OVERLAY_RENDER_DEVICE)
     assert "tpad=stop_mode=clone:stop_duration=15.000" in command[command.index("-vf") + 1]
-    assert command[command.index("-c:v") + 1] == "h264_vaapi"
+    assert command[command.index("-c:v") + 1] == "libx264"
 
 
 def test_prepare_pip_video_auto_aligns_start_time_by_timezone_offset(tmp_path, monkeypatch):
@@ -1686,9 +1680,8 @@ def test_prepare_pip_video_auto_aligns_start_time_by_timezone_offset(tmp_path, m
     assert prepared == work_dir / "pip-prepared-job-pip.mp4"
     assert prepared.read_bytes() == b"prepared"
     command = commands[0]
-    assert command[command.index("-vaapi_device") + 1] == str(config.GOPRO_OVERLAY_RENDER_DEVICE)
     assert "tpad=stop_mode=clone:stop_duration=20.000" in command[command.index("-vf") + 1]
-    assert command[command.index("-c:v") + 1] == "h264_vaapi"
+    assert command[command.index("-c:v") + 1] == "libx264"
 
 
 def test_prepare_pip_video_uses_merged_gpx_timeline_without_creation_time(tmp_path, monkeypatch):
@@ -2225,14 +2218,16 @@ def test_gopro_overlay_worker_reports_gpu_runtime(
     render_device = tmp_path / "renderD128"
     render_device.write_bytes(b"")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_RENDER_DEVICE", str(render_device))
+    monkeypatch.setattr(config, "VIDEO_ACCELERATOR", "nvidia")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PROFILE", "nnvgpu")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_CONFIG_DIR", "/config")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_EXTRA_ARGS", "--double-buffer")
 
+    monkeypatch.setattr(gopro_overlay_worker, "select_video_accelerator", lambda _: "nvidia")
     summary = gopro_overlay_worker._gpu_runtime_summary()
 
-    assert f"render_device={render_device}" in summary
-    assert "present=True" in summary
+    assert "requested_accelerator=nvidia" in summary
+    assert "selected_accelerator=nvidia" in summary
     assert "profile=nnvgpu" in summary
     assert "config_dir=/config" in summary
     assert "extra_args=--double-buffer" in summary
@@ -2702,6 +2697,9 @@ def test_run_job_passes_configured_overlay_gpu_args(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "GOPRO_OVERLAY_CONFIG_DIR", "/config")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PROFILE", "nnvgpu")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_EXTRA_ARGS", "--double-buffer")
+    monkeypatch.setattr(config, "VIDEO_ACCELERATOR", "nvidia")
+    monkeypatch.setattr(gopro_overlay_export, "select_video_accelerator", lambda _: "nvidia")
+    monkeypatch.setattr(gopro_overlay_export, "ffmpeg_supports_cuda_overlay", lambda: True)
     monkeypatch.setattr(
         gopro_overlay_export,
         "check_gopro_overlay_dependencies",
@@ -2724,12 +2722,17 @@ def test_run_job_passes_configured_overlay_gpu_args(monkeypatch, tmp_path):
         with patch("gopro_overlay_export.subprocess.Popen", return_value=FailedProcess()) as popen:
             gopro_overlay_export._run_job(job_id)
 
-        command = popen.call_args.args[0]
+        assert popen.call_count == 2
+        command = popen.call_args_list[0].args[0]
         assert "--config-dir" in command
         assert command[command.index("--config-dir") + 1] == "/config"
         assert "--profile" in command
         assert command[command.index("--profile") + 1] == "nnvgpu"
         assert "--double-buffer" in command
+        fallback_command = popen.call_args_list[1].args[0]
+        assert fallback_command[fallback_command.index("--config-dir") + 1] == "/config"
+        assert "--profile" not in fallback_command
+        assert "--double-buffer" not in fallback_command
     finally:
         gopro_overlay_export._JOBS.pop(job_id, None)
         gopro_overlay_export._PROCESSES.pop(job_id, None)

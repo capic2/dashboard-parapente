@@ -24,6 +24,12 @@ from database import SessionLocal
 from deployment_drain import job_admission
 from models import Flight, GoproOverlayJob
 from sqlalchemy.exc import OperationalError
+from video_acceleration import (
+    VideoAccelerator,
+    ffmpeg_supports_cuda_overlay,
+    h264_encode_args,
+    select_video_accelerator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -387,8 +393,8 @@ def _job_preparation_metadata(
 
 
 def _queued_render_method() -> str:
-    gpu_device_path = Path(config.GOPRO_OVERLAY_RENDER_DEVICE)
-    return "gpu" if gpu_device_path.exists() and config.GOPRO_OVERLAY_PROFILE else "cpu"
+    accelerator = select_video_accelerator(config.VIDEO_ACCELERATOR)
+    return "gpu" if accelerator == "nvidia" and config.GOPRO_OVERLAY_PROFILE else "cpu"
 
 
 def _gpx_offset_from_command_metadata(command: Any) -> float:
@@ -884,51 +890,22 @@ def _ffmpeg_timeout_for_duration(duration: float) -> int:
     return max(600, min(int(duration * 20), 6 * 60 * 60))
 
 
-def _gpu_ffmpeg_args(
+def _ffmpeg_output_args(
     *,
+    accelerator: VideoAccelerator,
     software_filters: list[str] | None,
-    hardware_filters: list[str] | None = None,
     include_audio: bool,
 ) -> list[str]:
-    """Build a VAAPI ffmpeg pipeline that keeps encoding on the GPU."""
-
-    filters: list[str] = []
-    if software_filters:
-        filters.extend(software_filters)
-    filters.extend(["format=nv12", "hwupload"])
-    if hardware_filters:
-        filters.extend(hardware_filters)
-    return [
-        "-vaapi_device",
-        str(Path(config.GOPRO_OVERLAY_RENDER_DEVICE)),
-        "-vf",
-        ",".join(filters),
-        "-c:v",
-        "h264_vaapi",
-        "-qp",
-        "18",
-        "-profile:v",
-        "high",
-        *(["-c:a", "copy"] if include_audio else ["-an"]),
-    ]
-
-
-def _cpu_ffmpeg_args(*, software_filters: list[str] | None, include_audio: bool) -> list[str]:
     args: list[str] = []
     if software_filters:
         args.extend(["-vf", ",".join(software_filters)])
     args.extend(
-        [
-            "-c:v",
-            "libx264",
-            "-preset",
-            "medium",
-            "-crf",
-            "18",
-            "-pix_fmt",
-            "yuv420p",
-            *(["-c:a", "copy"] if include_audio else ["-an"]),
-        ]
+        h264_encode_args(
+            accelerator,
+            quality="18",
+            cpu_preset="medium",
+            include_audio=include_audio,
+        )
     )
     return args
 
@@ -1007,13 +984,18 @@ def _prepare_pip_video_for_overlay(
         )
 
     output_args = ["-movflags", "+faststart", str(prepared_path)]
+    accelerator = select_video_accelerator(config.VIDEO_ACCELERATOR)
     command = [
         *command_prefix,
-        *_gpu_ffmpeg_args(software_filters=software_filters, include_audio=False),
+        *_ffmpeg_output_args(
+            accelerator=accelerator,
+            software_filters=software_filters,
+            include_audio=False,
+        ),
         *output_args,
     ]
 
-    vaapi_error: str | None = None
+    hardware_error: str | None = None
     try:
         result: subprocess.CompletedProcess[str] | None = subprocess.run(
             command,
@@ -1029,24 +1011,28 @@ def _prepare_pip_video_for_overlay(
         raise ValueError(str(exc) or exc.__class__.__name__) from exc
     except (subprocess.SubprocessError, TimeoutError) as exc:
         result = None
-        vaapi_error = str(exc) or exc.__class__.__name__
+        hardware_error = str(exc) or exc.__class__.__name__
 
-    if result is None or result.returncode != 0:
+    if accelerator == "nvidia" and (result is None or result.returncode != 0):
         _unlink_if_exists(prepared_path)
-        vaapi_error = vaapi_error or (
-            result.stderr.strip() or result.stdout.strip() or "ffmpeg VAAPI pip preparation failed"
+        hardware_error = hardware_error or (
+            result.stderr.strip() or result.stdout.strip() or "ffmpeg NVENC pip preparation failed"
         )
         logger.warning(
-            "VAAPI PIP preparation failed for job %s; retrying on CPU: %s",
+            "NVENC PIP preparation failed for job %s; retrying on CPU: %s",
             job_id,
-            vaapi_error,
+            hardware_error,
         )
         if log_path:
-            _append_job_log(log_path, f"VAAPI PIP preparation failed: {vaapi_error}")
+            _append_job_log(log_path, f"NVENC PIP preparation failed: {hardware_error}")
             _append_job_log(log_path, "Retrying PIP preparation with CPU encoding")
         command = [
             *command_prefix,
-            *_cpu_ffmpeg_args(software_filters=software_filters, include_audio=False),
+            *_ffmpeg_output_args(
+                accelerator="cpu",
+                software_filters=software_filters,
+                include_audio=False,
+            ),
             *output_args,
         ]
         try:
@@ -1063,6 +1049,12 @@ def _prepare_pip_video_for_overlay(
                 _append_job_log(log_path, f"CPU PIP preparation failed: {exc}")
             raise ValueError(str(exc) or exc.__class__.__name__) from exc
 
+    if result is None:
+        detail = hardware_error or "ffmpeg pip preparation failed"
+        _unlink_if_exists(prepared_path)
+        if log_path:
+            _append_job_log(log_path, f"PIP preparation failed: {detail}")
+        raise ValueError(detail)
     if result.returncode != 0:
         _unlink_if_exists(prepared_path)
         detail = result.stderr.strip() or result.stdout.strip() or "ffmpeg pip preparation failed"
@@ -1116,10 +1108,11 @@ def _ensure_video_output_resolution(
         "-i",
         str(path),
     ]
+    accelerator = select_video_accelerator(config.VIDEO_ACCELERATOR)
     command.extend(
-        _gpu_ffmpeg_args(
-            software_filters=None,
-            hardware_filters=[f"scale_vaapi=w={expected_width}:h={expected_height}"],
+        _ffmpeg_output_args(
+            accelerator=accelerator,
+            software_filters=[f"scale=w={expected_width}:h={expected_height}:flags=lanczos"],
             include_audio=True,
         )
     )
@@ -1144,6 +1137,34 @@ def _ensure_video_output_resolution(
         _unlink_if_exists(scaled_path)
         return False, str(exc) or exc.__class__.__name__
 
+    if result.returncode != 0 and accelerator == "nvidia":
+        logger.warning("NVENC output scaling failed; retrying with CPU encoding")
+        _unlink_if_exists(scaled_path)
+        command = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(path),
+            *_ffmpeg_output_args(
+                accelerator="cpu",
+                software_filters=[f"scale=w={expected_width}:h={expected_height}:flags=lanczos"],
+                include_audio=True,
+            ),
+            "-movflags",
+            "+faststart",
+            str(scaled_path),
+        ]
+        try:
+            result = subprocess.run(
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=2 * 60 * 60,
+            )
+        except (FileNotFoundError, subprocess.SubprocessError, TimeoutError) as exc:
+            _unlink_if_exists(scaled_path)
+            return False, str(exc) or exc.__class__.__name__
     if result.returncode != 0:
         detail = result.stderr.strip() or result.stdout.strip() or "ffmpeg scale failed"
         _unlink_if_exists(scaled_path)
@@ -1693,49 +1714,47 @@ def _run_job(job_id: str) -> None:
     ]
     if config.GOPRO_OVERLAY_FONT:
         command.extend(["--font", config.GOPRO_OVERLAY_FONT])
-    dependencies = check_gopro_overlay_dependencies()
-    gpu_device_path = Path(config.GOPRO_OVERLAY_RENDER_DEVICE)
-    gpu_device_present = gpu_device_path.exists()
-    gpu_device_usable = bool(
-        gpu_device_present
-        and config.GOPRO_OVERLAY_PROFILE
-        and dependencies.get("ffmpeg_vaapi")
-        and _ffmpeg_can_use_vaapi_device(gpu_device_path)
-    )
-    gpu_render_enabled = bool(gpu_device_usable)
+    if config.GOPRO_OVERLAY_CONFIG_DIR:
+        command.extend(["--config-dir", config.GOPRO_OVERLAY_CONFIG_DIR])
+    cpu_command = command.copy()
+    accelerator = select_video_accelerator(config.VIDEO_ACCELERATOR)
+    profile = config.GOPRO_OVERLAY_PROFILE
+    if accelerator == "nvidia" and profile == "nnvgpu" and not ffmpeg_supports_cuda_overlay():
+        logger.warning("CUDA overlay filters unavailable; using nvgpu profile")
+        profile = "nvgpu"
+    gpu_render_enabled = accelerator == "nvidia" and bool(profile)
     render_method = "gpu" if gpu_render_enabled else "cpu"
 
     if gpu_render_enabled:
-        if config.GOPRO_OVERLAY_CONFIG_DIR:
-            command.extend(["--config-dir", config.GOPRO_OVERLAY_CONFIG_DIR])
-        command.extend(["--profile", config.GOPRO_OVERLAY_PROFILE])
+        command.extend(["--profile", profile])
         if config.GOPRO_OVERLAY_EXTRA_ARGS:
             command.extend(shlex.split(config.GOPRO_OVERLAY_EXTRA_ARGS))
     else:
         logger.info(
-            "GoPro overlay job %s falling back to CPU rendering (render_device_present=%s profile=%s ffmpeg_vaapi=%s)",
+            "GoPro overlay job %s falling back to CPU rendering (requested_accelerator=%s profile=%s)",
             job_id,
-            gpu_device_present,
-            bool(config.GOPRO_OVERLAY_PROFILE),
-            dependencies.get("ffmpeg_vaapi"),
+            config.VIDEO_ACCELERATOR,
+            profile or "<none>",
         )
+    common_args: list[str] = []
     if job.get("video_width") and job.get("video_height"):
-        command.extend(["--overlay-size", f"{job['video_width']}x{job['video_height']}"])
+        common_args.extend(["--overlay-size", f"{job['video_width']}x{job['video_height']}"])
     if job.get("pip_path"):
-        command.extend(["--video", f"pip={job['pip_path']}"])
+        common_args.extend(["--video", f"pip={job['pip_path']}"])
     output_path = Path(job["output_path"])
     temp_output_path = Path(job.get("temp_output_path") or _temp_output_path(output_path, job_id))
     log_path = Path(job.get("log_path") or temp_output_path.with_suffix(".log"))
     temp_output_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    command.extend([job["video_path"], str(temp_output_path)])
+    common_args.extend([job["video_path"], str(temp_output_path)])
+    command.extend(common_args)
+    cpu_command.extend(common_args)
 
     logger.info(
-        "GoPro overlay runtime for job %s: render_device=%s present=%s profile=%s config_dir=%s extra_args=%s method=%s",
+        "GoPro overlay runtime for job %s: accelerator=%s profile=%s config_dir=%s extra_args=%s method=%s",
         job_id,
-        gpu_device_path,
-        gpu_device_present,
-        config.GOPRO_OVERLAY_PROFILE,
+        accelerator,
+        profile,
         config.GOPRO_OVERLAY_CONFIG_DIR or "<none>",
         config.GOPRO_OVERLAY_EXTRA_ARGS or "<none>",
         render_method,
@@ -1816,6 +1835,60 @@ def _run_job(job_id: str) -> None:
         current_job = get_gopro_overlay_job(job_id, include_command=True)
         if current_job and current_job.get("status") == _STATUS_CANCELLED:
             return
+
+        if return_code != 0 and gpu_render_enabled:
+            _unlink_if_exists(temp_output_path)
+            _append_job_log(log_path, "GPU overlay failed; retrying with CPU rendering")
+            _update_job(
+                job_id,
+                message="GPU unavailable; retrying overlay on CPU",
+                render_method="cpu",
+                command=cpu_command,
+                command_json=json.dumps({"command": cpu_command, "render_method": "cpu"}),
+            )
+            logger.warning("GPU overlay failed for job %s; retrying on CPU", job_id)
+            try:
+                process = subprocess.Popen(
+                    _background_process_command(cpu_command),
+                    cwd=config.GOPRO_OVERLAY_ROOT or None,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                )
+                with _LOCK:
+                    if _JOBS.get(job_id, {}).get("status") == _STATUS_CANCELLED:
+                        process.terminate()
+                        return
+                    _PROCESSES[job_id] = process
+                with log_path.open("a", encoding="utf-8") as log_file:
+                    log_file.write("CPU fallback command: " + " ".join(cpu_command) + "\n")
+                    log_file.flush()
+                    for line in _read_process_updates_from_process(process, job_id):
+                        log_file.write(line + "\n")
+                        log_file.flush()
+                        output_lines.append(line)
+                        if len(output_lines) > 50:
+                            output_lines = output_lines[-50:]
+                        progress = _progress_from_output_chunk(line)
+                        if progress is None:
+                            _update_job(job_id, message=line or "Rendering overlay on CPU")
+                        else:
+                            _update_job(
+                                job_id,
+                                progress=progress,
+                                message=f"Rendering overlay on CPU: {progress}%",
+                            )
+                return_code = process.wait()
+            except Exception as exc:
+                output_lines.append(str(exc) or exc.__class__.__name__)
+                return_code = 1
+            finally:
+                with _LOCK:
+                    _PROCESSES.pop(job_id, None)
+
+            current_job = get_gopro_overlay_job(job_id, include_command=True)
+            if current_job and current_job.get("status") == _STATUS_CANCELLED:
+                return
 
         if return_code != 0:
             error = _tail_lines(log_path) or f"Process exited with {return_code}"

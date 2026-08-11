@@ -29,6 +29,12 @@ from auth import create_job_token, decode_job_token
 from database import SessionLocal
 from flight_storage import get_video_output_path
 from models import Flight, VideoExportJob
+from video_acceleration import (
+    VideoAccelerator,
+    chromium_launch_args,
+    h264_encode_args,
+    select_video_accelerator,
+)
 
 # Storage for export jobs (compatibility snapshot)
 export_jobs: dict[str, dict[str, Any]] = {}
@@ -207,39 +213,9 @@ def _is_software_webgl_renderer(renderer: str) -> bool:
     )
 
 
-def _chromium_launch_args(
-    render_device: Path = Path("/dev/dri/renderD128"),
-) -> list[str]:
-    args = [
-        "--enable-gpu",
-        "--enable-webgl",
-        "--enable-webgl2",
-        "--ignore-gpu-blocklist",
-        "--disable-gpu-vsync",
-        "--disable-dev-shm-usage",
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--js-flags=--max-old-space-size=8192",
-        "--disable-background-timer-throttling",
-        "--disable-backgrounding-occluded-windows",
-        "--disable-renderer-backgrounding",
-        "--force-device-scale-factor=1",
-        "--high-dpi-support=1",
-    ]
-    if render_device.exists():
-        return [
-            *args,
-            "--use-gl=angle",
-            "--use-angle=gl-egl",
-            "--enable-gpu-rasterization",
-            "--enable-zero-copy",
-        ]
-    return [
-        *args,
-        "--use-gl=angle",
-        "--use-angle=swiftshader-webgl",
-        "--enable-unsafe-swiftshader",
-    ]
+def _chromium_launch_args(accelerator: VideoAccelerator | None = None) -> list[str]:
+    selected = accelerator or select_video_accelerator(config.VIDEO_ACCELERATOR)
+    return chromium_launch_args(selected)
 
 
 def _to_public_status(status: str) -> str:
@@ -1179,8 +1155,10 @@ def _ffmpeg_command(
     output_file: Path,
     is_fast_mode: bool,
     frames_dir: Path | None = None,
+    accelerator: VideoAccelerator | None = None,
 ) -> list[str]:
     ffmpeg_preset, ffmpeg_crf = _ffmpeg_encoding_settings(is_fast_mode)
+    selected = accelerator or select_video_accelerator(config.VIDEO_ACCELERATOR)
     if frames_dir is None:
         input_args = [
             "-f",
@@ -1203,14 +1181,12 @@ def _ffmpeg_command(
     return [
         "ffmpeg",
         *input_args,
-        "-c:v",
-        "libx264",
-        "-preset",
-        ffmpeg_preset,
-        "-crf",
-        ffmpeg_crf,
-        "-pix_fmt",
-        "yuv420p",
+        *h264_encode_args(
+            selected,
+            quality=ffmpeg_crf,
+            cpu_preset=ffmpeg_preset,
+            include_audio=False,
+        ),
         "-nostats",
         "-progress",
         "pipe:2",
@@ -1678,11 +1654,16 @@ async def _export_video_manual_render(job_id: str):
         # Resolution mapping
         resolutions = {"720p": (1280, 720), "1080p": (1920, 1080), "4K": (3840, 2160)}
         width, height = resolutions.get(quality, (1920, 1080))
+        accelerator = select_video_accelerator(config.VIDEO_ACCELERATOR)
+        if config.VIDEO_ACCELERATOR == "nvidia" and accelerator == "cpu":
+            _log_job(job_id, "NVIDIA NVENC unavailable; falling back to CPU")
+        else:
+            _log_job(job_id, f"Video accelerator selected: {accelerator}")
 
         async with async_playwright() as p:
             browser = await p.chromium.launch(
                 headless=True,
-                args=_chromium_launch_args(),
+                args=_chromium_launch_args(accelerator),
             )
 
             context = await browser.new_context(
@@ -1927,16 +1908,18 @@ async def _export_video_manual_render(job_id: str):
                 _log_job(job_id, f"Resuming capture from frame {resume_from_frame}/{total_frames}")
 
             encoding_output_file = temp_dir / "encoding.mp4"
+            concurrent_encoding = is_fast_mode and accelerator == "cpu"
             ffmpeg_cmd = _ffmpeg_command(
                 fps=fps,
                 output_file=encoding_output_file,
                 is_fast_mode=is_fast_mode,
-                frames_dir=None if is_fast_mode else frames_dir,
+                frames_dir=None if concurrent_encoding else frames_dir,
+                accelerator=accelerator,
             )
             ffmpeg_stderr: deque[str] = deque(maxlen=_MAX_FFMPEG_STDERR_LINES)
             ffmpeg_state: dict[str, float] = {}
 
-            if is_fast_mode:
+            if concurrent_encoding:
                 _log_job(job_id, f"Starting concurrent FFmpeg encoding: {' '.join(ffmpeg_cmd)}")
                 ffmpeg_process = await asyncio.create_subprocess_exec(
                     *ffmpeg_cmd,
@@ -2009,25 +1992,27 @@ async def _export_video_manual_render(job_id: str):
 
                 frame_path = frames_dir / f"frame{i:05d}.png"
                 if is_fast_mode:
-                    assert ffmpeg_process is not None
-                    assert ffmpeg_process.stdin is not None
                     frame_png = await page.screenshot(type="png", timeout=60000)
-                    frame_written = await _write_ffmpeg_frame(
-                        job_id=job_id,
-                        process=ffmpeg_process,
-                        stderr_task=ffmpeg_stderr_task,
-                        stderr_lines=ffmpeg_stderr,
-                        state=ffmpeg_state,
-                        frame_png=frame_png,
-                    )
-                    if not frame_written:
-                        await browser.close()
-                        _update_job(
-                            job_id,
-                            status=_STATUS_CANCELLED,
-                            message="Export cancelled by user",
+                    if concurrent_encoding:
+                        assert ffmpeg_process is not None
+                        assert ffmpeg_process.stdin is not None
+                        assert ffmpeg_stderr_task is not None
+                        frame_written = await _write_ffmpeg_frame(
+                            job_id=job_id,
+                            process=ffmpeg_process,
+                            stderr_task=ffmpeg_stderr_task,
+                            stderr_lines=ffmpeg_stderr,
+                            state=ffmpeg_state,
+                            frame_png=frame_png,
                         )
-                        return
+                        if not frame_written:
+                            await browser.close()
+                            _update_job(
+                                job_id,
+                                status=_STATUS_CANCELLED,
+                                message="Export cancelled by user",
+                            )
+                            return
 
                     pending_frame_writes.add(
                         asyncio.create_task(
@@ -2078,7 +2063,7 @@ async def _export_video_manual_render(job_id: str):
                 await asyncio.gather(*pending_frame_writes)
                 pending_frame_writes.clear()
 
-            if is_fast_mode:
+            if concurrent_encoding:
                 assert ffmpeg_process is not None
                 assert ffmpeg_process.stdin is not None
                 ffmpeg_process.stdin.close()
@@ -2115,7 +2100,7 @@ async def _export_video_manual_render(job_id: str):
             )
             _set_job_runtime(job_id, phase=_STATUS_ENCODING, eta_seconds=None)
 
-            if not is_fast_mode:
+            if not concurrent_encoding:
                 _log_job(job_id, f"FFmpeg command: {' '.join(ffmpeg_cmd)}")
                 ffmpeg_process = await asyncio.create_subprocess_exec(
                     *ffmpeg_cmd,
@@ -2135,16 +2120,55 @@ async def _export_video_manual_render(job_id: str):
 
             assert ffmpeg_process is not None
             assert ffmpeg_stderr_task is not None
-            encoding_completed = await _wait_for_ffmpeg_process(
-                job_id=job_id,
-                process=ffmpeg_process,
-                stderr_task=ffmpeg_stderr_task,
-                stderr_lines=ffmpeg_stderr,
-                state=ffmpeg_state,
-                output_file=encoding_output_file,
-                video_duration=video_duration,
-                ffmpeg_cmd=ffmpeg_cmd,
-            )
+            try:
+                encoding_completed = await _wait_for_ffmpeg_process(
+                    job_id=job_id,
+                    process=ffmpeg_process,
+                    stderr_task=ffmpeg_stderr_task,
+                    stderr_lines=ffmpeg_stderr,
+                    state=ffmpeg_state,
+                    output_file=encoding_output_file,
+                    video_duration=video_duration,
+                    ffmpeg_cmd=ffmpeg_cmd,
+                )
+            except RuntimeError:
+                if accelerator != "nvidia" or _is_cancelled(job_id):
+                    raise
+                _log_job(job_id, "NVENC encoding failed; retrying with CPU encoding")
+                encoding_output_file.unlink(missing_ok=True)
+                ffmpeg_cmd = _ffmpeg_command(
+                    fps=fps,
+                    output_file=encoding_output_file,
+                    is_fast_mode=is_fast_mode,
+                    frames_dir=frames_dir,
+                    accelerator="cpu",
+                )
+                ffmpeg_stderr = deque(maxlen=_MAX_FFMPEG_STDERR_LINES)
+                ffmpeg_state = {"started_at": time.monotonic()}
+                ffmpeg_process = await asyncio.create_subprocess_exec(
+                    *ffmpeg_cmd,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                assert ffmpeg_process.stderr is not None
+                ffmpeg_stderr_task = asyncio.create_task(
+                    _drain_ffmpeg_stderr(
+                        job_id,
+                        ffmpeg_process.stderr,
+                        ffmpeg_stderr,
+                        ffmpeg_state,
+                    )
+                )
+                encoding_completed = await _wait_for_ffmpeg_process(
+                    job_id=job_id,
+                    process=ffmpeg_process,
+                    stderr_task=ffmpeg_stderr_task,
+                    stderr_lines=ffmpeg_stderr,
+                    state=ffmpeg_state,
+                    output_file=encoding_output_file,
+                    video_duration=video_duration,
+                    ffmpeg_cmd=ffmpeg_cmd,
+                )
             if not encoding_completed:
                 return
 
