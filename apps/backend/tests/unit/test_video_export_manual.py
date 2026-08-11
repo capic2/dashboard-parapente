@@ -240,19 +240,16 @@ def test_hardware_webgl_renderer_is_not_marked_as_software():
     assert video_export_manual._is_software_webgl_renderer("NV168 (nouveau)") is False
 
 
-def test_chromium_launch_args_use_hardware_egl_when_render_device_exists(tmp_path):
-    render_device = tmp_path / "renderD128"
-    render_device.touch()
-
-    args = video_export_manual._chromium_launch_args(render_device)
+def test_chromium_launch_args_use_hardware_egl_for_nvidia():
+    args = video_export_manual._chromium_launch_args("nvidia")
 
     assert "--use-angle=gl-egl" in args
     assert "--enable-gpu-rasterization" in args
     assert "--use-angle=swiftshader-webgl" not in args
 
 
-def test_chromium_launch_args_fall_back_to_swiftshader_without_render_device(tmp_path):
-    args = video_export_manual._chromium_launch_args(tmp_path / "missing-render-device")
+def test_chromium_launch_args_use_swiftshader_for_cpu():
+    args = video_export_manual._chromium_launch_args("cpu")
 
     assert "--use-angle=swiftshader-webgl" in args
     assert "--enable-unsafe-swiftshader" in args
@@ -310,6 +307,39 @@ def test_ffmpeg_command_reads_saved_frames_for_classic_mode(tmp_path):
     assert "image2pipe" not in command
     assert command[command.index("-preset") + 1] == "medium"
     assert command[command.index("-crf") + 1] == "18"
+
+
+def test_ffmpeg_command_uses_nvenc_when_nvidia_is_available(tmp_path):
+    command = video_export_manual._ffmpeg_command(
+        fps=15,
+        output_file=tmp_path / "export.mp4",
+        is_fast_mode=True,
+        accelerator="nvidia",
+    )
+
+    assert command[command.index("-c:v") + 1] == "h264_nvenc"
+    assert command[command.index("-cq") + 1] == "23"
+    assert "-crf" not in command
+
+
+def test_manual_fast_nvenc_command_reads_saved_frames_for_cpu_retry(tmp_path):
+    frames_dir = tmp_path / "frames"
+    command = video_export_manual._ffmpeg_command(
+        fps=15,
+        output_file=tmp_path / "export.mp4",
+        is_fast_mode=True,
+        frames_dir=frames_dir,
+        accelerator="nvidia",
+    )
+
+    assert command[:5] == [
+        "ffmpeg",
+        "-framerate",
+        "15",
+        "-i",
+        str(frames_dir / "frame%05d.png"),
+    ]
+    assert command[command.index("-c:v") + 1] == "h264_nvenc"
 
 
 @pytest.mark.asyncio
