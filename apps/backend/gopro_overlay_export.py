@@ -213,12 +213,18 @@ def _merge_osv_files_with_gpx(
             log_path,
             f"Merging {len(osv_paths)} OSV file(s) into {merged_gpx_path.name}",
         )
+    first_gpx_at: float | None = None
+    if video_duration is not None and gpx_offset:
+        gpx_duration = _gpx_duration_seconds(gpx_path)
+        if gpx_duration is not None:
+            first_gpx_at = max(0.0, max(0.0, video_duration - gpx_duration) + gpx_offset)
     command = [
         "python3",
         str(merge_script),
         "--sync",
         "gpx-start",
         *(["--video-duration", f"{video_duration:.3f}"] if video_duration is not None else []),
+        *(["--first-gpx-at", f"{first_gpx_at:.3f}"] if first_gpx_at is not None else []),
         *(["--gpx-offset", str(gpx_offset)] if gpx_offset else []),
         *(str(path) for path in osv_paths),
         str(gpx_path),
@@ -842,6 +848,27 @@ def _first_gpx_timestamp(gpx_path: Path) -> datetime | None:
             if parsed:
                 return parsed
     return None
+
+
+def _gpx_duration_seconds(gpx_path: Path) -> float | None:
+    try:
+        root = ET.parse(gpx_path).getroot()
+    except (ET.ParseError, OSError):
+        return None
+
+    timestamps: list[datetime] = []
+    for trackpoint in root.iter():
+        if trackpoint.tag.rsplit("}", 1)[-1] != "trkpt":
+            continue
+        for element in trackpoint:
+            if element.tag.rsplit("}", 1)[-1] != "time" or not element.text:
+                continue
+            if parsed := _parse_utc_datetime(element.text):
+                timestamps.append(parsed)
+            break
+    if len(timestamps) < 2:
+        return None
+    return max(0.0, (timestamps[-1] - timestamps[0]).total_seconds())
 
 
 def _pip_timeline_offsets(
