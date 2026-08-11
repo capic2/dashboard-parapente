@@ -1814,7 +1814,7 @@ def test_prepare_queued_job_uses_prepared_pip_path(tmp_path, monkeypatch, test_d
 
     assert prepared is not None
     assert Path(prepared["pip_path"]) == prepared_pip_path
-    assert pip_calls[0]["gpx_offset"] == 0.0
+    assert pip_calls[0]["gpx_offset"] == 2.5
 
 
 @pytest.mark.asyncio

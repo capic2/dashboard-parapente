@@ -1285,7 +1285,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 work_dir,
                 log_path=log_path,
                 timeline_start=_first_gpx_timestamp(render_gpx_path),
-                gpx_offset=gpx_offset if osv_paths else 0.0,
+                gpx_offset=gpx_offset,
             )
         else:
             _append_job_log(log_path, "No PIP video configured")
