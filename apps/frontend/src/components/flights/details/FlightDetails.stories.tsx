@@ -204,6 +204,12 @@ export const Default = meta.story({
   name: 'Default',
   args: { flight: fullFlight, mobileMode: true },
 });
+Default.test('The stored track file name is displayed', async ({ canvas }) => {
+  await expect(canvas.getByText('arguel-001.gpx')).toBeInTheDocument();
+  await expect(
+    canvas.queryByText('/data/flights/arguel-001.gpx')
+  ).not.toBeInTheDocument();
+});
 Default.test(
   'The flight can be edited',
   async ({ canvas, userEvent, step }) => {

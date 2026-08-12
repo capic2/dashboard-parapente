@@ -951,6 +951,7 @@
     "maxAltitudeLabel": "Altitude max (m)",
     "elevationGainLabel": "Dénivelé (m)",
     "maxSpeedLabel": "Vitesse max (km/h)",
+    "trackFileLabel": "Fichier GPX/IGC",
     "notesLabel": "Notes",
     "notesPlaceholder": "Conditions, sensations, points à améliorer...",
     "noNotes": "Aucune note pour ce vol",

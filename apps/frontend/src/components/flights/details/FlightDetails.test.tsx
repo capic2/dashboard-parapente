@@ -160,6 +160,7 @@ vi.mock('react-i18next', () => ({
         'flights.goproOverlayCancelError': 'Overlay cancel error',
         'flights.goproOverlayNeedsVideo': 'Needs video',
         'flights.goproOverlayNeedsCameraVideo': 'Needs camera video',
+        'flights.trackFileLabel': 'GPX/IGC file',
         'flights.generationLogs.title': 'Generation logs',
         'flights.generationLogs.description': 'Media job tracking',
         'flights.generationLogs.videoTitle': 'Flight video',
@@ -262,7 +263,40 @@ describe('FlightDetails GoPro overlay action', () => {
     mockFlight.video_file_path = '/exports/flight.mp4';
     mockFlight.video_file_exists = true;
     mockFlight.gopro_camera_file_exists = true;
+    mockFlight.gpx_file_path = 'sample.gpx';
     videoStatusMock.current = null;
+  });
+
+  it('shows only the stored track file name in flight information', () => {
+    mockFlight.gpx_file_path = '/private/flights/20260315/01/watch.igc';
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    expect(screen.getByText('GPX/IGC file')).toBeInTheDocument();
+    expect(screen.getByText('watch.igc')).toHaveAttribute('title', 'watch.igc');
+    expect(
+      screen.queryByText('/private/flights/20260315/01/watch.igc')
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not show track file information when no track is stored', () => {
+    mockFlight.gpx_file_path = null;
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    expect(screen.queryByText('GPX/IGC file')).not.toBeInTheDocument();
   });
 
   it('shows why overlay generation is unavailable', () => {
