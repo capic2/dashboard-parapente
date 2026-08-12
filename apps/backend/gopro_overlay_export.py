@@ -215,7 +215,7 @@ def _merge_osv_files_with_gpx(
         )
     first_gpx_at: float | None = None
     if video_duration is not None and gpx_offset:
-        gpx_duration = _gpx_duration_seconds(gpx_path)
+        gpx_duration = gpx_duration_seconds(gpx_path)
         if gpx_duration is not None:
             first_gpx_at = max(0.0, max(0.0, video_duration - gpx_duration) + gpx_offset)
     command = [
@@ -836,21 +836,27 @@ def probe_video_start_time(video_path: Path) -> datetime | None:
     )
 
 
-def _first_gpx_timestamp(gpx_path: Path) -> datetime | None:
+def first_gpx_timestamp(gpx_path: Path) -> datetime | None:
     try:
         root = ET.parse(gpx_path).getroot()
     except (ET.ParseError, OSError):
         return None
 
+    for trackpoint in root.iter():
+        if trackpoint.tag.rsplit("}", 1)[-1] != "trkpt":
+            continue
+        for element in trackpoint:
+            if element.tag.rsplit("}", 1)[-1] == "time" and element.text:
+                if parsed := _parse_utc_datetime(element.text):
+                    return parsed
     for element in root.iter():
         if element.tag.rsplit("}", 1)[-1] == "time" and element.text:
-            parsed = _parse_utc_datetime(element.text)
-            if parsed:
+            if parsed := _parse_utc_datetime(element.text):
                 return parsed
     return None
 
 
-def _gpx_duration_seconds(gpx_path: Path) -> float | None:
+def gpx_duration_seconds(gpx_path: Path) -> float | None:
     try:
         root = ET.parse(gpx_path).getroot()
     except (ET.ParseError, OSError):
@@ -871,6 +877,24 @@ def _gpx_duration_seconds(gpx_path: Path) -> float | None:
     return max(0.0, (timestamps[-1] - timestamps[0]).total_seconds())
 
 
+def _shift_gpx_timestamps(gpx_path: Path, output_path: Path, offset: float) -> Path:
+    tree = ET.parse(gpx_path)
+    for trackpoint in tree.getroot().iter():
+        if trackpoint.tag.rsplit("}", 1)[-1] != "trkpt":
+            continue
+        for element in trackpoint:
+            if element.tag.rsplit("}", 1)[-1] != "time" or not element.text:
+                continue
+            timestamp = _parse_utc_datetime(element.text)
+            if timestamp:
+                element.text = (
+                    (timestamp + timedelta(seconds=offset)).isoformat().replace("+00:00", "Z")
+                )
+            break
+    tree.write(output_path, encoding="utf-8", xml_declaration=True)
+    return output_path
+
+
 def _pip_timeline_offsets(
     video_start: datetime | None,
     gpx_start: datetime | None,
@@ -883,7 +907,7 @@ def _pip_timeline_offsets(
     return 0.0, abs(offset)
 
 
-def _align_video_start_time_to_gpx(
+def align_video_start_time_to_gpx(
     video_start: datetime | None,
     gpx_start: datetime | None,
 ) -> datetime | None:
@@ -956,10 +980,10 @@ def _prepare_pip_video_for_overlay(
         _append_job_log(log_path, f"Preparing PIP video: {pip_path.name}")
 
     pip_duration = probe_video_duration(pip_path)
-    gpx_start = _first_gpx_timestamp(gpx_path)
+    gpx_start = first_gpx_timestamp(gpx_path)
     if gpx_start is not None and gpx_offset:
         gpx_start += timedelta(seconds=gpx_offset)
-    video_start = timeline_start or _align_video_start_time_to_gpx(
+    video_start = timeline_start or align_video_start_time_to_gpx(
         probe_video_start_time(video_path), gpx_start
     )
     pip_delay, pip_trim = _pip_timeline_offsets(video_start, gpx_start)
@@ -1298,6 +1322,12 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
             )
         else:
             _append_job_log(log_path, "No OSV files found; using GPX directly")
+            if gpx_offset:
+                render_gpx_path = _shift_gpx_timestamps(
+                    render_gpx_path,
+                    work_dir / f"gpx-offset-{job_id}.gpx",
+                    gpx_offset,
+                )
 
         command_metadata["render_gpx_path"] = str(render_gpx_path)
         _append_job_log(log_path, f"Render GPX: {render_gpx_path.name}")
@@ -1311,7 +1341,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 pip_path,
                 work_dir,
                 log_path=log_path,
-                timeline_start=_first_gpx_timestamp(render_gpx_path),
+                timeline_start=first_gpx_timestamp(render_gpx_path),
                 gpx_offset=gpx_offset,
             )
         else:

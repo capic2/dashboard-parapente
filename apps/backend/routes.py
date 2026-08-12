@@ -64,17 +64,22 @@ from flight_summaries import (
 from flight_storage import flight_sequence_number, write_flight_text_file
 from flight_tracks import calculate_track_stats, normalize_track
 from gopro_overlay_export import (
+    align_video_start_time_to_gpx,
     cancel_gopro_overlay_job,
     check_gopro_overlay_dependencies,
     create_gopro_overlay_job,
     create_gopro_overlay_job_from_paths,
     delete_gopro_overlay_job,
     delete_gopro_overlay_output,
+    first_gpx_timestamp,
     get_gopro_overlay_job,
+    gpx_duration_seconds,
     gopro_overlay_output_path,
     list_gopro_overlay_jobs,
     list_gopro_overlay_layouts,
+    probe_video_duration,
     probe_video_resolution,
+    probe_video_start_time,
     save_uploaded_file,
     stream_gopro_overlay_job,
 )
@@ -107,6 +112,7 @@ from schemas import (
     GoproOverlayCancelResponse,
     GoproOverlayDependencies,
     GoproOverlayJob,
+    GoproOverlayPreview,
     GoproOverlayLayoutsResponse,
     GoproOverlayProbeResponse,
     IntervalsPreviewResponse,
@@ -338,6 +344,25 @@ def _flight_gopro_camera_file_exists(db: Session, flight: Flight) -> bool:
     return camera_path.exists()
 
 
+def _flight_gopro_camera_path(db: Session, flight: Flight) -> Path:
+    input_dir = _gopro_overlay_flight_directory(db, flight, create=False)
+    camera_path = input_dir / "camera.mp4"
+    if not camera_path.is_file():
+        raise HTTPException(status_code=404, detail="GoPro camera video not found")
+    return camera_path
+
+
+def _flight_gopro_preview_inputs(db: Session, flight: Flight) -> tuple[Path, Path]:
+    camera_path = _flight_gopro_camera_path(db, flight)
+    input_dir = camera_path.parent
+    gpx_path = _first_matching_file(input_dir, "Zepp*.gpx") or _resolve_flight_file_path(
+        flight.gpx_file_path
+    )
+    if not gpx_path or not gpx_path.is_file():
+        raise HTTPException(status_code=404, detail="Flight GPX file not found")
+    return camera_path, gpx_path
+
+
 _GOPRO_OVERLAY_IN_PROGRESS_STATUSES = {"queued", "preparing", "running"}
 _GOPRO_OVERLAY_MERGED_GPX_FILENAME = "merged-gopro-overlay.gpx"
 
@@ -457,10 +482,13 @@ def _flight_gopro_overlay_state(db: Session, flight: Flight) -> dict[str, Any]:
     }
 
 
-def _mark_flight_gopro_overlay_job(db: Session, flight: Flight, job: dict[str, Any]) -> None:
+def _mark_flight_gopro_overlay_job(
+    db: Session, flight: Flight, job: dict[str, Any], *, gpx_offset: float
+) -> None:
     flight.gopro_overlay_job_id = job["job_id"]
     flight.gopro_overlay_status = job["status"]
     flight.gopro_overlay_file_path = job.get("output_path")
+    flight.gopro_overlay_gpx_offset = gpx_offset
     db.commit()
     db.refresh(flight)
 
@@ -3623,6 +3651,7 @@ def get_flights(
             "gopro_overlay_progress": gopro_overlay["progress"],
             "gopro_overlay_file_path": gopro_overlay["file_path"],
             "gopro_overlay_file_exists": gopro_overlay["file_exists"],
+            "gopro_overlay_gpx_offset": flight.gopro_overlay_gpx_offset,
             "external_url": flight.external_url,
             "created_at": flight.created_at.isoformat() if flight.created_at else None,
             "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
@@ -4079,6 +4108,7 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "gopro_overlay_progress": gopro_overlay["progress"],
         "gopro_overlay_file_path": gopro_overlay["file_path"],
         "gopro_overlay_file_exists": gopro_overlay["file_exists"],
+        "gopro_overlay_gpx_offset": flight.gopro_overlay_gpx_offset,
         "created_at": flight.created_at.isoformat() if flight.created_at else None,
         "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
     }
@@ -5701,6 +5731,58 @@ def get_gopro_overlay_dependencies() -> GoproOverlayDependencies:
     return check_gopro_overlay_dependencies()
 
 
+@router.get(
+    "/flights/{flight_id}/gopro-overlay/preview",
+    response_model=GoproOverlayPreview,
+)
+def get_flight_gopro_overlay_preview(
+    flight_id: str, db: Session = Depends(get_db)
+) -> GoproOverlayPreview:
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+
+    camera_path, gpx_path = _flight_gopro_preview_inputs(db, flight)
+    video_duration = probe_video_duration(camera_path)
+    video_start = probe_video_start_time(camera_path)
+    gpx_start = first_gpx_timestamp(gpx_path)
+    gpx_duration = gpx_duration_seconds(gpx_path)
+    coordinates = parse_gpx_file(gpx_path)
+    if video_duration is None or video_start is None:
+        raise HTTPException(status_code=422, detail="Camera video has no usable time metadata")
+    if gpx_start is None or gpx_duration is None:
+        raise HTTPException(status_code=422, detail="GPX track has no usable timestamps")
+
+    aligned_video_start = align_video_start_time_to_gpx(video_start, gpx_start)
+    if aligned_video_start is None:
+        raise HTTPException(status_code=422, detail="Unable to align camera video and GPX track")
+    automatic_offset = (gpx_start - aligned_video_start).total_seconds()
+    manual_offset = float(flight.gopro_overlay_gpx_offset or 0.0)
+    return GoproOverlayPreview(
+        video={"duration_seconds": video_duration, "start_time": aligned_video_start},
+        gpx={
+            "start_time": gpx_start,
+            "end_time": gpx_start + timedelta(seconds=gpx_duration),
+            "duration_seconds": gpx_duration,
+            "coordinates": coordinates,
+        },
+        alignment={
+            "automatic_offset_seconds": automatic_offset,
+            "manual_offset_seconds": manual_offset,
+            "effective_offset_seconds": automatic_offset + manual_offset,
+        },
+    )
+
+
+@router.get("/flights/{flight_id}/gopro-camera")
+def stream_flight_gopro_camera(flight_id: str, db: Session = Depends(get_db)) -> FileResponse:
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    camera_path = _flight_gopro_camera_path(db, flight)
+    return FileResponse(path=camera_path, media_type="video/mp4", content_disposition_type="inline")
+
+
 @router.post(
     "/flights/{flight_id}/gopro-overlay",
     response_model=GoproOverlayJob,
@@ -5797,7 +5879,7 @@ async def create_flight_gopro_overlay_job(
                 output_dir=resolved_output_dir,
                 gpx_offset=gpx_offset,
             )
-            _mark_flight_gopro_overlay_job(db, flight, job)
+            _mark_flight_gopro_overlay_job(db, flight, job, gpx_offset=gpx_offset)
             return _with_gopro_overlay_job_token(job)
 
         if not video_file or not video_file.filename:
@@ -5826,7 +5908,7 @@ async def create_flight_gopro_overlay_job(
             pin_inputs=pin_overlay_inputs,
             gpx_offset=gpx_offset,
         )
-        _mark_flight_gopro_overlay_job(db, flight, job)
+        _mark_flight_gopro_overlay_job(db, flight, job, gpx_offset=gpx_offset)
         return _with_gopro_overlay_job_token(job)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -40,6 +40,7 @@ import { FlightNotesSection } from './FlightNotesSection';
 import { FlightReplayCard } from './FlightReplayCard';
 import { FlightStatsGrid } from './FlightStatsGrid';
 import { GoproOverlayJobCard } from './GoproOverlayJobCard';
+import { GoproOverlaySyncPreview } from './GoproOverlaySyncPreview';
 
 interface FlightDetailsProps {
   flight: Flight;
@@ -83,7 +84,9 @@ export function FlightDetails({
   >(null);
   const [isCancellingGoproOverlay, setIsCancellingGoproOverlay] =
     useState(false);
-  const [goproOverlayGpxOffset, setGoproOverlayGpxOffset] = useState('0');
+  const [goproOverlayGpxOffset, setGoproOverlayGpxOffset] = useState(
+    String(flight.gopro_overlay_gpx_offset ?? 0)
+  );
   const [downloadingMedia, setDownloadingMedia] =
     useState<DownloadableFlightMedia | null>(null);
 
@@ -151,10 +154,15 @@ export function FlightDetails({
     setGoproOverlayJobToken(null);
     setIsGoproOverlayDialogOpen(false);
     setIsCancellingGoproOverlay(false);
-    setGoproOverlayGpxOffset('0');
     setDownloadingMedia(null);
     resetGoproOverlayJob();
   }, [flight.id, resetGoproOverlayJob]);
+
+  useEffect(() => {
+    if (!isGoproOverlayDialogOpen) {
+      setGoproOverlayGpxOffset(String(flight.gopro_overlay_gpx_offset ?? 0));
+    }
+  }, [flight.gopro_overlay_gpx_offset, isGoproOverlayDialogOpen]);
 
   useEffect(() => {
     setNotesText(flight.notes ?? '');
@@ -537,7 +545,7 @@ export function FlightDetails({
             isOpen={isGoproOverlayDialogOpen}
             onClose={() => setIsGoproOverlayDialogOpen(false)}
             title={t('flights.goproOverlayGenerateTitle')}
-            size="lg"
+            size="xl"
           >
             <div className="space-y-4">
               <p className="text-sm text-gray-600 dark:text-gray-300">
@@ -556,6 +564,12 @@ export function FlightDetails({
                   <span>{t('flights.goproOverlayConfirmRegenerate')}</span>
                 </div>
               )}
+
+              <GoproOverlaySyncPreview
+                flightId={flight.id}
+                offset={goproOverlayGpxOffset}
+                onOffsetChange={setGoproOverlayGpxOffset}
+              />
 
               <TextField className="flex flex-col gap-1">
                 <Label className="block text-sm font-medium text-gray-700 dark:text-gray-200">

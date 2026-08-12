@@ -182,6 +182,7 @@ class Flight(Base):
     gopro_overlay_job_id = Column(String, nullable=True)
     gopro_overlay_status = Column(String, nullable=True)
     gopro_overlay_file_path = Column(String, nullable=True)
+    gopro_overlay_gpx_offset = Column(Float, nullable=False, default=0.0)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

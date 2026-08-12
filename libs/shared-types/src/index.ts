@@ -115,6 +115,7 @@ export const FlightSchema = z
     gopro_overlay_progress: z.number().nullish(),
     gopro_overlay_file_path: z.string().nullish(),
     gopro_overlay_file_exists: z.boolean().nullish(),
+    gopro_overlay_gpx_offset: z.number().nullish(),
     site: SiteSchema.optional(),
     created_at: z.string().optional(),
     updated_at: z.string().optional(),

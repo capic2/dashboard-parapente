@@ -71,6 +71,37 @@ class GoproOverlayJob(BaseModel):
     job_token: str | None = None
 
 
+class GoproOverlayPreviewVideo(BaseModel):
+    duration_seconds: float
+    start_time: datetime
+
+
+class GoproOverlayPreviewCoordinate(BaseModel):
+    lat: float
+    lon: float
+    elevation: float
+    timestamp: float
+
+
+class GoproOverlayPreviewGpx(BaseModel):
+    start_time: datetime
+    end_time: datetime
+    duration_seconds: float
+    coordinates: list[GoproOverlayPreviewCoordinate]
+
+
+class GoproOverlayPreviewAlignment(BaseModel):
+    automatic_offset_seconds: float
+    manual_offset_seconds: float
+    effective_offset_seconds: float
+
+
+class GoproOverlayPreview(BaseModel):
+    video: GoproOverlayPreviewVideo
+    gpx: GoproOverlayPreviewGpx
+    alignment: GoproOverlayPreviewAlignment
+
+
 class GoproOverlayCancelResponse(BaseModel):
     job_id: str
     message: str

@@ -202,6 +202,7 @@ vi.mock('../../../hooks/gopro/useGoproOverlay', () => ({
     reset: resetOverlayMock,
   }),
   useGoproOverlayJobStream: () => ({ job: overlayJobStreamMock.current }),
+  useGoproOverlayPreview: () => ({ isPending: true }),
 }));
 
 vi.mock('../../../hooks/useToast', () => ({
@@ -212,8 +213,14 @@ vi.mock('../../../lib/api', () => ({
   api: {
     delete: apiDelete,
   },
+  getApiUrlWithSearchParams: () => '/api/camera.mp4',
   getApiErrorMessage: (_error: unknown, fallback: string) =>
     Promise.resolve(fallback),
+}));
+
+vi.mock('../../../stores/authStore', () => ({
+  useAuthStore: (selector: (state: { token: string }) => unknown) =>
+    selector({ token: 'test-token' }),
 }));
 
 vi.mock('../../../stores/appSettingsStore', () => ({
