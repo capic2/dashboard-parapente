@@ -982,6 +982,8 @@
     "goproOverlayPreviewError": "La prévisualisation n’est pas disponible. Vérifiez les horodatages de la vidéo et du GPX.",
     "goproOverlayCameraPreview": "Prévisualisation de la vidéo GoPro",
     "goproOverlayVideoTime": "Temps vidéo",
+    "goproOverlayHeartRate": "Fréquence cardiaque",
+    "goproOverlayHeartRateUnavailable": "BPM non disponible",
     "goproOverlayGpxPosition": "Position GPX",
     "goproOverlayOutsideTrack": "Hors de la trace GPX",
     "goproOverlayEffectiveOffset": "Décalage total",

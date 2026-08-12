@@ -51,6 +51,7 @@ export function telemetryAtTimestamp(
     elevation:
       previous.elevation + (next.elevation - previous.elevation) * progress,
     timestamp,
+    heart_rate: previous.heart_rate ?? next.heart_rate,
     speedKmh,
   };
 }

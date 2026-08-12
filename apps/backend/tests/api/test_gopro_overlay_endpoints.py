@@ -36,8 +36,8 @@ def test_gopro_overlay_preview_returns_shared_timeline(
     gpx_path = input_dir / "Zepp-track.gpx"
     gpx_path.write_text(
         "<gpx><trk><trkseg>"
-        '<trkpt lat="45" lon="5"><time>2026-03-15T10:00:10Z</time></trkpt>'
-        '<trkpt lat="45.1" lon="5.1"><time>2026-03-15T10:01:10Z</time></trkpt>'
+        '<trkpt lat="45" lon="5"><time>2026-03-15T10:00:10Z</time><hr>120</hr></trkpt>'
+        '<trkpt lat="45.1" lon="5.1"><time>2026-03-15T10:01:10Z</time><hr>126</hr></trkpt>'
         "</trkseg></trk></gpx>"
     )
     sample_flight.gopro_overlay_gpx_offset = 1.5
@@ -57,6 +57,7 @@ def test_gopro_overlay_preview_returns_shared_timeline(
     assert response.json()["video"]["duration_seconds"] == 120.0
     assert response.json()["gpx"]["duration_seconds"] == 60.0
     assert len(response.json()["gpx"]["coordinates"]) == 2
+    assert response.json()["gpx"]["coordinates"][0]["heart_rate"] == 120
     assert response.json()["alignment"] == {
         "automatic_offset_seconds": 10.0,
         "manual_offset_seconds": 1.5,
