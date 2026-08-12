@@ -947,6 +947,7 @@
     "maxAltitudeLabel": "Max altitude (m)",
     "elevationGainLabel": "Elevation gain (m)",
     "maxSpeedLabel": "Max speed (km/h)",
+    "trackFileLabel": "GPX/IGC file",
     "notesLabel": "Notes",
     "notesPlaceholder": "Conditions, feelings, areas for improvement...",
     "noNotes": "No notes for this flight",
