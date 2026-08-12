@@ -101,11 +101,30 @@ const mockGPXData = {
     lat: 47.2 + i * 0.001,
     lon: 6.0 + i * 0.001,
     elevation: 800 + Math.sin(i / 10) * 400,
-    time: new Date(1773842400000 + i * 60000).toISOString(),
+    timestamp: 1773842400000 + i * 60000,
   })),
 };
 
 const defaultHandlers = [
+  http.get('*/api/flights/:id/gopro-overlay/preview', () =>
+    HttpResponse.json({
+      video: {
+        duration_seconds: 600,
+        start_time: '2026-03-18T10:00:00Z',
+      },
+      gpx: {
+        start_time: '2026-03-18T10:00:08Z',
+        end_time: '2026-03-18T11:39:08Z',
+        duration_seconds: 5940,
+        coordinates: mockGPXData.coordinates,
+      },
+      alignment: {
+        automatic_offset_seconds: 8,
+        manual_offset_seconds: 0,
+        effective_offset_seconds: 8,
+      },
+    })
+  ),
   http.get('*/api/flights/:id/gpx-data', () =>
     HttpResponse.json({ data: mockGPXData })
   ),

@@ -27,6 +27,72 @@ from models import Flight
 API_PREFIX = "/api"
 
 
+def test_gopro_overlay_preview_returns_shared_timeline(
+    client: TestClient, db_session, sample_flight, tmp_path, monkeypatch
+) -> None:
+    input_dir = tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01"
+    input_dir.mkdir(parents=True)
+    (input_dir / "camera.mp4").write_bytes(b"video")
+    gpx_path = input_dir / "Zepp-track.gpx"
+    gpx_path.write_text(
+        "<gpx><trk><trkseg>"
+        '<trkpt lat="45" lon="5"><time>2026-03-15T10:00:10Z</time></trkpt>'
+        '<trkpt lat="45.1" lon="5.1"><time>2026-03-15T10:01:10Z</time></trkpt>'
+        "</trkseg></trk></gpx>"
+    )
+    sample_flight.gopro_overlay_gpx_offset = 1.5
+    db_session.commit()
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+
+    with (
+        patch("routes.probe_video_duration", return_value=120.0),
+        patch(
+            "routes.probe_video_start_time",
+            return_value=datetime.fromisoformat("2026-03-15T10:00:00+00:00"),
+        ),
+    ):
+        response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay/preview")
+
+    assert response.status_code == 200
+    assert response.json()["video"]["duration_seconds"] == 120.0
+    assert response.json()["gpx"]["duration_seconds"] == 60.0
+    assert len(response.json()["gpx"]["coordinates"]) == 2
+    assert response.json()["alignment"] == {
+        "automatic_offset_seconds": 10.0,
+        "manual_offset_seconds": 1.5,
+        "effective_offset_seconds": 11.5,
+    }
+
+
+def test_gopro_camera_endpoint_serves_the_flight_camera(
+    client: TestClient, sample_flight, tmp_path, monkeypatch
+) -> None:
+    input_dir = tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01"
+    input_dir.mkdir(parents=True)
+    (input_dir / "camera.mp4").write_bytes(b"camera-video")
+    (input_dir / "Zepp-track.gpx").write_text("<gpx />")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+
+    response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-camera")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "video/mp4"
+    assert response.content == b"camera-video"
+
+
+def test_gopro_camera_endpoint_does_not_require_a_gpx_file(
+    client: TestClient, sample_flight, tmp_path, monkeypatch
+) -> None:
+    input_dir = tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01"
+    input_dir.mkdir(parents=True)
+    (input_dir / "camera.mp4").write_bytes(b"camera-video")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+
+    response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-camera")
+
+    assert response.status_code == 200
+
+
 def test_gopro_overlay_layouts_returns_recommended_layout(client: TestClient):
     response = client.get(f"{API_PREFIX}/gopro-overlays/layouts?width=1920&height=1080")
 
@@ -174,6 +240,19 @@ def test_gpx_offset_from_command_metadata_defaults_malformed_values():
     assert gopro_overlay_export._gpx_offset_from_command_metadata({"gpx_offset": None}) == 0.0
 
 
+def test_first_gpx_timestamp_ignores_metadata_time(tmp_path) -> None:
+    gpx_path = tmp_path / "track.gpx"
+    gpx_path.write_text(
+        "<gpx><metadata><time>2026-03-15T11:00:00Z</time></metadata>"
+        '<trk><trkseg><trkpt lat="45" lon="5">'
+        "<time>2026-03-15T10:00:00Z</time></trkpt></trkseg></trk></gpx>"
+    )
+
+    assert gopro_overlay_export.first_gpx_timestamp(gpx_path) == datetime.fromisoformat(
+        "2026-03-15T10:00:00+00:00"
+    )
+
+
 def test_gopro_overlay_job_access_status_accepts_job_token(client: TestClient):
     token = create_job_token(purpose="gopro_overlay", job_id="job-gopro")
     expected = {
@@ -245,6 +324,7 @@ def test_create_flight_gopro_overlay_job_uses_flight_files(
             data={
                 "output_filename": "Arguel test-overlay.mp4",
                 "output_dir": str(output_dir),
+                "gpx_offset": "2.5",
             },
         )
 
@@ -253,6 +333,7 @@ def test_create_flight_gopro_overlay_job_uses_flight_files(
     db_session.refresh(sample_flight)
     assert sample_flight.gopro_overlay_job_id == "job-flight-gopro"
     assert sample_flight.gopro_overlay_status == "queued"
+    assert sample_flight.gopro_overlay_gpx_offset == 2.5
     assert create_job.call_args.kwargs["video_file"] is not None
     assert create_job.call_args.kwargs["gpx_file"] is None
     assert create_job.call_args.kwargs["fallback_gpx_path"] == gpx_path
@@ -1828,6 +1909,8 @@ def test_prepare_queued_job_uses_prepared_pip_path(tmp_path, monkeypatch, test_d
     assert prepared is not None
     assert Path(prepared["pip_path"]) == prepared_pip_path
     assert pip_calls[0]["gpx_offset"] == 2.5
+    render_gpx_path = Path(prepared["command"]["render_gpx_path"])
+    assert render_gpx_path.name.startswith("gpx-offset-")
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import type { GeoPoint } from '../../types/flight';
 
 export type GoproOverlayJob = {
   job_id: string;
@@ -27,6 +28,32 @@ export type GoproOverlayJob = {
   log_tail?: string[];
   job_token?: string | null;
 };
+
+export type GoproOverlayPreview = {
+  video: { duration_seconds: number; start_time: string };
+  gpx: {
+    start_time: string;
+    end_time: string;
+    duration_seconds: number;
+    coordinates: GeoPoint[];
+  };
+  alignment: {
+    automatic_offset_seconds: number;
+    manual_offset_seconds: number;
+    effective_offset_seconds: number;
+  };
+};
+
+export function useGoproOverlayPreview(flightId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['flights', flightId, 'gopro-overlay-preview'],
+    queryFn: () =>
+      api
+        .get(`flights/${flightId}/gopro-overlay/preview`)
+        .json<GoproOverlayPreview>(),
+    enabled,
+  });
+}
 
 export function useCreateFlightGoproOverlayJob(flightId: string) {
   return useMutation({
