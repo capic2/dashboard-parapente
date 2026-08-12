@@ -355,9 +355,9 @@ def _flight_gopro_camera_path(db: Session, flight: Flight) -> Path:
 def _flight_gopro_preview_inputs(db: Session, flight: Flight) -> tuple[Path, Path]:
     camera_path = _flight_gopro_camera_path(db, flight)
     input_dir = camera_path.parent
-    gpx_path = _first_matching_file(input_dir, "Zepp*.gpx") or _resolve_flight_file_path(
-        flight.gpx_file_path
-    )
+    gpx_path = _resolve_flight_file_path(flight.gpx_file_path)
+    if not gpx_path or not gpx_path.is_file():
+        gpx_path = _first_matching_file(input_dir, "Zepp*.gpx")
     if not gpx_path or not gpx_path.is_file():
         raise HTTPException(status_code=404, detail="Flight GPX file not found")
     return camera_path, gpx_path
