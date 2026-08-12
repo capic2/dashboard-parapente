@@ -64,6 +64,37 @@ def test_gopro_overlay_preview_returns_shared_timeline(
     }
 
 
+def test_gopro_overlay_preview_falls_back_to_camera_mtime_when_creation_time_is_missing(
+    client: TestClient, db_session, sample_flight, tmp_path, monkeypatch
+) -> None:
+    input_dir = tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01"
+    input_dir.mkdir(parents=True)
+    camera_path = input_dir / "camera.mp4"
+    camera_path.write_bytes(b"video")
+    gpx_path = input_dir / "Zepp-track.gpx"
+    gpx_path.write_text(
+        "<gpx><trk><trkseg>"
+        '<trkpt lat="45" lon="5"><time>2026-03-15T10:00:10Z</time></trkpt>'
+        '<trkpt lat="45.1" lon="5.1"><time>2026-03-15T10:01:10Z</time></trkpt>'
+        "</trkseg></trk></gpx>"
+    )
+    sample_flight.gopro_overlay_gpx_offset = 0.0
+    db_session.commit()
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+    camera_mtime = datetime.fromisoformat("2026-03-15T10:00:00+00:00").timestamp()
+    camera_path.write_bytes(b"video")
+    os.utime(camera_path, (camera_mtime, camera_mtime))
+
+    with (
+        patch("routes.probe_video_duration", return_value=120.0),
+        patch("routes.probe_video_start_time", return_value=None),
+    ):
+        response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay/preview")
+
+    assert response.status_code == 200
+    assert response.json()["alignment"]["automatic_offset_seconds"] == 10.0
+
+
 def test_gopro_camera_endpoint_serves_the_flight_camera(
     client: TestClient, sample_flight, tmp_path, monkeypatch
 ) -> None:

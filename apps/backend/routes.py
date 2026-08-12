@@ -5745,6 +5745,11 @@ def get_flight_gopro_overlay_preview(
     camera_path, gpx_path = _flight_gopro_preview_inputs(db, flight)
     video_duration = probe_video_duration(camera_path)
     video_start = probe_video_start_time(camera_path)
+    if video_start is None:
+        try:
+            video_start = datetime.fromtimestamp(camera_path.stat().st_mtime, tz=timezone.utc)
+        except OSError:
+            video_start = None
     gpx_start = first_gpx_timestamp(gpx_path)
     gpx_duration = gpx_duration_seconds(gpx_path)
     coordinates = parse_gpx_file(gpx_path)
