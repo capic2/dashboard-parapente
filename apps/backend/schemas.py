@@ -81,6 +81,7 @@ class GoproOverlayPreviewCoordinate(BaseModel):
     lon: float
     elevation: float
     timestamp: float
+    heart_rate: int | None = None
 
 
 class GoproOverlayPreviewGpx(BaseModel):

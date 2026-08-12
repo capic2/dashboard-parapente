@@ -4931,7 +4931,20 @@ def parse_gpx_file_from_string(gpx_content: str) -> list[dict]:
         else:
             timestamp = 0
 
-        coordinates.append({"lat": lat, "lon": lon, "elevation": elevation, "timestamp": timestamp})
+        heart_rate_elem = trkpt.find("gpx:hr", ns) if ns else None
+        if heart_rate_elem is None:
+            heart_rate_elem = trkpt.find("hr")
+        heart_rate = None
+        if heart_rate_elem is not None and heart_rate_elem.text:
+            try:
+                heart_rate = int(float(heart_rate_elem.text))
+            except Exception as e:
+                print(f"⚠️ DEBUG Parse heart rate failed: {e}")
+
+        coordinate = {"lat": lat, "lon": lon, "elevation": elevation, "timestamp": timestamp}
+        if heart_rate is not None:
+            coordinate["heart_rate"] = heart_rate
+        coordinates.append(coordinate)
 
     if coordinates:
         print(
