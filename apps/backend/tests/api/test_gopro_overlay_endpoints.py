@@ -665,9 +665,15 @@ def test_worker_merge_osv_files_with_gpx_uses_configured_timeout(
     assert run.call_args.kwargs["timeout"] == 456
 
 
+@pytest.mark.parametrize(
+    ("gpx_offset", "expected_first_gpx_at"),
+    [(15.0, "29.483"), (-15.0, "0.000")],
+)
 def test_worker_merge_osv_files_with_gpx_passes_gpx_offset_to_merge_tool(
     tmp_path,
     monkeypatch,
+    gpx_offset,
+    expected_first_gpx_at,
 ) -> None:
     gopro_root = tmp_path / "gopro-overlay"
     gopro_root.mkdir()
@@ -677,7 +683,12 @@ def test_worker_merge_osv_files_with_gpx_passes_gpx_offset_to_merge_tool(
     source_gpx = input_dir / "Zepp-track.gpx"
     osv_path = input_dir / "flight.osv"
     merged_gpx_path = input_dir / "merged-gopro-overlay.gpx"
-    source_gpx.write_text("<gpx>source</gpx>")
+    source_gpx.write_text(
+        "<gpx><metadata><time>2020-01-01T00:00:00Z</time></metadata><trk><trkseg>"
+        "<trkpt><time>2026-08-08T09:30:43Z</time></trkpt>"
+        "<trkpt><time>2026-08-08T09:37:30Z</time></trkpt>"
+        "</trkseg></trk></gpx>"
+    )
     osv_path.write_bytes(b"osv")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_ROOT", str(gopro_root))
 
@@ -695,12 +706,14 @@ def test_worker_merge_osv_files_with_gpx_passes_gpx_offset_to_merge_tool(
             [osv_path],
             source_gpx,
             input_dir,
-            gpx_offset=-1.5,
+            gpx_offset=gpx_offset,
+            video_duration=421.483,
         )
 
     assert result == merged_gpx_path
     command = run.call_args.args[0]
-    assert command[command.index("--gpx-offset") + 1] == "-1.5"
+    assert command[command.index("--gpx-offset") + 1] == str(gpx_offset)
+    assert command[command.index("--first-gpx-at") + 1] == expected_first_gpx_at
     assert command[-3:] == [str(osv_path), str(source_gpx), str(merged_gpx_path)]
 
 
