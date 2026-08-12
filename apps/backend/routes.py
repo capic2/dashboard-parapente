@@ -4931,9 +4931,14 @@ def parse_gpx_file_from_string(gpx_content: str) -> list[dict]:
         else:
             timestamp = 0
 
-        heart_rate_elem = trkpt.find("gpx:hr", ns) if ns else None
-        if heart_rate_elem is None:
-            heart_rate_elem = trkpt.find("hr")
+        heart_rate_elem = next(
+            (
+                element
+                for element in trkpt.iter()
+                if element is not trkpt and element.tag.rsplit("}", 1)[-1] == "hr" and element.text
+            ),
+            None,
+        )
         heart_rate = None
         if heart_rate_elem is not None and heart_rate_elem.text:
             try:
