@@ -36,8 +36,8 @@ def test_gopro_overlay_preview_returns_shared_timeline(
     gpx_path = input_dir / "Zepp-track.gpx"
     gpx_path.write_text(
         "<gpx><trk><trkseg>"
-        '<trkpt lat="45" lon="5"><time>2026-03-15T10:00:10Z</time><hr>120</hr></trkpt>'
-        '<trkpt lat="45.1" lon="5.1"><time>2026-03-15T10:01:10Z</time><hr>126</hr></trkpt>'
+        '<trkpt lat="45" lon="5"><time>2026-03-15T10:00:10Z</time><extensions><hr>120</hr></extensions></trkpt>'
+        '<trkpt lat="45.1" lon="5.1"><time>2026-03-15T10:01:10Z</time><extensions><hr>126</hr></extensions></trkpt>'
         "</trkseg></trk></gpx>"
     )
     sample_flight.gopro_overlay_gpx_offset = 1.5
