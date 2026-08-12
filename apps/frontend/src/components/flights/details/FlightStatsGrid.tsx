@@ -48,6 +48,7 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
     flight.max_speed_kmh == null
       ? 'N/A'
       : formatSpeedKmh(flight.max_speed_kmh, units.speed);
+  const trackFileName = flight.gpx_file_path?.split(/[\\/]/u).pop();
 
   return (
     <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3">
@@ -97,6 +98,14 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
         <span className={labelClass}>{t('flights.maxSpeedLabel')}</span>
         <span className={valueClass}>{maxSpeedLabel}</span>
       </div>
+      {trackFileName && (
+        <div className="col-span-2 min-w-0 md:col-span-3">
+          <span className={labelClass}>{t('flights.trackFileLabel')}</span>
+          <span className={`${valueClass} truncate`} title={trackFileName}>
+            {trackFileName}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
