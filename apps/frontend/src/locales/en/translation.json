@@ -978,6 +978,8 @@
     "goproOverlayPreviewError": "Preview is unavailable. Check the video and GPX timestamps.",
     "goproOverlayCameraPreview": "GoPro video preview",
     "goproOverlayVideoTime": "Video time",
+    "goproOverlayHeartRate": "Heart rate",
+    "goproOverlayHeartRateUnavailable": "BPM unavailable",
     "goproOverlayGpxPosition": "GPX position",
     "goproOverlayOutsideTrack": "Outside GPX track",
     "goproOverlayEffectiveOffset": "Total offset",

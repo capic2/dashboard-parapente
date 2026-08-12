@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Gauge, MapPin, Mountain, TimerReset } from 'lucide-react';
+import { Gauge, HeartPulse, MapPin, Mountain, TimerReset } from 'lucide-react';
 import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { getApiUrlWithSearchParams } from '../../../lib/api';
 import { useAuthStore } from '../../../stores/authStore';
@@ -41,6 +41,7 @@ export function GoproOverlaySyncPreview({
         gpxStart + (videoTime - automaticOffset - manualOffset) * 1000
       )
     : null;
+  const heartRate = telemetry?.heart_rate ?? null;
   const videoUrl = getApiUrlWithSearchParams(
     `flights/${flightId}/gopro-camera`,
     { access_token: token }
@@ -113,6 +114,20 @@ export function GoproOverlaySyncPreview({
             <div className="font-mono text-lg font-semibold">
               {telemetry ? `${telemetry.speedKmh.toFixed(1)} km/h` : '--'}
             </div>
+          </div>
+        </div>
+        <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+          <HeartPulse
+            className="mb-2 h-4 w-4 text-emerald-600"
+            aria-hidden="true"
+          />
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            {t('flights.goproOverlayHeartRate')}
+          </div>
+          <div className="font-mono text-lg font-semibold">
+            {heartRate === null
+              ? t('flights.goproOverlayHeartRateUnavailable')
+              : `${heartRate} bpm`}
           </div>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
