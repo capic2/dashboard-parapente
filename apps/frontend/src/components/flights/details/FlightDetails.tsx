@@ -20,6 +20,7 @@ import {
 import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
 import {
   useCreateFlightGoproOverlayJob,
+  useGoproOverlayPreview,
   useGoproOverlayJobStream,
 } from '../../../hooks/gopro/useGoproOverlay';
 import { useToast } from '../../../hooks/useToast';
@@ -85,14 +86,20 @@ export function FlightDetails({
   const [isCancellingGoproOverlay, setIsCancellingGoproOverlay] =
     useState(false);
   const [goproOverlayGpxOffset, setGoproOverlayGpxOffset] = useState(
-    String(flight.gopro_overlay_gpx_offset ?? 0)
+    String(flight.gopro_overlay_gpx_offset ?? '')
   );
+  const [goproOverlayInitialGpxOffset, setGoproOverlayInitialGpxOffset] =
+    useState<string | null>(null);
   const [downloadingMedia, setDownloadingMedia] =
     useState<DownloadableFlightMedia | null>(null);
 
   const hasGpx = Boolean(flight.gpx_file_path);
   const hasVideo = hasFlightVideo(flight);
   const hasGoproCameraVideo = flight.gopro_camera_file_exists === true;
+  const goproOverlayPreview = useGoproOverlayPreview(
+    flight.id,
+    hasGpx && hasGoproCameraVideo
+  );
   const hasPersistedGoproOverlay = hasFlightGoproOverlay(flight);
   const effectiveGoproOverlayJobId =
     goproOverlayJobId ?? flight.gopro_overlay_job_id ?? null;
@@ -143,6 +150,8 @@ export function FlightDetails({
         date: localDate.toLocaleDateString(i18n.language),
       });
     })();
+  const automaticGoproOverlayOffset =
+    goproOverlayPreview.data?.alignment.automatic_offset_seconds ?? null;
 
   useEffect(() => {
     activeFlightIdRef.current = flight.id;
@@ -160,9 +169,28 @@ export function FlightDetails({
 
   useEffect(() => {
     if (!isGoproOverlayDialogOpen) {
-      setGoproOverlayGpxOffset(String(flight.gopro_overlay_gpx_offset ?? 0));
+      setGoproOverlayGpxOffset(String(flight.gopro_overlay_gpx_offset ?? ''));
+      setGoproOverlayInitialGpxOffset(null);
     }
   }, [flight.gopro_overlay_gpx_offset, isGoproOverlayDialogOpen]);
+
+  useEffect(() => {
+    if (
+      isGoproOverlayDialogOpen &&
+      flight.gopro_overlay_gpx_offset == null &&
+      automaticGoproOverlayOffset != null &&
+      !goproOverlayGpxOffset.trim()
+    ) {
+      const automaticOffset = String(automaticGoproOverlayOffset);
+      setGoproOverlayInitialGpxOffset(automaticOffset);
+      setGoproOverlayGpxOffset(automaticOffset);
+    }
+  }, [
+    automaticGoproOverlayOffset,
+    flight.gopro_overlay_gpx_offset,
+    goproOverlayGpxOffset,
+    isGoproOverlayDialogOpen,
+  ]);
 
   useEffect(() => {
     setNotesText(flight.notes ?? '');
@@ -298,8 +326,21 @@ export function FlightDetails({
   const handleOpenGoproOverlayDialog = () => {
     if (createGoproOverlayJob.isPending || isGoproOverlayRunning) return;
     setIsGoproOverlayDialogOpen(true);
+    if (flight.gopro_overlay_gpx_offset != null) {
+      const storedOffset = String(flight.gopro_overlay_gpx_offset);
+      setGoproOverlayInitialGpxOffset(storedOffset);
+      setGoproOverlayGpxOffset(storedOffset);
+      return;
+    }
+    if (automaticGoproOverlayOffset != null) {
+      const automaticOffset = String(automaticGoproOverlayOffset);
+      setGoproOverlayInitialGpxOffset(automaticOffset);
+      setGoproOverlayGpxOffset(automaticOffset);
+      return;
+    }
+    setGoproOverlayInitialGpxOffset(null);
     if (!goproOverlayGpxOffset.trim()) {
-      setGoproOverlayGpxOffset('0');
+      setGoproOverlayGpxOffset('');
     }
   };
 
@@ -572,9 +613,25 @@ export function FlightDetails({
               />
 
               <TextField className="flex flex-col gap-1">
-                <Label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-                  {t('flights.goproOverlayGpxOffsetLabel')}
-                </Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                    {t('flights.goproOverlayGpxOffsetLabel')}
+                  </Label>
+                  {goproOverlayInitialGpxOffset !== null && (
+                    <Button
+                      variant="ghost"
+                      className="min-h-8 px-2 py-1 text-xs"
+                      onPress={() =>
+                        setGoproOverlayGpxOffset(goproOverlayInitialGpxOffset)
+                      }
+                      isDisabled={
+                        goproOverlayGpxOffset === goproOverlayInitialGpxOffset
+                      }
+                    >
+                      {t('common.reset')}
+                    </Button>
+                  )}
+                </div>
                 <Input
                   type="number"
                   step="0.1"
