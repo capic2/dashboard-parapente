@@ -181,6 +181,11 @@ export function GoproOverlaySyncPreview({
                   })}
             </button>
           </div>
+          {isGenerating && (
+            <p className="text-xs text-amber-200">
+              {t('flights.goproPreviewGeneratingNotice')}
+            </p>
+          )}
           {(preview.data?.video.preview_status === 'failed' ||
             generatePreview.isError) && (
             <p role="alert" className="text-xs text-amber-300">

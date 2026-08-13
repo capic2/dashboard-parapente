@@ -984,6 +984,7 @@
     "goproPreviewAvailable": "Available: {{count}} min",
     "goproPreviewGenerate": "Generate {{count}} min",
     "goproPreviewGenerating": "Generating…",
+    "goproPreviewGeneratingNotice": "The preview is being generated. You can play it as soon as it becomes available.",
     "goproPreviewFallback": "The low-resolution preview could not be generated. The original video remains available.",
     "goproOverlayHeartRate": "Heart rate",
     "goproOverlayHeartRateUnavailable": "BPM unavailable",
