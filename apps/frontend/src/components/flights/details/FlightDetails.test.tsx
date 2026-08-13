@@ -400,7 +400,7 @@ describe('FlightDetails GoPro overlay action', () => {
         name: 'flights.goproOverlayGenerateTitle',
       })
     ).toBeInTheDocument();
-    expect(screen.getByLabelText('GPX offset (seconds)')).toHaveValue(8);
+    expect(screen.getByLabelText('GPX offset (seconds)')).toHaveValue(0);
 
     fireEvent.change(screen.getByLabelText('GPX offset (seconds)'), {
       target: { value: '2.5' },
@@ -416,7 +416,7 @@ describe('FlightDetails GoPro overlay action', () => {
     expect(formData.get('gpx_offset')).toBe('2.5');
   });
 
-  it('prefills the GPX offset from the computed preview value', () => {
+  it('keeps the automatic alignment separate from the manual GPX offset', () => {
     previewMock.current = {
       isPending: false,
       data: {
@@ -460,7 +460,7 @@ describe('FlightDetails GoPro overlay action', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Generate overlay/u }));
 
-    expect(screen.getByLabelText('GPX offset (seconds)')).toHaveValue(8);
+    expect(screen.getByLabelText('GPX offset (seconds)')).toHaveValue(0);
   });
 
   it('requests a longer low-resolution preview from the duration slider', async () => {
@@ -552,7 +552,7 @@ describe('FlightDetails GoPro overlay action', () => {
     ).toBeInTheDocument();
   });
 
-  it('resets the GPX offset to the original computed value', async () => {
+  it('resets the manual GPX offset without applying automatic alignment', async () => {
     previewMock.current = {
       isPending: false,
       data: {
@@ -598,13 +598,13 @@ describe('FlightDetails GoPro overlay action', () => {
 
     const offsetInput = screen.getByLabelText('GPX offset (seconds)');
     await waitFor(() => {
-      expect(offsetInput).toHaveValue(8);
+      expect(offsetInput).toHaveValue(0);
     });
 
     fireEvent.change(offsetInput, { target: { value: '2.5' } });
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
 
-    expect(offsetInput).toHaveValue(8);
+    expect(offsetInput).toHaveValue(0);
   });
 
   it('shows video and GoPro job details in the logs tab', () => {

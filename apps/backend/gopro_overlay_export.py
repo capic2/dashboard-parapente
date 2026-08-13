@@ -1330,6 +1330,9 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 )
 
         command_metadata["render_gpx_path"] = str(render_gpx_path)
+        command_metadata["video_time_start"] = (
+            "video-created" if probe_video_start_time(video_path) is not None else "file-modified"
+        )
         _append_job_log(log_path, f"Render GPX: {render_gpx_path.name}")
 
         if pip_path:
@@ -1764,6 +1767,8 @@ def _run_job(job_id: str) -> None:
         "--use-gpx-only",
         "--gpx",
         str(render_gpx_path),
+        "--video-time-start",
+        str(prepared_command.get("video_time_start") or "video-created"),
         "--layout",
         "xml",
         "--layout-xml",

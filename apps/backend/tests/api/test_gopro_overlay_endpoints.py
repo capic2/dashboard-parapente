@@ -2062,12 +2062,21 @@ def test_prepare_queued_job_uses_prepared_pip_path(tmp_path, monkeypatch, test_d
     pip_path = tmp_path / "pip.mp4"
     prepared_pip_path = tmp_path / "prepared-pip.mp4"
     video_path.write_bytes(b"video")
-    gpx_path.write_text("<gpx />")
+    gpx_path.write_text(
+        '<gpx xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>'
+        '<trkpt lat="45" lon="5"><time>2026-08-08T09:30:43Z</time></trkpt>'
+        "</trkseg></trk></gpx>"
+    )
     pip_path.write_bytes(b"pip")
     prepared_pip_path.write_bytes(b"prepared")
     pip_calls: list[dict] = []
     monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
     monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "probe_video_start_time",
+        lambda _: gopro_overlay_export._parse_utc_datetime("2026-08-08T09:30:28.517Z"),
+    )
     monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
 
     def fake_prepare_pip(*_args, **kwargs):
@@ -2094,6 +2103,39 @@ def test_prepare_queued_job_uses_prepared_pip_path(tmp_path, monkeypatch, test_d
     assert pip_calls[0]["gpx_offset"] == 0.0
     render_gpx_path = Path(prepared["command"]["render_gpx_path"])
     assert render_gpx_path.name.startswith("gpx-offset-")
+    assert "2026-08-08T09:30:45.500000Z" in render_gpx_path.read_text()
+    assert prepared["command"]["video_time_start"] == "video-created"
+
+
+def test_prepare_queued_job_falls_back_to_file_mtime_for_render_timeline(
+    tmp_path, monkeypatch, test_db
+):
+    layout_dir = tmp_path / "layouts"
+    layout_dir.mkdir()
+    (layout_dir / "layout_parapente_1080.xml").write_text("<layout />")
+    video_path = tmp_path / "source.mp4"
+    gpx_path = tmp_path / "source.gpx"
+    video_path.write_bytes(b"video")
+    gpx_path.write_text("<gpx />")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_start_time", lambda _: None)
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+
+    job = create_gopro_overlay_job_from_paths(
+        video_path=video_path,
+        gpx_path=gpx_path,
+        pip_path=None,
+        layout_id="parapente-1080",
+        output_filename="overlay.mp4",
+    )
+    queued_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"], include_command=True)
+    assert queued_job is not None
+
+    prepared = gopro_overlay_export._prepare_queued_job(job["job_id"], queued_job)
+
+    assert prepared is not None
+    assert prepared["command"]["video_time_start"] == "file-modified"
 
 
 @pytest.mark.asyncio
@@ -2726,6 +2768,11 @@ def test_run_job_prepares_inputs_before_starting_process(
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PROFILE", "nvgpu")
     monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
     monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: 421.483)
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "probe_video_start_time",
+        lambda _: gopro_overlay_export._parse_utc_datetime("2026-08-08T09:30:28.517Z"),
+    )
     monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
     monkeypatch.setattr(gopro_overlay_export, "_verify_video_output", lambda _: (True, None))
     monkeypatch.setattr(
@@ -2777,6 +2824,7 @@ def test_run_job_prepares_inputs_before_starting_process(
     assert popen.call_args.kwargs["cwd"] == str(tmp_path / "runner-root")
     assert Path(command[command.index("--layout-xml") + 1]).parent == work_dir
     assert command[command.index("--overlay-size") + 1] == "1920x1080"
+    assert command[command.index("--video-time-start") + 1] == "video-created"
     assert "--gpx-offset" not in command
     assert Path(command[-2]) == video_path
     assert Path(command[-1]) == Path(job["temp_output_path"])
@@ -2809,6 +2857,11 @@ def test_run_job_keeps_manual_gpx_offset_out_of_pip_preparation(
     monkeypatch.setattr(config, "GOPRO_OVERLAY_ROOT", str(tmp_path / "runner-root"))
     monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
     monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: 421.483)
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "probe_video_start_time",
+        lambda _: gopro_overlay_export._parse_utc_datetime("2026-08-08T09:30:28.517Z"),
+    )
     monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
     monkeypatch.setattr(gopro_overlay_export, "_verify_video_output", lambda _: (True, None))
     monkeypatch.setattr(
