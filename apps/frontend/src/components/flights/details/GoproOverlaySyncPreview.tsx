@@ -1,7 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Gauge, HeartPulse, MapPin, Mountain, TimerReset } from 'lucide-react';
-import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
+import {
+  useGenerateGoproPreview,
+  useGoproOverlayPreview,
+} from '../../../hooks/gopro/useGoproOverlay';
 import { getApiUrlWithSearchParams } from '../../../lib/api';
 import { useAuthStore } from '../../../stores/authStore';
 import { telemetryAtTimestamp } from './goproSyncTelemetry';
@@ -27,8 +31,11 @@ export function GoproOverlaySyncPreview({
 }: GoproOverlaySyncPreviewProps) {
   const { t } = useTranslation();
   const token = useAuthStore((state) => state.token);
+  const queryClient = useQueryClient();
   const preview = useGoproOverlayPreview(flightId, true);
+  const generatePreview = useGenerateGoproPreview(flightId);
   const [videoTime, setVideoTime] = useState(0);
+  const [requestedMinutes, setRequestedMinutes] = useState(3);
   const parsedOffset = Number(offset);
   const manualOffset = Number.isFinite(parsedOffset) ? parsedOffset : 0;
   const automaticOffset = preview.data?.alignment.automatic_offset_seconds ?? 0;
@@ -43,9 +50,41 @@ export function GoproOverlaySyncPreview({
     : null;
   const heartRate = telemetry?.heart_rate ?? null;
   const videoUrl = getApiUrlWithSearchParams(
-    `flights/${flightId}/gopro-camera`,
-    { access_token: token }
+    `flights/${flightId}/gopro-camera/preview`,
+    {
+      access_token: token,
+      version: String(preview.data?.video.preview_available_duration_seconds),
+    }
   );
+
+  const availableMinutes = Math.max(
+    0,
+    Math.ceil(
+      (preview.data?.video.preview_available_duration_seconds ?? 0) / 60
+    )
+  );
+  const maxMinutes = Math.max(
+    3,
+    Math.floor((preview.data?.video.preview_max_duration_seconds ?? 900) / 60)
+  );
+  const isGenerating = preview.data?.video.preview_status === 'generating';
+  const requestedDurationCoversSource =
+    requestedMinutes * 60 >= (preview.data?.video.duration_seconds ?? Infinity);
+
+  useEffect(() => {
+    setRequestedMinutes((current) => Math.max(current, availableMinutes, 3));
+  }, [availableMinutes]);
+
+  const handleGeneratePreview = async () => {
+    try {
+      await generatePreview.mutateAsync(requestedMinutes * 60);
+      await queryClient.invalidateQueries({
+        queryKey: ['flights', flightId, 'gopro-overlay-preview'],
+      });
+    } catch {
+      // The existing preview remains usable; the inline fallback explains the failure.
+    }
+  };
 
   const adjustOffset = (delta: number) => {
     onOffsetChange((manualOffset + delta).toFixed(1));
@@ -82,6 +121,12 @@ export function GoproOverlaySyncPreview({
             setVideoTime(event.currentTarget.currentTime)
           }
           onSeeked={(event) => setVideoTime(event.currentTarget.currentTime)}
+          onLoadedMetadata={(event) => {
+            event.currentTarget.currentTime = Math.min(
+              videoTime,
+              event.currentTarget.duration || videoTime
+            );
+          }}
           aria-label={t('flights.goproOverlayCameraPreview')}
         >
           <track kind="captions" />
@@ -89,6 +134,64 @@ export function GoproOverlaySyncPreview({
         <div className="flex items-center justify-between px-3 py-2 font-mono text-xs text-gray-200">
           <span>{t('flights.goproOverlayVideoTime')}</span>
           <span>{formatSeconds(videoTime)}</span>
+        </div>
+        <div className="space-y-2 border-t border-gray-800 px-3 py-3 text-gray-100">
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <label htmlFor="gopro-preview-duration">
+              {t('flights.goproPreviewDuration')}
+            </label>
+            <span className="font-mono">
+              {t('flights.goproPreviewMinutes', { count: requestedMinutes })}
+            </span>
+          </div>
+          <input
+            id="gopro-preview-duration"
+            className="w-full accent-sky-500"
+            type="range"
+            min={3}
+            max={maxMinutes}
+            step={1}
+            value={Math.min(requestedMinutes, maxMinutes)}
+            onChange={(event) =>
+              setRequestedMinutes(Number(event.target.value))
+            }
+          />
+          <div className="flex items-center justify-between gap-3 text-xs text-gray-300">
+            <span>
+              {t('flights.goproPreviewAvailable', {
+                count: availableMinutes,
+              })}
+            </span>
+            <button
+              type="button"
+              className="cursor-pointer rounded-md bg-sky-600 px-3 py-2 font-medium text-white transition-colors hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={
+                isGenerating ||
+                generatePreview.isPending ||
+                requestedMinutes <= availableMinutes ||
+                (requestedDurationCoversSource &&
+                  preview.data?.video.preview_status === 'ready')
+              }
+              onClick={() => void handleGeneratePreview()}
+            >
+              {isGenerating || generatePreview.isPending
+                ? t('flights.goproPreviewGenerating')
+                : t('flights.goproPreviewGenerate', {
+                    count: requestedMinutes,
+                  })}
+            </button>
+          </div>
+          {isGenerating && (
+            <p className="text-xs text-amber-200">
+              {t('flights.goproPreviewGeneratingNotice')}
+            </p>
+          )}
+          {(preview.data?.video.preview_status === 'failed' ||
+            generatePreview.isError) && (
+            <p role="alert" className="text-xs text-amber-300">
+              {t('flights.goproPreviewFallback')}
+            </p>
+          )}
         </div>
       </div>
 

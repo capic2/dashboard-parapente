@@ -1,7 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useGoproOverlayJobStream } from './useGoproOverlay';
+import {
+  goproPreviewRefetchInterval,
+  useGoproOverlayJobStream,
+} from './useGoproOverlay';
 
 const apiGet = vi.hoisted(() => vi.fn());
 
@@ -95,5 +98,14 @@ describe('useGoproOverlayJobStream', () => {
       'access_token=overlay-token'
     );
     expect(apiGet).not.toHaveBeenCalled();
+  });
+});
+
+describe('goproPreviewRefetchInterval', () => {
+  it('polls running encodes quickly and missing previews at scanner cadence', () => {
+    expect(goproPreviewRefetchInterval('generating')).toBe(2000);
+    expect(goproPreviewRefetchInterval('missing')).toBe(30_000);
+    expect(goproPreviewRefetchInterval('ready')).toBe(false);
+    expect(goproPreviewRefetchInterval('failed')).toBe(false);
   });
 });

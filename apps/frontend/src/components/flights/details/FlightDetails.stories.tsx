@@ -111,6 +111,10 @@ const defaultHandlers = [
       video: {
         duration_seconds: 600,
         start_time: '2026-03-18T10:00:00Z',
+        preview_status: 'ready',
+        preview_available_duration_seconds: 180,
+        preview_requested_duration_seconds: 180,
+        preview_max_duration_seconds: 600,
       },
       gpx: {
         start_time: '2026-03-18T10:00:08Z',

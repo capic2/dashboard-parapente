@@ -300,6 +300,21 @@ GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT = int(
     os.getenv("BACKEND_GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT", "1080")
 )
 
+# Short browser-friendly camera preview used to synchronize the GoPro overlay.
+GOPRO_PREVIEW_ENABLED = os.getenv("BACKEND_GOPRO_PREVIEW_ENABLED", "true").lower() == "true"
+GOPRO_PREVIEW_DEFAULT_SECONDS = _int_env_at_least("BACKEND_GOPRO_PREVIEW_DEFAULT_SECONDS", 180, 180)
+GOPRO_PREVIEW_MAX_SECONDS = _int_env_at_least(
+    "BACKEND_GOPRO_PREVIEW_MAX_SECONDS", 900, GOPRO_PREVIEW_DEFAULT_SECONDS
+)
+GOPRO_PREVIEW_MAX_WIDTH = _int_env_at_least("BACKEND_GOPRO_PREVIEW_MAX_WIDTH", 854, 2)
+GOPRO_PREVIEW_MAX_HEIGHT = _int_env_at_least("BACKEND_GOPRO_PREVIEW_MAX_HEIGHT", 480, 2)
+GOPRO_PREVIEW_QUALITY = _int_env_at_least("BACKEND_GOPRO_PREVIEW_QUALITY", 28, 0)
+GOPRO_PREVIEW_SCAN_INTERVAL_SECONDS = _int_env_at_least(
+    "BACKEND_GOPRO_PREVIEW_SCAN_INTERVAL_SECONDS", 30, 1
+)
+GOPRO_PREVIEW_STABLE_SECONDS = _int_env_at_least("BACKEND_GOPRO_PREVIEW_STABLE_SECONDS", 30, 1)
+GOPRO_PREVIEW_TIMEOUT_SECONDS = _int_env_at_least("BACKEND_GOPRO_PREVIEW_TIMEOUT_SECONDS", 1800, 1)
+
 # ============================================================================
 # VALIDATION
 # ============================================================================

@@ -30,7 +30,15 @@ export type GoproOverlayJob = {
 };
 
 export type GoproOverlayPreview = {
-  video: { duration_seconds: number; start_time: string };
+  video: {
+    duration_seconds: number;
+    start_time: string;
+    preview_status: 'missing' | 'generating' | 'ready' | 'failed';
+    preview_available_duration_seconds: number;
+    preview_requested_duration_seconds: number;
+    preview_max_duration_seconds: number;
+    preview_error?: string | null;
+  };
   gpx: {
     start_time: string;
     end_time: string;
@@ -44,6 +52,14 @@ export type GoproOverlayPreview = {
   };
 };
 
+export function goproPreviewRefetchInterval(
+  status?: GoproOverlayPreview['video']['preview_status']
+) {
+  if (status === 'generating') return 2000;
+  if (status === 'missing') return 30_000;
+  return false;
+}
+
 export function useGoproOverlayPreview(flightId: string, enabled: boolean) {
   return useQuery({
     queryKey: ['flights', flightId, 'gopro-overlay-preview'],
@@ -52,6 +68,19 @@ export function useGoproOverlayPreview(flightId: string, enabled: boolean) {
         .get(`flights/${flightId}/gopro-overlay/preview`)
         .json<GoproOverlayPreview>(),
     enabled,
+    refetchInterval: (query) =>
+      goproPreviewRefetchInterval(query.state.data?.video.preview_status),
+  });
+}
+
+export function useGenerateGoproPreview(flightId: string) {
+  return useMutation({
+    mutationFn: (durationSeconds: number) =>
+      api
+        .post(`flights/${flightId}/gopro-camera/preview`, {
+          json: { duration_seconds: durationSeconds },
+        })
+        .json(),
   });
 }
 
