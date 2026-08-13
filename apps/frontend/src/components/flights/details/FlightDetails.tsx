@@ -20,7 +20,6 @@ import {
 import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
 import {
   useCreateFlightGoproOverlayJob,
-  useGoproOverlayPreview,
   useGoproOverlayJobStream,
 } from '../../../hooks/gopro/useGoproOverlay';
 import { useToast } from '../../../hooks/useToast';
@@ -86,7 +85,7 @@ export function FlightDetails({
   const [isCancellingGoproOverlay, setIsCancellingGoproOverlay] =
     useState(false);
   const [goproOverlayGpxOffset, setGoproOverlayGpxOffset] = useState(
-    String(flight.gopro_overlay_gpx_offset ?? '')
+    String(flight.gopro_overlay_gpx_offset ?? 0)
   );
   const [goproOverlayInitialGpxOffset, setGoproOverlayInitialGpxOffset] =
     useState<string | null>(null);
@@ -96,10 +95,6 @@ export function FlightDetails({
   const hasGpx = Boolean(flight.gpx_file_path);
   const hasVideo = hasFlightVideo(flight);
   const hasGoproCameraVideo = flight.gopro_camera_file_exists === true;
-  const goproOverlayPreview = useGoproOverlayPreview(
-    flight.id,
-    hasGpx && hasGoproCameraVideo
-  );
   const hasPersistedGoproOverlay = hasFlightGoproOverlay(flight);
   const effectiveGoproOverlayJobId =
     goproOverlayJobId ?? flight.gopro_overlay_job_id ?? null;
@@ -150,9 +145,6 @@ export function FlightDetails({
         date: localDate.toLocaleDateString(i18n.language),
       });
     })();
-  const automaticGoproOverlayOffset =
-    goproOverlayPreview.data?.alignment.automatic_offset_seconds ?? null;
-
   useEffect(() => {
     activeFlightIdRef.current = flight.id;
     setActiveTab('infos');
@@ -169,28 +161,10 @@ export function FlightDetails({
 
   useEffect(() => {
     if (!isGoproOverlayDialogOpen) {
-      setGoproOverlayGpxOffset(String(flight.gopro_overlay_gpx_offset ?? ''));
+      setGoproOverlayGpxOffset(String(flight.gopro_overlay_gpx_offset ?? 0));
       setGoproOverlayInitialGpxOffset(null);
     }
   }, [flight.gopro_overlay_gpx_offset, isGoproOverlayDialogOpen]);
-
-  useEffect(() => {
-    if (
-      isGoproOverlayDialogOpen &&
-      flight.gopro_overlay_gpx_offset == null &&
-      automaticGoproOverlayOffset != null &&
-      !goproOverlayGpxOffset.trim()
-    ) {
-      const automaticOffset = String(automaticGoproOverlayOffset);
-      setGoproOverlayInitialGpxOffset(automaticOffset);
-      setGoproOverlayGpxOffset(automaticOffset);
-    }
-  }, [
-    automaticGoproOverlayOffset,
-    flight.gopro_overlay_gpx_offset,
-    goproOverlayGpxOffset,
-    isGoproOverlayDialogOpen,
-  ]);
 
   useEffect(() => {
     setNotesText(flight.notes ?? '');
@@ -332,16 +306,8 @@ export function FlightDetails({
       setGoproOverlayGpxOffset(storedOffset);
       return;
     }
-    if (automaticGoproOverlayOffset != null) {
-      const automaticOffset = String(automaticGoproOverlayOffset);
-      setGoproOverlayInitialGpxOffset(automaticOffset);
-      setGoproOverlayGpxOffset(automaticOffset);
-      return;
-    }
-    setGoproOverlayInitialGpxOffset(null);
-    if (!goproOverlayGpxOffset.trim()) {
-      setGoproOverlayGpxOffset('');
-    }
+    setGoproOverlayInitialGpxOffset('0');
+    setGoproOverlayGpxOffset('0');
   };
 
   const downloadBlob = async (
