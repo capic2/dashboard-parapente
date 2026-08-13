@@ -2169,6 +2169,7 @@ def _enqueue_gopro_overlay_job_in_rq(job_id: str) -> None:
         job_id=_rq_job_id(job_id),
         timeout=config.JOB_QUEUE_TIMEOUT_SECONDS,
         queue_name=config.GOPRO_OVERLAY_QUEUE_NAME,
+        at_front=True,
     )
 
 

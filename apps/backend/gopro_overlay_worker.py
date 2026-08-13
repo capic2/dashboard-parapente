@@ -56,11 +56,12 @@ def main() -> None:
     if queued_count:
         logger.info("Enqueued %s pending GoPro overlay job(s)", queued_count)
 
-    queue = get_queue(config.GOPRO_OVERLAY_QUEUE_NAME)
-    worker = Worker([queue], connection=get_redis_connection())
+    queue_names = [config.GOPRO_OVERLAY_QUEUE_NAME, config.GOPRO_PREVIEW_QUEUE_NAME]
+    queues = [get_queue(queue_name) for queue_name in queue_names]
+    worker = Worker(queues, connection=get_redis_connection())
     logger.info(
-        "Starting GoPro overlay RQ worker for queue '%s' (%s)",
-        config.GOPRO_OVERLAY_QUEUE_NAME,
+        "Starting GoPro RQ worker for queues '%s' in priority order (%s)",
+        ", ".join(queue_names),
         _gpu_runtime_summary(),
     )
     worker.work(with_scheduler=True)
