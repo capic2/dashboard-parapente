@@ -84,7 +84,7 @@ from gopro_overlay_export import (
     save_uploaded_file,
     stream_gopro_overlay_job,
 )
-from gopro_preview_proxy import get_preview_state, request_preview
+import gopro_preview_proxy
 from models import (
     EmagramAnalysis,
     Flight,
@@ -5785,7 +5785,7 @@ def get_flight_gopro_overlay_preview(
         raise HTTPException(status_code=422, detail="Unable to align camera video and GPX track")
     automatic_offset = (gpx_start - aligned_video_start).total_seconds()
     manual_offset = float(flight.gopro_overlay_gpx_offset or 0.0)
-    preview_state = get_preview_state(camera_path)
+    preview_state = gopro_preview_proxy.get_preview_state(camera_path)
     return GoproOverlayPreview(
         video={
             "duration_seconds": video_duration,
@@ -5794,7 +5794,8 @@ def get_flight_gopro_overlay_preview(
             "preview_available_duration_seconds": preview_state.available_duration_seconds,
             "preview_requested_duration_seconds": preview_state.requested_duration_seconds,
             "preview_max_duration_seconds": min(
-                config.GOPRO_PREVIEW_MAX_SECONDS, max(180, math.ceil(video_duration))
+                config.GOPRO_PREVIEW_MAX_SECONDS,
+                max(config.GOPRO_PREVIEW_DEFAULT_SECONDS, math.ceil(video_duration)),
             ),
             "preview_error": preview_state.error,
         },
@@ -5829,9 +5830,13 @@ def stream_flight_gopro_camera_preview(
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
     camera_path = _flight_gopro_camera_path(db, flight)
-    preview_state = get_preview_state(camera_path)
-    preview_path = camera_path.with_name("camera.preview.mp4")
-    video_path = preview_path if preview_state.available_duration_seconds > 0 else camera_path
+    preview_state = gopro_preview_proxy.get_preview_state(camera_path)
+    preview_path = camera_path.with_name(gopro_preview_proxy.PREVIEW_FILENAME)
+    video_path = (
+        preview_path
+        if preview_state.available_duration_seconds > 0 and preview_path.is_file()
+        else camera_path
+    )
     return FileResponse(path=video_path, media_type="video/mp4", content_disposition_type="inline")
 
 
@@ -5854,7 +5859,7 @@ def generate_flight_gopro_camera_preview(
         )
     camera_path = _flight_gopro_camera_path(db, flight)
     return GoproPreviewState.model_validate(
-        asdict(request_preview(camera_path, request.duration_seconds))
+        asdict(gopro_preview_proxy.request_preview(camera_path, request.duration_seconds))
     )
 
 

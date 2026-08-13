@@ -209,6 +209,36 @@ def test_gopro_camera_preview_endpoint_serves_current_proxy(
     assert response.content == b"proxy-video"
 
 
+def test_gopro_camera_preview_endpoint_falls_back_when_proxy_file_is_missing(
+    client: TestClient, sample_flight, tmp_path, monkeypatch
+) -> None:
+    input_dir = tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01"
+    input_dir.mkdir(parents=True)
+    camera_path = input_dir / "camera.mp4"
+    camera_path.write_bytes(b"camera-video")
+    fingerprint = camera_path.stat()
+    (input_dir / ".camera.preview.json").write_text(
+        json.dumps(
+            {
+                "profile_version": 1,
+                "source": {
+                    "size": fingerprint.st_size,
+                    "mtime_ns": fingerprint.st_mtime_ns,
+                },
+                "status": "ready",
+                "available_duration_seconds": 180,
+                "requested_duration_seconds": 180,
+            }
+        )
+    )
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+
+    response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-camera/preview")
+
+    assert response.status_code == 200
+    assert response.content == b"camera-video"
+
+
 def test_request_gopro_camera_preview_extension(
     client: TestClient, sample_flight, tmp_path, monkeypatch
 ) -> None:

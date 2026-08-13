@@ -13,7 +13,7 @@ import threading
 import time
 import uuid
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -247,11 +247,11 @@ def _file_lock(lock_path: Path) -> Iterator[None]:
             fcntl.flock(lock_file, fcntl.LOCK_UN)
 
 
-def _preview_lock(camera_path: Path) -> Iterator[None]:
+def _preview_lock(camera_path: Path) -> AbstractContextManager[None]:
     return _file_lock(camera_path.with_name(LOCK_FILENAME))
 
 
-def _state_lock(camera_path: Path) -> Iterator[None]:
+def _state_lock(camera_path: Path) -> AbstractContextManager[None]:
     return _file_lock(camera_path.with_name(STATE_LOCK_FILENAME))
 
 
@@ -438,7 +438,8 @@ def scan_for_gopro_previews() -> int:
             ):
                 request_preview(camera_path, config.GOPRO_PREVIEW_DEFAULT_SECONDS)
                 requested += 1
-        except OSError:
+        except Exception:
+            logger.warning("GoPro preview scan skipped %s", camera_path, exc_info=True)
             continue
     for stale_path in _STABILITY_OBSERVATIONS.keys() - observed_paths:
         del _STABILITY_OBSERVATIONS[stale_path]

@@ -43,7 +43,7 @@ def test_rq_job_id_changes_between_generations(tmp_path: Path, monkeypatch) -> N
 
 
 def test_request_preview_is_cached_and_invalidated_when_camera_changes(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path,
 ) -> None:
     camera_path = tmp_path / "camera.mp4"
     camera_path.write_bytes(b"camera")
@@ -64,15 +64,12 @@ def test_request_preview_is_cached_and_invalidated_when_camera_changes(
             }
         )
     )
-    enqueue = patch("gopro_preview_proxy._enqueue_preview").start()
-    try:
+    with patch("gopro_preview_proxy._enqueue_preview") as enqueue:
         assert gopro_preview_proxy.request_preview(camera_path, 180).status == "ready"
         enqueue.assert_not_called()
 
         camera_path.write_bytes(b"replacement-camera")
         state = gopro_preview_proxy.request_preview(camera_path, 180)
-    finally:
-        patch.stopall()
 
     assert state.status == "generating"
     assert state.available_duration_seconds == 0
