@@ -42,6 +42,24 @@ def test_rq_job_id_changes_between_generations(tmp_path: Path, monkeypatch) -> N
     assert len(set(enqueued_ids)) == 2
 
 
+def test_rq_preview_uses_dedicated_queue(tmp_path: Path, monkeypatch) -> None:
+    camera_path = tmp_path / "camera.mp4"
+    camera_path.write_bytes(b"camera")
+    fingerprint = gopro_preview_proxy._source_fingerprint(camera_path)
+    enqueued: list[dict[str, object]] = []
+
+    monkeypatch.setattr(config, "GOPRO_PREVIEW_QUEUE_NAME", "preview-test-queue")
+    monkeypatch.setattr("job_queue.is_rq_enabled", lambda: True)
+    monkeypatch.setattr(
+        "job_queue.enqueue_once",
+        lambda *_args, **kwargs: enqueued.append(kwargs),
+    )
+
+    gopro_preview_proxy._enqueue_preview(camera_path, fingerprint, 180, "generation")
+
+    assert enqueued[0]["queue_name"] == "preview-test-queue"
+
+
 def test_request_preview_is_cached_and_invalidated_when_camera_changes(
     tmp_path: Path,
 ) -> None:

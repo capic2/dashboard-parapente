@@ -223,7 +223,7 @@ def _enqueue_preview(
             generation_id,
             job_id=f"gopro-preview-{digest}",
             timeout=config.GOPRO_PREVIEW_TIMEOUT_SECONDS,
-            queue_name=config.GOPRO_OVERLAY_QUEUE_NAME,
+            queue_name=config.GOPRO_PREVIEW_QUEUE_NAME,
         )
         return
 

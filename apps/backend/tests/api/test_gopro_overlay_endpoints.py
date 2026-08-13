@@ -2466,6 +2466,7 @@ def test_enqueue_gopro_overlay_job_uses_dedicated_rq_queue(monkeypatch):
                 "job_id": "gopro-overlay-job-rq",
                 "timeout": config.JOB_QUEUE_TIMEOUT_SECONDS,
                 "queue_name": "overlay-test-queue",
+                "at_front": True,
             },
         }
     ]
