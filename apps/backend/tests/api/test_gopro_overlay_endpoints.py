@@ -2107,7 +2107,7 @@ def test_prepare_queued_job_uses_prepared_pip_path(tmp_path, monkeypatch, test_d
     assert prepared["command"]["video_time_start"] == "video-created"
 
 
-def test_prepare_queued_job_falls_back_to_file_mtime_for_render_timeline(
+def test_prepare_queued_job_omits_unreliable_file_time_for_render_timeline(
     tmp_path, monkeypatch, test_db
 ):
     layout_dir = tmp_path / "layouts"
@@ -2135,7 +2135,7 @@ def test_prepare_queued_job_falls_back_to_file_mtime_for_render_timeline(
     prepared = gopro_overlay_export._prepare_queued_job(job["job_id"], queued_job)
 
     assert prepared is not None
-    assert prepared["command"]["video_time_start"] == "file-modified"
+    assert "video_time_start" not in prepared["command"]
 
 
 @pytest.mark.asyncio
