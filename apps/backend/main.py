@@ -19,6 +19,7 @@ import config
 import models  # noqa: F401 - imported for side effects (model registration)
 from database import Base, SessionLocal, engine
 from gopro_overlay_export import start_gopro_overlay_worker, stop_gopro_overlay_worker
+from gopro_preview_proxy import start_preview_scanner, stop_preview_scanner
 from metrics import setup_metrics
 from models import Site  # Needed for database initialization
 from routes import public_router, router
@@ -502,11 +503,13 @@ async def lifespan(app: FastAPI):
     if not config.TESTING:
         start_video_export_worker()
         start_gopro_overlay_worker()
+        start_preview_scanner()
 
     yield
 
     # Shutdown
     logger.info("⏹️ Shutting down Dashboard Parapente API...")
+    stop_preview_scanner()
     stop_gopro_overlay_worker()
     stop_video_export_worker()
     stop_scheduler()

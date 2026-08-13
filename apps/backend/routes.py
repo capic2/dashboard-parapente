@@ -8,6 +8,7 @@ import os
 import subprocess
 import uuid
 import xml.etree.ElementTree as ET
+from dataclasses import asdict
 from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
@@ -83,6 +84,7 @@ from gopro_overlay_export import (
     save_uploaded_file,
     stream_gopro_overlay_job,
 )
+from gopro_preview_proxy import get_preview_state, request_preview
 from models import (
     EmagramAnalysis,
     Flight,
@@ -113,6 +115,8 @@ from schemas import (
     GoproOverlayDependencies,
     GoproOverlayJob,
     GoproOverlayPreview,
+    GoproPreviewRequest,
+    GoproPreviewState,
     GoproOverlayLayoutsResponse,
     GoproOverlayProbeResponse,
     IntervalsPreviewResponse,
@@ -5781,8 +5785,19 @@ def get_flight_gopro_overlay_preview(
         raise HTTPException(status_code=422, detail="Unable to align camera video and GPX track")
     automatic_offset = (gpx_start - aligned_video_start).total_seconds()
     manual_offset = float(flight.gopro_overlay_gpx_offset or 0.0)
+    preview_state = get_preview_state(camera_path)
     return GoproOverlayPreview(
-        video={"duration_seconds": video_duration, "start_time": aligned_video_start},
+        video={
+            "duration_seconds": video_duration,
+            "start_time": aligned_video_start,
+            "preview_status": preview_state.status,
+            "preview_available_duration_seconds": preview_state.available_duration_seconds,
+            "preview_requested_duration_seconds": preview_state.requested_duration_seconds,
+            "preview_max_duration_seconds": min(
+                config.GOPRO_PREVIEW_MAX_SECONDS, max(180, math.ceil(video_duration))
+            ),
+            "preview_error": preview_state.error,
+        },
         gpx={
             "start_time": gpx_start,
             "end_time": gpx_start + timedelta(seconds=gpx_duration),
@@ -5804,6 +5819,43 @@ def stream_flight_gopro_camera(flight_id: str, db: Session = Depends(get_db)) ->
         raise HTTPException(status_code=404, detail="Flight not found")
     camera_path = _flight_gopro_camera_path(db, flight)
     return FileResponse(path=camera_path, media_type="video/mp4", content_disposition_type="inline")
+
+
+@router.get("/flights/{flight_id}/gopro-camera/preview")
+def stream_flight_gopro_camera_preview(
+    flight_id: str, db: Session = Depends(get_db)
+) -> FileResponse:
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    camera_path = _flight_gopro_camera_path(db, flight)
+    preview_state = get_preview_state(camera_path)
+    preview_path = camera_path.with_name("camera.preview.mp4")
+    video_path = preview_path if preview_state.available_duration_seconds > 0 else camera_path
+    return FileResponse(path=video_path, media_type="video/mp4", content_disposition_type="inline")
+
+
+@router.post(
+    "/flights/{flight_id}/gopro-camera/preview",
+    response_model=GoproPreviewState,
+)
+def generate_flight_gopro_camera_preview(
+    flight_id: str,
+    request: GoproPreviewRequest,
+    db: Session = Depends(get_db),
+) -> GoproPreviewState:
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    if request.duration_seconds > config.GOPRO_PREVIEW_MAX_SECONDS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Preview duration must not exceed {config.GOPRO_PREVIEW_MAX_SECONDS} seconds",
+        )
+    camera_path = _flight_gopro_camera_path(db, flight)
+    return GoproPreviewState.model_validate(
+        asdict(request_preview(camera_path, request.duration_seconds))
+    )
 
 
 @router.post(

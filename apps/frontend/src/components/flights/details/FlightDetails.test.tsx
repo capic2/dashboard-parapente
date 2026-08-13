@@ -7,6 +7,7 @@ const {
   apiDelete,
   confirmMock,
   createOverlayMock,
+  generatePreviewMock,
   mockFlight,
   overlayJobStreamMock,
   previewMock,
@@ -16,6 +17,7 @@ const {
   apiDelete: vi.fn(),
   confirmMock: vi.fn(),
   createOverlayMock: vi.fn(),
+  generatePreviewMock: vi.fn(),
   resetOverlayMock: vi.fn(),
   overlayJobStreamMock: { current: null as unknown },
   previewMock: { current: null as unknown },
@@ -207,6 +209,11 @@ vi.mock('../../../hooks/gopro/useGoproOverlay', () => ({
   }),
   useGoproOverlayJobStream: () => ({ job: overlayJobStreamMock.current }),
   useGoproOverlayPreview: () => previewMock.current ?? { isPending: true },
+  useGenerateGoproPreview: () => ({
+    isPending: false,
+    isError: false,
+    mutateAsync: generatePreviewMock,
+  }),
 }));
 
 vi.mock('../../../hooks/useToast', () => ({
@@ -250,6 +257,8 @@ describe('FlightDetails GoPro overlay action', () => {
   beforeEach(() => {
     apiDelete.mockReset();
     createOverlayMock.mockReset();
+    generatePreviewMock.mockReset();
+    generatePreviewMock.mockResolvedValue({ status: 'generating' });
     createOverlayMock.mockResolvedValue({ job_id: 'job-new', job_token: null });
     confirmMock.mockReset();
     confirmMock.mockReturnValue(true);
@@ -346,7 +355,14 @@ describe('FlightDetails GoPro overlay action', () => {
     previewMock.current = {
       isPending: false,
       data: {
-        video: { duration_seconds: 60, start_time: '2026-03-15T14:00:00Z' },
+        video: {
+          duration_seconds: 60,
+          start_time: '2026-03-15T14:00:00Z',
+          preview_status: 'ready',
+          preview_available_duration_seconds: 60,
+          preview_requested_duration_seconds: 60,
+          preview_max_duration_seconds: 180,
+        },
         gpx: {
           start_time: '2026-03-15T14:00:00Z',
           end_time: '2026-03-15T14:01:00Z',
@@ -400,11 +416,18 @@ describe('FlightDetails GoPro overlay action', () => {
     expect(formData.get('gpx_offset')).toBe('2.5');
   });
 
-  it('prefills the GPX offset from the computed preview value', async () => {
+  it('prefills the GPX offset from the computed preview value', () => {
     previewMock.current = {
       isPending: false,
       data: {
-        video: { duration_seconds: 60, start_time: '2026-03-15T14:00:00Z' },
+        video: {
+          duration_seconds: 60,
+          start_time: '2026-03-15T14:00:00Z',
+          preview_status: 'ready',
+          preview_available_duration_seconds: 60,
+          preview_requested_duration_seconds: 60,
+          preview_max_duration_seconds: 180,
+        },
         gpx: {
           start_time: '2026-03-15T14:00:00Z',
           end_time: '2026-03-15T14:01:00Z',
@@ -437,16 +460,69 @@ describe('FlightDetails GoPro overlay action', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Generate overlay/u }));
 
-    await waitFor(() => {
-      expect(screen.getByLabelText('GPX offset (seconds)')).toHaveValue(8);
-    });
+    expect(screen.getByLabelText('GPX offset (seconds)')).toHaveValue(8);
   });
+
+  it('requests a longer low-resolution preview from the duration slider', async () => {
+    previewMock.current = {
+      isPending: false,
+      data: {
+        video: {
+          duration_seconds: 1200,
+          start_time: '2026-03-15T14:00:00Z',
+          preview_status: 'ready',
+          preview_available_duration_seconds: 180,
+          preview_requested_duration_seconds: 180,
+          preview_max_duration_seconds: 601,
+        },
+        gpx: {
+          start_time: '2026-03-15T14:00:00Z',
+          end_time: '2026-03-15T14:20:00Z',
+          duration_seconds: 1200,
+          coordinates: [],
+        },
+        alignment: {
+          automatic_offset_seconds: 0,
+          manual_offset_seconds: 0,
+          effective_offset_seconds: 0,
+        },
+      },
+    };
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Generate overlay/u }));
+    const durationSlider = screen.getByLabelText(
+      'flights.goproPreviewDuration'
+    );
+    expect(durationSlider).toHaveAttribute('max', '10');
+    fireEvent.change(durationSlider, {
+      target: { value: '8' },
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'flights.goproPreviewGenerate' })
+    );
+
+    await waitFor(() => expect(generatePreviewMock).toHaveBeenCalledWith(480));
+  }, 10_000);
 
   it('resets the GPX offset to the original computed value', async () => {
     previewMock.current = {
       isPending: false,
       data: {
-        video: { duration_seconds: 60, start_time: '2026-03-15T14:00:00Z' },
+        video: {
+          duration_seconds: 60,
+          start_time: '2026-03-15T14:00:00Z',
+          preview_status: 'ready',
+          preview_available_duration_seconds: 60,
+          preview_requested_duration_seconds: 60,
+          preview_max_duration_seconds: 180,
+        },
         gpx: {
           start_time: '2026-03-15T14:00:00Z',
           end_time: '2026-03-15T14:01:00Z',

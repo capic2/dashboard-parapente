@@ -1,4 +1,5 @@
 import logging
+import json
 import os
 from datetime import date, datetime
 from io import BytesIO
@@ -161,6 +162,88 @@ def test_gopro_camera_endpoint_does_not_require_a_gpx_file(
     response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-camera")
 
     assert response.status_code == 200
+
+
+def test_gopro_camera_preview_endpoint_falls_back_to_original(
+    client: TestClient, sample_flight, tmp_path, monkeypatch
+) -> None:
+    input_dir = tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01"
+    input_dir.mkdir(parents=True)
+    (input_dir / "camera.mp4").write_bytes(b"camera-video")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+
+    response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-camera/preview")
+
+    assert response.status_code == 200
+    assert response.content == b"camera-video"
+
+
+def test_gopro_camera_preview_endpoint_serves_current_proxy(
+    client: TestClient, sample_flight, tmp_path, monkeypatch
+) -> None:
+    input_dir = tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01"
+    input_dir.mkdir(parents=True)
+    camera_path = input_dir / "camera.mp4"
+    camera_path.write_bytes(b"camera-video")
+    (input_dir / "camera.preview.mp4").write_bytes(b"proxy-video")
+    fingerprint = camera_path.stat()
+    (input_dir / ".camera.preview.json").write_text(
+        json.dumps(
+            {
+                "profile_version": 1,
+                "source": {
+                    "size": fingerprint.st_size,
+                    "mtime_ns": fingerprint.st_mtime_ns,
+                },
+                "status": "ready",
+                "available_duration_seconds": 180,
+                "requested_duration_seconds": 180,
+            }
+        )
+    )
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+
+    response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-camera/preview")
+
+    assert response.status_code == 200
+    assert response.content == b"proxy-video"
+
+
+def test_request_gopro_camera_preview_extension(
+    client: TestClient, sample_flight, tmp_path, monkeypatch
+) -> None:
+    input_dir = tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01"
+    input_dir.mkdir(parents=True)
+    (input_dir / "camera.mp4").write_bytes(b"camera-video")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+
+    with patch("gopro_preview_proxy._enqueue_preview") as enqueue:
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/gopro-camera/preview",
+            json={"duration_seconds": 600},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "generating"
+    assert response.json()["requested_duration_seconds"] == 600
+    enqueue.assert_called_once()
+
+
+def test_request_gopro_camera_preview_rejects_configured_maximum(
+    client: TestClient, sample_flight, tmp_path, monkeypatch
+) -> None:
+    input_dir = tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01"
+    input_dir.mkdir(parents=True)
+    (input_dir / "camera.mp4").write_bytes(b"camera-video")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+    monkeypatch.setattr(config, "GOPRO_PREVIEW_MAX_SECONDS", 600)
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/gopro-camera/preview",
+        json={"duration_seconds": 601},
+    )
+
+    assert response.status_code == 422
 
 
 def test_gopro_overlay_layouts_returns_recommended_layout(client: TestClient):
