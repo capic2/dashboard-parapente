@@ -1978,7 +1978,7 @@ def test_prepare_queued_job_uses_prepared_pip_path(tmp_path, monkeypatch, test_d
 
     assert prepared is not None
     assert Path(prepared["pip_path"]) == prepared_pip_path
-    assert pip_calls[0]["gpx_offset"] == 2.5
+    assert pip_calls[0]["gpx_offset"] == 0.0
     render_gpx_path = Path(prepared["command"]["render_gpx_path"])
     assert render_gpx_path.name.startswith("gpx-offset-")
 
@@ -2674,6 +2674,73 @@ def test_run_job_prepares_inputs_before_starting_process(
     assert Path(job["output_path"]).read_bytes() == b"video"
     assert not Path(job["temp_output_path"]).exists()
     assert not work_dir.exists()
+
+
+def test_run_job_keeps_manual_gpx_offset_out_of_pip_preparation(
+    tmp_path,
+    monkeypatch,
+    test_db,
+):
+    layout_dir = tmp_path / "layouts"
+    layout_dir.mkdir()
+    (layout_dir / "layout_parapente_1080.xml").write_text("<layout />")
+    video_path = tmp_path / "source.mp4"
+    gpx_path = tmp_path / "source.gpx"
+    pip_path = tmp_path / "pip.mp4"
+    video_path.write_bytes(b"video")
+    gpx_path.write_text("<gpx><time>2026-08-08T09:30:43Z</time></gpx>")
+    pip_path.write_bytes(b"pip")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_BIN", "gopro-dashboard.py")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_ROOT", str(tmp_path / "runner-root"))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: 421.483)
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+    monkeypatch.setattr(gopro_overlay_export, "_verify_video_output", lambda _: (True, None))
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "check_gopro_overlay_dependencies",
+        lambda: {
+            "gopro_dashboard": True,
+            "ffmpeg": True,
+            "ffprobe": True,
+            "ffmpeg_vaapi": True,
+        },
+    )
+    monkeypatch.setattr(gopro_overlay_export, "_ffmpeg_can_use_vaapi_device", lambda *_: True)
+    pip_calls: list[dict] = []
+
+    def fake_prepare_pip(*_args, **kwargs):
+        pip_calls.append(kwargs)
+        return tmp_path / "prepared-pip.mp4"
+
+    monkeypatch.setattr(gopro_overlay_export, "_prepare_pip_video_for_overlay", fake_prepare_pip)
+
+    job = create_gopro_overlay_job_from_paths(
+        video_path=video_path,
+        gpx_path=gpx_path,
+        pip_path=pip_path,
+        layout_id="parapente-1080",
+        output_filename="overlay.mp4",
+        gpx_offset=2.5,
+    )
+
+    class FakeProcess:
+        def __init__(self, command: list[str]):
+            self.command = command
+            self.stdout = None
+
+        def wait(self) -> int:
+            Path(self.command[-1]).write_bytes(b"video")
+            return 0
+
+    with patch(
+        "gopro_overlay_export.subprocess.Popen",
+        side_effect=lambda command, **kwargs: FakeProcess(command),
+    ):
+        gopro_overlay_export._run_job(job["job_id"])
+
+    assert pip_calls[0]["gpx_offset"] == 0.0
 
 
 def test_run_job_cleans_temp_files_after_process_failure(
