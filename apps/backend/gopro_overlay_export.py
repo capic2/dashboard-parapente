@@ -1330,9 +1330,10 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 )
 
         command_metadata["render_gpx_path"] = str(render_gpx_path)
-        command_metadata["video_time_start"] = (
-            "video-created" if probe_video_start_time(video_path) is not None else "file-modified"
-        )
+        if probe_video_start_time(video_path) is not None:
+            command_metadata["video_time_start"] = "video-created"
+        else:
+            command_metadata.pop("video_time_start", None)
         _append_job_log(log_path, f"Render GPX: {render_gpx_path.name}")
 
         if pip_path:
@@ -1767,13 +1768,13 @@ def _run_job(job_id: str) -> None:
         "--use-gpx-only",
         "--gpx",
         str(render_gpx_path),
-        "--video-time-start",
-        str(prepared_command.get("video_time_start") or "video-created"),
         "--layout",
         "xml",
         "--layout-xml",
         job["layout_path"],
     ]
+    if video_time_start := prepared_command.get("video_time_start"):
+        command[4:4] = ["--video-time-start", str(video_time_start)]
     if config.GOPRO_OVERLAY_FONT:
         command.extend(["--font", config.GOPRO_OVERLAY_FONT])
     if config.GOPRO_OVERLAY_CONFIG_DIR:
