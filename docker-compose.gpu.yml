@@ -11,6 +11,14 @@ services:
       - BACKEND_VIDEO_ACCELERATOR=nvidia
       - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
       - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-compute,video,graphics,utility}
+      - __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json
+    volumes:
+      - type: bind
+        source: ${NVIDIA_EGL_VENDOR_JSON:-/usr/share/glvnd/egl_vendor.d/10_nvidia.json}
+        target: /usr/share/glvnd/egl_vendor.d/10_nvidia.json
+        read_only: true
+        bind:
+          create_host_path: false
 
   backend-worker:
     deploy:
@@ -24,6 +32,14 @@ services:
       - BACKEND_VIDEO_ACCELERATOR=nvidia
       - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
       - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-compute,video,graphics,utility}
+      - __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json
+    volumes:
+      - type: bind
+        source: ${NVIDIA_EGL_VENDOR_JSON:-/usr/share/glvnd/egl_vendor.d/10_nvidia.json}
+        target: /usr/share/glvnd/egl_vendor.d/10_nvidia.json
+        read_only: true
+        bind:
+          create_host_path: false
 
   gopro-overlay-worker:
     deploy:
