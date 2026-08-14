@@ -931,9 +931,9 @@ def test_worker_merge_osv_files_with_gpx_uses_configured_timeout(
 
 @pytest.mark.parametrize(
     ("gpx_offset", "expected_first_gpx_at"),
-    [(15.0, "29.483"), (-15.0, "0.000")],
+    [(15.0, "15.000"), (-15.0, "0.000")],
 )
-def test_worker_merge_osv_files_with_gpx_passes_gpx_offset_to_merge_tool(
+def test_worker_merge_osv_files_with_gpx_uses_manual_offset_without_auto_offset(
     tmp_path,
     monkeypatch,
     gpx_offset,
