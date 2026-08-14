@@ -189,6 +189,7 @@ def _merge_osv_files_with_gpx(
     log_path: Path | None = None,
     gpx_offset: float = 0.0,
     video_duration: float | None = None,
+    first_gpx_at: float | None = None,
 ) -> Path:
     if not osv_paths:
         return gpx_path
@@ -213,16 +214,20 @@ def _merge_osv_files_with_gpx(
             log_path,
             f"Merging {len(osv_paths)} OSV file(s) into {merged_gpx_path.name}",
         )
-    first_gpx_at: float | None = None
-    if video_duration is not None and gpx_offset:
-        first_gpx_at = max(0.0, gpx_offset)
+    effective_first_gpx_at = (
+        max(0.0, first_gpx_at) if video_duration is not None and first_gpx_at is not None else None
+    )
     command = [
         "python3",
         str(merge_script),
         "--sync",
         "gpx-start",
         *(["--video-duration", f"{video_duration:.3f}"] if video_duration is not None else []),
-        *(["--first-gpx-at", f"{first_gpx_at:.3f}"] if first_gpx_at is not None else []),
+        *(
+            ["--first-gpx-at", f"{effective_first_gpx_at:.3f}"]
+            if effective_first_gpx_at is not None
+            else []
+        ),
         *(["--gpx-offset", str(gpx_offset)] if gpx_offset else []),
         *(str(path) for path in osv_paths),
         str(gpx_path),
@@ -1307,6 +1312,22 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         source_input_dir = Path(str(job["output_path"])).parent
         osv_paths = _matching_files_by_mtime(source_input_dir, "*.osv")
         gpx_offset = _gpx_offset_from_command_metadata(command_metadata)
+        embedded_video_start = probe_video_start_time(video_path)
+        alignment_video_start = embedded_video_start
+        if alignment_video_start is None:
+            try:
+                alignment_video_start = datetime.fromtimestamp(
+                    video_path.stat().st_mtime, tz=timezone.utc
+                )
+            except OSError:
+                alignment_video_start = None
+        gpx_start = first_gpx_timestamp(render_gpx_path)
+        aligned_video_start = align_video_start_time_to_gpx(alignment_video_start, gpx_start)
+        first_gpx_at = (
+            (gpx_start - aligned_video_start).total_seconds() + gpx_offset
+            if gpx_offset and gpx_start is not None and aligned_video_start is not None
+            else None
+        )
         if osv_paths:
             _update_job(job_id, progress=10, message="Merging OSV telemetry")
             video_duration = probe_video_duration(video_path)
@@ -1317,6 +1338,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 log_path=log_path,
                 gpx_offset=gpx_offset,
                 video_duration=video_duration,
+                first_gpx_at=first_gpx_at,
             )
         else:
             _append_job_log(log_path, "No OSV files found; using GPX directly")
@@ -1328,7 +1350,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 )
 
         command_metadata["render_gpx_path"] = str(render_gpx_path)
-        if probe_video_start_time(video_path) is not None:
+        if embedded_video_start is not None:
             command_metadata["video_time_start"] = "video-created"
         else:
             command_metadata.pop("video_time_start", None)
