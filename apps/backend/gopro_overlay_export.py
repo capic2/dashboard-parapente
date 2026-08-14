@@ -53,6 +53,14 @@ _UPLOAD_WORK_ROOT = Path("/tmp/dashboard-parapente/gopro-overlays")
 _PATH_WORK_DIR_NAME = ".gopro-overlay-work"
 _PROGRESS_PERCENT_RE = re.compile(r"(?P<percent>\d{1,3})\s*%")
 _LOG_TAIL_LINE_COUNT = 100
+_GOPRO_OVERLAY_SITE_CUSTOMIZE = """\
+import multiprocessing as _multiprocessing
+
+try:
+    _multiprocessing.set_start_method("fork")
+except (RuntimeError, ValueError):
+    pass
+"""
 
 
 def _gopro_overlay_log_dir() -> Path:
@@ -665,6 +673,20 @@ def _background_process_command(command: list[str]) -> list[str]:
     if os.name == "posix" and nice_value > 0 and shutil.which("nice"):
         wrapped = ["nice", "-n", str(nice_value), *wrapped]
     return wrapped
+
+
+def _gopro_overlay_subprocess_env(work_dir: Path) -> dict[str, str]:
+    helper_dir = work_dir / ".pythonpath"
+    helper_dir.mkdir(parents=True, exist_ok=True)
+    sitecustomize_path = helper_dir / "sitecustomize.py"
+    if not sitecustomize_path.exists():
+        sitecustomize_path.write_text(_GOPRO_OVERLAY_SITE_CUSTOMIZE, encoding="utf-8")
+
+    env = os.environ.copy()
+    pythonpath = env.get("PYTHONPATH")
+    helper_path = str(helper_dir)
+    env["PYTHONPATH"] = helper_path if not pythonpath else f"{helper_path}{os.pathsep}{pythonpath}"
+    return env
 
 
 def _tail_log_lines(path: Path, limit: int = _LOG_TAIL_LINE_COUNT) -> list[str]:
@@ -1832,6 +1854,7 @@ def _run_job(job_id: str) -> None:
     common_args.extend([job["video_path"], str(temp_output_path)])
     command.extend(common_args)
     cpu_command.extend(common_args)
+    process_env = _gopro_overlay_subprocess_env(temp_output_path.parent)
 
     logger.info(
         "GoPro overlay runtime for job %s: accelerator=%s profile=%s config_dir=%s extra_args=%s method=%s",
@@ -1856,6 +1879,7 @@ def _run_job(job_id: str) -> None:
         process = subprocess.Popen(
             _background_process_command(command),
             cwd=config.GOPRO_OVERLAY_ROOT or None,
+            env=process_env,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -1934,6 +1958,7 @@ def _run_job(job_id: str) -> None:
                 process = subprocess.Popen(
                     _background_process_command(cpu_command),
                     cwd=config.GOPRO_OVERLAY_ROOT or None,
+                    env=process_env,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
