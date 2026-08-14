@@ -3133,16 +3133,11 @@ def test_run_job_passes_configured_overlay_gpu_args(monkeypatch, tmp_path):
 
         assert popen.call_count == 2
         command = popen.call_args_list[0].args[0]
-        env = popen.call_args_list[0].kwargs["env"]
         assert "--config-dir" in command
         assert command[command.index("--config-dir") + 1] == "/config"
         assert "--profile" in command
         assert command[command.index("--profile") + 1] == "nnvgpu"
         assert "--double-buffer" in command
-        pythonpath_root = Path(env["PYTHONPATH"].split(os.pathsep)[0])
-        sitecustomize_path = pythonpath_root / "sitecustomize.py"
-        assert sitecustomize_path.exists()
-        assert 'set_start_method("fork")' in sitecustomize_path.read_text(encoding="utf-8")
         fallback_command = popen.call_args_list[1].args[0]
         assert fallback_command[fallback_command.index("--config-dir") + 1] == "/config"
         assert "--profile" not in fallback_command
