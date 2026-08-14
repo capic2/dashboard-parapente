@@ -215,9 +215,7 @@ def _merge_osv_files_with_gpx(
         )
     first_gpx_at: float | None = None
     if video_duration is not None and gpx_offset:
-        gpx_duration = gpx_duration_seconds(gpx_path)
-        if gpx_duration is not None:
-            first_gpx_at = max(0.0, max(0.0, video_duration - gpx_duration) + gpx_offset)
+        first_gpx_at = max(0.0, gpx_offset)
     command = [
         "python3",
         str(merge_script),
