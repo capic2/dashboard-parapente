@@ -71,9 +71,17 @@ class GoproOverlayJob(BaseModel):
     job_token: str | None = None
 
 
+class GoproPreviewSegment(BaseModel):
+    preview_start_seconds: float
+    source_start_seconds: float
+    duration_seconds: float
+
+
 class GoproOverlayPreviewVideo(BaseModel):
     duration_seconds: float
     start_time: datetime
+    preview_target_end_seconds: float
+    preview_segments: list[GoproPreviewSegment]
     preview_status: Literal["missing", "generating", "ready", "failed"]
     preview_available_duration_seconds: int
     preview_requested_duration_seconds: int
@@ -83,6 +91,7 @@ class GoproOverlayPreviewVideo(BaseModel):
 
 class GoproPreviewRequest(BaseModel):
     duration_seconds: int = Field(ge=180)
+    target_end_seconds: float = Field(ge=0)
 
 
 class GoproPreviewState(BaseModel):

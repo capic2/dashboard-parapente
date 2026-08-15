@@ -33,6 +33,12 @@ export type GoproOverlayPreview = {
   video: {
     duration_seconds: number;
     start_time: string;
+    preview_target_end_seconds: number;
+    preview_segments: {
+      preview_start_seconds: number;
+      source_start_seconds: number;
+      duration_seconds: number;
+    }[];
     preview_status: 'missing' | 'generating' | 'ready' | 'failed';
     preview_available_duration_seconds: number;
     preview_requested_duration_seconds: number;
@@ -75,10 +81,19 @@ export function useGoproOverlayPreview(flightId: string, enabled: boolean) {
 
 export function useGenerateGoproPreview(flightId: string) {
   return useMutation({
-    mutationFn: (durationSeconds: number) =>
+    mutationFn: ({
+      durationSeconds,
+      targetEndSeconds,
+    }: {
+      durationSeconds: number;
+      targetEndSeconds: number;
+    }) =>
       api
         .post(`flights/${flightId}/gopro-camera/preview`, {
-          json: { duration_seconds: durationSeconds },
+          json: {
+            duration_seconds: durationSeconds,
+            target_end_seconds: targetEndSeconds,
+          },
         })
         .json(),
   });
