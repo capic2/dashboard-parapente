@@ -51,7 +51,7 @@ interface FlightDetailsProps {
 }
 
 type FlightDetailsTab = 'infos' | 'replay' | 'logs';
-type GoproOverlayOutputResolution = 'source' | '1080p' | '4k';
+type GoproOverlayOutputResolution = 'auto' | 'source' | '1080p' | '4k';
 
 export function FlightDetails({
   flight,
@@ -91,7 +91,7 @@ export function FlightDetails({
   const [goproOverlayInitialGpxOffset, setGoproOverlayInitialGpxOffset] =
     useState<string | null>(null);
   const [goproOverlayOutputResolution, setGoproOverlayOutputResolution] =
-    useState<GoproOverlayOutputResolution>('1080p');
+    useState<GoproOverlayOutputResolution>('auto');
   const [downloadingMedia, setDownloadingMedia] =
     useState<DownloadableFlightMedia | null>(null);
 
@@ -157,7 +157,7 @@ export function FlightDetails({
     setGoproOverlayJobId(null);
     setGoproOverlayJobToken(null);
     setIsGoproOverlayDialogOpen(false);
-    setGoproOverlayOutputResolution('1080p');
+    setGoproOverlayOutputResolution('auto');
     setIsCancellingGoproOverlay(false);
     setDownloadingMedia(null);
     resetGoproOverlayJob();
@@ -304,7 +304,7 @@ export function FlightDetails({
 
   const handleOpenGoproOverlayDialog = () => {
     if (createGoproOverlayJob.isPending || isGoproOverlayRunning) return;
-    setGoproOverlayOutputResolution('1080p');
+    setGoproOverlayOutputResolution('auto');
     setIsGoproOverlayDialogOpen(true);
     if (flight.gopro_overlay_gpx_offset != null) {
       const storedOffset = String(flight.gopro_overlay_gpx_offset);
@@ -602,6 +602,9 @@ export function FlightDetails({
                   className="min-h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                   aria-describedby="gopro-overlay-output-resolution-hint"
                 >
+                  <option value="auto">
+                    {t('flights.goproOverlayOutputResolutionAuto')}
+                  </option>
                   <option value="source">
                     {t('flights.goproOverlayOutputResolutionSource')}
                   </option>
