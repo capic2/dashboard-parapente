@@ -236,7 +236,7 @@ services:
     command: ['python', 'gopro_overlay_worker.py']
     cpus: '${GOPRO_OVERLAY_WORKER_CPUS:-4.0}'
     mem_limit: ${GOPRO_OVERLAY_WORKER_MEM_LIMIT:-12g}
-    pids_limit: ${GOPRO_OVERLAY_WORKER_PIDS_LIMIT:-256}
+    pids_limit: ${GOPRO_OVERLAY_WORKER_PIDS_LIMIT:-1024}
     labels:
       project: dashboard-parapente
       service: gopro-overlay-worker
