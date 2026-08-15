@@ -436,6 +436,7 @@ def test_create_gopro_overlay_job_passes_uploaded_files(client: TestClient):
             data={
                 "layout_id": "parapente-1080",
                 "output_filename": "flight-overlay.mp4",
+                "output_resolution": "4k",
                 "gpx_offset": "2.5",
             },
         )
@@ -446,6 +447,7 @@ def test_create_gopro_overlay_job_passes_uploaded_files(client: TestClient):
     assert response.json()["job_token"]
     assert create_job.call_args.kwargs["layout_id"] == "parapente-1080"
     assert create_job.call_args.kwargs["output_filename"] == "flight-overlay.mp4"
+    assert create_job.call_args.kwargs["output_resolution"] == "4k"
     assert create_job.call_args.kwargs["gpx_offset"] == 2.5
     assert create_job.call_args.kwargs["pip_file"] is not None
 
@@ -465,6 +467,19 @@ def test_create_gopro_overlay_job_rejects_non_finite_gpx_offset(
 
     assert response.status_code == 422
     assert response.json()["detail"] == "gpx_offset must be a finite number"
+
+
+def test_create_gopro_overlay_job_rejects_unknown_output_resolution(client: TestClient):
+    response = client.post(
+        f"{API_PREFIX}/gopro-overlays/jobs",
+        files={
+            "video_file": ("flight.mp4", b"video", "video/mp4"),
+            "gpx_file": ("flight.gpx", b"<gpx />", "application/gpx+xml"),
+        },
+        data={"output_resolution": "720p"},
+    )
+
+    assert response.status_code == 422
 
 
 def test_gpx_offset_from_command_metadata_defaults_malformed_values():
@@ -706,14 +721,18 @@ def test_create_flight_gopro_overlay_job_uses_auto_flight_directory_files(
         ),
         patch("routes.create_gopro_overlay_job_from_paths", return_value=expected) as create_job,
     ):
-        response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay")
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay",
+            data={"output_resolution": "4k"},
+        )
 
     assert response.status_code == 200
     assert create_job.call_args.kwargs["video_path"] == camera_path
     assert create_job.call_args.kwargs["gpx_path"] == first_gpx_path
     assert create_job.call_args.kwargs["pip_path"] == new_pip_path
     assert create_job.call_args.kwargs["output_dir"] == str(input_dir)
-    assert create_job.call_args.kwargs["output_filename"] == "final.mp4"
+    assert create_job.call_args.kwargs["output_filename"] == "Arguel 15-03 14h00-4k.mp4"
+    assert create_job.call_args.kwargs["output_resolution"] == "4k"
 
 
 def test_create_flight_gopro_overlay_job_requires_auto_zepp_gpx(
@@ -796,6 +815,8 @@ def test_create_flight_gopro_overlay_job_uses_daily_departure_index(
     assert create_job.call_args.kwargs["video_path"] == camera_path
     assert create_job.call_args.kwargs["gpx_path"] == gpx_path
     assert create_job.call_args.kwargs["pip_path"] == pip_path
+    assert create_job.call_args.kwargs["output_filename"] == "Arguel 15-03 14h00-1080p.mp4"
+    assert create_job.call_args.kwargs["output_resolution"] == "1080p"
 
 
 def test_create_flight_gopro_overlay_job_merges_all_auto_osv_files(
@@ -2399,7 +2420,7 @@ def test_auto_layout_selection_uses_4k_layout_for_4k_source():
     assert selected.id == "parapente-3840"
 
 
-def test_worker_preparation_uses_video_render_size_for_4k_source(
+def test_worker_preparation_uses_requested_1080p_size_for_4k_source(
     tmp_path,
     monkeypatch,
     test_db,
@@ -2429,6 +2450,7 @@ def test_worker_preparation_uses_video_render_size_for_4k_source(
         pip_path=pip_path,
         layout_id="parapente-1080",
         output_filename="overlay.mp4",
+        output_resolution="1080p",
     )
     queued_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"], include_command=True)
     assert queued_job is not None
@@ -2437,15 +2459,15 @@ def test_worker_preparation_uses_video_render_size_for_4k_source(
 
     assert prepared is not None
     assert prepared["layout_id"] == "parapente-1080"
-    assert prepared["video_width"] == 3840
-    assert prepared["video_height"] == 2160
+    assert prepared["video_width"] == 1920
+    assert prepared["video_height"] == 1080
     prepared_layout = Path(prepared["layout_path"]).read_text()
-    assert 'width="3840"' in prepared_layout
-    assert 'height="2160"' in prepared_layout
+    assert 'width="1920"' in prepared_layout
+    assert 'height="1080"' in prepared_layout
     assert 'id="pip"' in prepared_layout
-    assert 'size="440"' in prepared_layout
-    assert 'x="200"' in prepared_layout
-    assert 'y="100"' in prepared_layout
+    assert 'size="220"' in prepared_layout
+    assert 'x="100"' in prepared_layout
+    assert 'y="50"' in prepared_layout
 
 
 def test_worker_preparation_merges_osv_files_before_rendering(
@@ -3117,10 +3139,10 @@ def test_create_gopro_overlay_job_from_paths_sanitizes_output_filename_in_source
         gpx_path=gpx_path,
         pip_path=None,
         layout_id="parapente-1080",
-        output_filename="custom overlay.mov",
+        output_filename="Arguel test-1080p.mov",
     )
 
-    assert Path(job["output_path"]) == tmp_path / "custom_overlay.mp4"
+    assert Path(job["output_path"]) == tmp_path / "Arguel_test-1080p.mp4"
 
 
 def test_cancelled_queued_job_does_not_start_process():

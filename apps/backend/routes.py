@@ -12,7 +12,7 @@ from dataclasses import asdict
 from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 from zoneinfo import ZoneInfo
 
 if TYPE_CHECKING:
@@ -5895,6 +5895,7 @@ async def create_flight_gopro_overlay_job(
     output_dir: str | None = Form(None),
     layout_id: str | None = Form(None),
     output_filename: str | None = Form(None),
+    output_resolution: Literal["source", "1080p", "4k"] = Form("1080p"),
     gpx_offset: float = Form(0.0),
     db: Session = Depends(get_db),
 ) -> GoproOverlayJob:
@@ -5917,9 +5918,7 @@ async def create_flight_gopro_overlay_job(
     title = flight.title or flight.name or flight.id
     input_dir = _gopro_overlay_flight_directory(db, flight)
     use_input_output_dir = not output_dir or not output_dir.strip()
-    resolved_output_filename = (
-        "final.mp4" if use_input_output_dir else output_filename or f"{title}-overlay.mp4"
-    )
+    resolved_output_filename = output_filename or f"{title}-{output_resolution}.mp4"
 
     try:
         resolved_output_dir = (
@@ -5972,6 +5971,7 @@ async def create_flight_gopro_overlay_job(
                 pip_path=fallback_pip_path,
                 layout_id=layout_id,
                 output_filename=resolved_output_filename,
+                output_resolution=output_resolution,
                 output_dir=resolved_output_dir,
                 gpx_offset=gpx_offset,
             )
@@ -6000,6 +6000,7 @@ async def create_flight_gopro_overlay_job(
             pip_file=osv_video_file,
             layout_id=layout_id,
             output_filename=resolved_output_filename,
+            output_resolution=output_resolution,
             output_dir=resolved_output_dir,
             pin_inputs=pin_overlay_inputs,
             gpx_offset=gpx_offset,
@@ -6054,6 +6055,7 @@ async def create_gopro_overlay_render_job(
     pip_file: UploadFile | None = File(None),
     layout_id: str | None = Form(None),
     output_filename: str | None = Form(None),
+    output_resolution: Literal["source", "1080p", "4k"] = Form("1080p"),
     gpx_offset: float = Form(0.0),
 ) -> GoproOverlayJob:
     """Create a GoPro overlay render job from uploaded video, GPX, and optional PIP video."""
@@ -6075,6 +6077,7 @@ async def create_gopro_overlay_render_job(
             pip_file=pip_file,
             layout_id=layout_id,
             output_filename=output_filename,
+            output_resolution=output_resolution,
             gpx_offset=gpx_offset,
         )
         return _with_gopro_overlay_job_token(job)
