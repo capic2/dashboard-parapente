@@ -28,7 +28,7 @@ PREVIEW_FILENAME = "camera.preview.mp4"
 MANIFEST_FILENAME = ".camera.preview.json"
 LOCK_FILENAME = ".camera.preview.lock"
 STATE_LOCK_FILENAME = ".camera.preview.state.lock"
-PROFILE_VERSION = 1
+PROFILE_VERSION = 2
 
 PreviewStatus = Literal["missing", "generating", "ready", "failed"]
 
@@ -40,12 +40,21 @@ class SourceFingerprint:
 
 
 @dataclass(frozen=True)
+class PreviewSegment:
+    preview_start_seconds: float
+    source_start_seconds: float
+    duration_seconds: float
+
+
+@dataclass(frozen=True)
 class PreviewState:
     status: PreviewStatus
     available_duration_seconds: int
     requested_duration_seconds: int
     source_duration_seconds: float | None
     error: str | None = None
+    target_end_seconds: float | None = None
+    segments: tuple[PreviewSegment, ...] = ()
 
 
 def _source_fingerprint(camera_path: Path) -> SourceFingerprint:
@@ -84,6 +93,55 @@ def _manifest_matches_source(manifest: dict[str, Any], fingerprint: SourceFinger
     )
 
 
+def _manifest_matches_target(manifest: dict[str, Any], target_end_seconds: float | None) -> bool:
+    if target_end_seconds is None:
+        return True
+    stored_target = manifest.get("target_end_seconds")
+    try:
+        source_duration = manifest.get("source_duration_seconds")
+        normalized_target = min(
+            target_end_seconds,
+            float(source_duration) if source_duration is not None else target_end_seconds,
+        )
+        return stored_target is not None and math.isclose(
+            float(stored_target), normalized_target, rel_tol=0, abs_tol=1e-6
+        )
+    except (TypeError, ValueError):
+        return False
+
+
+def preview_segments(target_end_seconds: float, duration_seconds: int) -> list[PreviewSegment]:
+    target_end_seconds = max(0.0, float(target_end_seconds))
+    duration_seconds = max(0, duration_seconds)
+    if target_end_seconds <= 0 or duration_seconds <= 0:
+        return []
+    if target_end_seconds <= 2 * duration_seconds:
+        return [PreviewSegment(0.0, 0.0, target_end_seconds)]
+    return [
+        PreviewSegment(0.0, 0.0, float(duration_seconds)),
+        PreviewSegment(
+            float(duration_seconds),
+            target_end_seconds - duration_seconds,
+            float(duration_seconds),
+        ),
+    ]
+
+
+def _manifest_segments(manifest: dict[str, Any]) -> tuple[PreviewSegment, ...]:
+    try:
+        return tuple(
+            PreviewSegment(
+                preview_start_seconds=float(segment["preview_start_seconds"]),
+                source_start_seconds=float(segment["source_start_seconds"]),
+                duration_seconds=float(segment["duration_seconds"]),
+            )
+            for segment in manifest.get("segments", [])
+            if isinstance(segment, dict)
+        )
+    except (KeyError, TypeError, ValueError):
+        return ()
+
+
 def _probe_duration(video_path: Path) -> float | None:
     try:
         result = subprocess.run(
@@ -115,10 +173,12 @@ def _generation_is_active(manifest: dict[str, Any]) -> bool:
     return time.time() - started_at < config.GOPRO_PREVIEW_TIMEOUT_SECONDS
 
 
-def get_preview_state(camera_path: Path) -> PreviewState:
+def get_preview_state(camera_path: Path, target_end_seconds: float | None = None) -> PreviewState:
     fingerprint = _source_fingerprint(camera_path)
     manifest = _load_manifest(camera_path)
-    if not _manifest_matches_source(manifest, fingerprint):
+    if not _manifest_matches_source(manifest, fingerprint) or not _manifest_matches_target(
+        manifest, target_end_seconds
+    ):
         return PreviewState("missing", 0, config.GOPRO_PREVIEW_DEFAULT_SECONDS, None)
 
     available = int(manifest.get("available_duration_seconds") or 0)
@@ -127,6 +187,7 @@ def get_preview_state(camera_path: Path) -> PreviewState:
         int(manifest.get("requested_duration_seconds") or config.GOPRO_PREVIEW_DEFAULT_SECONDS),
     )
     source_duration = manifest.get("source_duration_seconds")
+    stored_target = manifest.get("target_end_seconds")
     return PreviewState(
         status=(
             "generating"
@@ -143,38 +204,54 @@ def get_preview_state(camera_path: Path) -> PreviewState:
         requested_duration_seconds=requested,
         source_duration_seconds=(float(source_duration) if source_duration is not None else None),
         error=str(manifest["error"]) if manifest.get("error") else None,
+        target_end_seconds=(float(stored_target) if stored_target is not None else None),
+        segments=_manifest_segments(manifest),
     )
 
 
-def request_preview(camera_path: Path, duration_seconds: int) -> PreviewState:
+def request_preview(
+    camera_path: Path, duration_seconds: int, target_end_seconds: float | None = None
+) -> PreviewState:
     duration_seconds = max(
         config.GOPRO_PREVIEW_DEFAULT_SECONDS,
         min(duration_seconds, config.GOPRO_PREVIEW_MAX_SECONDS),
     )
+    target_end_seconds = (
+        max(0.0, float(target_end_seconds)) if target_end_seconds is not None else None
+    )
     with _state_lock(camera_path):
         fingerprint = _source_fingerprint(camera_path)
         manifest = _load_manifest(camera_path)
-        if not _manifest_matches_source(manifest, fingerprint):
+        if not _manifest_matches_source(manifest, fingerprint) or not _manifest_matches_target(
+            manifest, target_end_seconds
+        ):
             manifest = {
                 "profile_version": PROFILE_VERSION,
                 "source": asdict(fingerprint),
                 "available_duration_seconds": 0,
+                "target_end_seconds": target_end_seconds,
             }
 
         available = int(manifest.get("available_duration_seconds") or 0)
         previous_requested = int(manifest.get("requested_duration_seconds") or 0)
         requested = max(duration_seconds, previous_requested)
         source_duration = manifest.get("source_duration_seconds")
-        covers_source = source_duration is not None and available >= math.ceil(
+        covers_source = source_duration is not None and available * 2 >= math.ceil(
             float(source_duration)
         )
-        if (available >= requested or covers_source) and _preview_path(camera_path).is_file():
-            return get_preview_state(camera_path)
+        stored_target = manifest.get("target_end_seconds")
+        covers_target = stored_target is not None and available * 2 >= math.ceil(
+            float(stored_target)
+        )
+        if (available >= requested or covers_source or covers_target) and _preview_path(
+            camera_path
+        ).is_file():
+            return get_preview_state(camera_path, target_end_seconds)
         if _generation_is_active(manifest):
             if requested > previous_requested:
                 manifest["requested_duration_seconds"] = requested
                 _write_manifest(camera_path, manifest)
-            return get_preview_state(camera_path)
+            return get_preview_state(camera_path, target_end_seconds)
 
         generation_id = uuid.uuid4().hex
         manifest.update(
@@ -186,7 +263,7 @@ def request_preview(camera_path: Path, duration_seconds: int) -> PreviewState:
         )
         _write_manifest(camera_path, manifest)
     try:
-        _enqueue_preview(camera_path, fingerprint, requested, generation_id)
+        _enqueue_preview(camera_path, fingerprint, requested, generation_id, target_end_seconds)
     except Exception as error:
         with _state_lock(camera_path):
             latest_manifest = _load_manifest(camera_path)
@@ -198,7 +275,7 @@ def request_preview(camera_path: Path, duration_seconds: int) -> PreviewState:
                 )
                 _write_manifest(camera_path, latest_manifest)
         raise
-    return get_preview_state(camera_path)
+    return get_preview_state(camera_path, target_end_seconds)
 
 
 def _enqueue_preview(
@@ -206,11 +283,12 @@ def _enqueue_preview(
     fingerprint: SourceFingerprint,
     duration_seconds: int,
     generation_id: str,
+    target_end_seconds: float | None = None,
 ) -> None:
     digest = hashlib.sha256(
         (
             f"{camera_path}:{fingerprint.size}:{fingerprint.mtime_ns}:"
-            f"{duration_seconds}:{generation_id}"
+            f"{duration_seconds}:{target_end_seconds}:{generation_id}"
         ).encode()
     ).hexdigest()[:24]
     from job_queue import enqueue_once, is_rq_enabled
@@ -221,6 +299,7 @@ def _enqueue_preview(
             str(camera_path),
             duration_seconds,
             generation_id,
+            target_end_seconds,
             job_id=f"gopro-preview-{digest}",
             timeout=config.GOPRO_PREVIEW_TIMEOUT_SECONDS,
             queue_name=config.GOPRO_PREVIEW_QUEUE_NAME,
@@ -231,7 +310,7 @@ def _enqueue_preview(
         return
     threading.Thread(
         target=process_preview_job,
-        args=(str(camera_path), duration_seconds, generation_id),
+        args=(str(camera_path), duration_seconds, generation_id, target_end_seconds),
         name=f"gopro-preview-{digest}",
         daemon=True,
     ).start()
@@ -258,28 +337,43 @@ def _state_lock(camera_path: Path) -> AbstractContextManager[None]:
 def _ffmpeg_command(
     camera_path: Path,
     output_path: Path,
-    duration_seconds: int,
+    segments: list[PreviewSegment] | int,
     accelerator: Literal["cpu", "nvidia"],
 ) -> list[str]:
+    if isinstance(segments, int):
+        segments = preview_segments(float(segments), segments)
+    if not segments:
+        raise ValueError("Preview requires at least one source segment")
     scale = (
         f"scale=w='min({config.GOPRO_PREVIEW_MAX_WIDTH},iw)':"
         f"h='min({config.GOPRO_PREVIEW_MAX_HEIGHT},ih)':"
         "force_original_aspect_ratio=decrease:force_divisible_by=2"
     )
+    input_args: list[str] = []
+    filters: list[str] = []
+    for index, segment in enumerate(segments):
+        if segment.source_start_seconds > 0:
+            input_args.extend(["-ss", f"{segment.source_start_seconds:g}"])
+        input_args.extend(["-i", str(camera_path)])
+        output_label = "outv" if len(segments) == 1 else f"v{index}"
+        filters.append(
+            f"[{index}:v:0]trim=duration={segment.duration_seconds:g},"
+            f"setpts=PTS-STARTPTS,{scale}[{output_label}]"
+        )
+    if len(segments) > 1:
+        inputs = "".join(f"[v{index}]" for index in range(len(segments)))
+        filters.append(f"{inputs}concat=n={len(segments)}:v=1:a=0[outv]")
     return [
         "ffmpeg",
         "-hide_banner",
         "-loglevel",
         "error",
         "-y",
-        "-i",
-        str(camera_path),
-        "-t",
-        str(duration_seconds),
+        *input_args,
+        "-filter_complex",
+        ";".join(filters),
         "-map",
-        "0:v:0",
-        "-vf",
-        scale,
+        "[outv]",
         *h264_encode_args(
             accelerator,
             quality=str(config.GOPRO_PREVIEW_QUALITY),
@@ -294,7 +388,7 @@ def _ffmpeg_command(
     ]
 
 
-def _run_ffmpeg(camera_path: Path, output_path: Path, duration_seconds: int) -> None:
+def _run_ffmpeg(camera_path: Path, output_path: Path, segments: list[PreviewSegment]) -> None:
     selected = select_video_accelerator(config.VIDEO_ACCELERATOR)
     accelerators: list[Literal["cpu", "nvidia"]] = [selected]
     if selected == "nvidia":
@@ -302,7 +396,7 @@ def _run_ffmpeg(camera_path: Path, output_path: Path, duration_seconds: int) -> 
     last_error = "ffmpeg failed"
     for accelerator in accelerators:
         result = subprocess.run(
-            _ffmpeg_command(camera_path, output_path, duration_seconds, accelerator),
+            _ffmpeg_command(camera_path, output_path, segments, accelerator),
             check=False,
             capture_output=True,
             text=True,
@@ -325,7 +419,10 @@ def _generation_matches(
 
 
 def process_preview_job(
-    camera_path_value: str, duration_seconds: int, generation_id: str | None = None
+    camera_path_value: str,
+    duration_seconds: int,
+    generation_id: str | None = None,
+    target_end_seconds: float | None = None,
 ) -> None:
     camera_path = Path(camera_path_value)
     if not camera_path.is_file():
@@ -342,6 +439,8 @@ def process_preview_job(
             manifest, fingerprint, generation_id
         ):
             return
+        if target_end_seconds is None and manifest.get("target_end_seconds") is not None:
+            target_end_seconds = float(manifest["target_end_seconds"])
         requested = max(duration_seconds, int(manifest.get("requested_duration_seconds") or 0))
         available = int(manifest.get("available_duration_seconds") or 0)
         if available >= requested and _preview_path(camera_path).is_file():
@@ -350,11 +449,31 @@ def process_preview_job(
             with job_admission():
                 source_duration = _probe_duration(camera_path)
                 effective_duration = min(requested, max(1, math.ceil(source_duration or requested)))
-                _run_ffmpeg(camera_path, temporary_path, effective_duration)
+                effective_target = min(
+                    source_duration or target_end_seconds or effective_duration,
+                    (
+                        target_end_seconds
+                        if target_end_seconds is not None
+                        else source_duration or effective_duration
+                    ),
+                )
+                segments = preview_segments(effective_target, effective_duration)
+                _run_ffmpeg(camera_path, temporary_path, segments)
                 proxy_duration = _probe_duration(temporary_path)
                 if proxy_duration is None:
                     raise RuntimeError("Generated preview has no usable duration")
-                published_duration = min(effective_duration, max(1, math.floor(proxy_duration)))
+                expected_proxy_duration = sum(segment.duration_seconds for segment in segments)
+                planned_available_duration = min(
+                    effective_duration,
+                    max(segment.duration_seconds for segment in segments),
+                )
+                published_duration = max(
+                    1,
+                    math.floor(
+                        planned_available_duration
+                        * min(1.0, proxy_duration / expected_proxy_duration)
+                    ),
+                )
                 with _state_lock(camera_path):
                     latest_manifest = _load_manifest(camera_path)
                     if _source_fingerprint(camera_path) != fingerprint or not _generation_matches(
@@ -376,6 +495,8 @@ def process_preview_job(
                         available_duration_seconds=published_duration,
                         requested_duration_seconds=max(effective_duration, latest_requested),
                         source_duration_seconds=source_duration,
+                        target_end_seconds=effective_target,
+                        segments=[asdict(segment) for segment in segments],
                         generation_started_at=None,
                         error=None,
                     )
@@ -404,7 +525,7 @@ def process_preview_job(
                         manifest = latest_manifest
                         _write_manifest(camera_path, manifest)
     if follow_up_duration:
-        request_preview(camera_path, follow_up_duration)
+        request_preview(camera_path, follow_up_duration, effective_target)
 
 
 _STABILITY_OBSERVATIONS: dict[Path, tuple[SourceFingerprint, float]] = {}
@@ -430,7 +551,7 @@ def scan_for_gopro_previews() -> int:
             state = get_preview_state(camera_path)
             covers_source = (
                 state.source_duration_seconds is not None
-                and state.available_duration_seconds >= math.ceil(state.source_duration_seconds)
+                and state.available_duration_seconds * 2 >= math.ceil(state.source_duration_seconds)
             )
             if (
                 state.available_duration_seconds < config.GOPRO_PREVIEW_DEFAULT_SECONDS
