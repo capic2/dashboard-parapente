@@ -575,6 +575,37 @@ def _video_export_public_status(export: dict[str, Any]) -> str:
     return "unknown"
 
 
+def _gopro_overlay_output_resolution_from_dimensions(
+    width: int | None,
+    height: int | None,
+) -> str | None:
+    if width is None or height is None:
+        return None
+    if width >= 3840 or height >= 2160:
+        return "4k"
+    return "1080p"
+
+
+async def _resolve_flight_gopro_overlay_output_resolution(
+    requested_output_resolution: str,
+    fallback_pip_path: Path | None,
+) -> str:
+    if requested_output_resolution != "auto":
+        return requested_output_resolution
+
+    if fallback_pip_path and fallback_pip_path.exists():
+        try:
+            width, height = await asyncio.to_thread(probe_video_resolution, fallback_pip_path)
+        except Exception:
+            width = height = None
+        else:
+            resolved = _gopro_overlay_output_resolution_from_dimensions(width, height)
+            if resolved:
+                return resolved
+
+    return "1080p"
+
+
 def _video_export_can_cancel(export: dict[str, Any]) -> bool:
     if export.get("mode") == "gopro_overlay":
         return export.get("status") in {"queued", "running"} and bool(export.get("job_id"))
@@ -5895,7 +5926,7 @@ async def create_flight_gopro_overlay_job(
     output_dir: str | None = Form(None),
     layout_id: str | None = Form(None),
     output_filename: str | None = Form(None),
-    output_resolution: Literal["source", "1080p", "4k"] = Form("1080p"),
+    output_resolution: Literal["auto", "source", "1080p", "4k"] = Form("auto"),
     gpx_offset: float = Form(0.0),
     db: Session = Depends(get_db),
 ) -> GoproOverlayJob:
@@ -5918,7 +5949,6 @@ async def create_flight_gopro_overlay_job(
     title = flight.title or flight.name or flight.id
     input_dir = _gopro_overlay_flight_directory(db, flight)
     use_input_output_dir = not output_dir or not output_dir.strip()
-    resolved_output_filename = output_filename or f"{title}-{output_resolution}.mp4"
 
     try:
         resolved_output_dir = (
@@ -5951,6 +5981,10 @@ async def create_flight_gopro_overlay_job(
             resolved_gpx_path or auto_gpx_path or _resolve_flight_file_path(flight.gpx_file_path)
         )
         fallback_pip_path = resolved_pip_path or auto_pip_path or generated_video_path
+        effective_output_resolution = await _resolve_flight_gopro_overlay_output_resolution(
+            output_resolution,
+            fallback_pip_path,
+        )
         gpx_file_for_job = gpx_file
         pin_overlay_inputs = bool(auto_osv_paths)
 
@@ -5964,6 +5998,9 @@ async def create_flight_gopro_overlay_job(
                     status_code=400,
                     detail="Generate the flight video before creating the GoPro overlay",
                 )
+            resolved_output_filename = (
+                output_filename or f"{title}-{effective_output_resolution}.mp4"
+            )
             job = await asyncio.to_thread(
                 create_gopro_overlay_job_from_paths,
                 video_path=resolved_video_path,
@@ -5971,7 +6008,7 @@ async def create_flight_gopro_overlay_job(
                 pip_path=fallback_pip_path,
                 layout_id=layout_id,
                 output_filename=resolved_output_filename,
-                output_resolution=output_resolution,
+                output_resolution=effective_output_resolution,
                 output_dir=resolved_output_dir,
                 gpx_offset=gpx_offset,
             )
@@ -5992,6 +6029,7 @@ async def create_flight_gopro_overlay_job(
                 detail="Generate the flight video before creating the GoPro overlay",
             )
 
+        resolved_output_filename = output_filename or f"{title}-{effective_output_resolution}.mp4"
         job = await create_gopro_overlay_job(
             video_file=video_file,
             gpx_file=gpx_file_for_job,
@@ -6000,7 +6038,7 @@ async def create_flight_gopro_overlay_job(
             pip_file=osv_video_file,
             layout_id=layout_id,
             output_filename=resolved_output_filename,
-            output_resolution=output_resolution,
+            output_resolution=effective_output_resolution,
             output_dir=resolved_output_dir,
             pin_inputs=pin_overlay_inputs,
             gpx_offset=gpx_offset,
