@@ -188,7 +188,7 @@ const defaultHandlers = [
       message: 'queued',
       layout_id: 'parapente-1080',
       layout_label: 'Parapente 1920x1080',
-      output_filename: 'final.mp4',
+      output_filename: 'Vol_à_Arguel-1080p.mp4',
       created_at: '2026-03-15T14:00:00Z',
       updated_at: '2026-03-15T14:00:00Z',
       job_token: 'token-gopro-overlay',
