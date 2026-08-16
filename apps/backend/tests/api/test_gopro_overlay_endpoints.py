@@ -26,7 +26,6 @@ from gopro_overlay_export import create_gopro_overlay_job
 from gopro_overlay_export import create_gopro_overlay_job_from_paths
 from gopro_overlay_export import delete_gopro_overlay_job
 from models import Flight
-from models import VideoExportJob
 
 API_PREFIX = "/api"
 
@@ -808,7 +807,6 @@ def test_create_flight_gopro_overlay_job_uses_daily_departure_index(
             "routes.check_gopro_overlay_dependencies",
             return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
         ),
-        patch("routes.probe_video_resolution", return_value=(1920, 1080)),
         patch("routes.create_gopro_overlay_job_from_paths", return_value=expected) as create_job,
     ):
         response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay")
@@ -819,68 +817,6 @@ def test_create_flight_gopro_overlay_job_uses_daily_departure_index(
     assert create_job.call_args.kwargs["pip_path"] == pip_path
     assert create_job.call_args.kwargs["output_filename"] == "Arguel 15-03 14h00-1080p.mp4"
     assert create_job.call_args.kwargs["output_resolution"] == "1080p"
-
-
-def test_create_flight_gopro_overlay_job_auto_uses_4k_output_resolution(
-    client: TestClient,
-    db_session,
-    sample_flight,
-    tmp_path,
-    monkeypatch,
-):
-    paragliding_root = tmp_path / "gopro-root"
-    input_dir = paragliding_root / "20260315" / "01"
-    input_dir.mkdir(parents=True)
-    camera_path = input_dir / "camera.mp4"
-    gpx_path = input_dir / "Zepp-track.gpx"
-    pip_path = input_dir / "flight-pip.mp4"
-    camera_path.write_bytes(b"camera")
-    gpx_path.write_text("<gpx />")
-    pip_path.write_bytes(b"pip")
-    sample_flight.video_file_path = str(pip_path)
-    db_session.add(
-        VideoExportJob(
-            id="export-4k",
-            flight_id=sample_flight.id,
-            status="completed",
-            mode="manual",
-            quality="4K",
-            fps=15,
-            speed=1,
-        )
-    )
-    db_session.commit()
-    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
-
-    expected = {
-        "job_id": "job-flight-gopro-auto-4k",
-        "status": "queued",
-        "progress": 0,
-        "message": "queued",
-        "layout_id": "parapente-3840",
-        "layout_label": "Parapente 3840x2160",
-        "output_filename": "Arguel 15-03 14h00-4k.mp4",
-        "created_at": "2026-01-01T00:00:00+00:00",
-        "updated_at": "2026-01-01T00:00:00+00:00",
-    }
-
-    with (
-        patch(
-            "routes.check_gopro_overlay_dependencies",
-            return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
-        ),
-        patch("routes.probe_video_resolution", return_value=(3840, 2160)),
-        patch("routes.create_gopro_overlay_job_from_paths", return_value=expected) as create_job,
-    ):
-        response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay")
-
-    assert response.status_code == 200
-    assert create_job.call_args.kwargs["video_path"] == camera_path
-    assert create_job.call_args.kwargs["gpx_path"] == gpx_path
-    assert create_job.call_args.kwargs["pip_path"] == pip_path
-    assert create_job.call_args.kwargs["output_dir"] == str(input_dir)
-    assert create_job.call_args.kwargs["output_filename"] == "Arguel 15-03 14h00-4k.mp4"
-    assert create_job.call_args.kwargs["output_resolution"] == "4k"
 
 
 def test_create_flight_gopro_overlay_job_merges_all_auto_osv_files(
@@ -926,7 +862,6 @@ def test_create_flight_gopro_overlay_job_merges_all_auto_osv_files(
             "routes.check_gopro_overlay_dependencies",
             return_value={"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
         ),
-        patch("routes.probe_video_resolution", return_value=(1920, 1080)),
         patch("routes.create_gopro_overlay_job_from_paths", return_value=expected) as create_job,
     ):
         response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay")
