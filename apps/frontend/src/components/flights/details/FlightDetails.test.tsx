@@ -158,11 +158,6 @@ vi.mock('react-i18next', () => ({
         'flights.goproOverlayRegenerateShort': 'Regenerate overlay',
         'flights.goproOverlayGenerate': 'Generate overlay',
         'flights.goproOverlayGenerateShort': 'Generate overlay',
-        'flights.goproOverlayOutputResolutionLabel': 'Output resolution',
-        'flights.goproOverlayOutputResolutionSource': 'Source resolution',
-        'flights.goproOverlayOutputResolution1080p': '1080p (1920 × 1080)',
-        'flights.goproOverlayOutputResolution4k': '4K (3840 × 2160)',
-        'flights.goproOverlayOutputResolutionHint': 'Resolution hint',
         'flights.goproOverlayGpxOffsetLabel': 'GPX offset (seconds)',
         'flights.goproOverlayGpxOffsetHint': 'Offset hint',
         'common.reset': 'Reset',
@@ -418,13 +413,9 @@ describe('FlightDetails GoPro overlay action', () => {
       })
     ).toBeInTheDocument();
     expect(screen.getByLabelText('GPX offset (seconds)')).toHaveValue(0);
-    expect(screen.getByLabelText('Output resolution')).toHaveValue('1080p');
 
     fireEvent.change(screen.getByLabelText('GPX offset (seconds)'), {
       target: { value: '2.5' },
-    });
-    fireEvent.change(screen.getByLabelText('Output resolution'), {
-      target: { value: '4k' },
     });
     fireEvent.click(
       screen.getByRole('button', { name: 'flights.goproOverlayLaunch' })
@@ -435,7 +426,6 @@ describe('FlightDetails GoPro overlay action', () => {
     });
     const formData = createOverlayMock.mock.calls[0][0] as FormData;
     expect(formData.get('gpx_offset')).toBe('2.5');
-    expect(formData.get('output_resolution')).toBe('4k');
   });
 
   it('keeps the automatic alignment separate from the manual GPX offset', () => {
