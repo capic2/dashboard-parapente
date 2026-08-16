@@ -2,7 +2,6 @@ import asyncio
 import fnmatch
 import json
 import logging
-import math
 import os
 import re
 import shlex
@@ -54,7 +53,6 @@ _UPLOAD_WORK_ROOT = Path("/tmp/dashboard-parapente/gopro-overlays")
 _PATH_WORK_DIR_NAME = ".gopro-overlay-work"
 _PROGRESS_PERCENT_RE = re.compile(r"(?P<percent>\d{1,3})\s*%")
 _LOG_TAIL_LINE_COUNT = 100
-_PIP_FRAME_RATE = 10
 
 
 def _gopro_overlay_log_dir() -> Path:
@@ -1019,14 +1017,11 @@ def _prepare_pip_video_for_overlay(
             f"{video_duration:.3f}",
         ]
     else:
-        software_filters = [f"fps={_PIP_FRAME_RATE}", "setpts=PTS-STARTPTS"]
+        software_filters = ["setpts=PTS-STARTPTS"]
         if pip_delay > 0:
-            start_frames = math.ceil(pip_delay * _PIP_FRAME_RATE)
-            software_filters.append(f"tpad=start_mode=add:start={start_frames}")
+            software_filters.append(f"tpad=start_mode=add:start_duration={pip_delay:.3f}")
         if pip_tail_duration and pip_tail_duration > 0:
-            stop_frames = math.ceil(pip_tail_duration * _PIP_FRAME_RATE)
-            software_filters.append(f"tpad=stop_mode=clone:stop={stop_frames}")
-        software_filters.append(f"setpts=N/({_PIP_FRAME_RATE}*TB)")
+            software_filters.append(f"tpad=stop_mode=clone:stop_duration={pip_tail_duration:.3f}")
         command_prefix = [
             "ffmpeg",
             "-y",

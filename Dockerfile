@@ -77,7 +77,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xdg-utils \
     curl \
     ffmpeg \
-    patch \
     nodejs \
     npm \
     sqlite3 \
@@ -95,11 +94,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 
 # Installer GoPro Dashboard Overlay dans un venv créé dans l'image.
 COPY --from=gopro-overlay-src / /app/gopro-overlay
-# Prevent floating-point frame timestamps from repeatedly restarting the PIP decoder.
-COPY docker/gopro-overlay/video-frame-source.patch /tmp/video-frame-source.patch
 RUN rm -rf /app/gopro-overlay/venv && \
-    patch -d /app/gopro-overlay -p1 < /tmp/video-frame-source.patch && \
-    rm /tmp/video-frame-source.patch && \
     python -m venv /app/gopro-overlay/venv && \
     /app/gopro-overlay/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel && \
     /app/gopro-overlay/venv/bin/pip install --no-cache-dir -e /app/gopro-overlay

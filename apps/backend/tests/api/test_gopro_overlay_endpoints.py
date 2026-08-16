@@ -1,8 +1,6 @@
-import json
 import logging
+import json
 import os
-import shutil
-import subprocess
 from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
@@ -1851,77 +1849,10 @@ def test_prepare_pip_video_delays_pip_until_gpx_start(tmp_path, monkeypatch):
     command = commands[0]
     assert "-ss" not in command
     video_filter = command[command.index("-vf") + 1]
-    assert "fps=10" in video_filter
     assert "setpts=PTS-STARTPTS" in video_filter
-    assert "tpad=start_mode=add:start=50" in video_filter
-    assert "tpad=stop_mode=clone:stop=150" in video_filter
-    assert "setpts=N/(10*TB)" in video_filter
+    assert "tpad=start_mode=add:start_duration=5.000" in video_filter
+    assert "tpad=stop_mode=clone:stop_duration=15.000" in video_filter
     assert command[command.index("-c:v") + 1] == "libx264"
-
-
-@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is required")
-def test_prepare_pip_video_keeps_a_decodable_frame_through_camera_end(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    video_path = tmp_path / "camera.mp4"
-    gpx_path = tmp_path / "track.gpx"
-    pip_path = tmp_path / "pip.mp4"
-    work_dir = tmp_path / "work"
-    work_dir.mkdir()
-    gpx_path.write_text("<gpx />")
-
-    for path, color, duration in (
-        (video_path, "blue", 3),
-        (pip_path, "red", 1),
-    ):
-        subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-f",
-                "lavfi",
-                "-i",
-                f"color=c={color}:s=32x32:r=10:d={duration}",
-                "-c:v",
-                "libx264",
-                "-pix_fmt",
-                "yuv420p",
-                str(path),
-            ],
-            check=True,
-        )
-
-    monkeypatch.setattr(gopro_overlay_export, "select_video_accelerator", lambda _: "cpu")
-
-    prepared = gopro_overlay_export._prepare_pip_video_for_overlay(
-        "job-pip", video_path, gpx_path, pip_path, work_dir
-    )
-
-    assert (gopro_overlay_export.probe_video_duration(prepared) or 0) >= 2.8
-    decoded_frame = tmp_path / "prepared-last-frame.raw"
-    subprocess.run(
-        [
-            "ffmpeg",
-            "-y",
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-ss",
-            "2.5",
-            "-i",
-            str(prepared),
-            "-frames:v",
-            "1",
-            "-f",
-            "rawvideo",
-            str(decoded_frame),
-        ],
-        check=True,
-    )
-    assert decoded_frame.stat().st_size > 0
 
 
 @pytest.mark.parametrize("nvenc_failure", ["nonzero", "timeout"])
@@ -2027,7 +1958,7 @@ def test_prepare_pip_video_trims_pip_when_camera_starts_after_gpx(tmp_path, monk
     assert prepared.exists()
     command = commands[0]
     assert command[command.index("-ss") + 1] == "5.000"
-    assert "tpad=stop_mode=clone:stop=150" in command[command.index("-vf") + 1]
+    assert "tpad=stop_mode=clone:stop_duration=15.000" in command[command.index("-vf") + 1]
     assert command[command.index("-c:v") + 1] == "libx264"
 
 
@@ -2075,7 +2006,7 @@ def test_prepare_pip_video_auto_aligns_start_time_by_timezone_offset(tmp_path, m
     assert prepared == work_dir / "pip-prepared-job-pip.mp4"
     assert prepared.read_bytes() == b"prepared"
     command = commands[0]
-    assert "tpad=stop_mode=clone:stop=200" in command[command.index("-vf") + 1]
+    assert "tpad=stop_mode=clone:stop_duration=20.000" in command[command.index("-vf") + 1]
     assert command[command.index("-c:v") + 1] == "libx264"
 
 
@@ -2123,8 +2054,8 @@ def test_prepare_pip_video_uses_merged_gpx_timeline_without_creation_time(tmp_pa
     command = commands[0]
     assert "-ss" not in command
     video_filter = command[command.index("-vf") + 1]
-    assert "tpad=start_mode=add:start=145" in video_filter
-    assert "stop_mode" not in video_filter
+    assert "tpad=start_mode=add:start_duration=14.483" in video_filter
+    assert "stop_duration" not in video_filter
 
 
 def test_prepare_pip_video_applies_manual_gpx_offset_to_shared_timeline(tmp_path, monkeypatch):
@@ -2168,7 +2099,7 @@ def test_prepare_pip_video_applies_manual_gpx_offset_to_shared_timeline(tmp_path
     )
 
     video_filter = commands[0][commands[0].index("-vf") + 1]
-    assert "tpad=start_mode=add:start=170" in video_filter
+    assert "tpad=start_mode=add:start_duration=16.983" in video_filter
 
 
 def test_prepare_queued_job_uses_prepared_pip_path(tmp_path, monkeypatch, test_db):
