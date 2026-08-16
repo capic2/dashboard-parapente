@@ -164,7 +164,7 @@ jobs:
 
       - name: Verify GoPro overlay build context
         env:
-          GOPRO_OVERLAY_BUILD_CONTEXT: ${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT || 'https://github.com/capic2/gopro-dashboard-overlay.git#657dd07a7d7e2f58ade271641326d0e00ff0027b' }}
+          GOPRO_OVERLAY_BUILD_CONTEXT: ${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT || 'https://github.com/capic2/gopro-dashboard-overlay.git#main' }}
         run: |
           if [ -z "$GOPRO_OVERLAY_BUILD_CONTEXT" ]; then
             echo "Missing repository variable GOPRO_OVERLAY_BUILD_CONTEXT"
