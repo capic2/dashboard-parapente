@@ -60,10 +60,6 @@ _OUTPUT_RESOLUTIONS: dict[str, tuple[int, int] | None] = {
     "1080p": (1920, 1080),
     "4k": (3840, 2160),
 }
-_OUTPUT_LAYOUT_FILENAMES = {
-    "1080p": "layout_parapente_1080.xml",
-    "4k": "layout_parapente_3840.xml",
-}
 
 
 def _gopro_overlay_log_dir() -> Path:
@@ -1393,15 +1389,11 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         if output_resolution not in _OUTPUT_RESOLUTIONS:
             raise ValueError("Unknown output resolution")
         requested_layout_id = metadata.get("requested_layout_id")
-        output_layout_filename = _OUTPUT_LAYOUT_FILENAMES.get(output_resolution)
-        if output_layout_filename:
-            selected_layout = next(
-                (layout for layout in _LAYOUTS if layout.path == output_layout_filename), None
-            )
-        elif requested_layout_id:
-            selected_layout = _find_layout(str(requested_layout_id))
-        else:
-            selected_layout = _nearest_layout(width, height)
+        selected_layout = (
+            _find_layout(str(requested_layout_id))
+            if requested_layout_id
+            else _nearest_layout(width, height)
+        )
         if not selected_layout:
             raise ValueError("Unknown layout")
         source_layout_path = _layout_path(selected_layout)
