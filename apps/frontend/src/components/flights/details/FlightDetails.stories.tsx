@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import preview from '../../../../.storybook/preview';
-import { expect, fn, userEvent } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { FlightDetails } from './FlightDetails';
 import { ToastContainer } from '@dashboard-parapente/design-system';
 import { useToastStore } from '../../../hooks/useToast';
@@ -106,11 +106,31 @@ const mockGPXData = {
 };
 
 const defaultHandlers = [
+  http.get(
+    '*/api/flights/:id/gopro-camera/preview',
+    () =>
+      new HttpResponse(new Uint8Array(), {
+        headers: { 'Content-Type': 'video/mp4' },
+      })
+  ),
   http.get('*/api/flights/:id/gopro-overlay/preview', () =>
     HttpResponse.json({
       video: {
         duration_seconds: 600,
         start_time: '2026-03-18T10:00:00Z',
+        preview_target_end_seconds: 600,
+        preview_segments: [
+          {
+            preview_start_seconds: 0,
+            source_start_seconds: 0,
+            duration_seconds: 180,
+          },
+          {
+            preview_start_seconds: 180,
+            source_start_seconds: 420,
+            duration_seconds: 180,
+          },
+        ],
         preview_status: 'ready',
         preview_available_duration_seconds: 180,
         preview_requested_duration_seconds: 180,
@@ -257,11 +277,17 @@ Default.test('The GPX can be replaced', async ({ canvas, step }) => {
 
 Default.test(
   'The GoPro overlay action starts with default values',
-  async ({ canvas, userEvent, step }) => {
+  async ({ canvas, canvasElement, userEvent, step }) => {
     await step('start the GoPro overlay generation', async () => {
       await userEvent.click(
         await canvas.findByRole('button', {
           name: i18n.t('flights.goproOverlayGenerate'),
+        })
+      );
+      const modal = within(canvasElement.ownerDocument.body);
+      await userEvent.click(
+        await modal.findByRole('button', {
+          name: i18n.t('flights.goproOverlayLaunch'),
         })
       );
       await expect(
