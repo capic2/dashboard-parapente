@@ -5789,8 +5789,10 @@ def get_gopro_overlay_dependencies() -> GoproOverlayDependencies:
     response_model=GoproOverlayPreview,
 )
 def get_flight_gopro_overlay_preview(
-    flight_id: str, db: Session = Depends(get_db)
+    flight_id: str, response: Response, db: Session = Depends(get_db)
 ) -> GoproOverlayPreview:
+    response.headers["Cache-Control"] = "no-store"
+
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
