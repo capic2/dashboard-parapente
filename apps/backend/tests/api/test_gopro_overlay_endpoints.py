@@ -2499,33 +2499,24 @@ def test_auto_layout_selection_uses_4k_layout_for_4k_source():
         (
             (3840, 2160),
             "1080p",
-            None,
             "parapente-3840",
-            "layout_parapente_3840.xml",
+            "parapente-1080",
+            "layout_parapente_1080.xml",
             (1920, 1080),
             ("220", "100", "50"),
         ),
         (
             (1920, 1080),
             "4k",
-            None,
             "parapente-1080",
-            "layout_parapente_1080.xml",
+            "parapente-3840",
+            "layout_parapente_3840.xml",
             (3840, 2160),
             ("440", "200", "100"),
         ),
-        (
-            (3840, 2160),
-            "1080p",
-            "parapente-1080",
-            "parapente-1080",
-            "layout_parapente_1080.xml",
-            (1920, 1080),
-            ("220", "100", "50"),
-        ),
     ],
 )
-def test_worker_preparation_uses_source_layout_unless_explicitly_requested(
+def test_worker_preparation_uses_layout_matching_output_resolution(
     tmp_path,
     monkeypatch,
     test_db,
