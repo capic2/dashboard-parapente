@@ -2171,9 +2171,7 @@ def test_prepare_pip_video_applies_manual_gpx_offset_to_shared_timeline(tmp_path
     assert "tpad=start_mode=add:start=170" in video_filter
 
 
-def test_prepare_queued_job_uses_prepared_pip_path_with_matching_gpx_offset(
-    tmp_path, monkeypatch, test_db
-):
+def test_prepare_queued_job_uses_prepared_pip_path(tmp_path, monkeypatch, test_db):
     layout_dir = tmp_path / "layouts"
     layout_dir.mkdir()
     (layout_dir / "layout_parapente_1080.xml").write_text("<layout />")
@@ -2220,7 +2218,7 @@ def test_prepare_queued_job_uses_prepared_pip_path_with_matching_gpx_offset(
 
     assert prepared is not None
     assert Path(prepared["pip_path"]) == prepared_pip_path
-    assert pip_calls[0]["gpx_offset"] == 2.5
+    assert pip_calls[0]["gpx_offset"] == 0.0
     render_gpx_path = Path(prepared["command"]["render_gpx_path"])
     assert render_gpx_path.name.startswith("gpx-offset-")
     assert "2026-08-08T09:30:45.500000Z" in render_gpx_path.read_text()
@@ -2965,7 +2963,7 @@ def test_run_job_uses_preview_effective_offset_for_osv_merge(
     assert not work_dir.exists()
 
 
-def test_run_job_passes_manual_gpx_offset_to_pip_preparation(
+def test_run_job_keeps_manual_gpx_offset_out_of_pip_preparation(
     tmp_path,
     monkeypatch,
     test_db,
@@ -3034,7 +3032,7 @@ def test_run_job_passes_manual_gpx_offset_to_pip_preparation(
     ):
         gopro_overlay_export._run_job(job["job_id"])
 
-    assert pip_calls[0]["gpx_offset"] == 2.5
+    assert pip_calls[0]["gpx_offset"] == 0.0
 
 
 def test_run_job_cleans_temp_files_after_process_failure(
