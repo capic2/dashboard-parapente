@@ -55,6 +55,11 @@ _PATH_WORK_DIR_NAME = ".gopro-overlay-work"
 _PROGRESS_PERCENT_RE = re.compile(r"(?P<percent>\d{1,3})\s*%")
 _LOG_TAIL_LINE_COUNT = 100
 _PIP_FRAME_RATE = 10
+_OUTPUT_RESOLUTIONS: dict[str, tuple[int, int] | None] = {
+    "source": None,
+    "1080p": (1920, 1080),
+    "4k": (3840, 2160),
+}
 
 
 def _gopro_overlay_log_dir() -> Path:
@@ -389,6 +394,7 @@ def _copy_job_input(source: Path, destination: Path, allowed_extensions: set[str
 def _job_preparation_metadata(
     pin_inputs: bool,
     requested_layout_id: str | None,
+    output_resolution: str,
     gpx_offset: float = 0.0,
     render_method: str | None = None,
 ) -> dict[str, Any]:
@@ -396,6 +402,7 @@ def _job_preparation_metadata(
         "prepare_overlay_inputs": True,
         "pin_inputs": pin_inputs,
         "requested_layout_id": requested_layout_id,
+        "output_resolution": output_resolution,
         "gpx_offset": gpx_offset,
     }
     if render_method:
@@ -1378,11 +1385,16 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
 
         width, height = probe_video_resolution(video_path)
         _update_job(job_id, progress=20, message="Preparing overlay layout")
+        output_resolution = str(metadata.get("output_resolution") or "source")
+        if output_resolution not in _OUTPUT_RESOLUTIONS:
+            raise ValueError("Unknown output resolution")
+        requested_dimensions = _OUTPUT_RESOLUTIONS[output_resolution]
+        selection_width, selection_height = requested_dimensions or (width, height)
         requested_layout_id = metadata.get("requested_layout_id")
         selected_layout = (
             _find_layout(str(requested_layout_id))
             if requested_layout_id
-            else _nearest_layout(width, height)
+            else _nearest_layout(selection_width, selection_height)
         )
         if not selected_layout:
             raise ValueError("Unknown layout")
@@ -1390,15 +1402,20 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         if not source_layout_path.exists():
             raise ValueError(f"Layout file not found: {source_layout_path}")
         _append_job_log(log_path, f"Using layout {selected_layout.label}")
+        render_width, render_height = _layout_render_size(
+            selected_layout,
+            width,
+            height,
+            output_resolution,
+        )
         layout_path = _prepare_layout_file(
             source_layout_path,
             work_dir / source_layout_path.name,
             has_pip=pip_path is not None,
-            target_width=width,
-            target_height=height,
+            target_width=render_width,
+            target_height=render_height,
         )
 
-        render_width, render_height = _layout_render_size(selected_layout, width, height)
         prepared_job = _update_job(
             job_id,
             status=_STATUS_QUEUED,
@@ -1472,8 +1489,15 @@ def _nearest_layout(width: int | None, height: int | None) -> GoproOverlayLayout
 
 
 def _layout_render_size(
-    layout: GoproOverlayLayout, source_width: int | None, source_height: int | None
+    layout: GoproOverlayLayout,
+    source_width: int | None,
+    source_height: int | None,
+    output_resolution: str = "source",
 ) -> tuple[int | None, int | None]:
+    if output_resolution not in _OUTPUT_RESOLUTIONS:
+        raise ValueError("Unknown output resolution")
+    if dimensions := _OUTPUT_RESOLUTIONS[output_resolution]:
+        return dimensions
     return source_width or layout.width, source_height or layout.height
 
 
@@ -1547,6 +1571,7 @@ async def create_gopro_overlay_job(
     pip_file: UploadFile | None,
     layout_id: str | None,
     output_filename: str | None,
+    output_resolution: str = "source",
     fallback_gpx_path: Path | None = None,
     fallback_pip_path: Path | None = None,
     output_dir: str | None = None,
@@ -1592,6 +1617,7 @@ async def create_gopro_overlay_job(
                 pip_path=pip_path,
                 layout_id=layout_id,
                 output_filename=output_filename,
+                output_resolution=output_resolution,
                 work_dir=job_upload_dir,
                 output_dir=output_dir,
                 pin_inputs=pin_inputs,
@@ -1608,6 +1634,7 @@ def create_gopro_overlay_job_from_paths(
     pip_path: Path | None,
     layout_id: str | None,
     output_filename: str | None,
+    output_resolution: str = "source",
     output_dir: str | None = None,
     gpx_offset: float = 0.0,
 ) -> dict[str, Any]:
@@ -1628,6 +1655,7 @@ def create_gopro_overlay_job_from_paths(
                 pip_path=pip_path,
                 layout_id=layout_id,
                 output_filename=output_filename,
+                output_resolution=output_resolution,
                 work_dir=work_dir,
                 pin_inputs=True,
                 output_dir=output_dir,
@@ -1646,10 +1674,13 @@ def _create_gopro_overlay_job_from_paths(
     layout_id: str | None,
     output_filename: str | None,
     work_dir: Path,
+    output_resolution: str = "source",
     pin_inputs: bool = False,
     output_dir: str | None = None,
     gpx_offset: float = 0.0,
 ) -> dict[str, Any]:
+    if output_resolution not in _OUTPUT_RESOLUTIONS:
+        raise ValueError("Unknown output resolution")
     output_name = _safe_filename(output_filename, f"gopro-overlay-{job_id}.mp4")
     if Path(output_name).suffix.lower() != ".mp4":
         output_name = f"{Path(output_name).stem}.mp4"
@@ -1670,6 +1701,7 @@ def _create_gopro_overlay_job_from_paths(
     preparation_metadata = _job_preparation_metadata(
         pin_inputs=pin_inputs,
         requested_layout_id=layout_id,
+        output_resolution=output_resolution,
         gpx_offset=gpx_offset,
         render_method=render_method,
     )
