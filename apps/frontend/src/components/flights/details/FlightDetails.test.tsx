@@ -7,7 +7,6 @@ const {
   apiDelete,
   confirmMock,
   createOverlayMock,
-  generatePreviewMutateMock,
   generatePreviewMock,
   mockFlight,
   overlayJobStreamMock,
@@ -18,7 +17,6 @@ const {
   apiDelete: vi.fn(),
   confirmMock: vi.fn(),
   createOverlayMock: vi.fn(),
-  generatePreviewMutateMock: vi.fn(),
   generatePreviewMock: vi.fn(),
   resetOverlayMock: vi.fn(),
   overlayJobStreamMock: { current: null as unknown },
@@ -214,7 +212,6 @@ vi.mock('../../../hooks/gopro/useGoproOverlay', () => ({
   useGenerateGoproPreview: () => ({
     isPending: false,
     isError: false,
-    mutate: generatePreviewMutateMock,
     mutateAsync: generatePreviewMock,
   }),
 }));
@@ -260,7 +257,6 @@ describe('FlightDetails GoPro overlay action', () => {
   beforeEach(() => {
     apiDelete.mockReset();
     createOverlayMock.mockReset();
-    generatePreviewMutateMock.mockReset();
     generatePreviewMock.mockReset();
     generatePreviewMock.mockResolvedValue({ status: 'generating' });
     createOverlayMock.mockResolvedValue({ job_id: 'job-new', job_token: null });
@@ -362,14 +358,6 @@ describe('FlightDetails GoPro overlay action', () => {
         video: {
           duration_seconds: 60,
           start_time: '2026-03-15T14:00:00Z',
-          preview_target_end_seconds: 60,
-          preview_segments: [
-            {
-              preview_start_seconds: 0,
-              source_start_seconds: 0,
-              duration_seconds: 60,
-            },
-          ],
           preview_status: 'ready',
           preview_available_duration_seconds: 60,
           preview_requested_duration_seconds: 60,
@@ -435,14 +423,6 @@ describe('FlightDetails GoPro overlay action', () => {
         video: {
           duration_seconds: 60,
           start_time: '2026-03-15T14:00:00Z',
-          preview_target_end_seconds: 60,
-          preview_segments: [
-            {
-              preview_start_seconds: 0,
-              source_start_seconds: 0,
-              duration_seconds: 60,
-            },
-          ],
           preview_status: 'ready',
           preview_available_duration_seconds: 60,
           preview_requested_duration_seconds: 60,
@@ -490,19 +470,6 @@ describe('FlightDetails GoPro overlay action', () => {
         video: {
           duration_seconds: 1200,
           start_time: '2026-03-15T14:00:00Z',
-          preview_target_end_seconds: 1200,
-          preview_segments: [
-            {
-              preview_start_seconds: 0,
-              source_start_seconds: 0,
-              duration_seconds: 180,
-            },
-            {
-              preview_start_seconds: 180,
-              source_start_seconds: 1020,
-              duration_seconds: 180,
-            },
-          ],
           preview_status: 'ready',
           preview_available_duration_seconds: 180,
           preview_requested_duration_seconds: 180,
@@ -541,64 +508,8 @@ describe('FlightDetails GoPro overlay action', () => {
       screen.getByRole('button', { name: 'flights.goproPreviewGenerate' })
     );
 
-    await waitFor(() =>
-      expect(generatePreviewMock).toHaveBeenCalledWith({
-        durationSeconds: 480,
-        targetEndSeconds: 1200,
-      })
-    );
+    await waitFor(() => expect(generatePreviewMock).toHaveBeenCalledWith(480));
   }, 10_000);
-
-  it('requests the default start and end preview when no matching cache exists', async () => {
-    previewMock.current = {
-      isPending: false,
-      data: {
-        video: {
-          duration_seconds: 1200,
-          start_time: '2026-03-15T14:00:00Z',
-          preview_target_end_seconds: 1100,
-          preview_segments: [
-            {
-              preview_start_seconds: 0,
-              source_start_seconds: 0,
-              duration_seconds: 1200,
-            },
-          ],
-          preview_status: 'missing',
-          preview_available_duration_seconds: 0,
-          preview_requested_duration_seconds: 180,
-          preview_max_duration_seconds: 900,
-        },
-        gpx: {
-          start_time: '2026-03-15T14:00:00Z',
-          end_time: '2026-03-15T14:18:20Z',
-          duration_seconds: 1100,
-          coordinates: [],
-        },
-        alignment: {
-          automatic_offset_seconds: 0,
-          manual_offset_seconds: 0,
-          effective_offset_seconds: 0,
-        },
-      },
-    };
-
-    render(
-      <FlightDetails
-        flight={mockFlight}
-        sites={sites}
-        onShowCreateSiteModal={() => undefined}
-      />
-    );
-    fireEvent.click(screen.getByRole('button', { name: /Generate overlay/u }));
-
-    await waitFor(() =>
-      expect(generatePreviewMutateMock).toHaveBeenCalledWith(
-        { durationSeconds: 180, targetEndSeconds: 1100 },
-        expect.objectContaining({ onSuccess: expect.any(Function) })
-      )
-    );
-  });
 
   it('shows a notice while the low-resolution preview is generating', () => {
     previewMock.current = {
@@ -607,19 +518,6 @@ describe('FlightDetails GoPro overlay action', () => {
         video: {
           duration_seconds: 1200,
           start_time: '2026-03-15T14:00:00Z',
-          preview_target_end_seconds: 1200,
-          preview_segments: [
-            {
-              preview_start_seconds: 0,
-              source_start_seconds: 0,
-              duration_seconds: 180,
-            },
-            {
-              preview_start_seconds: 180,
-              source_start_seconds: 1020,
-              duration_seconds: 180,
-            },
-          ],
           preview_status: 'generating',
           preview_available_duration_seconds: 180,
           preview_requested_duration_seconds: 180,
@@ -661,14 +559,6 @@ describe('FlightDetails GoPro overlay action', () => {
         video: {
           duration_seconds: 60,
           start_time: '2026-03-15T14:00:00Z',
-          preview_target_end_seconds: 60,
-          preview_segments: [
-            {
-              preview_start_seconds: 0,
-              source_start_seconds: 0,
-              duration_seconds: 60,
-            },
-          ],
           preview_status: 'ready',
           preview_available_duration_seconds: 60,
           preview_requested_duration_seconds: 60,

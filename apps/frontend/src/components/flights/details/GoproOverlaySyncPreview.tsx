@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Gauge, HeartPulse, MapPin, Mountain, TimerReset } from 'lucide-react';
@@ -9,7 +9,6 @@ import {
 import { getApiUrlWithSearchParams } from '../../../lib/api';
 import { useAuthStore } from '../../../stores/authStore';
 import { telemetryAtTimestamp } from './goproSyncTelemetry';
-import type { GoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 
 interface GoproOverlaySyncPreviewProps {
   flightId: string;
@@ -25,31 +24,6 @@ function formatSeconds(seconds: number) {
   return `${sign}${minutes}:${remainingSeconds.toFixed(1).padStart(4, '0')}`;
 }
 
-export function sourceTimeAtPreviewTime(
-  previewTime: number,
-  segments: GoproOverlayPreview['video']['preview_segments']
-) {
-  const segment = segments[previewSegmentIndex(previewTime, segments)];
-  if (!segment) return previewTime;
-  const elapsed = Math.min(
-    Math.max(0, previewTime - segment.preview_start_seconds),
-    segment.duration_seconds
-  );
-  return segment.source_start_seconds + elapsed;
-}
-
-function previewSegmentIndex(
-  previewTime: number,
-  segments: GoproOverlayPreview['video']['preview_segments']
-) {
-  let activeIndex = 0;
-  for (let index = 1; index < segments.length; index += 1) {
-    if (previewTime < segments[index].preview_start_seconds) break;
-    activeIndex = index;
-  }
-  return activeIndex;
-}
-
 export function GoproOverlaySyncPreview({
   flightId,
   offset,
@@ -60,22 +34,18 @@ export function GoproOverlaySyncPreview({
   const queryClient = useQueryClient();
   const preview = useGoproOverlayPreview(flightId, true);
   const generatePreview = useGenerateGoproPreview(flightId);
-  const automaticallyRequestedTarget = useRef<string | null>(null);
   const [videoTime, setVideoTime] = useState(0);
   const [requestedMinutes, setRequestedMinutes] = useState(3);
   const parsedOffset = Number(offset);
   const manualOffset = Number.isFinite(parsedOffset) ? parsedOffset : 0;
   const automaticOffset = preview.data?.alignment.automatic_offset_seconds ?? 0;
-  const previewSegments = preview.data?.video.preview_segments ?? [];
-  const sourceVideoTime = sourceTimeAtPreviewTime(videoTime, previewSegments);
-  const activeSegmentIndex = previewSegmentIndex(videoTime, previewSegments);
   const gpxStart = preview.data
     ? new Date(preview.data.gpx.start_time).getTime()
     : 0;
   const telemetry = preview.data
     ? telemetryAtTimestamp(
         preview.data.gpx.coordinates,
-        gpxStart + (sourceVideoTime - automaticOffset - manualOffset) * 1000
+        gpxStart + (videoTime - automaticOffset - manualOffset) * 1000
       )
     : null;
   const heartRate = telemetry?.heart_rate ?? null;
@@ -83,10 +53,7 @@ export function GoproOverlaySyncPreview({
     `flights/${flightId}/gopro-camera/preview`,
     {
       access_token: token,
-      target_end_seconds: String(
-        preview.data?.video.preview_target_end_seconds ?? ''
-      ),
-      version: `${preview.data?.video.preview_target_end_seconds}-${preview.data?.video.preview_available_duration_seconds}`,
+      version: String(preview.data?.video.preview_available_duration_seconds),
     }
   );
 
@@ -102,41 +69,15 @@ export function GoproOverlaySyncPreview({
   );
   const isGenerating = preview.data?.video.preview_status === 'generating';
   const requestedDurationCoversSource =
-    requestedMinutes * 120 >=
-    (preview.data?.video.preview_target_end_seconds ?? Infinity);
+    requestedMinutes * 60 >= (preview.data?.video.duration_seconds ?? Infinity);
 
   useEffect(() => {
     setRequestedMinutes((current) => Math.max(current, availableMinutes, 3));
   }, [availableMinutes]);
 
-  useEffect(() => {
-    const targetEndSeconds = preview.data?.video.preview_target_end_seconds;
-    const requestKey = `${flightId}:${targetEndSeconds}`;
-    if (
-      preview.data?.video.preview_status !== 'missing' ||
-      targetEndSeconds === undefined ||
-      automaticallyRequestedTarget.current === requestKey
-    ) {
-      return;
-    }
-    automaticallyRequestedTarget.current = requestKey;
-    generatePreview.mutate(
-      { durationSeconds: 180, targetEndSeconds },
-      {
-        onSuccess: () =>
-          void queryClient.invalidateQueries({
-            queryKey: ['flights', flightId, 'gopro-overlay-preview'],
-          }),
-      }
-    );
-  }, [flightId, generatePreview, preview.data?.video, queryClient]);
-
   const handleGeneratePreview = async () => {
     try {
-      await generatePreview.mutateAsync({
-        durationSeconds: requestedMinutes * 60,
-        targetEndSeconds: preview.data?.video.preview_target_end_seconds ?? 0,
-      });
+      await generatePreview.mutateAsync(requestedMinutes * 60);
       await queryClient.invalidateQueries({
         queryKey: ['flights', flightId, 'gopro-overlay-preview'],
       });
@@ -192,22 +133,8 @@ export function GoproOverlaySyncPreview({
         </video>
         <div className="flex items-center justify-between px-3 py-2 font-mono text-xs text-gray-200">
           <span>{t('flights.goproOverlayVideoTime')}</span>
-          <span>{formatSeconds(sourceVideoTime)}</span>
+          <span>{formatSeconds(videoTime)}</span>
         </div>
-        {previewSegments.length > 1 && (
-          <div className="grid grid-cols-2 border-t border-gray-800 text-center text-xs font-medium text-gray-400">
-            <span
-              className={`px-3 py-2 ${activeSegmentIndex === 0 ? 'bg-sky-950 text-sky-200' : ''}`}
-            >
-              {t('flights.goproPreviewStart')}
-            </span>
-            <span
-              className={`border-l border-gray-800 px-3 py-2 ${activeSegmentIndex === 1 ? 'bg-sky-950 text-sky-200' : ''}`}
-            >
-              {t('flights.goproPreviewEnd')}
-            </span>
-          </div>
-        )}
         <div className="space-y-2 border-t border-gray-800 px-3 py-3 text-gray-100">
           <div className="flex items-center justify-between gap-3 text-xs">
             <label htmlFor="gopro-preview-duration">

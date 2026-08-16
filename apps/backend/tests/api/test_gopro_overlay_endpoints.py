@@ -56,14 +56,6 @@ def test_gopro_overlay_preview_returns_shared_timeline(
 
     assert response.status_code == 200
     assert response.json()["video"]["duration_seconds"] == 120.0
-    assert response.json()["video"]["preview_target_end_seconds"] == 70.0
-    assert response.json()["video"]["preview_segments"] == [
-        {
-            "preview_start_seconds": 0.0,
-            "source_start_seconds": 0.0,
-            "duration_seconds": 120.0,
-        }
-    ]
     assert response.json()["gpx"]["duration_seconds"] == 60.0
     assert len(response.json()["gpx"]["coordinates"]) == 2
     assert response.json()["gpx"]["coordinates"][0]["heart_rate"] == 120
@@ -198,7 +190,7 @@ def test_gopro_camera_preview_endpoint_serves_current_proxy(
     (input_dir / ".camera.preview.json").write_text(
         json.dumps(
             {
-                "profile_version": 2,
+                "profile_version": 1,
                 "source": {
                     "size": fingerprint.st_size,
                     "mtime_ns": fingerprint.st_mtime_ns,
@@ -206,54 +198,15 @@ def test_gopro_camera_preview_endpoint_serves_current_proxy(
                 "status": "ready",
                 "available_duration_seconds": 180,
                 "requested_duration_seconds": 180,
-                "target_end_seconds": 900.0,
             }
         )
     )
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
 
-    response = client.get(
-        f"{API_PREFIX}/flights/{sample_flight.id}/gopro-camera/preview",
-        params={"target_end_seconds": 900.0},
-    )
+    response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-camera/preview")
 
     assert response.status_code == 200
     assert response.content == b"proxy-video"
-
-
-def test_gopro_camera_preview_endpoint_falls_back_for_a_different_target(
-    client: TestClient, sample_flight, tmp_path, monkeypatch
-) -> None:
-    input_dir = tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01"
-    input_dir.mkdir(parents=True)
-    camera_path = input_dir / "camera.mp4"
-    camera_path.write_bytes(b"camera-video")
-    (input_dir / "camera.preview.mp4").write_bytes(b"proxy-video")
-    fingerprint = camera_path.stat()
-    (input_dir / ".camera.preview.json").write_text(
-        json.dumps(
-            {
-                "profile_version": 2,
-                "source": {
-                    "size": fingerprint.st_size,
-                    "mtime_ns": fingerprint.st_mtime_ns,
-                },
-                "status": "ready",
-                "available_duration_seconds": 180,
-                "requested_duration_seconds": 180,
-                "target_end_seconds": 900.0,
-            }
-        )
-    )
-    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
-
-    response = client.get(
-        f"{API_PREFIX}/flights/{sample_flight.id}/gopro-camera/preview",
-        params={"target_end_seconds": 800.0},
-    )
-
-    assert response.status_code == 200
-    assert response.content == b"camera-video"
 
 
 def test_gopro_camera_preview_endpoint_falls_back_when_proxy_file_is_missing(
@@ -267,7 +220,7 @@ def test_gopro_camera_preview_endpoint_falls_back_when_proxy_file_is_missing(
     (input_dir / ".camera.preview.json").write_text(
         json.dumps(
             {
-                "profile_version": 2,
+                "profile_version": 1,
                 "source": {
                     "size": fingerprint.st_size,
                     "mtime_ns": fingerprint.st_mtime_ns,
@@ -297,7 +250,7 @@ def test_request_gopro_camera_preview_extension(
     with patch("gopro_preview_proxy._enqueue_preview") as enqueue:
         response = client.post(
             f"{API_PREFIX}/flights/{sample_flight.id}/gopro-camera/preview",
-            json={"duration_seconds": 600, "target_end_seconds": 900.0},
+            json={"duration_seconds": 600},
         )
 
     assert response.status_code == 200
@@ -317,7 +270,7 @@ def test_request_gopro_camera_preview_rejects_configured_maximum(
 
     response = client.post(
         f"{API_PREFIX}/flights/{sample_flight.id}/gopro-camera/preview",
-        json={"duration_seconds": 601, "target_end_seconds": 900.0},
+        json={"duration_seconds": 601},
     )
 
     assert response.status_code == 422

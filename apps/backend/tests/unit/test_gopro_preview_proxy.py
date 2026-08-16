@@ -9,135 +9,19 @@ import config
 import gopro_preview_proxy
 
 
-def test_ffmpeg_command_concatenates_start_and_target_tail_without_audio(
-    tmp_path: Path,
-) -> None:
+def test_ffmpeg_command_generates_short_480p_preview_without_audio(tmp_path: Path) -> None:
     camera_path = tmp_path / "camera.mp4"
     output_path = tmp_path / "preview.mp4"
 
-    segments = gopro_preview_proxy.preview_segments(1000, 180)
-    command = gopro_preview_proxy._ffmpeg_command(camera_path, output_path, segments, "cpu")
+    command = gopro_preview_proxy._ffmpeg_command(camera_path, output_path, 180, "cpu")
 
-    filters = command[command.index("-filter_complex") + 1]
-    assert "[0:v:0]trim=duration=180" in filters
-    assert "[1:v:0]trim=duration=180" in filters
-    assert command[command.index("-ss") + 1] == "820"
-    assert "concat=n=2:v=1:a=0[outv]" in filters
-    assert "min(854,iw)" in filters
-    assert "min(480,ih)" in filters
-    assert "force_divisible_by=2" in filters
+    assert command[command.index("-t") + 1] == "180"
+    assert "min(854,iw)" in command[command.index("-vf") + 1]
+    assert "min(480,ih)" in command[command.index("-vf") + 1]
+    assert "force_divisible_by=2" in command[command.index("-vf") + 1]
     assert "-an" in command
     assert command[command.index("-movflags") + 1] == "+faststart"
     assert command[command.index("-g") + 1] == "30"
-
-
-def test_preview_segments_use_one_continuous_segment_when_extremities_overlap() -> None:
-    assert gopro_preview_proxy.preview_segments(300, 180) == [
-        gopro_preview_proxy.PreviewSegment(0.0, 0.0, 300.0)
-    ]
-
-
-def test_preview_segments_map_tail_to_the_requested_target() -> None:
-    assert gopro_preview_proxy.preview_segments(1000, 180) == [
-        gopro_preview_proxy.PreviewSegment(0.0, 0.0, 180.0),
-        gopro_preview_proxy.PreviewSegment(180.0, 820.0, 180.0),
-    ]
-
-
-def test_request_preview_invalidates_cache_for_a_different_target(tmp_path: Path) -> None:
-    camera_path = tmp_path / "camera.mp4"
-    camera_path.write_bytes(b"camera")
-    (tmp_path / gopro_preview_proxy.PREVIEW_FILENAME).write_bytes(b"preview")
-    fingerprint = gopro_preview_proxy._source_fingerprint(camera_path)
-    (tmp_path / gopro_preview_proxy.MANIFEST_FILENAME).write_text(
-        json.dumps(
-            {
-                "profile_version": gopro_preview_proxy.PROFILE_VERSION,
-                "source": {
-                    "size": fingerprint.size,
-                    "mtime_ns": fingerprint.mtime_ns,
-                },
-                "status": "ready",
-                "available_duration_seconds": 180,
-                "requested_duration_seconds": 180,
-                "target_end_seconds": 1000.0,
-            }
-        )
-    )
-
-    with patch("gopro_preview_proxy._enqueue_preview") as enqueue:
-        state = gopro_preview_proxy.request_preview(camera_path, 180, 900.0)
-
-    assert state.status == "generating"
-    assert state.available_duration_seconds == 0
-    enqueue.assert_called_once()
-
-
-def test_request_preview_reuses_target_clamped_to_source_duration(tmp_path: Path) -> None:
-    camera_path = tmp_path / "camera.mp4"
-    camera_path.write_bytes(b"camera")
-    (tmp_path / gopro_preview_proxy.PREVIEW_FILENAME).write_bytes(b"preview")
-    fingerprint = gopro_preview_proxy._source_fingerprint(camera_path)
-    (tmp_path / gopro_preview_proxy.MANIFEST_FILENAME).write_text(
-        json.dumps(
-            {
-                "profile_version": gopro_preview_proxy.PROFILE_VERSION,
-                "source": {
-                    "size": fingerprint.size,
-                    "mtime_ns": fingerprint.mtime_ns,
-                },
-                "status": "ready",
-                "available_duration_seconds": 180,
-                "requested_duration_seconds": 180,
-                "source_duration_seconds": 300.0,
-                "target_end_seconds": 300.0,
-            }
-        )
-    )
-
-    with patch("gopro_preview_proxy._enqueue_preview") as enqueue:
-        state = gopro_preview_proxy.request_preview(camera_path, 180, 400.0)
-
-    assert state.status == "ready"
-    enqueue.assert_not_called()
-
-
-def test_running_extension_keeps_published_segment_metadata(tmp_path: Path) -> None:
-    camera_path = tmp_path / "camera.mp4"
-    camera_path.write_bytes(b"camera")
-    (tmp_path / gopro_preview_proxy.PREVIEW_FILENAME).write_bytes(b"preview")
-    fingerprint = gopro_preview_proxy._source_fingerprint(camera_path)
-    segments = gopro_preview_proxy.preview_segments(1000, 180)
-    (tmp_path / gopro_preview_proxy.MANIFEST_FILENAME).write_text(
-        json.dumps(
-            {
-                "profile_version": gopro_preview_proxy.PROFILE_VERSION,
-                "source": {
-                    "size": fingerprint.size,
-                    "mtime_ns": fingerprint.mtime_ns,
-                },
-                "status": "generating",
-                "generation_started_at": 1000,
-                "available_duration_seconds": 180,
-                "requested_duration_seconds": 600,
-                "target_end_seconds": 1000.0,
-                "segments": [
-                    {
-                        "preview_start_seconds": segment.preview_start_seconds,
-                        "source_start_seconds": segment.source_start_seconds,
-                        "duration_seconds": segment.duration_seconds,
-                    }
-                    for segment in segments
-                ],
-            }
-        )
-    )
-
-    with patch("gopro_preview_proxy.time.time", return_value=1001):
-        state = gopro_preview_proxy.get_preview_state(camera_path, 1000.0)
-
-    assert state.status == "generating"
-    assert state.segments == tuple(segments)
 
 
 def test_rq_job_id_changes_between_generations(tmp_path: Path, monkeypatch) -> None:
@@ -622,7 +506,6 @@ def test_process_preview_records_measured_truncated_duration(tmp_path: Path, mon
                 "generation_id": "generation",
                 "available_duration_seconds": 0,
                 "requested_duration_seconds": 180,
-                "target_end_seconds": 60.0,
             }
         )
     )
@@ -634,59 +517,11 @@ def test_process_preview_records_measured_truncated_duration(tmp_path: Path, mon
         lambda _camera, output, _duration: output.write_bytes(b"truncated-preview"),
     )
 
-    gopro_preview_proxy.process_preview_job(str(camera_path), 180, "generation", 60.0)
+    gopro_preview_proxy.process_preview_job(str(camera_path), 180, "generation")
 
     persisted = json.loads(manifest_path.read_text())
     assert persisted["available_duration_seconds"] == 59
     assert persisted["requested_duration_seconds"] == 180
-
-
-def test_process_preview_records_target_and_segment_metadata(tmp_path: Path, monkeypatch) -> None:
-    camera_path = tmp_path / "camera.mp4"
-    camera_path.write_bytes(b"camera")
-    fingerprint = gopro_preview_proxy._source_fingerprint(camera_path)
-    manifest_path = tmp_path / gopro_preview_proxy.MANIFEST_FILENAME
-    manifest_path.write_text(
-        json.dumps(
-            {
-                "profile_version": gopro_preview_proxy.PROFILE_VERSION,
-                "source": {
-                    "size": fingerprint.size,
-                    "mtime_ns": fingerprint.mtime_ns,
-                },
-                "status": "generating",
-                "generation_id": "generation",
-                "available_duration_seconds": 0,
-                "requested_duration_seconds": 180,
-                "target_end_seconds": 1000.0,
-            }
-        )
-    )
-    probe_calls = iter([1200.0, 360.0])
-    monkeypatch.setattr(gopro_preview_proxy, "_probe_duration", lambda _path: next(probe_calls))
-    monkeypatch.setattr(
-        gopro_preview_proxy,
-        "_run_ffmpeg",
-        lambda _camera, output, _segments: output.write_bytes(b"preview"),
-    )
-
-    gopro_preview_proxy.process_preview_job(str(camera_path), 180, "generation", 1000.0)
-
-    persisted = json.loads(manifest_path.read_text())
-    assert persisted["available_duration_seconds"] == 180
-    assert persisted["target_end_seconds"] == 1000.0
-    assert persisted["segments"] == [
-        {
-            "preview_start_seconds": 0.0,
-            "source_start_seconds": 0.0,
-            "duration_seconds": 180.0,
-        },
-        {
-            "preview_start_seconds": 180.0,
-            "source_start_seconds": 820.0,
-            "duration_seconds": 180.0,
-        },
-    ]
 
 
 def test_scanner_waits_for_stable_camera_observation(tmp_path: Path, monkeypatch) -> None:
