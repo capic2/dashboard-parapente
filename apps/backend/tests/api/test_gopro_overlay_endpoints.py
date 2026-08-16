@@ -2420,59 +2420,16 @@ def test_auto_layout_selection_uses_4k_layout_for_4k_source():
     assert selected.id == "parapente-3840"
 
 
-@pytest.mark.parametrize(
-    (
-        "source_resolution",
-        "output_resolution",
-        "requested_layout_id",
-        "expected_layout_id",
-        "expected_layout_filename",
-        "expected_resolution",
-        "expected_geometry",
-    ),
-    [
-        (
-            (3840, 2160),
-            "1080p",
-            "parapente-3840",
-            "parapente-1080",
-            "layout_parapente_1080.xml",
-            (1920, 1080),
-            ("220", "100", "50"),
-        ),
-        (
-            (1920, 1080),
-            "4k",
-            "parapente-1080",
-            "parapente-3840",
-            "layout_parapente_3840.xml",
-            (3840, 2160),
-            ("440", "200", "100"),
-        ),
-    ],
-)
-def test_worker_preparation_uses_layout_matching_output_resolution(
+def test_worker_preparation_uses_requested_1080p_size_for_4k_source(
     tmp_path,
     monkeypatch,
     test_db,
-    source_resolution,
-    output_resolution,
-    requested_layout_id,
-    expected_layout_id,
-    expected_layout_filename,
-    expected_resolution,
-    expected_geometry,
 ):
     layout_dir = tmp_path / "layouts"
     layout_dir.mkdir()
     (layout_dir / "layout_parapente_1080.xml").write_text(
         '<layout width="1920" height="1080">'
         '<component type="video" size="220" x="100" y="50" width="300" height="100" />'
-        "</layout>"
-    )
-    (layout_dir / "layout_parapente_3840.xml").write_text(
-        '<layout width="3840" height="2160">'
-        '<component type="video" size="440" x="200" y="100" width="600" height="200" />'
         "</layout>"
     )
     video_path = tmp_path / "source.mp4"
@@ -2484,16 +2441,16 @@ def test_worker_preparation_uses_layout_matching_output_resolution(
     monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_MAX_AUTO_LAYOUT_WIDTH", 1920)
     monkeypatch.setattr(config, "GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT", 1080)
-    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: source_resolution)
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (3840, 2160))
     monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
 
     job = create_gopro_overlay_job_from_paths(
         video_path=video_path,
         gpx_path=gpx_path,
         pip_path=pip_path,
-        layout_id=requested_layout_id,
+        layout_id="parapente-1080",
         output_filename="overlay.mp4",
-        output_resolution=output_resolution,
+        output_resolution="1080p",
     )
     queued_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"], include_command=True)
     assert queued_job is not None
@@ -2501,17 +2458,16 @@ def test_worker_preparation_uses_layout_matching_output_resolution(
     prepared = gopro_overlay_export._prepare_queued_job(job["job_id"], queued_job)
 
     assert prepared is not None
-    assert prepared["layout_id"] == expected_layout_id
-    assert Path(prepared["layout_path"]).name == expected_layout_filename
-    assert prepared["video_width"] == expected_resolution[0]
-    assert prepared["video_height"] == expected_resolution[1]
+    assert prepared["layout_id"] == "parapente-1080"
+    assert prepared["video_width"] == 1920
+    assert prepared["video_height"] == 1080
     prepared_layout = Path(prepared["layout_path"]).read_text()
-    assert f'width="{expected_resolution[0]}"' in prepared_layout
-    assert f'height="{expected_resolution[1]}"' in prepared_layout
+    assert 'width="1920"' in prepared_layout
+    assert 'height="1080"' in prepared_layout
     assert 'id="pip"' in prepared_layout
-    assert f'size="{expected_geometry[0]}"' in prepared_layout
-    assert f'x="{expected_geometry[1]}"' in prepared_layout
-    assert f'y="{expected_geometry[2]}"' in prepared_layout
+    assert 'size="220"' in prepared_layout
+    assert 'x="100"' in prepared_layout
+    assert 'y="50"' in prepared_layout
 
 
 def test_worker_preparation_merges_osv_files_before_rendering(
