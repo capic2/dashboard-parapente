@@ -1,0 +1,443 @@
+"""OAuth and durable resumable uploads for generated flight videos."""
+
+from __future__ import annotations
+
+import base64
+import hashlib
+import logging
+import re
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlencode, urlparse
+
+import httpx
+from cryptography.fernet import Fernet, InvalidToken
+from jose import JWTError, jwt
+from sqlalchemy.orm import Session
+
+import config
+from database import SessionLocal
+from models import Flight, YoutubeCredential, YoutubeUploadJob
+
+logger = logging.getLogger(__name__)
+
+_ALGORITHM = "HS256"
+_OAUTH_SCOPE = "https://www.googleapis.com/auth/youtube.upload"
+_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+_TOKEN_URL = "https://oauth2.googleapis.com/token"
+_UPLOAD_URL = "https://www.googleapis.com/upload/youtube/v3/videos"
+_ACTIVE_STATUSES = {"queued", "uploading"}
+_RANGE_PATTERN = re.compile(r"bytes=0-(\d+)")
+_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="youtube-upload")
+_SUBMITTED: set[str] = set()
+_SUBMITTED_LOCK = threading.Lock()
+
+
+class YoutubeConfigurationError(RuntimeError):
+    pass
+
+
+class YoutubeOAuthError(RuntimeError):
+    pass
+
+
+def is_configured() -> bool:
+    return bool(
+        config.YOUTUBE_CLIENT_ID
+        and config.YOUTUBE_CLIENT_SECRET
+        and config.YOUTUBE_REDIRECT_URI
+    )
+
+
+def _require_configuration() -> None:
+    if not is_configured():
+        raise YoutubeConfigurationError(
+            "YouTube upload is not configured. Set BACKEND_YOUTUBE_CLIENT_ID, "
+            "BACKEND_YOUTUBE_CLIENT_SECRET and BACKEND_YOUTUBE_REDIRECT_URI."
+        )
+
+
+def _fernet() -> Fernet:
+    secret = str(config.JWT_SECRET or "").encode()
+    key = base64.urlsafe_b64encode(hashlib.sha256(secret).digest())
+    return Fernet(key)
+
+
+def encrypt_secret(value: str) -> str:
+    return _fernet().encrypt(value.encode()).decode()
+
+
+def decrypt_secret(value: str) -> str:
+    try:
+        return _fernet().decrypt(value.encode()).decode()
+    except InvalidToken as exc:
+        raise YoutubeOAuthError("Stored YouTube authorization can no longer be decrypted") from exc
+
+
+def create_authorization_url(*, user_id: int, return_to: str) -> str:
+    _require_configuration()
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+    state = jwt.encode(
+        {
+            "purpose": "youtube_oauth",
+            "user_id": user_id,
+            "return_to": return_to,
+            "exp": expires_at,
+        },
+        config.JWT_SECRET,
+        algorithm=_ALGORITHM,
+    )
+    return f"{_AUTH_URL}?{urlencode({
+        'client_id': config.YOUTUBE_CLIENT_ID,
+        'redirect_uri': config.YOUTUBE_REDIRECT_URI,
+        'response_type': 'code',
+        'scope': _OAUTH_SCOPE,
+        'access_type': 'offline',
+        'prompt': 'consent',
+        'include_granted_scopes': 'true',
+        'state': state,
+    })}"
+
+
+def decode_oauth_state(state: str) -> tuple[int, str]:
+    try:
+        payload = jwt.decode(state, config.JWT_SECRET, algorithms=[_ALGORITHM])
+    except JWTError as exc:
+        raise YoutubeOAuthError("Invalid or expired YouTube authorization state") from exc
+    if payload.get("purpose") != "youtube_oauth" or not isinstance(payload.get("user_id"), int):
+        raise YoutubeOAuthError("Invalid YouTube authorization state")
+    return_to = payload.get("return_to", "/flights")
+    if not isinstance(return_to, str) or not return_to.startswith("/") or return_to.startswith("//"):
+        return_to = "/flights"
+    return payload["user_id"], return_to
+
+
+def exchange_authorization_code(db: Session, *, user_id: int, code: str) -> None:
+    _require_configuration()
+    response = httpx.post(
+        _TOKEN_URL,
+        data={
+            "client_id": config.YOUTUBE_CLIENT_ID,
+            "client_secret": config.YOUTUBE_CLIENT_SECRET,
+            "code": code,
+            "grant_type": "authorization_code",
+            "redirect_uri": config.YOUTUBE_REDIRECT_URI,
+        },
+        timeout=30,
+    )
+    if response.is_error:
+        raise YoutubeOAuthError("Google rejected the YouTube authorization code")
+    refresh_token = response.json().get("refresh_token")
+    if not isinstance(refresh_token, str) or not refresh_token:
+        raise YoutubeOAuthError("Google did not return a refresh token; reconnect YouTube")
+    credential = db.get(YoutubeCredential, user_id)
+    if credential is None:
+        credential = YoutubeCredential(user_id=user_id, refresh_token_encrypted="")
+        db.add(credential)
+    credential.refresh_token_encrypted = encrypt_secret(refresh_token)
+    db.commit()
+
+
+def is_connected(db: Session, user_id: int) -> bool:
+    return db.get(YoutubeCredential, user_id) is not None
+
+
+def disconnect(db: Session, user_id: int) -> None:
+    credential = db.get(YoutubeCredential, user_id)
+    if credential is not None:
+        db.delete(credential)
+        db.commit()
+
+
+def _access_token(user_id: int) -> str:
+    with SessionLocal() as db:
+        credential = db.get(YoutubeCredential, user_id)
+        if credential is None:
+            raise YoutubeOAuthError("YouTube is not connected")
+        refresh_token = decrypt_secret(credential.refresh_token_encrypted)
+    response = httpx.post(
+        _TOKEN_URL,
+        data={
+            "client_id": config.YOUTUBE_CLIENT_ID,
+            "client_secret": config.YOUTUBE_CLIENT_SECRET,
+            "refresh_token": refresh_token,
+            "grant_type": "refresh_token",
+        },
+        timeout=30,
+    )
+    if response.is_error:
+        raise YoutubeOAuthError("Unable to refresh the YouTube authorization")
+    access_token = response.json().get("access_token")
+    if not isinstance(access_token, str) or not access_token:
+        raise YoutubeOAuthError("Google returned an invalid access token")
+    return access_token
+
+
+def job_payload(job: YoutubeUploadJob) -> dict[str, Any]:
+    return {
+        "job_id": job.id,
+        "flight_id": job.flight_id,
+        "status": job.status,
+        "progress": job.progress or 0,
+        "youtube_url": job.youtube_url,
+        "error": job.error,
+    }
+
+
+def latest_job(db: Session, flight_id: str) -> YoutubeUploadJob | None:
+    return (
+        db.query(YoutubeUploadJob)
+        .filter(YoutubeUploadJob.flight_id == flight_id)
+        .order_by(YoutubeUploadJob.created_at.desc())
+        .first()
+    )
+
+
+def active_job(db: Session, flight_id: str) -> YoutubeUploadJob | None:
+    return (
+        db.query(YoutubeUploadJob)
+        .filter(
+            YoutubeUploadJob.flight_id == flight_id,
+            YoutubeUploadJob.status.in_(_ACTIVE_STATUSES),
+        )
+        .order_by(YoutubeUploadJob.created_at.desc())
+        .first()
+    )
+
+
+def _update_job(job_id: str, **changes: Any) -> None:
+    with SessionLocal() as db:
+        job = db.get(YoutubeUploadJob, job_id)
+        if job is None:
+            return
+        for key, value in changes.items():
+            setattr(job, key, value)
+        job.updated_at = datetime.utcnow()
+        db.commit()
+
+
+def _start_session(job: YoutubeUploadJob, video_path: Path, access_token: str) -> str:
+    response = httpx.post(
+        _UPLOAD_URL,
+        params={"uploadType": "resumable", "part": "snippet,status"},
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "X-Upload-Content-Length": str(video_path.stat().st_size),
+            "X-Upload-Content-Type": "video/mp4",
+        },
+        json={
+            "snippet": {
+                "title": job.title,
+                "description": job.description,
+                "categoryId": "17",
+            },
+            "status": {
+                "privacyStatus": job.privacy_status,
+                "embeddable": True,
+                "selfDeclaredMadeForKids": False,
+            },
+        },
+        timeout=30,
+    )
+    if response.is_error:
+        raise RuntimeError(f"YouTube rejected the upload metadata ({response.status_code})")
+    session_url = response.headers.get("location")
+    parsed = urlparse(session_url or "")
+    if parsed.scheme != "https" or parsed.hostname != "www.googleapis.com":
+        raise RuntimeError("YouTube returned an invalid resumable upload URL")
+    _update_job(job.id, upload_session_encrypted=encrypt_secret(session_url))
+    return session_url
+
+
+def _uploaded_offset(response: httpx.Response) -> int:
+    match = _RANGE_PATTERN.fullmatch(response.headers.get("range", ""))
+    return int(match.group(1)) + 1 if match else 0
+
+
+def _completion_id(response: httpx.Response) -> str | None:
+    if response.status_code not in {200, 201}:
+        return None
+    value = response.json().get("id")
+    return value if isinstance(value, str) and value else None
+
+
+def _session_offset(
+    session_url: str, *, access_token: str, total_size: int
+) -> tuple[int, str | None]:
+    response = httpx.put(
+        session_url,
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Length": "0",
+            "Content-Range": f"bytes */{total_size}",
+        },
+        content=b"",
+        timeout=30,
+    )
+    if response.status_code == 308:
+        return _uploaded_offset(response), None
+    video_id = _completion_id(response)
+    if video_id:
+        return total_size, video_id
+    if response.status_code in {404, 410}:
+        return 0, None
+    response.raise_for_status()
+    return 0, None
+
+
+def _finish_upload(job_id: str, video_id: str) -> None:
+    youtube_url = f"https://www.youtube.com/watch?v={video_id}"
+    with SessionLocal() as db:
+        job = db.get(YoutubeUploadJob, job_id)
+        if job is None:
+            return
+        flight = db.get(Flight, job.flight_id)
+        if flight is None:
+            raise RuntimeError("Flight was deleted during the YouTube upload")
+        urls = flight.youtube_urls
+        if youtube_url not in urls:
+            flight.youtube_urls = [*urls, youtube_url]
+        job.status = "completed"
+        job.progress = 100
+        job.youtube_video_id = video_id
+        job.youtube_url = youtube_url
+        job.upload_session_encrypted = None
+        job.completed_at = datetime.utcnow()
+        job.error = None
+        db.commit()
+
+
+def process_youtube_upload(job_id: str) -> None:
+    """RQ/thread job target for a resumable YouTube upload."""
+    try:
+        _require_configuration()
+        with SessionLocal() as db:
+            job = db.get(YoutubeUploadJob, job_id)
+            if job is None or job.status not in _ACTIVE_STATUSES:
+                return
+            flight = db.get(Flight, job.flight_id)
+            if flight is None or not flight.video_file_path:
+                raise RuntimeError("Generated flight video is no longer available")
+            video_path = Path(flight.video_file_path)
+            user_id = job.user_id
+            encrypted_session = job.upload_session_encrypted
+            job.status = "uploading"
+            job.started_at = job.started_at or datetime.utcnow()
+            job.error = None
+            db.commit()
+            db.expunge(job)
+
+        if not video_path.is_file():
+            raise RuntimeError("Generated flight video is no longer available")
+        total_size = video_path.stat().st_size
+        if total_size <= 0:
+            raise RuntimeError("Generated flight video is empty")
+
+        access_token = _access_token(user_id)
+        session_url = decrypt_secret(encrypted_session) if encrypted_session else None
+        offset = 0
+        if session_url:
+            offset, completed_id = _session_offset(
+                session_url, access_token=access_token, total_size=total_size
+            )
+            if completed_id:
+                _finish_upload(job_id, completed_id)
+                return
+            if offset == 0:
+                session_url = None
+        if not session_url:
+            session_url = _start_session(job, video_path, access_token)
+
+        chunk_size = max(256 * 1024, config.YOUTUBE_UPLOAD_CHUNK_SIZE)
+        chunk_size -= chunk_size % (256 * 1024)
+        with video_path.open("rb") as video_file:
+            video_file.seek(offset)
+            while offset < total_size:
+                chunk = video_file.read(min(chunk_size, total_size - offset))
+                if not chunk:
+                    raise RuntimeError("Unexpected end of generated video")
+                end = offset + len(chunk) - 1
+                for attempt in range(5):
+                    response = httpx.put(
+                        session_url,
+                        headers={
+                            "Authorization": f"Bearer {access_token}",
+                            "Content-Type": "video/mp4",
+                            "Content-Length": str(len(chunk)),
+                            "Content-Range": f"bytes {offset}-{end}/{total_size}",
+                        },
+                        content=chunk,
+                        timeout=120,
+                    )
+                    if response.status_code not in {500, 502, 503, 504}:
+                        break
+                    if attempt == 4:
+                        response.raise_for_status()
+                    time.sleep(2**attempt)
+                video_id = _completion_id(response)
+                if video_id:
+                    _finish_upload(job_id, video_id)
+                    return
+                if response.status_code != 308:
+                    response.raise_for_status()
+                    raise RuntimeError("YouTube did not acknowledge the uploaded video chunk")
+                next_offset = _uploaded_offset(response)
+                if next_offset <= offset:
+                    raise RuntimeError("YouTube upload did not make progress")
+                offset = next_offset
+                video_file.seek(offset)
+                _update_job(job_id, progress=min(99, int(offset * 100 / total_size)))
+        raise RuntimeError("YouTube upload ended without a video identifier")
+    except Exception as exc:
+        logger.exception("YouTube upload job %s failed", job_id)
+        _update_job(job_id, status="failed", error=str(exc)[:1000])
+    finally:
+        with _SUBMITTED_LOCK:
+            _SUBMITTED.discard(job_id)
+
+
+def _enqueue_rq(job_id: str) -> None:
+    from job_queue import enqueue_once
+
+    enqueue_once(
+        "youtube_upload.process_youtube_upload",
+        job_id,
+        job_id=f"youtube-upload-{job_id}",
+        timeout=config.JOB_QUEUE_TIMEOUT_SECONDS,
+        queue_name=config.JOB_QUEUE_NAME,
+    )
+
+
+def enqueue_youtube_upload(job_id: str) -> None:
+    from job_queue import is_rq_enabled
+
+    if is_rq_enabled():
+        _enqueue_rq(job_id)
+        return
+    with _SUBMITTED_LOCK:
+        if job_id in _SUBMITTED:
+            return
+        _SUBMITTED.add(job_id)
+    _EXECUTOR.submit(process_youtube_upload, job_id)
+
+
+def enqueue_pending_youtube_uploads(*, recover_active: bool = False) -> int:
+    with SessionLocal() as db:
+        jobs = (
+            db.query(YoutubeUploadJob)
+            .filter(YoutubeUploadJob.status.in_(_ACTIVE_STATUSES))
+            .order_by(YoutubeUploadJob.created_at)
+            .all()
+        )
+        if recover_active:
+            for job in jobs:
+                job.status = "queued"
+            db.commit()
+        job_ids = [job.id for job in jobs]
+    for job_id in job_ids:
+        enqueue_youtube_upload(job_id)
+    return len(job_ids)

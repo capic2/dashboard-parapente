@@ -26,6 +26,7 @@ from routes import public_router, router
 from scheduler import start_scheduler, stop_scheduler
 from versioning import initialize_deployment_version
 from video_export_manual import start_video_export_worker, stop_video_export_worker
+from youtube_upload import enqueue_pending_youtube_uploads
 
 # Configure logging
 logging.basicConfig(
@@ -504,6 +505,7 @@ async def lifespan(app: FastAPI):
         start_video_export_worker()
         start_gopro_overlay_worker()
         start_preview_scanner()
+        enqueue_pending_youtube_uploads(recover_active=True)
 
     yield
 

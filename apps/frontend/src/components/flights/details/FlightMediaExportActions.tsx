@@ -3,6 +3,8 @@ import { Button } from '@dashboard-parapente/design-system';
 import { Layers, Video, Wand2 } from 'lucide-react';
 import type { Flight } from '../../../types';
 import { FlightVideoExportControls } from '../video-export/FlightVideoExportControls';
+import { hasFlightVideo } from '../../../lib/flightMediaState';
+import { FlightYoutubeUploadControls } from './FlightYoutubeUploadControls';
 
 interface FlightMediaExportActionsProps {
   flight: Flight;
@@ -36,6 +38,8 @@ export function FlightMediaExportActions({
   onGoproOverlayAction,
 }: FlightMediaExportActionsProps) {
   const { t } = useTranslation();
+  const shouldOfferYoutubeUpload =
+    hasFlightVideo(flight) && (flight.youtube_urls?.length ?? 0) === 0;
   let goproOverlayVariant: 'danger' | 'warning' | 'outline' = 'outline';
   if (isGoproOverlayRunning) {
     goproOverlayVariant = 'danger';
@@ -56,7 +60,11 @@ export function FlightMediaExportActions({
           </span>
         )}
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div
+        className={`grid gap-2 ${
+          shouldOfferYoutubeUpload ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2'
+        }`}
+      >
         {hasGpx ? (
           <FlightVideoExportControls
             flight={flight}
@@ -97,6 +105,9 @@ export function FlightMediaExportActions({
           <Wand2 className="h-4 w-4" aria-hidden="true" />
           {goproOverlayCompactLabel}
         </Button>
+        {shouldOfferYoutubeUpload && (
+          <FlightYoutubeUploadControls flight={flight} />
+        )}
       </div>
       {goproOverlayUnavailableReason && (
         <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs font-medium text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
