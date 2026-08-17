@@ -1168,21 +1168,45 @@ def _ensure_video_output_resolution(
 
     scaled_path = _scaled_video_path(path)
     _unlink_if_exists(scaled_path)
-    command = [
-        "ffmpeg",
-        "-y",
-        "-i",
-        str(path),
-    ]
     accelerator = select_video_accelerator(config.VIDEO_ACCELERATOR)
-    command.extend(
-        _ffmpeg_output_args(
-            accelerator=accelerator,
-            software_filters=[f"scale=w={expected_width}:h={expected_height}:flags=lanczos"],
-            include_audio=True,
-        )
-    )
-    command.extend(["-movflags", "+faststart", str(scaled_path)])
+
+    if accelerator == "nvidia" and ffmpeg_supports_cuda_overlay():
+        command = [
+            "ffmpeg",
+            "-y",
+            "-hwaccel",
+            "cuda",
+            "-hwaccel_output_format",
+            "cuda",
+            "-i",
+            str(path),
+            "-vf",
+            f"scale_cuda=w={expected_width}:h={expected_height}:format=yuv420p",
+            *h264_encode_args(
+                "nvidia",
+                quality="18",
+                cpu_preset="medium",
+                include_audio=True,
+            ),
+            "-movflags",
+            "+faststart",
+            str(scaled_path),
+        ]
+    else:
+        command = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(path),
+            *_ffmpeg_output_args(
+                accelerator=accelerator,
+                software_filters=[f"scale=w={expected_width}:h={expected_height}:flags=lanczos"],
+                include_audio=True,
+            ),
+            "-movflags",
+            "+faststart",
+            str(scaled_path),
+        ]
     logger.info(
         "Rescaling GoPro overlay output from %sx%s to %sx%s: %s",
         output_width,
