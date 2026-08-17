@@ -210,48 +210,38 @@ export default function FlightHistory() {
     }
 
     return (
-      <>
-        <FlightsTable
-          flights={flights}
-          selectedFlightId={selectedFlightId}
-          selectionMode={selectionMode}
-          onSelectFlight={handleSelectFlight}
-          onDeleteFlight={setFlightToDelete}
-          onDownloadGpx={handleDownloadFlightGpx}
-          onDownloadVideo={handleDownloadFlightVideo}
-          onDownloadOverlay={handleDownloadFlightOverlay}
-          downloadingMedia={downloadingFlightMedia}
-          unavailableMedia={unavailableMedia}
-          rowSelection={rowSelection}
-          onRowSelectionChange={setRowSelection}
-          sorting={[{ id: search.sort, desc: search.order === 'desc' }]}
-          onSortingChange={(updater) => {
-            const current: SortingState = [
-              { id: search.sort, desc: search.order === 'desc' },
-            ];
-            const next =
-              typeof updater === 'function' ? updater(current) : updater;
-            const first = next[0];
-            if (!first) return;
-            void navigateWithSearch({
-              ...search,
-              sort: first.id as FlightsSearch['sort'],
-              order: first.desc ? 'desc' : 'asc',
-            });
-          }}
-        />
-        {summariesQuery.hasNextPage && (
-          <Button
-            className="mt-3 w-full"
-            isDisabled={summariesQuery.isFetchingNextPage}
-            onClick={() => void summariesQuery.fetchNextPage()}
-          >
-            {summariesQuery.isFetchingNextPage
-              ? t('flights.loadingMore')
-              : t('flights.loadMore')}
-          </Button>
-        )}
-      </>
+      <FlightsTable
+        flights={flights}
+        selectedFlightId={selectedFlightId}
+        selectionMode={selectionMode}
+        onSelectFlight={handleSelectFlight}
+        onDeleteFlight={setFlightToDelete}
+        onDownloadGpx={handleDownloadFlightGpx}
+        onDownloadVideo={handleDownloadFlightVideo}
+        onDownloadOverlay={handleDownloadFlightOverlay}
+        downloadingMedia={downloadingFlightMedia}
+        unavailableMedia={unavailableMedia}
+        rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
+        sorting={[{ id: search.sort, desc: search.order === 'desc' }]}
+        onSortingChange={(updater) => {
+          const current: SortingState = [
+            { id: search.sort, desc: search.order === 'desc' },
+          ];
+          const next =
+            typeof updater === 'function' ? updater(current) : updater;
+          const first = next[0];
+          if (!first) return;
+          void navigateWithSearch({
+            ...search,
+            sort: first.id as FlightsSearch['sort'],
+            order: first.desc ? 'desc' : 'asc',
+          });
+        }}
+        hasMoreFlights={summariesQuery.hasNextPage}
+        isLoadingMore={summariesQuery.isFetchingNextPage}
+        onLoadMore={() => void summariesQuery.fetchNextPage()}
+      />
     );
   };
 

@@ -2,8 +2,10 @@ import type { ReactNode } from 'react';
 import type { Table, Row } from '@tanstack/react-table';
 import {
   Button,
+  Collection,
   ListBox,
   ListBoxItem,
+  ListBoxLoadMoreItem,
   ListLayout,
   Virtualizer,
   type ListLayoutOptions,
@@ -109,6 +111,9 @@ export interface DataListProps<TData> {
   selectedKeys?: Selection;
   onSelectionChange?: (keys: Selection) => void;
   getTextValue?: (row: Row<TData>) => string;
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
+  loadingMoreMessage?: string;
 }
 
 function EmptyState({ label }: { label: string }) {
@@ -137,6 +142,9 @@ export function DataList<TData>({
   selectedKeys,
   onSelectionChange,
   getTextValue,
+  onLoadMore,
+  isLoadingMore = false,
+  loadingMoreMessage,
 }: DataListProps<TData>) {
   const { t } = useTranslation();
   const emptyLabel = emptyMessage ?? t('dataList.noItems');
@@ -210,8 +218,6 @@ export function DataList<TData>({
         >
           <ListBox
             aria-label={ariaLabel}
-            items={rows}
-            dependencies={renderDependencies}
             layout={layout}
             selectionMode={isSelectable ? selectionMode : undefined}
             selectedKeys={isSelectable ? selectedKeys : undefined}
@@ -219,20 +225,37 @@ export function DataList<TData>({
             className={itemsClassName || 'h-96 overflow-y-auto'}
             renderEmptyState={() => <EmptyState label={emptyLabel} />}
           >
-            {(row) => {
-              const textValue = getTextValue?.(row) || row.id;
-              const isSelected = isRowSelected(row.id);
+            <Collection items={rows} dependencies={renderDependencies}>
+              {(row) => {
+                const textValue = getTextValue?.(row) || row.id;
+                const isSelected = isRowSelected(row.id);
 
-              return (
-                <ListBoxItem
-                  id={row.id}
-                  textValue={textValue}
-                  className="outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 rounded-lg"
-                >
-                  {renderItem(row, { isSelected })}
-                </ListBoxItem>
-              );
-            }}
+                return (
+                  <ListBoxItem
+                    id={row.id}
+                    textValue={textValue}
+                    className="outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 rounded-lg"
+                  >
+                    {renderItem(row, { isSelected })}
+                  </ListBoxItem>
+                );
+              }}
+            </Collection>
+            {onLoadMore && (
+              <ListBoxLoadMoreItem
+                isLoading={isLoadingMore}
+                onLoadMore={onLoadMore}
+                className="flex min-h-10 items-center justify-center py-2 text-sm text-gray-500 dark:text-gray-400"
+              >
+                <output className="flex items-center gap-2">
+                  <span
+                    aria-hidden="true"
+                    className="h-4 w-4 animate-spin rounded-full border-2 border-sky-600 border-t-transparent"
+                  />
+                  {loadingMoreMessage ?? t('dataList.loadingMore')}
+                </output>
+              </ListBoxLoadMoreItem>
+            )}
           </ListBox>
         </Virtualizer>
       ) : (

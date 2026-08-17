@@ -27,6 +27,9 @@ interface FlightsTableProps {
   onRowSelectionChange: OnChangeFn<RowSelectionState>;
   sorting: SortingState;
   onSortingChange: OnChangeFn<SortingState>;
+  hasMoreFlights?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 export function FlightsTable({
@@ -44,6 +47,9 @@ export function FlightsTable({
   onRowSelectionChange,
   sorting,
   onSortingChange,
+  hasMoreFlights = false,
+  isLoadingMore = false,
+  onLoadMore,
 }: FlightsTableProps) {
   const { t } = useTranslation();
   const { table } = useFlightsTable({
@@ -132,8 +138,8 @@ export function FlightsTable({
       emptyMessage={t('flights.noFlights')}
       ariaLabel={t('flights.listAriaLabel')}
       isVirtualized
-      className="flex h-full flex-col lg:min-h-[calc(100vh-22rem)]"
-      itemsClassName="min-h-72 flex-1 overflow-y-auto pr-1"
+      className="flex flex-col"
+      itemsClassName="h-[calc(100vh-22rem)] min-h-72 max-h-[42rem] overflow-y-auto pr-1"
       virtualizedLayoutOptions={{ estimatedRowSize: 136, gap: 8 }}
       renderDependencies={[
         selectedFlightId,
@@ -144,6 +150,9 @@ export function FlightsTable({
       selectionMode={selectionMode ? 'multiple' : 'none'}
       selectedKeys={selectedKeys}
       onSelectionChange={handleSelectionChange}
+      onLoadMore={hasMoreFlights ? onLoadMore : undefined}
+      isLoadingMore={isLoadingMore}
+      loadingMoreMessage={t('flights.loadingMore')}
       getTextValue={(row) =>
         row.original.title || row.original.site_name || t('common.flight_one')
       }

@@ -483,7 +483,8 @@
     "sortOptions": "Options de tri",
     "sortBy": "Trier par {{column}}",
     "sortByAsc": "Trier par {{column}} croissant",
-    "sortByDesc": "Trier par {{column}} décroissant"
+    "sortByDesc": "Trier par {{column}} décroissant",
+    "loadingMore": "Chargement d’autres éléments..."
   },
   "sites": {
     "management": "Gestion des Sites",
