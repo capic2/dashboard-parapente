@@ -349,6 +349,7 @@ describe('FlightDetails GoPro overlay action', () => {
       'src',
       'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ'
     );
+    expect(players[0]).not.toHaveAttribute('sandbox');
     expect(players[1]).toHaveAttribute(
       'src',
       'https://www.youtube-nocookie.com/embed/9bZkp7q19f0'
