@@ -1658,6 +1658,59 @@ def test_delete_gopro_overlay_video_rejects_running_job(client: TestClient):
     assert response.json()["detail"] == "Cannot delete video for an active overlay"
 
 
+def test_delete_gopro_overlay_job_endpoint_deletes_job_and_owned_files(client: TestClient):
+    deletion_result = {
+        "job_id": "job-gopro",
+        "deleted": True,
+        "files_deleted": 3,
+        "dirs_deleted": 1,
+        "bytes_deleted": 42,
+        "paths_deleted": ["/tmp/final.mp4"],
+        "errors": [],
+    }
+    with patch("routes.delete_gopro_overlay_job", return_value=deletion_result):
+        response = client.delete(f"{API_PREFIX}/gopro-overlays/jobs/job-gopro")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "job_id": "job-gopro",
+        "deleted": True,
+        "files_deleted": 3,
+        "dirs_deleted": 1,
+        "bytes_deleted": 42,
+    }
+
+
+def test_delete_gopro_overlay_job_endpoint_hides_failed_file_path(client: TestClient):
+    with patch(
+        "routes.delete_gopro_overlay_job",
+        return_value={
+            "job_id": "job-gopro",
+            "deleted": False,
+            "files_deleted": 0,
+            "dirs_deleted": 0,
+            "bytes_deleted": 0,
+            "paths_deleted": [],
+            "errors": [{"path": "/private/overlay.mp4", "error": "permission denied"}],
+        },
+    ):
+        response = client.delete(f"{API_PREFIX}/gopro-overlays/jobs/job-gopro")
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Unable to delete overlay files"}
+
+
+def test_delete_gopro_overlay_job_endpoint_rejects_running_job(client: TestClient):
+    with patch(
+        "routes.delete_gopro_overlay_job",
+        return_value={"job_id": "job-gopro", "deleted": False, "error": "active"},
+    ):
+        response = client.delete(f"{API_PREFIX}/gopro-overlays/jobs/job-gopro")
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Cannot delete an active overlay"
+
+
 def test_delete_gopro_overlay_job_removes_terminal_row_and_work_dir(
     tmp_path,
     test_db,
@@ -1668,6 +1721,10 @@ def test_delete_gopro_overlay_job_removes_terminal_row_and_work_dir(
     work_dir.mkdir(parents=True)
     layout_path = work_dir / "layout.xml"
     layout_path.write_text("<layout />")
+    output_path = tmp_path / "final.mp4"
+    output_path.write_bytes(b"final overlay")
+    temp_output_path = tmp_path / "final.part.mp4"
+    temp_output_path.write_bytes(b"temporary overlay")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
     log_path = gopro_overlay_export._gopro_overlay_log_path(job_id)
     log_path.parent.mkdir(parents=True)
@@ -1690,8 +1747,8 @@ def test_delete_gopro_overlay_job_removes_terminal_row_and_work_dir(
                 layout_id="parapente-1080",
                 layout_label="Parapente 1920x1080",
                 layout_path=str(layout_path),
-                output_path=str(tmp_path / "final.mp4"),
-                temp_output_path=str(tmp_path / "final.part.mp4"),
+                output_path=str(output_path),
+                temp_output_path=str(temp_output_path),
                 output_filename="final.mp4",
                 log_path=str(log_path),
             )
@@ -1713,9 +1770,11 @@ def test_delete_gopro_overlay_job_removes_terminal_row_and_work_dir(
 
     assert result is not None
     assert result["deleted"] is True
-    assert result["files_deleted"] == 2
+    assert result["files_deleted"] == 4
     assert not work_dir.exists()
     assert not log_path.exists()
+    assert not output_path.exists()
+    assert not temp_output_path.exists()
     assert gopro_overlay_export.get_gopro_overlay_job(job_id) is None
     session = test_db()
     try:
@@ -1723,6 +1782,91 @@ def test_delete_gopro_overlay_job_removes_terminal_row_and_work_dir(
         assert flight is not None
         assert flight.gopro_overlay_job_id is None
         assert flight.gopro_overlay_status is None
+    finally:
+        session.close()
+
+
+def test_delete_latest_overlay_restores_previous_flight_overlay(
+    tmp_path,
+    test_db,
+    monkeypatch,
+):
+    from models import GoproOverlayJob
+
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+    flight_id = "flight-multiple-overlays"
+    previous_output = tmp_path / "flight-1080p.mp4"
+    latest_output = tmp_path / "flight-4k.mp4"
+    previous_output.write_bytes(b"1080p")
+    latest_output.write_bytes(b"4k")
+
+    def overlay_job(
+        job_id: str,
+        output_path: Path,
+        created_at: datetime,
+    ) -> GoproOverlayJob:
+        work_dir = tmp_path / ".gopro-overlay-work" / job_id
+        work_dir.mkdir(parents=True)
+        layout_path = work_dir / "layout.xml"
+        layout_path.write_text("<layout />")
+        return GoproOverlayJob(
+            id=job_id,
+            flight_id=flight_id,
+            status="completed",
+            progress=100,
+            message="Overlay ready",
+            video_path=str(tmp_path / "camera.mp4"),
+            gpx_path=str(tmp_path / "track.gpx"),
+            layout_id="parapente",
+            layout_label="Parapente",
+            layout_path=str(layout_path),
+            output_path=str(output_path),
+            temp_output_path=str(output_path.with_suffix(".part.mp4")),
+            output_filename=output_path.name,
+            command_json=json.dumps({"gpx_offset": 1.5}),
+            created_at=created_at,
+            updated_at=created_at,
+            completed_at=created_at,
+        )
+
+    session = test_db()
+    try:
+        flight = Flight(
+            id=flight_id,
+            name="Flight with overlays",
+            flight_date=date(2026, 3, 15),
+            gopro_overlay_job_id="overlay-4k",
+            gopro_overlay_status="completed",
+            gopro_overlay_file_path=str(latest_output),
+        )
+        session.add(flight)
+        session.add_all(
+            [
+                overlay_job("overlay-1080p", previous_output, datetime(2026, 3, 15, 12)),
+                overlay_job("overlay-4k", latest_output, datetime(2026, 3, 15, 13)),
+            ]
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    result = delete_gopro_overlay_job("overlay-4k")
+
+    assert result is not None
+    assert result["deleted"] is True
+    assert not latest_output.exists()
+    assert previous_output.exists()
+    session = test_db()
+    try:
+        flight = session.get(Flight, flight_id)
+        assert flight is not None
+        assert flight.gopro_overlay_job_id == "overlay-1080p"
+        assert flight.gopro_overlay_status == "completed"
+        assert flight.gopro_overlay_file_path == str(previous_output)
+        assert flight.gopro_overlay_gpx_offset == 1.5
+        assert session.get(GoproOverlayJob, "overlay-4k") is None
+        assert session.get(GoproOverlayJob, "overlay-1080p") is not None
     finally:
         session.close()
 

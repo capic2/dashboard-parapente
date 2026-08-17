@@ -2396,6 +2396,18 @@ def delete_gopro_overlay_job(job_id: str) -> dict[str, Any] | None:
         "errors": [],
     }
 
+    standalone_paths = {
+        Path(str(path_value))
+        for path_value in (job.get("output_path"), job.get("temp_output_path"))
+        if path_value
+    }
+    for path in standalone_paths:
+        if path.exists() and path.is_dir():
+            result["errors"].append(
+                {"path": str(path), "error": "Refusing to delete a directory as an overlay file"}
+            )
+            return result
+
     if work_dir and work_dir.exists():
         if not _can_delete_work_dir(work_dir):
             result["errors"].append(
@@ -2406,6 +2418,20 @@ def delete_gopro_overlay_job(job_id: str) -> dict[str, Any] | None:
             )
             return result
 
+    for path in standalone_paths:
+        if not path.exists() or (work_dir and _is_path_inside(path, work_dir)):
+            continue
+        try:
+            file_size = path.stat().st_size
+            path.unlink()
+        except OSError as exc:
+            result["errors"].append({"path": str(path), "error": str(exc)})
+            return result
+        result["files_deleted"] += 1
+        result["bytes_deleted"] += file_size
+        result["paths_deleted"].append(str(path))
+
+    if work_dir and work_dir.exists():
         files_count, dirs_count, bytes_count = _path_usage(work_dir)
         try:
             if work_dir.is_dir() and not work_dir.is_symlink():
@@ -2416,10 +2442,10 @@ def delete_gopro_overlay_job(job_id: str) -> dict[str, Any] | None:
             result["errors"].append({"path": str(work_dir), "error": str(exc)})
             return result
 
-        result["files_deleted"] = files_count
-        result["dirs_deleted"] = dirs_count
-        result["bytes_deleted"] = bytes_count
-        result["paths_deleted"] = [str(work_dir)]
+        result["files_deleted"] += files_count
+        result["dirs_deleted"] += dirs_count
+        result["bytes_deleted"] += bytes_count
+        result["paths_deleted"].append(str(work_dir))
 
     log_path_value = job.get("log_path")
     if log_path_value:
@@ -2441,8 +2467,34 @@ def delete_gopro_overlay_job(job_id: str) -> dict[str, Any] | None:
         with SessionLocal() as db:
             db_job = db.query(GoproOverlayJob).filter(GoproOverlayJob.id == job_id).first()
             for flight in db.query(Flight).filter(Flight.gopro_overlay_job_id == job_id).all():
-                flight.gopro_overlay_job_id = None
-                flight.gopro_overlay_status = None
+                fallback_job = (
+                    db.query(GoproOverlayJob)
+                    .filter(
+                        GoproOverlayJob.flight_id == flight.id,
+                        GoproOverlayJob.id != job_id,
+                    )
+                    .order_by(GoproOverlayJob.created_at.desc())
+                    .first()
+                )
+                if fallback_job:
+                    fallback_command = (
+                        json.loads(fallback_job.command_json) if fallback_job.command_json else None
+                    )
+                    flight.gopro_overlay_job_id = fallback_job.id
+                    flight.gopro_overlay_status = fallback_job.status
+                    flight.gopro_overlay_file_path = (
+                        fallback_job.output_path
+                        if fallback_job.status == _STATUS_COMPLETED
+                        else None
+                    )
+                    flight.gopro_overlay_gpx_offset = _gpx_offset_from_command_metadata(
+                        fallback_command
+                    )
+                else:
+                    flight.gopro_overlay_job_id = None
+                    flight.gopro_overlay_status = None
+                    flight.gopro_overlay_file_path = None
+                    flight.gopro_overlay_gpx_offset = 0.0
             if db_job:
                 db.delete(db_job)
             db.commit()
