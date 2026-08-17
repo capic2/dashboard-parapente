@@ -76,6 +76,7 @@ from gopro_overlay_export import (
     get_gopro_overlay_job,
     gpx_duration_seconds,
     gopro_overlay_output_path,
+    gopro_overlay_job_to_payload,
     list_gopro_overlay_jobs,
     list_gopro_overlay_layouts,
     probe_video_duration,
@@ -486,9 +487,19 @@ def _flight_gopro_overlay_state(db: Session, flight: Flight) -> dict[str, Any]:
     }
 
 
+def _flight_gopro_overlay_jobs(flight: Flight) -> list[dict[str, Any]]:
+    return [
+        GoproOverlayJob.model_validate(gopro_overlay_job_to_payload(job)).model_dump(mode="json")
+        for job in reversed(flight.gopro_overlay_jobs)
+    ]
+
+
 def _mark_flight_gopro_overlay_job(
     db: Session, flight: Flight, job: dict[str, Any], *, gpx_offset: float
 ) -> None:
+    db_job = next((item for item in flight.gopro_overlay_jobs if item.id == job["job_id"]), None)
+    if db_job is not None:
+        db_job.flight_id = flight.id
     flight.gopro_overlay_job_id = job["job_id"]
     flight.gopro_overlay_status = job["status"]
     flight.gopro_overlay_file_path = job.get("output_path")
@@ -3687,6 +3698,7 @@ def get_flights(
             "gopro_overlay_file_path": gopro_overlay["file_path"],
             "gopro_overlay_file_exists": gopro_overlay["file_exists"],
             "gopro_overlay_gpx_offset": flight.gopro_overlay_gpx_offset,
+            "gopro_overlays": _flight_gopro_overlay_jobs(flight),
             "external_url": flight.external_url,
             "created_at": flight.created_at.isoformat() if flight.created_at else None,
             "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
@@ -4144,6 +4156,7 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "gopro_overlay_file_path": gopro_overlay["file_path"],
         "gopro_overlay_file_exists": gopro_overlay["file_exists"],
         "gopro_overlay_gpx_offset": flight.gopro_overlay_gpx_offset,
+        "gopro_overlays": _flight_gopro_overlay_jobs(flight),
         "created_at": flight.created_at.isoformat() if flight.created_at else None,
         "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
     }
@@ -6013,6 +6026,7 @@ async def create_flight_gopro_overlay_job(
                 output_resolution=effective_output_resolution,
                 output_dir=resolved_output_dir,
                 gpx_offset=gpx_offset,
+                flight_id=flight.id,
             )
             _mark_flight_gopro_overlay_job(db, flight, job, gpx_offset=gpx_offset)
             return _with_gopro_overlay_job_token(job)
@@ -6044,6 +6058,7 @@ async def create_flight_gopro_overlay_job(
             output_dir=resolved_output_dir,
             pin_inputs=pin_overlay_inputs,
             gpx_offset=gpx_offset,
+            flight_id=flight.id,
         )
         _mark_flight_gopro_overlay_job(db, flight, job, gpx_offset=gpx_offset)
         return _with_gopro_overlay_job_token(job)

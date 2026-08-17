@@ -452,6 +452,7 @@ def _job_to_payload(job: GoproOverlayJob, include_command: bool = False) -> dict
     command = json.loads(job.command_json) if job.command_json else None
     payload = {
         "job_id": job.id,
+        "flight_id": job.flight_id,
         "status": job.status,
         "progress": job.progress or 0,
         "message": job.message or "",
@@ -480,6 +481,11 @@ def _job_to_payload(job: GoproOverlayJob, include_command: bool = False) -> dict
     if include_command:
         payload["command"] = command
     return payload
+
+
+def gopro_overlay_job_to_payload(job: GoproOverlayJob) -> dict[str, Any]:
+    """Serialize a durable overlay job for flight API responses."""
+    return _job_to_payload(job)
 
 
 def _get_db_job_payload(job_id: str, include_command: bool = False) -> dict[str, Any] | None:
@@ -1599,6 +1605,7 @@ async def create_gopro_overlay_job(
     output_dir: str | None = None,
     pin_inputs: bool = False,
     gpx_offset: float = 0.0,
+    flight_id: str | None = None,
 ) -> dict[str, Any]:
     job_id = str(uuid.uuid4())
     job_upload_dir = _uploaded_job_work_dir(job_id)
@@ -1644,6 +1651,7 @@ async def create_gopro_overlay_job(
                 output_dir=output_dir,
                 pin_inputs=pin_inputs,
                 gpx_offset=gpx_offset,
+                flight_id=flight_id,
             )
     except Exception:
         shutil.rmtree(job_upload_dir, ignore_errors=True)
@@ -1659,6 +1667,7 @@ def create_gopro_overlay_job_from_paths(
     output_resolution: str = "source",
     output_dir: str | None = None,
     gpx_offset: float = 0.0,
+    flight_id: str | None = None,
 ) -> dict[str, Any]:
     _validate_file_extension(video_path, _VIDEO_EXTENSIONS)
     _validate_file_extension(gpx_path, _GPX_EXTENSIONS)
@@ -1682,6 +1691,7 @@ def create_gopro_overlay_job_from_paths(
                 pin_inputs=True,
                 output_dir=output_dir,
                 gpx_offset=gpx_offset,
+                flight_id=flight_id,
             )
     except Exception:
         shutil.rmtree(work_dir, ignore_errors=True)
@@ -1700,6 +1710,7 @@ def _create_gopro_overlay_job_from_paths(
     pin_inputs: bool = False,
     output_dir: str | None = None,
     gpx_offset: float = 0.0,
+    flight_id: str | None = None,
 ) -> dict[str, Any]:
     if output_resolution not in _OUTPUT_RESOLUTIONS:
         raise ValueError("Unknown output resolution")
@@ -1734,6 +1745,7 @@ def _create_gopro_overlay_job_from_paths(
         with SessionLocal() as db:
             db_job = GoproOverlayJob(
                 id=job_id,
+                flight_id=flight_id,
                 status=_STATUS_QUEUED,
                 progress=0,
                 message="Overlay queued",
@@ -1766,6 +1778,7 @@ def _create_gopro_overlay_job_from_paths(
     if db_job is None:
         job = {
             "job_id": job_id,
+            "flight_id": flight_id,
             "status": _STATUS_QUEUED,
             "progress": 0,
             "message": "Overlay queued",

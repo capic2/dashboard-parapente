@@ -11,6 +11,7 @@ import {
   Modal,
 } from '@dashboard-parapente/design-system';
 import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
+import type { GoproOverlayJob } from '@dashboard-parapente/shared-types';
 import { CircleAlert, Edit3, FileUp } from 'lucide-react';
 import { Input, Label, TextField } from 'react-aria-components';
 import {
@@ -99,20 +100,38 @@ export function FlightDetails({
   const hasVideo = hasFlightVideo(flight);
   const hasGoproCameraVideo = flight.gopro_camera_file_exists === true;
   const hasPersistedGoproOverlay = hasFlightGoproOverlay(flight);
+  const persistedGoproOverlays = flight.gopro_overlays ?? [];
+  const activePersistedGoproOverlay = persistedGoproOverlays.find((overlay) =>
+    isGoproOverlayInProgress(overlay.status)
+  );
   const effectiveGoproOverlayJobId =
-    goproOverlayJobId ?? flight.gopro_overlay_job_id ?? null;
+    goproOverlayJobId ??
+    activePersistedGoproOverlay?.job_id ??
+    flight.gopro_overlay_job_id ??
+    null;
   const { job: streamedGoproOverlayJob } = useGoproOverlayJobStream(
     effectiveGoproOverlayJobId,
     goproOverlayJobToken
   );
   const goproOverlayJob =
     streamedGoproOverlayJob ?? createGoproOverlayJob.data ?? null;
+  const visibleGoproOverlays = [
+    ...(goproOverlayJob ? [goproOverlayJob] : []),
+    ...persistedGoproOverlays,
+  ].filter(
+    (overlay, index, overlays) =>
+      overlays.findIndex((candidate) => candidate.job_id === overlay.job_id) ===
+      index
+  );
   const { status: videoExportStatus } = useVideoExportStatus(
     flight.video_export_job_id,
     Boolean(flight.video_export_job_id)
   );
   const goproOverlayStatus =
-    goproOverlayJob?.status ?? flight.gopro_overlay_status ?? null;
+    goproOverlayJob?.status ??
+    activePersistedGoproOverlay?.status ??
+    flight.gopro_overlay_status ??
+    null;
   const isGoproOverlayRunning = isGoproOverlayInProgress(goproOverlayStatus);
   const isVideoExportRunning = Boolean(
     flight.video_export_status &&
@@ -388,27 +407,27 @@ export function FlightDetails({
     }
   };
 
-  const handleDownloadGoproOverlay = async () => {
-    if (!goproOverlayJob || goproOverlayJob.status !== 'completed') return;
+  const handleDownloadGoproOverlay = async (job: GoproOverlayJob) => {
+    if (job.status !== 'completed') return;
     if (isDownloadingAnyMedia) return;
 
     setDownloadingMedia('overlay');
     try {
-      const downloadPath = goproOverlayJobToken
-        ? `job-access/gopro-overlays/jobs/${goproOverlayJob.job_id}/download`
-        : `gopro-overlays/jobs/${goproOverlayJob.job_id}/download`;
+      const jobToken =
+        job.job_id === goproOverlayJob?.job_id ? goproOverlayJobToken : null;
+      const downloadPath = jobToken
+        ? `job-access/gopro-overlays/jobs/${job.job_id}/download`
+        : `gopro-overlays/jobs/${job.job_id}/download`;
       const blob = await api
         .get(downloadPath, {
-          searchParams: goproOverlayJobToken
-            ? { access_token: goproOverlayJobToken }
-            : undefined,
+          searchParams: jobToken ? { access_token: jobToken } : undefined,
           timeout: false,
         })
         .blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = goproOverlayJob.output_filename;
+      a.download = job.output_filename;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -462,7 +481,8 @@ export function FlightDetails({
     goproOverlayJob?.status ||
     goproOverlayJob?.job_id ||
     effectiveGoproOverlayJobId ||
-    flight.gopro_overlay_status
+    flight.gopro_overlay_status ||
+    persistedGoproOverlays.length > 0
   );
   const visibleActiveTab: FlightDetailsTab =
     (mobileMode && !hasGenerationLogs && activeTab === 'logs') ||
@@ -574,7 +594,7 @@ export function FlightDetails({
                     className="mt-0.5 h-4 w-4 shrink-0"
                     aria-hidden="true"
                   />
-                  <span>{t('flights.goproOverlayConfirmRegenerate')}</span>
+                  <span>{t('flights.goproOverlayAdditionalResolution')}</span>
                 </div>
               )}
 
@@ -683,13 +703,14 @@ export function FlightDetails({
             </div>
           </Modal>
 
-          {goproOverlayJob && (
+          {visibleGoproOverlays.map((overlay) => (
             <GoproOverlayJobCard
-              job={goproOverlayJob}
+              key={overlay.job_id}
+              job={overlay}
               isDownloadingAnyMedia={isDownloadingAnyMedia}
-              onDownload={handleDownloadGoproOverlay}
+              onDownload={() => void handleDownloadGoproOverlay(overlay)}
             />
-          )}
+          ))}
           <FlightStatsGrid flight={flight} sites={sites} />
           <FlightNotesSection
             notes={flight.notes}

@@ -52,6 +52,7 @@ class GoproOverlayProbeResponse(GoproOverlayLayoutsResponse):
 
 class GoproOverlayJob(BaseModel):
     job_id: str
+    flight_id: str | None = None
     status: Literal["queued", "preparing", "running", "completed", "failed", "cancelled"]
     progress: int
     message: str

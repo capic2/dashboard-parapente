@@ -61,6 +61,35 @@ export const LandingAssociationSchema = z.object({
 
 export type LandingAssociation = z.infer<typeof LandingAssociationSchema>;
 
+export const GoproOverlayJobSchema = z.object({
+  job_id: z.string(),
+  flight_id: z.string().nullish(),
+  status: z.enum([
+    'queued',
+    'preparing',
+    'running',
+    'completed',
+    'failed',
+    'cancelled',
+  ]),
+  progress: z.number(),
+  message: z.string(),
+  error: z.string().nullish(),
+  render_method: z.enum(['cpu', 'gpu']).nullish(),
+  gpx_path: z.string().nullish(),
+  layout_id: z.string(),
+  layout_label: z.string(),
+  output_filename: z.string(),
+  video_width: z.number().nullish(),
+  video_height: z.number().nullish(),
+  gpx_offset: z.number().optional().default(0),
+  created_at: z.string(),
+  updated_at: z.string(),
+  completed_at: z.string().nullish(),
+  log_tail: z.array(z.string()).optional().default([]),
+  job_token: z.string().nullish(),
+});
+
 export const FlightSchema = z
   .object({
     id: z.string(),
@@ -116,6 +145,7 @@ export const FlightSchema = z
     gopro_overlay_file_path: z.string().nullish(),
     gopro_overlay_file_exists: z.boolean().nullish(),
     gopro_overlay_gpx_offset: z.number().nullish(),
+    gopro_overlays: z.array(GoproOverlayJobSchema).optional(),
     site: SiteSchema.optional(),
     created_at: z.string().optional(),
     updated_at: z.string().optional(),
@@ -723,6 +753,7 @@ export type Site = z.infer<typeof SiteSchema>;
 export type SiteUpdate = z.infer<typeof SiteUpdateSchema>;
 export type CreateSiteData = z.infer<typeof CreateSiteSchema>;
 export type Flight = z.infer<typeof FlightSchema>;
+export type GoproOverlayJob = z.infer<typeof GoproOverlayJobSchema>;
 export type FlightSummary = z.infer<typeof FlightSummarySchema>;
 export type FlightSummariesResponse = z.infer<
   typeof FlightSummariesResponseSchema

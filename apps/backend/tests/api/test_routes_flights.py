@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import config
-from models import Flight
+from models import Flight, GoproOverlayJob
 
 # API prefix for all routes
 API_PREFIX = "/api"
@@ -46,6 +46,57 @@ class TestFlightsListEndpoint:
         data = response.json()
         assert "flights" in data
         assert len(data["flights"]) == 3
+
+    def test_get_flights_returns_all_gopro_overlays(self, client, db_session, arguel_site):
+        flight = Flight(
+            id="flight-multi-overlay",
+            name="Flight with multiple overlays",
+            flight_date=date(2026, 3, 15),
+            site_id=arguel_site.id,
+        )
+        db_session.add(flight)
+        for job_id, width, height, created_at in (
+            ("overlay-1080p", 1920, 1080, datetime(2026, 3, 15, 12)),
+            ("overlay-4k", 3840, 2160, datetime(2026, 3, 15, 13)),
+        ):
+            db_session.add(
+                GoproOverlayJob(
+                    id=job_id,
+                    flight_id=flight.id,
+                    status="completed",
+                    progress=100,
+                    message="Overlay ready",
+                    video_path="camera.mp4",
+                    gpx_path="track.gpx",
+                    layout_id="parapente",
+                    layout_label="Parapente",
+                    layout_path="layout.xml",
+                    output_path=f"{job_id}.mp4",
+                    temp_output_path=f"{job_id}.tmp.mp4",
+                    output_filename=f"{job_id}.mp4",
+                    video_width=width,
+                    video_height=height,
+                    created_at=created_at,
+                    updated_at=created_at,
+                    completed_at=created_at,
+                )
+            )
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights")
+
+        assert response.status_code == 200
+        returned = next(
+            item for item in response.json()["flights"] if item["id"] == "flight-multi-overlay"
+        )
+        assert [overlay["job_id"] for overlay in returned["gopro_overlays"]] == [
+            "overlay-4k",
+            "overlay-1080p",
+        ]
+        assert [
+            (overlay["video_width"], overlay["video_height"])
+            for overlay in returned["gopro_overlays"]
+        ] == [(3840, 2160), (1920, 1080)]
 
     def test_get_flights_includes_video_export_fields(self, client, db_session, arguel_site):
         """GET /flights includes video fields used by flight details actions."""

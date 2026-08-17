@@ -1,33 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import type { GoproOverlayJob } from '@dashboard-parapente/shared-types';
 import { api } from '../../lib/api';
 import type { GeoPoint } from '../../types/flight';
 
-export type GoproOverlayJob = {
-  job_id: string;
-  status:
-    | 'queued'
-    | 'preparing'
-    | 'running'
-    | 'completed'
-    | 'failed'
-    | 'cancelled';
-  progress: number;
-  message: string;
-  error?: string | null;
-  render_method?: 'cpu' | 'gpu' | null;
-  gpx_path?: string | null;
-  layout_id: string;
-  layout_label: string;
-  output_filename: string;
-  video_width?: number | null;
-  video_height?: number | null;
-  created_at: string;
-  updated_at: string;
-  completed_at?: string | null;
-  log_tail?: string[];
-  job_token?: string | null;
-};
+export type { GoproOverlayJob } from '@dashboard-parapente/shared-types';
 
 export type GoproOverlayPreview = {
   video: {

@@ -589,6 +589,7 @@ def test_create_flight_gopro_overlay_job_uses_flight_files(
     assert create_job.call_args.kwargs["pip_file"] is not None
     assert create_job.call_args.kwargs["output_filename"] == "Arguel test-overlay.mp4"
     assert create_job.call_args.kwargs["output_dir"] == str(output_dir)
+    assert create_job.call_args.kwargs["flight_id"] == sample_flight.id
 
 
 @pytest.mark.parametrize("gpx_offset", ["nan", "inf", "-inf"])
@@ -673,6 +674,7 @@ def test_create_flight_gopro_overlay_job_resolves_paragliding_root_paths(
     assert create_job.call_args.kwargs["pip_path"] == pip_path
     assert create_job.call_args.kwargs["output_filename"] == "Arguel test-overlay.mp4"
     assert create_job.call_args.kwargs["output_dir"] == str(output_dir)
+    assert create_job.call_args.kwargs["flight_id"] == sample_flight.id
 
 
 def test_create_flight_gopro_overlay_job_uses_auto_flight_directory_files(

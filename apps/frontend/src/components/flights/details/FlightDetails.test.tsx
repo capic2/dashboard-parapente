@@ -154,6 +154,8 @@ vi.mock('react-i18next', () => ({
         'flights.goproOverlayCancelShort': 'Cancel overlay',
         'flights.goproOverlayConfirmCancel': 'Confirm cancel overlay',
         'flights.goproOverlayConfirmRegenerate': 'Confirm regenerate overlay',
+        'flights.goproOverlayAdditionalResolution':
+          'The existing overlay will be kept',
         'flights.goproOverlayRegenerate': 'Regenerate overlay',
         'flights.goproOverlayRegenerateShort': 'Regenerate overlay',
         'flights.goproOverlayGenerate': 'Generate overlay',
@@ -280,6 +282,7 @@ describe('FlightDetails GoPro overlay action', () => {
     mockFlight.gopro_overlay_file_path = null;
     mockFlight.gopro_overlay_file_exists = undefined;
     mockFlight.gopro_overlay_progress = null;
+    mockFlight.gopro_overlays = undefined;
     mockFlight.video_export_job_id = null;
     mockFlight.video_export_status = null;
     mockFlight.video_export_progress = null;
@@ -915,6 +918,51 @@ describe('FlightDetails GoPro overlay action', () => {
     );
 
     expect(createOverlayMock).toHaveBeenCalled();
+  });
+
+  it('shows every persisted overlay resolution', () => {
+    const baseOverlay = {
+      flight_id: mockFlight.id,
+      status: 'completed' as const,
+      progress: 100,
+      message: 'Overlay ready',
+      layout_id: 'parapente',
+      layout_label: 'Parapente',
+      gpx_offset: 0,
+      created_at: '2026-03-15T12:00:00Z',
+      updated_at: '2026-03-15T12:00:00Z',
+      completed_at: '2026-03-15T12:00:00Z',
+      log_tail: [],
+    };
+    mockFlight.gopro_overlays = [
+      {
+        ...baseOverlay,
+        job_id: 'overlay-4k',
+        output_filename: 'test-flight-4k.mp4',
+        video_width: 3840,
+        video_height: 2160,
+      },
+      {
+        ...baseOverlay,
+        job_id: 'overlay-1080p',
+        output_filename: 'test-flight-1080p.mp4',
+        video_width: 1920,
+        video_height: 1080,
+      },
+    ];
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    expect(screen.getByText('test-flight-4k.mp4')).toBeInTheDocument();
+    expect(screen.getByText('test-flight-1080p.mp4')).toBeInTheDocument();
+    expect(screen.getByText('3840 × 2160')).toBeInTheDocument();
+    expect(screen.getByText('1920 × 1080')).toBeInTheDocument();
   });
 
   it('regenerates an existing overlay after confirmation', () => {

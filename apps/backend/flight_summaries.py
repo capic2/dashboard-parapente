@@ -6,12 +6,12 @@ import unicodedata
 from datetime import date, datetime
 from typing import Any, Literal
 
-from sqlalchemy import String, and_, cast, func, or_
+from sqlalchemy import String, and_, cast, exists, func, or_
 from sqlalchemy.orm import Query, Session
 from sqlalchemy.sql.elements import ColumnElement
 
 import config
-from models import Flight, Site
+from models import Flight, GoproOverlayJob, Site
 from schemas import FlightSummariesResponse, FlightSummary
 
 FlightGpxStatus = Literal["all", "with", "missing"]
@@ -251,6 +251,12 @@ def list_flight_summaries(
         Flight.gopro_overlay_job_id,
         Flight.gopro_overlay_status,
         Flight.gopro_overlay_file_path,
+        exists()
+        .where(
+            GoproOverlayJob.flight_id == Flight.id,
+            GoproOverlayJob.status == "completed",
+        )
+        .label("has_completed_gopro_overlay"),
     )
     if cursor_values is not None:
         page_query = page_query.filter(_after_cursor(expressions, cursor_values, sort_order))
@@ -284,7 +290,7 @@ def list_flight_summaries(
             gopro_overlay_job_id=row.gopro_overlay_job_id,
             gopro_overlay_status=row.gopro_overlay_status,
             gopro_overlay_progress=None,
-            has_gopro_overlay=bool(row.gopro_overlay_file_path),
+            has_gopro_overlay=bool(row.gopro_overlay_file_path or row.has_completed_gopro_overlay),
         )
         for row in rows
     ]

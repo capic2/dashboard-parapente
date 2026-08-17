@@ -194,6 +194,12 @@ class Flight(Base):
         passive_deletes=True,
         order_by="VideoExportJob.created_at",
     )
+    gopro_overlay_jobs = relationship(
+        "GoproOverlayJob",
+        back_populates="flight",
+        cascade="all, delete-orphan",
+        order_by="GoproOverlayJob.created_at",
+    )
 
 
 Index(
@@ -246,6 +252,12 @@ class GoproOverlayJob(Base):
     __tablename__ = "gopro_overlay_jobs"
 
     id = Column(String, primary_key=True)
+    flight_id = Column(
+        String,
+        ForeignKey("flights.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     status = Column(String, nullable=False, index=True)
     progress = Column(Integer, default=0)
     message = Column(Text)
@@ -269,6 +281,8 @@ class GoproOverlayJob(Base):
     cancelled_at = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    flight = relationship("Flight", back_populates="gopro_overlay_jobs")
 
 
 class WeatherForecast(Base):

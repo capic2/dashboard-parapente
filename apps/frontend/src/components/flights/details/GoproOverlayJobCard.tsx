@@ -19,6 +19,10 @@ export function GoproOverlayJobCard({
     job.render_method && ['cpu', 'gpu'].includes(job.render_method)
       ? t(`flights.generationLogs.method.${job.render_method}`)
       : null;
+  const resolutionLabel =
+    job.video_width && job.video_height
+      ? `${job.video_width} × ${job.video_height}`
+      : null;
 
   return (
     <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60">
@@ -31,6 +35,11 @@ export function GoproOverlayJobCard({
             <p>
               {job.layout_label} · {job.output_filename}
             </p>
+            {resolutionLabel && (
+              <span className="rounded-full border border-slate-300 bg-white px-2 py-0.5 font-medium dark:border-slate-600 dark:bg-slate-800">
+                {resolutionLabel}
+              </span>
+            )}
             {renderMethodLabel && (
               <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
                 {renderMethodLabel}
