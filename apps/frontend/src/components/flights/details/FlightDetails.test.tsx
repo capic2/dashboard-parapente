@@ -191,6 +191,9 @@ vi.mock('react-i18next', () => ({
         'flights.infoTab': 'Info',
         'flights.replayTab': 'Replay',
         'flights.logsTab': 'Logs',
+        'flights.youtubeVideos': 'YouTube videos',
+        'flights.youtubeVideoTitle': 'Flight YouTube video',
+        'flights.openOnYoutube': 'Open on YouTube',
       })[key] ?? key,
   }),
 }));
@@ -287,6 +290,7 @@ describe('FlightDetails GoPro overlay action', () => {
     mockFlight.video_file_exists = true;
     mockFlight.gopro_camera_file_exists = true;
     mockFlight.gpx_file_path = 'sample.gpx';
+    mockFlight.youtube_urls = [];
     videoStatusMock.current = null;
   });
 
@@ -320,6 +324,32 @@ describe('FlightDetails GoPro overlay action', () => {
     );
 
     expect(screen.queryByText('GPX/IGC file')).not.toBeInTheDocument();
+  });
+
+  it('embeds every YouTube video attached to the flight', () => {
+    mockFlight.youtube_urls = [
+      'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      'https://youtu.be/9bZkp7q19f0',
+    ];
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    const players = screen.getAllByTitle('Flight YouTube video');
+    expect(players).toHaveLength(2);
+    expect(players[0]).toHaveAttribute(
+      'src',
+      'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ'
+    );
+    expect(players[1]).toHaveAttribute(
+      'src',
+      'https://www.youtube-nocookie.com/embed/9bZkp7q19f0'
+    );
   });
 
   it('shows why overlay generation is unavailable', () => {

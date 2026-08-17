@@ -1,5 +1,7 @@
+import re
 from datetime import date, datetime, time
 from typing import Any, Literal
+from urllib.parse import parse_qs, urlparse
 
 from pydantic import BaseModel, Field, model_validator, validator
 
@@ -22,6 +24,51 @@ VALID_SITE_ORIENTATIONS = {
     "NW",
     "NNW",
 }
+
+YOUTUBE_VIDEO_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{11}$")
+YOUTUBE_HOSTS = {
+    "youtube.com",
+    "www.youtube.com",
+    "m.youtube.com",
+    "music.youtube.com",
+    "youtube-nocookie.com",
+    "www.youtube-nocookie.com",
+}
+
+
+def normalize_youtube_urls(urls: list[str]) -> list[str]:
+    """Validate supported YouTube links and return unique canonical URLs."""
+    if len(urls) > 20:
+        raise ValueError("A flight cannot have more than 20 YouTube videos")
+
+    normalized: list[str] = []
+    for raw_url in urls:
+        url = raw_url.strip()
+        if not url:
+            continue
+
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower()
+        video_id: str | None = None
+        if parsed.scheme not in {"http", "https"}:
+            raise ValueError("YouTube URLs must use http or https")
+        if host in {"youtu.be", "www.youtu.be"}:
+            video_id = parsed.path.strip("/").split("/")[0]
+        elif host in YOUTUBE_HOSTS:
+            if parsed.path.rstrip("/") == "/watch":
+                video_id = parse_qs(parsed.query).get("v", [None])[0]
+            else:
+                parts = parsed.path.strip("/").split("/")
+                if len(parts) >= 2 and parts[0] in {"embed", "shorts", "live"}:
+                    video_id = parts[1]
+
+        if not video_id or not YOUTUBE_VIDEO_ID_PATTERN.fullmatch(video_id):
+            raise ValueError(f"Unsupported YouTube URL: {url}")
+
+        canonical_url = f"https://www.youtube.com/watch?v={video_id}"
+        if canonical_url not in normalized:
+            normalized.append(canonical_url)
+    return normalized
 
 
 class GoproOverlayDependencies(BaseModel):
@@ -372,6 +419,11 @@ class FlightUpdate(BaseModel):
     notes: str | None = None
     description: str | None = None
     external_url: str | None = None
+    youtube_urls: list[str] | None = None
+
+    @validator("youtube_urls")
+    def valid_youtube_urls(cls, value):
+        return normalize_youtube_urls(value) if value is not None else None
 
     @validator("duration_minutes", "max_altitude_m", "elevation_gain_m")
     def positive_values(cls, v):
@@ -422,6 +474,7 @@ class Flight(FlightBase):
     external_activity_id: str | None = None
     gpx_file_path: str | None = None
     external_url: str | None = None
+    youtube_urls: list[str] = Field(default_factory=list)
     video_export_job_id: str | None = None
     video_export_status: str | None = None  # "processing", "completed", "failed"
     video_export_progress: int | None = None

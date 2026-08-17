@@ -956,6 +956,15 @@ class TestFlightDetailEndpoint:
         assert "site" in data
         assert data["site"]["name"] == "Arguel"
 
+    def test_get_flight_includes_youtube_urls(self, client, db_session, sample_flight):
+        sample_flight.youtube_urls = ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/flight-test-001")
+
+        assert response.status_code == 200
+        assert response.json()["youtube_urls"] == ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
+
     def test_get_flight_does_not_backfill_missing_max_speed(self, client, db_session):
         flight = Flight(
             id="flight-detail-missing-speed",
@@ -1013,6 +1022,35 @@ class TestUpdateFlightEndpoint:
         # Verify in DB
         db_session.refresh(sample_flight)
         assert sample_flight.notes == "Great thermal conditions!"
+
+    def test_update_flight_youtube_urls_normalizes_and_deduplicates(
+        self, client, db_session, sample_flight
+    ):
+        response = client.patch(
+            f"{API_PREFIX}/flights/flight-test-001",
+            json={
+                "youtube_urls": [
+                    "https://youtu.be/dQw4w9WgXcQ?t=12",
+                    "https://www.youtube.com/shorts/dQw4w9WgXcQ",
+                    "https://youtube.com/watch?v=9bZkp7q19f0",
+                ]
+            },
+        )
+
+        assert response.status_code == 200
+        db_session.refresh(sample_flight)
+        assert sample_flight.youtube_urls == [
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://www.youtube.com/watch?v=9bZkp7q19f0",
+        ]
+
+    def test_update_flight_rejects_non_youtube_urls(self, client, db_session, sample_flight):
+        response = client.patch(
+            f"{API_PREFIX}/flights/flight-test-001",
+            json={"youtube_urls": ["https://example.com/watch?v=dQw4w9WgXcQ"]},
+        )
+
+        assert response.status_code == 422
 
     def test_update_flight_multiple_fields(self, client, db_session, sample_flight):
         """PATCH /flights/{flight_id} updates multiple fields"""

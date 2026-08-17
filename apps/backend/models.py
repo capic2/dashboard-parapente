@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 from sqlalchemy import (
@@ -174,6 +175,7 @@ class Flight(Base):
     gpx_max_altitude_m = Column(Integer)
     gpx_elevation_gain_m = Column(Integer)
     external_url = Column(String)
+    youtube_urls_json = Column("youtube_urls", Text, nullable=False, default="[]")
     # Video export fields
     video_export_job_id = Column(String, nullable=True)  # Background job ID for video conversion
     video_export_status = Column(String, nullable=True)  # "processing", "completed", "failed"
@@ -194,6 +196,19 @@ class Flight(Base):
         passive_deletes=True,
         order_by="VideoExportJob.created_at",
     )
+
+    @property
+    def youtube_urls(self) -> list[str]:
+        """Return persisted YouTube links as a list, including for legacy rows."""
+        try:
+            value = json.loads(self.youtube_urls_json or "[]")
+        except (TypeError, json.JSONDecodeError):
+            return []
+        return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
+
+    @youtube_urls.setter
+    def youtube_urls(self, value: list[str] | None) -> None:
+        self.youtube_urls_json = json.dumps(value or [])
 
 
 Index(
