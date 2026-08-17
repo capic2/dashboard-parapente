@@ -222,6 +222,16 @@ ADMIN_EMAIL = os.getenv("BACKEND_ADMIN_EMAIL")
 ADMIN_PASSWORD = os.getenv("BACKEND_ADMIN_PASSWORD")
 
 # ============================================================================
+# YOUTUBE UPLOAD (Optional)
+# ============================================================================
+YOUTUBE_CLIENT_ID = os.getenv("BACKEND_YOUTUBE_CLIENT_ID")
+YOUTUBE_CLIENT_SECRET = os.getenv("BACKEND_YOUTUBE_CLIENT_SECRET")
+YOUTUBE_REDIRECT_URI = os.getenv("BACKEND_YOUTUBE_REDIRECT_URI")
+YOUTUBE_UPLOAD_CHUNK_SIZE = _int_env_at_least(
+    "BACKEND_YOUTUBE_UPLOAD_CHUNK_SIZE", 8 * 1024 * 1024, 256 * 1024
+)
+
+# ============================================================================
 # LOGGING
 # ============================================================================
 LOG_LEVEL = os.getenv("BACKEND_LOG_LEVEL", "INFO")

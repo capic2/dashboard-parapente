@@ -263,6 +263,12 @@ vi.mock('../video-export/FlightVideoExportControls', () => ({
   FlightVideoExportControls: () => <button type="button">Video action</button>,
 }));
 
+vi.mock('./FlightYoutubeUploadControls', () => ({
+  FlightYoutubeUploadControls: () => (
+    <button type="button">YouTube upload action</button>
+  ),
+}));
+
 import { FlightDetails } from './FlightDetails';
 
 const sites: Site[] = [];

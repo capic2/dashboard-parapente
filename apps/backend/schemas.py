@@ -448,6 +448,38 @@ class FlightUpdate(BaseModel):
         return v
 
 
+class YoutubeAuthUrlRequest(BaseModel):
+    return_to: str = "/flights"
+
+    @validator("return_to")
+    def valid_return_to(cls, value: str) -> str:
+        if not value.startswith("/") or value.startswith("//"):
+            raise ValueError("return_to must be a local application path")
+        return value
+
+
+class YoutubeUploadCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=100)
+    description: str = Field(default="", max_length=5000)
+    privacy_status: Literal["private", "unlisted", "public"] = "private"
+
+    @validator("title")
+    def trimmed_title(cls, value: str) -> str:
+        title = value.strip()
+        if not title:
+            raise ValueError("title must not be blank")
+        return title
+
+
+class YoutubeUploadJobResponse(BaseModel):
+    job_id: str
+    flight_id: str
+    status: Literal["queued", "uploading", "completed", "failed"]
+    progress: int = Field(ge=0, le=100)
+    youtube_url: str | None = None
+    error: str | None = None
+
+
 # Site info included in Flight response (for camera orientation)
 class SiteInFlight(BaseModel):
     id: str

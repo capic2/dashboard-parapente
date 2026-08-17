@@ -33,6 +33,19 @@ class User(Base):
     created_at = Column(DateTime, default=func.now())
 
 
+class YoutubeCredential(Base):
+    """Encrypted OAuth refresh token for one application user."""
+
+    __tablename__ = "youtube_credentials"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    refresh_token_encrypted = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+
 class AppSetting(Base):
     """Key-value store for application settings configurable from the UI"""
 
@@ -202,6 +215,13 @@ class Flight(Base):
         cascade="all, delete-orphan",
         order_by="GoproOverlayJob.created_at",
     )
+    youtube_upload_jobs = relationship(
+        "YoutubeUploadJob",
+        back_populates="flight",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="YoutubeUploadJob.created_at",
+    )
 
     @property
     def youtube_urls(self) -> list[str]:
@@ -298,6 +318,36 @@ class GoproOverlayJob(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     flight = relationship("Flight", back_populates="gopro_overlay_jobs")
+
+
+class YoutubeUploadJob(Base):
+    """Durable state for an upload of a generated flight video to YouTube."""
+
+    __tablename__ = "youtube_upload_jobs"
+
+    id = Column(String, primary_key=True)
+    flight_id = Column(
+        String,
+        ForeignKey("flights.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    status = Column(String, nullable=False, index=True)
+    progress = Column(Integer, nullable=False, default=0)
+    title = Column(String(100), nullable=False)
+    description = Column(Text, nullable=False, default="")
+    privacy_status = Column(String(16), nullable=False, default="private")
+    upload_session_encrypted = Column(Text)
+    youtube_video_id = Column(String(32))
+    youtube_url = Column(String)
+    error = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    started_at = Column(DateTime)
+    completed_at = Column(DateTime)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    flight = relationship("Flight", back_populates="youtube_upload_jobs")
 
 
 class WeatherForecast(Base):

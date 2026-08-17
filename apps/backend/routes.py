@@ -30,7 +30,7 @@ from fastapi import (
     Response,
     UploadFile,
 )
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
@@ -95,6 +95,7 @@ from models import (
     VideoExportJob,
     WeatherForecast,
     WeatherSourceConfig,
+    YoutubeUploadJob,
 )
 from para_index import analyze_hourly_slots, calculate_para_index, format_slots_summary
 from schemas import (
@@ -123,6 +124,9 @@ from schemas import (
     IntervalsPreviewResponse,
     IntervalsStatus,
     IntervalsSyncRequest,
+    YoutubeAuthUrlRequest,
+    YoutubeUploadCreate,
+    YoutubeUploadJobResponse,
 )
 from schemas import LandingAssociation as LandingAssociationSchema
 from schemas import (
@@ -165,6 +169,20 @@ from video_export_manual import (
 )
 from weather_pipeline import get_daily_aggregate, get_normalized_forecast
 from weather_sources import ensure_weather_source_configs
+from youtube_upload import (
+    YoutubeConfigurationError,
+    YoutubeOAuthError,
+    active_job as active_youtube_upload_job,
+    create_authorization_url,
+    decode_oauth_state,
+    disconnect as disconnect_youtube,
+    enqueue_youtube_upload,
+    exchange_authorization_code,
+    is_configured as is_youtube_configured,
+    is_connected as is_youtube_connected,
+    job_payload as youtube_upload_job_payload,
+    latest_job as latest_youtube_upload_job,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -812,6 +830,122 @@ public_router = APIRouter(prefix="/api", tags=["api"])
 
 # Protected routes: require valid JWT token
 router = APIRouter(prefix="/api", tags=["api"], dependencies=[Depends(get_current_user)])
+
+
+@router.get("/youtube/status")
+def get_youtube_status(
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> dict[str, bool]:
+    """Return whether OAuth is configured and connected for the current user."""
+    return {
+        "configured": is_youtube_configured(),
+        "connected": is_youtube_connected(db, user.id),
+    }
+
+
+@router.post("/youtube/auth-url")
+def get_youtube_auth_url(
+    payload: YoutubeAuthUrlRequest,
+    user: User = Depends(get_current_user),
+) -> dict[str, str]:
+    try:
+        return {
+            "authorization_url": create_authorization_url(
+                user_id=user.id, return_to=payload.return_to
+            )
+        }
+    except YoutubeConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@public_router.get("/youtube/oauth/callback")
+def youtube_oauth_callback(
+    state: str,
+    code: str | None = None,
+    error: str | None = None,
+    db: Session = Depends(get_db),
+) -> RedirectResponse:
+    """Finish Google's OAuth redirect without requiring the app JWT in the browser URL."""
+    try:
+        user_id, return_to = decode_oauth_state(state)
+    except YoutubeOAuthError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    separator = "&" if "?" in return_to else "?"
+    if error or not code:
+        return RedirectResponse(f"{return_to}{separator}youtube=denied", status_code=303)
+    try:
+        exchange_authorization_code(db, user_id=user_id, code=code)
+    except (YoutubeConfigurationError, YoutubeOAuthError) as exc:
+        logger.warning("YouTube OAuth callback failed: %s", exc)
+        return RedirectResponse(f"{return_to}{separator}youtube=error", status_code=303)
+    return RedirectResponse(f"{return_to}{separator}youtube=connected", status_code=303)
+
+
+@router.delete("/youtube/connection", status_code=204)
+def delete_youtube_connection(
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> Response:
+    disconnect_youtube(db, user.id)
+    return Response(status_code=204)
+
+
+@router.get(
+    "/flights/{flight_id}/youtube-upload",
+    response_model=YoutubeUploadJobResponse | None,
+)
+def get_flight_youtube_upload(
+    flight_id: str, db: Session = Depends(get_db)
+) -> dict[str, Any] | None:
+    if db.get(Flight, flight_id) is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    job = latest_youtube_upload_job(db, flight_id)
+    return youtube_upload_job_payload(job) if job else None
+
+
+@router.post(
+    "/flights/{flight_id}/youtube-upload",
+    response_model=YoutubeUploadJobResponse,
+    status_code=202,
+)
+def start_flight_youtube_upload(
+    flight_id: str,
+    payload: YoutubeUploadCreate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    if not is_youtube_configured():
+        raise HTTPException(status_code=503, detail="YouTube upload is not configured")
+    if not is_youtube_connected(db, user.id):
+        raise HTTPException(status_code=409, detail="Connect YouTube before uploading")
+    flight = db.get(Flight, flight_id)
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    if flight.youtube_urls:
+        raise HTTPException(status_code=409, detail="This flight already has a YouTube video")
+    video_path = _resolve_flight_file_path(flight.video_file_path)
+    if video_path is None or not video_path.is_file():
+        raise HTTPException(status_code=409, detail="Generate the flight video before uploading")
+    existing_job = active_youtube_upload_job(db, flight_id)
+    if existing_job is not None:
+        raise HTTPException(status_code=409, detail="A YouTube upload is already in progress")
+
+    job = YoutubeUploadJob(
+        id=str(uuid.uuid4()),
+        flight_id=flight.id,
+        user_id=user.id,
+        status="queued",
+        progress=0,
+        title=payload.title,
+        description=payload.description,
+        privacy_status=payload.privacy_status,
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    response_payload = youtube_upload_job_payload(job)
+    enqueue_youtube_upload(job.id)
+    return response_payload
 
 
 @public_router.get(

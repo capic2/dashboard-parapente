@@ -9,6 +9,7 @@ from rq import Worker
 import config
 from job_queue import get_queue, get_redis_connection, is_rq_enabled
 from video_export_manual import enqueue_pending_video_export_jobs
+from youtube_upload import enqueue_pending_youtube_uploads
 
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL, logging.INFO),
@@ -24,6 +25,10 @@ def main() -> None:
     queued_count = enqueue_pending_video_export_jobs(recover_active=True)
     if queued_count:
         logger.info("Enqueued %s pending video export job(s)", queued_count)
+
+    youtube_count = enqueue_pending_youtube_uploads(recover_active=True)
+    if youtube_count:
+        logger.info("Enqueued %s pending YouTube upload job(s)", youtube_count)
 
     queue = get_queue()
     worker = Worker([queue], connection=get_redis_connection())
