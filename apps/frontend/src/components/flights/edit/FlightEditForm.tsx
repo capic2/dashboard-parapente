@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from '@tanstack/react-form';
 import { tv } from 'tailwind-variants';
@@ -13,6 +14,7 @@ import { Select, Button } from '@dashboard-parapente/design-system';
 import type { Key } from 'react-aria-components';
 import type { Flight, FlightFormData, Site } from '../../../types';
 import { getSiteDisplayName } from '../../../lib/siteDisplay';
+import { Plus, Trash2 } from 'lucide-react';
 
 interface FlightEditFormProps {
   flight: Flight;
@@ -72,6 +74,8 @@ export function FlightEditForm({
   onShowCreateSiteModal,
 }: FlightEditFormProps) {
   const { t } = useTranslation();
+  const initialYoutubeUrls = flight.youtube_urls ?? [];
+  const [youtubeUrls, setYoutubeUrls] = useState<string[]>(initialYoutubeUrls);
 
   const form = useForm({
     defaultValues: {
@@ -100,12 +104,14 @@ export function FlightEditForm({
         elevation_gain_m: value.elevation_gain_m,
         max_speed_kmh: value.max_speed_kmh,
         notes: value.notes,
+        youtube_urls: youtubeUrls.map((url) => url.trim()).filter(Boolean),
       });
     },
   });
 
   const handleCancel = () => {
     form.reset();
+    setYoutubeUrls(initialYoutubeUrls);
     onCancel();
   };
 
@@ -340,6 +346,65 @@ export function FlightEditForm({
             </div>
           )}
         </form.Field>
+      </div>
+
+      <div className="mb-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div>
+            <h3 className={md.label()}>{t('flights.youtubeVideos')}</h3>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {t('flights.youtubeVideosHint')}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            className="min-h-10 rounded-lg px-3 py-2 text-sm"
+            onPress={() => setYoutubeUrls((urls) => [...urls, ''])}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {t('flights.addYoutubeVideo')}
+          </Button>
+        </div>
+        <div className="space-y-2">
+          {youtubeUrls.map((url, index) => (
+            <div key={index} className="flex items-end gap-2">
+              <TextField
+                className="min-w-0 flex-1"
+                value={url}
+                onChange={(nextUrl) =>
+                  setYoutubeUrls((urls) =>
+                    urls.map((current, currentIndex) =>
+                      currentIndex === index ? nextUrl : current
+                    )
+                  )
+                }
+              >
+                <Label className={s.label()}>
+                  {t('flights.youtubeVideoLabel', { count: index + 1 })}
+                </Label>
+                <Input
+                  type="url"
+                  className={md.input()}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                />
+              </TextField>
+              <Button
+                variant="ghost"
+                className="min-h-10 rounded-lg px-3 py-2 text-sm text-red-600 dark:text-red-400"
+                aria-label={t('flights.removeYoutubeVideo', {
+                  count: index + 1,
+                })}
+                onPress={() =>
+                  setYoutubeUrls((urls) =>
+                    urls.filter((_, currentIndex) => currentIndex !== index)
+                  )
+                }
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Notes */}

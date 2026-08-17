@@ -112,6 +112,7 @@ export const FlightSchema = z
     gpx_max_altitude_m: z.number().nullish(),
     gpx_elevation_gain_m: z.number().nullish(),
     external_url: z.string().nullish(),
+    youtube_urls: z.array(z.string()).optional(),
     video_export_job_id: z.string().nullish(),
     video_export_status: z
       .enum([

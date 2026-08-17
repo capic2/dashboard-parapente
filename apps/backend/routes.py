@@ -4144,6 +4144,7 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "gpx_max_altitude_m": flight.gpx_max_altitude_m,
         "gpx_elevation_gain_m": flight.gpx_elevation_gain_m,
         "external_url": flight.external_url,
+        "youtube_urls": flight.youtube_urls,
         "video_export_job_id": flight.video_export_job_id,
         "video_export_status": video_export["status"],
         "video_export_progress": video_export["progress"],

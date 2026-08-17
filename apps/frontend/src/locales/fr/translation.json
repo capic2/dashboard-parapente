@@ -483,7 +483,8 @@
     "sortOptions": "Options de tri",
     "sortBy": "Trier par {{column}}",
     "sortByAsc": "Trier par {{column}} croissant",
-    "sortByDesc": "Trier par {{column}} décroissant"
+    "sortByDesc": "Trier par {{column}} décroissant",
+    "loadingMore": "Chargement d’autres éléments..."
   },
   "sites": {
     "management": "Gestion des Sites",
@@ -955,6 +956,13 @@
     "notesLabel": "Notes",
     "notesPlaceholder": "Conditions, sensations, points à améliorer...",
     "noNotes": "Aucune note pour ce vol",
+    "youtubeVideos": "Vidéos YouTube",
+    "youtubeVideosHint": "Ajoutez un ou plusieurs liens YouTube associés à ce vol.",
+    "addYoutubeVideo": "Ajouter une vidéo",
+    "youtubeVideoLabel": "Lien YouTube {{count}}",
+    "removeYoutubeVideo": "Supprimer le lien YouTube {{count}}",
+    "youtubeVideoTitle": "Vidéo YouTube du vol {{count}}",
+    "openOnYoutube": "Ouvrir sur YouTube",
     "gpxBadge": "GPX",
     "videoBadge": "Vidéo",
     "videoProcessingBadge": "Vidéo: en cours",

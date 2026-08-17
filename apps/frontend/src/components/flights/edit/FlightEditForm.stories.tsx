@@ -117,6 +117,7 @@ Default.test(
         notes: 'Superbe vol thermique, base cumulus 1800m',
         site_id: 'site-arguel',
         title: 'Vol thermique Arguel',
+        youtube_urls: [],
       });
     });
   }

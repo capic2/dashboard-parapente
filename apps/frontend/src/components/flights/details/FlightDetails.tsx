@@ -40,6 +40,7 @@ import { FlightMediaExportActions } from './FlightMediaExportActions';
 import { FlightNotesSection } from './FlightNotesSection';
 import { FlightReplayCard } from './FlightReplayCard';
 import { FlightStatsGrid } from './FlightStatsGrid';
+import { FlightYoutubeVideos } from './FlightYoutubeVideos';
 import { GoproOverlayJobCard } from './GoproOverlayJobCard';
 import { GoproOverlaySyncPreview } from './GoproOverlaySyncPreview';
 
@@ -712,6 +713,7 @@ export function FlightDetails({
             />
           ))}
           <FlightStatsGrid flight={flight} sites={sites} />
+          <FlightYoutubeVideos urls={flight.youtube_urls} />
           <FlightNotesSection
             notes={flight.notes}
             editingNotes={editingNotes}
