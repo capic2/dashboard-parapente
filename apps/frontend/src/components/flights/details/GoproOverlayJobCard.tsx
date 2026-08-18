@@ -1,7 +1,7 @@
-import { useTranslation } from "react-i18next";
-import { Button } from "@dashboard-parapente/design-system";
-import { Download, Trash2 } from "lucide-react";
-import type { GoproOverlayJob } from "../../../hooks/gopro/useGoproOverlay";
+import { useTranslation } from 'react-i18next';
+import { Button } from '@dashboard-parapente/design-system';
+import { Download, Trash2 } from 'lucide-react';
+import type { GoproOverlayJob } from '../../../hooks/gopro/useGoproOverlay';
 
 interface GoproOverlayJobCardProps {
   job: GoproOverlayJob;
@@ -20,7 +20,7 @@ export function GoproOverlayJobCard({
 }: GoproOverlayJobCardProps) {
   const { t } = useTranslation();
   const renderMethodLabel =
-    job.render_method && ["cpu", "gpu"].includes(job.render_method)
+    job.render_method && ['cpu', 'gpu'].includes(job.render_method)
       ? t(`flights.generationLogs.method.${job.render_method}`)
       : null;
   const resolutionLabel =
@@ -29,11 +29,11 @@ export function GoproOverlayJobCard({
       : null;
 
   return (
-    <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            {t("flights.goproOverlayJobTitle")}
+            {t('flights.goproOverlayJobTitle')}
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
             <p>
@@ -55,35 +55,35 @@ export function GoproOverlayJobCard({
           {t(`flights.goproOverlayStatus.${job.status}`)}
         </span>
       </div>
-      {job.status === "completed" && (
+      {job.status === 'completed' && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 dark:border-emerald-800 dark:bg-emerald-950/30">
           <span className="text-xs font-semibold text-emerald-900 dark:text-emerald-100">
             {job.output_filename}
           </span>
           <Button
             type="button"
-            className="min-h-9 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+            className="min-h-10 cursor-pointer rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed"
             onPress={onDownload}
             isDisabled={isDownloadingAnyMedia}
           >
             <Download className="h-4 w-4" aria-hidden="true" />
-            {t("flights.goproOverlayDownload")}
+            {t('flights.goproOverlayDownload')}
           </Button>
         </div>
       )}
-      {["completed", "failed", "cancelled"].includes(job.status) && (
+      {['completed', 'failed', 'cancelled'].includes(job.status) && (
         <div className="mt-3 flex justify-end">
           <Button
             type="button"
             variant="ghost"
-            className="min-h-9 rounded-lg px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/30"
+            className="min-h-10 cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed dark:text-red-300 dark:hover:bg-red-950/30"
             onPress={onDelete}
             isDisabled={isDeleting}
           >
             <Trash2 className="h-4 w-4" aria-hidden="true" />
             {isDeleting
-              ? t("flights.goproOverlayDeleting")
-              : t("flights.goproOverlayDelete")}
+              ? t('flights.goproOverlayDeleting')
+              : t('flights.goproOverlayDelete')}
           </Button>
         </div>
       )}

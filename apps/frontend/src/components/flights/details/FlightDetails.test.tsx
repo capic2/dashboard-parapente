@@ -198,6 +198,10 @@ vi.mock('react-i18next', () => ({
         'flights.infoTab': 'Summary',
         'flights.replayTab': 'Media',
         'flights.logsTab': 'Processing',
+        'flights.mediaPageTitle': 'Flight media',
+        'flights.mediaReplayTitle': 'Flight replay',
+        'flights.mediaFilesTitle': 'Available files',
+        'flights.mediaCreationTitle': 'Create and publish',
         'flights.youtubeVideos': 'YouTube videos',
         'flights.youtubeVideoTitle': 'Flight YouTube video',
         'flights.openOnYoutube': 'Open on YouTube',
@@ -371,6 +375,39 @@ describe('FlightDetails GoPro overlay action', () => {
       'src',
       'https://www.youtube-nocookie.com/embed/9bZkp7q19f0'
     );
+  });
+
+  it('organizes media into replay, available files, and creation sections', () => {
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    openTab('Media');
+
+    expect(
+      screen.getByRole('heading', { name: 'Flight media' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Flight replay' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Available files' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Create and publish' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'flights.downloadGpx' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: 'flights.viewer.downloadVideo',
+      })
+    ).toBeInTheDocument();
   });
 
   it('shows why overlay generation is unavailable', () => {
