@@ -17,6 +17,7 @@ export type VideoExportJob = {
   progress?: number | null;
   message?: string | null;
   error?: string | null;
+  render_method?: 'cpu' | 'gpu' | null;
   gpx_path?: string | null;
   mode?: string | null;
   started_at?: string | null;

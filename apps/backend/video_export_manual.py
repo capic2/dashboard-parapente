@@ -110,10 +110,8 @@ _WORKER_LOCK = threading.Lock()
 _JOB_UPDATE_DB_LOCK = threading.Lock()
 _EXPORT_JOBS_LOCK = threading.Lock()
 _JOB_RUNTIME_LOCK = threading.Lock()
-_JOB_RENDER_METHOD_LOCK = threading.Lock()
 _JOB_UPDATE_DB: dict[str, bool] = {}
 _JOB_RUNTIME: dict[str, dict[str, Any]] = {}
-_JOB_RENDER_METHODS: dict[str, str] = {}
 _JOB_CANCEL_REQUESTS: set[str] = set()
 
 _CANCEL_CHECK_INTERVAL = 10
@@ -334,7 +332,7 @@ def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
         "quality": job.quality,
         "speed": job.speed,
         "mode": job.mode,
-        "render_method": _get_job_render_method(job.id),
+        "render_method": job.render_method,
         "created_at": _to_iso(job.created_at),
         "updated_at": _to_iso(job.updated_at),
         "cancelled_at": _to_iso(job.cancelled_at),
@@ -368,21 +366,13 @@ def _clear_job_runtime(job_id: str) -> None:
 
 
 def _set_job_render_method(job_id: str, render_method: str | None) -> None:
-    with _JOB_RENDER_METHOD_LOCK:
-        if render_method in {"cpu", "gpu"}:
-            _JOB_RENDER_METHODS[job_id] = render_method
-        else:
-            _JOB_RENDER_METHODS.pop(job_id, None)
-
-
-def _get_job_render_method(job_id: str) -> str | None:
-    with _JOB_RENDER_METHOD_LOCK:
-        return _JOB_RENDER_METHODS.get(job_id)
-
-
-def _clear_job_render_method(job_id: str) -> None:
-    with _JOB_RENDER_METHOD_LOCK:
-        _JOB_RENDER_METHODS.pop(job_id, None)
+    normalized_method = render_method if render_method in {"cpu", "gpu"} else None
+    with SessionLocal() as db:
+        job = db.query(VideoExportJob).filter(VideoExportJob.id == job_id).first()
+        if job:
+            job.render_method = normalized_method
+            job.updated_at = datetime.utcnow()
+            db.commit()
 
 
 def _set_job_cancel_requested(job_id: str) -> None:
@@ -1079,7 +1069,6 @@ def delete_video_export_job(job_id: str) -> dict[str, Any] | None:
 
     _set_memory_snapshot(job_id, None)
     _clear_job_runtime(job_id)
-    _clear_job_render_method(job_id)
     _clear_job_cancel_requested(job_id)
     _clear_job_auth_token(job_id)
     return {"job_id": job_id, "deleted": True, **cleanup}

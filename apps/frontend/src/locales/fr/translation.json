@@ -107,6 +107,13 @@
     "mode": {
       "goproOverlay": "Overlay GoPro"
     },
+    "method": {
+      "cpu": "CPU",
+      "gpu": "GPU"
+    },
+    "table": {
+      "method": "Méthode"
+    },
     "typeFilters": {
       "all": "Tous les types",
       "video": "Exports vidéo",

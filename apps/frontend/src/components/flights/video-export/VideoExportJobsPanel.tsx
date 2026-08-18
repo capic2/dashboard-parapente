@@ -310,6 +310,28 @@ function JobTypeBadge({ job }: { job: VideoExportJob }) {
   );
 }
 
+function JobRenderMethodBadge({ job }: { job: VideoExportJob }) {
+  const { t } = useTranslation();
+  const method = job.render_method;
+
+  if (!method) {
+    return <span>-</span>;
+  }
+
+  const className =
+    method === 'gpu'
+      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200'
+      : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200';
+
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}
+    >
+      {t(`videoJobs.method.${method}`, method.toUpperCase())}
+    </span>
+  );
+}
+
 function JobLogsDetails({
   job,
   isOpen,
@@ -629,6 +651,11 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
           const mode = getValue();
           return mode ? <JobModeBadge mode={mode} /> : <span>-</span>;
         },
+        sortingFn: 'alphanumeric',
+      }),
+      columnHelper.accessor('render_method', {
+        header: t('videoJobs.table.method', 'Méthode'),
+        cell: ({ row }) => <JobRenderMethodBadge job={row.original} />,
         sortingFn: 'alphanumeric',
       }),
       columnHelper.accessor((job) => getProgress(job), {

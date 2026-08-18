@@ -3,6 +3,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { VideoExportJob } from '../../../hooks/flights/useVideoExportJobs';
 import { VideoExportJobsPanel } from './VideoExportJobsPanel';
 
 const {
@@ -83,7 +84,7 @@ const {
       can_cancel: false,
       can_delete: true,
     },
-  ],
+  ] as VideoExportJob[],
 }));
 
 vi.mock('react-i18next', () => ({
@@ -183,6 +184,7 @@ describe('VideoExportJobsPanel', () => {
         progress: 42,
         message: 'Capturing frames',
         mode: 'manual_fast',
+        render_method: 'gpu',
         log_tail: ['Opening viewer', 'Captured 10/100 frames'],
         can_cancel: true,
         can_delete: true,
@@ -206,6 +208,7 @@ describe('VideoExportJobsPanel', () => {
         progress: 50,
         message: 'Rendering overlay',
         mode: 'gopro_overlay',
+        render_method: 'cpu',
         log_tail: ['Starting overlay', 'Rendering overlay: 50%'],
         can_cancel: true,
         can_delete: false,
@@ -251,6 +254,8 @@ describe('VideoExportJobsPanel', () => {
     expect(screen.queryByText('vol-overlay.mp4')).not.toBeInTheDocument();
     expect(screen.queryByText('final.mp4')).not.toBeInTheDocument();
     expect(screen.getAllByText('Overlay GoPro').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('GPU').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('CPU').length).toBeGreaterThan(0);
     expect(screen.getAllByText('42%').length).toBeGreaterThan(0);
     expect(screen.getAllByText('En cours').length).toBeGreaterThan(1);
     expect(screen.getAllByRole('button', { name: 'Stopper' })).toHaveLength(4);
