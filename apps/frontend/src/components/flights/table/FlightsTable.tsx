@@ -8,7 +8,7 @@ import type {
 } from '@tanstack/react-table';
 import type { Selection } from 'react-aria-components';
 import { DataList } from '@dashboard-parapente/design-system';
-import { Flight, type DownloadingMedia } from './Flight';
+import { Flight } from './Flight';
 import { useFlightsTable } from './useFlightsTable';
 import type { FlightSummary } from '@dashboard-parapente/shared-types';
 
@@ -18,11 +18,6 @@ interface FlightsTableProps {
   selectionMode: boolean;
   onSelectFlight: (flight: FlightSummary) => void;
   onDeleteFlight: (flight: FlightSummary) => void;
-  onDownloadGpx: (flight: FlightSummary) => void;
-  onDownloadVideo: (flight: FlightSummary) => void;
-  onDownloadOverlay: (flight: FlightSummary) => void;
-  downloadingMedia: DownloadingMedia | null;
-  unavailableMedia: ReadonlySet<string>;
   rowSelection: RowSelectionState;
   onRowSelectionChange: OnChangeFn<RowSelectionState>;
   sorting: SortingState;
@@ -38,11 +33,6 @@ export function FlightsTable({
   selectionMode,
   onSelectFlight,
   onDeleteFlight,
-  onDownloadGpx,
-  onDownloadVideo,
-  onDownloadOverlay,
-  downloadingMedia,
-  unavailableMedia,
   rowSelection,
   onRowSelectionChange,
   sorting,
@@ -107,27 +97,12 @@ export function FlightsTable({
           isActive={selectedFlightId === flight.id}
           isSelected={isSelected}
           selectionMode={selectionMode}
-          downloadingMedia={downloadingMedia}
-          unavailableMedia={unavailableMedia}
           onSelectFlight={onSelectFlight}
           onDeleteFlight={onDeleteFlight}
-          onDownloadGpx={onDownloadGpx}
-          onDownloadVideo={onDownloadVideo}
-          onDownloadOverlay={onDownloadOverlay}
         />
       );
     },
-    [
-      selectionMode,
-      selectedFlightId,
-      onSelectFlight,
-      onDeleteFlight,
-      onDownloadGpx,
-      onDownloadVideo,
-      onDownloadOverlay,
-      downloadingMedia,
-      unavailableMedia,
-    ]
+    [selectionMode, selectedFlightId, onSelectFlight, onDeleteFlight]
   );
 
   return (
@@ -139,14 +114,9 @@ export function FlightsTable({
       ariaLabel={t('flights.listAriaLabel')}
       isVirtualized
       className="flex flex-col"
-      itemsClassName="h-[calc(100vh-22rem)] min-h-72 max-h-[42rem] overflow-y-auto pr-1"
-      virtualizedLayoutOptions={{ estimatedRowSize: 136, gap: 8 }}
-      renderDependencies={[
-        selectedFlightId,
-        selectionMode,
-        rowSelection,
-        unavailableMedia,
-      ]}
+      itemsClassName="h-[calc(100vh-23rem)] min-h-72 overflow-y-auto pr-1 xl:h-[calc(100vh-19rem)]"
+      virtualizedLayoutOptions={{ estimatedRowSize: 132, gap: 8 }}
+      renderDependencies={[selectedFlightId, selectionMode, rowSelection]}
       selectionMode={selectionMode ? 'multiple' : 'none'}
       selectedKeys={selectedKeys}
       onSelectionChange={handleSelectionChange}

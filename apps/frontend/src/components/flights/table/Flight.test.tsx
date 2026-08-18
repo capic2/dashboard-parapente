@@ -71,12 +71,8 @@ test('does not render the selected flight badge', () => {
       isActive={true}
       isSelected={false}
       selectionMode={false}
-      downloadingMedia={null}
       onSelectFlight={() => undefined}
       onDeleteFlight={() => undefined}
-      onDownloadGpx={() => undefined}
-      onDownloadVideo={() => undefined}
-      onDownloadOverlay={() => undefined}
     />
   );
 
@@ -92,25 +88,20 @@ test('does not render the selected flight badge', () => {
   expect(screen.getByText('Besançon - Puy de Dôme')).toBeInTheDocument();
 });
 
-test('disables media that became unavailable during the session', () => {
+test('renders media as a passive status in the flight list', () => {
   render(
     <Flight
       flight={{ ...flight, has_gpx: true }}
       isActive={false}
       isSelected={false}
       selectionMode={false}
-      downloadingMedia={null}
-      unavailableMedia={new Set(['flight-1:gpx'])}
       onSelectFlight={() => undefined}
       onDeleteFlight={() => undefined}
-      onDownloadGpx={() => undefined}
-      onDownloadVideo={() => undefined}
-      onDownloadOverlay={() => undefined}
     />
   );
 
+  expect(screen.getByText('flights.gpxBadge')).toBeInTheDocument();
   expect(
-    screen.getByRole('button', { name: 'flights.downloadGpx' })
-  ).toBeDisabled();
-  expect(screen.getByText('flights.mediaUnavailable')).toBeInTheDocument();
+    screen.queryByRole('button', { name: 'flights.downloadGpx' })
+  ).not.toBeInTheDocument();
 });

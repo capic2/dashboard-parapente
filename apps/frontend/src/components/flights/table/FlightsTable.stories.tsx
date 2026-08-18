@@ -184,11 +184,6 @@ function FlightsTableWrapper({
         selectionMode={selectionMode}
         onSelectFlight={(flight) => setSelectedFlightId(flight.id)}
         onDeleteFlight={fn()}
-        onDownloadGpx={fn()}
-        onDownloadVideo={fn()}
-        onDownloadOverlay={fn()}
-        downloadingMedia={null}
-        unavailableMedia={new Set()}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         sorting={[{ id: 'flight_date', desc: true }]}
