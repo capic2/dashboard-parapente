@@ -776,94 +776,92 @@ export function FlightDetails({
         </div>
       </header>
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="min-w-0 space-y-4">
-          <section aria-labelledby="flight-media-replay-title">
-            <div className="mb-3 flex items-start gap-3 px-1">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-100">
-                <Play className="h-4 w-4" aria-hidden="true" />
-              </span>
-              <div>
-                <h3
-                  id="flight-media-replay-title"
-                  className="font-semibold text-slate-950 dark:text-white"
-                >
-                  {t('flights.mediaReplayTitle')}
-                </h3>
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  {t('flights.mediaReplayDescription')}
-                </p>
-              </div>
-            </div>
-            {hasOpenedReplay ? replayCard : null}
-          </section>
+      <FlightMediaExportActions
+        flight={flight}
+        hasGpx={hasGpx}
+        isVideoExportRunning={isVideoExportRunning}
+        isGoproOverlayRunning={isGoproOverlayRunning}
+        canRegenerateGoproOverlay={canRegenerateGoproOverlay}
+        canUseGoproOverlayAction={canUseGoproOverlayAction}
+        isCreatingGoproOverlay={createGoproOverlayJob.isPending}
+        isCancellingGoproOverlay={isCancellingGoproOverlay}
+        goproOverlayLabel={goproOverlayLabel}
+        goproOverlayCompactLabel={goproOverlayCompactLabel}
+        goproOverlayTitle={goproOverlayTitle}
+        goproOverlayUnavailableReason={goproOverlayUnavailableReason}
+        onGoproOverlayAction={goproOverlayAction}
+      />
 
-          <FlightMediaBadges
-            hasGpx={hasGpx}
-            hasVideo={hasVideo}
-            hasPersistedGoproOverlay={hasPersistedGoproOverlay}
-            isVideoExportRunning={isVideoExportRunning}
-            isVideoExportFailed={isVideoExportFailed}
-            isGoproOverlayRunning={isGoproOverlayRunning}
-            isGoproOverlayFailed={isGoproOverlayFailed}
-            isDownloadingAnyMedia={isDownloadingAnyMedia}
-            videoProcessingLabel={videoProcessingLabel}
-            goproOverlayProcessingLabel={goproOverlayProcessingLabel}
-            onDownloadGpx={() => void handleDownloadGpx()}
-            onDownloadVideo={() => void handleDownloadVideo()}
-            onDownloadPersistedGoproOverlay={() =>
-              void handleDownloadPersistedGoproOverlay()
-            }
-          />
-
-          {completedGoproOverlays.length > 0 && (
-            <section
-              aria-labelledby="flight-media-overlays-title"
-              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800 sm:p-5"
-            >
+      <div className="min-w-0 space-y-4">
+        <section aria-labelledby="flight-media-replay-title">
+          <div className="mb-3 flex items-start gap-3 px-1">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-100">
+              <Play className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div>
               <h3
-                id="flight-media-overlays-title"
-                className="mb-3 text-base font-semibold text-slate-950 dark:text-white"
+                id="flight-media-replay-title"
+                className="font-semibold text-slate-950 dark:text-white"
               >
-                {t('flights.mediaGeneratedOverlaysTitle')}
+                {t('flights.mediaReplayTitle')}
               </h3>
-              <div className="space-y-3">
-                {completedGoproOverlays.map((overlay) => (
-                  <GoproOverlayJobCard
-                    key={overlay.job_id}
-                    job={overlay}
-                    isDownloadingAnyMedia={isDownloadingAnyMedia}
-                    isDeleting={deletingGoproOverlayJobId === overlay.job_id}
-                    onDownload={() => void handleDownloadGoproOverlay(overlay)}
-                    onDelete={() => void handleDeleteGoproOverlay(overlay)}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {(flight.youtube_urls?.length ?? 0) > 0 && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800 sm:p-5">
-              <FlightYoutubeVideos urls={flight.youtube_urls} />
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                {t('flights.mediaReplayDescription')}
+              </p>
             </div>
-          )}
-        </div>
+          </div>
+          {hasOpenedReplay ? replayCard : null}
+        </section>
 
-        <FlightMediaExportActions
-          flight={flight}
+        <FlightMediaBadges
           hasGpx={hasGpx}
+          hasVideo={hasVideo}
+          hasPersistedGoproOverlay={hasPersistedGoproOverlay}
           isVideoExportRunning={isVideoExportRunning}
+          isVideoExportFailed={isVideoExportFailed}
           isGoproOverlayRunning={isGoproOverlayRunning}
-          canRegenerateGoproOverlay={canRegenerateGoproOverlay}
-          canUseGoproOverlayAction={canUseGoproOverlayAction}
-          isCreatingGoproOverlay={createGoproOverlayJob.isPending}
-          isCancellingGoproOverlay={isCancellingGoproOverlay}
-          goproOverlayLabel={goproOverlayLabel}
-          goproOverlayCompactLabel={goproOverlayCompactLabel}
-          goproOverlayTitle={goproOverlayTitle}
-          goproOverlayUnavailableReason={goproOverlayUnavailableReason}
-          onGoproOverlayAction={goproOverlayAction}
+          isGoproOverlayFailed={isGoproOverlayFailed}
+          isDownloadingAnyMedia={isDownloadingAnyMedia}
+          videoProcessingLabel={videoProcessingLabel}
+          goproOverlayProcessingLabel={goproOverlayProcessingLabel}
+          onDownloadGpx={() => void handleDownloadGpx()}
+          onDownloadVideo={() => void handleDownloadVideo()}
+          onDownloadPersistedGoproOverlay={() =>
+            void handleDownloadPersistedGoproOverlay()
+          }
         />
+
+        {completedGoproOverlays.length > 0 && (
+          <section
+            aria-labelledby="flight-media-overlays-title"
+            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800 sm:p-5"
+          >
+            <h3
+              id="flight-media-overlays-title"
+              className="mb-3 text-base font-semibold text-slate-950 dark:text-white"
+            >
+              {t('flights.mediaGeneratedOverlaysTitle')}
+            </h3>
+            <div className="space-y-3">
+              {completedGoproOverlays.map((overlay) => (
+                <GoproOverlayJobCard
+                  key={overlay.job_id}
+                  job={overlay}
+                  isDownloadingAnyMedia={isDownloadingAnyMedia}
+                  isDeleting={deletingGoproOverlayJobId === overlay.job_id}
+                  onDownload={() => void handleDownloadGoproOverlay(overlay)}
+                  onDelete={() => void handleDeleteGoproOverlay(overlay)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {(flight.youtube_urls?.length ?? 0) > 0 && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800 sm:p-5">
+            <FlightYoutubeVideos urls={flight.youtube_urls} />
+          </div>
+        )}
       </div>
       {goproOverlayModal}
     </div>

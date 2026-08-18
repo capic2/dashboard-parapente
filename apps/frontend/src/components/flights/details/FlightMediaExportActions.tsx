@@ -75,7 +75,11 @@ export function FlightMediaExportActions({
           </p>
         </div>
       </div>
-      <div className="grid gap-2">
+      <div
+        className={`grid gap-2 sm:grid-cols-2 ${
+          shouldOfferYoutubeUpload ? 'lg:grid-cols-3' : ''
+        }`}
+      >
         {hasGpx ? (
           <FlightVideoExportControls
             flight={flight}
