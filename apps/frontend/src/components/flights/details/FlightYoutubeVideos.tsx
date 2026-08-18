@@ -19,7 +19,7 @@ export function FlightYoutubeVideos({
   if (videos.length === 0) return null;
 
   return (
-    <section className="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+    <section>
       <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
         {t('flights.youtubeVideos')}
       </h3>
