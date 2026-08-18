@@ -1,7 +1,9 @@
 from urllib.parse import parse_qs, urlparse
 
 import config
+import pytest
 from models import YoutubeCredential, YoutubeUploadJob
+from sqlalchemy.exc import IntegrityError
 from youtube_upload import decode_oauth_state, encrypt_secret
 
 API_PREFIX = "/api"
@@ -109,3 +111,35 @@ def test_start_youtube_upload_rejects_flight_with_existing_youtube_video(
 
     assert response.status_code == 409
     assert "already has" in response.json()["detail"]
+
+
+def test_database_rejects_two_active_uploads_for_the_same_flight(
+    db_session, sample_flight
+):
+    first = YoutubeUploadJob(
+        id="youtube-job-1",
+        flight_id=sample_flight.id,
+        user_id=1,
+        status="queued",
+        progress=0,
+        title="Premier envoi",
+        description="",
+        privacy_status="private",
+    )
+    second = YoutubeUploadJob(
+        id="youtube-job-2",
+        flight_id=sample_flight.id,
+        user_id=1,
+        status="uploading",
+        progress=1,
+        title="Deuxième envoi",
+        description="",
+        privacy_status="private",
+    )
+    db_session.add(first)
+    db_session.commit()
+    db_session.add(second)
+
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()

@@ -32,3 +32,7 @@ ON youtube_upload_jobs (flight_id);
 
 CREATE INDEX IF NOT EXISTS idx_youtube_upload_jobs_status
 ON youtube_upload_jobs (status);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_youtube_upload_jobs_active_flight
+ON youtube_upload_jobs (flight_id)
+WHERE status IN ('queued', 'uploading');

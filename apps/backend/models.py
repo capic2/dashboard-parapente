@@ -15,6 +15,7 @@ from sqlalchemy import (
     Text,
     Time,
     func,
+    text,
 )
 from sqlalchemy.orm import relationship
 
@@ -348,6 +349,14 @@ class YoutubeUploadJob(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     flight = relationship("Flight", back_populates="youtube_upload_jobs")
+
+
+Index(
+    "uq_youtube_upload_jobs_active_flight",
+    YoutubeUploadJob.flight_id,
+    unique=True,
+    sqlite_where=text("status IN ('queued', 'uploading')"),
+)
 
 
 class WeatherForecast(Base):

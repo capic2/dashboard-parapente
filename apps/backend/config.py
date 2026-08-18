@@ -94,6 +94,17 @@ def _intervals_sync_enabled(api_key: str | None) -> bool:
     return requested and bool(api_key)
 
 
+def _youtube_upload_chunk_size() -> int:
+    chunk_size = _int_env_at_least(
+        "BACKEND_YOUTUBE_UPLOAD_CHUNK_SIZE", 8 * 1024 * 1024, 256 * 1024
+    )
+    if chunk_size % (256 * 1024) != 0:
+        raise ValueError(
+            "BACKEND_YOUTUBE_UPLOAD_CHUNK_SIZE must be a multiple of 256 KiB"
+        )
+    return chunk_size
+
+
 # ============================================================================
 # DATABASE
 # ============================================================================
@@ -227,9 +238,7 @@ ADMIN_PASSWORD = os.getenv("BACKEND_ADMIN_PASSWORD")
 YOUTUBE_CLIENT_ID = os.getenv("BACKEND_YOUTUBE_CLIENT_ID")
 YOUTUBE_CLIENT_SECRET = os.getenv("BACKEND_YOUTUBE_CLIENT_SECRET")
 YOUTUBE_REDIRECT_URI = os.getenv("BACKEND_YOUTUBE_REDIRECT_URI")
-YOUTUBE_UPLOAD_CHUNK_SIZE = _int_env_at_least(
-    "BACKEND_YOUTUBE_UPLOAD_CHUNK_SIZE", 8 * 1024 * 1024, 256 * 1024
-)
+YOUTUBE_UPLOAD_CHUNK_SIZE = _youtube_upload_chunk_size()
 
 # ============================================================================
 # LOGGING

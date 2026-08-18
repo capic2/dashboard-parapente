@@ -33,6 +33,7 @@ from fastapi import (
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 import config
@@ -941,7 +942,13 @@ def start_flight_youtube_upload(
         privacy_status=payload.privacy_status,
     )
     db.add(job)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409, detail="A YouTube upload is already in progress"
+        ) from exc
     db.refresh(job)
     response_payload = youtube_upload_job_payload(job)
     enqueue_youtube_upload(job.id)
