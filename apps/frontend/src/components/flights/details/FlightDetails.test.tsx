@@ -173,6 +173,11 @@ vi.mock('react-i18next', () => ({
         'flights.goproOverlayCancelled': 'Overlay cancelled',
         'flights.goproOverlayStartError': 'Overlay start error',
         'flights.goproOverlayCancelError': 'Overlay cancel error',
+        'flights.goproOverlayDelete': 'Delete overlay',
+        'flights.goproOverlayDeleting': 'Deleting overlay',
+        'flights.goproOverlayConfirmDelete': 'Confirm delete overlay',
+        'flights.goproOverlayDeleted': 'Overlay deleted',
+        'flights.goproOverlayDeleteError': 'Overlay delete error',
         'flights.goproOverlayNeedsVideo': 'Needs video',
         'flights.goproOverlayNeedsCameraVideo': 'Needs camera video',
         'flights.trackFileLabel': 'GPX/IGC file',
@@ -190,9 +195,13 @@ vi.mock('react-i18next', () => ({
         'flights.generationLogs.status.failed': 'Failed',
         'flights.generationLogs.method.cpu': 'CPU',
         'flights.generationLogs.method.gpu': 'GPU',
-        'flights.infoTab': 'Info',
-        'flights.replayTab': 'Replay',
-        'flights.logsTab': 'Logs',
+        'flights.infoTab': 'Summary',
+        'flights.replayTab': 'Media',
+        'flights.logsTab': 'Processing',
+        'flights.mediaPageTitle': 'Flight media',
+        'flights.mediaReplayTitle': 'Flight replay',
+        'flights.mediaFilesTitle': 'Available files',
+        'flights.mediaCreationTitle': 'Create and publish',
         'flights.youtubeVideos': 'YouTube videos',
         'flights.youtubeVideoTitle': 'Flight YouTube video',
         'flights.openOnYoutube': 'Open on YouTube',
@@ -273,6 +282,10 @@ import { FlightDetails } from './FlightDetails';
 
 const sites: Site[] = [];
 
+const openTab = (name: 'Media' | 'Processing') => {
+  fireEvent.click(screen.getByRole('tab', { name }));
+};
+
 describe('FlightDetails GoPro overlay action', () => {
   beforeEach(() => {
     apiDelete.mockReset();
@@ -349,6 +362,8 @@ describe('FlightDetails GoPro overlay action', () => {
       />
     );
 
+    openTab('Media');
+
     const players = screen.getAllByTitle('Flight YouTube video');
     expect(players).toHaveLength(2);
     expect(players[0]).toHaveAttribute(
@@ -362,6 +377,39 @@ describe('FlightDetails GoPro overlay action', () => {
     );
   });
 
+  it('organizes media into replay, available files, and creation sections', () => {
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    openTab('Media');
+
+    expect(
+      screen.getByRole('heading', { name: 'Flight media' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Flight replay' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Available files' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Create and publish' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'flights.downloadGpx' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: 'flights.viewer.downloadVideo',
+      })
+    ).toBeInTheDocument();
+  });
+
   it('shows why overlay generation is unavailable', () => {
     mockFlight.gopro_camera_file_exists = false;
 
@@ -372,6 +420,8 @@ describe('FlightDetails GoPro overlay action', () => {
         onShowCreateSiteModal={() => undefined}
       />
     );
+
+    openTab('Media');
 
     expect(screen.getByText('Needs camera video')).toBeInTheDocument();
     expect(
@@ -390,6 +440,8 @@ describe('FlightDetails GoPro overlay action', () => {
         onShowCreateSiteModal={() => undefined}
       />
     );
+
+    openTab('Media');
 
     fireEvent.click(screen.getByRole('button', { name: /Cancel overlay/u }));
 
@@ -450,6 +502,8 @@ describe('FlightDetails GoPro overlay action', () => {
         onShowCreateSiteModal={() => undefined}
       />
     );
+
+    openTab('Media');
 
     fireEvent.click(screen.getByRole('button', { name: /Generate overlay/u }));
 
@@ -529,6 +583,8 @@ describe('FlightDetails GoPro overlay action', () => {
       />
     );
 
+    openTab('Media');
+
     fireEvent.click(screen.getByRole('button', { name: /Generate overlay/u }));
 
     expect(screen.getByLabelText('GPX offset (seconds)')).toHaveValue(0);
@@ -580,6 +636,7 @@ describe('FlightDetails GoPro overlay action', () => {
         onShowCreateSiteModal={() => undefined}
       />
     );
+    openTab('Media');
     fireEvent.click(screen.getByRole('button', { name: /Generate overlay/u }));
     const durationSlider = screen.getByLabelText(
       'flights.goproPreviewDuration'
@@ -641,6 +698,7 @@ describe('FlightDetails GoPro overlay action', () => {
         onShowCreateSiteModal={() => undefined}
       />
     );
+    openTab('Media');
     fireEvent.click(screen.getByRole('button', { name: /Generate overlay/u }));
 
     await waitFor(() =>
@@ -697,6 +755,8 @@ describe('FlightDetails GoPro overlay action', () => {
         onShowCreateSiteModal={() => undefined}
       />
     );
+
+    openTab('Media');
 
     fireEvent.click(screen.getByRole('button', { name: /Generate overlay/u }));
 
@@ -755,6 +815,8 @@ describe('FlightDetails GoPro overlay action', () => {
       />
     );
 
+    openTab('Media');
+
     fireEvent.click(screen.getByRole('button', { name: /Generate overlay/u }));
 
     const offsetInput = screen.getByLabelText('GPX offset (seconds)');
@@ -805,7 +867,7 @@ describe('FlightDetails GoPro overlay action', () => {
 
     expect(screen.queryByText('Generation logs')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Logs' }));
+    openTab('Processing');
 
     expect(screen.getByText('Generation logs')).toBeInTheDocument();
     const videoToggle = screen.getByRole('button', {
@@ -844,7 +906,13 @@ describe('FlightDetails GoPro overlay action', () => {
     );
 
     expect(screen.queryByText('Generation logs')).not.toBeInTheDocument();
-    expect(screen.queryByRole('tab', { name: 'Logs' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('tab', { name: 'Processing' })
+    ).not.toBeInTheDocument();
+    openTab('Media');
+    expect(
+      screen.getByRole('button', { name: 'Video action' })
+    ).toBeInTheDocument();
   });
 
   it('keeps the logs tab available while a job status is loading', () => {
@@ -858,7 +926,7 @@ describe('FlightDetails GoPro overlay action', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Logs' }));
+    openTab('Processing');
 
     expect(screen.getByText('Generation logs')).toBeInTheDocument();
     const videoToggle = screen.getByRole('button', {
@@ -896,7 +964,7 @@ describe('FlightDetails GoPro overlay action', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Logs' }));
+    openTab('Processing');
 
     expect(
       screen.getByRole('button', { name: /GoPro overlay/u })
@@ -915,7 +983,7 @@ describe('FlightDetails GoPro overlay action', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Logs' }));
+    openTab('Processing');
     const videoToggle = screen.getByRole('button', {
       name: /Flight video/u,
     });
@@ -945,6 +1013,8 @@ describe('FlightDetails GoPro overlay action', () => {
         onShowCreateSiteModal={() => undefined}
       />
     );
+
+    openTab('Media');
 
     fireEvent.click(
       screen.getByRole('button', { name: /Regenerate overlay/u })
@@ -996,10 +1066,53 @@ describe('FlightDetails GoPro overlay action', () => {
       />
     );
 
+    openTab('Media');
+
     expect(screen.getByText('test-flight-4k.mp4')).toBeInTheDocument();
     expect(screen.getByText('test-flight-1080p.mp4')).toBeInTheDocument();
     expect(screen.getByText('3840 × 2160')).toBeInTheDocument();
     expect(screen.getByText('1920 × 1080')).toBeInTheDocument();
+  });
+
+  it('deletes an overlay and removes its card', async () => {
+    apiDelete.mockResolvedValue({ deleted: true });
+    mockFlight.gopro_overlays = [
+      {
+        flight_id: mockFlight.id,
+        job_id: 'overlay-4k',
+        status: 'completed',
+        progress: 100,
+        message: 'Overlay ready',
+        layout_id: 'parapente',
+        layout_label: 'Parapente',
+        output_filename: 'test-flight-4k.mp4',
+        video_width: 3840,
+        video_height: 2160,
+        gpx_offset: 0,
+        created_at: '2026-03-15T12:00:00Z',
+        updated_at: '2026-03-15T12:00:00Z',
+        completed_at: '2026-03-15T12:00:00Z',
+        log_tail: [],
+      },
+    ];
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    openTab('Media');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete overlay' }));
+
+    await waitFor(() => {
+      expect(apiDelete).toHaveBeenCalledWith('gopro-overlays/jobs/overlay-4k');
+      expect(screen.queryByText('test-flight-4k.mp4')).not.toBeInTheDocument();
+    });
+    expect(confirmMock).toHaveBeenCalledWith('Confirm delete overlay');
   });
 
   it('regenerates an existing overlay after confirmation', () => {
@@ -1015,6 +1128,8 @@ describe('FlightDetails GoPro overlay action', () => {
         onShowCreateSiteModal={() => undefined}
       />
     );
+
+    openTab('Media');
 
     fireEvent.click(
       screen.getByRole('button', { name: /Regenerate overlay/u })
@@ -1040,6 +1155,8 @@ describe('FlightDetails GoPro overlay action', () => {
         onShowCreateSiteModal={() => undefined}
       />
     );
+
+    openTab('Media');
 
     fireEvent.click(
       screen.getByRole('button', { name: /Regenerate overlay/u })

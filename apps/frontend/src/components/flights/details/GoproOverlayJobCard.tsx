@@ -1,18 +1,22 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@dashboard-parapente/design-system';
-import { Download } from 'lucide-react';
+import { Download, Trash2 } from 'lucide-react';
 import type { GoproOverlayJob } from '../../../hooks/gopro/useGoproOverlay';
 
 interface GoproOverlayJobCardProps {
   job: GoproOverlayJob;
   isDownloadingAnyMedia: boolean;
+  isDeleting: boolean;
   onDownload: () => void;
+  onDelete: () => void;
 }
 
 export function GoproOverlayJobCard({
   job,
   isDownloadingAnyMedia,
+  isDeleting,
   onDownload,
+  onDelete,
 }: GoproOverlayJobCardProps) {
   const { t } = useTranslation();
   const renderMethodLabel =
@@ -25,7 +29,7 @@ export function GoproOverlayJobCard({
       : null;
 
   return (
-    <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -58,12 +62,28 @@ export function GoproOverlayJobCard({
           </span>
           <Button
             type="button"
-            className="min-h-9 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+            className="min-h-10 cursor-pointer rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed"
             onPress={onDownload}
             isDisabled={isDownloadingAnyMedia}
           >
             <Download className="h-4 w-4" aria-hidden="true" />
             {t('flights.goproOverlayDownload')}
+          </Button>
+        </div>
+      )}
+      {['completed', 'failed', 'cancelled'].includes(job.status) && (
+        <div className="mt-3 flex justify-end">
+          <Button
+            type="button"
+            variant="ghost"
+            className="min-h-10 cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed dark:text-red-300 dark:hover:bg-red-950/30"
+            onPress={onDelete}
+            isDisabled={isDeleting}
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+            {isDeleting
+              ? t('flights.goproOverlayDeleting')
+              : t('flights.goproOverlayDelete')}
           </Button>
         </div>
       )}

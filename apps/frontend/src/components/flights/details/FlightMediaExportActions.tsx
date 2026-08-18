@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@dashboard-parapente/design-system';
-import { Layers, Video, Wand2 } from 'lucide-react';
+import { Clapperboard, Video, Wand2 } from 'lucide-react';
 import type { Flight } from '../../../types';
 import { FlightVideoExportControls } from '../video-export/FlightVideoExportControls';
 import { hasFlightVideo } from '../../../lib/flightMediaState';
@@ -48,21 +48,36 @@ export function FlightMediaExportActions({
   }
 
   return (
-    <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-900/50 sm:w-auto sm:min-w-80">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-          <Layers className="h-3.5 w-3.5" aria-hidden="true" />
-          {t('flights.mediaExportActions')}
+    <section
+      aria-labelledby="flight-media-creation-title"
+      className="w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800 sm:p-5"
+    >
+      <div className="mb-4 flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+          <Clapperboard className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3
+              id="flight-media-creation-title"
+              className="text-base font-semibold text-slate-950 dark:text-white"
+            >
+              {t('flights.mediaCreationTitle')}
+            </h3>
+            {(isVideoExportRunning || isGoproOverlayRunning) && (
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-800 dark:bg-blue-950/50 dark:text-blue-200">
+                {t('flights.mediaExportInProgress')}
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
+            {t('flights.mediaCreationDescription')}
+          </p>
         </div>
-        {(isVideoExportRunning || isGoproOverlayRunning) && (
-          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-800 dark:bg-blue-950/50 dark:text-blue-200">
-            {t('flights.mediaExportInProgress')}
-          </span>
-        )}
       </div>
       <div
-        className={`grid gap-2 ${
-          shouldOfferYoutubeUpload ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2'
+        className={`grid gap-2 sm:grid-cols-2 ${
+          shouldOfferYoutubeUpload ? 'lg:grid-cols-3' : ''
         }`}
       >
         {hasGpx ? (
@@ -114,6 +129,6 @@ export function FlightMediaExportActions({
           {goproOverlayUnavailableReason}
         </p>
       )}
-    </div>
+    </section>
   );
 }

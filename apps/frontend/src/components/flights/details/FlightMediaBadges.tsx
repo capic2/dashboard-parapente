@@ -1,5 +1,13 @@
 import { useTranslation } from 'react-i18next';
-import { Download, FileText, Video, Wand2 } from 'lucide-react';
+import {
+  CircleAlert,
+  Download,
+  FileText,
+  FolderDown,
+  LoaderCircle,
+  Video,
+  Wand2,
+} from 'lucide-react';
 
 interface FlightMediaBadgesProps {
   hasGpx: boolean;
@@ -36,79 +44,163 @@ export function FlightMediaBadges({
   const showPersistedOverlayBadge =
     hasPersistedGoproOverlay && !isGoproOverlayRunning && !isGoproOverlayFailed;
 
-  if (
-    !hasGpx &&
-    !hasVideo &&
-    !isVideoExportRunning &&
-    !isVideoExportFailed &&
-    !showPersistedOverlayBadge &&
-    !isGoproOverlayRunning &&
-    !isGoproOverlayFailed
-  ) {
-    return null;
-  }
+  const hasMediaOrStatus =
+    hasGpx ||
+    hasVideo ||
+    isVideoExportRunning ||
+    isVideoExportFailed ||
+    showPersistedOverlayBadge ||
+    isGoproOverlayRunning ||
+    isGoproOverlayFailed;
+
+  const downloadCardClassName =
+    'group flex min-h-24 cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition-colors duration-200 hover:border-indigo-300 hover:bg-indigo-50/60 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/30 dark:focus:ring-offset-gray-800';
 
   return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
-      {hasGpx && (
-        <button
-          type="button"
-          className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-green-800 transition-colors hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200 dark:hover:bg-green-900/50 dark:focus:ring-offset-gray-800"
-          onClick={onDownloadGpx}
-          disabled={isDownloadingAnyMedia}
-          aria-label={t('flights.downloadGpx')}
-        >
-          <FileText className="h-3 w-3" aria-hidden="true" />
-          {t('flights.gpxBadge')}
-          <Download className="h-3 w-3" aria-hidden="true" />
-        </button>
-      )}
-      {hasVideo && (
-        <button
-          type="button"
-          className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-800 transition-colors hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200 dark:hover:bg-indigo-900/50 dark:focus:ring-offset-gray-800"
-          onClick={onDownloadVideo}
-          disabled={isDownloadingAnyMedia}
-          aria-label={t('flights.viewer.downloadVideo')}
-        >
-          <Video className="h-3 w-3" aria-hidden="true" />
-          {t('flights.videoBadge')}
-          <Download className="h-3 w-3" aria-hidden="true" />
-        </button>
-      )}
-      {isVideoExportRunning && (
-        <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
-          {videoProcessingLabel}
+    <section
+      aria-labelledby="flight-media-files-title"
+      className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/40 sm:p-5"
+    >
+      <div className="mb-4 flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+          <FolderDown className="h-5 w-5" aria-hidden="true" />
         </span>
+        <div>
+          <h3
+            id="flight-media-files-title"
+            className="text-base font-semibold text-slate-950 dark:text-white"
+          >
+            {t('flights.mediaFilesTitle')}
+          </h3>
+          <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
+            {t('flights.mediaFilesDescription')}
+          </p>
+        </div>
+      </div>
+
+      {!hasMediaOrStatus && (
+        <p className="rounded-xl border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
+          {t('flights.mediaFilesEmpty')}
+        </p>
       )}
-      {isVideoExportFailed && (
-        <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
-          {t('flights.videoErrorBadge')}
-        </span>
+
+      {hasMediaOrStatus && (
+        <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+          {hasGpx && (
+            <button
+              type="button"
+              className={downloadCardClassName}
+              onClick={onDownloadGpx}
+              disabled={isDownloadingAnyMedia}
+              aria-label={t('flights.downloadGpx')}
+            >
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                <FileText className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-slate-950 dark:text-white">
+                  {t('flights.gpxBadge')}
+                </span>
+                <span className="block text-xs text-slate-600 dark:text-slate-300">
+                  {t('flights.mediaFileAvailable')}
+                </span>
+              </span>
+              <Download
+                className="h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-indigo-600 dark:group-hover:text-indigo-300"
+                aria-hidden="true"
+              />
+            </button>
+          )}
+          {hasVideo && (
+            <button
+              type="button"
+              className={downloadCardClassName}
+              onClick={onDownloadVideo}
+              disabled={isDownloadingAnyMedia}
+              aria-label={t('flights.viewer.downloadVideo')}
+            >
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                <Video className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-slate-950 dark:text-white">
+                  {t('flights.videoBadge')}
+                </span>
+                <span className="block text-xs text-slate-600 dark:text-slate-300">
+                  {t('flights.mediaFileAvailable')}
+                </span>
+              </span>
+              <Download
+                className="h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-indigo-600 dark:group-hover:text-indigo-300"
+                aria-hidden="true"
+              />
+            </button>
+          )}
+          {showPersistedOverlayBadge && (
+            <button
+              type="button"
+              className={downloadCardClassName}
+              onClick={onDownloadPersistedGoproOverlay}
+              disabled={isDownloadingAnyMedia}
+              aria-label={t('flights.goproOverlayDownload')}
+            >
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
+                <Wand2 className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-slate-950 dark:text-white">
+                  {t('flights.goproOverlayBadge')}
+                </span>
+                <span className="block text-xs text-slate-600 dark:text-slate-300">
+                  {t('flights.mediaFileAvailable')}
+                </span>
+              </span>
+              <Download
+                className="h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-indigo-600 dark:group-hover:text-indigo-300"
+                aria-hidden="true"
+              />
+            </button>
+          )}
+          {isVideoExportRunning && (
+            <div className="flex min-h-24 items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3 text-blue-900 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-100">
+              <LoaderCircle
+                className="h-5 w-5 shrink-0 motion-safe:animate-spin"
+                aria-hidden="true"
+              />
+              <span className="text-sm font-semibold">
+                {videoProcessingLabel}
+              </span>
+            </div>
+          )}
+          {isGoproOverlayRunning && (
+            <div className="flex min-h-24 items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3 text-blue-900 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-100">
+              <LoaderCircle
+                className="h-5 w-5 shrink-0 motion-safe:animate-spin"
+                aria-hidden="true"
+              />
+              <span className="text-sm font-semibold">
+                {goproOverlayProcessingLabel}
+              </span>
+            </div>
+          )}
+          {isVideoExportFailed && (
+            <div className="flex min-h-24 items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-red-900 dark:border-red-800 dark:bg-red-950/40 dark:text-red-100">
+              <CircleAlert className="h-5 w-5 shrink-0" aria-hidden="true" />
+              <span className="text-sm font-semibold">
+                {t('flights.videoErrorBadge')}
+              </span>
+            </div>
+          )}
+          {isGoproOverlayFailed && (
+            <div className="flex min-h-24 items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-red-900 dark:border-red-800 dark:bg-red-950/40 dark:text-red-100">
+              <CircleAlert className="h-5 w-5 shrink-0" aria-hidden="true" />
+              <span className="text-sm font-semibold">
+                {t('flights.goproOverlayErrorBadge')}
+              </span>
+            </div>
+          )}
+        </div>
       )}
-      {showPersistedOverlayBadge && (
-        <button
-          type="button"
-          className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-cyan-800 transition-colors hover:bg-cyan-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200 dark:hover:bg-cyan-900/50 dark:focus:ring-offset-gray-800"
-          onClick={onDownloadPersistedGoproOverlay}
-          disabled={isDownloadingAnyMedia}
-          aria-label={t('flights.goproOverlayDownload')}
-        >
-          <Wand2 className="h-3 w-3" aria-hidden="true" />
-          {t('flights.goproOverlayBadge')}
-          <Download className="h-3 w-3" aria-hidden="true" />
-        </button>
-      )}
-      {isGoproOverlayRunning && (
-        <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
-          {goproOverlayProcessingLabel}
-        </span>
-      )}
-      {isGoproOverlayFailed && (
-        <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
-          {t('flights.goproOverlayErrorBadge')}
-        </span>
-      )}
-    </div>
+    </section>
   );
 }

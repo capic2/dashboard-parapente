@@ -19,11 +19,17 @@ export function FlightYoutubeVideos({
   if (videos.length === 0) return null;
 
   return (
-    <section className="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
-      <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
+    <section aria-labelledby="flight-media-youtube-title">
+      <h3
+        id="flight-media-youtube-title"
+        className="mb-1 text-base font-semibold text-gray-900 dark:text-white"
+      >
         {t('flights.youtubeVideos')}
       </h3>
-      <div className="grid gap-4 xl:grid-cols-2">
+      <p className="mb-4 text-sm text-slate-600 dark:text-slate-300">
+        {t('flights.mediaPublishedDescription')}
+      </p>
+      <div className="grid gap-4 2xl:grid-cols-2">
         {videos.map(({ embedUrl, url }, index) => (
           <div
             key={embedUrl}
@@ -43,7 +49,7 @@ export function FlightYoutubeVideos({
               href={url}
               target="_blank"
               rel="noreferrer"
-              className="block truncate bg-gray-900 px-3 py-2 text-xs text-gray-200 underline-offset-2 hover:underline"
+              className="block cursor-pointer truncate bg-gray-900 px-3 py-3 text-sm text-gray-200 underline-offset-2 transition-colors hover:bg-gray-800 hover:underline focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-400"
             >
               {t('flights.openOnYoutube')}
             </a>

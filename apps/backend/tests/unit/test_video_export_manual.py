@@ -210,6 +210,32 @@ def test_set_job_auth_token_removes_value_when_none(test_db, monkeypatch):
     assert video_export_manual._get_job_auth_token(job_id) is None
 
 
+def test_job_render_method_is_persisted_for_other_processes(test_db, monkeypatch):
+    job_id = "job-render-method"
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+
+    with test_db() as db_session:
+        db_session.add(
+            VideoExportJob(
+                id=job_id,
+                flight_id="flight-test-001",
+                status="capturing",
+                mode="manual_fast",
+                render_method=None,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+        )
+        db_session.commit()
+
+    video_export_manual._set_job_render_method(job_id, "gpu")
+
+    with test_db() as db_session:
+        job = db_session.get(VideoExportJob, job_id)
+        assert job is not None
+        assert job.render_method == "gpu"
+
+
 def test_capture_progress_percent_spans_capture_phase_range():
     assert video_export_manual._capture_progress_percent(0, 100) == 5
     assert video_export_manual._capture_progress_percent(50, 100) == 42

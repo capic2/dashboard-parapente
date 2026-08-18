@@ -270,6 +270,7 @@ class VideoExportJob(Base):
     speed = Column(Integer, default=1)
     progress = Column(Integer, default=0)
     message = Column(Text)
+    render_method = Column(String, nullable=True)
     frontend_url = Column(String)
     auth_token = Column(Text)
     video_path = Column(String)

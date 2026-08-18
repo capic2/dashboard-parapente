@@ -6334,6 +6334,26 @@ def download_gopro_overlay_render_job(job_id: str) -> FileResponse:
     return FileResponse(path=output_path, media_type="video/mp4", filename=output_path.name)
 
 
+@router.delete("/gopro-overlays/jobs/{job_id}")
+def delete_gopro_overlay_render_job(job_id: str):
+    """Delete a terminal GoPro overlay job and every file owned by that job."""
+    result = delete_gopro_overlay_job(job_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="GoPro overlay job not found")
+    if result.get("error") == "active":
+        raise HTTPException(status_code=400, detail="Cannot delete an active overlay")
+    if result.get("errors"):
+        logger.error("Failed to delete GoPro overlay job %s: %s", job_id, result["errors"])
+        raise HTTPException(status_code=500, detail="Unable to delete overlay files")
+    return {
+        "job_id": result["job_id"],
+        "deleted": result["deleted"],
+        "files_deleted": result["files_deleted"],
+        "dirs_deleted": result["dirs_deleted"],
+        "bytes_deleted": result["bytes_deleted"],
+    }
+
+
 @router.delete("/gopro-overlays/jobs/{job_id}/video")
 def delete_gopro_overlay_render_output(job_id: str):
     """Delete the final GoPro overlay video for a terminal job."""
