@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, Modal } from '@dashboard-parapente/design-system';
-import { Tv, Upload } from 'lucide-react';
+import { Tv, Upload, X } from 'lucide-react';
 import type { Flight } from '../../../types';
 import {
+  useCancelYoutubeUpload,
   useStartYoutubeUpload,
   useYoutubeAuthorizationUrl,
   useYoutubeStatus,
@@ -28,6 +29,7 @@ export function FlightYoutubeUploadControls({
   const connection = useYoutubeStatus();
   const upload = useYoutubeUpload(flight.id);
   const startUpload = useStartYoutubeUpload(flight.id);
+  const cancelUpload = useCancelYoutubeUpload(flight.id);
   const authorizationUrl = useYoutubeAuthorizationUrl();
   const previousStatus = useRef(upload.data?.status);
   const [isOpen, setIsOpen] = useState(false);
@@ -37,8 +39,7 @@ export function FlightYoutubeUploadControls({
   const [description, setDescription] = useState(
     flight.description ?? flight.notes ?? ''
   );
-  const [privacyStatus, setPrivacyStatus] =
-    useState<PrivacyStatus>('private');
+  const [privacyStatus, setPrivacyStatus] = useState<PrivacyStatus>('private');
 
   const isActive =
     upload.data?.status === 'queued' || upload.data?.status === 'uploading';
@@ -91,13 +92,28 @@ export function FlightYoutubeUploadControls({
     }
   };
 
+  const handleCancel = async () => {
+    try {
+      await cancelUpload.mutateAsync();
+      toast.success(t('flights.youtubeUploadCancelled'));
+    } catch (error) {
+      toast.error(
+        await getApiErrorMessage(error, t('flights.youtubeUploadCancelError'))
+      );
+    }
+  };
+
   let label = t('flights.youtubeUpload');
   if (connection.isLoading || upload.isLoading) {
     label = t('common.loading');
+  } else if (isActive) {
+    label = cancelUpload.isPending
+      ? t('common.stopping')
+      : t('flights.youtubeUploadStop', {
+          progress: upload.data?.progress ?? 0,
+        });
   } else if (!connection.data?.connected) {
     label = t('flights.youtubeConnect');
-  } else if (isActive) {
-    label = t('flights.youtubeUploading', { progress: upload.data?.progress ?? 0 });
   } else if (upload.data?.status === 'failed') {
     label = t('flights.youtubeUploadRetry');
   }
@@ -107,17 +123,21 @@ export function FlightYoutubeUploadControls({
       <Button
         variant="outline"
         className="min-h-10 w-full rounded-lg border-red-200 px-3 py-2 text-sm text-red-700 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"
-        onPress={() => void handlePrimaryAction()}
+        onPress={() => void (isActive ? handleCancel() : handlePrimaryAction())}
         isDisabled={
           connection.isLoading ||
           upload.isLoading ||
           authorizationUrl.isPending ||
-          isActive
+          cancelUpload.isPending
         }
-        title={upload.data?.error ?? t('flights.youtubeUploadTitle')}
+        title={
+          isActive
+            ? t('flights.youtubeUploadStopTitle')
+            : (upload.data?.error ?? t('flights.youtubeUploadTitle'))
+        }
       >
         {isActive ? (
-          <Upload className="h-4 w-4" aria-hidden="true" />
+          <X className="h-4 w-4" aria-hidden="true" />
         ) : (
           <Tv className="h-4 w-4" aria-hidden="true" />
         )}
@@ -179,11 +199,15 @@ export function FlightYoutubeUploadControls({
               }
               className="min-h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
             >
-              <option value="private">{t('flights.youtubePrivacyPrivate')}</option>
+              <option value="private">
+                {t('flights.youtubePrivacyPrivate')}
+              </option>
               <option value="unlisted">
                 {t('flights.youtubePrivacyUnlisted')}
               </option>
-              <option value="public">{t('flights.youtubePrivacyPublic')}</option>
+              <option value="public">
+                {t('flights.youtubePrivacyPublic')}
+              </option>
             </select>
           </div>
           <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">

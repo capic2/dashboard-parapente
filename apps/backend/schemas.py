@@ -474,7 +474,7 @@ class YoutubeUploadCreate(BaseModel):
 class YoutubeUploadJobResponse(BaseModel):
     job_id: str
     flight_id: str
-    status: Literal["queued", "uploading", "completed", "failed"]
+    status: Literal["queued", "uploading", "completed", "failed", "cancelled"]
     progress: int = Field(ge=0, le=100)
     youtube_url: str | None = None
     error: str | None = None

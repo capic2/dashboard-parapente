@@ -9,7 +9,7 @@ export interface YoutubeConnectionStatus {
 export interface YoutubeUploadJob {
   job_id: string;
   flight_id: string;
-  status: 'queued' | 'uploading' | 'completed' | 'failed';
+  status: 'queued' | 'uploading' | 'completed' | 'failed' | 'cancelled';
   progress: number;
   youtube_url?: string | null;
   error?: string | null;
@@ -52,6 +52,17 @@ export function useStartYoutubeUpload(flightId: string) {
       api
         .post(`flights/${flightId}/youtube-upload`, { json: payload })
         .json<YoutubeUploadJob>(),
+    onSuccess: (job) => {
+      queryClient.setQueryData(['youtube-upload', flightId], job);
+    },
+  });
+}
+
+export function useCancelYoutubeUpload(flightId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.delete(`flights/${flightId}/youtube-upload`).json<YoutubeUploadJob>(),
     onSuccess: (job) => {
       queryClient.setQueryData(['youtube-upload', flightId], job);
     },

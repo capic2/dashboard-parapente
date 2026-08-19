@@ -174,6 +174,7 @@ from youtube_upload import (
     YoutubeConfigurationError,
     YoutubeOAuthError,
     active_job as active_youtube_upload_job,
+    cancel_upload as cancel_youtube_upload,
     create_authorization_url,
     decode_oauth_state,
     disconnect as disconnect_youtube,
@@ -953,6 +954,26 @@ def start_flight_youtube_upload(
     response_payload = youtube_upload_job_payload(job)
     enqueue_youtube_upload(job.id)
     return response_payload
+
+
+@router.delete(
+    "/flights/{flight_id}/youtube-upload",
+    response_model=YoutubeUploadJobResponse,
+)
+def cancel_flight_youtube_upload(
+    flight_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    if db.get(Flight, flight_id) is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    job = active_youtube_upload_job(db, flight_id)
+    if job is None or job.user_id != user.id:
+        raise HTTPException(status_code=409, detail="No YouTube upload is in progress")
+    cancelled_job = cancel_youtube_upload(db, job_id=job.id, user_id=user.id)
+    if cancelled_job is None:
+        raise HTTPException(status_code=409, detail="YouTube upload is no longer active")
+    return youtube_upload_job_payload(cancelled_job)
 
 
 @public_router.get(
