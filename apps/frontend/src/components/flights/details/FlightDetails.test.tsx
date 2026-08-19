@@ -13,6 +13,7 @@ const {
   overlayJobStreamMock,
   previewMock,
   resetOverlayMock,
+  updateFlightMock,
   videoStatusMock,
   youtubeUploadMock,
 } = vi.hoisted(() => ({
@@ -22,6 +23,7 @@ const {
   generatePreviewMutateMock: vi.fn(),
   generatePreviewMock: vi.fn(),
   resetOverlayMock: vi.fn(),
+  updateFlightMock: vi.fn(),
   overlayJobStreamMock: { current: null as unknown },
   previewMock: { current: null as unknown },
   videoStatusMock: { current: null as unknown },
@@ -209,6 +211,12 @@ vi.mock('react-i18next', () => ({
         'flights.youtubeVideos': 'YouTube videos',
         'flights.youtubeVideoTitle': 'Flight YouTube video',
         'flights.openOnYoutube': 'Open on YouTube',
+        'flights.removeYoutubeAssociation': 'Remove association',
+        'flights.removeYoutubeAssociationConfirm':
+          'Confirm remove YouTube association',
+        'flights.youtubeAssociationRemoving': 'Removing association',
+        'flights.youtubeAssociationRemoved': 'Association removed',
+        'flights.youtubeAssociationRemoveError': 'Association removal error',
       })[key] ?? key,
   }),
 }));
@@ -218,7 +226,7 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 
 vi.mock('../../../hooks/flights/useFlights', () => ({
-  useUpdateFlight: () => ({ mutateAsync: vi.fn() }),
+  useUpdateFlight: () => ({ mutateAsync: updateFlightMock }),
   useUploadGPXToFlight: () => ({ isPending: false, mutate: vi.fn() }),
 }));
 
@@ -298,6 +306,8 @@ describe('FlightDetails GoPro overlay action', () => {
   beforeEach(() => {
     apiDelete.mockReset();
     createOverlayMock.mockReset();
+    updateFlightMock.mockReset();
+    updateFlightMock.mockResolvedValue(mockFlight);
     generatePreviewMutateMock.mockReset();
     generatePreviewMock.mockReset();
     generatePreviewMock.mockResolvedValue({ status: 'generating' });
@@ -383,6 +393,34 @@ describe('FlightDetails GoPro overlay action', () => {
     expect(players[1]).toHaveAttribute(
       'src',
       'https://www.youtube-nocookie.com/embed/9bZkp7q19f0'
+    );
+  });
+
+  it('removes a YouTube association from the media tab', async () => {
+    const removedUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+    const remainingUrl = 'https://youtu.be/9bZkp7q19f0';
+    mockFlight.youtube_urls = [removedUrl, remainingUrl];
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    openTab('Media');
+    fireEvent.click(
+      screen.getAllByRole('button', { name: 'Remove association' })[0]
+    );
+
+    expect(confirmMock).toHaveBeenCalledWith(
+      'Confirm remove YouTube association'
+    );
+    await waitFor(() =>
+      expect(updateFlightMock).toHaveBeenCalledWith({
+        youtube_urls: [remainingUrl],
+      })
     );
   });
 
