@@ -409,6 +409,8 @@ jobs:
             GHCR_USERNAME="${{ github.actor }}"
             GHCR_TOKEN="${{ secrets.GHCR_READ_TOKEN }}"
             NVIDIA_GPU_ENABLED="${{ vars.NVIDIA_GPU_ENABLED || 'false' }}"
+            LOCAL_VERIFY_MAX_ATTEMPTS="${{ vars.DEPLOY_LOCAL_VERIFY_MAX_ATTEMPTS || vars.DEPLOY_VERIFY_MAX_ATTEMPTS || '30' }}"
+            LOCAL_VERIFY_SLEEP_SECONDS="${{ vars.DEPLOY_LOCAL_VERIFY_SLEEP_SECONDS || vars.DEPLOY_VERIFY_SLEEP_SECONDS || '10' }}"
 
             if [ -z "$GHCR_TOKEN" ]; then
               echo "Missing GHCR_READ_TOKEN secret for production image pull"
@@ -506,6 +508,100 @@ jobs:
               docker logs --tail 200 parapente-backend 2>&1 || true
               echo "Recent YouTube upload worker logs"
               docker logs --tail 200 parapente-youtube-upload-worker 2>&1 || true
+            }
+
+            describe_version_response() {
+              response_file="$1"
+              if ! docker run --rm -i --entrypoint python "$BACKEND_IMAGE" -c '
+            import hashlib
+            import json
+            import re
+            import sys
+
+            body = sys.stdin.buffer.read()
+            print(f"response_bytes={len(body)} response_sha256={hashlib.sha256(body).hexdigest()}")
+            try:
+                payload = json.loads(body)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                text = body.decode("utf-8", errors="replace")
+                title = re.search(r"<title[^>]*>(.*?)</title>", text, re.IGNORECASE | re.DOTALL)
+                if title:
+                    normalized_title = " ".join(title.group(1).split())[:200]
+                    print(f"response_kind=html title={normalized_title}")
+                else:
+                    print("response_kind=non_json")
+            else:
+                if isinstance(payload, dict):
+                    keys = json.dumps(sorted(str(key) for key in payload))
+                    version = json.dumps(str(payload.get("version", "")))
+                    print(f"response_kind=json_object keys={keys} version={version}")
+                else:
+                    print(f"response_kind=json_{type(payload).__name__}")
+            ' < "$response_file"; then
+                echo "response_parser=failed"
+              fi
+            }
+
+            verify_local_backend_version() {
+              endpoint="http://127.0.0.1:8001/api/version"
+              case "$LOCAL_VERIFY_MAX_ATTEMPTS" in
+                ''|*[!0-9]*|0)
+                  echo "DEPLOY_LOCAL_VERIFY_MAX_ATTEMPTS must be a positive integer"
+                  return 1
+                  ;;
+              esac
+              case "$LOCAL_VERIFY_SLEEP_SECONDS" in
+                ''|*[!0-9]*|0)
+                  echo "DEPLOY_LOCAL_VERIFY_SLEEP_SECONDS must be a positive integer"
+                  return 1
+                  ;;
+              esac
+
+              response_file=$(mktemp)
+              headers_file=$(mktemp)
+              error_file=$(mktemp)
+
+              attempt=1
+              while [ "$attempt" -le "$LOCAL_VERIFY_MAX_ATTEMPTS" ]; do
+                if http_status=$(curl --silent --show-error --location \
+                  --connect-timeout 5 --max-time 10 \
+                  --header 'Accept: application/json' \
+                  --header 'Cache-Control: no-cache' \
+                  --output "$response_file" \
+                  --dump-header "$headers_file" \
+                  --write-out '%{http_code}' \
+                  "$endpoint" 2>"$error_file"); then
+                  curl_status=0
+                else
+                  curl_status=$?
+                fi
+
+                content_type=$(awk 'tolower($0) ~ /^content-type:/ { value=$0 } END { sub(/^[^:]*:[[:space:]]*/, "", value); sub(/\r$/, "", value); print value }' "$headers_file")
+                if deployed_version=$(docker run --rm -i --entrypoint python "$BACKEND_IMAGE" -c 'import json, re, sys; payload = json.load(sys.stdin); version = payload.get("version", "") if isinstance(payload, dict) else ""; print(version if isinstance(version, str) and re.fullmatch(r"\d{4}\.\d{2}\.\d{2}\.\d+", version) else "")' < "$response_file" 2>/dev/null); then
+                  parser_status=0
+                else
+                  parser_status=$?
+                  deployed_version=""
+                fi
+
+                if [ "$curl_status" -eq 0 ] && [ "$http_status" -ge 200 ] && [ "$http_status" -lt 300 ] && [ "$deployed_version" = "$TARGET_VERSION" ]; then
+                  echo "Local backend version verified: $deployed_version"
+                  rm -f "$response_file" "$headers_file" "$error_file"
+                  return 0
+                fi
+
+                curl_error=$(tr -d '\n' < "$error_file")
+                echo "Local version check attempt $attempt/$LOCAL_VERIFY_MAX_ATTEMPTS: curl_exit=$curl_status parser_exit=$parser_status http_status=${http_status:-000} content_type=${content_type:-unknown} expected=$TARGET_VERSION actual=${deployed_version:-missing} error=${curl_error:-none}"
+                describe_version_response "$response_file"
+                if [ "$attempt" -lt "$LOCAL_VERIFY_MAX_ATTEMPTS" ]; then
+                  sleep "$LOCAL_VERIFY_SLEEP_SECONDS"
+                fi
+                attempt=$((attempt + 1))
+              done
+
+              rm -f "$response_file" "$headers_file" "$error_file"
+              echo "Local backend version verification failed"
+              return 1
             }
 
             download_gpu_compose_override() {
@@ -651,7 +747,13 @@ jobs:
 
             if [ -n "$DEPLOY_PATH" ] && [ -d "$DEPLOY_PATH" ]; then
               echo "Deploying from configured compose path: $DEPLOY_PATH"
-              deploy_from_compose_path "$DEPLOY_PATH"
+              if ! deploy_from_compose_path "$DEPLOY_PATH"; then
+                exit 1
+              fi
+              if ! verify_local_backend_version; then
+                print_backend_diagnostics
+                exit 1
+              fi
               exit 0
             fi
 
@@ -661,7 +763,13 @@ jobs:
 
             if resolve_from_portainer_volume; then
               echo "Configured host path unavailable, deploying compose from Portainer volume $PORTAINER_VOLUME (stack $STACK_ID)"
-              deploy_from_portainer_volume
+              if ! deploy_from_portainer_volume; then
+                exit 1
+              fi
+              if ! verify_local_backend_version; then
+                print_backend_diagnostics
+                exit 1
+              fi
               exit 0
             fi
 
@@ -682,6 +790,8 @@ jobs:
           MAX_ATTEMPTS: ${{ vars.DEPLOY_VERIFY_MAX_ATTEMPTS || '30' }}
           SLEEP_SECONDS: ${{ vars.DEPLOY_VERIFY_SLEEP_SECONDS || '10' }}
         run: |
+          set -u
+
           if [ -z "$VERSION_ENDPOINT_URL" ]; then
             echo "Missing PRODUCTION_VERSION_URL secret"
             exit 1
@@ -692,26 +802,73 @@ jobs:
             exit 1
           fi
 
+          response_file=$(mktemp)
+          headers_file=$(mktemp)
+          error_file=$(mktemp)
+          trap 'rm -f "$response_file" "$headers_file" "$error_file"' EXIT
+
+          describe_response() {
+            python3 - "$response_file" <<'PY'
+          import hashlib
+          import json
+          import re
+          import sys
+
+          path = sys.argv[1]
+          with open(path, "rb") as file:
+              body = file.read()
+
+          print(f"response_bytes={len(body)} response_sha256={hashlib.sha256(body).hexdigest()}")
+          try:
+              payload = json.loads(body)
+          except (json.JSONDecodeError, UnicodeDecodeError):
+              text = body.decode("utf-8", errors="replace")
+              title = re.search(r"<title[^>]*>(.*?)</title>", text, re.IGNORECASE | re.DOTALL)
+              if title:
+                  normalized_title = " ".join(title.group(1).split())[:200]
+                  print(f"response_kind=html title={normalized_title}")
+              else:
+                  print("response_kind=non_json")
+          else:
+              if isinstance(payload, dict):
+                  keys = json.dumps(sorted(str(key) for key in payload))
+                  version = json.dumps(str(payload.get("version", "")))
+                  print(f"response_kind=json_object keys={keys} version={version}")
+              else:
+                  print(f"response_kind=json_{type(payload).__name__}")
+          PY
+          }
+
           attempt=1
           while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
-            response=$(curl --show-error --silent --fail --max-time 10 "$VERSION_ENDPOINT_URL" 2>/tmp/version-check.err || true)
-            deployed_version=$(python -c "import json,sys; data=json.load(sys.stdin); print(data.get('version',''))" <<< "$response" 2>/dev/null || true)
+            : > "$response_file"
+            : > "$headers_file"
+            : > "$error_file"
+            if http_status=$(curl --silent --show-error --location \
+              --connect-timeout 5 --max-time 10 \
+              --header 'Accept: application/json' \
+              --header 'Cache-Control: no-cache' \
+              --header 'Pragma: no-cache' \
+              --output "$response_file" \
+              --dump-header "$headers_file" \
+              --write-out '%{http_code}' \
+              "$VERSION_ENDPOINT_URL" 2>"$error_file"); then
+              curl_status=0
+            else
+              curl_status=$?
+            fi
 
-            if [ "$deployed_version" = "$EXPECTED_VERSION" ]; then
+            content_type=$(awk 'tolower($0) ~ /^content-type:/ { value=$0 } END { sub(/^[^:]*:[[:space:]]*/, "", value); sub(/\r$/, "", value); print value }' "$headers_file")
+            deployed_version=$(python3 -c 'import json, re, sys; payload = json.load(sys.stdin); version = payload.get("version", "") if isinstance(payload, dict) else ""; print(version if isinstance(version, str) and re.fullmatch(r"\d{4}\.\d{2}\.\d{2}\.\d+", version) else "")' < "$response_file" 2>/dev/null || true)
+
+            if [ "$curl_status" -eq 0 ] && [ "$http_status" -ge 200 ] && [ "$http_status" -lt 300 ] && [ "$deployed_version" = "$EXPECTED_VERSION" ]; then
               echo "Deployment version verified: $deployed_version"
               exit 0
             fi
 
-            if [ -n "$deployed_version" ]; then
-              echo "Attempt $attempt/$MAX_ATTEMPTS: expected $EXPECTED_VERSION, got $deployed_version"
-            else
-              curl_error=$(tr -d '\n' </tmp/version-check.err)
-              if [ -n "$curl_error" ]; then
-                echo "Attempt $attempt/$MAX_ATTEMPTS: version endpoint unreachable ($curl_error)"
-              else
-                echo "Attempt $attempt/$MAX_ATTEMPTS: version endpoint not ready"
-              fi
-            fi
+            curl_error=$(tr -d '\n' < "$error_file")
+            echo "Attempt $attempt/$MAX_ATTEMPTS: curl_exit=$curl_status http_status=${http_status:-000} content_type=${content_type:-unknown} expected=$EXPECTED_VERSION actual=${deployed_version:-missing} error=${curl_error:-none}"
+            describe_response
 
             sleep "$SLEEP_SECONDS"
             attempt=$((attempt + 1))
