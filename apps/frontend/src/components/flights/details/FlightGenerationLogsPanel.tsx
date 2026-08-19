@@ -3,6 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { VideoExportStatusPayload } from '../../../hooks/flights/useVideoExportStatus';
+import type { YoutubeUploadJob } from '../../../hooks/flights/useYoutubeUpload';
 import type { GoproOverlayJob } from '../../../hooks/gopro/useGoproOverlay';
 import { isGoproOverlayInProgress } from '../../../lib/flightMediaState';
 import { JobLogViewer } from '../job-logs/JobLogViewer';
@@ -16,6 +17,7 @@ type FlightGenerationLogsPanelProps = {
   goproOverlayJobId?: string | null;
   goproOverlayFallbackStatus?: string | null;
   goproOverlayFallbackProgress?: number | null;
+  youtubeUploadJob: YoutubeUploadJob | null;
 };
 
 type LogSourceCardProps = {
@@ -181,6 +183,7 @@ export function FlightGenerationLogsPanel({
   goproOverlayJobId,
   goproOverlayFallbackStatus,
   goproOverlayFallbackProgress,
+  youtubeUploadJob,
 }: FlightGenerationLogsPanelProps) {
   const { t } = useTranslation();
   const videoStatusValue =
@@ -196,8 +199,13 @@ export function FlightGenerationLogsPanel({
   const hasGoproOverlayLogSource = Boolean(
     goproOverlayStatusValue || goproOverlayJob?.job_id || goproOverlayJobId
   );
+  const hasYoutubeUploadLogSource = Boolean(youtubeUploadJob?.job_id);
 
-  if (!hasVideoLogSource && !hasGoproOverlayLogSource) {
+  if (
+    !hasVideoLogSource &&
+    !hasGoproOverlayLogSource &&
+    !hasYoutubeUploadLogSource
+  ) {
     return null;
   }
 
@@ -249,6 +257,22 @@ export function FlightGenerationLogsPanel({
             message={goproOverlayJob?.message}
             error={goproOverlayJob?.error}
             logs={goproOverlayJob?.log_tail}
+          />
+        )}
+        {hasYoutubeUploadLogSource && youtubeUploadJob && (
+          <LogSourceCard
+            key={`youtube-${youtubeUploadJob.job_id}`}
+            title={t('flights.generationLogs.youtubeUploadTitle')}
+            status={youtubeUploadJob.status}
+            isInProgress={['queued', 'uploading'].includes(
+              youtubeUploadJob.status
+            )}
+            statusLabel={t(
+              `flights.generationLogs.status.${youtubeUploadJob.status}`
+            )}
+            progress={youtubeUploadJob.progress}
+            error={youtubeUploadJob.error}
+            logs={youtubeUploadJob.log_tail}
           />
         )}
       </div>

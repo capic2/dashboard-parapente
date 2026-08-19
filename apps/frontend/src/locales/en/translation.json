@@ -1100,9 +1100,10 @@
     },
     "generationLogs": {
       "title": "Generation logs",
-      "description": "Readable tracking for both media jobs linked to this flight.",
+      "description": "Readable tracking for media processing and publishing linked to this flight.",
       "videoTitle": "Flight video",
       "goproOverlayTitle": "GoPro overlay",
+      "youtubeUploadTitle": "YouTube upload",
       "method": {
         "cpu": "CPU",
         "gpu": "GPU"
@@ -1123,6 +1124,7 @@
       },
       "status": {
         "queued": "Queued",
+        "uploading": "Uploading",
         "processing": "Running",
         "started": "Started",
         "running": "Running",

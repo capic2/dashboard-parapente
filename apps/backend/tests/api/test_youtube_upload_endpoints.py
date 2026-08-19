@@ -91,6 +91,37 @@ def test_start_youtube_upload_creates_durable_job(
     assert enqueued == [job.id]
 
 
+def test_get_youtube_upload_includes_recent_job_logs(
+    client, db_session, sample_flight, tmp_path, monkeypatch
+):
+    job = YoutubeUploadJob(
+        id="youtube-job-with-logs",
+        flight_id=sample_flight.id,
+        user_id=1,
+        status="uploading",
+        progress=42,
+        title="Envoi journalisé",
+        description="",
+        privacy_status="private",
+    )
+    db_session.add(job)
+    db_session.commit()
+    log_path = tmp_path / "youtube-job-with-logs.log"
+    log_path.write_text("Upload queued\nUpload progress: 42%\n")
+    monkeypatch.setattr(youtube_upload, "_youtube_upload_log_path", lambda _job_id: log_path)
+
+    response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload")
+
+    assert response.status_code == 200
+    assert response.json()["log_tail"] == ["Upload queued", "Upload progress: 42%"]
+
+
+def test_youtube_upload_log_errors_redact_urls():
+    error = RuntimeError("Upload failed at https://www.googleapis.com/upload/session-secret")
+
+    assert youtube_upload._safe_log_error(error) == "Upload failed at [redacted-url]"
+
+
 def test_start_youtube_upload_rejects_flight_with_existing_youtube_video(
     client, db_session, sample_flight, tmp_path, monkeypatch
 ):

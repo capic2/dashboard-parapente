@@ -19,6 +19,7 @@ import {
   useUploadGPXToFlight,
 } from '../../../hooks/flights/useFlights';
 import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
+import { useYoutubeUpload } from '../../../hooks/flights/useYoutubeUpload';
 import {
   useCreateFlightGoproOverlayJob,
   useGoproOverlayJobStream,
@@ -141,6 +142,7 @@ export function FlightDetails({
     flight.video_export_job_id,
     Boolean(flight.video_export_job_id)
   );
+  const { data: youtubeUploadJob = null } = useYoutubeUpload(flight.id);
   const goproOverlayStatus =
     goproOverlayJob?.status ??
     activePersistedGoproOverlay?.status ??
@@ -530,7 +532,8 @@ export function FlightDetails({
     goproOverlayJob?.job_id ||
     effectiveGoproOverlayJobId ||
     flight.gopro_overlay_status ||
-    persistedGoproOverlays.length > 0
+    persistedGoproOverlays.length > 0 ||
+    youtubeUploadJob?.job_id
   );
   const visibleActiveTab =
     !hasGenerationLogs && activeTab === 'logs' ? 'infos' : activeTab;
@@ -755,6 +758,7 @@ export function FlightDetails({
       goproOverlayJobId={effectiveGoproOverlayJobId}
       goproOverlayFallbackStatus={flight.gopro_overlay_status}
       goproOverlayFallbackProgress={flight.gopro_overlay_progress}
+      youtubeUploadJob={youtubeUploadJob}
     />
   );
 
