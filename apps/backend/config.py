@@ -95,13 +95,9 @@ def _intervals_sync_enabled(api_key: str | None) -> bool:
 
 
 def _youtube_upload_chunk_size() -> int:
-    chunk_size = _int_env_at_least(
-        "BACKEND_YOUTUBE_UPLOAD_CHUNK_SIZE", 8 * 1024 * 1024, 256 * 1024
-    )
+    chunk_size = _int_env_at_least("BACKEND_YOUTUBE_UPLOAD_CHUNK_SIZE", 8 * 1024 * 1024, 256 * 1024)
     if chunk_size % (256 * 1024) != 0:
-        raise ValueError(
-            "BACKEND_YOUTUBE_UPLOAD_CHUNK_SIZE must be a multiple of 256 KiB"
-        )
+        raise ValueError("BACKEND_YOUTUBE_UPLOAD_CHUNK_SIZE must be a multiple of 256 KiB")
     return chunk_size
 
 
@@ -125,9 +121,7 @@ JOB_QUEUE_BACKEND = os.getenv(
     _default_job_queue_backend(),
 ).lower()
 JOB_QUEUE_NAME = os.getenv("BACKEND_JOB_QUEUE_NAME", "video_exports")
-YOUTUBE_UPLOAD_QUEUE_NAME = os.getenv(
-    "BACKEND_YOUTUBE_UPLOAD_QUEUE_NAME", "youtube_uploads"
-)
+YOUTUBE_UPLOAD_QUEUE_NAME = os.getenv("BACKEND_YOUTUBE_UPLOAD_QUEUE_NAME", "youtube_uploads")
 GOPRO_OVERLAY_QUEUE_NAME = os.getenv("BACKEND_GOPRO_OVERLAY_QUEUE_NAME", "gopro_overlays")
 GOPRO_PREVIEW_QUEUE_NAME = os.getenv("BACKEND_GOPRO_PREVIEW_QUEUE_NAME", "gopro_previews")
 JOB_QUEUE_TIMEOUT_SECONDS = int(os.getenv("BACKEND_JOB_QUEUE_TIMEOUT_SECONDS", "21600"))
@@ -342,11 +336,11 @@ GOPRO_PREVIEW_TIMEOUT_SECONDS = _int_env_at_least("BACKEND_GOPRO_PREVIEW_TIMEOUT
 # VALIDATION
 # ============================================================================
 
-# Valider les variables critiques (sauf en mode test)
-if not IS_TEST_ENV:
-    if not JWT_SECRET:
-        logger.error("❌ BACKEND_JWT_SECRET is required")
-        raise ValueError("BACKEND_JWT_SECRET environment variable is required")
+
+def validate_api_configuration() -> None:
+    """Validate configuration required specifically by the HTTP API."""
+    if IS_TEST_ENV:
+        return
 
     if not WEATHERAPI_KEY:
         logger.error("❌ WEATHERAPI_KEY is required")
@@ -354,6 +348,13 @@ if not IS_TEST_ENV:
 
     if not METEOBLUE_API_KEY:
         logger.warning("⚠️ METEOBLUE_API_KEY is missing")
+
+
+# Valider les variables critiques (sauf en mode test)
+if not IS_TEST_ENV:
+    if not JWT_SECRET:
+        logger.error("❌ BACKEND_JWT_SECRET is required")
+        raise ValueError("BACKEND_JWT_SECRET environment variable is required")
 
     if ENVIRONMENT == "production" and not METRICS_TOKEN:
         logger.error("❌ BACKEND_METRICS_TOKEN is required in production")

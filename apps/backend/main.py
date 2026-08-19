@@ -466,6 +466,7 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger.info("🚀 Starting Dashboard Parapente API...")
+    config.validate_api_configuration()
 
     try:
         initialize_deployment_version()

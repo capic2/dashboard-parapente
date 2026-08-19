@@ -1,9 +1,39 @@
+import os
+import subprocess
+import sys
+from pathlib import Path
 from unittest.mock import Mock
 
 import config
 import job_queue
 import youtube_upload
 import youtube_upload_worker
+
+
+def test_worker_import_does_not_require_weatherapi_key() -> None:
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "ENVIRONMENT": "production",
+            "TESTING": "false",
+            "BACKEND_DATABASE_URL": "sqlite:///worker-import.db",
+            "BACKEND_LOG_FILE": "/tmp/youtube-worker-import.log",
+            "BACKEND_JWT_SECRET": "worker-import-secret",
+            "BACKEND_METRICS_TOKEN": "worker-import-metrics",
+        }
+    )
+    environment.pop("BACKEND_WEATHERAPI_KEY", None)
+
+    result = subprocess.run(
+        [sys.executable, "-c", "import youtube_upload_worker"],
+        cwd=Path(youtube_upload_worker.__file__).parent,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 def test_upload_jobs_are_enqueued_on_dedicated_queue(monkeypatch) -> None:

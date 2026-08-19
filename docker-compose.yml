@@ -274,6 +274,7 @@ services:
     volumes:
       - /home/capic/docker-data/dashboard-parapente/db:/app/db
       - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
+      - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
     healthcheck:
       test:
         [

@@ -76,6 +76,7 @@ async def test_lifespan_starts_schedulers_when_enabled():
             return None
 
     with (
+        patch("main.config.validate_api_configuration") as mock_validate_configuration,
         patch("main.config.SCHEDULER_ENABLED", True),
         patch("app_settings.reload_cache") as mock_reload_cache,
         patch("main.SessionLocal") as mock_session_local,
@@ -95,6 +96,7 @@ async def test_lifespan_starts_schedulers_when_enabled():
         cm = lifespan(app)
         await cm.__aenter__()
 
+        mock_validate_configuration.assert_called_once_with()
         mock_trigger_cache_warmup.assert_called_once()
         mock_reload_cache.assert_called_once()
         mock_start_weather_scheduler.assert_called_once()
