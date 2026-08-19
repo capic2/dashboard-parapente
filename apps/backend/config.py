@@ -125,6 +125,9 @@ JOB_QUEUE_BACKEND = os.getenv(
     _default_job_queue_backend(),
 ).lower()
 JOB_QUEUE_NAME = os.getenv("BACKEND_JOB_QUEUE_NAME", "video_exports")
+YOUTUBE_UPLOAD_QUEUE_NAME = os.getenv(
+    "BACKEND_YOUTUBE_UPLOAD_QUEUE_NAME", "youtube_uploads"
+)
 GOPRO_OVERLAY_QUEUE_NAME = os.getenv("BACKEND_GOPRO_OVERLAY_QUEUE_NAME", "gopro_overlays")
 GOPRO_PREVIEW_QUEUE_NAME = os.getenv("BACKEND_GOPRO_PREVIEW_QUEUE_NAME", "gopro_previews")
 JOB_QUEUE_TIMEOUT_SECONDS = int(os.getenv("BACKEND_JOB_QUEUE_TIMEOUT_SECONDS", "21600"))

@@ -43,6 +43,7 @@ services:
       - BACKEND_USE_FAKE_REDIS=${BACKEND_USE_FAKE_REDIS:-false}
       - BACKEND_JOB_QUEUE_BACKEND=${BACKEND_JOB_QUEUE_BACKEND:-rq}
       - BACKEND_JOB_QUEUE_NAME=${BACKEND_JOB_QUEUE_NAME:-video_exports}
+      - BACKEND_YOUTUBE_UPLOAD_QUEUE_NAME=${BACKEND_YOUTUBE_UPLOAD_QUEUE_NAME:-youtube_uploads}
       - BACKEND_GOPRO_OVERLAY_QUEUE_NAME=${BACKEND_GOPRO_OVERLAY_QUEUE_NAME:-gopro_overlays}
       - BACKEND_GOPRO_PREVIEW_QUEUE_NAME=${BACKEND_GOPRO_PREVIEW_QUEUE_NAME:-gopro_previews}
 
@@ -191,10 +192,6 @@ services:
       - BACKEND_LOG_FILE=${BACKEND_LOG_FILE:?BACKEND_LOG_FILE is required}
       - BACKEND_METRICS_TOKEN=${BACKEND_METRICS_TOKEN:?required}
       - BACKEND_JWT_SECRET=${BACKEND_JWT_SECRET:?required}
-      - BACKEND_YOUTUBE_CLIENT_ID=${BACKEND_YOUTUBE_CLIENT_ID:-}
-      - BACKEND_YOUTUBE_CLIENT_SECRET=${BACKEND_YOUTUBE_CLIENT_SECRET:-}
-      - BACKEND_YOUTUBE_REDIRECT_URI=${BACKEND_YOUTUBE_REDIRECT_URI:-}
-      - BACKEND_YOUTUBE_UPLOAD_CHUNK_SIZE=${BACKEND_YOUTUBE_UPLOAD_CHUNK_SIZE:-8388608}
       - BACKEND_WEATHERAPI_KEY=${BACKEND_WEATHERAPI_KEY}
       - BACKEND_METEOBLUE_API_KEY=${BACKEND_METEOBLUE_API_KEY}
       # localhost inside this container is not the API container.
@@ -226,6 +223,57 @@ services:
       - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
       - ${VIDEO_TEMP_IMAGES_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/video-temp-images}:${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
       - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'python -c "from job_queue import get_redis_connection; get_redis_connection().ping()"',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    networks:
+      - parapente-network
+
+  youtube-upload-worker:
+    image: ${BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
+    container_name: parapente-youtube-upload-worker
+    restart: unless-stopped
+    command: ['python', 'youtube_upload_worker.py']
+    labels:
+      project: dashboard-parapente
+      service: youtube-upload-worker
+      env: ${ENVIRONMENT:-production}
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - BACKEND_DATABASE_URL=${BACKEND_DATABASE_URL:?BACKEND_DATABASE_URL is required}
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
+      - BACKEND_REDIS_HOST=redis
+      - BACKEND_REDIS_PORT=6379
+      - BACKEND_USE_FAKE_REDIS=${BACKEND_USE_FAKE_REDIS:-false}
+      - BACKEND_JOB_QUEUE_BACKEND=${BACKEND_JOB_QUEUE_BACKEND:-rq}
+      - BACKEND_JOB_QUEUE_NAME=${BACKEND_JOB_QUEUE_NAME:-video_exports}
+      - BACKEND_YOUTUBE_UPLOAD_QUEUE_NAME=${BACKEND_YOUTUBE_UPLOAD_QUEUE_NAME:-youtube_uploads}
+      - BACKEND_JOB_QUEUE_TIMEOUT_SECONDS=${BACKEND_JOB_QUEUE_TIMEOUT_SECONDS:-21600}
+      - BACKEND_LOG_LEVEL=${BACKEND_LOG_LEVEL:-INFO}
+      - BACKEND_LOG_FILE=${BACKEND_LOG_FILE:?BACKEND_LOG_FILE is required}
+      - BACKEND_METRICS_TOKEN=${BACKEND_METRICS_TOKEN:?required}
+      - BACKEND_JWT_SECRET=${BACKEND_JWT_SECRET:?required}
+      - BACKEND_YOUTUBE_CLIENT_ID=${BACKEND_YOUTUBE_CLIENT_ID:-}
+      - BACKEND_YOUTUBE_CLIENT_SECRET=${BACKEND_YOUTUBE_CLIENT_SECRET:-}
+      - BACKEND_YOUTUBE_REDIRECT_URI=${BACKEND_YOUTUBE_REDIRECT_URI:-}
+      - BACKEND_YOUTUBE_UPLOAD_CHUNK_SIZE=${BACKEND_YOUTUBE_UPLOAD_CHUNK_SIZE:-8388608}
+      - BACKEND_VIDEO_EXPORT_DIR=${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
+      - BACKEND_VERSION_STATE_FILE=${BACKEND_VERSION_STATE_FILE:?BACKEND_VERSION_STATE_FILE is required}
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    volumes:
+      - /home/capic/docker-data/dashboard-parapente/db:/app/db
+      - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
     healthcheck:
       test:
         [

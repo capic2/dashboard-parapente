@@ -489,6 +489,7 @@ jobs:
               for container_name in \
                 parapente-backend \
                 parapente-backend-worker \
+                parapente-youtube-upload-worker \
                 parapente-gopro-overlay-worker \
                 parapente-redis; do
                 if ! docker inspect "$container_name" >/dev/null 2>&1; then
@@ -503,6 +504,8 @@ jobs:
 
               echo "Recent backend logs"
               docker logs --tail 200 parapente-backend 2>&1 || true
+              echo "Recent YouTube upload worker logs"
+              docker logs --tail 200 parapente-youtube-upload-worker 2>&1 || true
             }
 
             download_gpu_compose_override() {
@@ -564,8 +567,8 @@ jobs:
               export BACKEND_IMAGE
               export BACKEND_DEPLOY_VERSION="$TARGET_VERSION"
 
-              if ! compose_cmd pull backend backend-worker gopro-overlay-worker redis ||
-                ! compose_cmd up -d --force-recreate --remove-orphans backend backend-worker gopro-overlay-worker redis; then
+              if ! compose_cmd pull backend backend-worker youtube-upload-worker gopro-overlay-worker redis ||
+                ! compose_cmd up -d --force-recreate --remove-orphans backend backend-worker youtube-upload-worker gopro-overlay-worker redis; then
                 print_backend_diagnostics
                 return 1
               fi
@@ -638,8 +641,8 @@ jobs:
                   export BACKEND_IMAGE
                   export BACKEND_DEPLOY_VERSION="$TARGET_VERSION"
 
-                  compose_cmd pull backend backend-worker gopro-overlay-worker redis
-                  compose_cmd up -d --force-recreate --remove-orphans backend backend-worker gopro-overlay-worker redis
+                  compose_cmd pull backend backend-worker youtube-upload-worker gopro-overlay-worker redis
+                  compose_cmd up -d --force-recreate --remove-orphans backend backend-worker youtube-upload-worker gopro-overlay-worker redis
                 '; then
                 print_backend_diagnostics
                 return 1

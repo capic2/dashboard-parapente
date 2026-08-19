@@ -408,8 +408,19 @@ def _enqueue_rq(job_id: str) -> None:
         job_id,
         job_id=f"youtube-upload-{job_id}",
         timeout=config.JOB_QUEUE_TIMEOUT_SECONDS,
-        queue_name=config.JOB_QUEUE_NAME,
+        queue_name=config.YOUTUBE_UPLOAD_QUEUE_NAME,
     )
+
+
+def _remove_legacy_rq_job(job_id: str) -> None:
+    """Remove a pending upload that was enqueued on the shared video queue."""
+    from job_queue import delete_job, get_queue
+
+    rq_job_id = f"youtube-upload-{job_id}"
+    existing_job = get_queue(config.JOB_QUEUE_NAME).fetch_job(rq_job_id)
+    if existing_job is None or existing_job.origin == config.YOUTUBE_UPLOAD_QUEUE_NAME:
+        return
+    delete_job(rq_job_id, queue_name=existing_job.origin or config.JOB_QUEUE_NAME)
 
 
 def enqueue_youtube_upload(job_id: str) -> None:
@@ -425,7 +436,9 @@ def enqueue_youtube_upload(job_id: str) -> None:
     _EXECUTOR.submit(process_youtube_upload, job_id)
 
 
-def enqueue_pending_youtube_uploads(*, recover_active: bool = False) -> int:
+def enqueue_pending_youtube_uploads(
+    *, recover_active: bool = False, migrate_legacy_queue: bool = False
+) -> int:
     with SessionLocal() as db:
         jobs = (
             db.query(YoutubeUploadJob)
@@ -439,5 +452,7 @@ def enqueue_pending_youtube_uploads(*, recover_active: bool = False) -> int:
             db.commit()
         job_ids = [job.id for job in jobs]
     for job_id in job_ids:
+        if migrate_legacy_queue:
+            _remove_legacy_rq_job(job_id)
         enqueue_youtube_upload(job_id)
     return len(job_ids)
