@@ -5,9 +5,11 @@ import os
 import time
 from collections import deque
 from datetime import datetime
+from types import SimpleNamespace
 from urllib.error import URLError
 
 import pytest
+from sqlalchemy.exc import SQLAlchemyError
 
 from auth import create_access_token, create_job_token, decode_job_token
 from deployment_drain import DeploymentDrainActive, deployment_drain
@@ -1111,7 +1113,6 @@ def test_cancel_queued_video_export_removes_rq_job(test_db, monkeypatch):
         "_delete_rq_video_export_job",
         lambda job_id: deleted_rq_jobs.append(job_id) or True,
     )
-
     db_session = test_db()
     db_session.add(
         VideoExportJob(
@@ -1337,6 +1338,111 @@ def test_cleanup_temp_dir_removes_nested_files(tmp_path):
     video_export_manual._cleanup_temp_dir(temp_dir)
 
     assert not temp_dir.exists()
+
+
+def test_cleanup_job_temp_dirs_removes_configured_and_legacy_dirs(tmp_path, monkeypatch):
+    configured_root = tmp_path / "configured-temp"
+    legacy_root = tmp_path / "legacy-temp"
+    job_id = "job-123"
+    for temp_root in (configured_root, legacy_root):
+        frames_dir = temp_root / job_id / "frames"
+        frames_dir.mkdir(parents=True)
+        (frames_dir / "frame00001.png").write_bytes(b"frame")
+
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: configured_root)
+    monkeypatch.setattr(video_export_manual, "_video_legacy_temp_images_dir", lambda: legacy_root)
+
+    video_export_manual._cleanup_job_temp_dirs(job_id)
+
+    assert not (configured_root / job_id).exists()
+    assert not (legacy_root / job_id).exists()
+
+
+@pytest.mark.asyncio
+async def test_manual_export_preserves_temp_frames_after_resumable_failure(tmp_path, monkeypatch):
+    configured_root = tmp_path / "configured-temp"
+    legacy_root = tmp_path / "legacy-temp"
+    job_id = "job-failed"
+    for temp_root in (configured_root, legacy_root):
+        frames_dir = temp_root / job_id / "frames"
+        frames_dir.mkdir(parents=True)
+        (frames_dir / "frame00001.png").write_bytes(b"frame")
+
+    job = SimpleNamespace(
+        id=job_id,
+        status="failed",
+        total_frames=10,
+        quality="1080p",
+        fps=15,
+        speed=1,
+        mode="manual",
+        flight_id="flight-test-001",
+        frontend_url="http://localhost:5173",
+        auth_token=None,
+    )
+
+    async def fail_preflight(_url):
+        raise RuntimeError("preflight failed")
+
+    monkeypatch.setattr(video_export_manual, "_get_job", lambda _job_id: job)
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: configured_root)
+    monkeypatch.setattr(video_export_manual, "_video_legacy_temp_images_dir", lambda: legacy_root)
+    monkeypatch.setattr(video_export_manual, "_ensure_export_viewer_reachable", fail_preflight)
+    monkeypatch.setattr(video_export_manual, "_update_job", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(video_export_manual, "_set_job_runtime", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(video_export_manual, "_log_job", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(video_export_manual, "_clear_job_cancel_requested", lambda _job_id: None)
+    monkeypatch.setattr(video_export_manual, "_clear_job_auth_token", lambda _job_id: None)
+
+    await video_export_manual._export_video_manual_render(job_id)
+
+    assert (configured_root / job_id).exists()
+    assert (legacy_root / job_id).exists()
+
+
+def test_cleanup_job_temp_dirs_removes_non_resumable_failure(tmp_path, monkeypatch):
+    configured_root = tmp_path / "configured-temp"
+    legacy_root = tmp_path / "legacy-temp"
+    job_id = "job-failed-without-frames"
+    temp_dir = configured_root / job_id
+    temp_dir.mkdir(parents=True)
+    (temp_dir / "encoding.mp4").write_bytes(b"partial video")
+    job = SimpleNamespace(id=job_id, status="failed", total_frames=10)
+
+    monkeypatch.setattr(video_export_manual, "_get_job", lambda _job_id: job)
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: configured_root)
+    monkeypatch.setattr(video_export_manual, "_video_legacy_temp_images_dir", lambda: legacy_root)
+
+    video_export_manual._cleanup_job_temp_dirs_unless_resumable(job_id)
+
+    assert not temp_dir.exists()
+
+
+def test_cleanup_job_temp_dirs_is_non_fatal_when_job_inspection_fails(monkeypatch):
+    cleanup_calls: list[str] = []
+    log_messages: list[str] = []
+
+    def fail_job_lookup(_job_id):
+        raise SQLAlchemyError("database unavailable")
+
+    monkeypatch.setattr(video_export_manual, "_get_job", fail_job_lookup)
+    monkeypatch.setattr(
+        video_export_manual,
+        "_cleanup_job_temp_dirs",
+        lambda job_id: cleanup_calls.append(job_id),
+    )
+    monkeypatch.setattr(
+        video_export_manual,
+        "_log_job",
+        lambda _job_id, message: log_messages.append(message),
+    )
+
+    video_export_manual._cleanup_job_temp_dirs_unless_resumable("job-123")
+
+    assert cleanup_calls == []
+    assert log_messages == [
+        "Unable to inspect temporary video files for cleanup: database unavailable"
+    ]
 
 
 def test_stream_export_paths_use_configured_storage_dirs(tmp_path, monkeypatch):

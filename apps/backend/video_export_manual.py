@@ -21,6 +21,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 import config
@@ -1085,6 +1086,28 @@ def _prepare_export_dirs(export_root: Path, temp_dir: Path, frames_dir: Path) ->
 
 def _job_temp_dir(temp_root: Path, job_id: str) -> Path:
     return temp_root / job_id
+
+
+def _cleanup_job_temp_dirs(job_id: str) -> None:
+    """Remove every temporary frame directory associated with an export job."""
+    temp_roots = {
+        _video_temp_images_dir().resolve(strict=False),
+        _video_legacy_temp_images_dir().resolve(strict=False),
+    }
+    for temp_root in temp_roots:
+        _cleanup_temp_dir(_job_temp_dir(temp_root, job_id))
+
+
+def _cleanup_job_temp_dirs_unless_resumable(job_id: str) -> None:
+    """Remove job artifacts unless captured frames can resume a terminal job."""
+    try:
+        job = _get_job(job_id)
+        if job and _job_resume_info(job)["can_resume"]:
+            return
+    except (OSError, SQLAlchemyError) as exc:
+        _log_job(job_id, f"Unable to inspect temporary video files for cleanup: {exc}")
+        return
+    _cleanup_job_temp_dirs(job_id)
 
 
 def _job_frames_dir(temp_root: Path, job_id: str) -> Path:
@@ -2166,8 +2189,6 @@ async def _export_video_manual_render(job_id: str):
             await asyncio.to_thread(shutil.move, str(encoding_output_file), str(output_file))
             _log_job(job_id, f"Video encoded: {output_file}")
 
-            _cleanup_temp_dir(temp_dir)
-
             file_size_mb = output_file.stat().st_size / (1024 * 1024)
             _update_job(
                 job_id,
@@ -2201,6 +2222,7 @@ async def _export_video_manual_render(job_id: str):
             await ffmpeg_process.wait()
         if ffmpeg_stderr_task is not None:
             await asyncio.gather(ffmpeg_stderr_task, return_exceptions=True)
+        _cleanup_job_temp_dirs_unless_resumable(job_id)
         _clear_job_cancel_requested(job_id)
         _clear_job_auth_token(job_id)
 
