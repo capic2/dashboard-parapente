@@ -478,6 +478,7 @@ class YoutubeUploadJobResponse(BaseModel):
     progress: int = Field(ge=0, le=100)
     youtube_url: str | None = None
     error: str | None = None
+    log_tail: list[str] = Field(default_factory=list)
 
 
 # Site info included in Flight response (for camera orientation)

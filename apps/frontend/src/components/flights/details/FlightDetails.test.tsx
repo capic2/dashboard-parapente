@@ -14,6 +14,7 @@ const {
   previewMock,
   resetOverlayMock,
   videoStatusMock,
+  youtubeUploadMock,
 } = vi.hoisted(() => ({
   apiDelete: vi.fn(),
   confirmMock: vi.fn(),
@@ -24,6 +25,7 @@ const {
   overlayJobStreamMock: { current: null as unknown },
   previewMock: { current: null as unknown },
   videoStatusMock: { current: null as unknown },
+  youtubeUploadMock: { current: null as unknown },
   mockFlight: {
     id: 'flight-1',
     flight_date: '2026-03-15',
@@ -185,6 +187,7 @@ vi.mock('react-i18next', () => ({
         'flights.generationLogs.description': 'Media job tracking',
         'flights.generationLogs.videoTitle': 'Flight video',
         'flights.generationLogs.goproOverlayTitle': 'GoPro overlay',
+        'flights.generationLogs.youtubeUploadTitle': 'YouTube upload',
         'flights.generationLogs.progress': 'Progress',
         'flights.generationLogs.error': 'Error',
         'flights.generationLogs.rawLogs': 'Raw logs',
@@ -193,6 +196,7 @@ vi.mock('react-i18next', () => ({
         'flights.generationLogs.status.running': 'Running',
         'flights.generationLogs.status.encoding': 'Encoding',
         'flights.generationLogs.status.failed': 'Failed',
+        'flights.generationLogs.status.uploading': 'Uploading',
         'flights.generationLogs.method.cpu': 'CPU',
         'flights.generationLogs.method.gpu': 'GPU',
         'flights.infoTab': 'Summary',
@@ -220,6 +224,10 @@ vi.mock('../../../hooks/flights/useFlights', () => ({
 
 vi.mock('../../../hooks/flights/useVideoExportStatus', () => ({
   useVideoExportStatus: () => ({ status: videoStatusMock.current }),
+}));
+
+vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
+  useYoutubeUpload: () => ({ data: youtubeUploadMock.current }),
 }));
 
 vi.mock('../../../hooks/gopro/useGoproOverlay', () => ({
@@ -314,6 +322,7 @@ describe('FlightDetails GoPro overlay action', () => {
     mockFlight.gpx_file_path = 'sample.gpx';
     mockFlight.youtube_urls = [];
     videoStatusMock.current = null;
+    youtubeUploadMock.current = null;
   });
 
   it('shows only the stored track file name in flight information', () => {
@@ -970,6 +979,35 @@ describe('FlightDetails GoPro overlay action', () => {
       screen.getByRole('button', { name: /GoPro overlay/u })
     ).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('Rendering overlay')).toBeInTheDocument();
+  });
+
+  it('shows YouTube upload logs in the processing tab', () => {
+    youtubeUploadMock.current = {
+      job_id: 'youtube-job',
+      flight_id: mockFlight.id,
+      status: 'uploading',
+      progress: 42,
+      youtube_url: null,
+      error: null,
+      log_tail: ['YouTube upload queued', 'YouTube upload progress: 42%'],
+    };
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    openTab('Processing');
+
+    expect(
+      screen.getByRole('button', { name: /YouTube upload/u })
+    ).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      screen.getAllByText(/YouTube upload progress: 42%/u).length
+    ).toBeGreaterThan(0);
   });
 
   it('preserves a manual toggle while a fallback-only job changes status', () => {

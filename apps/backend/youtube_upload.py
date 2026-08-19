@@ -37,6 +37,7 @@ _RANGE_PATTERN = re.compile(r"bytes=0-(\d+)")
 _EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="youtube-upload")
 _SUBMITTED: set[str] = set()
 _SUBMITTED_LOCK = threading.Lock()
+_LOG_TAIL_LINE_COUNT = 100
 
 
 class YoutubeConfigurationError(RuntimeError):
@@ -45,6 +46,36 @@ class YoutubeConfigurationError(RuntimeError):
 
 class YoutubeOAuthError(RuntimeError):
     pass
+
+
+def _youtube_upload_log_path(job_id: str) -> Path:
+    return Path(config.VIDEO_EXPORT_DIR) / ".logs" / "youtube-uploads" / f"{job_id}.log"
+
+
+def _log_job(job_id: str, message: str) -> None:
+    logger.info("YouTube upload job %s: %s", job_id, message)
+    try:
+        log_path = _youtube_upload_log_path(job_id)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        with log_path.open("a", encoding="utf-8") as log_file:
+            log_file.write(f"[{timestamp}] {message}\n")
+    except OSError:
+        logger.warning("Unable to persist logs for YouTube upload job %s", job_id)
+
+
+def _job_log_tail(job_id: str) -> list[str]:
+    log_path = _youtube_upload_log_path(job_id)
+    if not log_path.exists():
+        return []
+    try:
+        return log_path.read_text(errors="replace").splitlines()[-_LOG_TAIL_LINE_COUNT:]
+    except OSError:
+        return []
+
+
+def _safe_log_error(exc: Exception) -> str:
+    return re.sub(r"https?://\S+", "[redacted-url]", str(exc))[:1000]
 
 
 def is_configured() -> bool:
@@ -189,6 +220,7 @@ def job_payload(job: YoutubeUploadJob) -> dict[str, Any]:
         "progress": job.progress or 0,
         "youtube_url": job.youtube_url,
         "error": job.error,
+        "log_tail": _job_log_tail(job.id),
     }
 
 
@@ -255,6 +287,7 @@ def cancel_upload(db: Session, *, job_id: str, user_id: int) -> YoutubeUploadJob
     db.commit()
     if updated != 1:
         return None
+    _log_job(job_id, "YouTube upload cancelled")
 
     from job_queue import delete_job, is_rq_enabled
 
@@ -270,6 +303,7 @@ def cancel_upload(db: Session, *, job_id: str, user_id: int) -> YoutubeUploadJob
 
 
 def _start_session(job: YoutubeUploadJob, video_path: Path, access_token: str) -> str:
+    _log_job(job.id, "Creating resumable YouTube upload session")
     response = httpx.post(
         _UPLOAD_URL,
         params={"uploadType": "resumable", "part": "snippet,status"},
@@ -299,6 +333,7 @@ def _start_session(job: YoutubeUploadJob, video_path: Path, access_token: str) -
     if parsed.scheme != "https" or parsed.hostname != "www.googleapis.com":
         raise RuntimeError("YouTube returned an invalid resumable upload URL")
     _update_active_job(job.id, upload_session_encrypted=encrypt_secret(session_url))
+    _log_job(job.id, "Resumable YouTube upload session created")
     return session_url
 
 
@@ -373,11 +408,13 @@ def _finish_upload(job_id: str, video_id: str) -> None:
         if youtube_url not in urls:
             flight.youtube_urls = [*urls, youtube_url]
         db.commit()
+    _log_job(job_id, f"YouTube upload completed: {youtube_url}")
 
 
 def process_youtube_upload(job_id: str) -> None:
     """RQ/thread job target for a resumable YouTube upload."""
     try:
+        _log_job(job_id, "Starting YouTube upload")
         _require_configuration()
         with SessionLocal() as db:
             claimed = (
@@ -389,9 +426,7 @@ def process_youtube_upload(job_id: str) -> None:
                 .update(
                     {
                         "status": "uploading",
-                        "started_at": func.coalesce(
-                            YoutubeUploadJob.started_at, datetime.utcnow()
-                        ),
+                        "started_at": func.coalesce(YoutubeUploadJob.started_at, datetime.utcnow()),
                         "error": None,
                         "updated_at": datetime.utcnow(),
                     }
@@ -416,13 +451,17 @@ def process_youtube_upload(job_id: str) -> None:
         total_size = video_path.stat().st_size
         if total_size <= 0:
             raise RuntimeError("Generated flight video is empty")
+        _log_job(job_id, f"Generated video ready ({total_size} bytes)")
 
+        _log_job(job_id, "Refreshing YouTube authorization")
         access_token = _access_token(user_id)
+        _log_job(job_id, "YouTube authorization ready")
         if _is_cancelled(job_id):
             return
         session_url = decrypt_secret(encrypted_session) if encrypted_session else None
         offset = 0
         if session_url:
+            _log_job(job_id, "Checking existing resumable upload session")
             offset, completed_id = _session_offset(
                 session_url, access_token=access_token, total_size=total_size
             )
@@ -431,6 +470,11 @@ def process_youtube_upload(job_id: str) -> None:
                 return
             if offset == 0:
                 session_url = None
+            else:
+                _log_job(
+                    job_id,
+                    f"Resuming YouTube upload at {int(offset * 100 / total_size)}%",
+                )
         if not session_url:
             session_url = _start_session(job, video_path, access_token)
         if _is_cancelled(job_id):
@@ -463,6 +507,10 @@ def process_youtube_upload(job_id: str) -> None:
                     )
                     if response.status_code not in {500, 502, 503, 504}:
                         break
+                    _log_job(
+                        job_id,
+                        f"YouTube temporarily unavailable; retry {attempt + 1}/5",
+                    )
                     if attempt == 4:
                         response.raise_for_status()
                     time.sleep(2**attempt)
@@ -478,11 +526,15 @@ def process_youtube_upload(job_id: str) -> None:
                     raise RuntimeError("YouTube upload did not make progress")
                 offset = next_offset
                 video_file.seek(offset)
-                _update_active_job(job_id, progress=min(99, int(offset * 100 / total_size)))
+                progress = min(99, int(offset * 100 / total_size))
+                _update_active_job(job_id, progress=progress)
+                _log_job(job_id, f"YouTube upload progress: {progress}%")
         raise RuntimeError("YouTube upload ended without a video identifier")
     except Exception as exc:
+        safe_error = _safe_log_error(exc)
         logger.exception("YouTube upload job %s failed", job_id)
-        _update_active_job(job_id, status="failed", error=str(exc)[:1000])
+        _log_job(job_id, f"YouTube upload failed: {safe_error}")
+        _update_active_job(job_id, status="failed", error=safe_error)
     finally:
         with _SUBMITTED_LOCK:
             _SUBMITTED.discard(job_id)
@@ -515,12 +567,14 @@ def enqueue_youtube_upload(job_id: str) -> None:
     from job_queue import is_rq_enabled
 
     if is_rq_enabled():
+        _log_job(job_id, "YouTube upload queued")
         _enqueue_rq(job_id)
         return
     with _SUBMITTED_LOCK:
         if job_id in _SUBMITTED:
             return
         _SUBMITTED.add(job_id)
+    _log_job(job_id, "YouTube upload queued")
     _EXECUTOR.submit(process_youtube_upload, job_id)
 
 

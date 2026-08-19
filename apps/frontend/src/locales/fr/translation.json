@@ -1104,9 +1104,10 @@
     },
     "generationLogs": {
       "title": "Logs de génération",
-      "description": "Suivi lisible des deux traitements média liés à ce vol.",
+      "description": "Suivi lisible des traitements média et de leur publication liés à ce vol.",
       "videoTitle": "Vidéo du vol",
       "goproOverlayTitle": "Overlay GoPro",
+      "youtubeUploadTitle": "Upload YouTube",
       "method": {
         "cpu": "CPU",
         "gpu": "GPU"
@@ -1127,6 +1128,7 @@
       },
       "status": {
         "queued": "En attente",
+        "uploading": "Envoi en cours",
         "processing": "En cours",
         "started": "Démarré",
         "running": "En cours",
