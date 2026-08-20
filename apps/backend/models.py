@@ -42,9 +42,7 @@ class YoutubeCredential(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     refresh_token_encrypted = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 
 class AppSetting(Base):
@@ -323,7 +321,7 @@ class GoproOverlayJob(Base):
 
 
 class YoutubeUploadJob(Base):
-    """Durable state for an upload of a generated flight video to YouTube."""
+    """Durable state for an upload of a GoPro overlay video to YouTube."""
 
     __tablename__ = "youtube_upload_jobs"
 
@@ -335,6 +333,7 @@ class YoutubeUploadJob(Base):
         index=True,
     )
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    gopro_overlay_job_id = Column(String, nullable=True, index=True)
     status = Column(String, nullable=False, index=True)
     progress = Column(Integer, nullable=False, default=0)
     title = Column(String(100), nullable=False)
