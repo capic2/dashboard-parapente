@@ -873,6 +873,11 @@ export function FlightDetails({
                 <GoproOverlayJobCard
                   key={overlay.job_id}
                   job={overlay}
+                  youtubeUploadFlight={
+                    (flight.youtube_urls?.length ?? 0) === 0
+                      ? flight
+                      : undefined
+                  }
                   isDownloadingAnyMedia={isDownloadingAnyMedia}
                   isDeleting={deletingGoproOverlayJobId === overlay.job_id}
                   onDownload={() => void handleDownloadGoproOverlay(overlay)}

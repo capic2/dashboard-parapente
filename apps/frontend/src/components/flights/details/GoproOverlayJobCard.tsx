@@ -2,9 +2,12 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@dashboard-parapente/design-system';
 import { Download, Trash2 } from 'lucide-react';
 import type { GoproOverlayJob } from '../../../hooks/gopro/useGoproOverlay';
+import type { Flight } from '../../../types';
+import { FlightYoutubeUploadControls } from './FlightYoutubeUploadControls';
 
 interface GoproOverlayJobCardProps {
   job: GoproOverlayJob;
+  youtubeUploadFlight?: Flight;
   isDownloadingAnyMedia: boolean;
   isDeleting: boolean;
   onDownload: () => void;
@@ -13,6 +16,7 @@ interface GoproOverlayJobCardProps {
 
 export function GoproOverlayJobCard({
   job,
+  youtubeUploadFlight,
   isDownloadingAnyMedia,
   isDeleting,
   onDownload,
@@ -60,15 +64,25 @@ export function GoproOverlayJobCard({
           <span className="text-xs font-semibold text-emerald-900 dark:text-emerald-100">
             {job.output_filename}
           </span>
-          <Button
-            type="button"
-            className="min-h-10 cursor-pointer rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed"
-            onPress={onDownload}
-            isDisabled={isDownloadingAnyMedia}
-          >
-            <Download className="h-4 w-4" aria-hidden="true" />
-            {t('flights.goproOverlayDownload')}
-          </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button
+              type="button"
+              className="min-h-10 cursor-pointer rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed"
+              onPress={onDownload}
+              isDisabled={isDownloadingAnyMedia}
+            >
+              <Download className="h-4 w-4" aria-hidden="true" />
+              {t('flights.goproOverlayDownload')}
+            </Button>
+            {youtubeUploadFlight && (
+              <div className="min-w-48">
+                <FlightYoutubeUploadControls
+                  flight={youtubeUploadFlight}
+                  goproOverlayJobId={job.job_id}
+                />
+              </div>
+            )}
+          </div>
         </div>
       )}
       {['completed', 'failed', 'cancelled'].includes(job.status) && (

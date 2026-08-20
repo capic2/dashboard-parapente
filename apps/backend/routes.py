@@ -90,6 +90,7 @@ import gopro_preview_proxy
 from models import (
     EmagramAnalysis,
     Flight,
+    GoproOverlayJob as GoproOverlayJobModel,
     Site,
     SiteLandingAssociation,
     User,
@@ -925,9 +926,12 @@ def start_flight_youtube_upload(
         raise HTTPException(status_code=404, detail="Flight not found")
     if flight.youtube_urls:
         raise HTTPException(status_code=409, detail="This flight already has a YouTube video")
-    video_path = _resolve_flight_file_path(flight.video_file_path)
-    if video_path is None or not video_path.is_file():
-        raise HTTPException(status_code=409, detail="Generate the flight video before uploading")
+    overlay = db.get(GoproOverlayJobModel, payload.gopro_overlay_job_id)
+    if overlay is None or overlay.flight_id != flight.id:
+        raise HTTPException(status_code=404, detail="GoPro overlay not found for this flight")
+    video_path = _resolve_flight_file_path(overlay.output_path)
+    if overlay.status != "completed" or video_path is None or not video_path.is_file():
+        raise HTTPException(status_code=409, detail="Generate the GoPro overlay before uploading")
     existing_job = active_youtube_upload_job(db, flight_id)
     if existing_job is not None:
         raise HTTPException(status_code=409, detail="A YouTube upload is already in progress")
@@ -936,6 +940,7 @@ def start_flight_youtube_upload(
         id=str(uuid.uuid4()),
         flight_id=flight.id,
         user_id=user.id,
+        gopro_overlay_job_id=overlay.id,
         status="queued",
         progress=0,
         title=payload.title,
