@@ -103,6 +103,7 @@ def h264_encode_args(
     quality: str,
     cpu_preset: str,
     include_audio: bool,
+    pixel_format: str = "yuv420p",
 ) -> list[str]:
     if accelerator == "nvidia":
         args = [
@@ -119,7 +120,7 @@ def h264_encode_args(
             "-b:v",
             "0",
             "-pix_fmt",
-            "yuv420p",
+            pixel_format,
         ]
     else:
         args = [
@@ -130,7 +131,7 @@ def h264_encode_args(
             "-crf",
             quality,
             "-pix_fmt",
-            "yuv420p",
+            pixel_format,
         ]
     audio_args = ["-c:a", "copy"] if include_audio else ["-an"]
     return [*args, *audio_args]
