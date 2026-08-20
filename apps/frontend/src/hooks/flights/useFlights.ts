@@ -120,11 +120,11 @@ export const useFlightRecords = (): UseQueryResult<FlightRecords, Error> => {
  */
 export const useUpdateFlight = (
   flightId: string | undefined
-): UseMutationResult<Flight, Error, FlightFormData> => {
+): UseMutationResult<Flight, Error, Partial<FlightFormData>> => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (flightData: FlightFormData) => {
+    mutationFn: async (flightData: Partial<FlightFormData>) => {
       if (!flightId) throw new Error('Flight ID is required');
       const data = await api
         .patch(`flights/${flightId}`, { json: flightData })

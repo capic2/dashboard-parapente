@@ -1,14 +1,20 @@
+import { Button } from '@dashboard-parapente/design-system';
+import { Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getYoutubeEmbedUrl } from '../../../lib/youtube';
 
 interface FlightYoutubeVideosProps {
   urls?: string[];
+  removingUrl?: string | null;
+  onRemove?: (url: string) => void;
 }
 
 const EMPTY_URLS: string[] = [];
 
 export function FlightYoutubeVideos({
   urls = EMPTY_URLS,
+  removingUrl = null,
+  onRemove,
 }: FlightYoutubeVideosProps) {
   const { t } = useTranslation();
   const videos = urls.flatMap((url) => {
@@ -45,14 +51,30 @@ export function FlightYoutubeVideos({
               referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
             />
-            <a
-              href={url}
-              target="_blank"
-              rel="noreferrer"
-              className="block cursor-pointer truncate bg-gray-900 px-3 py-3 text-sm text-gray-200 underline-offset-2 transition-colors hover:bg-gray-800 hover:underline focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-400"
-            >
-              {t('flights.openOnYoutube')}
-            </a>
+            <div className="flex items-center justify-between gap-2 bg-gray-900 px-3 py-2">
+              <a
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                className="min-w-0 flex-1 cursor-pointer truncate py-1 text-sm text-gray-200 underline-offset-2 transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              >
+                {t('flights.openOnYoutube')}
+              </a>
+              {onRemove && (
+                <Button
+                  variant="ghost"
+                  className="min-h-9 shrink-0 rounded-lg px-2 py-1 text-sm text-red-300 hover:text-red-200"
+                  aria-label={t('flights.removeYoutubeAssociation')}
+                  isDisabled={removingUrl !== null}
+                  onPress={() => onRemove(url)}
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  {removingUrl === url
+                    ? t('flights.youtubeAssociationRemoving')
+                    : t('flights.removeYoutubeAssociation')}
+                </Button>
+              )}
+            </div>
           </div>
         ))}
       </div>

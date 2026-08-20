@@ -103,6 +103,9 @@ export function FlightDetails({
   const [deletedGoproOverlayJobIds, setDeletedGoproOverlayJobIds] = useState<
     string[]
   >([]);
+  const [removingYoutubeUrl, setRemovingYoutubeUrl] = useState<string | null>(
+    null
+  );
 
   const hasGpx = Boolean(flight.gpx_file_path);
   const hasVideo = hasFlightVideo(flight);
@@ -197,6 +200,7 @@ export function FlightDetails({
     setDownloadingMedia(null);
     setDeletingGoproOverlayJobId(null);
     setDeletedGoproOverlayJobIds([]);
+    setRemovingYoutubeUrl(null);
     resetGoproOverlayJob();
   }, [flight.id, resetGoproOverlayJob]);
 
@@ -243,6 +247,24 @@ export function FlightDetails({
       setEditingNotes(false);
     } catch {
       toast.error(t('flights.updateError'));
+    }
+  };
+
+  const handleRemoveYoutubeAssociation = async (url: string) => {
+    if (!confirm(t('flights.removeYoutubeAssociationConfirm'))) return;
+
+    setRemovingYoutubeUrl(url);
+    try {
+      await updateFlight.mutateAsync({
+        youtube_urls: (flight.youtube_urls ?? []).filter(
+          (youtubeUrl) => youtubeUrl !== url
+        ),
+      });
+      toast.success(t('flights.youtubeAssociationRemoved'));
+    } catch {
+      toast.error(t('flights.youtubeAssociationRemoveError'));
+    } finally {
+      setRemovingYoutubeUrl(null);
     }
   };
 
@@ -863,7 +885,11 @@ export function FlightDetails({
 
         {(flight.youtube_urls?.length ?? 0) > 0 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800 sm:p-5">
-            <FlightYoutubeVideos urls={flight.youtube_urls} />
+            <FlightYoutubeVideos
+              urls={flight.youtube_urls}
+              removingUrl={removingYoutubeUrl}
+              onRemove={(url) => void handleRemoveYoutubeAssociation(url)}
+            />
           </div>
         )}
       </div>
