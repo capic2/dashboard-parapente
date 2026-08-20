@@ -20,7 +20,7 @@ services:
       - parapente-network
 
   backend:
-    image: ${BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
+    image: ${CI_BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
     container_name: parapente-backend
     restart: unless-stopped
     ports:
@@ -143,7 +143,6 @@ services:
       - BACKEND_GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT=${BACKEND_GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT:-1080}
 
       # Backend - Deployment metadata
-      - BACKEND_DEPLOY_VERSION=${BACKEND_DEPLOY_VERSION}
       - BACKEND_VERSION_STATE_FILE=${BACKEND_VERSION_STATE_FILE:?BACKEND_VERSION_STATE_FILE is required}
     depends_on:
       redis:
@@ -165,7 +164,7 @@ services:
       - parapente-network
 
   backend-worker:
-    image: ${BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
+    image: ${CI_BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
     container_name: parapente-backend-worker
     restart: unless-stopped
     command: ['python', 'job_worker.py']
@@ -237,7 +236,7 @@ services:
       - parapente-network
 
   youtube-upload-worker:
-    image: ${BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
+    image: ${CI_BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
     container_name: parapente-youtube-upload-worker
     restart: unless-stopped
     command: ['python', 'youtube_upload_worker.py']
@@ -289,7 +288,7 @@ services:
       - parapente-network
 
   gopro-overlay-worker:
-    image: ${BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
+    image: ${CI_BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
     container_name: parapente-gopro-overlay-worker
     restart: unless-stopped
     command: ['python', 'gopro_overlay_worker.py']
