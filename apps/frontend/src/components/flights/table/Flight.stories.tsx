@@ -18,6 +18,7 @@ const mockFlight: FlightSummary = {
   elevation_gain_m: 800,
   has_gpx: true,
   has_video: true,
+  has_youtube_video: false,
   has_gopro_overlay: true,
   video_export_job_id: null,
   video_export_status: null,
@@ -115,6 +116,27 @@ export const WithGpxVideo = meta.story({
     <div className="max-w-sm">
       <Flight
         flight={{ ...mockFlight, has_gopro_overlay: false }}
+        isActive={false}
+        isSelected={false}
+        selectionMode={false}
+        onSelectFlight={fn()}
+        onDeleteFlight={fn()}
+      />
+    </div>
+  ),
+});
+
+export const WithYoutubeVideo = meta.story({
+  name: 'With YouTube Video',
+  render: () => (
+    <div className="max-w-sm">
+      <Flight
+        flight={{
+          ...mockFlight,
+          has_video: false,
+          has_youtube_video: true,
+          has_gopro_overlay: false,
+        }}
         isActive={false}
         isSelected={false}
         selectionMode={false}

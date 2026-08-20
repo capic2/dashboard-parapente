@@ -25,6 +25,9 @@ def _add_flights(db_session, *, count: int, site_id: str = "site-arguel") -> Non
                 video_file_path="private/video.mp4" if index == 1 else None,
                 video_export_job_id="video-job" if index == 1 else None,
                 video_export_status="completed" if index == 1 else None,
+                youtube_urls_json=(
+                    '["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]' if index == 1 else "[]"
+                ),
                 gopro_overlay_file_path="private/overlay.mp4" if index == 1 else None,
                 gopro_overlay_job_id="overlay-job" if index == 1 else None,
                 gopro_overlay_status="completed" if index == 1 else None,
@@ -86,10 +89,12 @@ def test_summaries_filter_search_sort_and_hide_paths(client, db_session, arguel_
     assert item["site_region"] == "Doubs"
     assert item["has_gpx"] is True
     assert item["has_video"] is True
+    assert item["has_youtube_video"] is True
     assert item["has_gopro_overlay"] is True
     assert item["video_export_job_id"] == "video-job"
     assert item["gopro_overlay_job_id"] == "overlay-job"
     assert not any("path" in key for key in item)
+    assert body["flights"][1]["has_youtube_video"] is False
 
 
 def test_summaries_search_is_case_and_accent_insensitive(client, db_session) -> None:
@@ -106,6 +111,40 @@ def test_summaries_search_is_case_and_accent_insensitive(client, db_session) -> 
 
     assert response.status_code == 200
     assert [item["id"] for item in response.json()["flights"]] == ["accented-flight"]
+
+
+def test_summaries_only_report_non_empty_youtube_url_lists(client, db_session) -> None:
+    stored_values = {
+        "youtube-empty-spaced": "[ ]",
+        "youtube-null": "null",
+        "youtube-object": "{}",
+        "youtube-invalid": "not-json",
+        "youtube-present": '["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]',
+    }
+    db_session.add_all(
+        [
+            Flight(
+                id=flight_id,
+                title=flight_id,
+                flight_date=date(2026, 1, 1),
+                youtube_urls_json=stored_value,
+            )
+            for flight_id, stored_value in stored_values.items()
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(API_URL)
+    flags_by_id = {item["id"]: item["has_youtube_video"] for item in response.json()["flights"]}
+
+    assert response.status_code == 200
+    assert flags_by_id == {
+        "youtube-empty-spaced": False,
+        "youtube-invalid": False,
+        "youtube-null": False,
+        "youtube-object": False,
+        "youtube-present": True,
+    }
 
 
 def test_summaries_put_nulls_last_and_keyset_ties_by_id(client, db_session, arguel_site):
