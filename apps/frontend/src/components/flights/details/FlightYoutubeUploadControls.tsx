@@ -16,12 +16,14 @@ import { getApiErrorMessage } from '../../../lib/api';
 
 interface FlightYoutubeUploadControlsProps {
   flight: Flight;
+  goproOverlayJobId: string;
 }
 
 type PrivacyStatus = 'private' | 'unlisted' | 'public';
 
 export function FlightYoutubeUploadControls({
   flight,
+  goproOverlayJobId,
 }: FlightYoutubeUploadControlsProps) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -41,20 +43,24 @@ export function FlightYoutubeUploadControls({
   );
   const [privacyStatus, setPrivacyStatus] = useState<PrivacyStatus>('private');
 
-  const isActive =
+  const hasActiveUpload =
     upload.data?.status === 'queued' || upload.data?.status === 'uploading';
+  const isSelectedOverlay =
+    upload.data?.gopro_overlay_job_id === goproOverlayJobId;
+  const isActive = hasActiveUpload && isSelectedOverlay;
 
   useEffect(() => {
     if (
       previousStatus.current &&
       previousStatus.current !== 'completed' &&
+      isSelectedOverlay &&
       upload.data?.status === 'completed'
     ) {
       toast.success(t('flights.youtubeUploadCompleted'));
       void queryClient.invalidateQueries({ queryKey: ['flights'] });
     }
     previousStatus.current = upload.data?.status;
-  }, [queryClient, t, toast, upload.data?.status]);
+  }, [isSelectedOverlay, queryClient, t, toast, upload.data?.status]);
 
   const handlePrimaryAction = async () => {
     if (!connection.data?.configured) {
@@ -79,6 +85,7 @@ export function FlightYoutubeUploadControls({
   const handleUpload = async () => {
     try {
       await startUpload.mutateAsync({
+        gopro_overlay_job_id: goproOverlayJobId,
         title,
         description,
         privacy_status: privacyStatus,
@@ -114,8 +121,16 @@ export function FlightYoutubeUploadControls({
         });
   } else if (!connection.data?.connected) {
     label = t('flights.youtubeConnect');
-  } else if (upload.data?.status === 'failed') {
+  } else if (isSelectedOverlay && upload.data?.status === 'failed') {
     label = t('flights.youtubeUploadRetry');
+  }
+  let buttonTitle =
+    (isSelectedOverlay ? upload.data?.error : null) ??
+    t('flights.youtubeUploadTitle');
+  if (isActive) {
+    buttonTitle = t('flights.youtubeUploadStopTitle');
+  } else if (hasActiveUpload) {
+    buttonTitle = t('flights.youtubeUploadOtherOverlayInProgress');
   }
 
   return (
@@ -127,14 +142,11 @@ export function FlightYoutubeUploadControls({
         isDisabled={
           connection.isLoading ||
           upload.isLoading ||
+          (hasActiveUpload && !isSelectedOverlay) ||
           authorizationUrl.isPending ||
           cancelUpload.isPending
         }
-        title={
-          isActive
-            ? t('flights.youtubeUploadStopTitle')
-            : (upload.data?.error ?? t('flights.youtubeUploadTitle'))
-        }
+        title={buttonTitle}
       >
         {isActive ? (
           <X className="h-4 w-4" aria-hidden="true" />
@@ -155,13 +167,13 @@ export function FlightYoutubeUploadControls({
           </p>
           <div className="flex flex-col gap-1">
             <label
-              htmlFor={`youtube-title-${flight.id}`}
+              htmlFor={`youtube-title-${flight.id}-${goproOverlayJobId}`}
               className="text-sm font-medium text-gray-700 dark:text-gray-200"
             >
               {t('flights.youtubeUploadTitleLabel')}
             </label>
             <input
-              id={`youtube-title-${flight.id}`}
+              id={`youtube-title-${flight.id}-${goproOverlayJobId}`}
               value={title}
               maxLength={100}
               onChange={(event) => setTitle(event.currentTarget.value)}
@@ -170,13 +182,13 @@ export function FlightYoutubeUploadControls({
           </div>
           <div className="flex flex-col gap-1">
             <label
-              htmlFor={`youtube-description-${flight.id}`}
+              htmlFor={`youtube-description-${flight.id}-${goproOverlayJobId}`}
               className="text-sm font-medium text-gray-700 dark:text-gray-200"
             >
               {t('flights.youtubeUploadDescriptionLabel')}
             </label>
             <textarea
-              id={`youtube-description-${flight.id}`}
+              id={`youtube-description-${flight.id}-${goproOverlayJobId}`}
               value={description}
               maxLength={5000}
               rows={4}
@@ -186,13 +198,13 @@ export function FlightYoutubeUploadControls({
           </div>
           <div className="flex flex-col gap-1">
             <label
-              htmlFor={`youtube-privacy-${flight.id}`}
+              htmlFor={`youtube-privacy-${flight.id}-${goproOverlayJobId}`}
               className="text-sm font-medium text-gray-700 dark:text-gray-200"
             >
               {t('flights.youtubeUploadPrivacyLabel')}
             </label>
             <select
-              id={`youtube-privacy-${flight.id}`}
+              id={`youtube-privacy-${flight.id}-${goproOverlayJobId}`}
               value={privacyStatus}
               onChange={(event) =>
                 setPrivacyStatus(event.currentTarget.value as PrivacyStatus)

@@ -289,9 +289,11 @@ vi.mock('../video-export/FlightVideoExportControls', () => ({
 }));
 
 vi.mock('./FlightYoutubeUploadControls', () => ({
-  FlightYoutubeUploadControls: () => (
-    <button type="button">YouTube upload action</button>
-  ),
+  FlightYoutubeUploadControls: ({
+    goproOverlayJobId,
+  }: {
+    goproOverlayJobId: string;
+  }) => <button type="button">YouTube upload {goproOverlayJobId}</button>,
 }));
 
 import { FlightDetails } from './FlightDetails';
@@ -1148,6 +1150,12 @@ describe('FlightDetails GoPro overlay action', () => {
     expect(screen.getByText('test-flight-1080p.mp4')).toBeInTheDocument();
     expect(screen.getByText('3840 × 2160')).toBeInTheDocument();
     expect(screen.getByText('1920 × 1080')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'YouTube upload overlay-4k' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'YouTube upload overlay-1080p' })
+    ).toBeInTheDocument();
   });
 
   it('deletes an overlay and removes its card', async () => {
