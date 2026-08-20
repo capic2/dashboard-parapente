@@ -1204,6 +1204,7 @@ def _ensure_video_output_resolution(
                 quality="18",
                 cpu_preset="medium",
                 include_audio=True,
+                pixel_format="cuda",
             ),
             "-movflags",
             "+faststart",

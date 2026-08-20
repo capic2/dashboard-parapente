@@ -1362,8 +1362,10 @@ def test_gopro_overlay_output_resolution_retries_cuda_failure_on_cpu(
     assert commands[0][commands[0].index("-hwaccel") + 1] == "cuda"
     assert commands[0][commands[0].index("-vf") + 1] == ("scale_cuda=w=3840:h=2160:format=yuv420p")
     assert commands[0][commands[0].index("-c:v") + 1] == "h264_nvenc"
+    assert commands[0][commands[0].index("-pix_fmt") + 1] == "cuda"
     assert commands[1][commands[1].index("-vf") + 1] == ("scale=w=3840:h=2160:flags=lanczos")
     assert commands[1][commands[1].index("-c:v") + 1] == "libx264"
+    assert commands[1][commands[1].index("-pix_fmt") + 1] == "yuv420p"
     assert timeouts == [8429, 8429]
     log = log_path.read_text()
     expected_detail = (
