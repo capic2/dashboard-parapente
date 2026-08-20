@@ -192,6 +192,7 @@ jobs:
           push: true
           build-args: |
             VITE_CESIUM_ION_TOKEN=${{ secrets.VITE_CESIUM_ION_TOKEN }}
+            BACKEND_DEPLOY_VERSION=${{ steps.version.outputs.version }}
           build-contexts: |
             gopro-overlay-src=${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT || 'https://github.com/capic2/gopro-dashboard-overlay.git#657dd07a7d7e2f58ade271641326d0e00ff0027b' }}
           tags: |
@@ -660,8 +661,7 @@ jobs:
 
               printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
-              export BACKEND_IMAGE
-              export BACKEND_DEPLOY_VERSION="$TARGET_VERSION"
+              export CI_BACKEND_IMAGE="$BACKEND_IMAGE"
 
               if ! compose_cmd pull backend backend-worker youtube-upload-worker gopro-overlay-worker redis ||
                 ! compose_cmd up -d --force-recreate --remove-orphans backend backend-worker youtube-upload-worker gopro-overlay-worker redis; then
@@ -672,7 +672,7 @@ jobs:
 
             deploy_from_portainer_volume() {
               if ! docker run --rm \
-                -e BACKEND_IMAGE="$BACKEND_IMAGE" \
+                -e CI_BACKEND_IMAGE="$BACKEND_IMAGE" \
                 -e COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" \
                 -e GHCR_TOKEN="$GHCR_TOKEN" \
                 -e GHCR_USERNAME="$GHCR_USERNAME" \
@@ -733,9 +733,6 @@ jobs:
                   fi
 
                   printf "%s" "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-
-                  export BACKEND_IMAGE
-                  export BACKEND_DEPLOY_VERSION="$TARGET_VERSION"
 
                   compose_cmd pull backend backend-worker youtube-upload-worker gopro-overlay-worker redis
                   compose_cmd up -d --force-recreate --remove-orphans backend backend-worker youtube-upload-worker gopro-overlay-worker redis
