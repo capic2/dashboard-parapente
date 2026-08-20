@@ -73,15 +73,11 @@ function parseLogLine(line: string) {
   return { message: match[2] || line, timestamp: match[1] || null };
 }
 
-function formatLogTime(timestamp: string | null, locale?: string) {
+function formatLogTimestamp(timestamp: string | null) {
   if (!timestamp) return null;
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) return timestamp;
-  return new Intl.DateTimeFormat(locale, {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(date);
+  return date.toISOString().replace(/\.\d{3}Z$/u, 'Z');
 }
 
 export function JobLogViewer({
@@ -89,7 +85,7 @@ export function JobLogViewer({
   emptyLabel,
   isLive = false,
 }: JobLogViewerProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const lines = logs?.filter(Boolean) ?? [];
 
@@ -119,7 +115,7 @@ export function JobLogViewer({
           {lines.map((line, index) => {
             const entry = parseLogLine(line);
             const tone = getLogTone(entry.message);
-            const time = formatLogTime(entry.timestamp, i18n?.language);
+            const timestamp = formatLogTimestamp(entry.timestamp);
             return (
               <li
                 key={`${index}-${line}`}
@@ -133,12 +129,12 @@ export function JobLogViewer({
                   )}
                   :
                 </span>
-                {time && (
+                {timestamp && (
                   <time
-                    dateTime={entry.timestamp ?? undefined}
+                    dateTime={timestamp}
                     className="shrink-0 font-mono text-[11px] opacity-70"
                   >
-                    {time}
+                    {timestamp}
                   </time>
                 )}
                 <span className="min-w-0 break-words">{entry.message}</span>

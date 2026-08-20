@@ -39,6 +39,23 @@ describe('JobLogViewer', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Succès:')).toBeInTheDocument();
     expect(screen.getByText('Erreur:')).toBeInTheDocument();
+    expect(screen.getByText('2026-07-31T10:15:20Z')).toHaveAttribute(
+      'datetime',
+      '2026-07-31T10:15:20Z'
+    );
+    expect(screen.getByText('2026-07-31T10:16:20Z')).toBeInTheDocument();
+  });
+
+  it('keeps events without a timestamp readable', () => {
+    render(
+      <JobLogViewer
+        logs={['Legacy export event']}
+        emptyLabel="Aucun événement"
+      />
+    );
+
+    expect(screen.getAllByText('Legacy export event')).toHaveLength(2);
+    expect(document.querySelector('time')).not.toBeInTheDocument();
   });
 
   it('keeps raw technical lines in a collapsed section', () => {

@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 from datetime import date, datetime
@@ -2043,7 +2044,10 @@ def test_overlay_log_survives_work_directory_cleanup(tmp_path, monkeypatch):
     )
 
     assert not work_dir.exists()
-    assert "Overlay ready" in log_path.read_text()
+    assert re.fullmatch(
+        r"\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00\] Overlay ready\n",
+        log_path.read_text(),
+    )
 
 
 def test_reconcile_gopro_overlay_flight_refs_clears_missing_active_job(test_db, monkeypatch):
