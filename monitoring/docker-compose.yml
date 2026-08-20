@@ -19,7 +19,7 @@ services:
       - monitoring
 
   prometheus:
-    image: prom/prometheus:v3.13.2
+    image: prom/prometheus:v3.14.0
     container_name: monitoring-prometheus
     restart: unless-stopped
     extra_hosts:
