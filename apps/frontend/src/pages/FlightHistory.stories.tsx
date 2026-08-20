@@ -418,7 +418,7 @@ export const MobileFlowWithReplay = meta.story({
 });
 
 MobileFlowWithReplay.test(
-  'loads GPX data only when Replay tab is selected',
+  'loads GPX data only when the 3D replay is opened',
   async ({ canvas, userEvent, step }) => {
     let requestsAfterOpeningFlight = 0;
 
@@ -443,17 +443,28 @@ MobileFlowWithReplay.test(
       expect(gpxRequestCount).toBe(requestsAfterOpeningFlight);
     });
 
-    await step('switches to Replay and shows loading state', async () => {
+    await step('switches to Media without loading the 3D replay', async () => {
       await userEvent.click(
         canvas.getByRole('tab', { name: i18n.t('flights.replayTab') })
       );
 
       await expect(
-        await canvas.findByText(i18n.t('flights.loading3dViewer'))
+        canvas.getByRole('button', { name: i18n.t('flights.open3dReplay') })
       ).toBeInTheDocument();
+      await expect(
+        canvas.queryByText(i18n.t('flights.loading3dViewer'))
+      ).not.toBeInTheDocument();
+      expect(gpxRequestCount).toBe(requestsAfterOpeningFlight);
     });
 
-    await step('triggers GPX loading once Replay is active', async () => {
+    await step('triggers GPX loading once the replay is opened', async () => {
+      await userEvent.click(
+        canvas.getByRole('button', { name: i18n.t('flights.open3dReplay') })
+      );
+
+      await expect(
+        await canvas.findByText(i18n.t('flights.loading3dViewer'))
+      ).toBeInTheDocument();
       await waitFor(() => {
         expect(gpxRequestCount).toBeGreaterThan(requestsAfterOpeningFlight);
       });

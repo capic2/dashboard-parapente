@@ -187,35 +187,6 @@ export function FlightDetails({
       });
     })();
   useEffect(() => {
-    activeFlightIdRef.current = flight.id;
-    setActiveTab('infos');
-    setHasOpenedReplay(false);
-    setEditingMode(false);
-    setEditingNotes(false);
-    setGoproOverlayJobId(null);
-    setGoproOverlayJobToken(null);
-    setIsGoproOverlayDialogOpen(false);
-    setGoproOverlayOutputResolution('auto');
-    setIsCancellingGoproOverlay(false);
-    setDownloadingMedia(null);
-    setDeletingGoproOverlayJobId(null);
-    setDeletedGoproOverlayJobIds([]);
-    setRemovingYoutubeUrl(null);
-    resetGoproOverlayJob();
-  }, [flight.id, resetGoproOverlayJob]);
-
-  useEffect(() => {
-    if (!isGoproOverlayDialogOpen) {
-      setGoproOverlayGpxOffset(String(flight.gopro_overlay_gpx_offset ?? 0));
-      setGoproOverlayInitialGpxOffset(null);
-    }
-  }, [flight.gopro_overlay_gpx_offset, isGoproOverlayDialogOpen]);
-
-  useEffect(() => {
-    setNotesText(flight.notes ?? '');
-  }, [flight.notes]);
-
-  useEffect(() => {
     if (
       streamedGoproOverlayJob?.status === 'completed' ||
       streamedGoproOverlayJob?.status === 'failed' ||
@@ -769,6 +740,19 @@ export function FlightDetails({
       compact={mobileMode}
     />
   );
+  const replayContent =
+    hasGpx && !hasOpenedReplay ? (
+      <Button
+        variant="secondary"
+        className="ml-12 min-h-10 rounded-lg px-4 py-2 text-sm"
+        onPress={() => setHasOpenedReplay(true)}
+      >
+        <Play className="h-4 w-4" aria-hidden="true" />
+        {t('flights.open3dReplay')}
+      </Button>
+    ) : (
+      replayCard
+    );
 
   const logsPanel = (
     <FlightGenerationLogsPanel
@@ -836,7 +820,7 @@ export function FlightDetails({
               </p>
             </div>
           </div>
-          {hasOpenedReplay ? replayCard : null}
+          {replayContent}
         </section>
 
         <FlightMediaBadges
@@ -942,9 +926,6 @@ export function FlightDetails({
           onSelectionChange={(key) => {
             const tab = key as FlightDetailsTab;
             setActiveTab(tab);
-            if (tab === 'replay') {
-              setHasOpenedReplay(true);
-            }
           }}
           className="space-y-4"
         >
@@ -986,9 +967,6 @@ export function FlightDetails({
       onSelectionChange={(key) => {
         const tab = key as FlightDetailsTab;
         setActiveTab(tab);
-        if (tab === 'replay') {
-          setHasOpenedReplay(true);
-        }
       }}
       className="space-y-4"
     >
