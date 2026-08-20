@@ -9,6 +9,7 @@ export interface YoutubeConnectionStatus {
 export interface YoutubeUploadJob {
   job_id: string;
   flight_id: string;
+  gopro_overlay_job_id?: string | null;
   status: 'queued' | 'uploading' | 'completed' | 'failed' | 'cancelled';
   progress: number;
   youtube_url?: string | null;
@@ -17,6 +18,7 @@ export interface YoutubeUploadJob {
 }
 
 interface YoutubeUploadInput {
+  gopro_overlay_job_id: string;
   title: string;
   description: string;
   privacy_status: 'private' | 'unlisted' | 'public';
