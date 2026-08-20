@@ -1,10 +1,12 @@
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import config
 import job_queue
 import pytest
 import youtube_upload
-from models import YoutubeCredential, YoutubeUploadJob
+from models import Flight, GoproOverlayJob, YoutubeCredential, YoutubeUploadJob
+from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from youtube_upload import decode_oauth_state, encrypt_secret
 
@@ -19,6 +21,27 @@ def _configure_youtube(monkeypatch) -> None:
         "YOUTUBE_REDIRECT_URI",
         "http://testserver/api/youtube/oauth/callback",
     )
+
+
+def _create_completed_overlay(
+    db_session: Session, sample_flight: Flight, output_path: Path
+) -> GoproOverlayJob:
+    overlay = GoproOverlayJob(
+        id="overlay-job",
+        flight_id=sample_flight.id,
+        status="completed",
+        progress=100,
+        video_path="/input/video.mp4",
+        gpx_path="/input/flight.gpx",
+        layout_id="parapente",
+        layout_label="Parapente",
+        layout_path="/layouts/parapente.xml",
+        output_path=str(output_path),
+        temp_output_path=f"{output_path}.tmp",
+        output_filename=output_path.name,
+    )
+    db_session.add(overlay)
+    return overlay
 
 
 def test_youtube_status_reports_configuration_and_connection(client, db_session, monkeypatch):
@@ -61,9 +84,9 @@ def test_start_youtube_upload_creates_durable_job(
     client, db_session, sample_flight, tmp_path, monkeypatch
 ):
     _configure_youtube(monkeypatch)
-    video_path = tmp_path / "flight.mp4"
-    video_path.write_bytes(b"video")
-    sample_flight.video_file_path = str(video_path)
+    overlay_path = tmp_path / "overlay.mp4"
+    overlay_path.write_bytes(b"overlay")
+    overlay = _create_completed_overlay(db_session, sample_flight, overlay_path)
     db_session.add(
         YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
     )
@@ -74,6 +97,7 @@ def test_start_youtube_upload_creates_durable_job(
     response = client.post(
         f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload",
         json={
+            "gopro_overlay_job_id": overlay.id,
             "title": "  Mon vol à Arguel  ",
             "description": "Une belle journée",
             "privacy_status": "private",
@@ -88,7 +112,47 @@ def test_start_youtube_upload_creates_durable_job(
     assert job is not None
     assert job.title == "Mon vol à Arguel"
     assert job.flight_id == sample_flight.id
+    assert job.gopro_overlay_job_id == overlay.id
+    assert payload["gopro_overlay_job_id"] == overlay.id
     assert enqueued == [job.id]
+
+
+def test_start_youtube_upload_rejects_standard_video_without_overlay(
+    client, db_session, sample_flight, tmp_path, monkeypatch
+):
+    _configure_youtube(monkeypatch)
+    video_path = tmp_path / "flight.mp4"
+    video_path.write_bytes(b"standard video")
+    sample_flight.video_file_path = str(video_path)
+    db_session.add(
+        YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
+    )
+    db_session.commit()
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload",
+        json={
+            "gopro_overlay_job_id": "missing-overlay",
+            "title": "Vidéo standard",
+            "privacy_status": "private",
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "GoPro overlay not found for this flight"
+
+
+def test_start_youtube_upload_rejects_blank_overlay_id(client, sample_flight):
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload",
+        json={
+            "gopro_overlay_job_id": "   ",
+            "title": "Overlay",
+            "privacy_status": "private",
+        },
+    )
+
+    assert response.status_code == 422
 
 
 def test_get_youtube_upload_includes_recent_job_logs(
@@ -122,6 +186,30 @@ def test_youtube_upload_log_errors_redact_urls():
     assert youtube_upload._safe_log_error(error) == "Upload failed at [redacted-url]"
 
 
+def test_worker_resolves_only_the_selected_overlay(db_session, sample_flight, tmp_path):
+    standard_path = tmp_path / "standard.mp4"
+    standard_path.write_bytes(b"standard")
+    overlay_path = tmp_path / "overlay.mp4"
+    overlay_path.write_bytes(b"overlay")
+    sample_flight.video_file_path = str(standard_path)
+    overlay = _create_completed_overlay(db_session, sample_flight, overlay_path)
+    job = YoutubeUploadJob(
+        id="youtube-overlay-source",
+        flight_id=sample_flight.id,
+        user_id=1,
+        gopro_overlay_job_id=overlay.id,
+        status="queued",
+        progress=0,
+        title="Overlay",
+        description="",
+        privacy_status="private",
+    )
+    db_session.add(job)
+    db_session.commit()
+
+    assert youtube_upload._overlay_video_path(db_session, job) == overlay_path
+
+
 def test_start_youtube_upload_rejects_flight_with_existing_youtube_video(
     client, db_session, sample_flight, tmp_path, monkeypatch
 ):
@@ -137,7 +225,11 @@ def test_start_youtube_upload_rejects_flight_with_existing_youtube_video(
 
     response = client.post(
         f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload",
-        json={"title": "Déjà publiée", "privacy_status": "private"},
+        json={
+            "gopro_overlay_job_id": "overlay-job",
+            "title": "Déjà publiée",
+            "privacy_status": "private",
+        },
     )
 
     assert response.status_code == 409

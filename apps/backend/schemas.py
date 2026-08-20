@@ -459,9 +459,17 @@ class YoutubeAuthUrlRequest(BaseModel):
 
 
 class YoutubeUploadCreate(BaseModel):
+    gopro_overlay_job_id: str = Field(min_length=1)
     title: str = Field(min_length=1, max_length=100)
     description: str = Field(default="", max_length=5000)
     privacy_status: Literal["private", "unlisted", "public"] = "private"
+
+    @validator("gopro_overlay_job_id")
+    def trimmed_overlay_job_id(cls, value: str) -> str:
+        overlay_job_id = value.strip()
+        if not overlay_job_id:
+            raise ValueError("gopro_overlay_job_id must not be blank")
+        return overlay_job_id
 
     @validator("title")
     def trimmed_title(cls, value: str) -> str:
@@ -474,6 +482,7 @@ class YoutubeUploadCreate(BaseModel):
 class YoutubeUploadJobResponse(BaseModel):
     job_id: str
     flight_id: str
+    gopro_overlay_job_id: str | None = None
     status: Literal["queued", "uploading", "completed", "failed", "cancelled"]
     progress: int = Field(ge=0, le=100)
     youtube_url: str | None = None

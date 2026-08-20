@@ -1,4 +1,4 @@
-"""OAuth and durable resumable uploads for generated flight videos."""
+"""OAuth and durable resumable uploads for generated GoPro overlay videos."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 import config
 from database import SessionLocal
-from models import Flight, YoutubeCredential, YoutubeUploadJob
+from models import Flight, GoproOverlayJob, YoutubeCredential, YoutubeUploadJob
 
 logger = logging.getLogger(__name__)
 
@@ -216,6 +216,7 @@ def job_payload(job: YoutubeUploadJob) -> dict[str, Any]:
     return {
         "job_id": job.id,
         "flight_id": job.flight_id,
+        "gopro_overlay_job_id": job.gopro_overlay_job_id,
         "status": job.status,
         "progress": job.progress or 0,
         "youtube_url": job.youtube_url,
@@ -411,6 +412,15 @@ def _finish_upload(job_id: str, video_id: str) -> None:
     _log_job(job_id, f"YouTube upload completed: {youtube_url}")
 
 
+def _overlay_video_path(db: Session, job: YoutubeUploadJob) -> Path:
+    if not job.gopro_overlay_job_id:
+        raise RuntimeError("YouTube upload has no GoPro overlay source")
+    overlay = db.get(GoproOverlayJob, job.gopro_overlay_job_id)
+    if overlay is None or overlay.flight_id != job.flight_id or overlay.status != "completed":
+        raise RuntimeError("GoPro overlay video is no longer available")
+    return Path(overlay.output_path)
+
+
 def process_youtube_upload(job_id: str) -> None:
     """RQ/thread job target for a resumable YouTube upload."""
     try:
@@ -438,20 +448,17 @@ def process_youtube_upload(job_id: str) -> None:
             job = db.get(YoutubeUploadJob, job_id)
             if job is None:
                 return
-            flight = db.get(Flight, job.flight_id)
-            if flight is None or not flight.video_file_path:
-                raise RuntimeError("Generated flight video is no longer available")
-            video_path = Path(flight.video_file_path)
+            video_path = _overlay_video_path(db, job)
             user_id = job.user_id
             encrypted_session = job.upload_session_encrypted
             db.expunge(job)
 
         if not video_path.is_file():
-            raise RuntimeError("Generated flight video is no longer available")
+            raise RuntimeError("GoPro overlay video is no longer available")
         total_size = video_path.stat().st_size
         if total_size <= 0:
-            raise RuntimeError("Generated flight video is empty")
-        _log_job(job_id, f"Generated video ready ({total_size} bytes)")
+            raise RuntimeError("GoPro overlay video is empty")
+        _log_job(job_id, f"GoPro overlay video ready ({total_size} bytes)")
 
         _log_job(job_id, "Refreshing YouTube authorization")
         access_token = _access_token(user_id)
