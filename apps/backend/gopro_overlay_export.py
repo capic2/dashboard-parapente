@@ -438,12 +438,16 @@ def _render_method_from_command(command: Any) -> str | None:
     return None
 
 
+def _format_job_log_line(message: str) -> str:
+    timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return f"[{timestamp}] {message}\n"
+
+
 def _append_job_log(log_path: Path, message: str) -> None:
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
         with log_path.open("a", encoding="utf-8") as log_file:
-            log_file.write(f"[{timestamp}] {message}\n")
+            log_file.write(_format_job_log_line(message))
     except OSError:
         pass
 
@@ -1966,11 +1970,11 @@ def _run_job(job_id: str) -> None:
     output_lines: list[str] = []
     try:
         with log_path.open("a", encoding="utf-8") as log_file:
-            log_file.write(f"[{_utc_now()}] Starting GoPro overlay job {job_id}\n")
-            log_file.write("Command: " + " ".join(command) + "\n")
+            log_file.write(_format_job_log_line(f"Starting GoPro overlay job {job_id}"))
+            log_file.write(_format_job_log_line("Command: " + " ".join(command)))
             log_file.flush()
             for line in _read_process_updates_from_process(process, job_id):
-                log_file.write(line + "\n")
+                log_file.write(_format_job_log_line(line))
                 log_file.flush()
                 output_lines.append(line)
                 if len(output_lines) > 50:
@@ -2016,10 +2020,12 @@ def _run_job(job_id: str) -> None:
                         return
                     _PROCESSES[job_id] = process
                 with log_path.open("a", encoding="utf-8") as log_file:
-                    log_file.write("CPU fallback command: " + " ".join(cpu_command) + "\n")
+                    log_file.write(
+                        _format_job_log_line("CPU fallback command: " + " ".join(cpu_command))
+                    )
                     log_file.flush()
                     for line in _read_process_updates_from_process(process, job_id):
-                        log_file.write(line + "\n")
+                        log_file.write(_format_job_log_line(line))
                         log_file.flush()
                         output_lines.append(line)
                         if len(output_lines) > 50:
