@@ -26,6 +26,7 @@ const summary = FlightSummariesResponseSchema.parse({
       elevation_gain_m: null,
       has_gpx: false,
       has_video: false,
+      has_youtube_video: false,
       has_gopro_overlay: false,
       video_export_job_id: null,
       video_export_status: null,

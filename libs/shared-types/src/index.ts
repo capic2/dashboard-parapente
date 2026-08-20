@@ -177,6 +177,7 @@ export const FlightSummarySchema = z.object({
   elevation_gain_m: z.number().nullable(),
   has_gpx: z.boolean(),
   has_video: z.boolean(),
+  has_youtube_video: z.boolean(),
   has_gopro_overlay: z.boolean(),
   video_export_job_id: z.string().nullable(),
   video_export_status: z.string().nullable(),

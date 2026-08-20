@@ -62,6 +62,14 @@ class InvalidFlightSummaryCursor(ValueError):
     pass
 
 
+def _has_youtube_video(value: str | None) -> bool:
+    try:
+        urls = json.loads(value or "[]")
+    except (TypeError, json.JSONDecodeError):
+        return False
+    return isinstance(urls, list) and bool(urls)
+
+
 def _encode_cursor(payload: dict[str, Any]) -> str:
     body = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
     signature = hmac.new(_CURSOR_SIGNING_KEY, body, hashlib.sha256).digest()
@@ -248,6 +256,7 @@ def list_flight_summaries(
         Flight.video_export_job_id,
         Flight.video_export_status,
         Flight.video_file_path,
+        Flight.youtube_urls_json,
         Flight.gopro_overlay_job_id,
         Flight.gopro_overlay_status,
         Flight.gopro_overlay_file_path,
@@ -287,6 +296,7 @@ def list_flight_summaries(
             video_export_status=row.video_export_status,
             video_export_progress=None,
             has_video=bool(row.video_file_path),
+            has_youtube_video=_has_youtube_video(row.youtube_urls_json),
             gopro_overlay_job_id=row.gopro_overlay_job_id,
             gopro_overlay_status=row.gopro_overlay_status,
             gopro_overlay_progress=None,

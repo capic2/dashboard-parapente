@@ -1000,6 +1000,7 @@
     "youtubeUploadError": "Unable to upload the video to YouTube",
     "gpxBadge": "GPX",
     "videoBadge": "Video",
+    "youtubeBadge": "YouTube",
     "videoProcessingBadge": "Video: in progress",
     "videoErrorBadge": "Video: error",
     "goproOverlayBadge": "GoPro overlay",
