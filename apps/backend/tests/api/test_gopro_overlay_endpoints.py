@@ -6,6 +6,7 @@ import subprocess
 from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -1288,6 +1289,7 @@ def test_gopro_overlay_output_resolution_is_rescaled_when_needed(tmp_path, monke
         return Result()
 
     monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", fake_probe)
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: 30.0)
     with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run) as run:
         ok, error = gopro_overlay_export._ensure_video_output_resolution(
             output_path,
@@ -1301,6 +1303,155 @@ def test_gopro_overlay_output_resolution_is_rescaled_when_needed(tmp_path, monke
     command = run.call_args.args[0]
     assert command[command.index("-vf") + 1] == "scale=w=1920:h=1080:flags=lanczos"
     assert command[command.index("-c:v") + 1] == "libx264"
+    assert run.call_args.kwargs["timeout"] == 600
+
+
+@pytest.mark.parametrize("nvenc_failure", ["nonzero", "timeout"])
+def test_gopro_overlay_output_resolution_retries_cuda_failure_on_cpu(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    nvenc_failure: str,
+) -> None:
+    output_path = tmp_path / "overlay.mp4"
+    output_path.write_bytes(b"small")
+    scaled_path = gopro_overlay_export._scaled_video_path(output_path)
+    log_path = tmp_path / "overlay.log"
+    commands: list[list[str]] = []
+    timeouts: list[int] = []
+
+    def fake_probe(path: Path) -> tuple[int | None, int | None]:
+        if path == output_path:
+            return (3840, 2176)
+        if path == scaled_path:
+            return (3840, 2160)
+        return (None, None)
+
+    class Result:
+        def __init__(self, returncode: int, stderr: str = "") -> None:
+            self.returncode = returncode
+            self.stderr = stderr
+            self.stdout = ""
+
+    def fake_run(command: list[str], **kwargs: Any) -> Result:
+        commands.append(command)
+        timeouts.append(kwargs["timeout"])
+        if len(commands) == 1:
+            if nvenc_failure == "timeout":
+                raise gopro_overlay_export.subprocess.TimeoutExpired(command, kwargs["timeout"])
+            return Result(1, "NVENC initialization failed")
+        scaled_path.write_bytes(b"scaled")
+        return Result(0)
+
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", fake_probe)
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: 421.482)
+    monkeypatch.setattr(gopro_overlay_export, "select_video_accelerator", lambda _: "nvidia")
+    monkeypatch.setattr(gopro_overlay_export, "ffmpeg_supports_cuda_overlay", lambda: True)
+    monkeypatch.setattr(gopro_overlay_export.subprocess, "run", fake_run)
+
+    ok, error = gopro_overlay_export._ensure_video_output_resolution(
+        output_path,
+        3840,
+        2160,
+        log_path=log_path,
+    )
+
+    assert ok is True
+    assert error is None
+    assert len(commands) == 2
+    assert commands[0][commands[0].index("-hwaccel") + 1] == "cuda"
+    assert commands[0][commands[0].index("-vf") + 1] == ("scale_cuda=w=3840:h=2160:format=yuv420p")
+    assert commands[0][commands[0].index("-c:v") + 1] == "h264_nvenc"
+    assert commands[1][commands[1].index("-vf") + 1] == ("scale=w=3840:h=2160:flags=lanczos")
+    assert commands[1][commands[1].index("-c:v") + 1] == "libx264"
+    assert timeouts == [8429, 8429]
+    log = log_path.read_text()
+    expected_detail = (
+        "NVENC initialization failed"
+        if nvenc_failure == "nonzero"
+        else "timed out after 8429 seconds"
+    )
+    assert "NVENC output scaling failed:" in log
+    assert expected_detail in log
+    assert "Retrying output scaling with CPU encoding" in log
+
+
+def test_gopro_overlay_output_resolution_reports_cpu_fallback_timeout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_path = tmp_path / "overlay.mp4"
+    output_path.write_bytes(b"small")
+    scaled_path = gopro_overlay_export._scaled_video_path(output_path)
+    log_path = tmp_path / "overlay.log"
+    calls = 0
+
+    class Result:
+        returncode = 1
+        stderr = "NVENC initialization failed"
+        stdout = ""
+
+    def fake_run(command: list[str], **kwargs: Any) -> Result:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return Result()
+        scaled_path.write_bytes(b"partial")
+        raise gopro_overlay_export.subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (3840, 2176))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: 421.482)
+    monkeypatch.setattr(gopro_overlay_export, "select_video_accelerator", lambda _: "nvidia")
+    monkeypatch.setattr(gopro_overlay_export, "ffmpeg_supports_cuda_overlay", lambda: True)
+    monkeypatch.setattr(gopro_overlay_export.subprocess, "run", fake_run)
+
+    ok, error = gopro_overlay_export._ensure_video_output_resolution(
+        output_path,
+        3840,
+        2160,
+        log_path=log_path,
+    )
+
+    assert ok is False
+    assert error is not None
+    assert "timed out after 8429 seconds" in error
+    assert "CPU output scaling failed" in log_path.read_text()
+    assert not scaled_path.exists()
+
+
+@pytest.mark.parametrize("failure", ["missing", "timeout"])
+def test_gopro_overlay_output_resolution_logs_direct_scaling_exception(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+) -> None:
+    output_path = tmp_path / "overlay.mp4"
+    output_path.write_bytes(b"small")
+    log_path = tmp_path / "overlay.log"
+
+    def fake_run(command: list[str], **kwargs: Any) -> None:
+        if failure == "missing":
+            raise FileNotFoundError("ffmpeg not found")
+        raise gopro_overlay_export.subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1280, 720))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: 30.0)
+    monkeypatch.setattr(gopro_overlay_export, "select_video_accelerator", lambda _: "cpu")
+    monkeypatch.setattr(gopro_overlay_export.subprocess, "run", fake_run)
+
+    ok, error = gopro_overlay_export._ensure_video_output_resolution(
+        output_path,
+        1920,
+        1080,
+        log_path=log_path,
+    )
+
+    assert ok is False
+    assert error is not None
+    expected_detail = "ffmpeg not found" if failure == "missing" else "timed out after 600 seconds"
+    assert expected_detail in error
+    log = log_path.read_text()
+    assert "Output scaling failed:" in log
+    assert expected_detail in log
 
 
 def test_gopro_overlay_output_resolution_noops_when_size_matches(tmp_path, monkeypatch) -> None:
@@ -1349,6 +1500,7 @@ def test_gopro_overlay_output_resolution_cleans_scaled_file_on_ffmpeg_error(
         return Result()
 
     monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1280, 720))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: 30.0)
     with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run):
         ok, error = gopro_overlay_export._ensure_video_output_resolution(
             output_path,
@@ -1387,6 +1539,7 @@ def test_gopro_overlay_output_resolution_cleans_scaled_file_on_wrong_scaled_size
         return Result()
 
     monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", fake_probe)
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: 30.0)
     with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run):
         ok, error = gopro_overlay_export._ensure_video_output_resolution(
             output_path,
