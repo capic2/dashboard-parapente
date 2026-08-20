@@ -1158,6 +1158,7 @@ def _ensure_video_output_resolution(
     path: Path,
     expected_width: int | None,
     expected_height: int | None,
+    log_path: Path | None = None,
 ) -> tuple[bool, str | None]:
     if not expected_width or not expected_height:
         return True, None
@@ -1175,6 +1176,12 @@ def _ensure_video_output_resolution(
     scaled_path = _scaled_video_path(path)
     _unlink_if_exists(scaled_path)
     accelerator = select_video_accelerator(config.VIDEO_ACCELERATOR)
+    video_duration = probe_video_duration(path)
+    ffmpeg_timeout = (
+        _ffmpeg_timeout_for_duration(video_duration)
+        if video_duration is not None
+        else config.JOB_QUEUE_TIMEOUT_SECONDS
+    )
 
     if accelerator == "nvidia" and ffmpeg_supports_cuda_overlay():
         command = [
@@ -1221,20 +1228,36 @@ def _ensure_video_output_resolution(
         expected_height,
         path,
     )
+    hardware_error: str | None = None
     try:
-        result = subprocess.run(
+        result: subprocess.CompletedProcess[str] | None = subprocess.run(
             command,
             check=False,
             capture_output=True,
             text=True,
-            timeout=2 * 60 * 60,
+            timeout=ffmpeg_timeout,
         )
-    except (FileNotFoundError, subprocess.SubprocessError, TimeoutError) as exc:
+    except FileNotFoundError as exc:
         _unlink_if_exists(scaled_path)
-        return False, str(exc) or exc.__class__.__name__
+        detail = str(exc) or exc.__class__.__name__
+        if log_path:
+            _append_job_log(log_path, f"Output scaling failed: {detail}")
+        return False, detail
+    except (subprocess.SubprocessError, TimeoutError) as exc:
+        result = None
+        hardware_error = str(exc) or exc.__class__.__name__
 
-    if result.returncode != 0 and accelerator == "nvidia":
-        logger.warning("NVENC output scaling failed; retrying with CPU encoding")
+    if accelerator == "nvidia" and (result is None or result.returncode != 0):
+        hardware_error = hardware_error or (
+            result.stderr.strip() or result.stdout.strip() or "ffmpeg NVENC output scaling failed"
+        )
+        logger.warning(
+            "NVENC output scaling failed; retrying with CPU encoding: %s",
+            hardware_error,
+        )
+        if log_path:
+            _append_job_log(log_path, f"NVENC output scaling failed: {hardware_error}")
+            _append_job_log(log_path, "Retrying output scaling with CPU encoding")
         _unlink_if_exists(scaled_path)
         command = [
             "ffmpeg",
@@ -1256,14 +1279,25 @@ def _ensure_video_output_resolution(
                 check=False,
                 capture_output=True,
                 text=True,
-                timeout=2 * 60 * 60,
+                timeout=ffmpeg_timeout,
             )
         except (FileNotFoundError, subprocess.SubprocessError, TimeoutError) as exc:
             _unlink_if_exists(scaled_path)
-            return False, str(exc) or exc.__class__.__name__
+            detail = str(exc) or exc.__class__.__name__
+            if log_path:
+                _append_job_log(log_path, f"CPU output scaling failed: {detail}")
+            return False, detail
+    if result is None:
+        _unlink_if_exists(scaled_path)
+        detail = hardware_error or "ffmpeg output scaling failed"
+        if log_path:
+            _append_job_log(log_path, f"Output scaling failed: {detail}")
+        return False, detail
     if result.returncode != 0:
         detail = result.stderr.strip() or result.stdout.strip() or "ffmpeg scale failed"
         _unlink_if_exists(scaled_path)
+        if log_path:
+            _append_job_log(log_path, f"Output scaling failed: {detail}")
         return False, detail
     scaled_width, scaled_height = probe_video_resolution(scaled_path)
     if scaled_width != expected_width or scaled_height != expected_height:
@@ -2091,6 +2125,7 @@ def _run_job(job_id: str) -> None:
             temp_output_path,
             int(job["video_width"]) if job.get("video_width") else None,
             int(job["video_height"]) if job.get("video_height") else None,
+            log_path=log_path,
         )
         if not resolution_ok:
             _finish_job(
