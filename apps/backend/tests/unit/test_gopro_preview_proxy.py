@@ -1,4 +1,6 @@
 import json
+import os
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
@@ -16,7 +18,9 @@ def test_ffmpeg_command_concatenates_start_and_target_tail_without_audio(
     output_path = tmp_path / "preview.mp4"
 
     segments = gopro_preview_proxy.preview_segments(1000, 180)
-    command = gopro_preview_proxy._ffmpeg_command(camera_path, output_path, segments, "cpu")
+    command = gopro_preview_proxy._ffmpeg_command(
+        camera_path, output_path, segments, "cpu", include_audio=False
+    )
 
     filters = command[command.index("-filter_complex") + 1]
     assert "[0:v:0]trim=duration=180" in filters
@@ -29,6 +33,28 @@ def test_ffmpeg_command_concatenates_start_and_target_tail_without_audio(
     assert "-an" in command
     assert command[command.index("-movflags") + 1] == "+faststart"
     assert command[command.index("-g") + 1] == "30"
+
+
+def test_ffmpeg_command_concatenates_audio_with_video(tmp_path: Path) -> None:
+    camera_path = tmp_path / "camera.mp4"
+    output_path = tmp_path / "preview.mp4"
+
+    command = gopro_preview_proxy._ffmpeg_command(
+        camera_path,
+        output_path,
+        gopro_preview_proxy.preview_segments(1000, 180),
+        "cpu",
+        include_audio=True,
+    )
+
+    filters = command[command.index("-filter_complex") + 1]
+    assert "[0:a:0]atrim=duration=180,asetpts=PTS-STARTPTS[a0]" in filters
+    assert "[1:a:0]atrim=duration=180,asetpts=PTS-STARTPTS[a1]" in filters
+    assert "[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]" in filters
+    assert command.count("-map") == 2
+    assert "[outa]" in command
+    assert command[command.index("-c:a") + 1] == "aac"
+    assert "-an" not in command
 
 
 def test_preview_segments_use_one_continuous_segment_when_extremities_overlap() -> None:
@@ -708,3 +734,28 @@ def test_scanner_waits_for_stable_camera_observation(tmp_path: Path, monkeypatch
         assert gopro_preview_proxy.scan_for_gopro_previews() == 1
 
     assert requested == [(camera_path, config.GOPRO_PREVIEW_DEFAULT_SECONDS)]
+
+
+def test_scanner_removes_only_stale_preview_temporary_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    camera_path = tmp_path / "20260315" / "01" / "camera.mp4"
+    camera_path.parent.mkdir(parents=True)
+    camera_path.write_bytes(b"camera")
+    stale_video = camera_path.with_name(".camera.preview.mp4.123.part.mp4")
+    stale_manifest = camera_path.with_name(".camera.preview.json.123.456.tmp")
+    recent_video = camera_path.with_name(".camera.preview.mp4.789.part.mp4")
+    for path in (stale_video, stale_manifest, recent_video):
+        path.write_bytes(b"temporary")
+    stale_mtime = time.time() - 301
+    os.utime(stale_video, (stale_mtime, stale_mtime))
+    os.utime(stale_manifest, (stale_mtime, stale_mtime))
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+    monkeypatch.setattr(config, "GOPRO_PREVIEW_TIMEOUT_SECONDS", 300)
+    gopro_preview_proxy._STABILITY_OBSERVATIONS.clear()
+
+    assert gopro_preview_proxy.scan_for_gopro_previews() == 0
+
+    assert not stale_video.exists()
+    assert not stale_manifest.exists()
+    assert recent_video.exists()

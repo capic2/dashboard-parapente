@@ -28,7 +28,7 @@ PREVIEW_FILENAME = "camera.preview.mp4"
 MANIFEST_FILENAME = ".camera.preview.json"
 LOCK_FILENAME = ".camera.preview.lock"
 STATE_LOCK_FILENAME = ".camera.preview.state.lock"
-PROFILE_VERSION = 2
+PROFILE_VERSION = 3
 
 PreviewStatus = Literal["missing", "generating", "ready", "failed"]
 
@@ -83,8 +83,11 @@ def _write_manifest(camera_path: Path, manifest: dict[str, Any]) -> None:
     temporary_path = manifest_path.with_suffix(
         f"{manifest_path.suffix}.{os.getpid()}.{threading.get_ident()}.tmp"
     )
-    temporary_path.write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
-    temporary_path.replace(manifest_path)
+    try:
+        temporary_path.write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+        temporary_path.replace(manifest_path)
+    finally:
+        _unlink_temp_file(temporary_path)
 
 
 def _manifest_matches_source(manifest: dict[str, Any], fingerprint: SourceFingerprint) -> bool:
@@ -164,6 +167,38 @@ def _probe_duration(video_path: Path) -> float | None:
     except (FileNotFoundError, subprocess.SubprocessError, ValueError):
         return None
     return duration if result.returncode == 0 and duration > 0 else None
+
+
+def _has_audio_stream(video_path: Path) -> bool:
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "a:0",
+                "-show_entries",
+                "stream=index",
+                "-of",
+                "csv=p=0",
+                str(video_path),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError, TimeoutError):
+        return False
+    return result.returncode == 0 and bool(result.stdout.strip())
+
+
+def _unlink_temp_file(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        logger.warning("Failed to delete temporary GoPro preview file %s", path, exc_info=True)
 
 
 def _generation_is_active(manifest: dict[str, Any]) -> bool:
@@ -339,6 +374,7 @@ def _ffmpeg_command(
     output_path: Path,
     segments: list[PreviewSegment] | int,
     accelerator: Literal["cpu", "nvidia"],
+    include_audio: bool,
 ) -> list[str]:
     if isinstance(segments, int):
         segments = preview_segments(float(segments), segments)
@@ -355,14 +391,33 @@ def _ffmpeg_command(
         if segment.source_start_seconds > 0:
             input_args.extend(["-ss", f"{segment.source_start_seconds:g}"])
         input_args.extend(["-i", str(camera_path)])
-        output_label = "outv" if len(segments) == 1 else f"v{index}"
+        video_label = "outv" if len(segments) == 1 else f"v{index}"
         filters.append(
             f"[{index}:v:0]trim=duration={segment.duration_seconds:g},"
-            f"setpts=PTS-STARTPTS,{scale}[{output_label}]"
+            f"setpts=PTS-STARTPTS,{scale}[{video_label}]"
         )
+        if include_audio:
+            audio_label = "outa" if len(segments) == 1 else f"a{index}"
+            filters.append(
+                f"[{index}:a:0]atrim=duration={segment.duration_seconds:g},"
+                f"asetpts=PTS-STARTPTS[{audio_label}]"
+            )
     if len(segments) > 1:
-        inputs = "".join(f"[v{index}]" for index in range(len(segments)))
-        filters.append(f"{inputs}concat=n={len(segments)}:v=1:a=0[outv]")
+        if include_audio:
+            inputs = "".join(f"[v{index}][a{index}]" for index in range(len(segments)))
+            filters.append(f"{inputs}concat=n={len(segments)}:v=1:a=1[outv][outa]")
+        else:
+            inputs = "".join(f"[v{index}]" for index in range(len(segments)))
+            filters.append(f"{inputs}concat=n={len(segments)}:v=1:a=0[outv]")
+    encode_args = h264_encode_args(
+        accelerator,
+        quality=str(config.GOPRO_PREVIEW_QUALITY),
+        cpu_preset="veryfast",
+        include_audio=False,
+    )
+    if include_audio:
+        encode_args.remove("-an")
+        encode_args.extend(["-c:a", "aac", "-b:a", "128k"])
     return [
         "ffmpeg",
         "-hide_banner",
@@ -374,12 +429,8 @@ def _ffmpeg_command(
         ";".join(filters),
         "-map",
         "[outv]",
-        *h264_encode_args(
-            accelerator,
-            quality=str(config.GOPRO_PREVIEW_QUALITY),
-            cpu_preset="veryfast",
-            include_audio=False,
-        ),
+        *(["-map", "[outa]"] if include_audio else []),
+        *encode_args,
         "-g",
         "30",
         "-movflags",
@@ -390,13 +441,14 @@ def _ffmpeg_command(
 
 def _run_ffmpeg(camera_path: Path, output_path: Path, segments: list[PreviewSegment]) -> None:
     selected = select_video_accelerator(config.VIDEO_ACCELERATOR)
+    include_audio = _has_audio_stream(camera_path)
     accelerators: list[Literal["cpu", "nvidia"]] = [selected]
     if selected == "nvidia":
         accelerators.append("cpu")
     last_error = "ffmpeg failed"
     for accelerator in accelerators:
         result = subprocess.run(
-            _ffmpeg_command(camera_path, output_path, segments, accelerator),
+            _ffmpeg_command(camera_path, output_path, segments, accelerator, include_audio),
             check=False,
             capture_output=True,
             text=True,
@@ -404,7 +456,7 @@ def _run_ffmpeg(camera_path: Path, output_path: Path, segments: list[PreviewSegm
         )
         if result.returncode == 0:
             return
-        output_path.unlink(missing_ok=True)
+        _unlink_temp_file(output_path)
         last_error = (result.stderr or last_error).strip()[-1000:]
     raise RuntimeError(last_error)
 
@@ -508,7 +560,7 @@ def process_preview_job(
             logger.warning("GoPro preview generation failed for %s: %s", camera_path, error)
             manifest.update(status="failed", generation_started_at=None, error=str(error)[:1000])
         finally:
-            temporary_path.unlink(missing_ok=True)
+            _unlink_temp_file(temporary_path)
             if not _preview_path(camera_path).is_file() or manifest.get("status") != "ready":
                 with _state_lock(camera_path):
                     latest_manifest = _load_manifest(camera_path)
@@ -531,6 +583,22 @@ def process_preview_job(
 _STABILITY_OBSERVATIONS: dict[Path, tuple[SourceFingerprint, float]] = {}
 
 
+def _cleanup_stale_preview_temp_files(camera_path: Path) -> None:
+    cutoff = time.time() - config.GOPRO_PREVIEW_TIMEOUT_SECONDS
+    patterns = (f".{PREVIEW_FILENAME}.*.part.mp4", f"{MANIFEST_FILENAME}.*.tmp")
+    for pattern in patterns:
+        for temporary_path in camera_path.parent.glob(pattern):
+            try:
+                if temporary_path.stat().st_mtime < cutoff:
+                    _unlink_temp_file(temporary_path)
+            except OSError:
+                logger.warning(
+                    "Failed to inspect temporary GoPro preview file %s",
+                    temporary_path,
+                    exc_info=True,
+                )
+
+
 def scan_for_gopro_previews() -> int:
     root = Path(config.GOPRO_OVERLAY_PARAGLIDING_ROOT)
     if not root.is_dir():
@@ -539,6 +607,7 @@ def scan_for_gopro_previews() -> int:
     observed_paths: set[Path] = set()
     for camera_path in root.glob("[0-9]" * 8 + "/[0-9][0-9]/camera.mp4"):
         try:
+            _cleanup_stale_preview_temp_files(camera_path)
             observed_paths.add(camera_path)
             fingerprint = _source_fingerprint(camera_path)
             previous = _STABILITY_OBSERVATIONS.get(camera_path)

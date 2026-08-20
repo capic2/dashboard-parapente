@@ -1155,7 +1155,7 @@ def _unlink_if_exists(path: Path) -> None:
         if path.exists():
             path.unlink()
     except OSError:
-        pass
+        logger.exception("Failed to delete temporary GoPro overlay file %s", path)
 
 
 def _ensure_video_output_resolution(
@@ -2351,21 +2351,24 @@ def process_gopro_overlay_job(job_id: str) -> None:
 
 
 def _mark_interrupted_jobs_failed() -> None:
+    jobs_to_clean: list[dict[str, Any]] = []
     try:
         with SessionLocal() as db:
             jobs = (
                 db.query(GoproOverlayJob)
-                .filter(GoproOverlayJob.status.in_(_INTERRUPTIBLE_STATUSES))
+                .filter(GoproOverlayJob.status.in_(_INTERRUPTIBLE_STATUSES | _TERMINAL_STATUSES))
                 .all()
             )
             for job in jobs:
-                job.status = _STATUS_FAILED
-                job.progress = 100
-                job.message = "Overlay interrupted by backend restart"
-                job.error = "The backend stopped while the overlay process was running"
-                job.completed_at = _utc_now_dt()
-                job.updated_at = _utc_now_dt()
-                _sync_flights_from_job(db, job)
+                if job.status in _INTERRUPTIBLE_STATUSES:
+                    job.status = _STATUS_FAILED
+                    job.progress = 100
+                    job.message = "Overlay interrupted by backend restart"
+                    job.error = "The backend stopped while the overlay process was running"
+                    job.completed_at = _utc_now_dt()
+                    job.updated_at = _utc_now_dt()
+                    _sync_flights_from_job(db, job)
+                jobs_to_clean.append(_job_to_payload(job))
             db.commit()
     except OperationalError as exc:
         if "no such table: gopro_overlay_jobs" not in str(exc):
@@ -2381,6 +2384,11 @@ def _mark_interrupted_jobs_failed() -> None:
                         completed_at=_utc_now(),
                         updated_at=_utc_now(),
                     )
+                if job.get("status") in _TERMINAL_STATUSES:
+                    jobs_to_clean.append(job.copy())
+
+    for job in jobs_to_clean:
+        _cleanup_gopro_overlay_temp_files(job)
 
 
 def _worker_loop() -> None:
