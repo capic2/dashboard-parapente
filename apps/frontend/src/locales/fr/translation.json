@@ -1004,6 +1004,7 @@
     "youtubeUploadError": "Impossible d'envoyer la vidéo sur YouTube",
     "gpxBadge": "GPX",
     "videoBadge": "Vidéo",
+    "youtubeBadge": "YouTube",
     "videoProcessingBadge": "Vidéo: en cours",
     "videoErrorBadge": "Vidéo: erreur",
     "goproOverlayBadge": "Overlay GoPro",

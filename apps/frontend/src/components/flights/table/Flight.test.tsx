@@ -55,6 +55,7 @@ const flight = {
   elevation_gain_m: null,
   has_gpx: false,
   has_video: false,
+  has_youtube_video: false,
   has_gopro_overlay: false,
   video_export_job_id: null,
   video_export_status: null,
@@ -104,4 +105,20 @@ test('renders media as a passive status in the flight list', () => {
   expect(
     screen.queryByRole('button', { name: 'flights.downloadGpx' })
   ).not.toBeInTheDocument();
+  expect(screen.queryByText('flights.youtubeBadge')).not.toBeInTheDocument();
+});
+
+test('renders a YouTube badge when the flight has a YouTube video', () => {
+  render(
+    <Flight
+      flight={{ ...flight, has_youtube_video: true }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(screen.getByText('flights.youtubeBadge')).toBeInTheDocument();
 });
