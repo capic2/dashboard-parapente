@@ -206,6 +206,7 @@ vi.mock('react-i18next', () => ({
         'flights.logsTab': 'Processing',
         'flights.mediaPageTitle': 'Flight media',
         'flights.mediaReplayTitle': 'Flight replay',
+        'flights.open3dReplay': 'Open 3D replay',
         'flights.mediaFilesTitle': 'Available files',
         'flights.mediaCreationTitle': 'Create and publish',
         'flights.youtubeVideos': 'YouTube videos',
@@ -396,6 +397,12 @@ describe('FlightDetails GoPro overlay action', () => {
       'src',
       'https://www.youtube-nocookie.com/embed/9bZkp7q19f0'
     );
+    expect(
+      screen.getByRole('button', { name: 'Open 3D replay' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('flights.loading3dViewer')
+    ).not.toBeInTheDocument();
   });
 
   it('removes a YouTube association from the media tab', async () => {
