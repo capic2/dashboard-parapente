@@ -18,6 +18,7 @@ from starlette.datastructures import UploadFile
 import config
 import gopro_overlay_export
 import gopro_overlay_worker
+import gopro_preview_proxy
 from auth import create_job_token
 import routes
 from gopro_overlay_export import _prepare_layout_file
@@ -203,7 +204,7 @@ def test_gopro_camera_preview_endpoint_serves_current_proxy(
     (input_dir / ".camera.preview.json").write_text(
         json.dumps(
             {
-                "profile_version": 2,
+                "profile_version": gopro_preview_proxy.PROFILE_VERSION,
                 "source": {
                     "size": fingerprint.st_size,
                     "mtime_ns": fingerprint.st_mtime_ns,
@@ -238,7 +239,7 @@ def test_gopro_camera_preview_endpoint_falls_back_for_a_different_target(
     (input_dir / ".camera.preview.json").write_text(
         json.dumps(
             {
-                "profile_version": 2,
+                "profile_version": gopro_preview_proxy.PROFILE_VERSION,
                 "source": {
                     "size": fingerprint.st_size,
                     "mtime_ns": fingerprint.st_mtime_ns,
@@ -272,7 +273,7 @@ def test_gopro_camera_preview_endpoint_falls_back_when_proxy_file_is_missing(
     (input_dir / ".camera.preview.json").write_text(
         json.dumps(
             {
-                "profile_version": 2,
+                "profile_version": gopro_preview_proxy.PROFILE_VERSION,
                 "source": {
                     "size": fingerprint.st_size,
                     "mtime_ns": fingerprint.st_mtime_ns,
@@ -2078,13 +2079,26 @@ def test_reconcile_gopro_overlay_flight_refs_clears_missing_active_job(test_db, 
         session.close()
 
 
-def test_mark_interrupted_jobs_failed_marks_active_rows_failed(test_db, monkeypatch):
+def test_mark_interrupted_jobs_failed_marks_active_rows_failed(
+    test_db: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+    final_output = tmp_path / "final.mp4"
+    final_output.write_bytes(b"completed")
     session = test_db()
     try:
         from models import GoproOverlayJob
 
-        for job_id, status in (("job-preparing", "preparing"), ("job-running", "running")):
+        jobs = (
+            ("job-preparing", "preparing", ".final.job-preparing.part.mp4"),
+            ("job-running", "running", ".Vol_test.job-running.part.mp4"),
+            ("job-already-failed", "failed", ".final.job-already-failed.part.mp4"),
+        )
+        temporary_paths = []
+        for job_id, status, temporary_name in jobs:
+            temporary_path = tmp_path / temporary_name
+            temporary_path.write_bytes(b"partial")
+            temporary_paths.append(temporary_path)
             session.add(
                 GoproOverlayJob(
                     id=job_id,
@@ -2096,8 +2110,8 @@ def test_mark_interrupted_jobs_failed_marks_active_rows_failed(test_db, monkeypa
                     layout_id="parapente-1080",
                     layout_label="Parapente 1920x1080",
                     layout_path="layout.xml",
-                    output_path="final.mp4",
-                    temp_output_path=f".final.{job_id}.part.mp4",
+                    output_path=str(final_output),
+                    temp_output_path=str(temporary_path),
                     output_filename="final.mp4",
                 )
             )
@@ -2122,6 +2136,11 @@ def test_mark_interrupted_jobs_failed_marks_active_rows_failed(test_db, monkeypa
             refreshed_flight = session.get(Flight, f"flight-{job_id}")
             assert refreshed_flight is not None
             assert refreshed_flight.gopro_overlay_status == "failed"
+        already_failed = gopro_overlay_export.get_gopro_overlay_job("job-already-failed")
+        assert already_failed is not None
+        assert already_failed["message"] == "Rendering overlay"
+        assert all(not temporary_path.exists() for temporary_path in temporary_paths)
+        assert final_output.read_bytes() == b"completed"
     finally:
         session.close()
 
