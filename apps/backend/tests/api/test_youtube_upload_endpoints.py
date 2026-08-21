@@ -26,6 +26,39 @@ def _configure_youtube(monkeypatch) -> None:
     )
 
 
+def test_existing_youtube_video_ids_returns_only_remote_matches(monkeypatch) -> None:
+    requests: list[dict[str, Any]] = []
+    monkeypatch.setattr(youtube_upload, "_access_token", lambda user_id: f"token-{user_id}")
+
+    def get_videos(url: str, **kwargs: Any) -> httpx.Response:
+        requests.append({"url": url, **kwargs})
+        return httpx.Response(
+            200,
+            json={"items": [{"id": "dQw4w9WgXcQ"}]},
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr(youtube_upload.httpx, "get", get_videos)
+
+    result = youtube_upload.existing_youtube_video_ids({1: {"dQw4w9WgXcQ", "9bZkp7q19f0"}})
+
+    assert result == {"dQw4w9WgXcQ"}
+    assert requests[0]["params"] == {
+        "part": "id",
+        "id": "9bZkp7q19f0,dQw4w9WgXcQ",
+    }
+    assert requests[0]["headers"] == {"Authorization": "Bearer token-1"}
+
+
+def test_existing_youtube_video_ids_tolerates_token_refresh_failure(monkeypatch) -> None:
+    def unavailable_token(_user_id: int) -> str:
+        raise httpx.ConnectError("YouTube unavailable")
+
+    monkeypatch.setattr(youtube_upload, "_access_token", unavailable_token)
+
+    assert youtube_upload.existing_youtube_video_ids({1: {"dQw4w9WgXcQ"}}) == set()
+
+
 def _create_completed_overlay(
     db_session: Session, sample_flight: Flight, output_path: Path
 ) -> GoproOverlayJob:

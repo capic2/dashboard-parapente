@@ -583,6 +583,7 @@ class FlightSummary(BaseModel):
     video_export_status: str | None = None
     video_export_progress: int | None = None
     has_video: bool
+    has_camera: bool
     has_youtube_video: bool
     gopro_overlay_job_id: str | None = None
     gopro_overlay_status: str | None = None

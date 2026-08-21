@@ -55,6 +55,7 @@ const flight = {
   elevation_gain_m: null,
   has_gpx: false,
   has_video: false,
+  has_camera: false,
   has_youtube_video: false,
   has_gopro_overlay: false,
   video_export_job_id: null,
@@ -108,10 +109,17 @@ test('renders media as a passive status in the flight list', () => {
   expect(screen.queryByText('flights.youtubeBadge')).not.toBeInTheDocument();
 });
 
-test('renders a YouTube badge when the flight has a YouTube video', () => {
+test('renders available media badges in the expected order', () => {
   render(
     <Flight
-      flight={{ ...flight, has_youtube_video: true }}
+      flight={{
+        ...flight,
+        has_gpx: true,
+        has_video: true,
+        has_camera: true,
+        has_gopro_overlay: true,
+        has_youtube_video: true,
+      }}
       isActive={false}
       isSelected={false}
       selectionMode={false}
@@ -120,5 +128,18 @@ test('renders a YouTube badge when the flight has a YouTube video', () => {
     />
   );
 
-  expect(screen.getByText('flights.youtubeBadge')).toBeInTheDocument();
+  const badges = [
+    'flights.gpxBadge',
+    'flights.videoBadge',
+    'flights.cameraBadge',
+    'flights.goproOverlayBadge',
+    'flights.youtubeBadge',
+  ].map((label) => screen.getByText(label));
+
+  expect(badges).toEqual(
+    [...badges].sort((left, right) => {
+      const position = left.compareDocumentPosition(right);
+      return position & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+    })
+  );
 });

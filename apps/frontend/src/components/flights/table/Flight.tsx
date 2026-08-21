@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Card } from '@dashboard-parapente/design-system';
 import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
 import {
+  Camera,
   Clock3,
   FileText,
   MapPin,
@@ -62,6 +63,7 @@ export function Flight({
   const isHighlighted = isActive || isSelected;
   const hasGpx = flight.has_gpx;
   const hasVideo = flight.has_video;
+  const hasCamera = flight.has_camera;
   const hasYoutubeVideo = flight.has_youtube_video;
   const hasPersistedGoproOverlay = flight.has_gopro_overlay;
   const isGoproOverlayRunning = isGoproOverlayInProgress(
@@ -100,6 +102,7 @@ export function Flight({
   const hasMediaStatus =
     hasGpx ||
     hasVideo ||
+    hasCamera ||
     hasYoutubeVideo ||
     isVideoExportRunning ||
     isVideoExportFailed ||
@@ -176,6 +179,18 @@ export function Flight({
                   {t('flights.videoBadge')}
                 </span>
               )}
+              {hasCamera && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                  <Camera className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.cameraBadge')}
+                </span>
+              )}
+              {hasCompletedGoproOverlay && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200">
+                  <Wand2 className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.goproOverlayBadge')}
+                </span>
+              )}
               {hasYoutubeVideo && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
                   <Play className="h-3 w-3" aria-hidden="true" />
@@ -190,12 +205,6 @@ export function Flight({
               {isVideoExportFailed && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
                   {t('flights.videoErrorBadge')}
-                </span>
-              )}
-              {hasCompletedGoproOverlay && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200">
-                  <Wand2 className="h-3 w-3" aria-hidden="true" />
-                  {t('flights.goproOverlayBadge')}
                 </span>
               )}
               {isGoproOverlayRunning && (

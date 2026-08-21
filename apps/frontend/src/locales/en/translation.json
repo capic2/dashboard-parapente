@@ -1006,6 +1006,7 @@
     "youtubeUploadError": "Unable to upload the video to YouTube",
     "gpxBadge": "GPX",
     "videoBadge": "Video",
+    "cameraBadge": "Camera",
     "youtubeBadge": "YouTube",
     "videoProcessingBadge": "Video: in progress",
     "videoErrorBadge": "Video: error",
