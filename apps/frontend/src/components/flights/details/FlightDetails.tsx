@@ -898,6 +898,7 @@ export function FlightDetails({
         </section>
 
         <FlightMediaBadges
+          flightId={flight.id}
           hasGpx={hasGpx}
           hasVideo={hasVideo}
           hasPersistedGoproOverlay={hasPersistedGoproOverlay}

@@ -155,6 +155,7 @@ from schemas import (
     WeatherSourceTestResult,
 )
 from versioning import get_version_payload
+from video_thumbnail import VideoThumbnailError, get_video_thumbnail
 from video_export import cancel_video_export as cancel_video_export_stream
 from video_export import delete_export_job as delete_video_export_stream_job
 from video_export import get_export_status as get_export_status_stream
@@ -4580,6 +4581,32 @@ def download_flight_video(flight_id: str, db: Session = Depends(get_db)) -> File
     return FileResponse(path=video_path, media_type="video/mp4", filename=video_path.name)
 
 
+def _video_thumbnail_response(video_path: Path) -> FileResponse:
+    try:
+        thumbnail_path = get_video_thumbnail(video_path)
+    except VideoThumbnailError as exc:
+        logger.warning("Unable to generate thumbnail for %s: %s", video_path, exc)
+        raise HTTPException(status_code=422, detail="Unable to generate video thumbnail") from exc
+    return FileResponse(
+        path=thumbnail_path,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+@router.get("/flights/{flight_id}/video/thumbnail")
+def get_flight_video_thumbnail(flight_id: str, db: Session = Depends(get_db)) -> FileResponse:
+    """Return a thumbnail for the generated flight video."""
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+
+    video_path = _resolve_flight_file_path(flight.video_file_path)
+    if not video_path or not video_path.is_file():
+        raise HTTPException(status_code=404, detail="No video file available for this flight")
+    return _video_thumbnail_response(video_path)
+
+
 @router.get("/flights/{flight_id}/gopro-overlay")
 def download_flight_gopro_overlay(flight_id: str, db: Session = Depends(get_db)) -> FileResponse:
     """Download generated GoPro overlay video for a flight."""
@@ -4592,6 +4619,22 @@ def download_flight_gopro_overlay(flight_id: str, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="No GoPro overlay available for this flight")
 
     return FileResponse(path=overlay_path, media_type="video/mp4", filename=overlay_path.name)
+
+
+@router.get("/flights/{flight_id}/gopro-overlay/thumbnail")
+def get_flight_gopro_overlay_thumbnail(
+    flight_id: str, db: Session = Depends(get_db)
+) -> FileResponse:
+    """Return a thumbnail for the current GoPro overlay video."""
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+
+    overlay_path_value = _flight_gopro_overlay_file_path(db, flight)
+    overlay_path = Path(overlay_path_value) if overlay_path_value else None
+    if not overlay_path or not overlay_path.is_file():
+        raise HTTPException(status_code=404, detail="No GoPro overlay available for this flight")
+    return _video_thumbnail_response(overlay_path)
 
 
 @router.post("/flights")
@@ -6414,6 +6457,19 @@ def download_gopro_overlay_render_job(job_id: str) -> FileResponse:
         raise HTTPException(status_code=400, detail="GoPro overlay video is not ready")
 
     return FileResponse(path=output_path, media_type="video/mp4", filename=output_path.name)
+
+
+@router.get("/gopro-overlays/jobs/{job_id}/thumbnail")
+def get_gopro_overlay_render_job_thumbnail(job_id: str) -> FileResponse:
+    """Return a thumbnail for a completed GoPro overlay job."""
+    job = get_gopro_overlay_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="GoPro overlay job not found")
+
+    output_path = gopro_overlay_output_path(job_id)
+    if not output_path:
+        raise HTTPException(status_code=400, detail="GoPro overlay video is not ready")
+    return _video_thumbnail_response(output_path)
 
 
 @router.delete("/gopro-overlays/jobs/{job_id}")

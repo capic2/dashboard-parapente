@@ -8,8 +8,10 @@ import {
   Video,
   Wand2,
 } from 'lucide-react';
+import { FlightMediaThumbnail } from './FlightMediaThumbnail';
 
 interface FlightMediaBadgesProps {
+  flightId: string;
   hasGpx: boolean;
   hasVideo: boolean;
   hasPersistedGoproOverlay: boolean;
@@ -26,6 +28,7 @@ interface FlightMediaBadgesProps {
 }
 
 export function FlightMediaBadges({
+  flightId,
   hasGpx,
   hasVideo,
   hasPersistedGoproOverlay,
@@ -112,54 +115,64 @@ export function FlightMediaBadges({
             </button>
           )}
           {hasVideo && (
-            <button
-              type="button"
-              className={downloadCardClassName}
-              onClick={onDownloadVideo}
-              disabled={isDownloadingAnyMedia}
-              aria-label={t('flights.viewer.downloadVideo')}
-            >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
-                <Video className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-semibold text-slate-950 dark:text-white">
-                  {t('flights.videoBadge')}
-                </span>
-                <span className="block text-xs text-slate-600 dark:text-slate-300">
-                  {t('flights.mediaFileAvailable')}
-                </span>
-              </span>
-              <Download
-                className="h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-indigo-600 dark:group-hover:text-indigo-300"
-                aria-hidden="true"
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
+              <FlightMediaThumbnail
+                path={`/flights/${flightId}/video/thumbnail`}
+                alt={t('flights.videoThumbnailAlt')}
               />
-            </button>
+              <div className="flex items-center gap-3 p-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                  <Video className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold text-slate-950 dark:text-white">
+                    {t('flights.videoBadge')}
+                  </span>
+                  <span className="block text-xs text-slate-600 dark:text-slate-300">
+                    {t('flights.mediaFileAvailable')}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-300 dark:hover:bg-indigo-950/50 dark:hover:text-indigo-300"
+                  onClick={onDownloadVideo}
+                  disabled={isDownloadingAnyMedia}
+                  aria-label={t('flights.viewer.downloadVideo')}
+                >
+                  <Download className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
           )}
           {showPersistedOverlayBadge && (
-            <button
-              type="button"
-              className={downloadCardClassName}
-              onClick={onDownloadPersistedGoproOverlay}
-              disabled={isDownloadingAnyMedia}
-              aria-label={t('flights.goproOverlayDownload')}
-            >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
-                <Wand2 className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-semibold text-slate-950 dark:text-white">
-                  {t('flights.goproOverlayBadge')}
-                </span>
-                <span className="block text-xs text-slate-600 dark:text-slate-300">
-                  {t('flights.mediaFileAvailable')}
-                </span>
-              </span>
-              <Download
-                className="h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-indigo-600 dark:group-hover:text-indigo-300"
-                aria-hidden="true"
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
+              <FlightMediaThumbnail
+                path={`/flights/${flightId}/gopro-overlay/thumbnail`}
+                alt={t('flights.goproOverlayThumbnailAlt')}
               />
-            </button>
+              <div className="flex items-center gap-3 p-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
+                  <Wand2 className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold text-slate-950 dark:text-white">
+                    {t('flights.goproOverlayBadge')}
+                  </span>
+                  <span className="block text-xs text-slate-600 dark:text-slate-300">
+                    {t('flights.mediaFileAvailable')}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-300 dark:hover:bg-indigo-950/50 dark:hover:text-indigo-300"
+                  onClick={onDownloadPersistedGoproOverlay}
+                  disabled={isDownloadingAnyMedia}
+                  aria-label={t('flights.goproOverlayDownload')}
+                >
+                  <Download className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
           )}
           {isVideoExportRunning && (
             <div className="flex min-h-24 items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3 text-blue-900 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-100">

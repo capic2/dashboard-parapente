@@ -77,6 +77,8 @@ vi.mock('@dashboard-parapente/design-system', async () => {
         {children}
       </button>
     ),
+    Lightbox: ({ isOpen }: { isOpen: boolean }) =>
+      isOpen ? <dialog open>Lightbox</dialog> : null,
     Modal: ({
       children,
       isOpen,
@@ -314,6 +316,10 @@ vi.mock('./FlightYoutubeUploadControls', () => ({
   }: {
     goproOverlayJobId: string;
   }) => <button type="button">YouTube upload {goproOverlayJobId}</button>,
+}));
+
+vi.mock('./FlightMediaThumbnail', () => ({
+  FlightMediaThumbnail: ({ alt }: { alt: string }) => <div>{alt}</div>,
 }));
 
 import { FlightDetails } from './FlightDetails';
