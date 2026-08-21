@@ -1329,9 +1329,11 @@ def _transition_job_to_running(
                 db_job.status = _STATUS_RUNNING
                 db_job.progress = 5
                 db_job.message = "Rendering overlay"
-                db_job.command_json = json.dumps(
-                    {"command": command, "render_method": render_method}
-                )
+                command_metadata = json.loads(db_job.command_json) if db_job.command_json else {}
+                if not isinstance(command_metadata, dict):
+                    command_metadata = {}
+                command_metadata.update(command=command, render_method=render_method)
+                db_job.command_json = json.dumps(command_metadata)
                 db_job.started_at = _utc_now_dt()
                 db_job.updated_at = _utc_now_dt()
                 db.commit()
