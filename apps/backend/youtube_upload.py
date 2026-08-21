@@ -263,9 +263,10 @@ def latest_job(db: Session, flight_id: str) -> YoutubeUploadJob | None:
 def youtube_video_associations(
     db: Session, *, flight: Flight, user_id: int
 ) -> list[YoutubeVideoAssociationPayload]:
-    """Return local video links and whether the current user uploaded each video."""
+    """Return local links and whether the connected user may delete each video."""
     associations = [(url, youtube_video_id_from_url(url)) for url in flight.youtube_urls]
     video_ids = {video_id for _, video_id in associations}
+    youtube_connected = is_connected(db, user_id)
     deletable_video_ids = {
         video_id
         for (video_id,) in (
@@ -284,7 +285,7 @@ def youtube_video_associations(
         {
             "url": url,
             "video_id": video_id,
-            "can_delete_from_youtube": video_id in deletable_video_ids,
+            "can_delete_from_youtube": youtube_connected and video_id in deletable_video_ids,
         }
         for url, video_id in associations
     ]
