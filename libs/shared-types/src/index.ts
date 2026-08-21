@@ -90,6 +90,16 @@ export const GoproOverlayJobSchema = z.object({
   job_token: z.string().nullish(),
 });
 
+export const YoutubeVideoAssociationSchema = z.object({
+  url: z.string().url(),
+  video_id: z.string().min(1),
+  can_delete_from_youtube: z.boolean(),
+});
+
+export const YoutubeVideoAssociationsSchema = z.array(
+  YoutubeVideoAssociationSchema
+);
+
 export const FlightSchema = z
   .object({
     id: z.string(),
@@ -756,6 +766,9 @@ export type SiteUpdate = z.infer<typeof SiteUpdateSchema>;
 export type CreateSiteData = z.infer<typeof CreateSiteSchema>;
 export type Flight = z.infer<typeof FlightSchema>;
 export type GoproOverlayJob = z.infer<typeof GoproOverlayJobSchema>;
+export type YoutubeVideoAssociation = z.infer<
+  typeof YoutubeVideoAssociationSchema
+>;
 export type FlightSummary = z.infer<typeof FlightSummarySchema>;
 export type FlightSummariesResponse = z.infer<
   typeof FlightSummariesResponseSchema

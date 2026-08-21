@@ -11,7 +11,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 from urllib.parse import urlencode, urlparse
 
 import httpx
@@ -23,14 +23,16 @@ from sqlalchemy.orm import Session
 import config
 from database import SessionLocal
 from models import Flight, GoproOverlayJob, YoutubeCredential, YoutubeUploadJob
+from schemas import youtube_video_id_from_url
 
 logger = logging.getLogger(__name__)
 
 _ALGORITHM = "HS256"
-_OAUTH_SCOPE = "https://www.googleapis.com/auth/youtube.upload"
+_OAUTH_SCOPE = "https://www.googleapis.com/auth/youtube.force-ssl"
 _AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
 _UPLOAD_URL = "https://www.googleapis.com/upload/youtube/v3/videos"
+_VIDEOS_URL = "https://www.googleapis.com/youtube/v3/videos"
 _ACTIVE_STATUSES = {"queued", "uploading"}
 _CANCELLED_STATUS = "cancelled"
 _RANGE_PATTERN = re.compile(r"bytes=0-(\d+)")
@@ -46,6 +48,24 @@ class YoutubeConfigurationError(RuntimeError):
 
 class YoutubeOAuthError(RuntimeError):
     pass
+
+
+class YoutubeVideoNotAssociatedError(RuntimeError):
+    pass
+
+
+class YoutubeVideoDeletionForbiddenError(RuntimeError):
+    pass
+
+
+class YoutubeRemoteDeletionError(RuntimeError):
+    pass
+
+
+class YoutubeVideoAssociationPayload(TypedDict):
+    url: str
+    video_id: str
+    can_delete_from_youtube: bool
 
 
 def _youtube_upload_log_path(job_id: str) -> Path:
@@ -166,7 +186,8 @@ def exchange_authorization_code(db: Session, *, user_id: int, code: str) -> None
     )
     if response.is_error:
         raise YoutubeOAuthError("Google rejected the YouTube authorization code")
-    refresh_token = response.json().get("refresh_token")
+    token_payload = response.json()
+    refresh_token = token_payload.get("refresh_token")
     if not isinstance(refresh_token, str) or not refresh_token:
         raise YoutubeOAuthError("Google did not return a refresh token; reconnect YouTube")
     credential = db.get(YoutubeCredential, user_id)
@@ -174,11 +195,14 @@ def exchange_authorization_code(db: Session, *, user_id: int, code: str) -> None
         credential = YoutubeCredential(user_id=user_id, refresh_token_encrypted="")
         db.add(credential)
     credential.refresh_token_encrypted = encrypt_secret(refresh_token)
+    granted_scope = token_payload.get("scope")
+    credential.oauth_scope = granted_scope if isinstance(granted_scope, str) else _OAUTH_SCOPE
     db.commit()
 
 
 def is_connected(db: Session, user_id: int) -> bool:
-    return db.get(YoutubeCredential, user_id) is not None
+    credential = db.get(YoutubeCredential, user_id)
+    return credential is not None and _OAUTH_SCOPE in credential.oauth_scope.split()
 
 
 def disconnect(db: Session, user_id: int) -> None:
@@ -193,6 +217,8 @@ def _access_token(user_id: int) -> str:
         credential = db.get(YoutubeCredential, user_id)
         if credential is None:
             raise YoutubeOAuthError("YouTube is not connected")
+        if _OAUTH_SCOPE not in credential.oauth_scope.split():
+            raise YoutubeOAuthError("YouTube authorization must be renewed before deleting videos")
         refresh_token = decrypt_secret(credential.refresh_token_encrypted)
     response = httpx.post(
         _TOKEN_URL,
@@ -232,6 +258,110 @@ def latest_job(db: Session, flight_id: str) -> YoutubeUploadJob | None:
         .order_by(YoutubeUploadJob.created_at.desc())
         .first()
     )
+
+
+def youtube_video_associations(
+    db: Session, *, flight: Flight, user_id: int
+) -> list[YoutubeVideoAssociationPayload]:
+    """Return local video links and whether the current user uploaded each video."""
+    associations = [(url, youtube_video_id_from_url(url)) for url in flight.youtube_urls]
+    video_ids = {video_id for _, video_id in associations}
+    deletable_video_ids = {
+        video_id
+        for (video_id,) in (
+            db.query(YoutubeUploadJob.youtube_video_id)
+            .filter(
+                YoutubeUploadJob.flight_id == flight.id,
+                YoutubeUploadJob.user_id == user_id,
+                YoutubeUploadJob.status == "completed",
+                YoutubeUploadJob.youtube_video_id.in_(video_ids),
+            )
+            .all()
+        )
+        if video_id is not None
+    }
+    return [
+        {
+            "url": url,
+            "video_id": video_id,
+            "can_delete_from_youtube": video_id in deletable_video_ids,
+        }
+        for url, video_id in associations
+    ]
+
+
+def _completed_upload_for_user(
+    db: Session, *, flight_id: str, video_id: str, user_id: int
+) -> YoutubeUploadJob | None:
+    return (
+        db.query(YoutubeUploadJob)
+        .filter(
+            YoutubeUploadJob.flight_id == flight_id,
+            YoutubeUploadJob.youtube_video_id == video_id,
+            YoutubeUploadJob.user_id == user_id,
+            YoutubeUploadJob.status == "completed",
+        )
+        .first()
+    )
+
+
+def _delete_remote_video(*, video_id: str, user_id: int) -> None:
+    try:
+        access_token = _access_token(user_id)
+        response = httpx.delete(
+            _VIDEOS_URL,
+            params={"id": video_id},
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=30,
+        )
+    except httpx.RequestError as exc:
+        raise YoutubeRemoteDeletionError(
+            "YouTube could not be reached; retry deleting the video later"
+        ) from exc
+
+    if response.status_code in {200, 204, 404}:
+        return
+    if response.status_code in {401, 403}:
+        raise YoutubeOAuthError(
+            "YouTube authorization cannot delete this video; reconnect YouTube and try again"
+        )
+    if response.status_code >= 500:
+        raise YoutubeRemoteDeletionError(
+            "YouTube is temporarily unavailable; retry deleting the video later"
+        )
+    raise YoutubeRemoteDeletionError(
+        f"YouTube rejected the video deletion ({response.status_code}); the local link was kept"
+    )
+
+
+def remove_youtube_video(
+    db: Session,
+    *,
+    flight: Flight,
+    video_id: str,
+    user_id: int,
+    delete_from_youtube: bool,
+) -> None:
+    """Optionally delete a video remotely, then atomically remove its local association."""
+    associated_urls = [
+        url for url in flight.youtube_urls if youtube_video_id_from_url(url) == video_id
+    ]
+    if not associated_urls:
+        raise YoutubeVideoNotAssociatedError("This YouTube video is not associated with the flight")
+
+    if delete_from_youtube:
+        job = _completed_upload_for_user(
+            db, flight_id=flight.id, video_id=video_id, user_id=user_id
+        )
+        if job is None:
+            raise YoutubeVideoDeletionForbiddenError(
+                "Only the user who uploaded this video can delete it from YouTube"
+            )
+        _delete_remote_video(video_id=video_id, user_id=user_id)
+
+    associated_url_set = set(associated_urls)
+    flight.youtube_urls = [url for url in flight.youtube_urls if url not in associated_url_set]
+    db.commit()
 
 
 def active_job(db: Session, flight_id: str) -> YoutubeUploadJob | None:

@@ -12,10 +12,12 @@ const {
   mockFlight,
   overlayJobStreamMock,
   previewMock,
+  removeYoutubeAssociationMock,
   resetOverlayMock,
   updateFlightMock,
   videoStatusMock,
   youtubeUploadMock,
+  youtubeAssociationsMock,
 } = vi.hoisted(() => ({
   apiDelete: vi.fn(),
   confirmMock: vi.fn(),
@@ -26,8 +28,10 @@ const {
   updateFlightMock: vi.fn(),
   overlayJobStreamMock: { current: null as unknown },
   previewMock: { current: null as unknown },
+  removeYoutubeAssociationMock: vi.fn(),
   videoStatusMock: { current: null as unknown },
   youtubeUploadMock: { current: null as unknown },
+  youtubeAssociationsMock: { current: [] as unknown[] },
   mockFlight: {
     id: 'flight-1',
     flight_date: '2026-03-15',
@@ -213,11 +217,19 @@ vi.mock('react-i18next', () => ({
         'flights.youtubeVideoTitle': 'Flight YouTube video',
         'flights.openOnYoutube': 'Open on YouTube',
         'flights.removeYoutubeAssociation': 'Remove association',
-        'flights.removeYoutubeAssociationConfirm':
-          'Confirm remove YouTube association',
         'flights.youtubeAssociationRemoving': 'Removing association',
         'flights.youtubeAssociationRemoved': 'Association removed',
         'flights.youtubeAssociationRemoveError': 'Association removal error',
+        'flights.youtubeRemovalDialogTitle': 'Remove YouTube video',
+        'flights.youtubeRemovalManualDescription':
+          'The video remains on YouTube.',
+        'flights.youtubeRemovalOwnedDescription': 'Choose removal type.',
+        'flights.youtubeRemovalPermanentWarning':
+          'Permanent deletion cannot be undone.',
+        'flights.youtubeRemovalDissociate': 'Dissociate only',
+        'flights.youtubeRemovalDeletePermanently':
+          'Delete permanently from YouTube',
+        'common.cancel': 'Cancel',
       })[key] ?? key,
   }),
 }));
@@ -237,6 +249,13 @@ vi.mock('../../../hooks/flights/useVideoExportStatus', () => ({
 
 vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
   useYoutubeUpload: () => ({ data: youtubeUploadMock.current }),
+  useYoutubeVideoAssociations: () => ({
+    data: youtubeAssociationsMock.current,
+  }),
+  useRemoveYoutubeVideoAssociation: () => ({
+    isPending: false,
+    mutateAsync: removeYoutubeAssociationMock,
+  }),
 }));
 
 vi.mock('../../../hooks/gopro/useGoproOverlay', () => ({
@@ -336,6 +355,9 @@ describe('FlightDetails GoPro overlay action', () => {
     mockFlight.youtube_urls = [];
     videoStatusMock.current = null;
     youtubeUploadMock.current = null;
+    youtubeAssociationsMock.current = [];
+    removeYoutubeAssociationMock.mockReset();
+    removeYoutubeAssociationMock.mockResolvedValue(undefined);
   });
 
   it('shows only the stored track file name in flight information', () => {
@@ -405,10 +427,22 @@ describe('FlightDetails GoPro overlay action', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('removes a YouTube association from the media tab', async () => {
+  it('dissociates a manual YouTube link without offering remote deletion', async () => {
     const removedUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
     const remainingUrl = 'https://youtu.be/9bZkp7q19f0';
     mockFlight.youtube_urls = [removedUrl, remainingUrl];
+    youtubeAssociationsMock.current = [
+      {
+        url: removedUrl,
+        video_id: 'manual-video',
+        can_delete_from_youtube: false,
+      },
+      {
+        url: remainingUrl,
+        video_id: 'remaining-video',
+        can_delete_from_youtube: false,
+      },
+    ];
 
     render(
       <FlightDetails
@@ -423,14 +457,119 @@ describe('FlightDetails GoPro overlay action', () => {
       screen.getAllByRole('button', { name: 'Remove association' })[0]
     );
 
-    expect(confirmMock).toHaveBeenCalledWith(
-      'Confirm remove YouTube association'
-    );
+    expect(
+      screen.getByRole('dialog', { name: 'Remove YouTube video' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', {
+        name: 'Delete permanently from YouTube',
+      })
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Dissociate only' }));
+
     await waitFor(() =>
-      expect(updateFlightMock).toHaveBeenCalledWith({
-        youtube_urls: [remainingUrl],
+      expect(removeYoutubeAssociationMock).toHaveBeenCalledWith({
+        videoId: 'manual-video',
+        deleteFromYoutube: false,
       })
     );
+    expect(updateFlightMock).not.toHaveBeenCalled();
+  });
+
+  it('offers permanent deletion for an app-uploaded YouTube video', async () => {
+    const url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+    mockFlight.youtube_urls = [url];
+    youtubeAssociationsMock.current = [
+      {
+        url,
+        video_id: 'owned-video',
+        can_delete_from_youtube: true,
+      },
+    ];
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+    openTab('Media');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove association' }));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Delete permanently from YouTube',
+      })
+    );
+
+    await waitFor(() =>
+      expect(removeYoutubeAssociationMock).toHaveBeenCalledWith({
+        videoId: 'owned-video',
+        deleteFromYoutube: true,
+      })
+    );
+  });
+
+  it('cancels YouTube removal without mutating', () => {
+    const url = 'https://youtu.be/9bZkp7q19f0';
+    mockFlight.youtube_urls = [url];
+    youtubeAssociationsMock.current = [
+      {
+        url,
+        video_id: 'manual-video',
+        can_delete_from_youtube: false,
+      },
+    ];
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+    openTab('Media');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove association' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(removeYoutubeAssociationMock).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole('dialog', { name: 'Remove YouTube video' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the YouTube association and modal visible on removal failure', async () => {
+    const url = 'https://youtu.be/9bZkp7q19f0';
+    mockFlight.youtube_urls = [url];
+    youtubeAssociationsMock.current = [
+      {
+        url,
+        video_id: 'manual-video',
+        can_delete_from_youtube: false,
+      },
+    ];
+    removeYoutubeAssociationMock.mockRejectedValue(new Error('API failed'));
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+    openTab('Media');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove association' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Dissociate only' }));
+
+    await waitFor(() =>
+      expect(removeYoutubeAssociationMock).toHaveBeenCalled()
+    );
+    expect(
+      screen.getByRole('dialog', { name: 'Remove YouTube video' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Remove association' })
+    ).toBeInTheDocument();
   });
 
   it('organizes media into replay, available files, and creation sections', () => {

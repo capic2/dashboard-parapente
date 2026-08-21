@@ -47,28 +47,34 @@ def normalize_youtube_urls(urls: list[str]) -> list[str]:
         if not url:
             continue
 
-        parsed = urlparse(url)
-        host = (parsed.hostname or "").lower()
-        video_id: str | None = None
-        if parsed.scheme not in {"http", "https"}:
-            raise ValueError("YouTube URLs must use http or https")
-        if host in {"youtu.be", "www.youtu.be"}:
-            video_id = parsed.path.strip("/").split("/")[0]
-        elif host in YOUTUBE_HOSTS:
-            if parsed.path.rstrip("/") == "/watch":
-                video_id = parse_qs(parsed.query).get("v", [None])[0]
-            else:
-                parts = parsed.path.strip("/").split("/")
-                if len(parts) >= 2 and parts[0] in {"embed", "shorts", "live"}:
-                    video_id = parts[1]
-
-        if not video_id or not YOUTUBE_VIDEO_ID_PATTERN.fullmatch(video_id):
-            raise ValueError(f"Unsupported YouTube URL: {url}")
+        video_id = youtube_video_id_from_url(url)
 
         canonical_url = f"https://www.youtube.com/watch?v={video_id}"
         if canonical_url not in normalized:
             normalized.append(canonical_url)
     return normalized
+
+
+def youtube_video_id_from_url(url: str) -> str:
+    """Extract a validated video ID from a supported YouTube URL."""
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    video_id: str | None = None
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError("YouTube URLs must use http or https")
+    if host in {"youtu.be", "www.youtu.be"}:
+        video_id = parsed.path.strip("/").split("/")[0]
+    elif host in YOUTUBE_HOSTS:
+        if parsed.path.rstrip("/") == "/watch":
+            video_id = parse_qs(parsed.query).get("v", [None])[0]
+        else:
+            parts = parsed.path.strip("/").split("/")
+            if len(parts) >= 2 and parts[0] in {"embed", "shorts", "live"}:
+                video_id = parts[1]
+
+    if not video_id or not YOUTUBE_VIDEO_ID_PATTERN.fullmatch(video_id):
+        raise ValueError(f"Unsupported YouTube URL: {url}")
+    return video_id
 
 
 class GoproOverlayDependencies(BaseModel):
@@ -488,6 +494,16 @@ class YoutubeUploadJobResponse(BaseModel):
     youtube_url: str | None = None
     error: str | None = None
     log_tail: list[str] = Field(default_factory=list)
+
+
+class YoutubeVideoAssociation(BaseModel):
+    url: str
+    video_id: str = Field(pattern=YOUTUBE_VIDEO_ID_PATTERN.pattern)
+    can_delete_from_youtube: bool
+
+
+class YoutubeVideoRemoveRequest(BaseModel):
+    delete_from_youtube: bool
 
 
 # Site info included in Flight response (for camera orientation)

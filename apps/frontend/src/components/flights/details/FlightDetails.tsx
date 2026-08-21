@@ -12,6 +12,7 @@ import {
 } from '@dashboard-parapente/design-system';
 import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
 import type { GoproOverlayJob } from '@dashboard-parapente/shared-types';
+import type { YoutubeVideoAssociation } from '@dashboard-parapente/shared-types';
 import { CircleAlert, Edit3, FileUp, Images, Play } from 'lucide-react';
 import { Input, Label, TextField } from 'react-aria-components';
 import {
@@ -19,7 +20,11 @@ import {
   useUploadGPXToFlight,
 } from '../../../hooks/flights/useFlights';
 import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
-import { useYoutubeUpload } from '../../../hooks/flights/useYoutubeUpload';
+import {
+  useRemoveYoutubeVideoAssociation,
+  useYoutubeUpload,
+  useYoutubeVideoAssociations,
+} from '../../../hooks/flights/useYoutubeUpload';
 import {
   useCreateFlightGoproOverlayJob,
   useGoproOverlayJobStream,
@@ -31,8 +36,12 @@ import {
   hasFlightVideo,
   isGoproOverlayInProgress,
 } from '../../../lib/flightMediaState';
-import type { Flight, FlightFormData, Site } from '../../../types';
-import { FlightEditForm } from '../edit/FlightEditForm';
+import type { Flight, Site } from '../../../types';
+import {
+  FlightEditForm,
+  type FlightEditSubmission,
+} from '../edit/FlightEditForm';
+import { YoutubeAssociationRemovalModal } from '../YoutubeAssociationRemovalModal';
 import { formatMediaProgressLabel } from '../table/mediaProgress';
 import type { DownloadableFlightMedia } from './FlightDetails.types';
 import { FlightGenerationLogsPanel } from './FlightGenerationLogsPanel';
@@ -72,6 +81,7 @@ export function FlightDetails({
   const resetGoproOverlayJob = createGoproOverlayJob.reset;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeFlightIdRef = useRef(flight.id);
+  const completedEditYoutubeRemovalIdsRef = useRef(new Set<string>());
 
   const [editingMode, setEditingMode] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
@@ -103,9 +113,8 @@ export function FlightDetails({
   const [deletedGoproOverlayJobIds, setDeletedGoproOverlayJobIds] = useState<
     string[]
   >([]);
-  const [removingYoutubeUrl, setRemovingYoutubeUrl] = useState<string | null>(
-    null
-  );
+  const [youtubeRemovalTarget, setYoutubeRemovalTarget] =
+    useState<YoutubeVideoAssociation | null>(null);
 
   const hasGpx = Boolean(flight.gpx_file_path);
   const hasVideo = hasFlightVideo(flight);
@@ -146,6 +155,10 @@ export function FlightDetails({
     Boolean(flight.video_export_job_id)
   );
   const { data: youtubeUploadJob = null } = useYoutubeUpload(flight.id);
+  const { data: youtubeAssociations = [] } = useYoutubeVideoAssociations(
+    flight.id
+  );
+  const removeYoutubeAssociation = useRemoveYoutubeVideoAssociation(flight.id);
   const goproOverlayStatus =
     goproOverlayJob?.status ??
     activePersistedGoproOverlay?.status ??
@@ -196,10 +209,57 @@ export function FlightDetails({
     }
   }, [queryClient, streamedGoproOverlayJob?.status]);
 
-  const handleSubmitEdit = async (values: FlightFormData) => {
-    await updateFlight.mutateAsync(values);
-    toast.success(t('flights.updateSuccess'));
+  const handleSubmitEdit = async ({
+    values,
+    pendingYoutubeRemovals,
+  }: FlightEditSubmission) => {
+    const remainingRemovals = pendingYoutubeRemovals.filter(
+      (removal) =>
+        !completedEditYoutubeRemovalIdsRef.current.has(removal.videoId)
+    );
+
+    try {
+      await updateFlight.mutateAsync({
+        ...values,
+        youtube_urls: [
+          ...(values.youtube_urls ?? []),
+          ...remainingRemovals.map((removal) => removal.url),
+        ],
+      });
+    } catch (error) {
+      toast.error(await getApiErrorMessage(error, t('flights.updateError')));
+      throw error;
+    }
+
+    try {
+      for (const removal of remainingRemovals) {
+        // Each endpoint rewrites the shared URL list, so removals must stay serialized.
+        // oxlint-disable-next-line eslint/no-await-in-loop
+        await removeYoutubeAssociation.mutateAsync(removal);
+        completedEditYoutubeRemovalIdsRef.current.add(removal.videoId);
+      }
+      completedEditYoutubeRemovalIdsRef.current.clear();
+      toast.success(t('flights.updateSuccess'));
+      setEditingMode(false);
+    } catch (error) {
+      toast.error(
+        await getApiErrorMessage(
+          error,
+          t('flights.youtubeAssociationRemoveError')
+        )
+      );
+      throw error;
+    }
+  };
+
+  const handleCancelEdit = () => {
+    completedEditYoutubeRemovalIdsRef.current.clear();
     setEditingMode(false);
+  };
+
+  const handleStartEdit = () => {
+    completedEditYoutubeRemovalIdsRef.current.clear();
+    setEditingMode(true);
   };
 
   const handleSaveNotes = async () => {
@@ -221,21 +281,34 @@ export function FlightDetails({
     }
   };
 
-  const handleRemoveYoutubeAssociation = async (url: string) => {
-    if (!confirm(t('flights.removeYoutubeAssociationConfirm'))) return;
+  const handleOpenYoutubeRemoval = (url: string) => {
+    const association = youtubeAssociations.find(
+      (candidate) => candidate.url === url
+    );
+    if (!association) {
+      toast.error(t('flights.youtubeAssociationMetadataError'));
+      return;
+    }
+    setYoutubeRemovalTarget(association);
+  };
 
-    setRemovingYoutubeUrl(url);
+  const handleRemoveYoutubeAssociation = async (deleteFromYoutube: boolean) => {
+    if (!youtubeRemovalTarget) return;
+
     try {
-      await updateFlight.mutateAsync({
-        youtube_urls: (flight.youtube_urls ?? []).filter(
-          (youtubeUrl) => youtubeUrl !== url
-        ),
+      await removeYoutubeAssociation.mutateAsync({
+        videoId: youtubeRemovalTarget.video_id,
+        deleteFromYoutube,
       });
+      setYoutubeRemovalTarget(null);
       toast.success(t('flights.youtubeAssociationRemoved'));
-    } catch {
-      toast.error(t('flights.youtubeAssociationRemoveError'));
-    } finally {
-      setRemovingYoutubeUrl(null);
+    } catch (error) {
+      toast.error(
+        await getApiErrorMessage(
+          error,
+          t('flights.youtubeAssociationRemoveError')
+        )
+      );
     }
   };
 
@@ -668,8 +741,9 @@ export function FlightDetails({
         <FlightEditForm
           flight={flight}
           sites={sites}
+          youtubeAssociations={youtubeAssociations}
           onSubmit={handleSubmitEdit}
-          onCancel={() => setEditingMode(false)}
+          onCancel={handleCancelEdit}
           onShowCreateSiteModal={onShowCreateSiteModal}
         />
       ) : (
@@ -687,7 +761,7 @@ export function FlightDetails({
               <Button
                 variant="ghost"
                 className="min-h-10 rounded-lg px-3 py-2 text-sm"
-                onPress={() => setEditingMode(true)}
+                onPress={handleStartEdit}
                 aria-label={t('flights.editFlight')}
               >
                 <Edit3 className="h-4 w-4" aria-hidden="true" />
@@ -876,13 +950,25 @@ export function FlightDetails({
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800 sm:p-5">
             <FlightYoutubeVideos
               urls={flight.youtube_urls}
-              removingUrl={removingYoutubeUrl}
-              onRemove={(url) => void handleRemoveYoutubeAssociation(url)}
+              removingUrl={
+                removeYoutubeAssociation.isPending
+                  ? youtubeRemovalTarget?.url
+                  : null
+              }
+              onRemove={handleOpenYoutubeRemoval}
             />
           </div>
         )}
       </div>
       {goproOverlayModal}
+      <YoutubeAssociationRemovalModal
+        association={youtubeRemovalTarget}
+        isPending={removeYoutubeAssociation.isPending}
+        onCancel={() => setYoutubeRemovalTarget(null)}
+        onRemove={(deleteFromYoutube) =>
+          void handleRemoveYoutubeAssociation(deleteFromYoutube)
+        }
+      />
     </div>
   );
 
