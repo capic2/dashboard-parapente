@@ -7,6 +7,7 @@ import {
   FileText,
   MapPin,
   Mountain,
+  Orbit,
   Play,
   Ruler,
   Trash2,
@@ -65,6 +66,7 @@ export function Flight({
   const hasVideo = flight.has_video;
   const hasCamera = flight.has_camera;
   const hasYoutubeVideo = flight.has_youtube_video;
+  const hasPanoVideo = flight.has_pano_video;
   const hasPersistedGoproOverlay = flight.has_gopro_overlay;
   const isGoproOverlayRunning = isGoproOverlayInProgress(
     flight.gopro_overlay_status
@@ -104,6 +106,7 @@ export function Flight({
     hasVideo ||
     hasCamera ||
     hasYoutubeVideo ||
+    hasPanoVideo ||
     isVideoExportRunning ||
     isVideoExportFailed ||
     hasPersistedGoproOverlay ||
@@ -195,6 +198,12 @@ export function Flight({
                 <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
                   <Play className="h-3 w-3" aria-hidden="true" />
                   {t('flights.youtubeBadge')}
+                </span>
+              )}
+              {hasPanoVideo && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
+                  <Orbit className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.panoBadge')}
                 </span>
               )}
               {isVideoExportRunning && (

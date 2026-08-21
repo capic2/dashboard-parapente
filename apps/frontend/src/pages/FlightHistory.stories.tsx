@@ -169,6 +169,7 @@ const toSummary = (flight: Record<string, unknown>) => ({
   has_youtube_video:
     Array.isArray(flight.youtube_urls) && flight.youtube_urls.length > 0,
   has_gopro_overlay: Boolean(flight.gopro_overlay_file_path),
+  has_pano_video: Boolean(flight.pano_video_file_exists),
   video_export_job_id: flight.video_export_job_id ?? null,
   video_export_status: flight.video_export_status ?? null,
   video_export_progress: flight.video_export_progress ?? null,

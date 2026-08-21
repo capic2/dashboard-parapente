@@ -5,15 +5,20 @@ import {
   FileText,
   FolderDown,
   LoaderCircle,
+  Orbit,
   Video,
   Wand2,
 } from 'lucide-react';
+import type { Flight } from '../../../types';
 import { FlightMediaThumbnail } from './FlightMediaThumbnail';
+import { FlightYoutubeUploadControls } from './FlightYoutubeUploadControls';
 
 interface FlightMediaBadgesProps {
   flightId: string;
   hasGpx: boolean;
   hasVideo: boolean;
+  hasPanoVideo: boolean;
+  flight: Flight;
   hasPersistedGoproOverlay: boolean;
   isVideoExportRunning: boolean;
   isVideoExportFailed: boolean;
@@ -31,6 +36,8 @@ export function FlightMediaBadges({
   flightId,
   hasGpx,
   hasVideo,
+  hasPanoVideo,
+  flight,
   hasPersistedGoproOverlay,
   isVideoExportRunning,
   isVideoExportFailed,
@@ -50,6 +57,7 @@ export function FlightMediaBadges({
   const hasMediaOrStatus =
     hasGpx ||
     hasVideo ||
+    hasPanoVideo ||
     isVideoExportRunning ||
     isVideoExportFailed ||
     showPersistedOverlayBadge ||
@@ -141,6 +149,27 @@ export function FlightMediaBadges({
                 >
                   <Download className="h-4 w-4" aria-hidden="true" />
                 </button>
+              </div>
+            </div>
+          )}
+          {hasPanoVideo && (
+            <div className="flex min-h-24 flex-wrap items-center gap-3 rounded-xl border border-violet-200 bg-white p-3 shadow-sm dark:border-violet-800 dark:bg-slate-900/60">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
+                <Orbit className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-slate-950 dark:text-white">
+                  {t('flights.panoBadge')}
+                </span>
+                <span className="block text-xs text-slate-600 dark:text-slate-300">
+                  {t('flights.mediaFileAvailable')}
+                </span>
+              </span>
+              <div className="w-full sm:ml-14 sm:w-auto sm:min-w-48">
+                <FlightYoutubeUploadControls
+                  flight={flight}
+                  source={{ source_type: 'pano' }}
+                />
               </div>
             </div>
           )}

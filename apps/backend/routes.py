@@ -64,7 +64,12 @@ from flight_summaries import (
     SortOrder,
     list_flight_summaries,
 )
-from flight_storage import flight_sequence_number, write_flight_text_file
+from flight_storage import (
+    flight_sequence_number,
+    pano_video_path,
+    pano_video_paths,
+    write_flight_text_file,
+)
 from flight_tracks import calculate_track_stats, normalize_track
 from gopro_overlay_export import (
     align_video_start_time_to_gpx,
@@ -955,11 +960,19 @@ def remove_flight_youtube_video(
     response_model=YoutubeUploadJobResponse | None,
 )
 def get_flight_youtube_upload(
-    flight_id: str, db: Session = Depends(get_db)
+    flight_id: str,
+    source_type: Literal["gopro_overlay", "pano"] | None = None,
+    gopro_overlay_job_id: str | None = None,
+    db: Session = Depends(get_db),
 ) -> dict[str, Any] | None:
     if db.get(Flight, flight_id) is None:
         raise HTTPException(status_code=404, detail="Flight not found")
-    job = latest_youtube_upload_job(db, flight_id)
+    job = latest_youtube_upload_job(
+        db,
+        flight_id,
+        source_type=source_type,
+        gopro_overlay_job_id=gopro_overlay_job_id,
+    )
     return youtube_upload_job_payload(job) if job else None
 
 
@@ -981,14 +994,33 @@ def start_flight_youtube_upload(
     flight = db.get(Flight, flight_id)
     if flight is None:
         raise HTTPException(status_code=404, detail="Flight not found")
-    if flight.youtube_urls:
-        raise HTTPException(status_code=409, detail="This flight already has a YouTube video")
-    overlay = db.get(GoproOverlayJobModel, payload.gopro_overlay_job_id)
-    if overlay is None or overlay.flight_id != flight.id:
-        raise HTTPException(status_code=404, detail="GoPro overlay not found for this flight")
-    video_path = _resolve_flight_file_path(overlay.output_path)
-    if overlay.status != "completed" or video_path is None or not video_path.is_file():
-        raise HTTPException(status_code=409, detail="Generate the GoPro overlay before uploading")
+    overlay = None
+    if payload.source_type == "gopro_overlay":
+        overlay = db.get(GoproOverlayJobModel, payload.gopro_overlay_job_id)
+        if overlay is None or overlay.flight_id != flight.id:
+            raise HTTPException(status_code=404, detail="GoPro overlay not found for this flight")
+        video_path = _resolve_flight_file_path(overlay.output_path)
+        if overlay.status != "completed" or video_path is None or not video_path.is_file():
+            raise HTTPException(
+                status_code=409, detail="Generate the GoPro overlay before uploading"
+            )
+    else:
+        video_path = pano_video_path(db, flight)
+        if not video_path.is_file():
+            raise HTTPException(status_code=409, detail="Panorama video is not available")
+
+    completed_source_query = db.query(YoutubeUploadJob).filter(
+        YoutubeUploadJob.flight_id == flight.id,
+        YoutubeUploadJob.source_type == payload.source_type,
+        YoutubeUploadJob.status == "completed",
+        YoutubeUploadJob.youtube_url.in_(flight.youtube_urls),
+    )
+    if overlay is not None:
+        completed_source_query = completed_source_query.filter(
+            YoutubeUploadJob.gopro_overlay_job_id == overlay.id
+        )
+    if completed_source_query.first() is not None:
+        raise HTTPException(status_code=409, detail="This video is already published on YouTube")
     existing_job = active_youtube_upload_job(db, flight_id)
     if existing_job is not None:
         raise HTTPException(status_code=409, detail="A YouTube upload is already in progress")
@@ -997,7 +1029,8 @@ def start_flight_youtube_upload(
         id=str(uuid.uuid4()),
         flight_id=flight.id,
         user_id=user.id,
-        gopro_overlay_job_id=overlay.id,
+        source_type=payload.source_type,
+        gopro_overlay_job_id=overlay.id if overlay is not None else None,
         status="queued",
         progress=0,
         title=payload.title,
@@ -3875,10 +3908,14 @@ def get_flights(
             ) from e
 
     flights = query.order_by(Flight.flight_date.desc()).limit(limit).all()
+    previous_pano_paths = {flight.id: flight.pano_video_file_path for flight in flights}
+    pano_paths = pano_video_paths(db, flights)
 
     # Convert to dict (user_id removed - not needed for single-user app)
     flights_data = []
-    export_state_changed = False
+    export_state_changed = any(
+        previous_pano_paths[flight.id] != flight.pano_video_file_path for flight in flights
+    )
     for flight in flights:
         previous_video_job_id = flight.video_export_job_id
         previous_video_status = flight.video_export_status
@@ -3915,6 +3952,7 @@ def get_flights(
             "video_export_progress": video_export["progress"],
             "video_file_path": flight.video_file_path,
             "video_file_exists": _flight_video_file_exists(flight),
+            "pano_video_file_exists": pano_paths[flight.id].is_file(),
             "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
             "gopro_overlay_job_id": flight.gopro_overlay_job_id,
             "gopro_overlay_status": gopro_overlay["status"],
@@ -4338,6 +4376,8 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
     previous_video_status = flight.video_export_status
     previous_overlay_job_id = flight.gopro_overlay_job_id
     previous_overlay_status = flight.gopro_overlay_status
+    previous_pano_path = flight.pano_video_file_path
+    pano_path = pano_video_path(db, flight)
     video_export = _flight_video_export_state(db, flight)
     gopro_overlay = _flight_gopro_overlay_state(db, flight)
     export_state_changed = (
@@ -4345,6 +4385,7 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         or previous_video_status != flight.video_export_status
         or previous_overlay_job_id != flight.gopro_overlay_job_id
         or previous_overlay_status != flight.gopro_overlay_status
+        or previous_pano_path != flight.pano_video_file_path
     )
 
     # Build response with flight data
@@ -4374,6 +4415,7 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "video_export_progress": video_export["progress"],
         "video_file_path": flight.video_file_path,
         "video_file_exists": _flight_video_file_exists(flight),
+        "pano_video_file_exists": pano_path.is_file(),
         "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
         "gopro_overlay_job_id": flight.gopro_overlay_job_id,
         "gopro_overlay_status": gopro_overlay["status"],
@@ -4710,6 +4752,7 @@ def create_flight(flight_data: FlightCreate, db: Session = Depends(get_db)):
         "video_export_progress": None,
         "video_file_path": None,
         "video_file_exists": False,
+        "pano_video_file_exists": False,
         "gopro_camera_file_exists": False,
         "gopro_overlay_job_id": None,
         "gopro_overlay_status": None,

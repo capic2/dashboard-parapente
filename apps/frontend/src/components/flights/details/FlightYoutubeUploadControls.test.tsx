@@ -38,6 +38,7 @@ vi.mock('react-i18next', () => ({
         'flights.youtubeUploadCancelled': "L'envoi vers YouTube a été arrêté.",
         'flights.youtubeUpload': 'Publier sur YouTube',
         'flights.youtubeUploadConfirm': "Lancer l'envoi",
+        'flights.youtubeUploadPublished': 'Déjà publiée',
       };
       return labels[key] ?? key;
     },
@@ -55,6 +56,10 @@ vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
   useYoutubeAuthorizationUrl,
   useYoutubeStatus,
   useYoutubeUpload,
+  youtubeVideoAssociationsQueryKey: (flightId: string) => [
+    'youtube-video-associations',
+    flightId,
+  ],
 }));
 
 describe('FlightYoutubeUploadControls', () => {
@@ -102,7 +107,10 @@ describe('FlightYoutubeUploadControls', () => {
       <QueryClientProvider client={queryClient}>
         <FlightYoutubeUploadControls
           flight={flight}
-          goproOverlayJobId="overlay-1080p"
+          source={{
+            source_type: 'gopro_overlay',
+            gopro_overlay_job_id: 'overlay-1080p',
+          }}
         />
       </QueryClientProvider>
     );
@@ -133,7 +141,10 @@ describe('FlightYoutubeUploadControls', () => {
       <QueryClientProvider client={queryClient}>
         <FlightYoutubeUploadControls
           flight={flight}
-          goproOverlayJobId="overlay-4k"
+          source={{
+            source_type: 'gopro_overlay',
+            gopro_overlay_job_id: 'overlay-4k',
+          }}
         />
       </QueryClientProvider>
     );
@@ -145,10 +156,110 @@ describe('FlightYoutubeUploadControls', () => {
 
     await waitFor(() =>
       expect(startUpload).toHaveBeenCalledWith({
+        source_type: 'gopro_overlay',
         gopro_overlay_job_id: 'overlay-4k',
         title: 'Vol test',
         description: '',
         privacy_status: 'private',
+      })
+    );
+  });
+
+  it('starts an upload from the panorama video', async () => {
+    useYoutubeUpload.mockReturnValue({ data: null, isLoading: false });
+    const queryClient = new QueryClient();
+    const flight = {
+      id: 'flight-1',
+      flight_date: '2026-08-19',
+      name: 'Vol test',
+    } as Flight;
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FlightYoutubeUploadControls
+          flight={flight}
+          source={{ source_type: 'pano' }}
+        />
+      </QueryClientProvider>
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Publier sur YouTube' })
+    );
+    fireEvent.click(screen.getByRole('button', { name: "Lancer l'envoi" }));
+
+    await waitFor(() =>
+      expect(startUpload).toHaveBeenCalledWith(
+        expect.objectContaining({ source_type: 'pano' })
+      )
+    );
+  });
+
+  it('disables a source whose uploaded video is still associated', () => {
+    useYoutubeUpload.mockReturnValue({
+      data: {
+        status: 'completed',
+        youtube_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      },
+      isLoading: false,
+    });
+    const queryClient = new QueryClient();
+    const flight = {
+      id: 'flight-1',
+      flight_date: '2026-08-19',
+      name: 'Vol test',
+      youtube_urls: ['https://www.youtube.com/watch?v=dQw4w9WgXcQ'],
+    } as Flight;
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FlightYoutubeUploadControls
+          flight={flight}
+          source={{ source_type: 'pano' }}
+        />
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByRole('button', { name: 'Déjà publiée' })).toBeDisabled();
+  });
+
+  it('refreshes YouTube associations when an upload completes', async () => {
+    let status = 'uploading';
+    useYoutubeUpload.mockImplementation(
+      (_flightId: string, source?: { source_type: string }) => ({
+        data: source ? { status, progress: 50 } : null,
+        isLoading: false,
+      })
+    );
+    const queryClient = new QueryClient();
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+    const flight = {
+      id: 'flight-1',
+      flight_date: '2026-08-19',
+      name: 'Vol test',
+    } as Flight;
+    const view = render(
+      <QueryClientProvider client={queryClient}>
+        <FlightYoutubeUploadControls
+          flight={flight}
+          source={{ source_type: 'pano' }}
+        />
+      </QueryClientProvider>
+    );
+
+    invalidateQueries.mockClear();
+    status = 'completed';
+    view.rerender(
+      <QueryClientProvider client={queryClient}>
+        <FlightYoutubeUploadControls
+          flight={flight}
+          source={{ source_type: 'pano' }}
+        />
+      </QueryClientProvider>
+    );
+
+    await waitFor(() =>
+      expect(invalidateQueries).toHaveBeenCalledWith({
+        queryKey: ['youtube-video-associations', flight.id],
       })
     );
   });

@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from sqlalchemy import event
 
+import config
 from models import Flight, GoproOverlayJob, YoutubeUploadJob
 
 API_URL = "/api/flights/summaries"
@@ -96,6 +97,28 @@ def test_summaries_filter_search_sort_and_hide_paths(client, db_session, arguel_
     assert item["gopro_overlay_job_id"] == "overlay-job"
     assert not any("path" in key for key in item)
     assert body["flights"][1]["has_youtube_video"] is False
+
+
+def test_summaries_report_panorama_file(client, db_session, monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    flight = Flight(
+        id="summary-pano",
+        title="Panorama",
+        flight_date=date(2026, 1, 1),
+        departure_time=datetime(2026, 1, 1, 10),
+    )
+    db_session.add(flight)
+    db_session.commit()
+    directory = tmp_path / "20260101" / "01"
+    directory.mkdir(parents=True)
+    (directory / "pano.mp4").write_bytes(b"pano")
+
+    response = client.get(API_URL)
+
+    assert response.status_code == 200
+    assert response.json()["flights"][0]["has_pano_video"] is True
+    db_session.refresh(flight)
+    assert flight.pano_video_file_path == str((directory / "pano.mp4").resolve())
 
 
 def test_summaries_search_is_case_and_accent_insensitive(client, db_session) -> None:

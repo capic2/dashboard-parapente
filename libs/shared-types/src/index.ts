@@ -140,6 +140,7 @@ export const FlightSchema = z
     video_export_progress: z.number().nullish(),
     video_file_path: z.string().nullish(),
     video_file_exists: z.boolean().nullish(),
+    pano_video_file_exists: z.boolean().nullish(),
     gopro_camera_file_exists: z.boolean().nullish(),
     gopro_overlay_job_id: z.string().nullish(),
     gopro_overlay_status: z
@@ -190,6 +191,7 @@ export const FlightSummarySchema = z.object({
   has_camera: z.boolean(),
   has_youtube_video: z.boolean(),
   has_gopro_overlay: z.boolean(),
+  has_pano_video: z.boolean(),
   video_export_job_id: z.string().nullable(),
   video_export_status: z.string().nullable(),
   video_export_progress: z.number().nullable(),

@@ -1,4 +1,4 @@
-"""OAuth and durable resumable uploads for generated GoPro overlay videos."""
+"""OAuth and durable resumable uploads for flight videos."""
 
 from __future__ import annotations
 
@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 import config
 from database import SessionLocal
+from flight_storage import pano_video_path
 from models import Flight, GoproOverlayJob, YoutubeCredential, YoutubeUploadJob
 from schemas import youtube_video_id_from_url
 
@@ -242,6 +243,7 @@ def job_payload(job: YoutubeUploadJob) -> dict[str, Any]:
     return {
         "job_id": job.id,
         "flight_id": job.flight_id,
+        "source_type": job.source_type,
         "gopro_overlay_job_id": job.gopro_overlay_job_id,
         "status": job.status,
         "progress": job.progress or 0,
@@ -251,13 +253,19 @@ def job_payload(job: YoutubeUploadJob) -> dict[str, Any]:
     }
 
 
-def latest_job(db: Session, flight_id: str) -> YoutubeUploadJob | None:
-    return (
-        db.query(YoutubeUploadJob)
-        .filter(YoutubeUploadJob.flight_id == flight_id)
-        .order_by(YoutubeUploadJob.created_at.desc())
-        .first()
-    )
+def latest_job(
+    db: Session,
+    flight_id: str,
+    *,
+    source_type: str | None = None,
+    gopro_overlay_job_id: str | None = None,
+) -> YoutubeUploadJob | None:
+    query = db.query(YoutubeUploadJob).filter(YoutubeUploadJob.flight_id == flight_id)
+    if source_type is not None:
+        query = query.filter(YoutubeUploadJob.source_type == source_type)
+    if gopro_overlay_job_id is not None:
+        query = query.filter(YoutubeUploadJob.gopro_overlay_job_id == gopro_overlay_job_id)
+    return query.order_by(YoutubeUploadJob.created_at.desc()).first()
 
 
 def existing_youtube_video_ids(video_ids_by_user: dict[int, set[str]]) -> set[str]:
@@ -575,7 +583,14 @@ def _finish_upload(job_id: str, video_id: str) -> None:
     _log_job(job_id, f"YouTube upload completed: {youtube_url}")
 
 
-def _overlay_video_path(db: Session, job: YoutubeUploadJob) -> Path:
+def _source_video_path(db: Session, job: YoutubeUploadJob) -> Path:
+    if job.source_type == "pano":
+        flight = db.get(Flight, job.flight_id)
+        if flight is None:
+            raise RuntimeError("Flight is no longer available")
+        return pano_video_path(db, flight)
+    if job.source_type != "gopro_overlay":
+        raise RuntimeError("YouTube upload has an unsupported video source")
     if not job.gopro_overlay_job_id:
         raise RuntimeError("YouTube upload has no GoPro overlay source")
     overlay = db.get(GoproOverlayJob, job.gopro_overlay_job_id)
@@ -611,17 +626,17 @@ def process_youtube_upload(job_id: str) -> None:
             job = db.get(YoutubeUploadJob, job_id)
             if job is None:
                 return
-            video_path = _overlay_video_path(db, job)
+            video_path = _source_video_path(db, job)
             user_id = job.user_id
             encrypted_session = job.upload_session_encrypted
             db.expunge(job)
 
         if not video_path.is_file():
-            raise RuntimeError("GoPro overlay video is no longer available")
+            raise RuntimeError("Source video is no longer available")
         total_size = video_path.stat().st_size
         if total_size <= 0:
-            raise RuntimeError("GoPro overlay video is empty")
-        _log_job(job_id, f"GoPro overlay video ready ({total_size} bytes)")
+            raise RuntimeError("Source video is empty")
+        _log_job(job_id, f"Source video ready ({total_size} bytes)")
 
         _log_job(job_id, "Refreshing YouTube authorization")
         access_token = _access_token(user_id)

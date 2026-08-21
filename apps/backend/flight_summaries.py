@@ -11,6 +11,7 @@ from sqlalchemy import String, and_, cast, exists, func, or_, select
 from sqlalchemy.orm import Query, Session, aliased
 from sqlalchemy.sql.elements import ColumnElement
 
+from flight_storage import flight_storage_root
 import config
 from models import Flight, GoproOverlayJob, Site, YoutubeUploadJob
 from schemas import FlightSummariesResponse, FlightSummary, youtube_video_id_from_url
@@ -346,7 +347,23 @@ def list_flight_summaries(
         .correlate(Flight)
         .scalar_subquery()
     )
-    page_query = base_query.with_entities(
+    sequence_flight = aliased(Flight)
+    flight_sequences = db.query(
+        sequence_flight.id.label("flight_id"),
+        func.row_number()
+        .over(
+            partition_by=sequence_flight.flight_date,
+            order_by=(
+                sequence_flight.departure_time.asc().nullslast(),
+                sequence_flight.created_at.asc().nullslast(),
+                sequence_flight.id.asc(),
+            ),
+        )
+        .label("flight_sequence"),
+    ).subquery()
+    page_query = base_query.outerjoin(
+        flight_sequences, flight_sequences.c.flight_id == Flight.id
+    ).with_entities(
         Flight.id,
         Flight.site_id,
         Site.name.label("site_name"),
@@ -363,11 +380,12 @@ def list_flight_summaries(
         Flight.video_export_job_id,
         Flight.video_export_status,
         Flight.video_file_path,
+        Flight.pano_video_file_path,
         Flight.youtube_urls_json,
         Flight.gopro_overlay_job_id,
         Flight.gopro_overlay_status,
         Flight.gopro_overlay_file_path,
-        _flight_sequence_expression().label("flight_sequence"),
+        flight_sequences.c.flight_sequence,
         completed_overlay_path.label("completed_overlay_path"),
         completed_youtube_uploads.label("completed_youtube_uploads"),
         exists()
@@ -398,6 +416,25 @@ def list_flight_summaries(
             uploaded_youtube_ids[row.id].add(video_id)
             youtube_video_ids_by_user.setdefault(user_id, set()).add(video_id)
     existing_youtube_ids = existing_youtube_video_ids(youtube_video_ids_by_user)
+
+    storage_root = flight_storage_root()
+    detected_pano_paths: list[dict[str, str]] = []
+    pano_flags: dict[str, bool] = {}
+    for row in rows:
+        path = (
+            Path(row.pano_video_file_path)
+            if row.pano_video_file_path
+            else storage_root
+            / row.flight_date.strftime("%Y%m%d")
+            / f"{row.flight_sequence:02d}"
+            / "pano.mp4"
+        )
+        pano_flags[row.id] = path.is_file()
+        if pano_flags[row.id] and not row.pano_video_file_path:
+            detected_pano_paths.append({"id": row.id, "pano_video_file_path": str(path.resolve())})
+    if detected_pano_paths:
+        db.bulk_update_mappings(Flight, detected_pano_paths)
+        db.commit()
 
     flights = [
         FlightSummary(
@@ -435,6 +472,7 @@ def list_flight_summaries(
                     ).is_file()
                 )
             ),
+            has_pano_video=pano_flags[row.id],
         )
         for row in rows
     ]

@@ -118,6 +118,7 @@ export function FlightDetails({
 
   const hasGpx = Boolean(flight.gpx_file_path);
   const hasVideo = hasFlightVideo(flight);
+  const hasPanoVideo = flight.pano_video_file_exists === true;
   const hasGoproCameraVideo = flight.gopro_camera_file_exists === true;
   const hasPersistedGoproOverlay = hasFlightGoproOverlay(flight);
   const persistedGoproOverlays = flight.gopro_overlays ?? [];
@@ -898,9 +899,11 @@ export function FlightDetails({
         </section>
 
         <FlightMediaBadges
+          flight={flight}
           flightId={flight.id}
           hasGpx={hasGpx}
           hasVideo={hasVideo}
+          hasPanoVideo={hasPanoVideo}
           hasPersistedGoproOverlay={hasPersistedGoproOverlay}
           isVideoExportRunning={isVideoExportRunning}
           isVideoExportFailed={isVideoExportFailed}
@@ -932,11 +935,7 @@ export function FlightDetails({
                 <GoproOverlayJobCard
                   key={overlay.job_id}
                   job={overlay}
-                  youtubeUploadFlight={
-                    (flight.youtube_urls?.length ?? 0) === 0
-                      ? flight
-                      : undefined
-                  }
+                  youtubeUploadFlight={flight}
                   isDownloadingAnyMedia={isDownloadingAnyMedia}
                   isDeleting={deletingGoproOverlayJobId === overlay.job_id}
                   onDownload={() => void handleDownloadGoproOverlay(overlay)}

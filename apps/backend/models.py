@@ -197,6 +197,7 @@ class Flight(Base):
     video_export_job_id = Column(String, nullable=True)  # Background job ID for video conversion
     video_export_status = Column(String, nullable=True)  # "processing", "completed", "failed"
     video_file_path = Column(String, nullable=True)  # Path to generated MP4 file
+    pano_video_file_path = Column(String, nullable=True)
     # GoPro overlay export fields
     gopro_overlay_job_id = Column(String, nullable=True)
     gopro_overlay_status = Column(String, nullable=True)
@@ -326,7 +327,7 @@ class GoproOverlayJob(Base):
 
 
 class YoutubeUploadJob(Base):
-    """Durable state for an upload of a GoPro overlay video to YouTube."""
+    """Durable state for a flight video upload to YouTube."""
 
     __tablename__ = "youtube_upload_jobs"
 
@@ -338,6 +339,7 @@ class YoutubeUploadJob(Base):
         index=True,
     )
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    source_type = Column(String(32), nullable=False, default="gopro_overlay", index=True)
     gopro_overlay_job_id = Column(String, nullable=True, index=True)
     status = Column(String, nullable=False, index=True)
     progress = Column(Integer, nullable=False, default=0)
