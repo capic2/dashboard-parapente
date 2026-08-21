@@ -142,12 +142,6 @@ const defaultHandlers = [
       { headers: { 'Content-Type': 'image/svg+xml' } }
     )
   ),
-  http.get('*/api/gopro-overlays/jobs/:id/thumbnail', () =>
-    HttpResponse.text(
-      '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#164e63"/><path d="M0 285 165 135 305 255 455 105 640 275V360H0Z" fill="#a5f3fc"/><text x="28" y="48" fill="white" font-size="22">1920 x 1080</text></svg>',
-      { headers: { 'Content-Type': 'image/svg+xml' } }
-    )
-  ),
   http.get(
     '*/api/flights/:id/gopro-camera/preview',
     () =>
@@ -365,13 +359,6 @@ MediaThumbnails.test(
     ).toBeVisible();
     await expect(
       await canvas.findByAltText(i18n.t('flights.goproOverlayThumbnailAlt'))
-    ).toBeVisible();
-    await expect(
-      await canvas.findByAltText(
-        i18n.t('flights.goproOverlayJobThumbnailAlt', {
-          name: 'vol-arguel-1080p.mp4',
-        })
-      )
     ).toBeVisible();
   }
 );
