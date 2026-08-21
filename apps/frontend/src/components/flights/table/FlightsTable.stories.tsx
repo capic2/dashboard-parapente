@@ -153,6 +153,7 @@ const summarizeFlight = (flight: Flight): FlightSummary => ({
   elevation_gain_m: flight.elevation_gain_m ?? null,
   has_gpx: Boolean(flight.gpx_file_path),
   has_video: Boolean(flight.video_file_path),
+  has_camera: flight.gopro_camera_file_exists === true,
   has_youtube_video: Boolean(flight.youtube_urls?.length),
   has_gopro_overlay: Boolean(flight.gopro_overlay_file_path),
   video_export_job_id: flight.video_export_job_id ?? null,

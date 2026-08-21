@@ -4,15 +4,17 @@ import hmac
 import json
 import unicodedata
 from datetime import date, datetime
+from pathlib import Path
 from typing import Any, Literal
 
-from sqlalchemy import String, and_, cast, exists, func, or_
-from sqlalchemy.orm import Query, Session
+from sqlalchemy import String, and_, cast, exists, func, or_, select
+from sqlalchemy.orm import Query, Session, aliased
 from sqlalchemy.sql.elements import ColumnElement
 
 import config
-from models import Flight, GoproOverlayJob, Site
-from schemas import FlightSummariesResponse, FlightSummary
+from models import Flight, GoproOverlayJob, Site, YoutubeUploadJob
+from schemas import FlightSummariesResponse, FlightSummary, youtube_video_id_from_url
+from youtube_upload import existing_youtube_video_ids
 
 FlightGpxStatus = Literal["all", "with", "missing"]
 FlightSortBy = Literal[
@@ -62,12 +64,87 @@ class InvalidFlightSummaryCursor(ValueError):
     pass
 
 
-def _has_youtube_video(value: str | None) -> bool:
+def _resolve_file_path(file_path: str | None) -> Path | None:
+    if not file_path:
+        return None
+    path = Path(file_path)
+    if path.is_absolute() or path.exists():
+        return path
+    return Path(__file__).parent / path
+
+
+def _file_exists(file_path: str | None) -> bool:
+    path = _resolve_file_path(file_path)
+    return bool(path and path.is_file())
+
+
+def _youtube_video_ids(value: str | None) -> set[str]:
     try:
         urls = json.loads(value or "[]")
     except (TypeError, json.JSONDecodeError):
-        return False
-    return isinstance(urls, list) and bool(urls)
+        return set()
+    if not isinstance(urls, list):
+        return set()
+
+    video_ids: set[str] = set()
+    for url in urls:
+        if not isinstance(url, str):
+            continue
+        try:
+            video_ids.add(youtube_video_id_from_url(url))
+        except ValueError:
+            continue
+    return video_ids
+
+
+def _completed_youtube_uploads(value: str | None) -> list[tuple[int, str]]:
+    try:
+        uploads = json.loads(value or "[]")
+    except (TypeError, json.JSONDecodeError):
+        return []
+    if not isinstance(uploads, list):
+        return []
+
+    return [
+        (upload["user_id"], upload["video_id"])
+        for upload in uploads
+        if isinstance(upload, dict)
+        and isinstance(upload.get("user_id"), int)
+        and isinstance(upload.get("video_id"), str)
+    ]
+
+
+def _flight_directory(flight_date: date, sequence: int) -> Path:
+    return Path(config.PARAGLIDING_DATA_ROOT) / flight_date.strftime("%Y%m%d") / f"{sequence:02d}"
+
+
+def _null_safe_equal(left: Any, right: Any) -> ColumnElement[bool]:
+    return or_(left == right, and_(left.is_(None), right.is_(None)))
+
+
+def _flight_sequence_expression() -> ColumnElement[int]:
+    candidate = aliased(Flight)
+    same_departure = _null_safe_equal(candidate.departure_time, Flight.departure_time)
+    same_creation = _null_safe_equal(candidate.created_at, Flight.created_at)
+    earlier = or_(
+        and_(candidate.departure_time.isnot(None), Flight.departure_time.is_(None)),
+        candidate.departure_time < Flight.departure_time,
+        and_(
+            same_departure,
+            or_(
+                and_(candidate.created_at.isnot(None), Flight.created_at.is_(None)),
+                candidate.created_at < Flight.created_at,
+                and_(same_creation, candidate.id < Flight.id),
+            ),
+        ),
+    )
+    return (
+        select(func.count(candidate.id))
+        .where(candidate.flight_date == Flight.flight_date, earlier)
+        .correlate(Flight)
+        .scalar_subquery()
+        + 1
+    )
 
 
 def _encode_cursor(payload: dict[str, Any]) -> str:
@@ -239,6 +316,36 @@ def list_flight_summaries(
     total = base_query.with_entities(func.count(Flight.id)).scalar() or 0
 
     expressions = _ordering(sort_by)
+    completed_overlay_path = (
+        select(GoproOverlayJob.output_path)
+        .where(
+            GoproOverlayJob.flight_id == Flight.id,
+            GoproOverlayJob.status == "completed",
+        )
+        .order_by(GoproOverlayJob.completed_at.desc(), GoproOverlayJob.created_at.desc())
+        .limit(1)
+        .correlate(Flight)
+        .scalar_subquery()
+    )
+    completed_youtube_uploads = (
+        select(
+            func.json_group_array(
+                func.json_object(
+                    "user_id",
+                    YoutubeUploadJob.user_id,
+                    "video_id",
+                    YoutubeUploadJob.youtube_video_id,
+                )
+            )
+        )
+        .where(
+            YoutubeUploadJob.flight_id == Flight.id,
+            YoutubeUploadJob.status == "completed",
+            YoutubeUploadJob.youtube_video_id.isnot(None),
+        )
+        .correlate(Flight)
+        .scalar_subquery()
+    )
     page_query = base_query.with_entities(
         Flight.id,
         Flight.site_id,
@@ -260,6 +367,9 @@ def list_flight_summaries(
         Flight.gopro_overlay_job_id,
         Flight.gopro_overlay_status,
         Flight.gopro_overlay_file_path,
+        _flight_sequence_expression().label("flight_sequence"),
+        completed_overlay_path.label("completed_overlay_path"),
+        completed_youtube_uploads.label("completed_youtube_uploads"),
         exists()
         .where(
             GoproOverlayJob.flight_id == Flight.id,
@@ -276,6 +386,18 @@ def list_flight_summaries(
     rows = page_query.order_by(*order).limit(page_size + 1).all()
     has_more = len(rows) > page_size
     rows = rows[:page_size]
+    youtube_video_ids_by_user: dict[int, set[str]] = {}
+    associated_youtube_ids: dict[str, set[str]] = {}
+    uploaded_youtube_ids: dict[str, set[str]] = {}
+    for row in rows:
+        associated_youtube_ids[row.id] = _youtube_video_ids(row.youtube_urls_json)
+        uploaded_youtube_ids[row.id] = set()
+        for user_id, video_id in _completed_youtube_uploads(row.completed_youtube_uploads):
+            if video_id not in associated_youtube_ids[row.id]:
+                continue
+            uploaded_youtube_ids[row.id].add(video_id)
+            youtube_video_ids_by_user.setdefault(user_id, set()).add(video_id)
+    existing_youtube_ids = existing_youtube_video_ids(youtube_video_ids_by_user)
 
     flights = [
         FlightSummary(
@@ -291,16 +413,28 @@ def list_flight_summaries(
             max_altitude_m=row.max_altitude_m,
             distance_km=row.distance_km,
             elevation_gain_m=row.elevation_gain_m,
-            has_gpx=bool(row.gpx_file_path),
+            has_gpx=_file_exists(row.gpx_file_path),
             video_export_job_id=row.video_export_job_id,
             video_export_status=row.video_export_status,
             video_export_progress=None,
-            has_video=bool(row.video_file_path),
-            has_youtube_video=_has_youtube_video(row.youtube_urls_json),
+            has_video=row.video_export_status == "completed" and _file_exists(row.video_file_path),
+            has_camera=(
+                _flight_directory(row.flight_date, row.flight_sequence) / "camera.mp4"
+            ).is_file(),
+            has_youtube_video=bool(uploaded_youtube_ids[row.id] & existing_youtube_ids),
             gopro_overlay_job_id=row.gopro_overlay_job_id,
             gopro_overlay_status=row.gopro_overlay_status,
             gopro_overlay_progress=None,
-            has_gopro_overlay=bool(row.gopro_overlay_file_path or row.has_completed_gopro_overlay),
+            has_gopro_overlay=bool(
+                (row.gopro_overlay_status == "completed" or row.has_completed_gopro_overlay)
+                and (
+                    _file_exists(row.gopro_overlay_file_path)
+                    or _file_exists(row.completed_overlay_path)
+                    or (
+                        _flight_directory(row.flight_date, row.flight_sequence) / "final.mp4"
+                    ).is_file()
+                )
+            ),
         )
         for row in rows
     ]

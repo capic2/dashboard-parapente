@@ -18,6 +18,7 @@ const mockFlight: FlightSummary = {
   elevation_gain_m: 800,
   has_gpx: true,
   has_video: true,
+  has_camera: true,
   has_youtube_video: false,
   has_gopro_overlay: true,
   video_export_job_id: null,
@@ -78,6 +79,7 @@ export const NoFile = meta.story({
           ...mockFlight,
           has_gpx: false,
           has_video: false,
+          has_camera: false,
           has_gopro_overlay: false,
         }}
         isActive={false}

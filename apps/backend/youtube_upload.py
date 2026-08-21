@@ -260,6 +260,38 @@ def latest_job(db: Session, flight_id: str) -> YoutubeUploadJob | None:
     )
 
 
+def existing_youtube_video_ids(video_ids_by_user: dict[int, set[str]]) -> set[str]:
+    """Return uploaded video IDs that YouTube still exposes to their owner."""
+    existing_ids: set[str] = set()
+    for user_id, video_ids in video_ids_by_user.items():
+        try:
+            access_token = _access_token(user_id)
+        except (YoutubeOAuthError, httpx.HTTPError, ValueError) as exc:
+            logger.warning("Unable to verify YouTube videos for user %s: %s", user_id, exc)
+            continue
+
+        ordered_ids = sorted(video_ids)
+        for offset in range(0, len(ordered_ids), 50):
+            batch = ordered_ids[offset : offset + 50]
+            try:
+                response = httpx.get(
+                    _VIDEOS_URL,
+                    params={"part": "id", "id": ",".join(batch)},
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    timeout=30,
+                )
+                response.raise_for_status()
+                items = response.json().get("items", [])
+                existing_ids.update(
+                    item["id"]
+                    for item in items
+                    if isinstance(item, dict) and isinstance(item.get("id"), str)
+                )
+            except (httpx.HTTPError, ValueError, AttributeError) as exc:
+                logger.warning("Unable to verify YouTube video batch: %s", _safe_log_error(exc))
+    return existing_ids
+
+
 def youtube_video_associations(
     db: Session, *, flight: Flight, user_id: int
 ) -> list[YoutubeVideoAssociationPayload]:
