@@ -1,10 +1,13 @@
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import config
+import httpx
 import job_queue
 import pytest
 import youtube_upload
+from fastapi.testclient import TestClient
 from models import Flight, GoproOverlayJob, YoutubeCredential, YoutubeUploadJob
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -62,8 +65,8 @@ def test_youtube_status_reports_configuration_and_connection(client, db_session,
 
 
 def test_youtube_status_requires_reauthorization_for_legacy_upload_scope(
-    client, db_session, monkeypatch
-):
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _configure_youtube(monkeypatch)
     db_session.add(
         YoutubeCredential(
@@ -391,8 +394,8 @@ def _completed_youtube_job(
 
 
 def test_youtube_video_metadata_marks_only_current_users_completed_upload_as_deletable(
-    client, db_session, sample_flight
-):
+    client: TestClient, db_session: Session, sample_flight: Flight
+) -> None:
     sample_flight.youtube_urls = [
         "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
         "https://www.youtube.com/watch?v=abcdefghijk",
@@ -405,6 +408,12 @@ def test_youtube_video_metadata_marks_only_current_users_completed_upload_as_del
         job_id="youtube-job-other-user",
         user_id=2,
         video_id="abcdefghijk",
+    )
+    db_session.add(
+        YoutubeCredential(
+            user_id=1,
+            refresh_token_encrypted=encrypt_secret("refresh-token"),
+        )
     )
     db_session.commit()
 
@@ -430,7 +439,29 @@ def test_youtube_video_metadata_marks_only_current_users_completed_upload_as_del
     ]
 
 
-def test_remove_youtube_video_can_unlink_locally(client, db_session, sample_flight):
+def test_youtube_video_metadata_disables_remote_deletion_when_disconnected(
+    client: TestClient, db_session: Session, sample_flight: Flight
+) -> None:
+    youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    sample_flight.youtube_urls = [youtube_url]
+    _completed_youtube_job(db_session, sample_flight)
+    db_session.commit()
+
+    response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/youtube-videos")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "url": youtube_url,
+            "video_id": "dQw4w9WgXcQ",
+            "can_delete_from_youtube": False,
+        }
+    ]
+
+
+def test_remove_youtube_video_can_unlink_locally(
+    client: TestClient, db_session: Session, sample_flight: Flight
+) -> None:
     sample_flight.youtube_urls = ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
     db_session.commit()
 
@@ -446,17 +477,25 @@ def test_remove_youtube_video_can_unlink_locally(client, db_session, sample_flig
 
 @pytest.mark.parametrize("remote_status", [204, 404])
 def test_remove_youtube_video_unlinks_after_remote_success(
-    client, db_session, sample_flight, monkeypatch, remote_status
-):
+    client: TestClient,
+    db_session: Session,
+    sample_flight: Flight,
+    monkeypatch: pytest.MonkeyPatch,
+    remote_status: int,
+) -> None:
     sample_flight.youtube_urls = ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
     job = _completed_youtube_job(db_session, sample_flight)
     db_session.commit()
-    monkeypatch.setattr(youtube_upload, "_access_token", lambda _user_id: "access-token")
-    requests: list[dict] = []
 
-    def delete_video(url, **kwargs):
+    def access_token(_user_id: int) -> str:
+        return "access-token"
+
+    monkeypatch.setattr(youtube_upload, "_access_token", access_token)
+    requests: list[dict[str, Any]] = []
+
+    def delete_video(url: str, **kwargs: Any) -> httpx.Response:
         requests.append({"url": url, **kwargs})
-        return youtube_upload.httpx.Response(remote_status)
+        return httpx.Response(remote_status)
 
     monkeypatch.setattr(youtube_upload.httpx, "delete", delete_video)
 
@@ -476,8 +515,12 @@ def test_remove_youtube_video_unlinks_after_remote_success(
 
 @pytest.mark.parametrize("job_user_id", [None, 2])
 def test_remove_youtube_video_rejects_remote_deletion_for_manual_or_other_users_upload(
-    client, db_session, sample_flight, monkeypatch, job_user_id
-):
+    client: TestClient,
+    db_session: Session,
+    sample_flight: Flight,
+    monkeypatch: pytest.MonkeyPatch,
+    job_user_id: int | None,
+) -> None:
     youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
     sample_flight.youtube_urls = [youtube_url]
     if job_user_id is not None:
@@ -485,7 +528,7 @@ def test_remove_youtube_video_rejects_remote_deletion_for_manual_or_other_users_
     db_session.commit()
     delete_called = False
 
-    def delete_video(*args, **kwargs):
+    def delete_video(*_args: Any, **_kwargs: Any) -> None:
         nonlocal delete_called
         delete_called = True
 
@@ -513,8 +556,13 @@ def test_remove_youtube_video_rejects_remote_deletion_for_manual_or_other_users_
     ],
 )
 def test_remove_youtube_video_remote_failures_keep_association(
-    client, db_session, sample_flight, monkeypatch, failure, expected_status
-):
+    client: TestClient,
+    db_session: Session,
+    sample_flight: Flight,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: Exception | int,
+    expected_status: int,
+) -> None:
     youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
     sample_flight.youtube_urls = [youtube_url]
     _completed_youtube_job(db_session, sample_flight)
@@ -524,17 +572,21 @@ def test_remove_youtube_video_remote_failures_keep_association(
         failure, youtube_upload.httpx.RequestError
     ):
 
-        def access_token(_user_id):
+        def access_token(_user_id: int) -> str:
             raise failure
 
         monkeypatch.setattr(youtube_upload, "_access_token", access_token)
     else:
-        monkeypatch.setattr(youtube_upload, "_access_token", lambda _user_id: "access-token")
 
-        def delete_video(*args, **kwargs):
+        def access_token(_user_id: int) -> str:
+            return "access-token"
+
+        monkeypatch.setattr(youtube_upload, "_access_token", access_token)
+
+        def delete_video(*_args: Any, **_kwargs: Any) -> httpx.Response:
             if isinstance(failure, Exception):
                 raise failure
-            return youtube_upload.httpx.Response(failure)
+            return httpx.Response(failure)
 
         monkeypatch.setattr(youtube_upload.httpx, "delete", delete_video)
 
