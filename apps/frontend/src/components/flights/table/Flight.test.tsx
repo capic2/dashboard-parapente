@@ -58,6 +58,7 @@ const flight = {
   has_camera: false,
   has_youtube_video: false,
   has_gopro_overlay: false,
+  has_pano_video: false,
   video_export_job_id: null,
   video_export_status: null,
   video_export_progress: null,
@@ -142,4 +143,19 @@ test('renders available media badges in the expected order', () => {
       return position & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
     })
   );
+});
+
+test('renders a panorama badge when pano.mp4 exists', () => {
+  render(
+    <Flight
+      flight={{ ...flight, has_pano_video: true }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(screen.getByText('flights.panoBadge')).toBeInTheDocument();
 });

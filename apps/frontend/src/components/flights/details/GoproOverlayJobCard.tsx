@@ -89,7 +89,10 @@ export function GoproOverlayJobCard({
               <div className="min-w-48">
                 <FlightYoutubeUploadControls
                   flight={youtubeUploadFlight}
-                  goproOverlayJobId={job.job_id}
+                  source={{
+                    source_type: 'gopro_overlay',
+                    gopro_overlay_job_id: job.job_id,
+                  }}
                 />
               </div>
             )}

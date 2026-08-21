@@ -214,6 +214,7 @@ vi.mock('react-i18next', () => ({
         'flights.mediaReplayTitle': 'Flight replay',
         'flights.open3dReplay': 'Open 3D replay',
         'flights.mediaFilesTitle': 'Available files',
+        'flights.panoBadge': 'Pano',
         'flights.mediaCreationTitle': 'Create and publish',
         'flights.youtubeVideos': 'YouTube videos',
         'flights.youtubeVideoTitle': 'Flight YouTube video',
@@ -312,10 +313,14 @@ vi.mock('../video-export/FlightVideoExportControls', () => ({
 
 vi.mock('./FlightYoutubeUploadControls', () => ({
   FlightYoutubeUploadControls: ({
-    goproOverlayJobId,
+    source,
   }: {
-    goproOverlayJobId: string;
-  }) => <button type="button">YouTube upload {goproOverlayJobId}</button>,
+    source: { source_type: string; gopro_overlay_job_id?: string };
+  }) => (
+    <button type="button">
+      YouTube upload {source.gopro_overlay_job_id ?? source.source_type}
+    </button>
+  ),
 }));
 
 vi.mock('./FlightMediaThumbnail', () => ({
@@ -357,6 +362,7 @@ describe('FlightDetails GoPro overlay action', () => {
     mockFlight.video_file_path = '/exports/flight.mp4';
     mockFlight.video_file_exists = true;
     mockFlight.gopro_camera_file_exists = true;
+    mockFlight.pano_video_file_exists = false;
     mockFlight.gpx_file_path = 'sample.gpx';
     mockFlight.youtube_urls = [];
     videoStatusMock.current = null;
@@ -608,6 +614,24 @@ describe('FlightDetails GoPro overlay action', () => {
       screen.getByRole('button', {
         name: 'flights.viewer.downloadVideo',
       })
+    ).toBeInTheDocument();
+  });
+
+  it('offers a panorama YouTube upload when pano.mp4 exists', () => {
+    mockFlight.pano_video_file_exists = true;
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    openTab('Media');
+
+    expect(screen.getByText('Pano')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'YouTube upload pano' })
     ).toBeInTheDocument();
   });
 

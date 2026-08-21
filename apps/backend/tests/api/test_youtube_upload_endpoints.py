@@ -210,6 +210,59 @@ def test_start_youtube_upload_rejects_blank_overlay_id(client, sample_flight):
     assert response.status_code == 422
 
 
+def test_start_youtube_upload_accepts_panorama_source(
+    client, db_session, sample_flight, tmp_path, monkeypatch
+):
+    _configure_youtube(monkeypatch)
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    pano_path = tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01" / "pano.mp4"
+    pano_path.parent.mkdir(parents=True)
+    pano_path.write_bytes(b"panorama")
+    db_session.add(
+        YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
+    )
+    db_session.commit()
+    enqueued: list[str] = []
+    monkeypatch.setattr("routes.enqueue_youtube_upload", enqueued.append)
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload",
+        json={
+            "source_type": "pano",
+            "title": "Panorama",
+            "privacy_status": "unlisted",
+        },
+    )
+
+    assert response.status_code == 202
+    payload = response.json()
+    assert payload["source_type"] == "pano"
+    assert payload["gopro_overlay_job_id"] is None
+    job = db_session.get(YoutubeUploadJob, payload["job_id"])
+    assert job is not None
+    assert job.source_type == "pano"
+    assert enqueued == [job.id]
+
+
+def test_start_youtube_upload_rejects_missing_panorama(
+    client, db_session, sample_flight, tmp_path, monkeypatch
+):
+    _configure_youtube(monkeypatch)
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    db_session.add(
+        YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
+    )
+    db_session.commit()
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload",
+        json={"source_type": "pano", "title": "Panorama"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Panorama video is not available"
+
+
 def test_get_youtube_upload_includes_recent_job_logs(
     client, db_session, sample_flight, tmp_path, monkeypatch
 ):
@@ -262,16 +315,40 @@ def test_worker_resolves_only_the_selected_overlay(db_session, sample_flight, tm
     db_session.add(job)
     db_session.commit()
 
-    assert youtube_upload._overlay_video_path(db_session, job) == overlay_path
+    assert youtube_upload._source_video_path(db_session, job) == overlay_path
 
 
-def test_start_youtube_upload_rejects_flight_with_existing_youtube_video(
+def test_worker_resolves_panorama_from_the_flight_directory(
+    db_session, sample_flight, tmp_path, monkeypatch
+):
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    pano_path = tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01" / "pano.mp4"
+    pano_path.parent.mkdir(parents=True)
+    pano_path.write_bytes(b"panorama")
+    job = YoutubeUploadJob(
+        id="youtube-pano-source",
+        flight_id=sample_flight.id,
+        user_id=1,
+        source_type="pano",
+        status="queued",
+        progress=0,
+        title="Panorama",
+        description="",
+        privacy_status="private",
+    )
+    db_session.add(job)
+    db_session.commit()
+
+    assert youtube_upload._source_video_path(db_session, job) == pano_path
+
+
+def test_start_youtube_upload_allows_an_overlay_with_an_existing_youtube_video(
     client, db_session, sample_flight, tmp_path, monkeypatch
 ):
     _configure_youtube(monkeypatch)
-    video_path = tmp_path / "flight.mp4"
-    video_path.write_bytes(b"video")
-    sample_flight.video_file_path = str(video_path)
+    overlay_path = tmp_path / "overlay.mp4"
+    overlay_path.write_bytes(b"video")
+    overlay = _create_completed_overlay(db_session, sample_flight, overlay_path)
     sample_flight.youtube_urls = ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
     db_session.add(
         YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
@@ -281,14 +358,13 @@ def test_start_youtube_upload_rejects_flight_with_existing_youtube_video(
     response = client.post(
         f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload",
         json={
-            "gopro_overlay_job_id": "overlay-job",
+            "gopro_overlay_job_id": overlay.id,
             "title": "Déjà publiée",
             "privacy_status": "private",
         },
     )
 
-    assert response.status_code == 409
-    assert "already has" in response.json()["detail"]
+    assert response.status_code == 202
 
 
 def test_database_rejects_two_active_uploads_for_the_same_flight(db_session, sample_flight):

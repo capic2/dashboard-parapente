@@ -465,17 +465,28 @@ class YoutubeAuthUrlRequest(BaseModel):
 
 
 class YoutubeUploadCreate(BaseModel):
-    gopro_overlay_job_id: str = Field(min_length=1)
+    source_type: Literal["gopro_overlay", "pano"] = "gopro_overlay"
+    gopro_overlay_job_id: str | None = None
     title: str = Field(min_length=1, max_length=100)
     description: str = Field(default="", max_length=5000)
     privacy_status: Literal["private", "unlisted", "public"] = "private"
 
     @validator("gopro_overlay_job_id")
-    def trimmed_overlay_job_id(cls, value: str) -> str:
+    def trimmed_overlay_job_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         overlay_job_id = value.strip()
         if not overlay_job_id:
             raise ValueError("gopro_overlay_job_id must not be blank")
         return overlay_job_id
+
+    @model_validator(mode="after")
+    def valid_source(self) -> "YoutubeUploadCreate":
+        if self.source_type == "gopro_overlay" and self.gopro_overlay_job_id is None:
+            raise ValueError("gopro_overlay_job_id is required for a GoPro overlay upload")
+        if self.source_type == "pano" and self.gopro_overlay_job_id is not None:
+            raise ValueError("gopro_overlay_job_id must be omitted for a panorama upload")
+        return self
 
     @validator("title")
     def trimmed_title(cls, value: str) -> str:
@@ -488,6 +499,7 @@ class YoutubeUploadCreate(BaseModel):
 class YoutubeUploadJobResponse(BaseModel):
     job_id: str
     flight_id: str
+    source_type: Literal["gopro_overlay", "pano"]
     gopro_overlay_job_id: str | None = None
     status: Literal["queued", "uploading", "completed", "failed", "cancelled"]
     progress: int = Field(ge=0, le=100)
@@ -539,6 +551,7 @@ class Flight(FlightBase):
     video_export_progress: int | None = None
     video_file_path: str | None = None
     video_file_exists: bool = False
+    pano_video_file_exists: bool = False
     gopro_camera_file_exists: bool = False
     gopro_overlay_job_id: str | None = None
     gopro_overlay_status: str | None = None
@@ -589,6 +602,7 @@ class FlightSummary(BaseModel):
     gopro_overlay_status: str | None = None
     gopro_overlay_progress: int | None = None
     has_gopro_overlay: bool
+    has_pano_video: bool
 
 
 class FlightSummariesResponse(BaseModel):

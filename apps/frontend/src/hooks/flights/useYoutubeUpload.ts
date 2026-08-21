@@ -13,6 +13,7 @@ export interface YoutubeConnectionStatus {
 export interface YoutubeUploadJob {
   job_id: string;
   flight_id: string;
+  source_type: 'gopro_overlay' | 'pano';
   gopro_overlay_job_id?: string | null;
   status: 'queued' | 'uploading' | 'completed' | 'failed' | 'cancelled';
   progress: number;
@@ -21,12 +22,23 @@ export interface YoutubeUploadJob {
   log_tail: string[];
 }
 
-interface YoutubeUploadInput {
-  gopro_overlay_job_id: string;
+export type YoutubeUploadSource =
+  | { source_type: 'gopro_overlay'; gopro_overlay_job_id: string }
+  | { source_type: 'pano' };
+
+type YoutubeUploadInput = YoutubeUploadSource & {
   title: string;
   description: string;
   privacy_status: 'private' | 'unlisted' | 'public';
-}
+};
+
+const sourceFromInput = (input: YoutubeUploadInput): YoutubeUploadSource =>
+  input.source_type === 'pano'
+    ? { source_type: 'pano' }
+    : {
+        source_type: 'gopro_overlay',
+        gopro_overlay_job_id: input.gopro_overlay_job_id,
+      };
 
 export function useYoutubeStatus() {
   return useQuery({
@@ -36,12 +48,22 @@ export function useYoutubeStatus() {
   });
 }
 
-export function useYoutubeUpload(flightId: string) {
+const youtubeUploadQueryKey = (
+  flightId: string,
+  source?: YoutubeUploadSource
+) => ['youtube-upload', flightId, source ?? 'latest'];
+
+export function useYoutubeUpload(
+  flightId: string,
+  source?: YoutubeUploadSource
+) {
   return useQuery({
-    queryKey: ['youtube-upload', flightId],
+    queryKey: youtubeUploadQueryKey(flightId, source),
     queryFn: () =>
       api
-        .get(`flights/${flightId}/youtube-upload`)
+        .get(`flights/${flightId}/youtube-upload`, {
+          searchParams: source,
+        })
         .json<YoutubeUploadJob | null>(),
     refetchInterval: (query) => {
       const job = query.state.data;
@@ -105,8 +127,12 @@ export function useStartYoutubeUpload(flightId: string) {
       api
         .post(`flights/${flightId}/youtube-upload`, { json: payload })
         .json<YoutubeUploadJob>(),
-    onSuccess: (job) => {
-      queryClient.setQueryData(['youtube-upload', flightId], job);
+    onSuccess: (job, input) => {
+      queryClient.setQueryData(youtubeUploadQueryKey(flightId), job);
+      queryClient.setQueryData(
+        youtubeUploadQueryKey(flightId, sourceFromInput(input)),
+        job
+      );
     },
   });
 }
@@ -117,7 +143,10 @@ export function useCancelYoutubeUpload(flightId: string) {
     mutationFn: () =>
       api.delete(`flights/${flightId}/youtube-upload`).json<YoutubeUploadJob>(),
     onSuccess: (job) => {
-      queryClient.setQueryData(['youtube-upload', flightId], job);
+      queryClient.setQueryData(youtubeUploadQueryKey(flightId), job);
+      void queryClient.invalidateQueries({
+        queryKey: ['youtube-upload', flightId],
+      });
     },
   });
 }
