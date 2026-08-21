@@ -1032,7 +1032,6 @@
     "mediaThumbnailUnavailable": "Miniature indisponible",
     "videoThumbnailAlt": "Miniature de la vidéo du vol",
     "goproOverlayThumbnailAlt": "Miniature de l’overlay GoPro",
-    "goproOverlayJobThumbnailAlt": "Miniature de l’overlay {{name}}",
     "mediaCreationTitle": "Créer et publier",
     "mediaCreationDescription": "Générez une vidéo, ajoutez un overlay ou publiez sur YouTube.",
     "mediaGeneratedOverlaysTitle": "Overlays générés",
