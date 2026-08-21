@@ -27,11 +27,14 @@ Projects: `frontend` in `apps/frontend`, `backend` in `apps/backend`, `design-sy
 
 ## Analysis Source Of Truth
 
-- Use `origin/main` as the default source of truth for repository analysis, diagnostics, code review, and behavior checks.
-- Before drawing conclusions from the current checkout, check whether it is aligned with `origin/main`.
-- If the current checkout is stale, dirty, or ambiguous, inspect `origin/main` directly or create/use a clean worktree from `origin/main`.
-- Only analyze local uncommitted changes, a non-main branch, or a specific worktree when the user explicitly asks for that target.
-- State which target is being analyzed when the distinction matters: local checkout, `origin/main`, or a named worktree.
+- When a pull request, branch, commit, worktree, or diff is supplied, analyze that target. For pull-request reviews, always use the PR base, head, and diff.
+- When no analysis or review target is supplied, use the current `main` commit published by GitHub as the default source of truth for repository analysis, diagnostics, code review, and behavior checks.
+- Resolve the GitHub SHA first with `gh api repos/{owner}/{repo}/commits/main --jq .sha`; never assume the local `origin/main` tracking ref is current.
+- For read-only analysis, inspect files at that GitHub SHA with GitHub API or raw URLs without changing local refs.
+- For implementation, fetch `origin/main` and create/use a clean worktree from the freshly fetched ref.
+- If GitHub is unavailable, report that the analysis uses a local ref that may be stale.
+- Only analyze local uncommitted changes, a non-main branch, or a specific worktree when that target is supplied by the user or review context.
+- State which target is being analyzed when the distinction matters: a GitHub SHA, local checkout, or a named worktree.
 
 ## Worktrees
 

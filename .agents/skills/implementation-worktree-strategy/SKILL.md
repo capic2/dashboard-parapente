@@ -21,9 +21,10 @@ Whenever a worktree is created, immediately name the current AI session with the
 
 ## Analysis Baseline
 
-- Treat `origin/main` as the baseline for implementation analysis before editing.
-- Do not rely on local `main` for conclusions unless it has been verified aligned with `origin/main`.
-- If local `main` is stale, dirty, or ambiguous, create the implementation worktree from `origin/main` and continue analysis there.
+- Treat the current `main` commit published by GitHub as the implementation baseline.
+- Fetch `origin/main` before analysis and verify that the fetched SHA matches GitHub `main`; do not assume an existing local tracking ref is current.
+- Do not rely on local `main` for conclusions unless it has been verified aligned with the freshly fetched `origin/main`.
+- If local `main` is stale, dirty, or ambiguous, create the implementation worktree from the freshly fetched `origin/main` and continue analysis there.
 - If the user asks about local uncommitted changes or a specific branch/worktree, analyze that explicit target and say so.
 
 ## Worktree Bootstrap Subagent

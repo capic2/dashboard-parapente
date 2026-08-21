@@ -473,14 +473,17 @@ def test_create_gopro_overlay_job_rejects_non_finite_gpx_offset(
     assert response.json()["detail"] == "gpx_offset must be a finite number"
 
 
-def test_create_gopro_overlay_job_rejects_unknown_output_resolution(client: TestClient):
+@pytest.mark.parametrize("output_resolution", ["auto", "source", "720p"])
+def test_create_gopro_overlay_job_rejects_unsupported_output_resolution(
+    client: TestClient, output_resolution: str
+):
     response = client.post(
         f"{API_PREFIX}/gopro-overlays/jobs",
         files={
             "video_file": ("flight.mp4", b"video", "video/mp4"),
             "gpx_file": ("flight.gpx", b"<gpx />", "application/gpx+xml"),
         },
-        data={"output_resolution": "720p"},
+        data={"output_resolution": output_resolution},
     )
 
     assert response.status_code == 422
@@ -608,6 +611,20 @@ def test_create_flight_gopro_overlay_job_rejects_non_finite_gpx_offset(
 
     assert response.status_code == 422
     assert response.json()["detail"] == "gpx_offset must be a finite number"
+
+
+@pytest.mark.parametrize("output_resolution", ["auto", "source", "720p"])
+def test_create_flight_gopro_overlay_job_rejects_unsupported_output_resolution(
+    client: TestClient,
+    sample_flight,
+    output_resolution: str,
+):
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay",
+        data={"output_resolution": output_resolution},
+    )
+
+    assert response.status_code == 422
 
 
 def test_create_flight_gopro_overlay_job_resolves_paragliding_root_paths(
@@ -826,7 +843,7 @@ def test_create_flight_gopro_overlay_job_uses_daily_departure_index(
     assert create_job.call_args.kwargs["output_resolution"] == "1080p"
 
 
-def test_create_flight_gopro_overlay_job_auto_uses_4k_output_resolution(
+def test_create_flight_gopro_overlay_job_uses_explicit_4k_output_resolution(
     client: TestClient,
     db_session,
     sample_flight,
@@ -877,7 +894,10 @@ def test_create_flight_gopro_overlay_job_auto_uses_4k_output_resolution(
         patch("routes.probe_video_resolution", return_value=(3840, 2160)),
         patch("routes.create_gopro_overlay_job_from_paths", return_value=expected) as create_job,
     ):
-        response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay")
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay",
+            data={"output_resolution": "4k"},
+        )
 
     assert response.status_code == 200
     assert create_job.call_args.kwargs["video_path"] == camera_path
@@ -3444,7 +3464,9 @@ def test_run_job_uses_preview_effective_offset_for_osv_merge(
     assert merge_calls[0][3]["gpx_offset"] == 295.9
     assert merge_calls[0][3]["first_gpx_at"] == pytest.approx(5.0)
     assert merge_calls[0][3]["video_duration"] == 421.483
-    assert gopro_overlay_export.get_gopro_overlay_job(job["job_id"])["status"] == "completed"
+    persisted_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"])
+    assert persisted_job["status"] == "completed"
+    assert persisted_job["gpx_offset"] == 295.9
     assert Path(job["output_path"]).read_bytes() == b"video"
     assert not Path(job["temp_output_path"]).exists()
     assert not work_dir.exists()
