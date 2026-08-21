@@ -1788,6 +1788,27 @@ def test_download_gopro_overlay_rejects_unfinished_job(client: TestClient):
     assert response.json()["detail"] == "GoPro overlay video is not ready"
 
 
+def test_get_gopro_overlay_job_thumbnail(client: TestClient, tmp_path: Path) -> None:
+    output_path = tmp_path / "overlay.mp4"
+    output_path.write_bytes(b"overlay")
+    thumbnail_path = tmp_path / "overlay-thumbnail.jpg"
+    thumbnail_path.write_bytes(b"jpeg")
+
+    with (
+        patch(
+            "routes.get_gopro_overlay_job",
+            return_value={"job_id": "job-gopro", "status": "completed"},
+        ),
+        patch("routes.gopro_overlay_output_path", return_value=output_path),
+        patch("routes.get_video_thumbnail", return_value=thumbnail_path),
+    ):
+        response = client.get(f"{API_PREFIX}/gopro-overlays/jobs/job-gopro/thumbnail")
+
+    assert response.status_code == 200
+    assert response.content == b"jpeg"
+    assert response.headers["content-type"] == "image/jpeg"
+
+
 def test_delete_gopro_overlay_video_removes_completed_output(client: TestClient):
     with patch(
         "routes.delete_gopro_overlay_output",

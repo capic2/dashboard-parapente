@@ -3,6 +3,7 @@ import { Button } from '@dashboard-parapente/design-system';
 import { Download, Trash2 } from 'lucide-react';
 import type { GoproOverlayJob } from '../../../hooks/gopro/useGoproOverlay';
 import type { Flight } from '../../../types';
+import { FlightMediaThumbnail } from './FlightMediaThumbnail';
 import { FlightYoutubeUploadControls } from './FlightYoutubeUploadControls';
 
 interface GoproOverlayJobCardProps {
@@ -59,6 +60,16 @@ export function GoproOverlayJobCard({
           {t(`flights.goproOverlayStatus.${job.status}`)}
         </span>
       </div>
+      {job.status === 'completed' && (
+        <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+          <FlightMediaThumbnail
+            path={`/gopro-overlays/jobs/${job.job_id}/thumbnail`}
+            alt={t('flights.goproOverlayJobThumbnailAlt', {
+              name: job.output_filename,
+            })}
+          />
+        </div>
+      )}
       {job.status === 'completed' && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 dark:border-emerald-800 dark:bg-emerald-950/30">
           <span className="text-xs font-semibold text-emerald-900 dark:text-emerald-100">

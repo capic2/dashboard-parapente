@@ -10,7 +10,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 import config
+from fastapi.testclient import TestClient
 from models import Flight, GoproOverlayJob
+from sqlalchemy.orm import Session
+from video_thumbnail import VideoThumbnailError
 
 # API prefix for all routes
 API_PREFIX = "/api"
@@ -442,6 +445,55 @@ class TestFlightsListEndpoint:
         assert response.status_code == 404
         assert response.json()["detail"] == "No video file available for this flight"
 
+    def test_get_flight_video_thumbnail(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        video_path = tmp_path / "flight.mp4"
+        video_path.write_bytes(b"video")
+        thumbnail_path = tmp_path / "thumbnail.jpg"
+        thumbnail_path.write_bytes(b"jpeg")
+        flight = Flight(
+            id="flight-video-thumbnail",
+            name="Flight video thumbnail",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            video_file_path=str(video_path),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        with patch("routes.get_video_thumbnail", return_value=thumbnail_path):
+            response = client.get(f"{API_PREFIX}/flights/{flight.id}/video/thumbnail")
+
+        assert response.status_code == 200
+        assert response.content == b"jpeg"
+        assert response.headers["content-type"] == "image/jpeg"
+        assert response.headers["cache-control"] == "no-cache"
+
+    def test_get_flight_video_thumbnail_returns_422_when_generation_fails(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        video_path = tmp_path / "flight.mp4"
+        video_path.write_bytes(b"video")
+        flight = Flight(
+            id="flight-video-thumbnail-error",
+            name="Flight video thumbnail error",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            video_file_path=str(video_path),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        with patch(
+            "routes.get_video_thumbnail",
+            side_effect=VideoThumbnailError("invalid video"),
+        ):
+            response = client.get(f"{API_PREFIX}/flights/{flight.id}/video/thumbnail")
+
+        assert response.status_code == 422
+        assert response.json()["detail"] == "Unable to generate video thumbnail"
+
     def test_download_flight_gopro_overlay(self, client, db_session, monkeypatch, tmp_path):
         """GET /flights/{id}/gopro-overlay downloads the generated overlay."""
         monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
@@ -482,6 +534,30 @@ class TestFlightsListEndpoint:
 
         assert response.status_code == 400
         assert response.json()["detail"] == "GoPro overlay paragliding root is not configured"
+
+    def test_get_flight_gopro_overlay_thumbnail(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        overlay_path = tmp_path / "overlay.mp4"
+        overlay_path.write_bytes(b"overlay")
+        thumbnail_path = tmp_path / "overlay-thumbnail.jpg"
+        thumbnail_path.write_bytes(b"jpeg")
+        flight = Flight(
+            id="flight-overlay-thumbnail",
+            name="Flight overlay thumbnail",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            gopro_overlay_file_path=str(overlay_path),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        with patch("routes.get_video_thumbnail", return_value=thumbnail_path):
+            response = client.get(f"{API_PREFIX}/flights/{flight.id}/gopro-overlay/thumbnail")
+
+        assert response.status_code == 200
+        assert response.content == b"jpeg"
+        assert response.headers["content-type"] == "image/jpeg"
 
     def test_get_flights_filter_by_site(self, client, db_session, arguel_site, chalais_site):
         """GET /flights?site_id=X filters by site"""
