@@ -1031,7 +1031,6 @@
     "mediaThumbnailUnavailable": "Thumbnail unavailable",
     "videoThumbnailAlt": "Flight video thumbnail",
     "goproOverlayThumbnailAlt": "GoPro overlay thumbnail",
-    "goproOverlayJobThumbnailAlt": "Thumbnail for overlay {{name}}",
     "mediaCreationTitle": "Create and publish",
     "mediaCreationDescription": "Generate a video, add an overlay, or publish to YouTube.",
     "mediaGeneratedOverlaysTitle": "Generated overlays",
