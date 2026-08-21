@@ -61,6 +61,25 @@ def test_youtube_status_reports_configuration_and_connection(client, db_session,
     assert response.json() == {"configured": True, "connected": True}
 
 
+def test_youtube_status_requires_reauthorization_for_legacy_upload_scope(
+    client, db_session, monkeypatch
+):
+    _configure_youtube(monkeypatch)
+    db_session.add(
+        YoutubeCredential(
+            user_id=1,
+            refresh_token_encrypted=encrypt_secret("refresh-token"),
+            oauth_scope="https://www.googleapis.com/auth/youtube.upload",
+        )
+    )
+    db_session.commit()
+
+    response = client.get(f"{API_PREFIX}/youtube/status")
+
+    assert response.status_code == 200
+    assert response.json() == {"configured": True, "connected": False}
+
+
 def test_youtube_auth_url_contains_signed_current_user_state(client, monkeypatch):
     _configure_youtube(monkeypatch)
 
@@ -72,7 +91,7 @@ def test_youtube_auth_url_contains_signed_current_user_state(client, monkeypatch
     assert response.status_code == 200
     authorization_url = response.json()["authorization_url"]
     query = parse_qs(urlparse(authorization_url).query)
-    assert query["scope"] == ["https://www.googleapis.com/auth/youtube.upload"]
+    assert query["scope"] == ["https://www.googleapis.com/auth/youtube.force-ssl"]
     assert query["access_type"] == ["offline"]
     assert decode_oauth_state(query["state"][0]) == (
         1,
@@ -345,3 +364,185 @@ def test_cancelled_upload_cannot_be_completed_by_worker(
     assert job.status == "cancelled"
     assert job.youtube_url is None
     assert sample_flight.youtube_urls == []
+
+
+def _completed_youtube_job(
+    db_session: Session,
+    sample_flight: Flight,
+    *,
+    job_id: str = "youtube-job-delete",
+    user_id: int = 1,
+    video_id: str = "dQw4w9WgXcQ",
+) -> YoutubeUploadJob:
+    job = YoutubeUploadJob(
+        id=job_id,
+        flight_id=sample_flight.id,
+        user_id=user_id,
+        status="completed",
+        progress=100,
+        title="Uploaded video",
+        description="",
+        privacy_status="private",
+        youtube_video_id=video_id,
+        youtube_url=f"https://www.youtube.com/watch?v={video_id}",
+    )
+    db_session.add(job)
+    return job
+
+
+def test_youtube_video_metadata_marks_only_current_users_completed_upload_as_deletable(
+    client, db_session, sample_flight
+):
+    sample_flight.youtube_urls = [
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "https://www.youtube.com/watch?v=abcdefghijk",
+        "https://www.youtube.com/watch?v=Zyxwvutsr_1",
+    ]
+    _completed_youtube_job(db_session, sample_flight)
+    _completed_youtube_job(
+        db_session,
+        sample_flight,
+        job_id="youtube-job-other-user",
+        user_id=2,
+        video_id="abcdefghijk",
+    )
+    db_session.commit()
+
+    response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/youtube-videos")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "video_id": "dQw4w9WgXcQ",
+            "can_delete_from_youtube": True,
+        },
+        {
+            "url": "https://www.youtube.com/watch?v=abcdefghijk",
+            "video_id": "abcdefghijk",
+            "can_delete_from_youtube": False,
+        },
+        {
+            "url": "https://www.youtube.com/watch?v=Zyxwvutsr_1",
+            "video_id": "Zyxwvutsr_1",
+            "can_delete_from_youtube": False,
+        },
+    ]
+
+
+def test_remove_youtube_video_can_unlink_locally(client, db_session, sample_flight):
+    sample_flight.youtube_urls = ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
+    db_session.commit()
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-videos/dQw4w9WgXcQ/remove",
+        json={"delete_from_youtube": False},
+    )
+
+    assert response.status_code == 204
+    db_session.refresh(sample_flight)
+    assert sample_flight.youtube_urls == []
+
+
+@pytest.mark.parametrize("remote_status", [204, 404])
+def test_remove_youtube_video_unlinks_after_remote_success(
+    client, db_session, sample_flight, monkeypatch, remote_status
+):
+    sample_flight.youtube_urls = ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
+    job = _completed_youtube_job(db_session, sample_flight)
+    db_session.commit()
+    monkeypatch.setattr(youtube_upload, "_access_token", lambda _user_id: "access-token")
+    requests: list[dict] = []
+
+    def delete_video(url, **kwargs):
+        requests.append({"url": url, **kwargs})
+        return youtube_upload.httpx.Response(remote_status)
+
+    monkeypatch.setattr(youtube_upload.httpx, "delete", delete_video)
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-videos/dQw4w9WgXcQ/remove",
+        json={"delete_from_youtube": True},
+    )
+
+    assert response.status_code == 204
+    assert requests[0]["params"] == {"id": "dQw4w9WgXcQ"}
+    assert requests[0]["headers"] == {"Authorization": "Bearer access-token"}
+    db_session.refresh(sample_flight)
+    db_session.refresh(job)
+    assert sample_flight.youtube_urls == []
+    assert db_session.get(YoutubeUploadJob, job.id) is job
+
+
+@pytest.mark.parametrize("job_user_id", [None, 2])
+def test_remove_youtube_video_rejects_remote_deletion_for_manual_or_other_users_upload(
+    client, db_session, sample_flight, monkeypatch, job_user_id
+):
+    youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    sample_flight.youtube_urls = [youtube_url]
+    if job_user_id is not None:
+        _completed_youtube_job(db_session, sample_flight, user_id=job_user_id)
+    db_session.commit()
+    delete_called = False
+
+    def delete_video(*args, **kwargs):
+        nonlocal delete_called
+        delete_called = True
+
+    monkeypatch.setattr(youtube_upload.httpx, "delete", delete_video)
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-videos/dQw4w9WgXcQ/remove",
+        json={"delete_from_youtube": True},
+    )
+
+    assert response.status_code == 403
+    assert "uploaded" in response.json()["detail"]
+    assert delete_called is False
+    db_session.refresh(sample_flight)
+    assert sample_flight.youtube_urls == [youtube_url]
+
+
+@pytest.mark.parametrize(
+    ("failure", "expected_status"),
+    [
+        (youtube_upload.YoutubeOAuthError("Reconnect YouTube"), 409),
+        (youtube_upload.httpx.ConnectError("network failure"), 502),
+        (403, 409),
+        (503, 502),
+    ],
+)
+def test_remove_youtube_video_remote_failures_keep_association(
+    client, db_session, sample_flight, monkeypatch, failure, expected_status
+):
+    youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    sample_flight.youtube_urls = [youtube_url]
+    _completed_youtube_job(db_session, sample_flight)
+    db_session.commit()
+
+    if isinstance(failure, Exception) and not isinstance(
+        failure, youtube_upload.httpx.RequestError
+    ):
+
+        def access_token(_user_id):
+            raise failure
+
+        monkeypatch.setattr(youtube_upload, "_access_token", access_token)
+    else:
+        monkeypatch.setattr(youtube_upload, "_access_token", lambda _user_id: "access-token")
+
+        def delete_video(*args, **kwargs):
+            if isinstance(failure, Exception):
+                raise failure
+            return youtube_upload.httpx.Response(failure)
+
+        monkeypatch.setattr(youtube_upload.httpx, "delete", delete_video)
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-videos/dQw4w9WgXcQ/remove",
+        json={"delete_from_youtube": True},
+    )
+
+    assert response.status_code == expected_status
+    db_session.refresh(sample_flight)
+    assert sample_flight.youtube_urls == [youtube_url]

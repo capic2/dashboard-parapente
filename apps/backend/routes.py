@@ -24,6 +24,7 @@ from fastapi import (
     Depends,
     File,
     Form,
+    Path as FastAPIPath,
     HTTPException,
     Query,
     Request,
@@ -127,6 +128,8 @@ from schemas import (
     IntervalsStatus,
     IntervalsSyncRequest,
     YoutubeAuthUrlRequest,
+    YoutubeVideoAssociation,
+    YoutubeVideoRemoveRequest,
     YoutubeUploadCreate,
     YoutubeUploadJobResponse,
 )
@@ -174,6 +177,9 @@ from weather_sources import ensure_weather_source_configs
 from youtube_upload import (
     YoutubeConfigurationError,
     YoutubeOAuthError,
+    YoutubeRemoteDeletionError,
+    YoutubeVideoDeletionForbiddenError,
+    YoutubeVideoNotAssociatedError,
     active_job as active_youtube_upload_job,
     cancel_upload as cancel_youtube_upload,
     create_authorization_url,
@@ -185,6 +191,8 @@ from youtube_upload import (
     is_connected as is_youtube_connected,
     job_payload as youtube_upload_job_payload,
     latest_job as latest_youtube_upload_job,
+    remove_youtube_video,
+    youtube_video_associations,
 )
 
 logger = logging.getLogger(__name__)
@@ -890,6 +898,54 @@ def delete_youtube_connection(
     user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ) -> Response:
     disconnect_youtube(db, user.id)
+    return Response(status_code=204)
+
+
+@router.get(
+    "/flights/{flight_id}/youtube-videos",
+    response_model=list[YoutubeVideoAssociation],
+)
+def get_flight_youtube_videos(
+    flight_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
+    flight = db.get(Flight, flight_id)
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    return youtube_video_associations(db, flight=flight, user_id=user.id)
+
+
+@router.post(
+    "/flights/{flight_id}/youtube-videos/{video_id}/remove",
+    status_code=204,
+)
+def remove_flight_youtube_video(
+    flight_id: str,
+    payload: YoutubeVideoRemoveRequest,
+    video_id: str = FastAPIPath(pattern=r"^[A-Za-z0-9_-]{11}$"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    flight = db.get(Flight, flight_id)
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    try:
+        remove_youtube_video(
+            db,
+            flight=flight,
+            video_id=video_id,
+            user_id=user.id,
+            delete_from_youtube=payload.delete_from_youtube,
+        )
+    except YoutubeVideoNotAssociatedError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except YoutubeVideoDeletionForbiddenError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except YoutubeOAuthError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except YoutubeRemoteDeletionError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     return Response(status_code=204)
 
 

@@ -1,4 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  YoutubeVideoAssociationsSchema,
+  type YoutubeVideoAssociation,
+} from '@dashboard-parapente/shared-types';
 import { api } from '../../lib/api';
 
 export interface YoutubeConnectionStatus {
@@ -44,6 +48,52 @@ export function useYoutubeUpload(flightId: string) {
       return job?.status === 'queued' || job?.status === 'uploading'
         ? 3_000
         : false;
+    },
+  });
+}
+
+export const youtubeVideoAssociationsQueryKey = (flightId: string) => [
+  'youtube-video-associations',
+  flightId,
+];
+
+export function useYoutubeVideoAssociations(flightId: string) {
+  return useQuery({
+    queryKey: youtubeVideoAssociationsQueryKey(flightId),
+    queryFn: async () => {
+      const data = await api.get(`flights/${flightId}/youtube-videos`).json();
+      return YoutubeVideoAssociationsSchema.parse(data);
+    },
+  });
+}
+
+export function useRemoveYoutubeVideoAssociation(flightId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      videoId,
+      deleteFromYoutube,
+    }: {
+      videoId: YoutubeVideoAssociation['video_id'];
+      deleteFromYoutube: boolean;
+    }) => {
+      await api.post(
+        `flights/${flightId}/youtube-videos/${encodeURIComponent(videoId)}/remove`,
+        { json: { delete_from_youtube: deleteFromYoutube } }
+      );
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['flights'] }),
+        queryClient.invalidateQueries({ queryKey: ['flights', flightId] }),
+        queryClient.invalidateQueries({
+          queryKey: ['youtube-upload', flightId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: youtubeVideoAssociationsQueryKey(flightId),
+        }),
+      ]);
     },
   });
 }

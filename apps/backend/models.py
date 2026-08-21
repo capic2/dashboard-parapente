@@ -41,6 +41,11 @@ class YoutubeCredential(Base):
 
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     refresh_token_encrypted = Column(Text, nullable=False)
+    oauth_scope = Column(
+        Text,
+        nullable=False,
+        default="https://www.googleapis.com/auth/youtube.force-ssl",
+    )
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
