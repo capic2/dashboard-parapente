@@ -61,6 +61,7 @@ const fullFlight: Flight = {
 
 const flightWithMediaThumbnails: Flight = {
   ...fullFlight,
+  pano_video_file_exists: true,
   gopro_overlay_file_exists: true,
   gopro_overlays: [
     {
@@ -78,6 +79,23 @@ const flightWithMediaThumbnails: Flight = {
       created_at: '2026-03-15T14:00:00Z',
       updated_at: '2026-03-15T15:00:00Z',
       completed_at: '2026-03-15T15:00:00Z',
+      log_tail: [],
+    },
+    {
+      job_id: 'overlay-4k',
+      flight_id: fullFlight.id,
+      status: 'completed',
+      progress: 100,
+      message: 'Overlay ready',
+      layout_id: 'parapente-4k',
+      layout_label: 'Parapente 3840x2160',
+      output_filename: 'vol-arguel-4k.mp4',
+      video_width: 3840,
+      video_height: 2160,
+      gpx_offset: 0,
+      created_at: '2026-03-15T14:10:00Z',
+      updated_at: '2026-03-15T15:20:00Z',
+      completed_at: '2026-03-15T15:20:00Z',
       log_tail: [],
     },
   ],
@@ -133,6 +151,18 @@ const defaultHandlers = [
   http.get('*/api/flights/:id/video/thumbnail', () =>
     HttpResponse.text(
       '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="#312e81"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs><rect width="640" height="360" fill="url(#g)"/><path d="M0 290 170 145 280 245 420 100 640 290V360H0Z" fill="#e0f2fe"/><circle cx="505" cy="78" r="32" fill="#fef3c7"/></svg>',
+      { headers: { 'Content-Type': 'image/svg+xml' } }
+    )
+  ),
+  http.get('*/api/flights/:id/pano/thumbnail', () =>
+    HttpResponse.text(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="p" x2="1"><stop stop-color="#4c1d95"/><stop offset="1" stop-color="#c4b5fd"/></linearGradient></defs><rect width="640" height="360" fill="url(#p)"/><circle cx="320" cy="180" r="110" fill="none" stroke="white" stroke-width="8"/><path d="M50 270 210 130 320 230 460 105 610 270" fill="none" stroke="white" stroke-width="12"/></svg>',
+      { headers: { 'Content-Type': 'image/svg+xml' } }
+    )
+  ),
+  http.get('*/api/gopro-overlays/jobs/:jobId/thumbnail', ({ params }) =>
+    HttpResponse.text(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#083344"/><path d="M0 300 190 120 320 250 470 90 640 280V360H0Z" fill="#67e8f9"/><rect x="24" y="24" width="260" height="72" rx="12" fill="#0f172a"/><text x="44" y="68" fill="white" font-size="22">${String(params.jobId)}</text></svg>`,
       { headers: { 'Content-Type': 'image/svg+xml' } }
     )
   ),
@@ -203,6 +233,11 @@ const defaultHandlers = [
       headers: { 'Content-Type': 'video/mp4' },
     })
   ),
+  http.get('*/api/youtube/status', () =>
+    HttpResponse.json({ configured: true, connected: false })
+  ),
+  http.get('*/api/flights/:id/youtube-upload', () => HttpResponse.json(null)),
+  http.get('*/api/flights/:id/youtube-videos', () => HttpResponse.json([])),
   http.get('*/api/flights/:id', () => HttpResponse.json(fullFlight)),
   http.patch('*/api/flights/:id', async ({ request }) => {
     const body = await request.json();
@@ -316,6 +351,9 @@ Default.test(
   async ({ canvas, canvasElement, userEvent, step }) => {
     await step('start the GoPro overlay generation', async () => {
       await userEvent.click(
+        canvas.getByRole('tab', { name: i18n.t('flights.replayTab') })
+      );
+      await userEvent.click(
         await canvas.findByRole('button', {
           name: i18n.t('flights.goproOverlayGenerate'),
         })
@@ -349,7 +387,7 @@ export const MediaThumbnails = meta.story({
 });
 
 MediaThumbnails.test(
-  'shows video and overlay thumbnails',
+  'shows video, Pano, and overlay thumbnails',
   async ({ canvas, userEvent }) => {
     await userEvent.click(
       canvas.getByRole('tab', { name: i18n.t('flights.replayTab') })
@@ -358,7 +396,21 @@ MediaThumbnails.test(
       await canvas.findByAltText(i18n.t('flights.videoThumbnailAlt'))
     ).toBeVisible();
     await expect(
-      await canvas.findByAltText(i18n.t('flights.goproOverlayThumbnailAlt'))
+      await canvas.findByAltText(i18n.t('flights.panoThumbnailAlt'))
+    ).toBeVisible();
+    await expect(
+      await canvas.findByAltText(
+        i18n.t('flights.goproOverlayJobThumbnailAlt', {
+          name: 'vol-arguel-1080p.mp4',
+        })
+      )
+    ).toBeVisible();
+    await expect(
+      await canvas.findByAltText(
+        i18n.t('flights.goproOverlayJobThumbnailAlt', {
+          name: 'vol-arguel-4k.mp4',
+        })
+      )
     ).toBeVisible();
   }
 );

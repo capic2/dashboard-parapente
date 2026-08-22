@@ -213,7 +213,13 @@ vi.mock('react-i18next', () => ({
         'flights.open3dReplay': 'Open 3D replay',
         'flights.mediaFilesTitle': 'Available files',
         'flights.panoBadge': 'Pano',
-        'flights.mediaCreationTitle': 'Create and publish',
+        'flights.panoThumbnailAlt': 'Pano thumbnail',
+        'flights.videoThumbnailAlt': 'Video thumbnail',
+        'flights.goproOverlayThumbnailAlt': 'Legacy overlay thumbnail',
+        'flights.goproOverlayJobThumbnailAlt': 'Overlay thumbnail',
+        'flights.goproOverlayAddCardTitle': 'New GoPro overlay',
+        'flights.goproOverlayAddCardDescription': 'Generate another overlay',
+        'flights.goproOverlayProcessingBadge': 'Overlay progress',
         'flights.youtubeVideos': 'YouTube videos',
         'flights.youtubeVideoTitle': 'Flight YouTube video',
         'flights.openOnYoutube': 'Open on YouTube',
@@ -583,7 +589,7 @@ describe('FlightDetails GoPro overlay action', () => {
     ).toBeInTheDocument();
   });
 
-  it('organizes media into replay, available files, and creation sections', () => {
+  it('organizes generation and downloads in the available file cards', () => {
     render(
       <FlightDetails
         flight={mockFlight}
@@ -604,8 +610,8 @@ describe('FlightDetails GoPro overlay action', () => {
       screen.getByRole('heading', { name: 'Available files' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Create and publish' })
-    ).toBeInTheDocument();
+      screen.queryByRole('heading', { name: 'Create and publish' })
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'flights.downloadGpx' })
     ).toBeInTheDocument();
@@ -614,6 +620,54 @@ describe('FlightDetails GoPro overlay action', () => {
         name: 'flights.viewer.downloadVideo',
       })
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Video action' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Video thumbnail')).toBeInTheDocument();
+    expect(screen.getByText('New GoPro overlay')).toBeInTheDocument();
+  });
+
+  it('offers video generation from the video card when no file exists', () => {
+    mockFlight.video_file_path = null;
+    mockFlight.video_file_exists = false;
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    openTab('Media');
+
+    expect(screen.queryByText('Video thumbnail')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Video action' })
+    ).toBeInTheDocument();
+  });
+
+  it('shows video generation progress in the video card', () => {
+    mockFlight.video_file_path = null;
+    mockFlight.video_file_exists = false;
+    mockFlight.video_export_status = 'running';
+    mockFlight.video_export_progress = 37;
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    openTab('Media');
+
+    expect(
+      screen.getByRole('progressbar', {
+        name: 'flights.videoProcessingBadge 37%',
+      })
+    ).toHaveAttribute('aria-valuenow', '37');
   });
 
   it('offers a panorama YouTube upload when pano.mp4 exists', () => {
@@ -629,6 +683,7 @@ describe('FlightDetails GoPro overlay action', () => {
     openTab('Media');
 
     expect(screen.getByText('Pano')).toBeInTheDocument();
+    expect(screen.getByText('Pano thumbnail')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'YouTube upload pano' })
     ).toBeInTheDocument();
@@ -656,6 +711,7 @@ describe('FlightDetails GoPro overlay action', () => {
   it('turns the overlay button into cancel while generation is running', async () => {
     mockFlight.gopro_overlay_job_id = 'job-overlay';
     mockFlight.gopro_overlay_status = 'running';
+    mockFlight.gopro_overlay_progress = 42;
 
     render(
       <FlightDetails
@@ -667,6 +723,10 @@ describe('FlightDetails GoPro overlay action', () => {
 
     openTab('Media');
 
+    expect(
+      screen.getByRole('progressbar', { name: 'Overlay progress' })
+    ).toHaveAttribute('aria-valuenow', '42');
+
     fireEvent.click(screen.getByRole('button', { name: /Cancel overlay/u }));
 
     await waitFor(() => {
@@ -675,6 +735,51 @@ describe('FlightDetails GoPro overlay action', () => {
         { searchParams: undefined }
       );
     });
+  });
+
+  it('keeps a legacy overlay available while a new overlay is running', () => {
+    mockFlight.gopro_overlay_file_path = '/exports/legacy-overlay.mp4';
+    mockFlight.gopro_overlay_file_exists = true;
+    mockFlight.gopro_overlay_job_id = 'overlay-running';
+    mockFlight.gopro_overlay_status = 'running';
+    mockFlight.gopro_overlays = [
+      {
+        flight_id: mockFlight.id,
+        job_id: 'overlay-running',
+        status: 'running',
+        progress: 61,
+        message: 'Encoding',
+        layout_id: 'parapente',
+        layout_label: 'Parapente',
+        output_filename: 'new-overlay.mp4',
+        gpx_offset: 0,
+        created_at: '2026-03-15T12:00:00Z',
+        updated_at: '2026-03-15T12:01:00Z',
+        completed_at: null,
+        log_tail: [],
+      },
+    ];
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    openTab('Media');
+
+    expect(screen.getByText('Legacy overlay thumbnail')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'flights.goproOverlayDownload' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('new-overlay.mp4')).toBeInTheDocument();
+    for (const progressbar of screen.getAllByRole('progressbar', {
+      name: 'Overlay progress',
+    })) {
+      expect(progressbar).toHaveAttribute('aria-valuenow', '61');
+    }
   });
 
   it('passes the GPX offset when starting overlay generation', async () => {
@@ -1361,6 +1466,8 @@ describe('FlightDetails GoPro overlay action', () => {
     expect(
       screen.getByRole('button', { name: 'YouTube upload overlay-1080p' })
     ).toBeInTheDocument();
+    expect(screen.getAllByText('Overlay thumbnail')).toHaveLength(2);
+    expect(screen.getByText('New GoPro overlay')).toBeInTheDocument();
   });
 
   it('deletes an overlay and removes its card', async () => {

@@ -4618,6 +4618,19 @@ def get_flight_video_thumbnail(flight_id: str, db: Session = Depends(get_db)) ->
     return _video_thumbnail_response(video_path)
 
 
+@router.get("/flights/{flight_id}/pano/thumbnail")
+def get_flight_pano_thumbnail(flight_id: str, db: Session = Depends(get_db)) -> FileResponse:
+    """Return a thumbnail for the flight Pano video."""
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+
+    pano_path = _resolve_flight_file_path(flight.pano_video_file_path)
+    if not pano_path or not pano_path.is_file():
+        raise HTTPException(status_code=404, detail="No Pano video available for this flight")
+    return _video_thumbnail_response(pano_path)
+
+
 @router.get("/flights/{flight_id}/gopro-overlay")
 def download_flight_gopro_overlay(flight_id: str, db: Session = Depends(get_db)) -> FileResponse:
     """Download generated GoPro overlay video for a flight."""
