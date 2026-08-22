@@ -494,6 +494,59 @@ class TestFlightsListEndpoint:
         assert response.status_code == 422
         assert response.json()["detail"] == "Unable to generate video thumbnail"
 
+    def test_get_flight_pano_thumbnail(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        pano_path = tmp_path / "pano.mp4"
+        pano_path.write_bytes(b"pano")
+        thumbnail_path = tmp_path / "pano-thumbnail.jpg"
+        thumbnail_path.write_bytes(b"jpeg")
+        flight = Flight(
+            id="flight-pano-thumbnail",
+            name="Flight Pano thumbnail",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        with patch("routes.get_video_thumbnail", return_value=thumbnail_path) as get_thumbnail:
+            response = client.get(f"{API_PREFIX}/flights/{flight.id}/pano/thumbnail")
+
+        assert response.status_code == 200
+        assert response.content == b"jpeg"
+        assert response.headers["content-type"] == "image/jpeg"
+        assert response.headers["cache-control"] == "no-cache"
+        get_thumbnail.assert_called_once_with(pano_path)
+
+    def test_get_flight_pano_thumbnail_returns_404_when_unavailable(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        response = client.get(f"{API_PREFIX}/flights/missing-flight/pano/thumbnail")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Flight not found"
+
+        flight = Flight(
+            id="flight-no-pano-thumbnail",
+            name="Flight without Pano thumbnail",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/{flight.id}/pano/thumbnail")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "No Pano video available for this flight"
+
+        flight.pano_video_file_path = str(tmp_path / "missing-pano.mp4")
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/{flight.id}/pano/thumbnail")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "No Pano video available for this flight"
+
     def test_download_flight_gopro_overlay(self, client, db_session, monkeypatch, tmp_path):
         """GET /flights/{id}/gopro-overlay downloads the generated overlay."""
         monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
