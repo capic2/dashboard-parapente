@@ -66,6 +66,9 @@ export function Flight({
   const hasVideo = flight.has_video;
   const hasCamera = flight.has_camera;
   const hasYoutubeVideo = flight.has_youtube_video;
+  const isYoutubeUploadRunning =
+    flight.youtube_upload_status === 'queued' ||
+    flight.youtube_upload_status === 'uploading';
   const hasPanoVideo = flight.has_pano_video;
   const hasPersistedGoproOverlay = flight.has_gopro_overlay;
   const isGoproOverlayRunning = isGoproOverlayInProgress(
@@ -87,6 +90,10 @@ export function Flight({
     t('flights.goproOverlayProcessingBadge'),
     flight.gopro_overlay_progress
   );
+  const youtubeLabel = formatMediaProgressLabel(
+    t('flights.youtubeBadge'),
+    isYoutubeUploadRunning ? flight.youtube_upload_progress : null
+  );
   const selectFlight = () => {
     if (!selectionMode) {
       onSelectFlight(flight);
@@ -106,6 +113,7 @@ export function Flight({
     hasVideo ||
     hasCamera ||
     hasYoutubeVideo ||
+    isYoutubeUploadRunning ||
     hasPanoVideo ||
     isVideoExportRunning ||
     isVideoExportFailed ||
@@ -194,10 +202,13 @@ export function Flight({
                   {t('flights.goproOverlayBadge')}
                 </span>
               )}
-              {hasYoutubeVideo && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+              {(hasYoutubeVideo || isYoutubeUploadRunning) && (
+                <span
+                  aria-live={isYoutubeUploadRunning ? 'polite' : undefined}
+                  className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
+                >
                   <Play className="h-3 w-3" aria-hidden="true" />
-                  {t('flights.youtubeBadge')}
+                  {youtubeLabel}
                 </span>
               )}
               {hasPanoVideo && (

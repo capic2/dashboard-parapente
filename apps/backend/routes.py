@@ -729,6 +729,28 @@ def _get_video_export_jobs_payload(db: Session, active_only: bool = False) -> di
     )
     if active_only:
         jobs = [job for job in jobs if job.get("can_cancel")]
+        jobs.extend(
+            {
+                "job_id": job.id,
+                "flight_id": job.flight_id,
+                "status": job.status,
+                "progress": job.progress,
+                "mode": "youtube",
+                "can_cancel": True,
+                "created_at": job.created_at,
+                "updated_at": job.updated_at,
+            }
+            for job in db.query(YoutubeUploadJob)
+            .filter(YoutubeUploadJob.status.in_(("queued", "uploading")))
+            .all()
+        )
+        jobs.sort(
+            key=lambda job: (
+                _video_export_sort_value(job),
+                str(job.get("job_id") or ""),
+            ),
+            reverse=True,
+        )
     return {"jobs": jobs}
 
 

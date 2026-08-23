@@ -92,6 +92,8 @@ def test_summaries_filter_search_sort_and_hide_paths(client, db_session, arguel_
     assert item["has_video"] is False
     assert item["has_camera"] is False
     assert item["has_youtube_video"] is False
+    assert item["youtube_upload_status"] is None
+    assert item["youtube_upload_progress"] is None
     assert item["has_gopro_overlay"] is False
     assert item["video_export_job_id"] == "video-job"
     assert item["gopro_overlay_job_id"] == "overlay-job"
