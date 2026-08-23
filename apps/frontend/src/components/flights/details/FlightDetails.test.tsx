@@ -428,12 +428,13 @@ describe('FlightDetails GoPro overlay action', () => {
     expect(players).toHaveLength(2);
     expect(players[0]).toHaveAttribute(
       'src',
-      'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ'
+      'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?enablejsapi=1&origin=http%3A%2F%2Flocalhost%3A3000'
     );
     expect(players[0]).not.toHaveAttribute('sandbox');
+    expect(players[0]).toHaveAttribute('referrerpolicy', 'origin');
     expect(players[1]).toHaveAttribute(
       'src',
-      'https://www.youtube-nocookie.com/embed/9bZkp7q19f0'
+      'https://www.youtube-nocookie.com/embed/9bZkp7q19f0?enablejsapi=1&origin=http%3A%2F%2Flocalhost%3A3000'
     );
     expect(
       screen.getByRole('button', { name: 'Flight replay' })
