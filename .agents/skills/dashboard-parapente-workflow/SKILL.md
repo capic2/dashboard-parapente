@@ -40,7 +40,7 @@ Projects: `frontend` in `apps/frontend`, `backend` in `apps/backend`, `design-sy
 
 Load `implementation-worktree-strategy` before implementation tasks: feature work, bug fixes, refactors, and code changes.
 
-When a worktree is created, work from the new worktree path, launch the `worktree-bootstrap` subagent immediately, and run impacted checks there before PR creation.
+When a worktree is created, work from the new worktree path and run the lightweight readiness check locally. Use `worktree-bootstrap` only when dependencies are missing/unusable and parallel setup is explicitly useful.
 
 Do not open a PR from a stale worktree. Fetch remote changes, update against `origin/main`, resolve conflicts, and rerun impacted checks first.
 
@@ -72,7 +72,7 @@ Use `local-machine-stack` for the exact backend validation command.
 
 Prefer affected Nx validation from `local-machine-stack` for implementation and PR validation. Use direct project targets only after an affected run identifies a failing project, or when explicitly requested. Use `run-many` only when affected detection is inappropriate or a full-repo check is required.
 
-For long validation runs, prefer a validation subagent that runs commands from the active worktree and returns a concise pass/fail report. The main agent fixes failures and decides whether more validation is needed.
+For long validation runs, run commands locally by default. Use a validation subagent only when the user requests parallel execution or the task has independent workstreams that justify its token cost.
 
 ## GitHub And CodeRabbit
 
@@ -82,7 +82,7 @@ Before creating or updating a PR, check branch status, review commits and diff a
 
 Run the `coderabbit-cli` skill at the end of implementation, after relevant validation and before marking the work ready to ship, unless the user explicitly skips it. Do not defer CodeRabbit to the push step.
 
-For CodeRabbit comments, delegate discovery and triage to a subagent. It should inspect only relevant PR conversations through `gh` and return requested changes, affected files/lines, priority, and conversations to reply to or close. When fixed, reply to each resolved conversation and close it.
+For CodeRabbit comments, inspect only relevant PR conversations directly by default. Delegate discovery and triage only when the user requests it or the PR has enough independent conversations to justify the extra agent.
 
 ## Git
 - Do not commit unless explicitly requested.

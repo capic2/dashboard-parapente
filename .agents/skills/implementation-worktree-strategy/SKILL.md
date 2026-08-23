@@ -14,7 +14,7 @@ Before any implementation task:
 3. If on another branch, ask whether to create a worktree.
 4. If yes, fetch `origin/main` and create the worktree from `origin/main`.
 5. If no, stay on the current branch.
-6. When a worktree is created, immediately launch the `worktree-bootstrap` subagent for dependency readiness.
+6. When a worktree is created, check dependency readiness locally. Use the `worktree-bootstrap` subagent only when installation is missing/unusable and parallel setup would materially reduce wait time.
 
 Create worktrees in `.codenomad/worktree` with names starting with `wt-`.
 Whenever a worktree is created, immediately name the current AI session with the exact worktree name.
@@ -29,7 +29,7 @@ Whenever a worktree is created, immediately name the current AI session with the
 
 ## Worktree Bootstrap Subagent
 
-After creating a worktree, launch the `worktree-bootstrap` subagent immediately and let it run in parallel with the main implementation work.
+After creating a worktree, perform the lightweight readiness check locally. Delegate setup only when dependencies are missing or unusable and the user has asked for parallel execution.
 
 Subagent responsibility:
 
@@ -49,7 +49,7 @@ The main agent remains responsible for interpreting blockers and making code cha
 - Fetch `origin/main`.
 - Create a worktree from `origin/main`.
 - Name the current AI session with the exact worktree name.
-- Launch the `worktree-bootstrap` subagent.
+- Run the local readiness check; launch `worktree-bootstrap` only for missing/unusable dependencies when parallel setup is explicitly useful.
 - Continue implementation in that worktree.
 
 ### If current branch is not `main`
@@ -64,7 +64,7 @@ If yes:
 - Create a worktree from `origin/main` in `.codenomad/worktree`.
 - Use a name like `wt-<task-label>`.
 - Name the current AI session with the exact worktree name.
-- Launch the `worktree-bootstrap` subagent.
+- Run the local readiness check; launch `worktree-bootstrap` only for missing/unusable dependencies when parallel setup is explicitly useful.
 - Continue there.
 
 If no:
