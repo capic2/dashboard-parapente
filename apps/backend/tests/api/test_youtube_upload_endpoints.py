@@ -400,6 +400,46 @@ def test_worker_rejects_unverified_spherical_metadata(tmp_path, monkeypatch) -> 
     assert not upload_path.with_suffix(".part.mp4").exists()
 
 
+def test_worker_regenerates_stale_panorama_without_spherical_metadata(
+    tmp_path, monkeypatch
+) -> None:
+    source_path = tmp_path / "pano.mp4"
+    source_path.write_bytes(b"flat panorama")
+    monkeypatch.setattr(config, "VIDEO_EXPORT_DIR", str(tmp_path / "exports"))
+    upload_path = youtube_upload._panorama_upload_path("youtube-stale")
+    upload_path.parent.mkdir(parents=True)
+    upload_path.write_bytes(b"stale artifact")
+    injected: list[Path] = []
+
+    def inject_metadata(_source, destination, _metadata, _console) -> None:
+        destination_path = Path(destination)
+        destination_path.write_bytes(b"regenerated spherical panorama")
+        injected.append(destination_path)
+
+    valid_metadata = youtube_upload.metadata_utils.ParsedMetadata()
+    valid_metadata.video["Track 0"] = {
+        "Spherical": "true",
+        "ProjectionType": "equirectangular",
+    }
+
+    def parse_metadata(path, _console):
+        parsed_metadata = youtube_upload.metadata_utils.ParsedMetadata()
+        return (
+            valid_metadata
+            if Path(path).read_bytes().startswith(b"regenerated")
+            else parsed_metadata
+        )
+
+    monkeypatch.setattr(youtube_upload.metadata_utils, "inject_metadata", inject_metadata)
+    monkeypatch.setattr(youtube_upload.metadata_utils, "parse_metadata", parse_metadata)
+
+    prepared_path = youtube_upload._prepare_upload_video("youtube-stale", "pano", source_path)
+
+    assert prepared_path == upload_path
+    assert prepared_path.read_bytes() == b"regenerated spherical panorama"
+    assert len(injected) == 1
+
+
 def test_worker_keeps_standard_youtube_upload_source_unchanged(tmp_path) -> None:
     source_path = tmp_path / "overlay.mp4"
 

@@ -604,6 +604,24 @@ def _panorama_upload_path(job_id: str) -> Path:
     return Path(config.VIDEO_EXPORT_DIR) / ".youtube-uploads" / f"{job_id}.spherical.mp4"
 
 
+def _has_spherical_panorama_metadata(video_path: Path) -> bool:
+    def debug_metadata(message: object, *extra: object) -> None:
+        logger.debug("Spatial metadata inspector: %s", " ".join(map(str, (message, *extra))))
+
+    try:
+        parsed_metadata = metadata_utils.parse_metadata(str(video_path), debug_metadata)
+    except Exception:
+        logger.debug("Unable to parse spatial metadata from %s", video_path, exc_info=True)
+        return False
+    parsed_video = getattr(parsed_metadata, "video", {})
+    return isinstance(parsed_video, dict) and any(
+        isinstance(track_metadata, dict)
+        and track_metadata.get("Spherical") == "true"
+        and track_metadata.get("ProjectionType") == "equirectangular"
+        for track_metadata in parsed_video.values()
+    )
+
+
 def _prepare_upload_video(job_id: str, source_type: str, source_path: Path) -> Path:
     """Return a YouTube-ready source, injecting 360 metadata for panoramas."""
     if source_type != "pano":
@@ -611,7 +629,9 @@ def _prepare_upload_video(job_id: str, source_type: str, source_path: Path) -> P
 
     upload_path = _panorama_upload_path(job_id)
     if upload_path.is_file() and upload_path.stat().st_size > 0:
-        return upload_path
+        if _has_spherical_panorama_metadata(upload_path):
+            return upload_path
+        upload_path.unlink()
 
     upload_path.parent.mkdir(parents=True, exist_ok=True)
     partial_path = upload_path.with_suffix(".part.mp4")
@@ -631,15 +651,7 @@ def _prepare_upload_video(job_id: str, source_type: str, source_path: Path) -> P
         )
         if not partial_path.is_file() or partial_path.stat().st_size <= 0:
             raise RuntimeError("Unable to inject panorama metadata")
-        parsed_metadata = metadata_utils.parse_metadata(str(partial_path), debug_metadata)
-        parsed_video = getattr(parsed_metadata, "video", {})
-        has_spherical_projection = isinstance(parsed_video, dict) and any(
-            isinstance(track_metadata, dict)
-            and track_metadata.get("Spherical") == "true"
-            and track_metadata.get("ProjectionType") == "equirectangular"
-            for track_metadata in parsed_video.values()
-        )
-        if not has_spherical_projection:
+        if not _has_spherical_panorama_metadata(partial_path):
             raise RuntimeError("Injected panorama metadata could not be verified")
         partial_path.replace(upload_path)
     except Exception:
