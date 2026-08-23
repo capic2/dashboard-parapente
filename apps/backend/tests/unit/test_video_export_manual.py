@@ -910,6 +910,9 @@ def test_resume_video_export_requeues_cancelled_job_with_frames(test_db, tmp_pat
     monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
     monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
     monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(
+        video_export_manual, "_is_rq_video_export_job_started", lambda _job_id: False
+    )
 
     def enqueue_rq_job(queued_job_id: str) -> None:
         enqueued_job_ids.append(video_export_manual._rq_job_id(queued_job_id))
@@ -955,6 +958,90 @@ def test_resume_video_export_requeues_cancelled_job_with_frames(test_db, tmp_pat
     assert job.video_path is None
     db_session.close()
     assert enqueued_job_ids == ["video-export-job-resume"]
+
+
+def test_stale_worker_update_does_not_overwrite_cancelled_job(test_db, monkeypatch):
+    job_id = "job-cancelled-cross-process"
+    cancelled_at = datetime.utcnow()
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+
+    with test_db() as db_session:
+        db_session.add(
+            VideoExportJob(
+                id=job_id,
+                flight_id="flight-test-001",
+                status="cancelled",
+                mode="manual_fast",
+                progress=42,
+                message="Export cancelled by user",
+                cancelled_at=cancelled_at,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+        )
+        db_session.commit()
+
+    updated_job = video_export_manual._update_job(
+        job_id,
+        status="capturing",
+        progress=43,
+        message="Captured 430/1000 frames",
+    )
+
+    assert updated_job is None
+    with test_db() as db_session:
+        job = db_session.get(VideoExportJob, job_id)
+        assert job is not None
+        assert job.status == "cancelled"
+        assert job.progress == 42
+        assert job.message == "Export cancelled by user"
+        assert job.cancelled_at == cancelled_at
+
+
+def test_resume_waits_for_started_rq_job_without_local_cancel_flag(test_db, tmp_path, monkeypatch):
+    job_id = "job-rq-still-running"
+    enqueued_job_ids: list[str] = []
+    temp_root = tmp_path / "temp-images"
+    frames_dir = temp_root / job_id / "frames"
+    frames_dir.mkdir(parents=True)
+    (frames_dir / "frame00000.png").write_bytes(b"frame")
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(
+        video_export_manual, "_is_rq_video_export_job_started", lambda _job_id: True
+    )
+    monkeypatch.setattr(
+        video_export_manual,
+        "_enqueue_video_export_job_in_rq",
+        lambda queued_job_id: enqueued_job_ids.append(queued_job_id),
+    )
+
+    with test_db() as db_session:
+        db_session.add(
+            VideoExportJob(
+                id=job_id,
+                flight_id="flight-test-001",
+                status="cancelled",
+                mode="manual_fast",
+                progress=42,
+                total_frames=10,
+                message="Export cancelled by user",
+                cancelled_at=datetime.utcnow(),
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+        )
+        db_session.commit()
+
+    assert video_export_manual._is_job_cancel_requested(job_id) is False
+    assert video_export_manual.resume_video_export(job_id, auth_token="resume-token") is False
+
+    with test_db() as db_session:
+        job = db_session.get(VideoExportJob, job_id)
+        assert job is not None
+        assert job.status == "cancelled"
+    assert enqueued_job_ids == []
 
 
 def test_resume_video_export_drain_rejection_preserves_cancelled_job(
