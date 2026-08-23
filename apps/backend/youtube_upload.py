@@ -19,6 +19,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from jose import JWTError, jwt
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from spatialmedia import metadata_utils
 
 import config
 from database import SessionLocal
@@ -599,8 +600,69 @@ def _source_video_path(db: Session, job: YoutubeUploadJob) -> Path:
     return Path(overlay.output_path)
 
 
+def _panorama_upload_path(job_id: str) -> Path:
+    return Path(config.VIDEO_EXPORT_DIR) / ".youtube-uploads" / f"{job_id}.spherical.mp4"
+
+
+def _has_spherical_panorama_metadata(video_path: Path) -> bool:
+    def debug_metadata(message: object, *extra: object) -> None:
+        logger.debug("Spatial metadata inspector: %s", " ".join(map(str, (message, *extra))))
+
+    try:
+        parsed_metadata = metadata_utils.parse_metadata(str(video_path), debug_metadata)
+    except Exception:
+        logger.debug("Unable to parse spatial metadata from %s", video_path, exc_info=True)
+        return False
+    parsed_video = getattr(parsed_metadata, "video", {})
+    return isinstance(parsed_video, dict) and any(
+        isinstance(track_metadata, dict)
+        and track_metadata.get("Spherical") == "true"
+        and track_metadata.get("ProjectionType") == "equirectangular"
+        for track_metadata in parsed_video.values()
+    )
+
+
+def _prepare_upload_video(job_id: str, source_type: str, source_path: Path) -> Path:
+    """Return a YouTube-ready source, injecting 360 metadata for panoramas."""
+    if source_type != "pano":
+        return source_path
+
+    upload_path = _panorama_upload_path(job_id)
+    if upload_path.is_file() and upload_path.stat().st_size > 0:
+        if _has_spherical_panorama_metadata(upload_path):
+            return upload_path
+        upload_path.unlink()
+
+    upload_path.parent.mkdir(parents=True, exist_ok=True)
+    partial_path = upload_path.with_suffix(".part.mp4")
+    partial_path.unlink(missing_ok=True)
+    spherical_xml = metadata_utils.generate_spherical_xml("equirectangular")
+    if not isinstance(spherical_xml, str):
+        raise RuntimeError("Unable to generate panorama metadata")
+    metadata = metadata_utils.Metadata()
+    metadata.video = spherical_xml
+
+    def debug_metadata(message: object, *extra: object) -> None:
+        logger.debug("Spatial metadata injector: %s", " ".join(map(str, (message, *extra))))
+
+    try:
+        metadata_utils.inject_metadata(
+            str(source_path), str(partial_path), metadata, debug_metadata
+        )
+        if not partial_path.is_file() or partial_path.stat().st_size <= 0:
+            raise RuntimeError("Unable to inject panorama metadata")
+        if not _has_spherical_panorama_metadata(partial_path):
+            raise RuntimeError("Injected panorama metadata could not be verified")
+        partial_path.replace(upload_path)
+    except Exception:
+        partial_path.unlink(missing_ok=True)
+        raise
+    return upload_path
+
+
 def process_youtube_upload(job_id: str) -> None:
     """RQ/thread job target for a resumable YouTube upload."""
+    prepared_video_path: Path | None = None
     try:
         _log_job(job_id, "Starting YouTube upload")
         _require_configuration()
@@ -627,12 +689,20 @@ def process_youtube_upload(job_id: str) -> None:
             if job is None:
                 return
             video_path = _source_video_path(db, job)
+            source_type = job.source_type
             user_id = job.user_id
             encrypted_session = job.upload_session_encrypted
             db.expunge(job)
 
         if not video_path.is_file():
             raise RuntimeError("Source video is no longer available")
+        source_size = video_path.stat().st_size
+        if source_size <= 0:
+            raise RuntimeError("Source video is empty")
+        video_path = _prepare_upload_video(job_id, source_type, video_path)
+        if source_type == "pano":
+            prepared_video_path = video_path
+            _log_job(job_id, "Panorama metadata ready for interactive 360° playback")
         total_size = video_path.stat().st_size
         if total_size <= 0:
             raise RuntimeError("Source video is empty")
@@ -721,6 +791,11 @@ def process_youtube_upload(job_id: str) -> None:
         _log_job(job_id, f"YouTube upload failed: {safe_error}")
         _update_active_job(job_id, status="failed", error=safe_error)
     finally:
+        if prepared_video_path is not None:
+            try:
+                prepared_video_path.unlink(missing_ok=True)
+            except OSError:
+                logger.warning("Unable to remove prepared panorama for YouTube upload %s", job_id)
         with _SUBMITTED_LOCK:
             _SUBMITTED.discard(job_id)
 

@@ -76,6 +76,11 @@ isort==8.0.1
 python-multipart==0.0.32
 
 # ============================================
+# 360 Video Metadata
+# ============================================
+spatialmedia @ https://github.com/google/spatial-media/archive/2308497c39bb604a7c3ba56ac17e302f2b1b6a96.zip
+
+# ============================================
 # Meteorology & Scientific Computing
 # ============================================
 metpy==1.7.1
