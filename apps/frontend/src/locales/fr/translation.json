@@ -1025,7 +1025,6 @@
     "mediaPageDescription": "Retrouvez le replay, les fichiers générés et les publications associés à ce vol.",
     "mediaReplayTitle": "Replay du vol",
     "mediaReplayDescription": "Explorez la trace en 3D avant de créer ou publier vos vidéos.",
-    "open3dReplay": "Ouvrir le replay 3D",
     "mediaFilesTitle": "Fichiers disponibles",
     "mediaFilesDescription": "Générez, suivez et publiez les médias associés à ce vol.",
     "mediaFilesEmpty": "Aucun fichier média n’est encore disponible pour ce vol.",
