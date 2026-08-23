@@ -14,6 +14,7 @@ import uuid
 import traceback
 import time
 from collections import deque
+from collections.abc import Collection
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -506,31 +508,44 @@ def _update_job(
     job_id: str,
     *,
     update_db: bool | None = None,
-    **kwargs,
+    allowed_current_statuses: Collection[str] | None = None,
+    **kwargs: Any,
 ) -> VideoExportJob | None:
+    allowed_statuses = (
+        set(allowed_current_statuses) if allowed_current_statuses is not None else _ACTIVE_STATUSES
+    )
+    now = datetime.utcnow()
+    changes = {**kwargs, "updated_at": now}
+    target_status = changes.get("status")
+
+    if target_status == _STATUS_RUNNING and "started_at" not in changes:
+        changes["started_at"] = func.coalesce(VideoExportJob.started_at, now)
+    if target_status in _TERMINAL_STATUSES:
+        changes["auth_token"] = None
+        if target_status == _STATUS_COMPLETED and "completed_at" not in changes:
+            changes["completed_at"] = func.coalesce(VideoExportJob.completed_at, now)
+        if target_status == _STATUS_CANCELLED and "cancelled_at" not in changes:
+            changes["cancelled_at"] = func.coalesce(VideoExportJob.cancelled_at, now)
+
     with SessionLocal() as db:
-        job = db.query(VideoExportJob).filter(VideoExportJob.id == job_id).first()
-        if not job:
+        updated_rows = (
+            db.query(VideoExportJob)
+            .filter(VideoExportJob.id == job_id)
+            .filter(VideoExportJob.status.in_(allowed_statuses))
+            .update(changes, synchronize_session=False)
+        )
+        if updated_rows != 1:
+            db.rollback()
             return None
 
-        for key, value in kwargs.items():
-            setattr(job, key, value)
-
-        job.updated_at = datetime.utcnow()
-        if job.status == _STATUS_RUNNING and not job.started_at:
-            job.started_at = datetime.utcnow()
+        job = db.get(VideoExportJob, job_id)
+        if not job:
+            db.rollback()
+            return None
 
         popped_update_db: bool | None = None
         if job.status in _TERMINAL_STATUSES:
-            job.auth_token = None
-            if job.status == _STATUS_COMPLETED:
-                if not job.completed_at:
-                    job.completed_at = datetime.utcnow()
-            if job.status == _STATUS_CANCELLED and not job.cancelled_at:
-                job.cancelled_at = datetime.utcnow()
-
             _clear_job_runtime(job_id)
-
             popped_update_db = _pop_job_update_db_flag(job_id)
 
         if update_db is not None:
@@ -563,74 +578,108 @@ def _is_cancelled(job_id: str) -> bool:
 def _mark_stale_jobs_as_queued():
     with SessionLocal() as db:
         cutoff = datetime.utcnow() - timedelta(minutes=2)
-        stale_jobs = (
-            db.query(VideoExportJob)
-            .filter(VideoExportJob.status.in_(list(_ACTIVE_STATUSES)))
-            .filter(VideoExportJob.updated_at < cutoff)
-            .all()
-        )
+        stale_job_ids = [
+            job_id
+            for (job_id,) in (
+                db.query(VideoExportJob.id)
+                .filter(VideoExportJob.status.in_(list(_ACTIVE_STATUSES)))
+                .filter(VideoExportJob.updated_at < cutoff)
+                .all()
+            )
+        ]
 
-        if not stale_jobs:
+        if not stale_job_ids:
             return
 
-        for job in stale_jobs:
-            job.status = _STATUS_QUEUED
-            job.message = "Recovered from restart"
-            job.updated_at = datetime.utcnow()
-
+        now = datetime.utcnow()
+        (
+            db.query(VideoExportJob)
+            .filter(VideoExportJob.id.in_(stale_job_ids))
+            .filter(VideoExportJob.status.in_(list(_ACTIVE_STATUSES)))
+            .filter(VideoExportJob.updated_at < cutoff)
+            .update(
+                {
+                    "status": _STATUS_QUEUED,
+                    "message": "Recovered from restart",
+                    "updated_at": now,
+                },
+                synchronize_session=False,
+            )
+        )
         db.commit()
 
+        stale_jobs = db.query(VideoExportJob).filter(VideoExportJob.id.in_(stale_job_ids)).all()
         for job in stale_jobs:
             _set_memory_snapshot(job.id, _snapshot_from_job(job))
 
 
 def _recover_active_jobs_after_worker_restart() -> None:
     with SessionLocal() as db:
-        active_jobs = (
-            db.query(VideoExportJob).filter(VideoExportJob.status.in_(list(_ACTIVE_STATUSES))).all()
-        )
-        for job in active_jobs:
-            job.status = _STATUS_QUEUED
-            job.message = "Recovered after worker restart"
-            job.updated_at = datetime.utcnow()
-        if active_jobs:
-            db.commit()
+        active_job_ids = [
+            job_id
+            for (job_id,) in db.query(VideoExportJob.id)
+            .filter(VideoExportJob.status.in_(list(_ACTIVE_STATUSES)))
+            .all()
+        ]
+        if not active_job_ids:
+            return
 
+        (
+            db.query(VideoExportJob)
+            .filter(VideoExportJob.id.in_(active_job_ids))
+            .filter(VideoExportJob.status.in_(list(_ACTIVE_STATUSES)))
+            .update(
+                {
+                    "status": _STATUS_QUEUED,
+                    "message": "Recovered after worker restart",
+                    "updated_at": datetime.utcnow(),
+                },
+                synchronize_session=False,
+            )
+        )
+        db.commit()
+
+        active_jobs = db.query(VideoExportJob).filter(VideoExportJob.id.in_(active_job_ids)).all()
         for job in active_jobs:
             _set_memory_snapshot(job.id, _snapshot_from_job(job))
 
 
 def _acquire_next_job() -> str | None:
     with SessionLocal() as db:
-        job = (
-            db.query(VideoExportJob)
+        job_id = (
+            db.query(VideoExportJob.id)
             .filter(VideoExportJob.status == _STATUS_QUEUED)
-            .with_for_update(skip_locked=True)
             .order_by(VideoExportJob.created_at)
-            .first()
+            .scalar()
         )
-        if not job:
-            return None
-
-        job.status = _STATUS_RUNNING
-        job.message = "Starting manual export"
-        job.updated_at = datetime.utcnow()
-        job.started_at = datetime.utcnow()
-        db.commit()
-        _set_memory_snapshot(job.id, _snapshot_from_job(job))
-        return job.id
+    return _acquire_job(str(job_id)) if job_id else None
 
 
 def _acquire_job(job_id: str) -> str | None:
+    now = datetime.utcnow()
     with SessionLocal() as db:
-        job = db.query(VideoExportJob).filter(VideoExportJob.id == job_id).first()
-        if not job or job.status != _STATUS_QUEUED:
+        updated_rows = (
+            db.query(VideoExportJob)
+            .filter(VideoExportJob.id == job_id)
+            .filter(VideoExportJob.status == _STATUS_QUEUED)
+            .update(
+                {
+                    "status": _STATUS_RUNNING,
+                    "message": "Starting manual export",
+                    "updated_at": now,
+                    "started_at": now,
+                },
+                synchronize_session=False,
+            )
+        )
+        if updated_rows != 1:
+            db.rollback()
             return None
 
-        job.status = _STATUS_RUNNING
-        job.message = "Starting manual export"
-        job.updated_at = datetime.utcnow()
-        job.started_at = datetime.utcnow()
+        job = db.get(VideoExportJob, job_id)
+        if not job:
+            db.rollback()
+            return None
         db.commit()
         _set_memory_snapshot(job.id, _snapshot_from_job(job))
         return job.id
@@ -2251,14 +2300,16 @@ def cancel_video_export(job_id: str, update_db: bool = True) -> bool:
     else:
         _delete_rq_video_export_job(job_id)
 
-    _update_job(
+    cancelled_job = _update_job(
         job_id,
         status=_STATUS_CANCELLED,
         message="Export cancelled by user",
         error=None,
         update_db=update_db,
     )
-    _clear_job_auth_token(job_id)
+    if not cancelled_job:
+        _clear_job_cancel_requested(job_id)
+        return False
 
     print(f"🛑 Video export {job_id} cancelled")
     return True
@@ -2273,9 +2324,13 @@ def resume_video_export(job_id: str, auth_token: str | None = None) -> bool:
     if job.status not in {_STATUS_CANCELLED, _STATUS_FAILED}:
         return False
 
-    if _is_job_cancel_requested(job_id):
-        if config.JOB_QUEUE_BACKEND != "rq" or _is_rq_video_export_job_started(job_id):
+    if config.JOB_QUEUE_BACKEND == "rq":
+        if _is_rq_video_export_job_started(job_id):
             return False
+    elif _is_job_cancel_requested(job_id):
+        return False
+
+    if _is_job_cancel_requested(job_id):
         _clear_job_cancel_requested(job_id)
 
     resume_info = _job_resume_info(job)
@@ -2283,8 +2338,7 @@ def resume_video_export(job_id: str, auth_token: str | None = None) -> bool:
         return False
 
     with job_admission():
-        _set_job_update_db_flag(job_id, True)
-        _update_job(
+        resumed_job = _update_job(
             job_id,
             status=_STATUS_QUEUED,
             progress=_capture_progress_percent(
@@ -2300,10 +2354,13 @@ def resume_video_export(job_id: str, auth_token: str | None = None) -> bool:
             video_path=None,
             completed_at=None,
             cancelled_at=None,
+            auth_token=_resolve_video_export_job_token(job_id, job.flight_id, auth_token),
+            allowed_current_statuses={_STATUS_CANCELLED, _STATUS_FAILED},
+            update_db=True,
         )
-        _set_job_auth_token(
-            job_id, _resolve_video_export_job_token(job_id, job.flight_id, auth_token)
-        )
+        if not resumed_job:
+            return False
+        _set_job_update_db_flag(job_id, True)
         _set_job_runtime(
             job_id,
             phase=_STATUS_QUEUED,
