@@ -188,6 +188,28 @@ class GoproOverlayCancelResponse(BaseModel):
     message: str
 
 
+class HighlightVideoClipResponse(BaseModel):
+    start_seconds: float
+    duration_seconds: float
+    yaw_degrees: float
+    overlay_start_seconds: float
+    category: str
+
+
+class HighlightVideoJobResponse(BaseModel):
+    job_id: str
+    flight_id: str
+    status: Literal["queued", "running", "completed", "failed", "cancelled"]
+    progress: int
+    message: str | None = None
+    error: str | None = None
+    output_format: str
+    overlay_offset_seconds: float
+    selection: list[HighlightVideoClipResponse] = Field(default_factory=list)
+    created_at: datetime
+    completed_at: datetime | None = None
+
+
 class DeploymentDrainRequest(BaseModel):
     deployment_id: str = Field(min_length=1)
     target_version: str = Field(min_length=1)

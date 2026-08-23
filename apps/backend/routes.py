@@ -97,6 +97,7 @@ from models import (
     EmagramAnalysis,
     Flight,
     GoproOverlayJob as GoproOverlayJobModel,
+    HighlightVideoJob,
     Site,
     SiteLandingAssociation,
     User,
@@ -129,6 +130,8 @@ from schemas import (
     GoproPreviewState,
     GoproOverlayLayoutsResponse,
     GoproOverlayProbeResponse,
+    HighlightVideoClipResponse,
+    HighlightVideoJobResponse,
     IntervalsPreviewResponse,
     IntervalsStatus,
     IntervalsSyncRequest,
@@ -161,6 +164,11 @@ from schemas import (
 )
 from versioning import get_version_payload
 from video_thumbnail import VideoThumbnailError, get_video_thumbnail
+from highlight_video_worker import (
+    STATUS_QUEUED as HIGHLIGHT_STATUS_QUEUED,
+    create_highlight_job_id,
+    process_highlight_video_job,
+)
 from video_export import cancel_video_export as cancel_video_export_stream
 from video_export import delete_export_job as delete_video_export_stream_job
 from video_export import get_export_status as get_export_status_stream
@@ -4673,6 +4681,145 @@ def get_flight_pano_thumbnail(flight_id: str, db: Session = Depends(get_db)) -> 
     if not pano_path or not pano_path.is_file():
         raise HTTPException(status_code=404, detail="No Pano video available for this flight")
     return _video_thumbnail_response(pano_path)
+
+
+def _highlight_job_payload(job: HighlightVideoJob) -> HighlightVideoJobResponse:
+    try:
+        raw_selection = json.loads(job.selection_json) if job.selection_json else []
+        if not isinstance(raw_selection, list):
+            raise ValueError("selection must be a list")
+        selection = [HighlightVideoClipResponse.model_validate(item) for item in raw_selection]
+    except (json.JSONDecodeError, TypeError, ValueError):
+        selection = []
+    return HighlightVideoJobResponse(
+        job_id=job.id,
+        flight_id=job.flight_id,
+        status=job.status,
+        progress=job.progress,
+        message=job.message,
+        error=job.error,
+        output_format=job.output_format,
+        overlay_offset_seconds=float(job.overlay_offset_seconds or 0.0),
+        selection=selection,
+        created_at=job.created_at,
+        completed_at=job.completed_at,
+    )
+
+
+@router.get(
+    "/flights/{flight_id}/highlight-videos",
+    response_model=list[HighlightVideoJobResponse],
+)
+def list_flight_highlight_videos(
+    flight_id: str, db: Session = Depends(get_db)
+) -> list[HighlightVideoJobResponse]:
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    return [
+        _highlight_job_payload(job)
+        for job in reversed(
+            db.query(HighlightVideoJob)
+            .filter(HighlightVideoJob.flight_id == flight_id)
+            .order_by(HighlightVideoJob.created_at)
+            .all()
+        )
+    ]
+
+
+@router.get("/flights/{flight_id}/highlight-videos/{job_id}/download")
+def download_flight_highlight_video(
+    flight_id: str, job_id: str, db: Session = Depends(get_db)
+) -> FileResponse:
+    job = (
+        db.query(HighlightVideoJob)
+        .filter(HighlightVideoJob.id == job_id, HighlightVideoJob.flight_id == flight_id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Highlight video job not found")
+    if job.status != "completed" or not job.output_path:
+        raise HTTPException(status_code=409, detail="Highlight video is not ready")
+    output_path = Path(job.output_path)
+    if not output_path.is_file():
+        raise HTTPException(status_code=404, detail="Highlight video file not found")
+    return FileResponse(path=output_path, media_type="video/mp4", filename=output_path.name)
+
+
+@router.post(
+    "/flights/{flight_id}/highlight-videos",
+    response_model=HighlightVideoJobResponse,
+    status_code=202,
+)
+def create_flight_highlight_video(
+    flight_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> HighlightVideoJobResponse:
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+
+    pano_path = pano_video_path(db, flight)
+    if not pano_path.is_file():
+        raise HTTPException(status_code=409, detail="Panorama video is not available")
+
+    active = (
+        db.query(HighlightVideoJob)
+        .filter(
+            HighlightVideoJob.flight_id == flight_id,
+            HighlightVideoJob.status.in_([HIGHLIGHT_STATUS_QUEUED, "running"]),
+        )
+        .order_by(HighlightVideoJob.created_at.desc())
+        .first()
+    )
+    if active:
+        return _highlight_job_payload(active)
+
+    overlay_path = _flight_gopro_overlay_file_path(db, flight)
+    job = HighlightVideoJob(
+        id=create_highlight_job_id(),
+        flight_id=flight_id,
+        status=HIGHLIGHT_STATUS_QUEUED,
+        progress=0,
+        message="En attente du rendu",
+        source_video_path=str(pano_path),
+        overlay_video_path=overlay_path,
+        output_format="original",
+        overlay_offset_seconds=float(flight.gopro_overlay_gpx_offset or 0.0),
+    )
+    db.add(job)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        active = (
+            db.query(HighlightVideoJob)
+            .filter(
+                HighlightVideoJob.flight_id == flight_id,
+                HighlightVideoJob.status.in_([HIGHLIGHT_STATUS_QUEUED, "running"]),
+            )
+            .order_by(HighlightVideoJob.created_at.desc())
+            .first()
+        )
+        if active:
+            return _highlight_job_payload(active)
+        raise
+    db.refresh(job)
+
+    from job_queue import enqueue_once, is_rq_enabled
+
+    if is_rq_enabled():
+        enqueue_once(
+            "highlight_video_worker.process_highlight_video_job",
+            job.id,
+            job_id=f"highlight-video-{job.id}",
+            timeout=config.JOB_QUEUE_TIMEOUT_SECONDS,
+            queue_name=config.JOB_QUEUE_NAME,
+        )
+    else:
+        background_tasks.add_task(process_highlight_video_job, job.id)
+    return _highlight_job_payload(job)
 
 
 @router.get("/flights/{flight_id}/gopro-overlay")
