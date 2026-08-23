@@ -94,6 +94,7 @@ export const YoutubeVideoAssociationSchema = z.object({
   url: z.string().url(),
   video_id: z.string().min(1),
   can_delete_from_youtube: z.boolean(),
+  exists_on_youtube: z.boolean().nullish(),
 });
 
 export const YoutubeVideoAssociationsSchema = z.array(
