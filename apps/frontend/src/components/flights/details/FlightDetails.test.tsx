@@ -757,8 +757,8 @@ describe('FlightDetails GoPro overlay action', () => {
     openTab('Media');
 
     expect(
-      screen.getByRole('progressbar', { name: 'Overlay progress' })
-    ).toHaveAttribute('aria-valuenow', '42');
+      screen.queryByRole('progressbar', { name: 'Overlay progress' })
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Cancel overlay/u }));
 
@@ -808,11 +808,11 @@ describe('FlightDetails GoPro overlay action', () => {
       screen.getByRole('button', { name: 'flights.goproOverlayDownload' })
     ).toBeInTheDocument();
     expect(screen.getByText('new-overlay.mp4')).toBeInTheDocument();
-    for (const progressbar of screen.getAllByRole('progressbar', {
+    const progressbars = screen.getAllByRole('progressbar', {
       name: 'Overlay progress',
-    })) {
-      expect(progressbar).toHaveAttribute('aria-valuenow', '61');
-    }
+    });
+    expect(progressbars).toHaveLength(1);
+    expect(progressbars[0]).toHaveAttribute('aria-valuenow', '61');
   });
 
   it('passes the GPX offset when starting overlay generation', async () => {
