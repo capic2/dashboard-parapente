@@ -23,6 +23,25 @@ interface FlightYoutubeUploadControlsProps {
 
 type PrivacyStatus = 'private' | 'unlisted' | 'public';
 
+const YOUTUBE_TITLE_MAX_LENGTH = 100;
+
+function getDefaultYoutubeTitle(
+  flight: Flight,
+  source: YoutubeUploadSource
+): string {
+  const baseTitle =
+    flight.name ?? flight.title ?? `Vol du ${flight.flight_date}`;
+  const suffix = ' pano';
+  const needsPanoSuffix =
+    source.source_type === 'pano' && !/\bpano\b/iu.test(baseTitle);
+
+  if (!needsPanoSuffix) {
+    return baseTitle.slice(0, YOUTUBE_TITLE_MAX_LENGTH);
+  }
+
+  return `${baseTitle.slice(0, YOUTUBE_TITLE_MAX_LENGTH - suffix.length).trimEnd()}${suffix}`;
+}
+
 export function FlightYoutubeUploadControls({
   flight,
   source,
@@ -38,13 +57,13 @@ export function FlightYoutubeUploadControls({
   const authorizationUrl = useYoutubeAuthorizationUrl();
   const previousStatus = useRef(upload.data?.status);
   const [isOpen, setIsOpen] = useState(false);
-  const [title, setTitle] = useState(
-    flight.name ?? flight.title ?? `Vol du ${flight.flight_date}`
+  const [title, setTitle] = useState(() =>
+    getDefaultYoutubeTitle(flight, source)
   );
   const [description, setDescription] = useState(
     flight.description ?? flight.notes ?? ''
   );
-  const [privacyStatus, setPrivacyStatus] = useState<PrivacyStatus>('private');
+  const [privacyStatus, setPrivacyStatus] = useState<PrivacyStatus>('unlisted');
 
   const hasActiveUpload =
     activeUpload.data?.status === 'queued' ||
@@ -190,7 +209,7 @@ export function FlightYoutubeUploadControls({
             <input
               id={`youtube-title-${flight.id}-${source.source_type}`}
               value={title}
-              maxLength={100}
+              maxLength={YOUTUBE_TITLE_MAX_LENGTH}
               onChange={(event) => setTitle(event.currentTarget.value)}
               className="min-h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
             />
