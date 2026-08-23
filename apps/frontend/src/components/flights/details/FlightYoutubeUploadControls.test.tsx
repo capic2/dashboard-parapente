@@ -16,6 +16,7 @@ const {
   useYoutubeAuthorizationUrl,
   useYoutubeStatus,
   useYoutubeUpload,
+  useYoutubeVideoAssociations,
 } = vi.hoisted(() => ({
   cancelUpload: vi.fn(),
   startUpload: vi.fn(),
@@ -26,6 +27,7 @@ const {
   useYoutubeAuthorizationUrl: vi.fn(),
   useYoutubeStatus: vi.fn(),
   useYoutubeUpload: vi.fn(),
+  useYoutubeVideoAssociations: vi.fn(),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -56,6 +58,7 @@ vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
   useYoutubeAuthorizationUrl,
   useYoutubeStatus,
   useYoutubeUpload,
+  useYoutubeVideoAssociations,
   youtubeVideoAssociationsQueryKey: (flightId: string) => [
     'youtube-video-associations',
     flightId,
@@ -79,6 +82,7 @@ describe('FlightYoutubeUploadControls', () => {
       },
       isLoading: false,
     });
+    useYoutubeVideoAssociations.mockReturnValue({ data: [] });
     useStartYoutubeUpload.mockReturnValue({
       mutateAsync: startUpload,
       isPending: false,
@@ -230,6 +234,16 @@ describe('FlightYoutubeUploadControls', () => {
   });
 
   it('disables a source whose uploaded video is still associated', () => {
+    useYoutubeVideoAssociations.mockReturnValue({
+      data: [
+        {
+          url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+          video_id: 'dQw4w9WgXcQ',
+          can_delete_from_youtube: true,
+          exists_on_youtube: true,
+        },
+      ],
+    });
     useYoutubeUpload.mockReturnValue({
       data: {
         status: 'completed',
@@ -255,6 +269,51 @@ describe('FlightYoutubeUploadControls', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Déjà publiée' })).toBeDisabled();
+  });
+
+  it('allows reupload when the associated video was deleted from YouTube', () => {
+    useYoutubeUpload.mockReturnValue({
+      data: {
+        status: 'completed',
+        youtube_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      },
+      isLoading: false,
+    });
+    useYoutubeVideoAssociations.mockReturnValue({
+      data: [
+        {
+          url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+          video_id: 'dQw4w9WgXcQ',
+          can_delete_from_youtube: true,
+          exists_on_youtube: false,
+        },
+      ],
+    });
+    const queryClient = new QueryClient();
+    const flight = {
+      id: 'flight-1',
+      flight_date: '2026-08-19',
+      name: 'Vol test',
+      youtube_urls: ['https://www.youtube.com/watch?v=dQw4w9WgXcQ'],
+    } as Flight;
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FlightYoutubeUploadControls
+          flight={flight}
+          source={{ source_type: 'pano' }}
+        />
+      </QueryClientProvider>
+    );
+
+    const button = screen.getByRole('button', {
+      name: 'Publier sur YouTube',
+    });
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    expect(
+      screen.getByRole('button', { name: "Lancer l'envoi" })
+    ).toBeInTheDocument();
   });
 
   it('refreshes YouTube associations when an upload completes', async () => {

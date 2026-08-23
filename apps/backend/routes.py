@@ -198,6 +198,7 @@ from youtube_upload import (
     job_payload as youtube_upload_job_payload,
     latest_job as latest_youtube_upload_job,
     remove_youtube_video,
+    youtube_video_availability,
     youtube_video_associations,
 )
 
@@ -988,8 +989,29 @@ def start_flight_youtube_upload(
         completed_source_query = completed_source_query.filter(
             YoutubeUploadJob.gopro_overlay_job_id == overlay.id
         )
-    if completed_source_query.first() is not None:
-        raise HTTPException(status_code=409, detail="This video is already published on YouTube")
+    completed_source_jobs = completed_source_query.all()
+    if completed_source_jobs:
+        video_ids_by_user: dict[int, set[str]] = {}
+        for completed_job in completed_source_jobs:
+            if completed_job.youtube_video_id is not None:
+                video_ids_by_user.setdefault(completed_job.user_id, set()).add(
+                    completed_job.youtube_video_id
+                )
+        availability = youtube_video_availability(video_ids_by_user)
+        if any(
+            completed_job.youtube_video_id is None
+            or availability.get(completed_job.youtube_video_id) is not False
+            for completed_job in completed_source_jobs
+        ):
+            raise HTTPException(
+                status_code=409, detail="This video is already published on YouTube"
+            )
+        deleted_urls = {
+            completed_job.youtube_url
+            for completed_job in completed_source_jobs
+            if completed_job.youtube_url is not None
+        }
+        flight.youtube_urls = [url for url in flight.youtube_urls if url not in deleted_urls]
     existing_job = active_youtube_upload_job(db, flight_id)
     if existing_job is not None:
         raise HTTPException(status_code=409, detail="A YouTube upload is already in progress")
