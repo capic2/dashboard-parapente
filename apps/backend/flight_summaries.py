@@ -459,6 +459,8 @@ def list_flight_summaries(
                 _flight_directory(row.flight_date, row.flight_sequence) / "camera.mp4"
             ).is_file(),
             has_youtube_video=bool(uploaded_youtube_ids[row.id] & existing_youtube_ids),
+            youtube_upload_status=None,
+            youtube_upload_progress=None,
             gopro_overlay_job_id=row.gopro_overlay_job_id,
             gopro_overlay_status=row.gopro_overlay_status,
             gopro_overlay_progress=None,

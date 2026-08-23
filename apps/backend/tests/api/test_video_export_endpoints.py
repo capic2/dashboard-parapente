@@ -6,6 +6,7 @@ Covers fallback behavior between manual/stream modes and internal status guards.
 
 import json
 import tempfile
+from datetime import datetime
 from unittest.mock import patch
 
 from pathlib import Path
@@ -13,6 +14,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from auth import create_job_token
+from models import YoutubeUploadJob
 from routes import _get_video_export_jobs_payload, serialize_sse_event
 
 API_PREFIX = "/api"
@@ -598,6 +600,54 @@ class TestVideoExportJobsEndpoint:
             next(job for job in jobs if job["job_id"] == "job-stream-encoding")["render_method"]
             == "gpu"
         )
+
+    def test_active_jobs_include_youtube_upload_progress(
+        self, client: TestClient, db_session, sample_flight
+    ) -> None:
+        db_session.add(
+            YoutubeUploadJob(
+                id="youtube-uploading",
+                flight_id=sample_flight.id,
+                user_id=1,
+                status="uploading",
+                progress=42,
+                title="Flight upload",
+                created_at=datetime(2026, 5, 2, 9),
+                updated_at=datetime(2026, 5, 2, 10),
+            )
+        )
+        db_session.commit()
+
+        with (
+            patch(
+                "routes.list_exports_manual",
+                return_value=[
+                    {
+                        "job_id": "video-exporting",
+                        "flight_id": sample_flight.id,
+                        "status": "processing",
+                        "progress": 12,
+                        "mode": "manual",
+                        "updated_at": "2026-05-01T10:00:00",
+                    }
+                ],
+            ),
+            patch("routes.list_exports_stream", return_value=[]),
+            patch("routes.list_gopro_overlay_jobs", return_value=[]),
+        ):
+            response = client.get(f"{API_PREFIX}/video-export-jobs?active_only=true")
+
+        assert response.status_code == 200
+        jobs = response.json()["jobs"]
+        assert [job["job_id"] for job in jobs] == [
+            "youtube-uploading",
+            "video-exporting",
+        ]
+        assert jobs[0]["flight_id"] == sample_flight.id
+        assert jobs[0]["status"] == "uploading"
+        assert jobs[0]["progress"] == 42
+        assert jobs[0]["mode"] == "youtube"
+        assert jobs[0]["can_cancel"] is True
 
     def test_export_status_passthrough_keeps_render_method(self, client: TestClient):
         with patch(
