@@ -1021,7 +1021,6 @@
     "mediaPageDescription": "Find the replay, generated files, and publications associated with this flight.",
     "mediaReplayTitle": "Flight replay",
     "mediaReplayDescription": "Explore the track in 3D before creating or publishing your videos.",
-    "open3dReplay": "Open 3D replay",
     "mediaFilesTitle": "Available files",
     "mediaFilesDescription": "Generate, track, and publish media associated with this flight.",
     "mediaFilesEmpty": "No media files are available for this flight yet.",

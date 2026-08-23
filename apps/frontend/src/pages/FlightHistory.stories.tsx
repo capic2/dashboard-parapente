@@ -387,6 +387,11 @@ MobileFlow.test(
       await userEvent.click(
         canvas.getByRole('tab', { name: i18n.t('flights.replayTab') })
       );
+      await userEvent.click(
+        canvas.getByRole('button', {
+          name: i18n.t('flights.mediaReplayTitle'),
+        })
+      );
       await expect(
         await canvas.findByText(i18n.t('flights.replayUnavailable'))
       ).toBeInTheDocument();
@@ -453,8 +458,10 @@ MobileFlowWithReplay.test(
       );
 
       await expect(
-        canvas.getByRole('button', { name: i18n.t('flights.open3dReplay') })
-      ).toBeInTheDocument();
+        canvas.getByRole('button', {
+          name: i18n.t('flights.mediaReplayTitle'),
+        })
+      ).toHaveAttribute('aria-expanded', 'false');
       await expect(
         canvas.queryByText(i18n.t('flights.loading3dViewer'))
       ).not.toBeInTheDocument();
@@ -463,7 +470,9 @@ MobileFlowWithReplay.test(
 
     await step('triggers GPX loading once the replay is opened', async () => {
       await userEvent.click(
-        canvas.getByRole('button', { name: i18n.t('flights.open3dReplay') })
+        canvas.getByRole('button', {
+          name: i18n.t('flights.mediaReplayTitle'),
+        })
       );
 
       await expect(
@@ -472,6 +481,18 @@ MobileFlowWithReplay.test(
       await waitFor(() => {
         expect(gpxRequestCount).toBeGreaterThan(requestsAfterOpeningFlight);
       });
+    });
+
+    await step('unmounts the replay when it is collapsed', async () => {
+      const replayToggle = canvas.getByRole('button', {
+        name: i18n.t('flights.mediaReplayTitle'),
+      });
+      await userEvent.click(replayToggle);
+
+      await expect(replayToggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(
+        canvas.queryByText(i18n.t('flights.loading3dViewer'))
+      ).not.toBeInTheDocument();
     });
   }
 );

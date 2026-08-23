@@ -13,7 +13,15 @@ import {
 import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
 import type { GoproOverlayJob } from '@dashboard-parapente/shared-types';
 import type { YoutubeVideoAssociation } from '@dashboard-parapente/shared-types';
-import { CircleAlert, Edit3, FileUp, Images, Play, Wand2 } from 'lucide-react';
+import {
+  ChevronDown,
+  CircleAlert,
+  Edit3,
+  FileUp,
+  Images,
+  Play,
+  Wand2,
+} from 'lucide-react';
 import { Input, Label, TextField } from 'react-aria-components';
 import {
   useUpdateFlight,
@@ -86,7 +94,7 @@ export function FlightDetails({
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesText, setNotesText] = useState(flight.notes ?? '');
   const [activeTab, setActiveTab] = useState<FlightDetailsTab>('infos');
-  const [hasOpenedReplay, setHasOpenedReplay] = useState(false);
+  const [isReplayExpanded, setIsReplayExpanded] = useState(false);
   const [isGoproOverlayDialogOpen, setIsGoproOverlayDialogOpen] =
     useState(false);
   const [goproOverlayJobId, setGoproOverlayJobId] = useState<string | null>(
@@ -809,20 +817,6 @@ export function FlightDetails({
       compact={mobileMode}
     />
   );
-  const replayContent =
-    hasGpx && !hasOpenedReplay ? (
-      <Button
-        variant="secondary"
-        className="ml-12 min-h-10 rounded-lg px-4 py-2 text-sm"
-        onPress={() => setHasOpenedReplay(true)}
-      >
-        <Play className="h-4 w-4" aria-hidden="true" />
-        {t('flights.open3dReplay')}
-      </Button>
-    ) : (
-      replayCard
-    );
-
   const logsPanel = (
     <FlightGenerationLogsPanel
       videoJobId={flight.video_export_job_id}
@@ -856,24 +850,41 @@ export function FlightDetails({
       </header>
 
       <div className="min-w-0 space-y-4">
-        <section aria-labelledby="flight-media-replay-title">
-          <div className="mb-3 flex items-start gap-3 px-1">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-100">
-              <Play className="h-4 w-4" aria-hidden="true" />
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
+          <button
+            type="button"
+            className="flex w-full cursor-pointer items-center justify-between gap-3 p-4 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-inset dark:hover:bg-slate-700/50"
+            aria-expanded={isReplayExpanded}
+            aria-controls="flight-media-replay-panel"
+            aria-label={t('flights.mediaReplayTitle')}
+            onClick={() => setIsReplayExpanded((isExpanded) => !isExpanded)}
+          >
+            <span className="flex min-w-0 items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-100">
+                <Play className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <span>
+                <span className="block font-semibold text-slate-950 dark:text-white">
+                  {t('flights.mediaReplayTitle')}
+                </span>
+                <span className="block text-sm text-slate-600 dark:text-slate-300">
+                  {t('flights.mediaReplayDescription')}
+                </span>
+              </span>
             </span>
-            <div>
-              <h3
-                id="flight-media-replay-title"
-                className="font-semibold text-slate-950 dark:text-white"
-              >
-                {t('flights.mediaReplayTitle')}
-              </h3>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                {t('flights.mediaReplayDescription')}
-              </p>
+            <ChevronDown
+              aria-hidden="true"
+              className={`size-5 shrink-0 text-slate-500 transition-transform duration-200 dark:text-slate-400 ${isReplayExpanded ? 'rotate-180' : ''}`}
+            />
+          </button>
+          {isReplayExpanded && (
+            <div
+              id="flight-media-replay-panel"
+              className="border-t border-slate-200 dark:border-slate-700"
+            >
+              {replayCard}
             </div>
-          </div>
-          {replayContent}
+          )}
         </section>
 
         <FlightMediaBadges

@@ -477,6 +477,11 @@ MobileWithoutGpx.test(
       name: i18n.t('flights.replayTab'),
     });
     await userEvent.click(replayTab);
+    await userEvent.click(
+      canvas.getByRole('button', {
+        name: i18n.t('flights.mediaReplayTitle'),
+      })
+    );
     await expect(
       await canvas.findByText(i18n.t('flights.replayUnavailable'))
     ).toBeInTheDocument();
