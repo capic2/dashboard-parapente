@@ -186,18 +186,6 @@ export function FlightDetails({
     t('flights.videoProcessingBadge'),
     flight.video_export_progress
   );
-  const goproOverlayProgress = Math.max(
-    0,
-    Math.min(
-      100,
-      Math.round(
-        goproOverlayJob?.progress ??
-          activePersistedGoproOverlay?.progress ??
-          flight.gopro_overlay_progress ??
-          0
-      )
-    )
-  );
   const normalizedTitle = flight.title?.trim();
   const flightTitle =
     normalizedTitle ||
@@ -932,23 +920,6 @@ export function FlightDetails({
                 {goproOverlayUnavailableReason ??
                   t('flights.goproOverlayAddCardDescription')}
               </p>
-              {isGoproOverlayRunning && (
-                <div className="mt-3">
-                  <div className="mb-1 flex items-center justify-between text-xs font-semibold text-blue-800 dark:text-blue-200">
-                    <span>{t('flights.mediaExportInProgress')}</span>
-                    <span>{goproOverlayProgress}%</span>
-                  </div>
-                  <progress
-                    aria-label={t('flights.goproOverlayProcessingBadge')}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={goproOverlayProgress}
-                    value={goproOverlayProgress}
-                    max={100}
-                    className="h-2 w-full accent-blue-600 dark:accent-blue-400"
-                  />
-                </div>
-              )}
             </div>
             <Button
               variant={isGoproOverlayRunning ? 'danger' : 'outline'}
