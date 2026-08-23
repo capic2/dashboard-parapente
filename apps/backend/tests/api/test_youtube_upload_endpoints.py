@@ -474,6 +474,48 @@ def test_start_youtube_upload_allows_an_overlay_with_an_existing_youtube_video(
     assert response.status_code == 202
 
 
+def test_start_youtube_upload_replaces_a_source_deleted_directly_from_youtube(
+    client: TestClient,
+    db_session: Session,
+    sample_flight: Flight,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _configure_youtube(monkeypatch)
+    overlay_path = tmp_path / "overlay.mp4"
+    overlay_path.write_bytes(b"video")
+    overlay = _create_completed_overlay(db_session, sample_flight, overlay_path)
+    youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    sample_flight.youtube_urls = [youtube_url]
+    completed_job = _completed_youtube_job(db_session, sample_flight)
+    completed_job.gopro_overlay_job_id = overlay.id
+    db_session.add(
+        YoutubeCredential(
+            user_id=1,
+            refresh_token_encrypted=encrypt_secret("refresh-token"),
+        )
+    )
+    db_session.commit()
+    monkeypatch.setattr(
+        "routes.youtube_video_availability",
+        lambda _video_ids_by_user: {"dQw4w9WgXcQ": False},
+    )
+    monkeypatch.setattr("routes.enqueue_youtube_upload", lambda _job_id: None)
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload",
+        json={
+            "gopro_overlay_job_id": overlay.id,
+            "title": "Nouvel envoi",
+            "privacy_status": "private",
+        },
+    )
+
+    assert response.status_code == 202
+    db_session.refresh(sample_flight)
+    assert sample_flight.youtube_urls == []
+
+
 def test_database_rejects_two_active_uploads_for_the_same_flight(db_session, sample_flight):
     first = YoutubeUploadJob(
         id="youtube-job-1",
@@ -610,7 +652,10 @@ def _completed_youtube_job(
 
 
 def test_youtube_video_metadata_marks_only_current_users_completed_upload_as_deletable(
-    client: TestClient, db_session: Session, sample_flight: Flight
+    client: TestClient,
+    db_session: Session,
+    sample_flight: Flight,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sample_flight.youtube_urls = [
         "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
@@ -632,6 +677,11 @@ def test_youtube_video_metadata_marks_only_current_users_completed_upload_as_del
         )
     )
     db_session.commit()
+    monkeypatch.setattr(
+        youtube_upload,
+        "youtube_video_availability",
+        lambda _video_ids_by_user: {"dQw4w9WgXcQ": True},
+    )
 
     response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/youtube-videos")
 
@@ -641,16 +691,19 @@ def test_youtube_video_metadata_marks_only_current_users_completed_upload_as_del
             "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
             "video_id": "dQw4w9WgXcQ",
             "can_delete_from_youtube": True,
+            "exists_on_youtube": True,
         },
         {
             "url": "https://www.youtube.com/watch?v=abcdefghijk",
             "video_id": "abcdefghijk",
             "can_delete_from_youtube": False,
+            "exists_on_youtube": None,
         },
         {
             "url": "https://www.youtube.com/watch?v=Zyxwvutsr_1",
             "video_id": "Zyxwvutsr_1",
             "can_delete_from_youtube": False,
+            "exists_on_youtube": None,
         },
     ]
 
@@ -671,6 +724,42 @@ def test_youtube_video_metadata_disables_remote_deletion_when_disconnected(
             "url": youtube_url,
             "video_id": "dQw4w9WgXcQ",
             "can_delete_from_youtube": False,
+            "exists_on_youtube": None,
+        }
+    ]
+
+
+def test_youtube_video_metadata_reports_a_video_deleted_directly_from_youtube(
+    client: TestClient,
+    db_session: Session,
+    sample_flight: Flight,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    sample_flight.youtube_urls = [youtube_url]
+    _completed_youtube_job(db_session, sample_flight)
+    db_session.add(
+        YoutubeCredential(
+            user_id=1,
+            refresh_token_encrypted=encrypt_secret("refresh-token"),
+        )
+    )
+    db_session.commit()
+    monkeypatch.setattr(
+        youtube_upload,
+        "youtube_video_availability",
+        lambda _video_ids_by_user: {"dQw4w9WgXcQ": False},
+    )
+
+    response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/youtube-videos")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "url": youtube_url,
+            "video_id": "dQw4w9WgXcQ",
+            "can_delete_from_youtube": True,
+            "exists_on_youtube": False,
         }
     ]
 

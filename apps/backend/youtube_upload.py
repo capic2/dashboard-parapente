@@ -68,6 +68,7 @@ class YoutubeVideoAssociationPayload(TypedDict):
     url: str
     video_id: str
     can_delete_from_youtube: bool
+    exists_on_youtube: bool | None
 
 
 def _youtube_upload_log_path(job_id: str) -> Path:
@@ -269,9 +270,13 @@ def latest_job(
     return query.order_by(YoutubeUploadJob.created_at.desc()).first()
 
 
-def existing_youtube_video_ids(video_ids_by_user: dict[int, set[str]]) -> set[str]:
-    """Return uploaded video IDs that YouTube still exposes to their owner."""
-    existing_ids: set[str] = set()
+def youtube_video_availability(
+    video_ids_by_user: dict[int, set[str]],
+) -> dict[str, bool | None]:
+    """Return remote availability, preserving unknown results when YouTube is unavailable."""
+    availability = {
+        video_id: None for video_ids in video_ids_by_user.values() for video_id in video_ids
+    }
     for user_id, video_ids in video_ids_by_user.items():
         try:
             access_token = _access_token(user_id)
@@ -291,14 +296,25 @@ def existing_youtube_video_ids(video_ids_by_user: dict[int, set[str]]) -> set[st
                 )
                 response.raise_for_status()
                 items = response.json().get("items", [])
-                existing_ids.update(
+                existing_ids = {
                     item["id"]
                     for item in items
                     if isinstance(item, dict) and isinstance(item.get("id"), str)
-                )
+                }
+                for video_id in batch:
+                    availability[video_id] = video_id in existing_ids
             except (httpx.HTTPError, ValueError, AttributeError) as exc:
                 logger.warning("Unable to verify YouTube video batch: %s", _safe_log_error(exc))
-    return existing_ids
+    return availability
+
+
+def existing_youtube_video_ids(video_ids_by_user: dict[int, set[str]]) -> set[str]:
+    """Return uploaded video IDs that YouTube still exposes to their owner."""
+    return {
+        video_id
+        for video_id, exists in youtube_video_availability(video_ids_by_user).items()
+        if exists is True
+    }
 
 
 def youtube_video_associations(
@@ -322,11 +338,17 @@ def youtube_video_associations(
         )
         if video_id is not None
     }
+    availability = (
+        youtube_video_availability({user_id: deletable_video_ids})
+        if youtube_connected and deletable_video_ids
+        else {}
+    )
     return [
         {
             "url": url,
             "video_id": video_id,
             "can_delete_from_youtube": youtube_connected and video_id in deletable_video_ids,
+            "exists_on_youtube": availability.get(video_id),
         }
         for url, video_id in associations
     ]
