@@ -210,7 +210,6 @@ vi.mock('react-i18next', () => ({
         'flights.logsTab': 'Processing',
         'flights.mediaPageTitle': 'Flight media',
         'flights.mediaReplayTitle': 'Flight replay',
-        'flights.open3dReplay': 'Open 3D replay',
         'flights.mediaFilesTitle': 'Available files',
         'flights.panoBadge': 'Pano',
         'flights.panoThumbnailAlt': 'Pano thumbnail',
@@ -437,10 +436,44 @@ describe('FlightDetails GoPro overlay action', () => {
       'https://www.youtube-nocookie.com/embed/9bZkp7q19f0'
     );
     expect(
-      screen.getByRole('button', { name: 'Open 3D replay' })
+      screen.getByRole('button', { name: 'Flight replay' })
     ).toBeInTheDocument();
     expect(
       screen.queryByText('flights.loading3dViewer')
+    ).not.toBeInTheDocument();
+  });
+
+  it('unmounts the replay when its collapsible is closed', () => {
+    mockFlight.gpx_file_path = null;
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    openTab('Media');
+    const replayToggle = screen.getByRole('button', {
+      name: 'Flight replay',
+    });
+
+    expect(replayToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      screen.queryByText('flights.replayUnavailable')
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(replayToggle);
+
+    expect(replayToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('flights.replayUnavailable')).toBeInTheDocument();
+
+    fireEvent.click(replayToggle);
+
+    expect(replayToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      screen.queryByText('flights.replayUnavailable')
     ).not.toBeInTheDocument();
   });
 
@@ -604,7 +637,7 @@ describe('FlightDetails GoPro overlay action', () => {
       screen.getByRole('heading', { name: 'Flight media' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Flight replay' })
+      screen.getByRole('button', { name: 'Flight replay' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Available files' })
