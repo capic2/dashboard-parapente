@@ -133,6 +133,9 @@ export function useStartYoutubeUpload(flightId: string) {
         youtubeUploadQueryKey(flightId, sourceFromInput(input)),
         job
       );
+      void queryClient.invalidateQueries({
+        queryKey: ['video-export-jobs', 'active'],
+      });
     },
   });
 }
@@ -144,6 +147,9 @@ export function useCancelYoutubeUpload(flightId: string) {
       api.delete(`flights/${flightId}/youtube-upload`).json<YoutubeUploadJob>(),
     onSuccess: (job) => {
       queryClient.setQueryData(youtubeUploadQueryKey(flightId), job);
+      void queryClient.invalidateQueries({
+        queryKey: ['video-export-jobs', 'active'],
+      });
       void queryClient.invalidateQueries({
         queryKey: ['youtube-upload', flightId],
       });

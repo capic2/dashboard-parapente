@@ -20,6 +20,8 @@ const mockFlight: FlightSummary = {
   has_video: true,
   has_camera: true,
   has_youtube_video: false,
+  youtube_upload_status: null,
+  youtube_upload_progress: null,
   has_gopro_overlay: true,
   has_pano_video: false,
   video_export_job_id: null,
