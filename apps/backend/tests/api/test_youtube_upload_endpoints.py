@@ -342,6 +342,73 @@ def test_worker_resolves_panorama_from_the_flight_directory(
     assert youtube_upload._source_video_path(db_session, job) == pano_path
 
 
+def test_worker_injects_spherical_metadata_for_panorama_uploads(tmp_path, monkeypatch) -> None:
+    source_path = tmp_path / "pano.mp4"
+    source_path.write_bytes(b"flat panorama")
+    monkeypatch.setattr(config, "VIDEO_EXPORT_DIR", str(tmp_path / "exports"))
+    injected: list[tuple[Path, Path, str | None]] = []
+
+    def inject_metadata(source, destination, metadata, _console) -> None:
+        destination_path = Path(destination)
+        destination_path.write_bytes(b"spherical panorama")
+        injected.append((Path(source), destination_path, metadata.video))
+
+    parsed_metadata = youtube_upload.metadata_utils.ParsedMetadata()
+    parsed_metadata.video["Track 0"] = {
+        "Spherical": "true",
+        "ProjectionType": "equirectangular",
+    }
+    monkeypatch.setattr(youtube_upload.metadata_utils, "inject_metadata", inject_metadata)
+    monkeypatch.setattr(
+        youtube_upload.metadata_utils,
+        "parse_metadata",
+        lambda _path, _console: parsed_metadata,
+    )
+
+    upload_path = youtube_upload._prepare_upload_video("youtube-pano", "pano", source_path)
+
+    assert upload_path.read_bytes() == b"spherical panorama"
+    assert injected[0][0] == source_path
+    assert injected[0][1].name == "youtube-pano.spherical.part.mp4"
+    assert "<GSpherical:Spherical>true</GSpherical:Spherical>" in (injected[0][2] or "")
+    assert "<GSpherical:ProjectionType>equirectangular</GSpherical:ProjectionType>" in (
+        injected[0][2] or ""
+    )
+
+
+def test_worker_rejects_unverified_spherical_metadata(tmp_path, monkeypatch) -> None:
+    source_path = tmp_path / "pano.mp4"
+    source_path.write_bytes(b"flat panorama")
+    monkeypatch.setattr(config, "VIDEO_EXPORT_DIR", str(tmp_path / "exports"))
+
+    def inject_metadata(_source, destination, _metadata, _console) -> None:
+        Path(destination).write_bytes(b"still flat")
+
+    parsed_metadata = youtube_upload.metadata_utils.ParsedMetadata()
+    monkeypatch.setattr(youtube_upload.metadata_utils, "inject_metadata", inject_metadata)
+    monkeypatch.setattr(
+        youtube_upload.metadata_utils,
+        "parse_metadata",
+        lambda _path, _console: parsed_metadata,
+    )
+
+    with pytest.raises(RuntimeError, match="could not be verified"):
+        youtube_upload._prepare_upload_video("youtube-flat", "pano", source_path)
+
+    upload_path = youtube_upload._panorama_upload_path("youtube-flat")
+    assert not upload_path.exists()
+    assert not upload_path.with_suffix(".part.mp4").exists()
+
+
+def test_worker_keeps_standard_youtube_upload_source_unchanged(tmp_path) -> None:
+    source_path = tmp_path / "overlay.mp4"
+
+    assert (
+        youtube_upload._prepare_upload_video("youtube-overlay", "gopro_overlay", source_path)
+        == source_path
+    )
+
+
 def test_start_youtube_upload_allows_an_overlay_with_an_existing_youtube_video(
     client, db_session, sample_flight, tmp_path, monkeypatch
 ):
