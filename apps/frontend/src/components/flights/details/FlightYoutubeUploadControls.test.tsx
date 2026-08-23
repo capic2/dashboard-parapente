@@ -160,7 +160,7 @@ describe('FlightYoutubeUploadControls', () => {
         gopro_overlay_job_id: 'overlay-4k',
         title: 'Vol test',
         description: '',
-        privacy_status: 'private',
+        privacy_status: 'unlisted',
       })
     );
   });
@@ -188,8 +188,43 @@ describe('FlightYoutubeUploadControls', () => {
     fireEvent.click(screen.getByRole('button', { name: "Lancer l'envoi" }));
 
     await waitFor(() =>
+      expect(startUpload).toHaveBeenCalledWith({
+        source_type: 'pano',
+        title: 'Vol test pano',
+        description: '',
+        privacy_status: 'unlisted',
+      })
+    );
+  });
+
+  it('limits the default title to the YouTube maximum length', async () => {
+    useYoutubeUpload.mockReturnValue({ data: null, isLoading: false });
+    const queryClient = new QueryClient();
+    const flight = {
+      id: 'flight-1',
+      flight_date: '2026-08-19',
+      name: 'x'.repeat(120),
+    } as Flight;
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FlightYoutubeUploadControls
+          flight={flight}
+          source={{
+            source_type: 'gopro_overlay',
+            gopro_overlay_job_id: 'overlay-4k',
+          }}
+        />
+      </QueryClientProvider>
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Publier sur YouTube' })
+    );
+    fireEvent.click(screen.getByRole('button', { name: "Lancer l'envoi" }));
+
+    await waitFor(() =>
       expect(startUpload).toHaveBeenCalledWith(
-        expect.objectContaining({ source_type: 'pano' })
+        expect.objectContaining({ title: 'x'.repeat(100) })
       )
     );
   });
