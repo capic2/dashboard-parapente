@@ -2546,7 +2546,6 @@ def delete_gopro_overlay_job(job_id: str) -> dict[str, Any] | None:
                     flight.gopro_overlay_job_id = None
                     flight.gopro_overlay_status = None
                     flight.gopro_overlay_file_path = None
-                    flight.gopro_overlay_gpx_offset = 0.0
             if db_job:
                 db.delete(db_job)
             db.commit()

@@ -2069,6 +2069,74 @@ def test_delete_latest_overlay_restores_previous_flight_overlay(
         session.close()
 
 
+def test_delete_last_overlay_preserves_flight_gpx_offset(
+    tmp_path: Path,
+    test_db: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from models import GoproOverlayJob
+
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+    flight_id = "flight-last-overlay-offset"
+    output_path = tmp_path / "flight-overlay.mp4"
+    output_path.write_bytes(b"overlay")
+
+    session = test_db()
+    try:
+        flight = Flight(
+            id=flight_id,
+            name="Flight with saved offset",
+            flight_date=date(2026, 3, 15),
+            gopro_overlay_job_id="overlay-only",
+            gopro_overlay_status="completed",
+            gopro_overlay_file_path=str(output_path),
+            gopro_overlay_gpx_offset=2.5,
+        )
+        session.add(flight)
+        session.add(
+            GoproOverlayJob(
+                id="overlay-only",
+                flight_id=flight_id,
+                status="completed",
+                progress=100,
+                message="Overlay ready",
+                video_path=str(tmp_path / "camera.mp4"),
+                gpx_path=str(tmp_path / "track.gpx"),
+                layout_id="parapente",
+                layout_label="Parapente",
+                layout_path=str(tmp_path / "layout.xml"),
+                output_path=str(output_path),
+                temp_output_path=str(output_path.with_suffix(".part.mp4")),
+                output_filename=output_path.name,
+                command_json=json.dumps({"gpx_offset": 2.5}),
+                created_at=datetime(2026, 3, 15, 12),
+                updated_at=datetime(2026, 3, 15, 12),
+                completed_at=datetime(2026, 3, 15, 12),
+            )
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    result = delete_gopro_overlay_job("overlay-only")
+
+    assert result is not None
+    assert result["deleted"] is True
+    assert not output_path.exists()
+    session = test_db()
+    try:
+        flight = session.get(Flight, flight_id)
+        assert flight is not None
+        assert flight.gopro_overlay_job_id is None
+        assert flight.gopro_overlay_status is None
+        assert flight.gopro_overlay_file_path is None
+        assert flight.gopro_overlay_gpx_offset == 2.5
+        assert session.get(GoproOverlayJob, "overlay-only") is None
+    finally:
+        session.close()
+
+
 def test_overlay_log_survives_work_directory_cleanup(tmp_path, monkeypatch):
     job_id = "job-overlay-persistent-log"
     work_dir = tmp_path / ".gopro-overlay-work" / job_id
