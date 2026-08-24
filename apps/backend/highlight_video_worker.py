@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import subprocess
+import time
 import uuid
 from datetime import datetime, timezone
 from dataclasses import replace
@@ -123,6 +124,49 @@ def _matching_gpx_path(
         return None
     logger.info("Using GPX %s for %.1fs pano (difference %.1fs)", path, video_duration, difference)
     return path
+
+
+def _ensure_overlay_video(
+    source_path: Path,
+    configured_gpx_path: str | None,
+    duration_seconds: float,
+    output_dir: Path,
+) -> Path | None:
+    """Build a temporary telemetry overlay from raw camera inputs when needed."""
+    camera_path = source_path.parent / "camera.mp4"
+    if not camera_path.is_file():
+        return None
+    gpx_path = _matching_gpx_path(source_path, configured_gpx_path, duration_seconds)
+    if gpx_path is None:
+        return None
+
+    from gopro_overlay_export import create_gopro_overlay_job_from_paths, get_gopro_overlay_job
+
+    output_path = output_dir / "camera-overlay.mp4"
+    if output_path.is_file():
+        return output_path
+    job = create_gopro_overlay_job_from_paths(
+        video_path=camera_path,
+        gpx_path=gpx_path,
+        pip_path=None,
+        layout_id=None,
+        output_filename=output_path.name,
+        output_resolution="source",
+        output_dir=str(output_dir),
+        flight_id=None,
+    )
+    job_id = str(job["job_id"])
+    deadline = time.monotonic() + config.JOB_QUEUE_TIMEOUT_SECONDS
+    while time.monotonic() < deadline:
+        current = get_gopro_overlay_job(job_id)
+        if current and current.get("status") == "completed" and output_path.is_file():
+            return output_path
+        if current and current.get("status") in {"failed", "cancelled"}:
+            raise RuntimeError(
+                f"Overlay temporaire impossible: {current.get('error') or current.get('message')}"
+            )
+        time.sleep(1)
+    raise TimeoutError("La génération de l'overlay temporaire a dépassé le délai autorisé")
 
 
 def _normalise(values: list[float]) -> list[float]:
@@ -558,6 +602,14 @@ def process_highlight_video_job(job_id: str) -> None:
     try:
         duration_seconds = _probe_duration(source_path)
         output_width, output_height = _output_dimensions(source_path)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        if not overlay_path or not overlay_path.is_file():
+            overlay_path = _ensure_overlay_video(
+                source_path,
+                gpx_file_path,
+                duration_seconds,
+                output_dir,
+            )
         visual_clips = select_highlight_clips(duration_seconds, source_path)
         track_points: list[TrackPoint] | None = None
         gpx_path = _matching_gpx_path(source_path, gpx_file_path, duration_seconds)
@@ -577,7 +629,6 @@ def process_highlight_video_job(job_id: str) -> None:
             )
             for clip in clips
         ]
-        output_dir.mkdir(parents=True, exist_ok=True)
         rendered: list[Path] = []
         for index, clip in enumerate(clips, start=1):
             target = output_dir / f"clip-{index:02d}.mp4"
