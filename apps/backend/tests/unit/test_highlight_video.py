@@ -1,5 +1,8 @@
+from pathlib import Path
+from unittest.mock import patch
+
 from highlight_video import HighlightClip, clamp_clip, overlay_interval_for_clip
-from highlight_video_worker import select_flight_event_clips
+from highlight_video_worker import _probe_video_dimensions, select_flight_event_clips
 
 
 def test_clip_maps_pano_time_to_overlay_time():
@@ -53,3 +56,9 @@ def test_thermal_selection_uses_sustained_climb_not_single_altitude_spike():
 
     thermal = next(clip for clip in clips if clip.category == "thermal")
     assert thermal.start_seconds > 20
+
+
+def test_probe_video_dimensions_accepts_ffprobe_trailing_separator():
+    result = type("Result", (), {"stdout": "6000x3000x\n"})()
+    with patch("highlight_video_worker.subprocess.run", return_value=result):
+        assert _probe_video_dimensions(Path("/tmp/pano.mp4")) == (6000, 3000)

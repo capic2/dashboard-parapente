@@ -65,7 +65,10 @@ def _probe_video_dimensions(path: Path) -> tuple[int, int]:
             "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", str(path),
         ], check=True, capture_output=True, text=True,
     )
-    width, height = (int(value) for value in result.stdout.strip().split("x"))
+    dimensions = [value for value in result.stdout.strip().split("x") if value]
+    if len(dimensions) < 2:
+        raise ValueError(f"Invalid video dimensions from ffprobe: {result.stdout!r}")
+    width, height = (int(value) for value in dimensions[:2])
     return width, height
 
 
@@ -161,8 +164,20 @@ def _best_yaw(source_path: Path, clip: HighlightClip) -> float:
             lower = rgb[70:]
             red_wing = ((lower[:, :, 0] > lower[:, :, 1] * 1.25) & (lower[:, :, 0] > lower[:, :, 2] * 1.15)).mean()
             saturated = ((lower.max(axis=2) - lower.min(axis=2)) > 45).mean()
+            dark_foreground = (rgb.mean(axis=2) < 45).mean()
+            skin_foreground = (
+                (rgb[:, :, 0] > rgb[:, :, 1] * 1.12)
+                & (rgb[:, :, 1] > rgb[:, :, 2] * 1.08)
+                & (rgb[:, :, 0] > 60)
+            ).mean()
+            foreground_obstruction = min(1.0, dark_foreground * 0.7 + skin_foreground)
             sharpness = np.abs(np.diff(gray, axis=1)).mean()
-            scores[yaw] = float(sharpness + red_wing * 140 + saturated * 20)
+            scores[yaw] = float(
+                sharpness
+                + red_wing * 20
+                + saturated * 8
+                - foreground_obstruction * 120
+            )
     return float(max(scores, key=scores.get)) if scores else 0.0
 
 
