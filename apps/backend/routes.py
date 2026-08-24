@@ -97,6 +97,7 @@ from models import (
     EmagramAnalysis,
     Flight,
     GoproOverlayJob as GoproOverlayJobModel,
+    HighlightVideoJob,
     Site,
     SiteLandingAssociation,
     User,
@@ -129,6 +130,8 @@ from schemas import (
     GoproPreviewState,
     GoproOverlayLayoutsResponse,
     GoproOverlayProbeResponse,
+    HighlightVideoClipResponse,
+    HighlightVideoJobResponse,
     IntervalsPreviewResponse,
     IntervalsStatus,
     IntervalsSyncRequest,
@@ -161,6 +164,12 @@ from schemas import (
 )
 from versioning import get_version_payload
 from video_thumbnail import VideoThumbnailError, get_video_thumbnail
+from gopro_overlay_inputs import first_matching_file, latest_matching_file
+from highlight_video_worker import (
+    STATUS_QUEUED as HIGHLIGHT_STATUS_QUEUED,
+    create_highlight_job_id,
+    process_highlight_video_job,
+)
 from video_export import cancel_video_export as cancel_video_export_stream
 from video_export import delete_export_job as delete_video_export_stream_job
 from video_export import get_export_status as get_export_status_stream
@@ -312,32 +321,6 @@ def _resolve_gopro_paragliding_path(file_path: str | None) -> Path | None:
     return resolved
 
 
-def _latest_matching_file(directory: Path, pattern: str) -> Path | None:
-    if not directory.is_dir():
-        return None
-    pattern_lower = pattern.lower()
-    matches = [
-        path
-        for path in directory.iterdir()
-        if path.is_file() and fnmatch.fnmatchcase(path.name.lower(), pattern_lower)
-    ]
-    if not matches:
-        return None
-    return max(matches, key=lambda path: (path.stat().st_mtime, path.name))
-
-
-def _first_matching_file(directory: Path, pattern: str) -> Path | None:
-    if not directory.is_dir():
-        return None
-    pattern_lower = pattern.lower()
-    matches = sorted(
-        path
-        for path in directory.iterdir()
-        if path.is_file() and fnmatch.fnmatchcase(path.name.lower(), pattern_lower)
-    )
-    return matches[0] if matches else None
-
-
 def _matching_files_by_mtime(directory: Path, pattern: str) -> list[Path]:
     if not directory.is_dir():
         return []
@@ -398,7 +381,7 @@ def _flight_gopro_preview_inputs(db: Session, flight: Flight) -> tuple[Path, Pat
     input_dir = camera_path.parent
     gpx_path = _resolve_flight_file_path(flight.gpx_file_path)
     if not gpx_path or not gpx_path.is_file():
-        gpx_path = _first_matching_file(input_dir, "Zepp*.gpx")
+        gpx_path = first_matching_file(input_dir, "Zepp*.gpx")
     if not gpx_path or not gpx_path.is_file():
         raise HTTPException(status_code=404, detail="Flight GPX file not found")
     return camera_path, gpx_path
@@ -4675,6 +4658,145 @@ def get_flight_pano_thumbnail(flight_id: str, db: Session = Depends(get_db)) -> 
     return _video_thumbnail_response(pano_path)
 
 
+def _highlight_job_payload(job: HighlightVideoJob) -> HighlightVideoJobResponse:
+    try:
+        raw_selection = json.loads(job.selection_json) if job.selection_json else []
+        if not isinstance(raw_selection, list):
+            raise ValueError("selection must be a list")
+        selection = [HighlightVideoClipResponse.model_validate(item) for item in raw_selection]
+    except (json.JSONDecodeError, TypeError, ValueError):
+        selection = []
+    return HighlightVideoJobResponse(
+        job_id=job.id,
+        flight_id=job.flight_id,
+        status=job.status,
+        progress=job.progress,
+        message=job.message,
+        error=job.error,
+        output_format=job.output_format,
+        overlay_offset_seconds=float(job.overlay_offset_seconds or 0.0),
+        selection=selection,
+        created_at=job.created_at,
+        completed_at=job.completed_at,
+    )
+
+
+@router.get(
+    "/flights/{flight_id}/highlight-videos",
+    response_model=list[HighlightVideoJobResponse],
+)
+def list_flight_highlight_videos(
+    flight_id: str, db: Session = Depends(get_db)
+) -> list[HighlightVideoJobResponse]:
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    return [
+        _highlight_job_payload(job)
+        for job in reversed(
+            db.query(HighlightVideoJob)
+            .filter(HighlightVideoJob.flight_id == flight_id)
+            .order_by(HighlightVideoJob.created_at)
+            .all()
+        )
+    ]
+
+
+@router.get("/flights/{flight_id}/highlight-videos/{job_id}/download")
+def download_flight_highlight_video(
+    flight_id: str, job_id: str, db: Session = Depends(get_db)
+) -> FileResponse:
+    job = (
+        db.query(HighlightVideoJob)
+        .filter(HighlightVideoJob.id == job_id, HighlightVideoJob.flight_id == flight_id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Highlight video job not found")
+    if job.status != "completed" or not job.output_path:
+        raise HTTPException(status_code=409, detail="Highlight video is not ready")
+    output_path = Path(job.output_path)
+    if not output_path.is_file():
+        raise HTTPException(status_code=404, detail="Highlight video file not found")
+    return FileResponse(path=output_path, media_type="video/mp4", filename=output_path.name)
+
+
+@router.post(
+    "/flights/{flight_id}/highlight-videos",
+    response_model=HighlightVideoJobResponse,
+    status_code=202,
+)
+def create_flight_highlight_video(
+    flight_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> HighlightVideoJobResponse:
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+
+    pano_path = pano_video_path(db, flight)
+    if not pano_path.is_file():
+        raise HTTPException(status_code=409, detail="Panorama video is not available")
+
+    active = (
+        db.query(HighlightVideoJob)
+        .filter(
+            HighlightVideoJob.flight_id == flight_id,
+            HighlightVideoJob.status.in_([HIGHLIGHT_STATUS_QUEUED, "running"]),
+        )
+        .order_by(HighlightVideoJob.created_at.desc())
+        .first()
+    )
+    if active:
+        return _highlight_job_payload(active)
+
+    overlay_path = _flight_gopro_overlay_file_path(db, flight)
+    job = HighlightVideoJob(
+        id=create_highlight_job_id(),
+        flight_id=flight_id,
+        status=HIGHLIGHT_STATUS_QUEUED,
+        progress=0,
+        message="En attente du rendu",
+        source_video_path=str(pano_path),
+        overlay_video_path=overlay_path,
+        output_format="original",
+        overlay_offset_seconds=float(flight.gopro_overlay_gpx_offset or 0.0),
+    )
+    db.add(job)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        active = (
+            db.query(HighlightVideoJob)
+            .filter(
+                HighlightVideoJob.flight_id == flight_id,
+                HighlightVideoJob.status.in_([HIGHLIGHT_STATUS_QUEUED, "running"]),
+            )
+            .order_by(HighlightVideoJob.created_at.desc())
+            .first()
+        )
+        if active:
+            return _highlight_job_payload(active)
+        raise
+    db.refresh(job)
+
+    from job_queue import enqueue_once, is_rq_enabled
+
+    if is_rq_enabled():
+        enqueue_once(
+            "highlight_video_worker.process_highlight_video_job",
+            job.id,
+            job_id=f"highlight-video-{job.id}",
+            timeout=config.JOB_QUEUE_TIMEOUT_SECONDS,
+            queue_name=config.JOB_QUEUE_NAME,
+        )
+    else:
+        background_tasks.add_task(process_highlight_video_job, job.id)
+    return _highlight_job_payload(job)
+
+
 @router.get("/flights/{flight_id}/gopro-overlay")
 def download_flight_gopro_overlay(flight_id: str, db: Session = Depends(get_db)) -> FileResponse:
     """Download generated GoPro overlay video for a flight."""
@@ -6314,8 +6436,8 @@ async def create_flight_gopro_overlay_job(
         resolved_gpx_path = _resolve_gopro_paragliding_path(gpx_path)
         resolved_pip_path = _resolve_gopro_paragliding_path(pip_path)
         auto_video_path = input_dir / "camera.mp4"
-        auto_gpx_path = _first_matching_file(input_dir, "Zepp*.gpx")
-        auto_pip_path = _latest_matching_file(input_dir, "flight*.mp4")
+        auto_gpx_path = first_matching_file(input_dir, "Zepp*.gpx")
+        auto_pip_path = latest_matching_file(input_dir, "flight*.mp4")
         auto_osv_paths = _matching_files_by_mtime(input_dir, "*.osv")
         logger.info(
             "GoPro overlay auto inputs for flight %s in %s: camera=%s, gpx=%s, pip=%s, osv=%s",
