@@ -126,6 +126,25 @@ def _matching_gpx_path(
     return path
 
 
+def _matching_pip_path(source_path: Path, duration_seconds: float) -> Path | None:
+    candidates = [
+        path
+        for path in source_path.parent.glob("*.mp4")
+        if path != source_path and path.name != "camera.mp4" and path.is_file()
+    ]
+    scored: list[tuple[float, Path]] = []
+    for path in candidates:
+        try:
+            difference = abs(_probe_duration(path) - duration_seconds)
+        except (OSError, subprocess.CalledProcessError, ValueError):
+            continue
+        scored.append((difference, path))
+    if not scored:
+        return None
+    difference, path = min(scored, key=lambda item: item[0])
+    return path if difference <= max(30.0, duration_seconds * 0.15) else None
+
+
 def _ensure_overlay_video(
     source_path: Path,
     configured_gpx_path: str | None,
@@ -139,6 +158,9 @@ def _ensure_overlay_video(
     gpx_path = _matching_gpx_path(source_path, configured_gpx_path, duration_seconds)
     if gpx_path is None:
         return None
+    pip_path = _matching_pip_path(source_path, duration_seconds)
+    if pip_path is None:
+        return None
 
     from gopro_overlay_export import create_gopro_overlay_job_from_paths, get_gopro_overlay_job
 
@@ -148,7 +170,7 @@ def _ensure_overlay_video(
     job = create_gopro_overlay_job_from_paths(
         video_path=camera_path,
         gpx_path=gpx_path,
-        pip_path=None,
+        pip_path=pip_path,
         layout_id=None,
         output_filename=output_path.name,
         output_resolution="source",
