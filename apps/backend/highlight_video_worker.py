@@ -22,6 +22,7 @@ from database import SessionLocal
 import config
 from flight_storage import ensure_flight_directory
 from flight_tracks import TrackPoint, normalize_track
+from gopro_overlay_inputs import resolve_automatic_overlay_inputs
 from highlight_video import HighlightClip, overlay_interval_for_clip
 from models import Flight, HighlightVideoJob
 from visual_event_detector import classify_motion_mask
@@ -91,58 +92,13 @@ def _output_dimensions(source_path: Path) -> tuple[int, int]:
     return output_width, output_height
 
 
-def _track_duration(path: Path) -> float | None:
-    try:
-        _normalized, points = normalize_track(path.read_bytes(), path.suffix)
-    except (OSError, ValueError):
+def _configured_gpx_path(value: str | None) -> Path | None:
+    if not value:
         return None
-    timestamps = [point.get("timestamp", 0) for point in points if point.get("timestamp", 0)]
-    if len(timestamps) < 2:
-        return None
-    return (timestamps[-1] - timestamps[0]) / 1000
-
-
-def _matching_gpx_path(
-    source_path: Path, configured_path: str | None, video_duration: float
-) -> Path | None:
-    """Choose the flight track whose elapsed time matches the pano recording."""
-    candidates: list[Path] = []
-    if configured_path:
-        candidates.append(Path(configured_path))
-    candidates.extend(sorted(source_path.parent.glob("*.gpx")))
-    unique_candidates = list(dict.fromkeys(path for path in candidates if path.is_file()))
-    scored: list[tuple[float, Path]] = []
-    for path in unique_candidates:
-        candidate_duration = _track_duration(path)
-        if candidate_duration is not None:
-            scored.append((abs(candidate_duration - video_duration), path))
-    if not scored:
-        return None
-    difference, path = min(scored, key=lambda item: item[0])
-    if difference > max(30.0, video_duration * 0.15):
-        logger.warning("No GPX duration matches pano video closely: %.1fs", difference)
-        return None
-    logger.info("Using GPX %s for %.1fs pano (difference %.1fs)", path, video_duration, difference)
-    return path
-
-
-def _matching_pip_path(source_path: Path, duration_seconds: float) -> Path | None:
-    candidates = [
-        path
-        for path in source_path.parent.glob("*.mp4")
-        if path != source_path and path.name != "camera.mp4" and path.is_file()
-    ]
-    scored: list[tuple[float, Path]] = []
-    for path in candidates:
-        try:
-            difference = abs(_probe_duration(path) - duration_seconds)
-        except (OSError, subprocess.CalledProcessError, ValueError):
-            continue
-        scored.append((difference, path))
-    if not scored:
-        return None
-    difference, path = min(scored, key=lambda item: item[0])
-    return path if difference <= max(30.0, duration_seconds * 0.15) else None
+    path = Path(value)
+    if path.is_absolute() or path.exists():
+        return path
+    return Path(__file__).parent / path
 
 
 def _ensure_overlay_video(
@@ -155,11 +111,12 @@ def _ensure_overlay_video(
     camera_path = source_path.parent / "camera.mp4"
     if not camera_path.is_file():
         return None
-    gpx_path = _matching_gpx_path(source_path, configured_gpx_path, duration_seconds)
-    if gpx_path is None:
-        return None
-    pip_path = _matching_pip_path(source_path, duration_seconds)
-    if pip_path is None:
+    gpx_path, pip_path = resolve_automatic_overlay_inputs(
+        source_path.parent,
+        _configured_gpx_path(configured_gpx_path),
+        source_path,
+    )
+    if gpx_path is None or not gpx_path.is_file() or pip_path is None or not pip_path.is_file():
         return None
 
     from gopro_overlay_export import create_gopro_overlay_job_from_paths, get_gopro_overlay_job
@@ -634,7 +591,13 @@ def process_highlight_video_job(job_id: str) -> None:
             )
         visual_clips = select_highlight_clips(duration_seconds, source_path)
         track_points: list[TrackPoint] | None = None
-        gpx_path = _matching_gpx_path(source_path, gpx_file_path, duration_seconds)
+        gpx_path, _pip_path = resolve_automatic_overlay_inputs(
+            source_path.parent,
+            _configured_gpx_path(gpx_file_path),
+            source_path,
+        )
+        if gpx_path and not gpx_path.is_file():
+            gpx_path = None
         if gpx_path:
             try:
                 _normalized_gpx, track_points = normalize_track(

@@ -164,6 +164,7 @@ from schemas import (
 )
 from versioning import get_version_payload
 from video_thumbnail import VideoThumbnailError, get_video_thumbnail
+from gopro_overlay_inputs import first_matching_file, latest_matching_file
 from highlight_video_worker import (
     STATUS_QUEUED as HIGHLIGHT_STATUS_QUEUED,
     create_highlight_job_id,
@@ -320,32 +321,6 @@ def _resolve_gopro_paragliding_path(file_path: str | None) -> Path | None:
     return resolved
 
 
-def _latest_matching_file(directory: Path, pattern: str) -> Path | None:
-    if not directory.is_dir():
-        return None
-    pattern_lower = pattern.lower()
-    matches = [
-        path
-        for path in directory.iterdir()
-        if path.is_file() and fnmatch.fnmatchcase(path.name.lower(), pattern_lower)
-    ]
-    if not matches:
-        return None
-    return max(matches, key=lambda path: (path.stat().st_mtime, path.name))
-
-
-def _first_matching_file(directory: Path, pattern: str) -> Path | None:
-    if not directory.is_dir():
-        return None
-    pattern_lower = pattern.lower()
-    matches = sorted(
-        path
-        for path in directory.iterdir()
-        if path.is_file() and fnmatch.fnmatchcase(path.name.lower(), pattern_lower)
-    )
-    return matches[0] if matches else None
-
-
 def _matching_files_by_mtime(directory: Path, pattern: str) -> list[Path]:
     if not directory.is_dir():
         return []
@@ -406,7 +381,7 @@ def _flight_gopro_preview_inputs(db: Session, flight: Flight) -> tuple[Path, Pat
     input_dir = camera_path.parent
     gpx_path = _resolve_flight_file_path(flight.gpx_file_path)
     if not gpx_path or not gpx_path.is_file():
-        gpx_path = _first_matching_file(input_dir, "Zepp*.gpx")
+        gpx_path = first_matching_file(input_dir, "Zepp*.gpx")
     if not gpx_path or not gpx_path.is_file():
         raise HTTPException(status_code=404, detail="Flight GPX file not found")
     return camera_path, gpx_path
@@ -6461,8 +6436,8 @@ async def create_flight_gopro_overlay_job(
         resolved_gpx_path = _resolve_gopro_paragliding_path(gpx_path)
         resolved_pip_path = _resolve_gopro_paragliding_path(pip_path)
         auto_video_path = input_dir / "camera.mp4"
-        auto_gpx_path = _first_matching_file(input_dir, "Zepp*.gpx")
-        auto_pip_path = _latest_matching_file(input_dir, "flight*.mp4")
+        auto_gpx_path = first_matching_file(input_dir, "Zepp*.gpx")
+        auto_pip_path = latest_matching_file(input_dir, "flight*.mp4")
         auto_osv_paths = _matching_files_by_mtime(input_dir, "*.osv")
         logger.info(
             "GoPro overlay auto inputs for flight %s in %s: camera=%s, gpx=%s, pip=%s, osv=%s",
