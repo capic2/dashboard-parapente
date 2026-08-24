@@ -61,9 +61,20 @@ def _probe_duration(path: Path) -> float:
 def _probe_video_dimensions(path: Path) -> tuple[int, int]:
     result = subprocess.run(
         [
-            "ffprobe", "-v", "error", "-select_streams", "v:0",
-            "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", str(path),
-        ], check=True, capture_output=True, text=True,
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=width,height",
+            "-of",
+            "csv=p=0:s=x",
+            str(path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
     )
     dimensions = [value for value in result.stdout.strip().split("x") if value]
     if len(dimensions) < 2:
@@ -77,6 +88,41 @@ def _output_dimensions(source_path: Path) -> tuple[int, int]:
     output_width = 1920
     output_height = max(2, round(output_width * source_height / source_width))
     return output_width, output_height
+
+
+def _track_duration(path: Path) -> float | None:
+    try:
+        _normalized, points = normalize_track(path.read_bytes(), path.suffix)
+    except (OSError, ValueError):
+        return None
+    timestamps = [point.get("timestamp", 0) for point in points if point.get("timestamp", 0)]
+    if len(timestamps) < 2:
+        return None
+    return (timestamps[-1] - timestamps[0]) / 1000
+
+
+def _matching_gpx_path(
+    source_path: Path, configured_path: str | None, video_duration: float
+) -> Path | None:
+    """Choose the flight track whose elapsed time matches the pano recording."""
+    candidates: list[Path] = []
+    if configured_path:
+        candidates.append(Path(configured_path))
+    candidates.extend(sorted(source_path.parent.glob("*.gpx")))
+    unique_candidates = list(dict.fromkeys(path for path in candidates if path.is_file()))
+    scored: list[tuple[float, Path]] = []
+    for path in unique_candidates:
+        candidate_duration = _track_duration(path)
+        if candidate_duration is not None:
+            scored.append((abs(candidate_duration - video_duration), path))
+    if not scored:
+        return None
+    difference, path = min(scored, key=lambda item: item[0])
+    if difference > max(30.0, video_duration * 0.15):
+        logger.warning("No GPX duration matches pano video closely: %.1fs", difference)
+        return None
+    logger.info("Using GPX %s for %.1fs pano (difference %.1fs)", path, video_duration, difference)
+    return path
 
 
 def _normalise(values: list[float]) -> list[float]:
@@ -99,15 +145,32 @@ def _frame_scores(source_path: Path, duration_seconds: float) -> list[tuple[floa
             break
         result = subprocess.run(
             [
-                "ffmpeg", "-v", "error", "-skip_frame", "nokey", "-ss", str(segment_start), "-i", str(source_path),
-                "-t", str(segment_duration), "-vf", "fps=0.5,scale=320:160,format=gray",
-                "-f", "rawvideo", "-pix_fmt", "gray", "pipe:1",
+                "ffmpeg",
+                "-v",
+                "error",
+                "-skip_frame",
+                "nokey",
+                "-ss",
+                str(segment_start),
+                "-i",
+                str(source_path),
+                "-t",
+                str(segment_duration),
+                "-vf",
+                "fps=0.5,scale=320:160,format=gray",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "gray",
+                "pipe:1",
             ],
             check=True,
             capture_output=True,
         )
         frames = [
-            np.frombuffer(result.stdout[index : index + frame_size], dtype=np.uint8).reshape(height, width)
+            np.frombuffer(result.stdout[index : index + frame_size], dtype=np.uint8).reshape(
+                height, width
+            )
             for index in range(0, len(result.stdout) - frame_size + 1, frame_size)
         ]
         samples.extend((segment_start + index * 2.0, frame) for index, frame in enumerate(frames))
@@ -116,12 +179,19 @@ def _frame_scores(source_path: Path, duration_seconds: float) -> list[tuple[floa
     sharpness: list[float] = []
     motion: list[float] = []
     exposure: list[float] = []
-    previous = samples[0][1]
-    for _timestamp, frame in samples:
+    previous: np.ndarray | None = None
+    previous_segment = -1
+    for timestamp, frame in samples:
+        segment = int(timestamp // 30)
         sharpness.append(float(np.abs(np.diff(frame.astype(np.int16), axis=1)).mean()))
-        motion.append(float(np.abs(frame.astype(np.int16) - previous.astype(np.int16)).mean()))
+        motion.append(
+            0.0
+            if previous is None or segment != previous_segment
+            else float(np.abs(frame.astype(np.int16) - previous.astype(np.int16)).mean())
+        )
         exposure.append(float(np.mean((frame > 18) & (frame < 238))))
         previous = frame
+        previous_segment = segment
     scores = [
         0.45 * motion_score + 0.40 * sharpness_score + 0.15 * exposure_score
         for motion_score, sharpness_score, exposure_score in zip(
@@ -138,18 +208,36 @@ def _frame_scores(source_path: Path, duration_seconds: float) -> list[tuple[floa
 def _best_yaw(source_path: Path, clip: HighlightClip) -> float:
     """Pick a clear view that also contains likely paraglider colors/silhouette."""
     yaws = tuple(range(-180, 180, 45))
-    branches = "".join(f"[a{index}]v360=input=e:output=rectilinear:yaw={yaw}:pitch=0:v_fov=80:w=160:h=284[v{index}];" for index, yaw in enumerate(yaws))
+    branches = "".join(
+        f"[a{index}]v360=input=e:output=rectilinear:yaw={yaw}:pitch=0:v_fov=80:w=160:h=284[v{index}];"
+        for index, yaw in enumerate(yaws)
+    )
     layout = "|".join(f"{(index % 4) * 160}_{(index // 4) * 284}" for index in range(8))
     filter_value = (
-        "[0:v]split=8" + "".join(f"[a{index}]" for index in range(8)) + ";"
+        "[0:v]split=8"
+        + "".join(f"[a{index}]" for index in range(8))
+        + ";"
         + branches
         + f"[v0][v1][v2][v3][v4][v5][v6][v7]xstack=inputs=8:layout={layout},format=rgb24"
     )
     result = subprocess.run(
         [
-            "ffmpeg", "-v", "error", "-ss", f"{clip.start_seconds + clip.duration_seconds / 2:.3f}",
-            "-i", str(source_path), "-frames:v", "1", "-filter_complex", filter_value,
-            "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1",
+            "ffmpeg",
+            "-v",
+            "error",
+            "-ss",
+            f"{clip.start_seconds + clip.duration_seconds / 2:.3f}",
+            "-i",
+            str(source_path),
+            "-frames:v",
+            "1",
+            "-filter_complex",
+            filter_value,
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            "pipe:1",
         ],
         check=True,
         capture_output=True,
@@ -159,10 +247,15 @@ def _best_yaw(source_path: Path, clip: HighlightClip) -> float:
     if frame.size == 640 * 568 * 3:
         tiled = frame.reshape(568, 640, 3).astype(np.float32)
         for index, yaw in enumerate(yaws):
-            rgb = tiled[(index // 4) * 284 : (index // 4 + 1) * 284, (index % 4) * 160 : (index % 4 + 1) * 160]
+            rgb = tiled[
+                (index // 4) * 284 : (index // 4 + 1) * 284,
+                (index % 4) * 160 : (index % 4 + 1) * 160,
+            ]
             gray = rgb.mean(axis=2)
             lower = rgb[70:]
-            red_wing = ((lower[:, :, 0] > lower[:, :, 1] * 1.25) & (lower[:, :, 0] > lower[:, :, 2] * 1.15)).mean()
+            red_wing = (
+                (lower[:, :, 0] > lower[:, :, 1] * 1.25) & (lower[:, :, 0] > lower[:, :, 2] * 1.15)
+            ).mean()
             saturated = ((lower.max(axis=2) - lower.min(axis=2)) > 45).mean()
             dark_foreground = (rgb.mean(axis=2) < 45).mean()
             skin_foreground = (
@@ -173,10 +266,7 @@ def _best_yaw(source_path: Path, clip: HighlightClip) -> float:
             foreground_obstruction = min(1.0, dark_foreground * 0.7 + skin_foreground)
             sharpness = np.abs(np.diff(gray, axis=1)).mean()
             scores[yaw] = float(
-                sharpness
-                + red_wing * 20
-                + saturated * 8
-                - foreground_obstruction * 120
+                sharpness + red_wing * 20 + saturated * 8 - foreground_obstruction * 120
             )
     return float(max(scores, key=scores.get)) if scores else 0.0
 
@@ -188,8 +278,22 @@ def _gray_projection(source_path: Path, clip: HighlightClip, at_seconds: float) 
     )
     result = subprocess.run(
         [
-            "ffmpeg", "-v", "error", "-ss", f"{at_seconds:.3f}", "-i", str(source_path),
-            "-frames:v", "1", "-vf", filter_value, "-f", "rawvideo", "-pix_fmt", "gray", "pipe:1",
+            "ffmpeg",
+            "-v",
+            "error",
+            "-ss",
+            f"{at_seconds:.3f}",
+            "-i",
+            str(source_path),
+            "-frames:v",
+            "1",
+            "-vf",
+            filter_value,
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "gray",
+            "pipe:1",
         ],
         check=True,
         capture_output=True,
@@ -225,7 +329,9 @@ def select_highlight_clips(
         return []
     clip_length = min(8.0, max(3.0, duration_seconds / 8))
     if source_path:
-        scored = sorted(_frame_scores(source_path, duration_seconds), key=lambda item: item[1], reverse=True)
+        scored = sorted(
+            _frame_scores(source_path, duration_seconds), key=lambda item: item[1], reverse=True
+        )
         starts: list[float] = []
         for center, _score in scored:
             start = max(0.0, min(duration_seconds - clip_length, center - clip_length / 2))
@@ -265,16 +371,36 @@ def select_flight_event_clips(
         return min(duration_seconds, max(0.0, track_seconds / track_duration * duration_seconds))
 
     clip_length = min(8.0, max(3.0, duration_seconds / 8))
-    phases = [
-        ("takeoff", 0.04),
-        ("landing", 0.96),
-    ]
+    # The first useful visual movement is a better takeoff anchor than the
+    # first GPS sample: cameras often keep recording while the wing is being
+    # prepared. Keep a little lead-in so the inflation is visible.
+    early_visual = [clip for clip in visual_clips if clip.start_seconds <= duration_seconds * 0.25]
+    takeoff_anchor = (
+        min(
+            early_visual,
+            key=lambda clip: abs(clip.start_seconds - duration_seconds * 0.12),
+        ).start_seconds
+        if early_visual
+        else duration_seconds * 0.04
+    )
+    takeoff_start = max(
+        0.0,
+        min(
+            duration_seconds - clip_length,
+            takeoff_anchor - clip_length,
+        ),
+    )
+    phases = [("takeoff", takeoff_start + clip_length / 2)]
     elevations = [elevation for _timestamp, elevation in samples]
     climb_candidates: list[tuple[float, float]] = []
     for index in range(1, len(elevations)):
         target_timestamp = timestamps[index] - 30_000
         previous_index = next(
-            (candidate for candidate in range(index - 1, -1, -1) if timestamps[candidate] <= target_timestamp),
+            (
+                candidate
+                for candidate in range(index - 1, -1, -1)
+                if timestamps[candidate] <= target_timestamp
+            ),
             None,
         )
         if previous_index is not None:
@@ -285,17 +411,25 @@ def select_flight_event_clips(
                 )
     if climb_candidates:
         _, best_index = max(climb_candidates)
-        phases.append(("thermal", best_index / max(1, len(track_points) - 1)))
+        phases.append(("thermal", (timestamps[best_index] - timestamps[0]) / 1000))
+
+    phases.append(("landing", duration_seconds * 0.96))
 
     selected: list[HighlightClip] = []
     for category, position in phases:
-        center = video_time(position * track_duration)
+        center = (
+            position
+            if category == "takeoff"
+            else (video_time(position) if category == "thermal" else position)
+        )
         start = max(0.0, min(duration_seconds - clip_length, center - clip_length / 2))
         selected.append(HighlightClip(start, clip_length, 0.0, category))
     for clip in visual_clips:
         if len(selected) >= 6:
             break
-        if all(abs(clip.start_seconds - chosen.start_seconds) >= clip_length for chosen in selected):
+        if all(
+            abs(clip.start_seconds - chosen.start_seconds) >= clip_length for chosen in selected
+        ):
             selected.append(clip)
     return sorted(selected, key=lambda clip: clip.start_seconds)
 
@@ -408,6 +542,7 @@ def process_highlight_video_job(job_id: str) -> None:
         if flight is None:
             raise ValueError(f"Flight not found for highlight job: {job.flight_id}")
         source_path = Path(job.source_video_path)
+        gpx_file_path = flight.gpx_file_path
         overlay_path = Path(job.overlay_video_path) if job.overlay_video_path else None
         output_dir = ensure_flight_directory(db, flight) / "highlights" / job.id
         output_path = output_dir / "highlights-original-format.mp4"
@@ -423,18 +558,21 @@ def process_highlight_video_job(job_id: str) -> None:
         output_width, output_height = _output_dimensions(source_path)
         visual_clips = select_highlight_clips(duration_seconds, source_path)
         track_points: list[TrackPoint] | None = None
-        if flight.gpx_file_path:
-            gpx_path = Path(flight.gpx_file_path)
-            if gpx_path.is_file():
-                try:
-                    _normalized_gpx, track_points = normalize_track(gpx_path.read_bytes(), gpx_path.suffix)
-                except (OSError, ValueError) as exc:
-                    logger.warning("Unable to classify flight phases from GPX: %s", exc)
+        gpx_path = _matching_gpx_path(source_path, gpx_file_path, duration_seconds)
+        if gpx_path:
+            try:
+                _normalized_gpx, track_points = normalize_track(
+                    gpx_path.read_bytes(), gpx_path.suffix
+                )
+            except (OSError, ValueError) as exc:
+                logger.warning("Unable to classify flight phases from GPX: %s", exc)
         clips = select_flight_event_clips(duration_seconds, track_points, visual_clips)
         if not clips:
             raise ValueError("La vidéo pano ne contient aucune durée exploitable")
         clips = [
-            classify_visual_clip(source_path, replace(clip, yaw_degrees=_best_yaw(source_path, clip)))
+            classify_visual_clip(
+                source_path, replace(clip, yaw_degrees=_best_yaw(source_path, clip))
+            )
             for clip in clips
         ]
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -443,11 +581,13 @@ def process_highlight_video_job(job_id: str) -> None:
             target = output_dir / f"clip-{index:02d}.mp4"
             _render_clip(source_path, target, clip, overlay_path, offset)
             rendered.append(target)
-            _update_job(job_id, progress=10 + index * 15, message=f"Rendu du clip {index}/{len(clips)}")
+            _update_job(
+                job_id, progress=10 + index * 15, message=f"Rendu du clip {index}/{len(clips)}"
+            )
 
         concat_file = output_dir / "concat.txt"
         concat_file.write_text(
-            "\n".join(f"file '{path}'" for path in rendered) + "\n", encoding="utf-8"
+            "\n".join(f"file '{path.resolve()}'" for path in rendered) + "\n", encoding="utf-8"
         )
         subprocess.run(
             [
@@ -492,7 +632,9 @@ def process_highlight_video_job(job_id: str) -> None:
         )
     except Exception as exc:
         logger.exception("Highlight video job %s failed", job_id)
-        _update_job(job_id, status=STATUS_FAILED, progress=100, message="Échec du rendu", error=str(exc))
+        _update_job(
+            job_id, status=STATUS_FAILED, progress=100, message="Échec du rendu", error=str(exc)
+        )
 
 
 def create_highlight_job_id() -> str:
