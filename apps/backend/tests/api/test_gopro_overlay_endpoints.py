@@ -2120,7 +2120,7 @@ def test_reconcile_gopro_overlay_flight_refs_clears_missing_active_job(test_db, 
         session.close()
 
 
-def test_mark_interrupted_jobs_failed_marks_active_rows_failed(
+def test_mark_interrupted_jobs_requeues_active_rows_and_preserves_partial_outputs(
     test_db: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
@@ -2172,15 +2172,18 @@ def test_mark_interrupted_jobs_failed_marks_active_rows_failed(
         for job_id in ("job-preparing", "job-running"):
             refreshed = gopro_overlay_export.get_gopro_overlay_job(job_id)
             assert refreshed is not None
-            assert refreshed["status"] == "failed"
-            assert refreshed["message"] == "Overlay interrupted by backend restart"
+            assert refreshed["status"] == "queued"
+            assert refreshed["message"] == (
+                "Overlay interrupted; resuming from the last completed segment"
+            )
             refreshed_flight = session.get(Flight, f"flight-{job_id}")
             assert refreshed_flight is not None
-            assert refreshed_flight.gopro_overlay_status == "failed"
+            assert refreshed_flight.gopro_overlay_status == "queued"
         already_failed = gopro_overlay_export.get_gopro_overlay_job("job-already-failed")
         assert already_failed is not None
         assert already_failed["message"] == "Rendering overlay"
-        assert all(not temporary_path.exists() for temporary_path in temporary_paths)
+        assert all(temporary_path.exists() for temporary_path in temporary_paths[:2])
+        assert not temporary_paths[2].exists()
         assert final_output.read_bytes() == b"completed"
     finally:
         session.close()
