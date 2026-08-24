@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import config
 from fastapi.testclient import TestClient
-from models import Flight, GoproOverlayJob
+from models import Flight, GoproOverlayJob, HighlightVideoJob
 from sqlalchemy.orm import Session
 from video_thumbnail import VideoThumbnailError
 
@@ -1412,6 +1412,105 @@ class TestCreateFlightFromGPX:
         data = {"site_id": "site-arguel"}
         response = client.post(f"{API_PREFIX}/flights/create-from-gpx", data=data)
         assert response.status_code in [400, 422]
+
+
+class TestHighlightVideoEndpoints:
+    def _flight(self, db_session, flight_id: str, pano_path: Path | None = None) -> Flight:
+        flight = Flight(
+            id=flight_id,
+            name=f"Highlight {flight_id}",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            pano_video_file_path=str(pano_path) if pano_path else None,
+        )
+        db_session.add(flight)
+        db_session.commit()
+        return flight
+
+    def test_create_returns_409_when_pano_is_unavailable(self, client, db_session):
+        flight = self._flight(db_session, "highlight-no-pano")
+        response = client.post(f"{API_PREFIX}/flights/{flight.id}/highlight-videos")
+        assert response.status_code == 409
+
+    def test_create_queues_job_without_exposing_paths(
+        self, client, db_session, monkeypatch, tmp_path
+    ):
+        pano_path = tmp_path / "pano.mp4"
+        pano_path.write_bytes(b"pano")
+        flight = self._flight(db_session, "highlight-queue", pano_path)
+        enqueue = patch("job_queue.enqueue_once")
+        monkeypatch.setattr("job_queue.is_rq_enabled", lambda: True)
+        with enqueue as enqueue_mock:
+            response = client.post(f"{API_PREFIX}/flights/{flight.id}/highlight-videos")
+
+        assert response.status_code == 202
+        payload = response.json()
+        assert payload["output_format"] == "original"
+        assert "source_video_path" not in payload
+        assert "output_path" not in payload
+        enqueue_mock.assert_called_once()
+
+    def test_create_reuses_active_job(self, client, db_session, tmp_path):
+        pano_path = tmp_path / "pano.mp4"
+        pano_path.write_bytes(b"pano")
+        flight = self._flight(db_session, "highlight-active", pano_path)
+        job = HighlightVideoJob(
+            id="highlight-existing",
+            flight_id=flight.id,
+            status="queued",
+            source_video_path=str(pano_path),
+            output_format="original",
+        )
+        db_session.add(job)
+        db_session.commit()
+
+        response = client.post(f"{API_PREFIX}/flights/{flight.id}/highlight-videos")
+        assert response.status_code == 202
+        assert response.json()["job_id"] == job.id
+
+    def test_download_completed_highlight(self, client, db_session, tmp_path):
+        pano_path = tmp_path / "pano.mp4"
+        output_path = tmp_path / "highlights.mp4"
+        pano_path.write_bytes(b"pano")
+        output_path.write_bytes(b"highlights")
+        flight = self._flight(db_session, "highlight-download", pano_path)
+        db_session.add(
+            HighlightVideoJob(
+                id="highlight-completed",
+                flight_id=flight.id,
+                status="completed",
+                source_video_path=str(pano_path),
+                output_path=str(output_path),
+                output_format="original",
+            )
+        )
+        db_session.commit()
+
+        response = client.get(
+            f"{API_PREFIX}/flights/{flight.id}/highlight-videos/highlight-completed/download"
+        )
+        assert response.status_code == 200
+        assert response.content == b"highlights"
+
+    def test_download_unfinished_highlight_returns_conflict(self, client, db_session, tmp_path):
+        pano_path = tmp_path / "pano.mp4"
+        pano_path.write_bytes(b"pano")
+        flight = self._flight(db_session, "highlight-unfinished", pano_path)
+        db_session.add(
+            HighlightVideoJob(
+                id="highlight-running",
+                flight_id=flight.id,
+                status="running",
+                source_video_path=str(pano_path),
+                output_format="original",
+            )
+        )
+        db_session.commit()
+
+        response = client.get(
+            f"{API_PREFIX}/flights/{flight.id}/highlight-videos/highlight-running/download"
+        )
+        assert response.status_code == 409
 
 
 class TestHealthCheck:

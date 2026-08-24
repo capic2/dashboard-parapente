@@ -220,6 +220,12 @@ class Flight(Base):
         cascade="all, delete-orphan",
         order_by="GoproOverlayJob.created_at",
     )
+    highlight_video_jobs = relationship(
+        "HighlightVideoJob",
+        back_populates="flight",
+        cascade="all, delete-orphan",
+        order_by="HighlightVideoJob.created_at",
+    )
     youtube_upload_jobs = relationship(
         "YoutubeUploadJob",
         back_populates="flight",
@@ -324,6 +330,37 @@ class GoproOverlayJob(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     flight = relationship("Flight", back_populates="gopro_overlay_jobs")
+
+
+class HighlightVideoJob(Base):
+    """Durable job for selecting and rendering social clips from a pano flight video."""
+
+    __tablename__ = "highlight_video_jobs"
+
+    id = Column(String, primary_key=True)
+    flight_id = Column(
+        String,
+        ForeignKey("flights.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    status = Column(String, nullable=False, index=True)
+    progress = Column(Integer, nullable=False, default=0)
+    message = Column(Text)
+    error = Column(Text)
+    source_video_path = Column(String, nullable=False)
+    overlay_video_path = Column(String)
+    output_path = Column(String)
+    selection_json = Column(Text)
+    output_format = Column(String, nullable=False, default="original")
+    overlay_offset_seconds = Column(Float, nullable=False, default=0.0)
+    started_at = Column(DateTime)
+    completed_at = Column(DateTime)
+    cancelled_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    flight = relationship("Flight", back_populates="highlight_video_jobs")
 
 
 class YoutubeUploadJob(Base):

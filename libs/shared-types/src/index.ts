@@ -90,6 +90,28 @@ export const GoproOverlayJobSchema = z.object({
   job_token: z.string().nullish(),
 });
 
+export const HighlightVideoClipSchema = z.object({
+  start_seconds: z.number(),
+  duration_seconds: z.number(),
+  yaw_degrees: z.number(),
+  overlay_start_seconds: z.number(),
+  category: z.string(),
+});
+
+export const HighlightVideoJobSchema = z.object({
+  job_id: z.string(),
+  flight_id: z.string(),
+  status: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
+  progress: z.number(),
+  message: z.string().nullish(),
+  error: z.string().nullish(),
+  output_format: z.string(),
+  overlay_offset_seconds: z.number(),
+  selection: z.array(HighlightVideoClipSchema).default([]),
+  created_at: z.string(),
+  completed_at: z.string().nullish(),
+});
+
 export const YoutubeVideoAssociationSchema = z.object({
   url: z.string().url(),
   video_id: z.string().min(1),
@@ -771,6 +793,7 @@ export type Site = z.infer<typeof SiteSchema>;
 export type SiteUpdate = z.infer<typeof SiteUpdateSchema>;
 export type CreateSiteData = z.infer<typeof CreateSiteSchema>;
 export type Flight = z.infer<typeof FlightSchema>;
+export type HighlightVideoJob = z.infer<typeof HighlightVideoJobSchema>;
 export type GoproOverlayJob = z.infer<typeof GoproOverlayJobSchema>;
 export type YoutubeVideoAssociation = z.infer<
   typeof YoutubeVideoAssociationSchema
