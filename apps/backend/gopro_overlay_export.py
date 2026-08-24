@@ -452,7 +452,11 @@ def _append_job_log(log_path: Path, message: str) -> None:
         pass
 
 
-def _job_to_payload(job: GoproOverlayJob, include_command: bool = False) -> dict[str, Any]:
+def _job_to_payload(
+    job: GoproOverlayJob,
+    include_command: bool = False,
+    include_log_tail: bool = True,
+) -> dict[str, Any]:
     command = json.loads(job.command_json) if job.command_json else None
     payload = {
         "job_id": job.id,
@@ -472,7 +476,9 @@ def _job_to_payload(job: GoproOverlayJob, include_command: bool = False) -> dict
         "output_filename": job.output_filename,
         "log_path": job.log_path,
         "log_tail": (
-            _tail_log_lines(Path(job.log_path), _LOG_TAIL_LINE_COUNT) if job.log_path else []
+            _tail_log_lines(Path(job.log_path), _LOG_TAIL_LINE_COUNT)
+            if include_log_tail and job.log_path
+            else []
         ),
         "video_width": job.video_width,
         "video_height": job.video_height,
@@ -517,7 +523,7 @@ def _touch_db_job(job_id: str, **changes: Any) -> dict[str, Any] | None:
             if not job:
                 return None
             if job.status in _TERMINAL_STATUSES:
-                payload = _job_to_payload(job)
+                payload = _job_to_payload(job, include_log_tail=False)
                 _set_memory_snapshot(payload)
                 return payload
 
@@ -537,7 +543,7 @@ def _touch_db_job(job_id: str, **changes: Any) -> dict[str, Any] | None:
                     job.completed_at = _utc_now_dt()
             _sync_flights_from_job(db, job)
             db.commit()
-            payload = _job_to_payload(job)
+            payload = _job_to_payload(job, include_log_tail=False)
             _set_memory_snapshot(payload)
             return payload
     except OperationalError as exc:
@@ -635,8 +641,19 @@ def _read_process_updates(stream: Any) -> Iterator[str]:
 
 
 def _is_job_cancelled(job_id: str) -> bool:
-    job = get_gopro_overlay_job(job_id)
-    return bool(job and job.get("status") == _STATUS_CANCELLED)
+    try:
+        with SessionLocal() as db:
+            status = (
+                db.query(GoproOverlayJob.status)
+                .filter(GoproOverlayJob.id == job_id)
+                .scalar()
+            )
+            return status == _STATUS_CANCELLED
+    except OperationalError as exc:
+        if "no such table: gopro_overlay_jobs" not in str(exc):
+            raise
+        with _LOCK:
+            return _JOBS.get(job_id, {}).get("status") == _STATUS_CANCELLED
 
 
 def _read_process_updates_from_process(
@@ -2578,7 +2595,7 @@ def _enqueue_gopro_overlay_job_in_rq(job_id: str) -> None:
         "gopro_overlay_export.process_gopro_overlay_job",
         job_id,
         job_id=_rq_job_id(job_id),
-        timeout=config.JOB_QUEUE_TIMEOUT_SECONDS,
+        timeout=config.GOPRO_OVERLAY_JOB_TIMEOUT_SECONDS,
         queue_name=config.GOPRO_OVERLAY_QUEUE_NAME,
         at_front=True,
     )
