@@ -1533,6 +1533,258 @@ def _finish_job(job_id: str, **changes: Any) -> dict[str, Any]:
         return job.copy()
 
 
+def _overlay_segment_path(work_dir: Path, job_id: str, index: int, kind: str) -> Path:
+    return work_dir / f"{kind}-{job_id}-{index:05d}.mp4"
+
+
+def _create_overlay_segment(
+    source_path: Path,
+    destination: Path,
+    start_seconds: float,
+    duration_seconds: float,
+) -> None:
+    if destination.exists():
+        return
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-ss",
+            f"{start_seconds:.3f}",
+            "-i",
+            str(source_path),
+            "-t",
+            f"{duration_seconds:.3f}",
+            "-map",
+            "0",
+            "-c",
+            "copy",
+            "-avoid_negative_ts",
+            "make_zero",
+            str(destination),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0 or not destination.exists():
+        detail = result.stderr.strip() or "Unable to create overlay segment"
+        raise ValueError(detail)
+
+
+def _concat_overlay_segments(segment_paths: list[Path], destination: Path) -> None:
+    concat_path = destination.with_suffix(".concat.txt")
+    concat_lines = []
+    for path in segment_paths:
+        escaped_path = path.as_posix().replace("'", "'\\''")
+        concat_lines.append(f"file '{escaped_path}'\n")
+    concat_path.write_text(
+        "".join(concat_lines),
+        encoding="utf-8",
+    )
+    try:
+        result = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                str(concat_path),
+                "-c",
+                "copy",
+                str(destination),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    finally:
+        concat_path.unlink(missing_ok=True)
+    if result.returncode != 0 or not destination.exists():
+        detail = result.stderr.strip() or "Unable to concatenate overlay segments"
+        raise ValueError(detail)
+
+
+def _run_segmented_overlay_job(
+    job_id: str,
+    job: dict[str, Any],
+    command: list[str],
+    cpu_command: list[str],
+    gpu_render_enabled: bool,
+    render_method: str,
+    log_path: Path,
+    output_path: Path,
+    temp_output_path: Path,
+) -> None:
+    video_path = Path(str(job["video_path"]))
+    work_dir = Path(str(job["layout_path"])).parent
+    duration = probe_video_duration(video_path)
+    segment_seconds = max(30, config.GOPRO_OVERLAY_SEGMENT_SECONDS)
+    if duration is None or duration <= segment_seconds:
+        raise ValueError("Segmented overlay requested for a video shorter than one segment")
+
+    total_segments = math.ceil(duration / segment_seconds)
+    metadata = job.get("command") if isinstance(job.get("command"), dict) else {}
+    resume = metadata.get("resume") if isinstance(metadata.get("resume"), dict) else {}
+    completed = {
+        int(index)
+        for index in resume.get("completed_segments", [])
+        if isinstance(index, int) or str(index).isdigit()
+    }
+    metadata = dict(metadata)
+    metadata["resume"] = {
+        "segment_seconds": segment_seconds,
+        "total_segments": total_segments,
+        "completed_segments": sorted(completed),
+    }
+    _update_job(job_id, command_json=json.dumps(metadata), message="Overlay queued")
+    if not _transition_job_to_running(job_id, command, render_method):
+        return
+
+    base_start = probe_video_start_time(video_path)
+    if base_start is None:
+        base_start = datetime.fromtimestamp(video_path.stat().st_mtime, tz=timezone.utc)
+    rendered_segments: list[Path] = []
+    try:
+        for index in range(total_segments):
+            start = index * segment_seconds
+            length = min(segment_seconds, duration - start)
+            source_segment = _overlay_segment_path(work_dir, job_id, index, "source")
+            rendered_segment = _overlay_segment_path(work_dir, job_id, index, "overlay")
+            _create_overlay_segment(video_path, source_segment, start, length)
+            segment_timestamp = (base_start + timedelta(seconds=start)).timestamp()
+            os.utime(source_segment, (segment_timestamp, segment_timestamp))
+
+            pip_segment = None
+            if job.get("pip_path"):
+                pip_segment = _overlay_segment_path(work_dir, job_id, index, "pip")
+                _create_overlay_segment(Path(str(job["pip_path"])), pip_segment, start, length)
+                os.utime(pip_segment, (segment_timestamp, segment_timestamp))
+
+            if index not in completed or not rendered_segment.exists():
+                segment_command = command[:-2] + [str(source_segment), str(rendered_segment)]
+                segment_cpu_command = cpu_command[:-2] + [
+                    str(source_segment),
+                    str(rendered_segment),
+                ]
+                for segment_command_variant in (segment_command, segment_cpu_command):
+                    if "--video-time-start" in segment_command_variant:
+                        time_start_index = segment_command_variant.index("--video-time-start") + 1
+                        segment_command_variant[time_start_index] = "file-modified"
+                if pip_segment:
+                    original_pip = f"pip={job['pip_path']}"
+                    segment_pip = f"pip={pip_segment}"
+                    segment_command = [
+                        segment_pip if arg == original_pip else arg for arg in segment_command
+                    ]
+                    segment_cpu_command = [
+                        segment_pip if arg == original_pip else arg for arg in segment_cpu_command
+                    ]
+                _unlink_if_exists(rendered_segment)
+                return_code = _run_overlay_process(
+                    job_id,
+                    segment_command,
+                    segment_cpu_command,
+                    gpu_render_enabled,
+                    log_path,
+                    index,
+                    total_segments,
+                )
+                if return_code != 0:
+                    raise RuntimeError(_tail_lines(log_path) or f"Segment {index} failed")
+                completed.add(index)
+                metadata["resume"]["completed_segments"] = sorted(completed)
+                _update_job(
+                    job_id,
+                    progress=math.floor(len(completed) * 100 / total_segments),
+                    message=f"Overlay segment {index + 1}/{total_segments} completed",
+                    command_json=json.dumps(metadata),
+                )
+            rendered_segments.append(rendered_segment)
+
+        _concat_overlay_segments(rendered_segments, temp_output_path)
+        is_valid, validation_error = _verify_video_output(temp_output_path)
+        if not is_valid:
+            raise ValueError(validation_error or "ffprobe validation failed")
+        temp_output_path.replace(output_path)
+        _finish_job(
+            job_id,
+            status=_STATUS_COMPLETED,
+            progress=100,
+            message="Overlay ready",
+            completed_at=_utc_now(),
+        )
+    except Exception as exc:
+        current = get_gopro_overlay_job(job_id)
+        if current and current.get("status") == _STATUS_CANCELLED:
+            return
+        _finish_job(
+            job_id,
+            status=_STATUS_FAILED,
+            progress=100,
+            message="Overlay rendering failed",
+            error=str(exc) or exc.__class__.__name__,
+            completed_at=_utc_now(),
+        )
+
+
+def _run_overlay_process(
+    job_id: str,
+    command: list[str],
+    cpu_command: list[str],
+    gpu_render_enabled: bool,
+    log_path: Path,
+    segment_index: int,
+    total_segments: int,
+) -> int:
+    selected_command = command
+    for attempt in range(2 if gpu_render_enabled else 1):
+        process = subprocess.Popen(
+            _background_process_command(selected_command),
+            cwd=config.GOPRO_OVERLAY_ROOT or None,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        with _LOCK:
+            _PROCESSES[job_id] = process
+        try:
+            with log_path.open("a", encoding="utf-8") as log_file:
+                log_file.write(
+                    _format_job_log_line(
+                        f"Starting overlay segment {segment_index + 1}/{total_segments}"
+                    )
+                )
+                for line in _read_process_updates_from_process(process, job_id):
+                    log_file.write(_format_job_log_line(line))
+                    log_file.flush()
+                    progress = _progress_from_output_chunk(line)
+                    if progress is not None:
+                        overall = math.floor((segment_index * 100 + progress) / total_segments)
+                        _update_job(
+                            job_id, progress=overall, message=f"Rendering overlay: {overall}%"
+                        )
+            return_code = process.wait()
+        finally:
+            with _LOCK:
+                _PROCESSES.pop(job_id, None)
+        if return_code == 0 or not gpu_render_enabled or attempt == 1:
+            return return_code
+        _append_job_log(log_path, "GPU segment failed; retrying with CPU rendering")
+        selected_command = cpu_command
+    return 1
+
+
 def _find_layout(layout_id: str) -> GoproOverlayLayout | None:
     return next((layout for layout in _LAYOUTS if layout.id == layout_id), None)
 
@@ -1956,6 +2208,23 @@ def _run_job(job_id: str) -> None:
         render_method,
     )
 
+    video_duration = probe_video_duration(Path(str(job["video_path"])))
+    if video_duration is not None and video_duration > max(
+        30, config.GOPRO_OVERLAY_SEGMENT_SECONDS
+    ):
+        _run_segmented_overlay_job(
+            job_id,
+            job,
+            command,
+            cpu_command,
+            gpu_render_enabled,
+            render_method,
+            log_path,
+            output_path,
+            temp_output_path,
+        )
+        return
+
     if not _transition_job_to_running(job_id, command, render_method):
         current_job = get_gopro_overlay_job(job_id)
         if current_job and current_job.get("status") in _TERMINAL_STATUSES:
@@ -2363,14 +2632,14 @@ def _mark_interrupted_jobs_failed() -> None:
             )
             for job in jobs:
                 if job.status in _INTERRUPTIBLE_STATUSES:
-                    job.status = _STATUS_FAILED
-                    job.progress = 100
-                    job.message = "Overlay interrupted by backend restart"
+                    job.status = _STATUS_QUEUED
+                    job.message = "Overlay interrupted; resuming from the last completed segment"
                     job.error = "The backend stopped while the overlay process was running"
-                    job.completed_at = _utc_now_dt()
+                    job.completed_at = None
                     job.updated_at = _utc_now_dt()
                     _sync_flights_from_job(db, job)
-                jobs_to_clean.append(_job_to_payload(job))
+                if job.status in _TERMINAL_STATUSES:
+                    jobs_to_clean.append(_job_to_payload(job))
             db.commit()
     except OperationalError as exc:
         if "no such table: gopro_overlay_jobs" not in str(exc):
@@ -2379,11 +2648,10 @@ def _mark_interrupted_jobs_failed() -> None:
             for job in _JOBS.values():
                 if job.get("status") in _INTERRUPTIBLE_STATUSES:
                     job.update(
-                        status=_STATUS_FAILED,
-                        progress=100,
-                        message="Overlay interrupted by backend restart",
+                        status=_STATUS_QUEUED,
+                        message="Overlay interrupted; resuming from the last completed segment",
                         error="The backend stopped while the overlay process was running",
-                        completed_at=_utc_now(),
+                        completed_at=None,
                         updated_at=_utc_now(),
                     )
                 if job.get("status") in _TERMINAL_STATUSES:
