@@ -466,7 +466,7 @@ def _render_clip(
         filter_complex = (
             f"[0:v]{pano_filter}[pano];"
             "[1:v]scale=iw*0.32:-1[overlay];"
-            "[pano][overlay]overlay=W-w-32:H-h-32:shortest=1[v]"
+            "[pano][overlay]overlay=W-w-32:H-h-32:eof_action=pass[v]"
         )
         command.extend(
             [
@@ -478,6 +478,7 @@ def _render_clip(
                 "[v]",
                 "-map",
                 "0:a?",
+                "-shortest",
             ]
         )
     else:
@@ -491,6 +492,7 @@ def _render_clip(
                 "0:v:0",
                 "-map",
                 "0:a?",
+                "-shortest",
             ]
         )
     accelerator = select_video_accelerator(config.VIDEO_ACCELERATOR)

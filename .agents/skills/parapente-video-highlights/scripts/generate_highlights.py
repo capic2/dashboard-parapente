@@ -94,6 +94,7 @@ def render_clip(
         "aac",
         "-b:a",
         "192k",
+        "-shortest",
         "-movflags",
         "+faststart",
         str(target),
