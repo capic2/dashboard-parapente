@@ -1026,6 +1026,8 @@
     "highlightVideoDownload": "Download video",
     "highlightVideoDownloadError": "Unable to download the best-moments video.",
     "highlightVideoStarting": "Starting…",
+    "highlightVideoCancel": "Cancel generation",
+    "highlightVideoCancelError": "Unable to cancel best moments generation",
     "highlightVideoStarted": "Best moments generation started",
     "highlightVideoStartError": "Unable to start best moments generation",
     "mediaReplayTitle": "Flight replay",

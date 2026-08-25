@@ -1030,6 +1030,8 @@
     "highlightVideoDownload": "Télécharger la vidéo",
     "highlightVideoDownloadError": "Impossible de télécharger la vidéo des meilleurs moments.",
     "highlightVideoStarting": "Lancement…",
+    "highlightVideoCancel": "Annuler la génération",
+    "highlightVideoCancelError": "Impossible d’annuler la génération des meilleurs moments",
     "highlightVideoStarted": "Génération des meilleurs moments lancée",
     "highlightVideoStartError": "Impossible de lancer la génération des meilleurs moments",
     "mediaReplayTitle": "Replay du vol",

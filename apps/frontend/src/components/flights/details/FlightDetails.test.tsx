@@ -221,6 +221,7 @@ vi.mock('react-i18next', () => ({
         'flights.goproOverlayThumbnailAlt': 'Legacy overlay thumbnail',
         'flights.goproOverlayJobThumbnailAlt': 'Overlay thumbnail',
         'flights.highlightVideoTitle': 'Best moments',
+        'flights.highlightVideoGenerate': 'Generate best moments',
         'flights.highlightVideoDownload': 'Download video',
         'flights.highlightVideoThumbnailAlt': 'Best moments thumbnail',
         'flights.mediaFileAvailable': 'Ready to download',
@@ -250,6 +251,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useQuery: () => ({ data: null }),
 }));
 
 vi.mock('../../../hooks/flights/useFlights', () => ({
@@ -266,6 +268,7 @@ vi.mock('../../../hooks/flights/useHighlightVideos', () => ({
     data: highlightVideoMock.current ? [highlightVideoMock.current] : [],
   }),
   useCreateFlightHighlightVideo: () => ({ isPending: false, mutate: vi.fn() }),
+  useCancelFlightHighlightVideo: () => ({ isPending: false, mutate: vi.fn() }),
 }));
 
 vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
@@ -678,6 +681,7 @@ describe('FlightDetails GoPro overlay action', () => {
   });
 
   it('shows completed best moments in the available files and processing tabs', () => {
+    mockFlight.pano_video_file_exists = true;
     highlightVideoMock.current = {
       job_id: 'highlight-1',
       flight_id: 'flight-1',
@@ -773,6 +777,9 @@ describe('FlightDetails GoPro overlay action', () => {
     expect(screen.getByText('Pano thumbnail')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'YouTube upload pano' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Generate best moments' })
     ).toBeInTheDocument();
   });
 

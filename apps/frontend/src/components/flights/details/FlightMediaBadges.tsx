@@ -9,6 +9,7 @@ import {
   FolderDown,
   LoaderCircle,
   Orbit,
+  Sparkles,
   Video,
   Wand2,
 } from 'lucide-react';
@@ -34,6 +35,10 @@ interface FlightMediaBadgesProps {
   onDownloadVideo: () => void;
   onDownloadPersistedGoproOverlay: () => void;
   highlightVideo: HighlightVideoJob | null;
+  isHighlightGenerationPending: boolean;
+  isHighlightCancellationPending: boolean;
+  onGenerateHighlightVideo: () => void;
+  onCancelHighlightVideo: () => void;
   onDownloadHighlightVideo: () => void;
   children: ReactNode;
 }
@@ -54,6 +59,10 @@ export function FlightMediaBadges({
   onDownloadVideo,
   onDownloadPersistedGoproOverlay,
   highlightVideo,
+  isHighlightGenerationPending,
+  isHighlightCancellationPending,
+  onGenerateHighlightVideo,
+  onCancelHighlightVideo,
   onDownloadHighlightVideo,
   children,
 }: FlightMediaBadgesProps) {
@@ -64,6 +73,8 @@ export function FlightMediaBadges({
     0,
     Math.min(100, Math.round(flight.video_export_progress ?? 0))
   );
+  const isHighlightProcessing =
+    highlightVideo?.status === 'queued' || highlightVideo?.status === 'running';
   let videoStatusLabel = t('flights.videoNotGenerated');
   if (hasVideo) {
     videoStatusLabel = t('flights.mediaFileAvailable');
@@ -271,9 +282,9 @@ export function FlightMediaBadges({
             </div>
           </div>
         )}
-        {highlightVideo && (
+        {hasPanoVideo && (
           <div className="overflow-hidden rounded-xl border border-violet-200 bg-white shadow-sm dark:border-violet-800 dark:bg-slate-900/60">
-            {highlightVideo.status === 'completed' && (
+            {highlightVideo?.status === 'completed' && (
               <FlightMediaThumbnail
                 path={`/flights/${flightId}/highlight-videos/${highlightVideo.job_id}/thumbnail`}
                 alt={t('flights.highlightVideoThumbnailAlt')}
@@ -289,16 +300,16 @@ export function FlightMediaBadges({
                     {t('flights.highlightVideoTitle')}
                   </span>
                   <span className="block text-xs text-slate-600 dark:text-slate-300">
-                    {highlightVideo.status === 'completed'
+                    {highlightVideo?.status === 'completed'
                       ? t('flights.mediaFileAvailable')
-                      : (highlightVideo.message ??
+                      : (highlightVideo?.message ??
                         t(
-                          `flights.generationLogs.status.${highlightVideo.status}`
+                          `flights.generationLogs.status.${highlightVideo?.status ?? 'queued'}`
                         ))}
                   </span>
                 </span>
               </div>
-              {highlightVideo.status === 'running' && (
+              {highlightVideo?.status === 'running' && (
                 <progress
                   className="mt-3 h-2 w-full accent-violet-600"
                   value={highlightVideo.progress}
@@ -306,7 +317,7 @@ export function FlightMediaBadges({
                   aria-label={t('flights.generationLogs.progress')}
                 />
               )}
-              {highlightVideo.status === 'completed' && (
+              {highlightVideo?.status === 'completed' && (
                 <div className="mt-3 space-y-2">
                   <Button
                     variant="outline"
@@ -326,6 +337,33 @@ export function FlightMediaBadges({
                   />
                 </div>
               )}
+              {highlightVideo?.status !== 'completed' &&
+                (isHighlightProcessing ? (
+                  <Button
+                    variant="danger"
+                    className="mt-3 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
+                    onPress={onCancelHighlightVideo}
+                    isDisabled={isHighlightCancellationPending}
+                  >
+                    {isHighlightCancellationPending
+                      ? t('common.stopping')
+                      : t('flights.highlightVideoCancel')}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="mt-3 min-h-10 w-full rounded-lg border-violet-300 px-3 py-2 text-sm dark:border-violet-700"
+                    onPress={onGenerateHighlightVideo}
+                    isDisabled={
+                      isHighlightGenerationPending || isHighlightProcessing
+                    }
+                  >
+                    <Sparkles className="h-4 w-4" aria-hidden="true" />
+                    {isHighlightGenerationPending
+                      ? t('flights.highlightVideoStarting')
+                      : t('flights.highlightVideoGenerate')}
+                  </Button>
+                ))}
             </div>
           </div>
         )}

@@ -4743,6 +4743,30 @@ def download_flight_highlight_video(
     return FileResponse(path=output_path, media_type="video/mp4", filename=output_path.name)
 
 
+@router.delete(
+    "/flights/{flight_id}/highlight-videos/{job_id}",
+    response_model=HighlightVideoJobResponse,
+)
+def cancel_flight_highlight_video(
+    flight_id: str, job_id: str, db: Session = Depends(get_db)
+) -> HighlightVideoJobResponse:
+    job = (
+        db.query(HighlightVideoJob)
+        .filter(HighlightVideoJob.id == job_id, HighlightVideoJob.flight_id == flight_id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Highlight video job not found")
+    if job.status not in {HIGHLIGHT_STATUS_QUEUED, "running"}:
+        raise HTTPException(status_code=409, detail="Highlight video cannot be cancelled")
+    job.status = "cancelled"
+    job.message = "Rendu des meilleurs moments annulé"
+    job.completed_at = datetime.utcnow()
+    db.commit()
+    db.refresh(job)
+    return _highlight_job_payload(job)
+
+
 @router.get("/flights/{flight_id}/highlight-videos/{job_id}/thumbnail")
 def get_flight_highlight_video_thumbnail(
     flight_id: str, job_id: str, db: Session = Depends(get_db)
