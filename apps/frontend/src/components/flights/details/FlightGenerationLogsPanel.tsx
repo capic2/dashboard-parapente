@@ -1,4 +1,7 @@
-import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
+import {
+  VIDEO_EXPORT_IN_PROGRESS_STATUSES,
+  type HighlightVideoJob,
+} from '@dashboard-parapente/shared-types';
 import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,6 +21,7 @@ type FlightGenerationLogsPanelProps = {
   goproOverlayFallbackStatus?: string | null;
   goproOverlayFallbackProgress?: number | null;
   youtubeUploadJob: YoutubeUploadJob | null;
+  highlightVideo: HighlightVideoJob | null;
 };
 
 type LogSourceCardProps = {
@@ -184,6 +188,7 @@ export function FlightGenerationLogsPanel({
   goproOverlayFallbackStatus,
   goproOverlayFallbackProgress,
   youtubeUploadJob,
+  highlightVideo,
 }: FlightGenerationLogsPanelProps) {
   const { t } = useTranslation();
   const videoStatusValue =
@@ -200,11 +205,13 @@ export function FlightGenerationLogsPanel({
     goproOverlayStatusValue || goproOverlayJob?.job_id || goproOverlayJobId
   );
   const hasYoutubeUploadLogSource = Boolean(youtubeUploadJob?.job_id);
+  const hasHighlightLogSource = Boolean(highlightVideo?.job_id);
 
   if (
     !hasVideoLogSource &&
     !hasGoproOverlayLogSource &&
-    !hasYoutubeUploadLogSource
+    !hasYoutubeUploadLogSource &&
+    !hasHighlightLogSource
   ) {
     return null;
   }
@@ -273,6 +280,20 @@ export function FlightGenerationLogsPanel({
             progress={youtubeUploadJob.progress}
             error={youtubeUploadJob.error}
             logs={youtubeUploadJob.log_tail}
+          />
+        )}
+        {hasHighlightLogSource && highlightVideo && (
+          <LogSourceCard
+            key={`highlight-${highlightVideo.job_id}`}
+            title={t('flights.generationLogs.highlightVideoTitle')}
+            status={highlightVideo.status}
+            isInProgress={['queued', 'running'].includes(highlightVideo.status)}
+            statusLabel={t(
+              `flights.generationLogs.status.${highlightVideo.status}`
+            )}
+            progress={highlightVideo.progress}
+            message={highlightVideo.message}
+            error={highlightVideo.error}
           />
         )}
       </div>

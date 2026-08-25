@@ -1042,6 +1042,7 @@
     "mediaThumbnailUnavailable": "Miniature indisponible",
     "videoThumbnailAlt": "Miniature de la vidéo du vol",
     "panoThumbnailAlt": "Miniature de la vidéo Pano",
+    "highlightVideoThumbnailAlt": "Miniature de la vidéo des meilleurs moments",
     "goproOverlayThumbnailAlt": "Miniature de l’overlay GoPro",
     "goproOverlayJobThumbnailAlt": "Miniature de l’overlay {{name}}",
     "videoNotGenerated": "À générer",
@@ -1138,6 +1139,7 @@
       "title": "Logs de génération",
       "description": "Suivi lisible des traitements média et de leur publication liés à ce vol.",
       "videoTitle": "Vidéo du vol",
+      "highlightVideoTitle": "Meilleurs moments",
       "goproOverlayTitle": "Overlay GoPro",
       "youtubeUploadTitle": "Upload YouTube",
       "method": {

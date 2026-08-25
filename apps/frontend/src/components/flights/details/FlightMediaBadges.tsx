@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@dashboard-parapente/design-system';
+import type { HighlightVideoJob } from '@dashboard-parapente/shared-types';
 import {
   CircleAlert,
   Download,
@@ -31,6 +32,8 @@ interface FlightMediaBadgesProps {
   onDownloadGpx: () => void;
   onDownloadVideo: () => void;
   onDownloadPersistedGoproOverlay: () => void;
+  highlightVideo: HighlightVideoJob | null;
+  onDownloadHighlightVideo: () => void;
   children: ReactNode;
 }
 
@@ -49,6 +52,8 @@ export function FlightMediaBadges({
   onDownloadGpx,
   onDownloadVideo,
   onDownloadPersistedGoproOverlay,
+  highlightVideo,
+  onDownloadHighlightVideo,
   children,
 }: FlightMediaBadgesProps) {
   const { t } = useTranslation();
@@ -259,6 +264,64 @@ export function FlightMediaBadges({
               >
                 <Download className="h-4 w-4" aria-hidden="true" />
               </button>
+            </div>
+          </div>
+        )}
+        {highlightVideo && (
+          <div className="overflow-hidden rounded-xl border border-violet-200 bg-white shadow-sm dark:border-violet-800 dark:bg-slate-900/60">
+            {highlightVideo.status === 'completed' && (
+              <FlightMediaThumbnail
+                path={`/flights/${flightId}/highlight-videos/${highlightVideo.job_id}/thumbnail`}
+                alt={t('flights.highlightVideoThumbnailAlt')}
+              />
+            )}
+            <div className="p-3">
+              <div className="flex items-center gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
+                  <Wand2 className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold text-slate-950 dark:text-white">
+                    {t('flights.highlightVideoTitle')}
+                  </span>
+                  <span className="block text-xs text-slate-600 dark:text-slate-300">
+                    {highlightVideo.status === 'completed'
+                      ? t('flights.mediaFileAvailable')
+                      : (highlightVideo.message ??
+                        t(
+                          `flights.generationLogs.status.${highlightVideo.status}`
+                        ))}
+                  </span>
+                </span>
+              </div>
+              {highlightVideo.status === 'running' && (
+                <progress
+                  className="mt-3 h-2 w-full accent-violet-600"
+                  value={highlightVideo.progress}
+                  max={100}
+                  aria-label={t('flights.generationLogs.progress')}
+                />
+              )}
+              {highlightVideo.status === 'completed' && (
+                <div className="mt-3 space-y-2">
+                  <Button
+                    variant="outline"
+                    className="min-h-10 w-full rounded-lg border-violet-300 px-3 py-2 text-sm dark:border-violet-700"
+                    onPress={onDownloadHighlightVideo}
+                    isDisabled={isDownloadingAnyMedia}
+                  >
+                    <Download className="h-4 w-4" aria-hidden="true" />
+                    {t('flights.highlightVideoDownload')}
+                  </Button>
+                  <FlightYoutubeUploadControls
+                    flight={flight}
+                    source={{
+                      source_type: 'highlight',
+                      highlight_video_job_id: highlightVideo.job_id,
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
