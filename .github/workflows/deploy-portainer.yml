@@ -509,6 +509,59 @@ jobs:
               docker logs --tail 200 parapente-backend 2>&1 || true
               echo "Recent YouTube upload worker logs"
               docker logs --tail 200 parapente-youtube-upload-worker 2>&1 || true
+              echo "Recent GoPro overlay worker logs"
+              docker logs --tail 200 parapente-gopro-overlay-worker 2>&1 || true
+              echo "Recent backend worker logs"
+              docker logs --tail 200 parapente-backend-worker 2>&1 || true
+            }
+
+            verify_gpu_prerequisites() {
+              [ "$NVIDIA_GPU_ENABLED" = "true" ] || return 0
+              echo "Verifying NVIDIA Docker runtime before replacing production containers"
+              if ! docker info --format '{{json .Runtimes}}' | grep -q '"nvidia"'; then
+                echo "NVIDIA runtime is not registered in Docker"
+                return 1
+              fi
+              if ! docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi -L; then
+                echo "NVIDIA GPU preflight failed; keeping the current production stack"
+                return 1
+              fi
+            }
+
+            verify_workers_started() {
+              attempts=1
+              while [ "$attempts" -le "$LOCAL_VERIFY_MAX_ATTEMPTS" ]; do
+                failed=0
+                for container_name in parapente-backend parapente-backend-worker parapente-youtube-upload-worker parapente-gopro-overlay-worker parapente-redis; do
+                  state=$(docker inspect --format '{{.State.Status}}' "$container_name" 2>/dev/null || true)
+                  health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_name" 2>/dev/null || true)
+                  if [ "$state" != "running" ] || [ "$health" != "healthy" ]; then
+                    failed=1
+                  fi
+                done
+                for worker_log in parapente-backend-worker parapente-gopro-overlay-worker parapente-youtube-upload-worker; do
+                  if ! docker logs "$worker_log" 2>&1 | grep -q 'Listening on'; then
+                    failed=1
+                  fi
+                done
+                if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
+                  gpu_devices=$(docker inspect --format '{{json .HostConfig.DeviceRequests}}' parapente-gopro-overlay-worker 2>/dev/null || true)
+                  gpu_accelerator=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' parapente-gopro-overlay-worker 2>/dev/null | grep '^BACKEND_VIDEO_ACCELERATOR=' || true)
+                  if ! echo "$gpu_devices" | grep -q '"Driver":"nvidia"' || [ "$gpu_accelerator" != "BACKEND_VIDEO_ACCELERATOR=nvidia" ]; then
+                    echo "GoPro worker was started without the requested NVIDIA device"
+                    failed=1
+                  fi
+                fi
+                if [ "$failed" -eq 0 ]; then
+                  echo "Production backend and all RQ workers are running"
+                  return 0
+                fi
+                echo "Worker readiness check attempt $attempts/$LOCAL_VERIFY_MAX_ATTEMPTS failed"
+                [ "$attempts" -lt "$LOCAL_VERIFY_MAX_ATTEMPTS" ] && sleep "$LOCAL_VERIFY_SLEEP_SECONDS"
+                attempts=$((attempts + 1))
+              done
+              echo "Production worker readiness verification failed"
+              return 1
             }
 
             describe_version_response() {
@@ -627,7 +680,8 @@ jobs:
                   ;;
                 404)
                   rm -f docker-compose.gpu.yml.tmp docker-compose.gpu.yml
-                  echo "GPU compose override not present at target commit; using CPU compose"
+                  echo "GPU compose override is missing from the target commit"
+                  return 1
                   ;;
                 *)
                   rm -f docker-compose.gpu.yml.tmp
@@ -659,6 +713,8 @@ jobs:
 
               configure_compose_cmd
 
+              verify_gpu_prerequisites
+
               printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
               export CI_BACKEND_IMAGE="$BACKEND_IMAGE"
@@ -668,6 +724,10 @@ jobs:
                 print_backend_diagnostics
                 return 1
               fi
+              verify_workers_started || {
+                print_backend_diagnostics
+                return 1
+              }
             }
 
             deploy_from_portainer_volume() {
@@ -706,7 +766,8 @@ jobs:
                       200) mv docker-compose.gpu.yml.tmp docker-compose.gpu.yml ;;
                       404)
                         rm -f docker-compose.gpu.yml.tmp docker-compose.gpu.yml
-                        echo "GPU compose override not present at target commit; using CPU compose"
+                        echo "GPU compose override is missing from the target commit"
+                        exit 1
                         ;;
                       *)
                         rm -f docker-compose.gpu.yml.tmp
@@ -732,10 +793,42 @@ jobs:
                     compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files "$@"; }
                   fi
 
+                  if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
+                    echo "Verifying NVIDIA Docker runtime before replacing production containers"
+                    if ! docker info --format '{{json .Runtimes}}' | grep -q '"nvidia"'; then
+                      echo "NVIDIA runtime is not registered in Docker"
+                      exit 1
+                    fi
+                    if ! docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi -L; then
+                      echo "NVIDIA GPU preflight failed; keeping the current production stack"
+                      exit 1
+                    fi
+                  fi
+
                   printf "%s" "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
                   compose_cmd pull backend backend-worker youtube-upload-worker gopro-overlay-worker redis
                   compose_cmd up -d --force-recreate --remove-orphans backend backend-worker youtube-upload-worker gopro-overlay-worker redis
+                  for container_name in parapente-backend parapente-backend-worker parapente-youtube-upload-worker parapente-gopro-overlay-worker parapente-redis; do
+                    state=$(docker inspect --format '{{.State.Status}}' "$container_name" 2>/dev/null || true)
+                    if [ "$state" != "running" ]; then
+                      echo "Container $container_name is not running after deployment"
+                      exit 1
+                    fi
+                  done
+                  for worker_log in parapente-backend-worker parapente-gopro-overlay-worker parapente-youtube-upload-worker; do
+                    if ! docker logs "$worker_log" 2>&1 | grep -q 'Listening on'; then
+                      echo "Worker $worker_log did not announce an RQ queue"
+                      exit 1
+                    fi
+                  done
+                  if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
+                    gpu_devices=$(docker inspect --format '{{json .HostConfig.DeviceRequests}}' parapente-gopro-overlay-worker 2>/dev/null || true)
+                    if ! echo "$gpu_devices" | grep -q '"Driver":"nvidia"'; then
+                      echo "GoPro worker has no NVIDIA device request after deployment"
+                      exit 1
+                    fi
+                  fi
                 '; then
                 print_backend_diagnostics
                 return 1
