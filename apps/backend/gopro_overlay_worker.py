@@ -42,7 +42,10 @@ def _require_gpu_runtime() -> None:
             f"GoPro overlay GPU runtime dependencies are missing: {', '.join(missing)}"
         )
     if config.VIDEO_ACCELERATOR == "nvidia" and select_video_accelerator("nvidia") == "cpu":
-        logger.warning("NVIDIA runtime unavailable; overlay jobs will fall back to CPU")
+        raise RuntimeError(
+            "NVIDIA accelerator was requested but NVENC is unavailable; "
+            "refusing to start the overlay worker instead of silently falling back to CPU"
+        )
 
 
 def main() -> None:
