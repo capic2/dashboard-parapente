@@ -557,6 +557,12 @@ def _update_job(job_id: str, **values: object) -> None:
         db.commit()
 
 
+def _is_cancelled(job_id: str) -> bool:
+    with SessionLocal() as db:
+        job = db.query(HighlightVideoJob).filter(HighlightVideoJob.id == job_id).first()
+        return job is None or job.status == STATUS_CANCELLED
+
+
 def process_highlight_video_job(job_id: str) -> None:
     """RQ target for a highlight render job."""
     with SessionLocal() as db:
@@ -572,6 +578,8 @@ def process_highlight_video_job(job_id: str) -> None:
         output_dir = ensure_flight_directory(db, flight) / "highlights" / job.id
         output_path = output_dir / "highlights-original-format.mp4"
         offset = float(job.overlay_offset_seconds or 0.0)
+        if job.status == STATUS_CANCELLED:
+            return
         job.status = STATUS_RUNNING
         job.progress = 5
         job.started_at = _now()
@@ -616,13 +624,19 @@ def process_highlight_video_job(job_id: str) -> None:
         ]
         rendered: list[Path] = []
         for index, clip in enumerate(clips, start=1):
+            if _is_cancelled(job_id):
+                return
             target = output_dir / f"clip-{index:02d}.mp4"
             _render_clip(source_path, target, clip, overlay_path, offset)
             rendered.append(target)
+            if _is_cancelled(job_id):
+                return
             _update_job(
                 job_id, progress=10 + index * 15, message=f"Rendu du clip {index}/{len(clips)}"
             )
 
+        if _is_cancelled(job_id):
+            return
         concat_file = output_dir / "concat.txt"
         concat_file.write_text(
             "\n".join(f"file '{path.resolve()}'" for path in rendered) + "\n", encoding="utf-8"

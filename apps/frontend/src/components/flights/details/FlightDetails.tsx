@@ -38,6 +38,7 @@ import {
   useGoproOverlayJobStream,
 } from '../../../hooks/gopro/useGoproOverlay';
 import {
+  useCancelFlightHighlightVideo,
   useCreateFlightHighlightVideo,
   useFlightHighlightVideos,
 } from '../../../hooks/flights/useHighlightVideos';
@@ -91,6 +92,7 @@ export function FlightDetails({
   const createGoproOverlayJob = useCreateFlightGoproOverlayJob(flight.id);
   const highlightVideosQuery = useFlightHighlightVideos(flight.id);
   const createHighlightVideo = useCreateFlightHighlightVideo(flight.id);
+  const cancelHighlightVideo = useCancelFlightHighlightVideo(flight.id);
   const resetGoproOverlayJob = createGoproOverlayJob.reset;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeFlightIdRef = useRef(flight.id);
@@ -923,6 +925,7 @@ export function FlightDetails({
           }
           highlightVideo={latestHighlightVideo}
           isHighlightGenerationPending={createHighlightVideo.isPending}
+          isHighlightCancellationPending={cancelHighlightVideo.isPending}
           onGenerateHighlightVideo={() => {
             createHighlightVideo.mutate(undefined, {
               onSuccess: () =>
@@ -937,6 +940,18 @@ export function FlightDetails({
             });
           }}
           onDownloadHighlightVideo={() => void handleDownloadHighlightVideo()}
+          onCancelHighlightVideo={() => {
+            if (!latestHighlightVideo) return;
+            cancelHighlightVideo.mutate(latestHighlightVideo.job_id, {
+              onError: async (error) =>
+                toast.error(
+                  await getApiErrorMessage(
+                    error,
+                    t('flights.highlightVideoCancelError')
+                  )
+                ),
+            });
+          }}
         >
           {visibleGoproOverlays.map((overlay) => (
             <GoproOverlayJobCard

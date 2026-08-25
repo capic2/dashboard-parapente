@@ -35,7 +35,9 @@ interface FlightMediaBadgesProps {
   onDownloadPersistedGoproOverlay: () => void;
   highlightVideo: HighlightVideoJob | null;
   isHighlightGenerationPending: boolean;
+  isHighlightCancellationPending: boolean;
   onGenerateHighlightVideo: () => void;
+  onCancelHighlightVideo: () => void;
   onDownloadHighlightVideo: () => void;
   children: ReactNode;
 }
@@ -57,7 +59,9 @@ export function FlightMediaBadges({
   onDownloadPersistedGoproOverlay,
   highlightVideo,
   isHighlightGenerationPending,
+  isHighlightCancellationPending,
   onGenerateHighlightVideo,
+  onCancelHighlightVideo,
   onDownloadHighlightVideo,
   children,
 }: FlightMediaBadgesProps) {
@@ -68,6 +72,8 @@ export function FlightMediaBadges({
     0,
     Math.min(100, Math.round(flight.video_export_progress ?? 0))
   );
+  const isHighlightProcessing =
+    highlightVideo?.status === 'queued' || highlightVideo?.status === 'running';
   let videoStatusLabel = t('flights.videoNotGenerated');
   if (hasVideo) {
     videoStatusLabel = t('flights.mediaFileAvailable');
@@ -327,23 +333,33 @@ export function FlightMediaBadges({
                   />
                 </div>
               )}
-              {highlightVideo?.status !== 'completed' && (
-                <Button
-                  variant="outline"
-                  className="mt-3 min-h-10 w-full rounded-lg border-violet-300 px-3 py-2 text-sm dark:border-violet-700"
-                  onPress={onGenerateHighlightVideo}
-                  isDisabled={
-                    isHighlightGenerationPending ||
-                    highlightVideo?.status === 'queued' ||
-                    highlightVideo?.status === 'running'
-                  }
-                >
-                  <Sparkles className="h-4 w-4" aria-hidden="true" />
-                  {isHighlightGenerationPending
-                    ? t('flights.highlightVideoStarting')
-                    : t('flights.highlightVideoGenerate')}
-                </Button>
-              )}
+              {highlightVideo?.status !== 'completed' &&
+                (isHighlightProcessing ? (
+                  <Button
+                    variant="danger"
+                    className="mt-3 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
+                    onPress={onCancelHighlightVideo}
+                    isDisabled={isHighlightCancellationPending}
+                  >
+                    {isHighlightCancellationPending
+                      ? t('common.stopping')
+                      : t('flights.highlightVideoCancel')}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="mt-3 min-h-10 w-full rounded-lg border-violet-300 px-3 py-2 text-sm dark:border-violet-700"
+                    onPress={onGenerateHighlightVideo}
+                    isDisabled={
+                      isHighlightGenerationPending || isHighlightProcessing
+                    }
+                  >
+                    <Sparkles className="h-4 w-4" aria-hidden="true" />
+                    {isHighlightGenerationPending
+                      ? t('flights.highlightVideoStarting')
+                      : t('flights.highlightVideoGenerate')}
+                  </Button>
+                ))}
             </div>
           </div>
         )}

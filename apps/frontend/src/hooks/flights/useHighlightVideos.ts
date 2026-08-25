@@ -39,3 +39,20 @@ export function useCreateFlightHighlightVideo(flightId: string) {
     },
   });
 }
+
+export function useCancelFlightHighlightVideo(flightId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (jobId: string) => {
+      const payload = await api
+        .delete(`flights/${flightId}/highlight-videos/${jobId}`)
+        .json<unknown>();
+      return HighlightVideoJobSchema.parse(payload);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['flights', flightId, 'highlight-videos'],
+      });
+    },
+  });
+}
