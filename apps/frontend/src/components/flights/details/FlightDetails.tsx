@@ -20,7 +20,6 @@ import {
   FileUp,
   Images,
   Play,
-  Sparkles,
   Wand2,
 } from 'lucide-react';
 import { Input, Label, TextField } from 'react-aria-components';
@@ -923,6 +922,20 @@ export function FlightDetails({
             void handleDownloadPersistedGoproOverlay()
           }
           highlightVideo={latestHighlightVideo}
+          isHighlightGenerationPending={createHighlightVideo.isPending}
+          onGenerateHighlightVideo={() => {
+            createHighlightVideo.mutate(undefined, {
+              onSuccess: () =>
+                toast.success(t('flights.highlightVideoStarted')),
+              onError: async (error) =>
+                toast.error(
+                  await getApiErrorMessage(
+                    error,
+                    t('flights.highlightVideoStartError')
+                  )
+                ),
+            });
+          }}
           onDownloadHighlightVideo={() => void handleDownloadHighlightVideo()}
         >
           {visibleGoproOverlays.map((overlay) => (
@@ -968,59 +981,6 @@ export function FlightDetails({
             </Button>
           </div>
         </FlightMediaBadges>
-
-        {hasPanoVideo && (
-          <section className="rounded-xl border border-violet-200 bg-violet-50/70 p-4 shadow-sm dark:border-violet-900 dark:bg-violet-950/20">
-            <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-600 text-white dark:bg-violet-500">
-                <Sparkles className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <h3 className="font-semibold text-slate-950 dark:text-white">
-                  {t('flights.highlightVideoTitle')}
-                </h3>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                  {t('flights.highlightVideoDescription')}
-                </p>
-                {latestHighlightVideo && (
-                  <p className="mt-2 text-xs text-violet-800 dark:text-violet-200">
-                    {latestHighlightVideo.message ??
-                      latestHighlightVideo.status}
-                    {latestHighlightVideo.status === 'running' &&
-                      ` · ${latestHighlightVideo.progress}%`}
-                  </p>
-                )}
-                <Button
-                  variant="outline"
-                  className="mt-3 min-h-10 rounded-lg border-violet-300 px-3 py-2 text-sm dark:border-violet-700"
-                  onPress={() => {
-                    createHighlightVideo.mutate(undefined, {
-                      onSuccess: () =>
-                        toast.success(t('flights.highlightVideoStarted')),
-                      onError: async (error) =>
-                        toast.error(
-                          await getApiErrorMessage(
-                            error,
-                            t('flights.highlightVideoStartError')
-                          )
-                        ),
-                    });
-                  }}
-                  isDisabled={
-                    createHighlightVideo.isPending ||
-                    latestHighlightVideo?.status === 'queued' ||
-                    latestHighlightVideo?.status === 'running'
-                  }
-                >
-                  <Sparkles className="h-4 w-4" aria-hidden="true" />
-                  {createHighlightVideo.isPending
-                    ? t('flights.highlightVideoStarting')
-                    : t('flights.highlightVideoGenerate')}
-                </Button>
-              </div>
-            </div>
-          </section>
-        )}
 
         {(flight.youtube_urls?.length ?? 0) > 0 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800 sm:p-5">
