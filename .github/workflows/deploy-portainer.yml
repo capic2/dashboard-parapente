@@ -724,6 +724,13 @@ jobs:
                 print_backend_diagnostics
                 return 1
               fi
+              # Compose can report success while a worker exits during its
+              # startup preflight. Re-apply the worker once before failing the
+              # deployment; its restart policy then keeps it supervised.
+              if ! verify_workers_started; then
+                echo "RQ worker readiness check failed; restarting GoPro worker once"
+                compose_cmd up -d --no-deps --force-recreate gopro-overlay-worker || true
+              fi
               verify_workers_started || {
                 print_backend_diagnostics
                 return 1

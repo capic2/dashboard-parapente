@@ -292,7 +292,11 @@ services:
   gopro-overlay-worker:
     image: ${CI_BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
     container_name: parapente-gopro-overlay-worker
-    restart: unless-stopped
+    # This worker may be stopped during a deployment while an ffmpeg child is
+    # still running. Always restart it so queued jobs cannot remain orphaned.
+    restart: always
+    init: true
+    stop_grace_period: 30s
     command: ['python', 'gopro_overlay_worker.py']
     cpus: '${GOPRO_OVERLAY_WORKER_CPUS:-4.0}'
     mem_limit: ${GOPRO_OVERLAY_WORKER_MEM_LIMIT:-12g}
