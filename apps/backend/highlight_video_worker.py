@@ -110,6 +110,7 @@ def _ensure_overlay_video(
     """Build a temporary telemetry overlay from raw camera inputs when needed."""
     camera_path = source_path.parent / "camera.mp4"
     if not camera_path.is_file():
+        logger.info("Highlight overlay skipped: camera source is missing path=%s", camera_path)
         return None
     gpx_path, pip_path = resolve_automatic_overlay_inputs(
         source_path.parent,
@@ -117,13 +118,26 @@ def _ensure_overlay_video(
         source_path,
     )
     if gpx_path is None or not gpx_path.is_file() or pip_path is None or not pip_path.is_file():
+        logger.info(
+            "Highlight overlay skipped: inputs unavailable gpx=%s pip=%s",
+            gpx_path or "none",
+            pip_path or "none",
+        )
         return None
 
     from gopro_overlay_export import create_gopro_overlay_job_from_paths, get_gopro_overlay_job
 
     output_path = output_dir / "camera-overlay.mp4"
     if output_path.is_file():
+        logger.info("Highlight overlay reused: output=%s", output_path)
         return output_path
+    logger.info(
+        "Highlight overlay generation started: camera=%s gpx=%s pip=%s output=%s",
+        camera_path,
+        gpx_path,
+        pip_path,
+        output_path,
+    )
     job = create_gopro_overlay_job_from_paths(
         video_path=camera_path,
         gpx_path=gpx_path,
@@ -136,9 +150,21 @@ def _ensure_overlay_video(
     )
     job_id = str(job["job_id"])
     deadline = time.monotonic() + config.JOB_QUEUE_TIMEOUT_SECONDS
+    last_status: object = None
     while time.monotonic() < deadline:
         current = get_gopro_overlay_job(job_id)
+        current_status = current.get("status") if current else None
+        if current_status != last_status:
+            logger.info(
+                "Highlight overlay generation status: overlay_job_id=%s status=%s progress=%s message=%s",
+                job_id,
+                current_status or "missing",
+                current.get("progress") if current else "unknown",
+                current.get("message") if current else "unknown",
+            )
+            last_status = current_status
         if current and current.get("status") == "completed" and output_path.is_file():
+            logger.info("Highlight overlay generation completed: overlay_job_id=%s", job_id)
             return output_path
         if current and current.get("status") in {"failed", "cancelled"}:
             raise RuntimeError(
@@ -166,6 +192,11 @@ def _frame_scores(source_path: Path, duration_seconds: float) -> list[tuple[floa
         segment_duration = min(12, duration_seconds - segment_start)
         if segment_duration <= 0:
             break
+        logger.info(
+            "Highlight analysis: scoring video segment start=%.1fs duration=%.1fs",
+            segment_start,
+            segment_duration,
+        )
         result = subprocess.run(
             [
                 "ffmpeg",
@@ -557,6 +588,18 @@ def _update_job(job_id: str, **values: object) -> None:
         db.commit()
 
 
+def _set_job_stage(job_id: str, *, progress: int, message: str, stage: str) -> None:
+    """Persist and log a stage so slow background work is diagnosable."""
+    _update_job(job_id, progress=progress, message=message)
+    logger.info(
+        "Highlight job stage: job_id=%s stage=%s progress=%d message=%s",
+        job_id,
+        stage,
+        progress,
+        message,
+    )
+
+
 def _is_cancelled(job_id: str) -> bool:
     with SessionLocal() as db:
         job = db.query(HighlightVideoJob).filter(HighlightVideoJob.id == job_id).first()
@@ -565,6 +608,8 @@ def _is_cancelled(job_id: str) -> bool:
 
 def process_highlight_video_job(job_id: str) -> None:
     """RQ target for a highlight render job."""
+    started_monotonic = time.monotonic()
+    logger.info("Highlight job started: job_id=%s", job_id)
     with SessionLocal() as db:
         job = db.query(HighlightVideoJob).filter(HighlightVideoJob.id == job_id).first()
         if job is None:
@@ -583,21 +628,63 @@ def process_highlight_video_job(job_id: str) -> None:
         job.status = STATUS_RUNNING
         job.progress = 5
         job.started_at = _now()
-        job.message = "Analyse de la vidéo pano"
+        job.message = "Analyse de la vidéo pano (initialisation)"
         db.commit()
+        logger.info(
+            "Highlight job running: job_id=%s flight_id=%s source=%s overlay=%s progress=5",
+            job.id,
+            flight.id,
+            source_path,
+            overlay_path or "none",
+        )
 
     try:
+        _set_job_stage(
+            job_id,
+            progress=5,
+            stage="probe_duration",
+            message="Analyse de la vidéo pano (durée)",
+        )
         duration_seconds = _probe_duration(source_path)
         output_width, output_height = _output_dimensions(source_path)
+        logger.info(
+            "Highlight video probed: job_id=%s duration=%.1fs output=%sx%s",
+            job_id,
+            duration_seconds,
+            output_width,
+            output_height,
+        )
         output_dir.mkdir(parents=True, exist_ok=True)
         if not overlay_path or not overlay_path.is_file():
+            _set_job_stage(
+                job_id,
+                progress=6,
+                stage="overlay",
+                message="Préparation de l’overlay télémétrique",
+            )
             overlay_path = _ensure_overlay_video(
                 source_path,
                 gpx_file_path,
                 duration_seconds,
                 output_dir,
             )
+            logger.info(
+                "Highlight overlay ready: job_id=%s overlay=%s",
+                job_id,
+                overlay_path or "none",
+            )
+        _set_job_stage(
+            job_id,
+            progress=10,
+            stage="frame_scoring",
+            message="Analyse des images pour sélectionner les meilleurs moments",
+        )
         visual_clips = select_highlight_clips(duration_seconds, source_path)
+        logger.info(
+            "Highlight visual selection complete: job_id=%s candidates=%d",
+            job_id,
+            len(visual_clips),
+        )
         track_points: list[TrackPoint] | None = None
         gpx_path, _pip_path = resolve_automatic_overlay_inputs(
             source_path.parent,
@@ -608,12 +695,19 @@ def process_highlight_video_job(job_id: str) -> None:
             gpx_path = None
         if gpx_path:
             try:
+                logger.info("Highlight GPX analysis started: job_id=%s gpx=%s", job_id, gpx_path)
                 _normalized_gpx, track_points = normalize_track(
                     gpx_path.read_bytes(), gpx_path.suffix
                 )
             except (OSError, ValueError) as exc:
                 logger.warning("Unable to classify flight phases from GPX: %s", exc)
         clips = select_flight_event_clips(duration_seconds, track_points, visual_clips)
+        logger.info(
+            "Highlight clip selection complete: job_id=%s clips=%d categories=%s",
+            job_id,
+            len(clips),
+            [clip.category for clip in clips],
+        )
         if not clips:
             raise ValueError("La vidéo pano ne contient aucune durée exploitable")
         clips = [
@@ -622,17 +716,38 @@ def process_highlight_video_job(job_id: str) -> None:
             )
             for clip in clips
         ]
+        logger.info("Highlight viewpoints classified: job_id=%s clips=%d", job_id, len(clips))
         rendered: list[Path] = []
         for index, clip in enumerate(clips, start=1):
             if _is_cancelled(job_id):
                 return
             target = output_dir / f"clip-{index:02d}.mp4"
+            logger.info(
+                "Highlight clip rendering started: job_id=%s clip=%d/%d start=%.1fs duration=%.1fs yaw=%.0f category=%s",
+                job_id,
+                index,
+                len(clips),
+                clip.start_seconds,
+                clip.duration_seconds,
+                clip.yaw_degrees,
+                clip.category,
+            )
             _render_clip(source_path, target, clip, overlay_path, offset)
             rendered.append(target)
             if _is_cancelled(job_id):
                 return
             _update_job(
-                job_id, progress=10 + index * 15, message=f"Rendu du clip {index}/{len(clips)}"
+                job_id,
+                progress=min(90, 10 + index * 12),
+                message=f"Rendu du clip {index}/{len(clips)}",
+            )
+            logger.info(
+                "Highlight clip rendering complete: job_id=%s clip=%d/%d progress=%d output=%s",
+                job_id,
+                index,
+                len(clips),
+                min(90, 10 + index * 12),
+                target,
             )
 
         if _is_cancelled(job_id):
@@ -641,6 +756,13 @@ def process_highlight_video_job(job_id: str) -> None:
         concat_file.write_text(
             "\n".join(f"file '{path.resolve()}'" for path in rendered) + "\n", encoding="utf-8"
         )
+        _set_job_stage(
+            job_id,
+            progress=95,
+            stage="concat",
+            message="Assemblage des clips sélectionnés",
+        )
+        logger.info("Highlight concatenation started: job_id=%s clips=%d", job_id, len(rendered))
         subprocess.run(
             [
                 "ffmpeg",
@@ -682,8 +804,18 @@ def process_highlight_video_job(job_id: str) -> None:
             selection_json=json.dumps(selection),
             completed_at=_now(),
         )
+        logger.info(
+            "Highlight job completed: job_id=%s duration=%.1fs output=%s",
+            job_id,
+            time.monotonic() - started_monotonic,
+            output_path,
+        )
     except Exception as exc:
-        logger.exception("Highlight video job %s failed", job_id)
+        logger.exception(
+            "Highlight video job failed: job_id=%s elapsed=%.1fs",
+            job_id,
+            time.monotonic() - started_monotonic,
+        )
         _update_job(
             job_id, status=STATUS_FAILED, progress=100, message="Échec du rendu", error=str(exc)
         )
