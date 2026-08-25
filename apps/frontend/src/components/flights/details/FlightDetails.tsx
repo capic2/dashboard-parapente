@@ -40,6 +40,7 @@ import {
 import {
   useCancelFlightHighlightVideo,
   useCreateFlightHighlightVideo,
+  useDeleteFlightHighlightVideo,
   useFlightHighlightVideos,
 } from '../../../hooks/flights/useHighlightVideos';
 import { useToast } from '../../../hooks/useToast';
@@ -93,6 +94,7 @@ export function FlightDetails({
   const highlightVideosQuery = useFlightHighlightVideos(flight.id);
   const createHighlightVideo = useCreateFlightHighlightVideo(flight.id);
   const cancelHighlightVideo = useCancelFlightHighlightVideo(flight.id);
+  const deleteHighlightVideo = useDeleteFlightHighlightVideo(flight.id);
   const resetGoproOverlayJob = createGoproOverlayJob.reset;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeFlightIdRef = useRef(flight.id);
@@ -940,6 +942,26 @@ export function FlightDetails({
             });
           }}
           onDownloadHighlightVideo={() => void handleDownloadHighlightVideo()}
+          isHighlightDeletionPending={deleteHighlightVideo.isPending}
+          onDeleteHighlightVideo={() => {
+            if (
+              !latestHighlightVideo ||
+              !confirm(t('flights.highlightVideoConfirmDelete'))
+            ) {
+              return;
+            }
+            deleteHighlightVideo.mutate(latestHighlightVideo.job_id, {
+              onSuccess: () =>
+                toast.success(t('flights.highlightVideoDeleted')),
+              onError: async (error) =>
+                toast.error(
+                  await getApiErrorMessage(
+                    error,
+                    t('flights.highlightVideoDeleteError')
+                  )
+                ),
+            });
+          }}
           onCancelHighlightVideo={() => {
             if (!latestHighlightVideo) return;
             cancelHighlightVideo.mutate(latestHighlightVideo.job_id, {
