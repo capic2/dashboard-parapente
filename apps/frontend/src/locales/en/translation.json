@@ -1038,6 +1038,7 @@
     "mediaThumbnailUnavailable": "Thumbnail unavailable",
     "videoThumbnailAlt": "Flight video thumbnail",
     "panoThumbnailAlt": "Pano video thumbnail",
+    "highlightVideoThumbnailAlt": "Best-moments video thumbnail",
     "goproOverlayThumbnailAlt": "GoPro overlay thumbnail",
     "goproOverlayJobThumbnailAlt": "Thumbnail for overlay {{name}}",
     "videoNotGenerated": "Not generated yet",
@@ -1134,6 +1135,7 @@
       "title": "Generation logs",
       "description": "Readable tracking for media processing and publishing linked to this flight.",
       "videoTitle": "Flight video",
+      "highlightVideoTitle": "Best moments",
       "goproOverlayTitle": "GoPro overlay",
       "youtubeUploadTitle": "YouTube upload",
       "method": {

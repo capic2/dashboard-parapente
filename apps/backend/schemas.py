@@ -487,8 +487,9 @@ class YoutubeAuthUrlRequest(BaseModel):
 
 
 class YoutubeUploadCreate(BaseModel):
-    source_type: Literal["gopro_overlay", "pano"] = "gopro_overlay"
+    source_type: Literal["gopro_overlay", "pano", "highlight"] = "gopro_overlay"
     gopro_overlay_job_id: str | None = None
+    highlight_video_job_id: str | None = None
     title: str = Field(min_length=1, max_length=100)
     description: str = Field(default="", max_length=5000)
     privacy_status: Literal["private", "unlisted", "public"] = "private"
@@ -506,8 +507,12 @@ class YoutubeUploadCreate(BaseModel):
     def valid_source(self) -> "YoutubeUploadCreate":
         if self.source_type == "gopro_overlay" and self.gopro_overlay_job_id is None:
             raise ValueError("gopro_overlay_job_id is required for a GoPro overlay upload")
-        if self.source_type == "pano" and self.gopro_overlay_job_id is not None:
-            raise ValueError("gopro_overlay_job_id must be omitted for a panorama upload")
+        if self.source_type != "gopro_overlay" and self.gopro_overlay_job_id is not None:
+            raise ValueError("gopro_overlay_job_id must be omitted for this upload")
+        if self.source_type == "highlight" and self.highlight_video_job_id is None:
+            raise ValueError("highlight_video_job_id is required for a highlights upload")
+        if self.source_type != "highlight" and self.highlight_video_job_id is not None:
+            raise ValueError("highlight_video_job_id must be omitted for this upload")
         return self
 
     @validator("title")
@@ -521,8 +526,9 @@ class YoutubeUploadCreate(BaseModel):
 class YoutubeUploadJobResponse(BaseModel):
     job_id: str
     flight_id: str
-    source_type: Literal["gopro_overlay", "pano"]
+    source_type: Literal["gopro_overlay", "pano", "highlight"]
     gopro_overlay_job_id: str | None = None
+    highlight_video_job_id: str | None = None
     status: Literal["queued", "uploading", "completed", "failed", "cancelled"]
     progress: int = Field(ge=0, le=100)
     youtube_url: str | None = None

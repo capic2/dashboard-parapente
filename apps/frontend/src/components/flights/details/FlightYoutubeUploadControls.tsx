@@ -32,11 +32,15 @@ function getDefaultYoutubeTitle(
 ): string {
   const baseTitle =
     flight.name ?? flight.title ?? `Vol du ${flight.flight_date}`;
-  const suffix = ' pano';
+  const suffix =
+    source.source_type === 'highlight' ? ' meilleurs moments' : ' pano';
   const needsPanoSuffix =
     source.source_type === 'pano' && !/\bpano\b/iu.test(baseTitle);
+  const needsHighlightSuffix =
+    source.source_type === 'highlight' &&
+    !/meilleurs moments/iu.test(baseTitle);
 
-  if (!needsPanoSuffix) {
+  if (!needsPanoSuffix && !needsHighlightSuffix) {
     return baseTitle.slice(0, YOUTUBE_TITLE_MAX_LENGTH);
   }
 

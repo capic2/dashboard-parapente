@@ -24,7 +24,7 @@ from spatialmedia import metadata_utils
 import config
 from database import SessionLocal
 from flight_storage import pano_video_path
-from models import Flight, GoproOverlayJob, YoutubeCredential, YoutubeUploadJob
+from models import Flight, GoproOverlayJob, HighlightVideoJob, YoutubeCredential, YoutubeUploadJob
 from schemas import youtube_video_id_from_url
 
 logger = logging.getLogger(__name__)
@@ -247,6 +247,7 @@ def job_payload(job: YoutubeUploadJob) -> dict[str, Any]:
         "flight_id": job.flight_id,
         "source_type": job.source_type,
         "gopro_overlay_job_id": job.gopro_overlay_job_id,
+        "highlight_video_job_id": job.highlight_video_job_id,
         "status": job.status,
         "progress": job.progress or 0,
         "youtube_url": job.youtube_url,
@@ -261,12 +262,15 @@ def latest_job(
     *,
     source_type: str | None = None,
     gopro_overlay_job_id: str | None = None,
+    highlight_video_job_id: str | None = None,
 ) -> YoutubeUploadJob | None:
     query = db.query(YoutubeUploadJob).filter(YoutubeUploadJob.flight_id == flight_id)
     if source_type is not None:
         query = query.filter(YoutubeUploadJob.source_type == source_type)
     if gopro_overlay_job_id is not None:
         query = query.filter(YoutubeUploadJob.gopro_overlay_job_id == gopro_overlay_job_id)
+    if highlight_video_job_id is not None:
+        query = query.filter(YoutubeUploadJob.highlight_video_job_id == highlight_video_job_id)
     return query.order_by(YoutubeUploadJob.created_at.desc()).first()
 
 
@@ -613,7 +617,19 @@ def _source_video_path(db: Session, job: YoutubeUploadJob) -> Path:
             raise RuntimeError("Flight is no longer available")
         return pano_video_path(db, flight)
     if job.source_type != "gopro_overlay":
-        raise RuntimeError("YouTube upload has an unsupported video source")
+        if job.source_type != "highlight":
+            raise RuntimeError("YouTube upload has an unsupported video source")
+        if not job.highlight_video_job_id:
+            raise RuntimeError("YouTube upload has no highlights source")
+        highlight = db.get(HighlightVideoJob, job.highlight_video_job_id)
+        if (
+            highlight is None
+            or highlight.flight_id != job.flight_id
+            or highlight.status != "completed"
+            or not highlight.output_path
+        ):
+            raise RuntimeError("Best-moments video is no longer available")
+        return Path(highlight.output_path)
     if not job.gopro_overlay_job_id:
         raise RuntimeError("YouTube upload has no GoPro overlay source")
     overlay = db.get(GoproOverlayJob, job.gopro_overlay_job_id)

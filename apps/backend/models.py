@@ -378,6 +378,7 @@ class YoutubeUploadJob(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     source_type = Column(String(32), nullable=False, default="gopro_overlay", index=True)
     gopro_overlay_job_id = Column(String, nullable=True, index=True)
+    highlight_video_job_id = Column(String, nullable=True, index=True)
     status = Column(String, nullable=False, index=True)
     progress = Column(Integer, nullable=False, default=0)
     title = Column(String(100), nullable=False)

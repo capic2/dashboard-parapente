@@ -10,6 +10,7 @@ const {
   generatePreviewMutateMock,
   generatePreviewMock,
   mockFlight,
+  highlightVideoMock,
   overlayJobStreamMock,
   previewMock,
   removeYoutubeAssociationMock,
@@ -24,6 +25,7 @@ const {
   createOverlayMock: vi.fn(),
   generatePreviewMutateMock: vi.fn(),
   generatePreviewMock: vi.fn(),
+  highlightVideoMock: { current: null as unknown },
   resetOverlayMock: vi.fn(),
   updateFlightMock: vi.fn(),
   overlayJobStreamMock: { current: null as unknown },
@@ -192,6 +194,7 @@ vi.mock('react-i18next', () => ({
         'flights.generationLogs.title': 'Generation logs',
         'flights.generationLogs.description': 'Media job tracking',
         'flights.generationLogs.videoTitle': 'Flight video',
+        'flights.generationLogs.highlightVideoTitle': 'Best moments',
         'flights.generationLogs.goproOverlayTitle': 'GoPro overlay',
         'flights.generationLogs.youtubeUploadTitle': 'YouTube upload',
         'flights.generationLogs.progress': 'Progress',
@@ -200,6 +203,7 @@ vi.mock('react-i18next', () => ({
         'flights.generationLogs.noLogs': 'No logs yet.',
         'flights.generationLogs.noRawLogs': 'No raw logs.',
         'flights.generationLogs.status.running': 'Running',
+        'flights.generationLogs.status.completed': 'Completed',
         'flights.generationLogs.status.encoding': 'Encoding',
         'flights.generationLogs.status.failed': 'Failed',
         'flights.generationLogs.status.uploading': 'Uploading',
@@ -216,6 +220,10 @@ vi.mock('react-i18next', () => ({
         'flights.videoThumbnailAlt': 'Video thumbnail',
         'flights.goproOverlayThumbnailAlt': 'Legacy overlay thumbnail',
         'flights.goproOverlayJobThumbnailAlt': 'Overlay thumbnail',
+        'flights.highlightVideoTitle': 'Best moments',
+        'flights.highlightVideoDownload': 'Download video',
+        'flights.highlightVideoThumbnailAlt': 'Best moments thumbnail',
+        'flights.mediaFileAvailable': 'Ready to download',
         'flights.goproOverlayAddCardTitle': 'New GoPro overlay',
         'flights.goproOverlayAddCardDescription': 'Generate another overlay',
         'flights.goproOverlayProcessingBadge': 'Overlay progress',
@@ -251,6 +259,13 @@ vi.mock('../../../hooks/flights/useFlights', () => ({
 
 vi.mock('../../../hooks/flights/useVideoExportStatus', () => ({
   useVideoExportStatus: () => ({ status: videoStatusMock.current }),
+}));
+
+vi.mock('../../../hooks/flights/useHighlightVideos', () => ({
+  useFlightHighlightVideos: () => ({
+    data: highlightVideoMock.current ? [highlightVideoMock.current] : [],
+  }),
+  useCreateFlightHighlightVideo: () => ({ isPending: false, mutate: vi.fn() }),
 }));
 
 vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
@@ -372,6 +387,7 @@ describe('FlightDetails GoPro overlay action', () => {
     videoStatusMock.current = null;
     youtubeUploadMock.current = null;
     youtubeAssociationsMock.current = [];
+    highlightVideoMock.current = null;
     removeYoutubeAssociationMock.mockReset();
     removeYoutubeAssociationMock.mockResolvedValue(undefined);
   });
@@ -659,6 +675,43 @@ describe('FlightDetails GoPro overlay action', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Video thumbnail')).toBeInTheDocument();
     expect(screen.getByText('New GoPro overlay')).toBeInTheDocument();
+  });
+
+  it('shows completed best moments in the available files and processing tabs', () => {
+    highlightVideoMock.current = {
+      job_id: 'highlight-1',
+      flight_id: 'flight-1',
+      status: 'completed',
+      progress: 100,
+      message: 'Best moments ready',
+      error: null,
+      output_format: 'original',
+      overlay_offset_seconds: 0,
+      selection: [],
+      created_at: '2026-03-15T10:00:00Z',
+      completed_at: '2026-03-15T10:05:00Z',
+    };
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    openTab('Media');
+    expect(screen.getByText('Best moments thumbnail')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Download video' })
+    ).toBeInTheDocument();
+
+    openTab('Processing');
+    expect(screen.getByText('Best moments')).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: /Best moments Completed/ })
+    );
+    expect(screen.getByText('Best moments ready')).toBeInTheDocument();
   });
 
   it('offers video generation from the video card when no file exists', () => {

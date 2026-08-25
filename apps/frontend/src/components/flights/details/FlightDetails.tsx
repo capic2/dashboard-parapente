@@ -16,7 +16,6 @@ import type { YoutubeVideoAssociation } from '@dashboard-parapente/shared-types'
 import {
   ChevronDown,
   CircleAlert,
-  Download,
   Edit3,
   FileUp,
   Images,
@@ -623,7 +622,8 @@ export function FlightDetails({
     effectiveGoproOverlayJobId ||
     flight.gopro_overlay_status ||
     persistedGoproOverlays.length > 0 ||
-    youtubeUploadJob?.job_id
+    youtubeUploadJob?.job_id ||
+    latestHighlightVideo?.job_id
   );
   const visibleActiveTab =
     !hasGenerationLogs && activeTab === 'logs' ? 'infos' : activeTab;
@@ -843,6 +843,7 @@ export function FlightDetails({
       goproOverlayFallbackStatus={flight.gopro_overlay_status}
       goproOverlayFallbackProgress={flight.gopro_overlay_progress}
       youtubeUploadJob={youtubeUploadJob}
+      highlightVideo={latestHighlightVideo}
     />
   );
 
@@ -921,6 +922,8 @@ export function FlightDetails({
           onDownloadPersistedGoproOverlay={() =>
             void handleDownloadPersistedGoproOverlay()
           }
+          highlightVideo={latestHighlightVideo}
+          onDownloadHighlightVideo={() => void handleDownloadHighlightVideo()}
         >
           {visibleGoproOverlays.map((overlay) => (
             <GoproOverlayJobCard
@@ -986,17 +989,6 @@ export function FlightDetails({
                     {latestHighlightVideo.status === 'running' &&
                       ` · ${latestHighlightVideo.progress}%`}
                   </p>
-                )}
-                {latestHighlightVideo?.status === 'completed' && (
-                  <Button
-                    variant="outline"
-                    className="mt-3 min-h-10 rounded-lg border-violet-300 px-3 py-2 text-sm dark:border-violet-700"
-                    onPress={() => void handleDownloadHighlightVideo()}
-                    isDisabled={isDownloadingAnyMedia}
-                  >
-                    <Download className="h-4 w-4" aria-hidden="true" />
-                    {t('flights.highlightVideoDownload')}
-                  </Button>
                 )}
                 <Button
                   variant="outline"
