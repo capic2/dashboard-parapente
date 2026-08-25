@@ -1040,6 +1040,8 @@
     "openMediaThumbnail": "Agrandir {{name}}",
     "enlargeMediaThumbnail": "Agrandir",
     "mediaThumbnailUnavailable": "Miniature indisponible",
+    "gpxThumbnailAlt": "Aperçu de la trace GPS du vol",
+    "gpxThumbnailUnavailable": "Trace GPS indisponible",
     "videoThumbnailAlt": "Miniature de la vidéo du vol",
     "panoThumbnailAlt": "Miniature de la vidéo Pano",
     "goproOverlayThumbnailAlt": "Miniature de l’overlay GoPro",
