@@ -2,7 +2,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from highlight_video import HighlightClip, clamp_clip, overlay_interval_for_clip
-from highlight_video_worker import _probe_video_dimensions, select_flight_event_clips
+from highlight_video_worker import (
+    _probe_video_dimensions,
+    _set_job_stage,
+    select_flight_event_clips,
+)
 
 
 def test_clip_maps_pano_time_to_overlay_time():
@@ -62,3 +66,25 @@ def test_probe_video_dimensions_accepts_ffprobe_trailing_separator():
     result = type("Result", (), {"stdout": "6000x3000x\n"})()
     with patch("highlight_video_worker.subprocess.run", return_value=result):
         assert _probe_video_dimensions(Path("/tmp/pano.mp4")) == (6000, 3000)
+
+
+def test_set_job_stage_persists_progress_and_logs_stage():
+    with (
+        patch("highlight_video_worker._update_job") as update_job,
+        patch("highlight_video_worker.logger") as logger,
+    ):
+        _set_job_stage(
+            "highlight-1",
+            progress=10,
+            stage="frame_scoring",
+            message="Analyse des images",
+        )
+
+    update_job.assert_called_once_with("highlight-1", progress=10, message="Analyse des images")
+    logger.info.assert_called_once_with(
+        "Highlight job stage: job_id=%s stage=%s progress=%d message=%s",
+        "highlight-1",
+        "frame_scoring",
+        10,
+        "Analyse des images",
+    )
