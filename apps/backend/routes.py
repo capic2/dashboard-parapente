@@ -936,8 +936,9 @@ def remove_flight_youtube_video(
 )
 def get_flight_youtube_upload(
     flight_id: str,
-    source_type: Literal["gopro_overlay", "pano"] | None = None,
+    source_type: Literal["gopro_overlay", "pano", "highlight"] | None = None,
     gopro_overlay_job_id: str | None = None,
+    highlight_video_job_id: str | None = None,
     db: Session = Depends(get_db),
 ) -> dict[str, Any] | None:
     if db.get(Flight, flight_id) is None:
@@ -947,6 +948,7 @@ def get_flight_youtube_upload(
         flight_id,
         source_type=source_type,
         gopro_overlay_job_id=gopro_overlay_job_id,
+        highlight_video_job_id=highlight_video_job_id,
     )
     return youtube_upload_job_payload(job) if job else None
 
@@ -970,6 +972,7 @@ def start_flight_youtube_upload(
     if flight is None:
         raise HTTPException(status_code=404, detail="Flight not found")
     overlay = None
+    highlight = None
     if payload.source_type == "gopro_overlay":
         overlay = db.get(GoproOverlayJobModel, payload.gopro_overlay_job_id)
         if overlay is None or overlay.flight_id != flight.id:
@@ -979,6 +982,20 @@ def start_flight_youtube_upload(
             raise HTTPException(
                 status_code=409, detail="Generate the GoPro overlay before uploading"
             )
+    elif payload.source_type == "highlight":
+        highlight = db.get(HighlightVideoJob, payload.highlight_video_job_id)
+        if (
+            highlight is None
+            or highlight.flight_id != flight.id
+            or highlight.status != "completed"
+            or not highlight.output_path
+        ):
+            raise HTTPException(
+                status_code=409, detail="Generate the best-moments video before uploading"
+            )
+        video_path = Path(highlight.output_path)
+        if not video_path.is_file():
+            raise HTTPException(status_code=409, detail="Best-moments video is not available")
     else:
         video_path = pano_video_path(db, flight)
         if not video_path.is_file():
@@ -993,6 +1010,10 @@ def start_flight_youtube_upload(
     if overlay is not None:
         completed_source_query = completed_source_query.filter(
             YoutubeUploadJob.gopro_overlay_job_id == overlay.id
+        )
+    if highlight is not None:
+        completed_source_query = completed_source_query.filter(
+            YoutubeUploadJob.highlight_video_job_id == highlight.id
         )
     completed_source_jobs = completed_source_query.all()
     if completed_source_jobs:
@@ -1027,6 +1048,7 @@ def start_flight_youtube_upload(
         user_id=user.id,
         source_type=payload.source_type,
         gopro_overlay_job_id=overlay.id if overlay is not None else None,
+        highlight_video_job_id=highlight.id if highlight is not None else None,
         status="queued",
         progress=0,
         title=payload.title,
@@ -4719,6 +4741,26 @@ def download_flight_highlight_video(
     if not output_path.is_file():
         raise HTTPException(status_code=404, detail="Highlight video file not found")
     return FileResponse(path=output_path, media_type="video/mp4", filename=output_path.name)
+
+
+@router.get("/flights/{flight_id}/highlight-videos/{job_id}/thumbnail")
+def get_flight_highlight_video_thumbnail(
+    flight_id: str, job_id: str, db: Session = Depends(get_db)
+) -> FileResponse:
+    """Return a thumbnail for a completed best-moments video."""
+    job = (
+        db.query(HighlightVideoJob)
+        .filter(HighlightVideoJob.id == job_id, HighlightVideoJob.flight_id == flight_id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Highlight video job not found")
+    if job.status != "completed" or not job.output_path:
+        raise HTTPException(status_code=404, detail="Highlight video is not ready")
+    output_path = Path(job.output_path)
+    if not output_path.is_file():
+        raise HTTPException(status_code=404, detail="Highlight video file not found")
+    return _video_thumbnail_response(output_path)
 
 
 @router.post(
