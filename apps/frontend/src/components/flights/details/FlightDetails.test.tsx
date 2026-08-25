@@ -160,92 +160,101 @@ vi.mock('react-aria-components', () => ({
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     i18n: { language: 'en' },
-    t: (key: string) =>
-      ({
-        'flights.goproOverlayCancel': 'Cancel overlay',
-        'flights.goproOverlayCancelShort': 'Cancel overlay',
-        'flights.goproOverlayConfirmCancel': 'Confirm cancel overlay',
-        'flights.goproOverlayConfirmRegenerate': 'Confirm regenerate overlay',
-        'flights.goproOverlayAdditionalResolution':
-          'The existing overlay will be kept',
-        'flights.goproOverlayRegenerate': 'Regenerate overlay',
-        'flights.goproOverlayRegenerateShort': 'Regenerate overlay',
-        'flights.goproOverlayGenerate': 'Generate overlay',
-        'flights.goproOverlayGenerateShort': 'Generate overlay',
-        'flights.goproOverlayOutputResolutionLabel': 'Output resolution',
-        'flights.goproOverlayOutputResolution1080p': '1080p (1920 × 1080)',
-        'flights.goproOverlayOutputResolution4k': '4K (3840 × 2160)',
-        'flights.goproOverlayOutputResolutionHint': 'Resolution hint',
-        'flights.goproOverlayGpxOffsetLabel': 'GPX offset (seconds)',
-        'flights.goproOverlayGpxOffsetHint': 'Offset hint',
-        'common.reset': 'Reset',
-        'flights.goproOverlayStarted': 'Overlay started',
-        'flights.goproOverlayCancelled': 'Overlay cancelled',
-        'flights.goproOverlayStartError': 'Overlay start error',
-        'flights.goproOverlayCancelError': 'Overlay cancel error',
-        'flights.goproOverlayDelete': 'Delete overlay',
-        'flights.goproOverlayDeleting': 'Deleting overlay',
-        'flights.goproOverlayConfirmDelete': 'Confirm delete overlay',
-        'flights.goproOverlayDeleted': 'Overlay deleted',
-        'flights.goproOverlayDeleteError': 'Overlay delete error',
-        'flights.goproOverlayNeedsVideo': 'Needs video',
-        'flights.goproOverlayNeedsCameraVideo': 'Needs camera video',
-        'flights.trackFileLabel': 'GPX/IGC file',
-        'flights.generationLogs.title': 'Generation logs',
-        'flights.generationLogs.description': 'Media job tracking',
-        'flights.generationLogs.videoTitle': 'Flight video',
-        'flights.generationLogs.highlightVideoTitle': 'Best moments',
-        'flights.generationLogs.goproOverlayTitle': 'GoPro overlay',
-        'flights.generationLogs.youtubeUploadTitle': 'YouTube upload',
-        'flights.generationLogs.progress': 'Progress',
-        'flights.generationLogs.error': 'Error',
-        'flights.generationLogs.rawLogs': 'Raw logs',
-        'flights.generationLogs.noLogs': 'No logs yet.',
-        'flights.generationLogs.noRawLogs': 'No raw logs.',
-        'flights.generationLogs.status.running': 'Running',
-        'flights.generationLogs.status.completed': 'Completed',
-        'flights.generationLogs.status.encoding': 'Encoding',
-        'flights.generationLogs.status.failed': 'Failed',
-        'flights.generationLogs.status.uploading': 'Uploading',
-        'flights.generationLogs.method.cpu': 'CPU',
-        'flights.generationLogs.method.gpu': 'GPU',
-        'flights.infoTab': 'Summary',
-        'flights.replayTab': 'Media',
-        'flights.logsTab': 'Processing',
-        'flights.mediaPageTitle': 'Flight media',
-        'flights.mediaReplayTitle': 'Flight replay',
-        'flights.mediaFilesTitle': 'Available files',
-        'flights.panoBadge': 'Pano',
-        'flights.panoThumbnailAlt': 'Pano thumbnail',
-        'flights.videoThumbnailAlt': 'Video thumbnail',
-        'flights.goproOverlayThumbnailAlt': 'Legacy overlay thumbnail',
-        'flights.goproOverlayJobThumbnailAlt': 'Overlay thumbnail',
-        'flights.highlightVideoTitle': 'Best moments',
-        'flights.highlightVideoGenerate': 'Generate best moments',
-        'flights.highlightVideoDownload': 'Download video',
-        'flights.highlightVideoThumbnailAlt': 'Best moments thumbnail',
-        'flights.mediaFileAvailable': 'Ready to download',
-        'flights.goproOverlayAddCardTitle': 'New GoPro overlay',
-        'flights.goproOverlayAddCardDescription': 'Generate another overlay',
-        'flights.goproOverlayProcessingBadge': 'Overlay progress',
-        'flights.youtubeVideos': 'YouTube videos',
-        'flights.youtubeVideoTitle': 'Flight YouTube video',
-        'flights.openOnYoutube': 'Open on YouTube',
-        'flights.removeYoutubeAssociation': 'Remove association',
-        'flights.youtubeAssociationRemoving': 'Removing association',
-        'flights.youtubeAssociationRemoved': 'Association removed',
-        'flights.youtubeAssociationRemoveError': 'Association removal error',
-        'flights.youtubeRemovalDialogTitle': 'Remove YouTube video',
-        'flights.youtubeRemovalManualDescription':
-          'The video remains on YouTube.',
-        'flights.youtubeRemovalOwnedDescription': 'Choose removal type.',
-        'flights.youtubeRemovalPermanentWarning':
-          'Permanent deletion cannot be undone.',
-        'flights.youtubeRemovalDissociate': 'Dissociate only',
-        'flights.youtubeRemovalDeletePermanently':
-          'Delete permanently from YouTube',
-        'common.cancel': 'Cancel',
-      })[key] ?? key,
+    t: (key: string, options?: { count?: number }) => {
+      const value =
+        {
+          'flights.goproOverlayCancel': 'Cancel overlay',
+          'flights.goproOverlayCancelShort': 'Cancel overlay',
+          'flights.goproOverlayConfirmCancel': 'Confirm cancel overlay',
+          'flights.goproOverlayConfirmRegenerate': 'Confirm regenerate overlay',
+          'flights.goproOverlayAdditionalResolution':
+            'The existing overlay will be kept',
+          'flights.goproOverlayRegenerate': 'Regenerate overlay',
+          'flights.goproOverlayRegenerateShort': 'Regenerate overlay',
+          'flights.goproOverlayGenerate': 'Generate overlay',
+          'flights.goproOverlayGenerateShort': 'Generate overlay',
+          'flights.goproOverlayOutputResolutionLabel': 'Output resolution',
+          'flights.goproOverlayOutputResolution1080p': '1080p (1920 × 1080)',
+          'flights.goproOverlayOutputResolution4k': '4K (3840 × 2160)',
+          'flights.goproOverlayOutputResolutionHint': 'Resolution hint',
+          'flights.goproOverlayGpxOffsetLabel': 'GPX offset (seconds)',
+          'flights.goproOverlayGpxOffsetHint': 'Offset hint',
+          'common.reset': 'Reset',
+          'flights.goproOverlayStarted': 'Overlay started',
+          'flights.goproOverlayCancelled': 'Overlay cancelled',
+          'flights.goproOverlayStartError': 'Overlay start error',
+          'flights.goproOverlayCancelError': 'Overlay cancel error',
+          'flights.goproOverlayDelete': 'Delete overlay',
+          'flights.goproOverlayDeleting': 'Deleting overlay',
+          'flights.goproOverlayConfirmDelete': 'Confirm delete overlay',
+          'flights.goproOverlayDeleted': 'Overlay deleted',
+          'flights.goproOverlayDeleteError': 'Overlay delete error',
+          'flights.goproOverlayNeedsVideo': 'Needs video',
+          'flights.goproOverlayNeedsCameraVideo': 'Needs camera video',
+          'flights.trackFileLabel': 'GPX/IGC file',
+          'flights.generationLogs.title': 'Generation logs',
+          'flights.generationLogs.description': 'Media job tracking',
+          'flights.generationLogs.videoTitle': 'Flight video',
+          'flights.generationLogs.highlightVideoTitle': 'Best moments',
+          'flights.generationLogs.goproOverlayTitle': 'GoPro overlay',
+          'flights.generationLogs.youtubeUploadTitle': 'YouTube upload',
+          'flights.generationLogs.progress': 'Progress',
+          'flights.generationLogs.error': 'Error',
+          'flights.generationLogs.rawLogs': 'Raw logs',
+          'flights.generationLogs.noLogs': 'No logs yet.',
+          'flights.generationLogs.noRawLogs': 'No raw logs.',
+          'flights.generationLogs.status.running': 'Running',
+          'flights.generationLogs.status.completed': 'Completed',
+          'flights.generationLogs.status.encoding': 'Encoding',
+          'flights.generationLogs.status.failed': 'Failed',
+          'flights.generationLogs.status.uploading': 'Uploading',
+          'flights.generationLogs.method.cpu': 'CPU',
+          'flights.generationLogs.method.gpu': 'GPU',
+          'flights.infoTab': 'Summary',
+          'flights.replayTab': 'Media',
+          'flights.logsTab': 'Processing',
+          'flights.mediaPageTitle': 'Flight media',
+          'flights.mediaReplayTitle': 'Flight replay',
+          'flights.mediaFilesTitle': 'Available files',
+          'flights.panoBadge': 'Pano',
+          'flights.panoThumbnailAlt': 'Pano thumbnail',
+          'flights.videoThumbnailAlt': 'Video thumbnail',
+          'flights.goproOverlayThumbnailAlt': 'Legacy overlay thumbnail',
+          'flights.goproOverlayJobThumbnailAlt': 'Overlay thumbnail',
+          'flights.goproOverlayStackTitle': 'Generated overlays',
+          'flights.goproOverlayStackCount': '{{count}} overlay versions',
+          'flights.goproOverlayStackExpand': 'Show overlay versions',
+          'flights.goproOverlayStackCollapse': 'Hide overlay versions',
+          'flights.highlightVideoTitle': 'Best moments',
+          'flights.highlightVideoGenerate': 'Generate best moments',
+          'flights.highlightVideoDownload': 'Download video',
+          'flights.highlightVideoThumbnailAlt': 'Best moments thumbnail',
+          'flights.mediaFileAvailable': 'Ready to download',
+          'flights.goproOverlayAddCardTitle': 'New GoPro overlay',
+          'flights.goproOverlayAddCardDescription': 'Generate another overlay',
+          'flights.goproOverlayProcessingBadge': 'Overlay progress',
+          'flights.youtubeVideos': 'YouTube videos',
+          'flights.youtubeVideoTitle': 'Flight YouTube video',
+          'flights.openOnYoutube': 'Open on YouTube',
+          'flights.removeYoutubeAssociation': 'Remove association',
+          'flights.youtubeAssociationRemoving': 'Removing association',
+          'flights.youtubeAssociationRemoved': 'Association removed',
+          'flights.youtubeAssociationRemoveError': 'Association removal error',
+          'flights.youtubeRemovalDialogTitle': 'Remove YouTube video',
+          'flights.youtubeRemovalManualDescription':
+            'The video remains on YouTube.',
+          'flights.youtubeRemovalOwnedDescription': 'Choose removal type.',
+          'flights.youtubeRemovalPermanentWarning':
+            'Permanent deletion cannot be undone.',
+          'flights.youtubeRemovalDissociate': 'Dissociate only',
+          'flights.youtubeRemovalDeletePermanently':
+            'Delete permanently from YouTube',
+          'common.cancel': 'Cancel',
+        }[key] ?? key;
+      return options?.count === undefined
+        ? value
+        : value.replace('{{count}}', String(options.count));
+    },
   }),
 }));
 
@@ -874,6 +883,66 @@ describe('FlightDetails GoPro overlay action', () => {
     });
     expect(progressbars).toHaveLength(1);
     expect(progressbars[0]).toHaveAttribute('aria-valuenow', '61');
+  });
+
+  it('groups multiple overlay cards into an expandable stack', () => {
+    mockFlight.gopro_overlays = [
+      {
+        flight_id: mockFlight.id,
+        job_id: 'overlay-1080p',
+        status: 'completed',
+        progress: 100,
+        message: 'Overlay ready',
+        layout_id: 'parapente',
+        layout_label: 'Parapente',
+        output_filename: 'overlay-1080p.mp4',
+        gpx_offset: 0,
+        created_at: '2026-03-15T12:00:00Z',
+        updated_at: '2026-03-15T12:01:00Z',
+        completed_at: '2026-03-15T12:01:00Z',
+        log_tail: [],
+      },
+      {
+        flight_id: mockFlight.id,
+        job_id: 'overlay-4k',
+        status: 'completed',
+        progress: 100,
+        message: 'Overlay ready',
+        layout_id: 'parapente',
+        layout_label: 'Parapente',
+        output_filename: 'overlay-4k.mp4',
+        gpx_offset: 0,
+        created_at: '2026-03-15T12:02:00Z',
+        updated_at: '2026-03-15T12:03:00Z',
+        completed_at: '2026-03-15T12:03:00Z',
+        log_tail: [],
+      },
+    ];
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    openTab('Media');
+
+    expect(screen.getByText('Generated overlays')).toBeInTheDocument();
+    expect(screen.getByText('2 overlay versions')).toBeInTheDocument();
+    expect(screen.queryByText('overlay-1080p.mp4')).not.toBeInTheDocument();
+    expect(screen.queryByText('overlay-4k.mp4')).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Show overlay versions' })
+    );
+
+    expect(screen.getByText('overlay-1080p.mp4')).toBeInTheDocument();
+    expect(screen.getByText('overlay-4k.mp4')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Hide overlay versions' })
+    ).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('passes the GPX offset when starting overlay generation', async () => {
@@ -1549,6 +1618,10 @@ describe('FlightDetails GoPro overlay action', () => {
     );
 
     openTab('Media');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Show overlay versions' })
+    );
 
     expect(screen.getByText('test-flight-4k.mp4')).toBeInTheDocument();
     expect(screen.getByText('test-flight-1080p.mp4')).toBeInTheDocument();
