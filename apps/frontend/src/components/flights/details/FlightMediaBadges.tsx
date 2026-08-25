@@ -16,6 +16,7 @@ import {
 import type { Flight } from '../../../types';
 import { FlightVideoExportControls } from '../video-export/FlightVideoExportControls';
 import { FlightMediaThumbnail } from './FlightMediaThumbnail';
+import { FlightGpxThumbnail } from './FlightGpxThumbnail';
 import { FlightYoutubeUploadControls } from './FlightYoutubeUploadControls';
 
 interface FlightMediaBadgesProps {
@@ -110,29 +111,32 @@ export function FlightMediaBadges({
 
       <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
         {hasGpx && (
-          <button
-            type="button"
-            className={downloadCardClassName}
-            onClick={onDownloadGpx}
-            disabled={isDownloadingAnyMedia}
-            aria-label={t('flights.downloadGpx')}
-          >
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
-              <FileText className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-semibold text-slate-950 dark:text-white">
-                {t('flights.gpxBadge')}
+          <div className="overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm dark:border-emerald-800 dark:bg-slate-900/60">
+            <FlightGpxThumbnail flightId={flightId} />
+            <button
+              type="button"
+              className={`${downloadCardClassName} min-h-0 w-full rounded-none border-0 border-t border-emerald-100 shadow-none dark:border-emerald-900/70`}
+              onClick={onDownloadGpx}
+              disabled={isDownloadingAnyMedia}
+              aria-label={t('flights.downloadGpx')}
+            >
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                <FileText className="h-5 w-5" aria-hidden="true" />
               </span>
-              <span className="block text-xs text-slate-600 dark:text-slate-300">
-                {t('flights.mediaFileAvailable')}
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-slate-950 dark:text-white">
+                  {t('flights.gpxBadge')}
+                </span>
+                <span className="block text-xs text-slate-600 dark:text-slate-300">
+                  {t('flights.mediaFileAvailable')}
+                </span>
               </span>
-            </span>
-            <Download
-              className="h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-indigo-600 dark:group-hover:text-indigo-300"
-              aria-hidden="true"
-            />
-          </button>
+              <Download
+                className="h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-indigo-600 dark:group-hover:text-indigo-300"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
         )}
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
           {hasVideo && (

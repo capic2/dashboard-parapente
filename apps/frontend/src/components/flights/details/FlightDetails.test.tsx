@@ -251,6 +251,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useQuery: () => ({ data: null }),
 }));
 
 vi.mock('../../../hooks/flights/useFlights', () => ({
