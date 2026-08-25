@@ -712,17 +712,21 @@ def test_create_flight_gopro_overlay_job_uses_auto_flight_directory_files(
     second_gpx_path = input_dir / "Zepp-b.gpx"
     old_pip_path = input_dir / "flight-old.mp4"
     new_pip_path = input_dir / "flight-new.MP4"
+    previous_overlay_path = input_dir / "flight-overlay.mp4"
     camera_path.write_bytes(b"camera")
     first_gpx_path.write_text("<gpx>first</gpx>")
     second_gpx_path.write_text("<gpx>second</gpx>")
     old_pip_path.write_bytes(b"old")
     new_pip_path.write_bytes(b"new")
+    previous_overlay_path.write_bytes(b"already-overlayed")
     sample_flight.video_file_path = str(new_pip_path)
+    sample_flight.gopro_overlay_file_path = str(previous_overlay_path)
     db_session.commit()
     os.utime(first_gpx_path, (2, 2))
     os.utime(second_gpx_path, (1, 1))
     os.utime(old_pip_path, (1, 1))
     os.utime(new_pip_path, (2, 2))
+    os.utime(previous_overlay_path, (3, 3))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
 
     expected = {

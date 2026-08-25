@@ -6503,7 +6503,12 @@ async def create_flight_gopro_overlay_job(
         resolved_pip_path = _resolve_gopro_paragliding_path(pip_path)
         auto_video_path = input_dir / "camera.mp4"
         auto_gpx_path = first_matching_file(input_dir, "Zepp*.gpx")
-        auto_pip_path = latest_matching_file(input_dir, "flight*.mp4")
+        previous_overlay_path = _resolve_flight_file_path(flight.gopro_overlay_file_path)
+        auto_pip_path = latest_matching_file(
+            input_dir,
+            "flight*.mp4",
+            (previous_overlay_path,) if previous_overlay_path else (),
+        )
         auto_osv_paths = _matching_files_by_mtime(input_dir, "*.osv")
         logger.info(
             "GoPro overlay auto inputs for flight %s in %s: camera=%s, gpx=%s, pip=%s, osv=%s",
