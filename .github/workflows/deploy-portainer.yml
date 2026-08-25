@@ -842,9 +842,33 @@ jobs:
               fi
             }
 
+            deploy_with_retry() {
+              deploy_name="$1"
+              deploy_attempt=1
+              deploy_max_attempts=2
+
+              while [ "$deploy_attempt" -le "$deploy_max_attempts" ]; do
+                echo "Starting $deploy_name deployment attempt $deploy_attempt/$deploy_max_attempts"
+                if [ "$deploy_name" = "configured compose path" ]; then
+                  deploy_from_compose_path "$DEPLOY_PATH" && return 0
+                else
+                  deploy_from_portainer_volume && return 0
+                fi
+
+                if [ "$deploy_attempt" -lt "$deploy_max_attempts" ]; then
+                  echo "Deployment attempt failed; waiting 20 seconds before retrying the stack"
+                  sleep 20
+                fi
+                deploy_attempt=$((deploy_attempt + 1))
+              done
+
+              echo "$deploy_name deployment failed after $deploy_max_attempts attempts"
+              return 1
+            }
+
             if [ -n "$DEPLOY_PATH" ] && [ -d "$DEPLOY_PATH" ]; then
               echo "Deploying from configured compose path: $DEPLOY_PATH"
-              if ! deploy_from_compose_path "$DEPLOY_PATH"; then
+              if ! deploy_with_retry "configured compose path"; then
                 exit 1
               fi
               if ! verify_local_backend_version; then
@@ -860,7 +884,7 @@ jobs:
 
             if resolve_from_portainer_volume; then
               echo "Configured host path unavailable, deploying compose from Portainer volume $PORTAINER_VOLUME (stack $STACK_ID)"
-              if ! deploy_from_portainer_volume; then
+              if ! deploy_with_retry "Portainer volume"; then
                 exit 1
               fi
               if ! verify_local_backend_version; then
