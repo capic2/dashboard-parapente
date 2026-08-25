@@ -7303,6 +7303,7 @@ async def get_emagram_hours(
                 EmagramAnalysis.analysis_status,
                 EmagramAnalysis.error_message,
                 EmagramAnalysis.id,
+                EmagramAnalysis.plafond_thermique_m,
                 EmagramAnalysis.analysis_datetime,
             )
             .filter(
@@ -7375,6 +7376,9 @@ async def get_emagram_hours(
                     "hour": hour,
                     "score": (
                         latest_by_hour[hour].score_volabilite if hour in latest_by_hour else None
+                    ),
+                    "ceiling_m": (
+                        latest_by_hour[hour].plafond_thermique_m if hour in latest_by_hour else None
                     ),
                     "status": (
                         latest_by_hour[hour].analysis_status
