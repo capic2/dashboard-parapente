@@ -319,6 +319,7 @@
       "precipitationWithUnit": "Precip. (mm)",
       "cloudsWithUnit": "Clouds (%)",
       "thermals": "Thermals",
+      "ceiling": "Ceiling",
       "flyability": "Flyability",
       "flightScore": "Adjusted flight score",
       "rawParaIndex": "Raw weather Para-Index",

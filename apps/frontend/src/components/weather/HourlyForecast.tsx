@@ -11,6 +11,7 @@ import {
   CloudRain,
   Cloud,
   Flame,
+  Mountain,
   CircleCheck,
   RefreshCw,
 } from 'lucide-react';
@@ -37,6 +38,7 @@ interface HourlyForecastProps {
   isForceRefreshing?: boolean;
   onForceRefresh?: () => void;
   flightDecision?: FlightDecisionResponse;
+  thermalCeilingByHour?: ReadonlyMap<number, number | null>;
 }
 
 type HourlyFlightDecision = FlightDecisionResponse['hourly'][number];
@@ -906,6 +908,7 @@ export default function HourlyForecast({
   isForceRefreshing = false,
   onForceRefresh,
   flightDecision,
+  thermalCeilingByHour,
 }: HourlyForecastProps) {
   const { t } = useTranslation();
   const {
@@ -1037,6 +1040,10 @@ export default function HourlyForecast({
   }
 
   const flyingHours = weather.hourly_forecast;
+  const getThermalCeiling = (hour: HourlyForecastItem): number | null => {
+    const hourNumber = Number.parseInt(hour.hour, 10);
+    return thermalCeilingByHour?.get(hourNumber) ?? null;
+  };
 
   const getDisplayDecisionForHour = (hour: HourlyForecastItem) => {
     const hourNumber = Number.parseInt(hour.hour, 10);
@@ -1271,6 +1278,7 @@ export default function HourlyForecast({
               hour.sources?.['open-meteo']?.wind_gust ??
               hour.sources?.['weatherapi']?.wind_gust ??
               null;
+            const thermalCeiling = getThermalCeiling(hour);
             const display = getFlyabilityDisplay(
               displayedHour,
               uiThresholds,
@@ -1397,6 +1405,18 @@ export default function HourlyForecast({
                         : '—'}
                     </div>
                   </div>
+                  <div className="rounded-xl border border-white/80 bg-white/85 p-2 dark:border-slate-800 dark:bg-slate-950/55">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      <Mountain
+                        className="h-3.5 w-3.5 text-emerald-600"
+                        aria-hidden="true"
+                      />
+                      {t('weather.hourly.ceiling')}
+                    </span>
+                    <div className="font-bold text-slate-950 dark:text-white">
+                      {thermalCeiling !== null ? `${thermalCeiling} m` : '—'}
+                    </div>
+                  </div>
                 </div>
               </article>
             );
@@ -1482,6 +1502,12 @@ export default function HourlyForecast({
                   {t('weather.hourly.thermals')}
                 </span>
               </th>
+              <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
+                <span className="inline-flex items-center justify-center gap-1">
+                  <Mountain size={14} aria-hidden="true" />{' '}
+                  {t('weather.hourly.ceiling')}
+                </span>
+              </th>
             </tr>
           </thead>
           <tbody className="text-gray-800 dark:text-gray-100">
@@ -1515,6 +1541,7 @@ export default function HourlyForecast({
                   hour.sources?.['open-meteo']?.wind_gust ??
                   hour.sources?.['weatherapi']?.wind_gust ??
                   null;
+                const thermalCeiling = getThermalCeiling(hour);
 
                 return (
                   <tr
@@ -1712,13 +1739,17 @@ export default function HourlyForecast({
                     <td className="py-2.5 px-2 text-center">
                       {hour.thermal_strength || t('weather.hourly.weak')}
                     </td>
+
+                    <td className="py-2.5 px-2 text-center font-semibold text-emerald-700 dark:text-emerald-300">
+                      {thermalCeiling !== null ? `${thermalCeiling} m` : '—'}
+                    </td>
                   </tr>
                 );
               })
             ) : (
               <tr>
                 <td
-                  colSpan={11}
+                  colSpan={12}
                   className="py-8 text-center text-gray-500 dark:text-gray-400"
                 >
                   {t('weather.hourly.noData')}
