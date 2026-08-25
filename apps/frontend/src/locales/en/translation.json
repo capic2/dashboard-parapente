@@ -1036,6 +1036,8 @@
     "openMediaThumbnail": "Enlarge {{name}}",
     "enlargeMediaThumbnail": "Enlarge",
     "mediaThumbnailUnavailable": "Thumbnail unavailable",
+    "gpxThumbnailAlt": "Flight GPS track preview",
+    "gpxThumbnailUnavailable": "GPS track unavailable",
     "videoThumbnailAlt": "Flight video thumbnail",
     "panoThumbnailAlt": "Pano video thumbnail",
     "highlightVideoThumbnailAlt": "Best-moments video thumbnail",
