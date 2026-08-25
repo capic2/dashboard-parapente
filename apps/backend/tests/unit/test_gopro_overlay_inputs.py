@@ -38,3 +38,21 @@ def test_overlay_inputs_fall_back_to_configured_files(tmp_path: Path) -> None:
 
     assert gpx_path == configured_gpx
     assert pip_path == generated_video
+
+
+def test_overlay_inputs_skip_the_previous_overlay_output(tmp_path: Path) -> None:
+    base_video = tmp_path / "flight-base.mp4"
+    previous_overlay = tmp_path / "flight-overlay.mp4"
+    base_video.write_bytes(b"base")
+    previous_overlay.write_bytes(b"overlay")
+    os.utime(base_video, ns=(1_000_000_000, 1_000_000_000))
+    os.utime(previous_overlay, ns=(2_000_000_000, 2_000_000_000))
+
+    _gpx_path, pip_path = resolve_automatic_overlay_inputs(
+        tmp_path,
+        None,
+        base_video,
+        previous_overlay,
+    )
+
+    assert pip_path == base_video
