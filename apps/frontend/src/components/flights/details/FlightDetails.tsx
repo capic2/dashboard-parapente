@@ -63,7 +63,7 @@ import { FlightNotesSection } from './FlightNotesSection';
 import { FlightReplayCard } from './FlightReplayCard';
 import { FlightStatsGrid } from './FlightStatsGrid';
 import { FlightYoutubeVideos } from './FlightYoutubeVideos';
-import { GoproOverlayJobCard } from './GoproOverlayJobCard';
+import { GoproOverlayJobStack } from './GoproOverlayJobStack';
 import { GoproOverlaySyncPreview } from './GoproOverlaySyncPreview';
 
 interface FlightDetailsProps {
@@ -953,19 +953,16 @@ export function FlightDetails({
             });
           }}
         >
-          {visibleGoproOverlays.map((overlay) => (
-            <GoproOverlayJobCard
-              key={overlay.job_id}
-              job={overlay}
-              youtubeUploadFlight={
-                overlay.status === 'completed' ? flight : undefined
-              }
+          {visibleGoproOverlays.length > 0 && (
+            <GoproOverlayJobStack
+              jobs={visibleGoproOverlays}
+              youtubeUploadFlight={flight}
               isDownloadingAnyMedia={isDownloadingAnyMedia}
-              isDeleting={deletingGoproOverlayJobId === overlay.job_id}
-              onDownload={() => void handleDownloadGoproOverlay(overlay)}
-              onDelete={() => void handleDeleteGoproOverlay(overlay)}
+              deletingJobId={deletingGoproOverlayJobId}
+              onDownload={(overlay) => void handleDownloadGoproOverlay(overlay)}
+              onDelete={(overlay) => void handleDeleteGoproOverlay(overlay)}
             />
-          ))}
+          )}
           <div className="flex min-h-48 flex-col justify-between rounded-xl border border-dashed border-cyan-300 bg-cyan-50/60 p-3 dark:border-cyan-800 dark:bg-cyan-950/20">
             <div>
               <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
