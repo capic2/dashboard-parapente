@@ -496,7 +496,18 @@ def _render_clip(
     overlay_offset_seconds: float,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_width, output_height = _output_dimensions(source_path)
+    render_path = source_path
+    render_start_seconds = clip.start_seconds
+    overlay_interval = None
+    if overlay_path and overlay_path.is_file():
+        overlay_interval = overlay_interval_for_clip(
+            clip, overlay_offset_seconds, _probe_duration(overlay_path)
+        )
+        if overlay_interval:
+            render_start_seconds, _ = overlay_interval
+            render_path = overlay_path
+
+    output_width, output_height = _output_dimensions(render_path)
     pano_filter = (
         f"v360=input=e:output=rectilinear:yaw={clip.yaw_degrees}:pitch=0:"
         f"h_fov=100:w={output_width}:h={output_height},setsar=1"
@@ -505,31 +516,17 @@ def _render_clip(
         "ffmpeg",
         "-y",
         "-ss",
-        f"{clip.start_seconds:.3f}",
+        f"{render_start_seconds:.3f}",
         "-i",
-        str(source_path),
+        str(render_path),
     ]
-    overlay_interval = None
-    if overlay_path and overlay_path.is_file():
-        overlay_interval = overlay_interval_for_clip(
-            clip, overlay_offset_seconds, _probe_duration(overlay_path)
-        )
     if overlay_interval:
-        overlay_start, _ = overlay_interval
-        command.extend(["-ss", f"{overlay_start:.3f}", "-i", str(overlay_path)])
-        filter_complex = (
-            f"[0:v]{pano_filter}[pano];"
-            "[1:v]scale=iw*0.32:-1[overlay];"
-            "[pano][overlay]overlay=W-w-32:H-h-32:eof_action=pass[v]"
-        )
         command.extend(
             [
                 "-t",
                 f"{clip.duration_seconds:.3f}",
-                "-filter_complex",
-                filter_complex,
                 "-map",
-                "[v]",
+                "0:v:0",
                 "-map",
                 "0:a?",
                 "-shortest",
