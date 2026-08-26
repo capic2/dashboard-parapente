@@ -4,8 +4,10 @@ import { Button } from '@dashboard-parapente/design-system';
 import type { HighlightVideoJob } from '@dashboard-parapente/shared-types';
 import {
   CircleAlert,
+  Camera,
   Download,
   FileText,
+  FileUp,
   FolderDown,
   LoaderCircle,
   Orbit,
@@ -25,6 +27,7 @@ interface FlightMediaBadgesProps {
   hasGpx: boolean;
   hasVideo: boolean;
   hasPanoVideo: boolean;
+  hasGoproCameraVideo: boolean;
   flight: Flight;
   hasPersistedGoproOverlay: boolean;
   hasCompletedGoproOverlayJob: boolean;
@@ -33,6 +36,7 @@ interface FlightMediaBadgesProps {
   isDownloadingAnyMedia: boolean;
   videoProcessingLabel: string;
   onDownloadGpx: () => void;
+  onUploadGpx: () => void;
   onDownloadVideo: () => void;
   onDownloadPersistedGoproOverlay: () => void;
   highlightVideo: HighlightVideoJob | null;
@@ -51,6 +55,7 @@ export function FlightMediaBadges({
   hasGpx,
   hasVideo,
   hasPanoVideo,
+  hasGoproCameraVideo,
   flight,
   hasPersistedGoproOverlay,
   hasCompletedGoproOverlayJob,
@@ -59,6 +64,7 @@ export function FlightMediaBadges({
   isDownloadingAnyMedia,
   videoProcessingLabel,
   onDownloadGpx,
+  onUploadGpx,
   onDownloadVideo,
   onDownloadPersistedGoproOverlay,
   highlightVideo,
@@ -89,9 +95,6 @@ export function FlightMediaBadges({
     videoStatusLabel = t('flights.videoErrorBadge');
   }
 
-  const downloadCardClassName =
-    'group flex min-h-24 cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition-colors duration-200 hover:border-indigo-300 hover:bg-indigo-50/60 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/30 dark:focus:ring-offset-gray-800';
-
   return (
     <section
       aria-labelledby="flight-media-files-title"
@@ -115,16 +118,23 @@ export function FlightMediaBadges({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
-        {hasGpx && (
-          <div className="overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm dark:border-emerald-800 dark:bg-slate-900/60">
-            <FlightGpxThumbnail flightId={flightId} />
-            <button
-              type="button"
-              className={`${downloadCardClassName} min-h-0 w-full rounded-none border-0 border-t border-emerald-100 shadow-none dark:border-emerald-900/70`}
-              onClick={onDownloadGpx}
-              disabled={isDownloadingAnyMedia}
-              aria-label={t('flights.downloadGpx')}
-            >
+        <div className="overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm dark:border-emerald-800 dark:bg-slate-900/60">
+          {hasGpx && <FlightGpxThumbnail flightId={flightId} />}
+          {!hasGpx && (
+            <div className="flex aspect-video items-center justify-center bg-emerald-50/70 p-6 text-center dark:bg-emerald-950/20">
+              <div>
+                <FileText
+                  className="mx-auto h-8 w-8 text-emerald-600 dark:text-emerald-300"
+                  aria-hidden="true"
+                />
+                <p className="mt-2 text-sm font-semibold text-slate-950 dark:text-white">
+                  {t('flights.gpxUnavailable', 'Aucun GPX disponible')}
+                </p>
+              </div>
+            </div>
+          )}
+          <div className="p-3">
+            <div className="flex items-center gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
                 <FileText className="h-5 w-5" aria-hidden="true" />
               </span>
@@ -133,16 +143,56 @@ export function FlightMediaBadges({
                   {t('flights.gpxBadge')}
                 </span>
                 <span className="block text-xs text-slate-600 dark:text-slate-300">
-                  {t('flights.mediaFileAvailable')}
+                  {hasGpx
+                    ? t('flights.mediaFileAvailable')
+                    : t('flights.gpxUnavailable', 'Aucun GPX disponible')}
                 </span>
               </span>
-              <Download
-                className="h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-indigo-600 dark:group-hover:text-indigo-300"
-                aria-hidden="true"
-              />
-            </button>
+            </div>
+            <Button
+              variant="outline"
+              className="mt-3 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
+              onPress={hasGpx ? onDownloadGpx : onUploadGpx}
+              isDisabled={isDownloadingAnyMedia}
+            >
+              {hasGpx ? (
+                <Download className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <FileUp className="h-4 w-4" aria-hidden="true" />
+              )}
+              {hasGpx ? t('flights.downloadGpx') : t('flights.addGpx')}
+            </Button>
           </div>
-        )}
+        </div>
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
+          {hasGoproCameraVideo ? (
+            <FlightMediaThumbnail
+              path={`/flights/${flightId}/gopro-camera/thumbnail`}
+              alt={t(
+                'flights.cameraThumbnailAlt',
+                'Miniature de la vidéo caméra'
+              )}
+            />
+          ) : (
+            <div className="flex aspect-video items-center justify-center bg-slate-100 p-6 text-center dark:bg-slate-800">
+              <div>
+                <Camera
+                  className="mx-auto h-8 w-8 text-slate-400"
+                  aria-hidden="true"
+                />
+                <p className="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  {t('flights.cameraUnavailable', 'Aucun fichier camera.mp4')}
+                </p>
+              </div>
+            </div>
+          )}
+          <div className="flex items-center gap-3 p-3">
+            <Camera className="h-5 w-5 text-slate-500" aria-hidden="true" />
+            <span className="font-semibold text-slate-950 dark:text-white">
+              {t('flights.cameraBadge')}
+            </span>
+          </div>
+        </div>
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
           {hasVideo && (
             <FlightMediaThumbnail
@@ -205,7 +255,7 @@ export function FlightMediaBadges({
               </p>
             )}
             <div className="mt-3">
-              {hasGpx ? (
+              {hasGpx && (
                 <FlightVideoExportControls
                   flight={flight}
                   buttonClassName="min-h-10 w-full px-3 py-2 text-sm"
@@ -214,49 +264,65 @@ export function FlightMediaBadges({
                   showCancelAction={false}
                   showLogsPanel={false}
                 />
-              ) : (
-                <Button
-                  variant="outline"
-                  className="min-h-10 w-full rounded-lg px-3 py-2 text-sm"
-                  isDisabled
-                  title={t('flights.replayUnavailable')}
-                >
-                  <Video className="h-4 w-4" aria-hidden="true" />
-                  {t('flights.viewer.generateVideoShort')}
-                </Button>
+              )}
+              {!hasGpx && !hasVideo && (
+                <>
+                  <p className="mb-3 rounded-lg bg-amber-50 p-2 text-xs font-medium text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                    {t(
+                      'flights.videoNeedsGpx',
+                      'Ajoutez un GPX pour générer cette vidéo.'
+                    )}
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="min-h-10 w-full rounded-lg px-3 py-2 text-sm"
+                    isDisabled
+                    title={t('flights.replayUnavailable')}
+                  >
+                    <Video className="h-4 w-4" aria-hidden="true" />
+                    {t('flights.viewer.generateVideoShort')}
+                  </Button>
+                </>
               )}
             </div>
           </div>
         </div>
-        {hasPanoVideo && (
-          <div className="overflow-hidden rounded-xl border border-violet-200 bg-white shadow-sm dark:border-violet-800 dark:bg-slate-900/60">
+        <div className="overflow-hidden rounded-xl border border-violet-200 bg-white shadow-sm dark:border-violet-800 dark:bg-slate-900/60">
+          {hasPanoVideo ? (
             <FlightMediaThumbnail
               path={`/flights/${flightId}/pano/thumbnail`}
               alt={t('flights.panoThumbnailAlt')}
             />
-            <div className="p-3">
-              <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
-                  <Orbit className="h-5 w-5" aria-hidden="true" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block font-semibold text-slate-950 dark:text-white">
-                    {t('flights.panoBadge')}
-                  </span>
-                  <span className="block text-xs text-slate-600 dark:text-slate-300">
-                    {t('flights.mediaFileAvailable')}
-                  </span>
-                </span>
+          ) : (
+            <div className="flex aspect-video items-center justify-center bg-violet-50 p-6 text-center dark:bg-violet-950/20">
+              <div>
+                <Orbit
+                  className="mx-auto h-8 w-8 text-violet-500"
+                  aria-hidden="true"
+                />
+                <p className="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  {t('flights.panoUnavailable', 'Aucun fichier pano.mp4')}
+                </p>
               </div>
+            </div>
+          )}
+          <div className="p-3">
+            <div className="flex items-center gap-3">
+              <Orbit className="h-5 w-5 text-violet-600" aria-hidden="true" />
+              <span className="font-semibold text-slate-950 dark:text-white">
+                {t('flights.panoBadge')}
+              </span>
+            </div>
+            {hasPanoVideo && (
               <div className="mt-3">
                 <FlightYoutubeUploadControls
                   flight={flight}
                   source={{ source_type: 'pano' }}
                 />
               </div>
-            </div>
+            )}
           </div>
-        )}
+        </div>
         {showPersistedOverlayBadge && (
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
             <FlightMediaThumbnail
@@ -287,108 +353,118 @@ export function FlightMediaBadges({
             </div>
           </div>
         )}
-        {hasPanoVideo && (
-          <div className="overflow-hidden rounded-xl border border-violet-200 bg-white shadow-sm dark:border-violet-800 dark:bg-slate-900/60">
-            {highlightVideo?.status === 'completed' && (
-              <FlightMediaThumbnail
-                path={`/flights/${flightId}/highlight-videos/${highlightVideo.job_id}/thumbnail`}
-                alt={t('flights.highlightVideoThumbnailAlt')}
+        <div className="overflow-hidden rounded-xl border border-violet-200 bg-white shadow-sm dark:border-violet-800 dark:bg-slate-900/60">
+          {highlightVideo?.status === 'completed' && (
+            <FlightMediaThumbnail
+              path={`/flights/${flightId}/highlight-videos/${highlightVideo.job_id}/thumbnail`}
+              alt={t('flights.highlightVideoThumbnailAlt')}
+            />
+          )}
+          {!highlightVideo?.status && (
+            <div className="flex aspect-video items-center justify-center bg-violet-50 p-6 text-center dark:bg-violet-950/20">
+              <Sparkles
+                className="h-8 w-8 text-violet-500"
+                aria-hidden="true"
+              />
+            </div>
+          )}
+          <div className="p-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
+                <Wand2 className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-slate-950 dark:text-white">
+                  {t('flights.highlightVideoTitle')}
+                </span>
+                <span className="block text-xs text-slate-600 dark:text-slate-300">
+                  {highlightVideo?.status === 'completed'
+                    ? t('flights.mediaFileAvailable')
+                    : (highlightVideo?.message ??
+                      (highlightVideo
+                        ? t(
+                            `flights.generationLogs.status.${highlightVideo.status}`
+                          )
+                        : t('flights.videoNotGenerated')))}
+                </span>
+              </span>
+            </div>
+            {highlightVideo?.status === 'running' && (
+              <progress
+                className="mt-3 h-2 w-full accent-violet-600"
+                value={highlightVideo.progress}
+                max={100}
+                aria-label={t('flights.generationLogs.progress')}
               />
             )}
-            <div className="p-3">
-              <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
-                  <Wand2 className="h-5 w-5" aria-hidden="true" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block font-semibold text-slate-950 dark:text-white">
-                    {t('flights.highlightVideoTitle')}
-                  </span>
-                  <span className="block text-xs text-slate-600 dark:text-slate-300">
-                    {highlightVideo?.status === 'completed'
-                      ? t('flights.mediaFileAvailable')
-                      : (highlightVideo?.message ??
-                        t(
-                          `flights.generationLogs.status.${highlightVideo?.status ?? 'queued'}`
-                        ))}
-                  </span>
-                </span>
-              </div>
-              {highlightVideo?.status === 'running' && (
-                <progress
-                  className="mt-3 h-2 w-full accent-violet-600"
-                  value={highlightVideo.progress}
-                  max={100}
-                  aria-label={t('flights.generationLogs.progress')}
+            {highlightVideo?.status === 'completed' && (
+              <div className="mt-3 space-y-2">
+                <Button
+                  variant="outline"
+                  className="min-h-10 w-full rounded-lg border-violet-300 px-3 py-2 text-sm dark:border-violet-700"
+                  onPress={onDownloadHighlightVideo}
+                  isDisabled={isDownloadingAnyMedia}
+                >
+                  <Download className="h-4 w-4" aria-hidden="true" />
+                  {t('flights.highlightVideoDownload')}
+                </Button>
+                <FlightYoutubeUploadControls
+                  flight={flight}
+                  source={{
+                    source_type: 'highlight',
+                    highlight_video_job_id: highlightVideo.job_id,
+                  }}
                 />
-              )}
-              {highlightVideo?.status === 'completed' && (
-                <div className="mt-3 space-y-2">
-                  <Button
-                    variant="outline"
-                    className="min-h-10 w-full rounded-lg border-violet-300 px-3 py-2 text-sm dark:border-violet-700"
-                    onPress={onDownloadHighlightVideo}
-                    isDisabled={isDownloadingAnyMedia}
-                  >
-                    <Download className="h-4 w-4" aria-hidden="true" />
-                    {t('flights.highlightVideoDownload')}
-                  </Button>
-                  <FlightYoutubeUploadControls
-                    flight={flight}
-                    source={{
-                      source_type: 'highlight',
-                      highlight_video_job_id: highlightVideo.job_id,
-                    }}
-                  />
-                </div>
-              )}
-              {['completed', 'failed', 'cancelled'].includes(
-                highlightVideo?.status ?? ''
-              ) && (
-                <div className="mt-2 flex justify-end">
-                  <Button
-                    variant="ghost"
-                    className="min-h-10 cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed dark:text-red-300 dark:hover:bg-red-950/30"
-                    onPress={onDeleteHighlightVideo}
-                    isDisabled={isHighlightDeletionPending}
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    {isHighlightDeletionPending
-                      ? t('flights.highlightVideoDeleting')
-                      : t('flights.highlightVideoDelete')}
-                  </Button>
-                </div>
-              )}
-              {highlightVideo?.status !== 'completed' &&
-                (isHighlightProcessing ? (
-                  <Button
-                    variant="danger"
-                    className="mt-3 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
-                    onPress={onCancelHighlightVideo}
-                    isDisabled={isHighlightCancellationPending}
-                  >
-                    {isHighlightCancellationPending
-                      ? t('common.stopping')
-                      : t('flights.highlightVideoCancel')}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    className="mt-3 min-h-10 w-full rounded-lg border-violet-300 px-3 py-2 text-sm dark:border-violet-700"
-                    onPress={onGenerateHighlightVideo}
-                    isDisabled={
-                      isHighlightGenerationPending || isHighlightProcessing
-                    }
-                  >
-                    <Sparkles className="h-4 w-4" aria-hidden="true" />
-                    {isHighlightGenerationPending
-                      ? t('flights.highlightVideoStarting')
-                      : t('flights.highlightVideoGenerate')}
-                  </Button>
-                ))}
-            </div>
+              </div>
+            )}
+            {['completed', 'failed', 'cancelled'].includes(
+              highlightVideo?.status ?? ''
+            ) && (
+              <div className="mt-2 flex justify-end">
+                <Button
+                  variant="ghost"
+                  className="min-h-10 cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed dark:text-red-300 dark:hover:bg-red-950/30"
+                  onPress={onDeleteHighlightVideo}
+                  isDisabled={isHighlightDeletionPending}
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  {isHighlightDeletionPending
+                    ? t('flights.highlightVideoDeleting')
+                    : t('flights.highlightVideoDelete')}
+                </Button>
+              </div>
+            )}
+            {highlightVideo?.status !== 'completed' &&
+              (isHighlightProcessing ? (
+                <Button
+                  variant="danger"
+                  className="mt-3 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
+                  onPress={onCancelHighlightVideo}
+                  isDisabled={isHighlightCancellationPending}
+                >
+                  {isHighlightCancellationPending
+                    ? t('common.stopping')
+                    : t('flights.highlightVideoCancel')}
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="mt-3 min-h-10 w-full rounded-lg border-violet-300 px-3 py-2 text-sm dark:border-violet-700"
+                  onPress={onGenerateHighlightVideo}
+                  isDisabled={
+                    !hasVideo ||
+                    isHighlightGenerationPending ||
+                    isHighlightProcessing
+                  }
+                >
+                  <Sparkles className="h-4 w-4" aria-hidden="true" />
+                  {isHighlightGenerationPending
+                    ? t('flights.highlightVideoStarting')
+                    : t('flights.highlightVideoGenerate')}
+                </Button>
+              ))}
           </div>
-        )}
+        </div>
         {children}
       </div>
     </section>

@@ -6435,6 +6435,18 @@ def stream_flight_gopro_camera(flight_id: str, db: Session = Depends(get_db)) ->
     return FileResponse(path=camera_path, media_type="video/mp4", content_disposition_type="inline")
 
 
+@router.get("/flights/{flight_id}/gopro-camera/thumbnail")
+def get_flight_gopro_camera_thumbnail(
+    flight_id: str, db: Session = Depends(get_db)
+) -> FileResponse:
+    """Return a thumbnail for the flight GoPro camera video."""
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    camera_path = _flight_gopro_camera_path(db, flight)
+    return _video_thumbnail_response(camera_path)
+
+
 @router.get("/flights/{flight_id}/gopro-camera/preview")
 def stream_flight_gopro_camera_preview(
     flight_id: str,
