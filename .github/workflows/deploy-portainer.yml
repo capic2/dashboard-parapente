@@ -546,8 +546,8 @@ jobs:
                 done
                 if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
                   gpu_devices=$(docker inspect --format '{{json .HostConfig.DeviceRequests}}' parapente-gopro-overlay-worker 2>/dev/null || true)
-                  gpu_accelerator=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' parapente-gopro-overlay-worker 2>/dev/null | grep '^BACKEND_VIDEO_ACCELERATOR=' || true)
-                  if ! echo "$gpu_devices" | grep -q '"Driver":"nvidia"' || [ "$gpu_accelerator" != "BACKEND_VIDEO_ACCELERATOR=nvidia" ]; then
+                  gpu_accelerator=$(docker inspect --format "{{range .Config.Env}}{{println .}}{{end}}" parapente-gopro-overlay-worker 2>/dev/null | grep "^BACKEND_VIDEO_ACCELERATOR=" || true)
+                  if ! echo "$gpu_devices" | grep -q "\"Driver\":\"nvidia\"" || [ "$gpu_accelerator" != "BACKEND_VIDEO_ACCELERATOR=nvidia" ]; then
                     echo "GoPro worker was started without the requested NVIDIA device"
                     failed=1
                   fi
@@ -802,7 +802,7 @@ jobs:
 
                   if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
                     echo "Verifying NVIDIA Docker runtime before replacing production containers"
-                    if ! docker info --format '{{json .Runtimes}}' | grep -q '"nvidia"'; then
+                    if ! docker info --format "{{json .Runtimes}}" | grep -q "\"nvidia\""; then
                       echo "NVIDIA runtime is not registered in Docker"
                       exit 1
                     fi
@@ -817,7 +817,7 @@ jobs:
                   compose_cmd pull backend backend-worker youtube-upload-worker gopro-overlay-worker redis
                   compose_cmd up -d --force-recreate --remove-orphans backend backend-worker youtube-upload-worker gopro-overlay-worker redis
                   for container_name in parapente-backend parapente-backend-worker parapente-youtube-upload-worker parapente-gopro-overlay-worker parapente-redis; do
-                    state=$(docker inspect --format '{{.State.Status}}' "$container_name" 2>/dev/null || true)
+                    state=$(docker inspect --format "{{.State.Status}}" "$container_name" 2>/dev/null || true)
                     if [ "$state" != "running" ]; then
                       echo "Container $container_name is not running after deployment"
                       exit 1
@@ -830,8 +830,8 @@ jobs:
                     fi
                   done
                   if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
-                    gpu_devices=$(docker inspect --format '{{json .HostConfig.DeviceRequests}}' parapente-gopro-overlay-worker 2>/dev/null || true)
-                    if ! echo "$gpu_devices" | grep -q '"Driver":"nvidia"'; then
+                    gpu_devices=$(docker inspect --format "{{json .HostConfig.DeviceRequests}}" parapente-gopro-overlay-worker 2>/dev/null || true)
+                    if ! echo "$gpu_devices" | grep -q "\"Driver\":\"nvidia\""; then
                       echo "GoPro worker has no NVIDIA device request after deployment"
                       exit 1
                     fi
