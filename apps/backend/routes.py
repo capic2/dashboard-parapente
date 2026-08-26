@@ -4681,6 +4681,23 @@ def get_flight_pano_thumbnail(flight_id: str, db: Session = Depends(get_db)) -> 
     return _video_thumbnail_response(pano_path)
 
 
+@router.get("/flights/{flight_id}/pano")
+def stream_flight_pano(flight_id: str, db: Session = Depends(get_db)) -> FileResponse:
+    """Stream the flight Pano video in the browser."""
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    pano_path = _resolve_flight_file_path(flight.pano_video_file_path)
+    if not pano_path or not pano_path.is_file():
+        raise HTTPException(status_code=404, detail="No Pano video available for this flight")
+    return FileResponse(
+        path=pano_path,
+        media_type="video/mp4",
+        filename=pano_path.name,
+        content_disposition_type="inline",
+    )
+
+
 def _highlight_job_payload(job: HighlightVideoJob) -> HighlightVideoJobResponse:
     try:
         raw_selection = json.loads(job.selection_json) if job.selection_json else []
@@ -4741,7 +4758,12 @@ def download_flight_highlight_video(
     output_path = Path(job.output_path)
     if not output_path.is_file():
         raise HTTPException(status_code=404, detail="Highlight video file not found")
-    return FileResponse(path=output_path, media_type="video/mp4", filename=output_path.name)
+    return FileResponse(
+        path=output_path,
+        media_type="video/mp4",
+        filename=output_path.name,
+        content_disposition_type="inline",
+    )
 
 
 @router.delete(
@@ -4911,7 +4933,12 @@ def download_flight_gopro_overlay(flight_id: str, db: Session = Depends(get_db))
     if not overlay_path:
         raise HTTPException(status_code=404, detail="No GoPro overlay available for this flight")
 
-    return FileResponse(path=overlay_path, media_type="video/mp4", filename=overlay_path.name)
+    return FileResponse(
+        path=overlay_path,
+        media_type="video/mp4",
+        filename=overlay_path.name,
+        content_disposition_type="inline",
+    )
 
 
 @router.get("/flights/{flight_id}/gopro-overlay/thumbnail")
@@ -6761,7 +6788,12 @@ def download_gopro_overlay_render_job(job_id: str) -> FileResponse:
     if not output_path:
         raise HTTPException(status_code=400, detail="GoPro overlay video is not ready")
 
-    return FileResponse(path=output_path, media_type="video/mp4", filename=output_path.name)
+    return FileResponse(
+        path=output_path,
+        media_type="video/mp4",
+        filename=output_path.name,
+        content_disposition_type="inline",
+    )
 
 
 @router.get("/gopro-overlays/jobs/{job_id}/thumbnail")

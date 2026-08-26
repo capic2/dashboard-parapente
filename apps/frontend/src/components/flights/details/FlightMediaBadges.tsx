@@ -147,6 +147,7 @@ export function FlightMediaBadges({
           {hasGoproCameraVideo ? (
             <FlightMediaThumbnail
               path={`/flights/${flightId}/gopro-camera/thumbnail`}
+              videoPath={`/flights/${flightId}/gopro-camera`}
               alt={t(
                 'flights.cameraThumbnailAlt',
                 'Miniature de la vidéo caméra'
@@ -176,6 +177,7 @@ export function FlightMediaBadges({
           {hasVideo && (
             <FlightMediaThumbnail
               path={`/flights/${flightId}/video/thumbnail`}
+              videoPath={`/flights/${flightId}/video`}
               alt={t('flights.videoThumbnailAlt')}
             />
           )}
@@ -270,6 +272,7 @@ export function FlightMediaBadges({
           {hasPanoVideo ? (
             <FlightMediaThumbnail
               path={`/flights/${flightId}/pano/thumbnail`}
+              videoPath={`/flights/${flightId}/pano`}
               alt={t('flights.panoThumbnailAlt')}
             />
           ) : (
@@ -306,6 +309,7 @@ export function FlightMediaBadges({
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
             <FlightMediaThumbnail
               path={`/flights/${flightId}/gopro-overlay/thumbnail`}
+              videoPath={`/flights/${flightId}/gopro-overlay`}
               alt={t('flights.goproOverlayThumbnailAlt')}
             />
             <div className="flex items-center gap-3 p-3">

@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Lightbox } from '@dashboard-parapente/design-system';
-import { ImageOff, LoaderCircle, Maximize2 } from 'lucide-react';
+import { ImageOff, LoaderCircle, Maximize2, Play } from 'lucide-react';
 import { api } from '../../../lib/api';
 
 interface FlightMediaThumbnailProps {
   path: string;
   alt: string;
   interactive?: boolean;
+  videoPath?: string;
 }
 
 function ThumbnailUnavailable({ inline = false }: { inline?: boolean }) {
@@ -40,13 +41,18 @@ function LoadedThumbnail({
   blob,
   alt,
   interactive,
+  videoPath,
 }: {
   blob: Blob;
   alt: string;
   interactive: boolean;
+  videoPath?: string;
 }) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const [isVideoLoading, setIsVideoLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [src, setSrc] = useState<string | null>(null);
 
@@ -56,6 +62,39 @@ function LoadedThumbnail({
     setSrc(objectUrl);
     return () => URL.revokeObjectURL(objectUrl);
   }, [blob]);
+
+  useEffect(() => {
+    if (!isPlaying || !videoPath) return;
+
+    const controller = new AbortController();
+    let isActive = true;
+    setIsVideoLoading(true);
+    void api
+      .get(videoPath, { signal: controller.signal })
+      .blob()
+      .then((videoBlob) => {
+        if (!isActive) return;
+        setVideoSrc(URL.createObjectURL(videoBlob));
+        setIsVideoLoading(false);
+      })
+      .catch(() => {
+        if (isActive) {
+          setHasError(true);
+          setIsVideoLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [isPlaying, videoPath]);
+
+  useEffect(() => {
+    return () => {
+      if (videoSrc) URL.revokeObjectURL(videoSrc);
+    };
+  }, [videoSrc]);
 
   if (hasError) return <ThumbnailUnavailable inline={!interactive} />;
   if (!src) return <ThumbnailLoading inline={!interactive} />;
@@ -77,13 +116,38 @@ function LoadedThumbnail({
     );
   }
 
+  if (videoPath && isPlaying && isVideoLoading) {
+    return <ThumbnailLoading />;
+  }
+
+  if (videoPath && isPlaying && videoSrc) {
+    return (
+      <div className="relative block aspect-video w-full overflow-hidden bg-black">
+        <video
+          className="h-full w-full object-contain"
+          src={videoSrc}
+          controls
+          autoPlay
+          preload="metadata"
+          aria-label={alt}
+        >
+          <track kind="captions" />
+        </video>
+      </div>
+    );
+  }
+
   return (
     <>
       <button
         type="button"
         className="group/thumbnail relative block aspect-video w-full cursor-pointer overflow-hidden bg-slate-200 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:bg-slate-800"
-        onClick={() => setIsOpen(true)}
-        aria-label={t('flights.openMediaThumbnail', { name: alt })}
+        onClick={() => (videoPath ? setIsPlaying(true) : setIsOpen(true))}
+        aria-label={
+          videoPath
+            ? t('flights.playMediaVideo', { name: alt })
+            : t('flights.openMediaThumbnail', { name: alt })
+        }
       >
         <img
           src={src}
@@ -96,8 +160,14 @@ function LoadedThumbnail({
           }}
         />
         <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-slate-950/75 px-2 py-1 text-xs font-semibold text-white">
-          <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
-          {t('flights.enlargeMediaThumbnail')}
+          {videoPath ? (
+            <Play className="h-3.5 w-3.5" aria-hidden="true" />
+          ) : (
+            <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
+          )}
+          {videoPath
+            ? t('flights.playMediaVideoShort')
+            : t('flights.enlargeMediaThumbnail')}
         </span>
       </button>
       <Lightbox
@@ -113,6 +183,7 @@ export function FlightMediaThumbnail({
   path,
   alt,
   interactive = true,
+  videoPath,
 }: FlightMediaThumbnailProps) {
   const { data, dataUpdatedAt, isError } = useQuery({
     queryKey: ['flight-media-thumbnail', path],
@@ -129,6 +200,7 @@ export function FlightMediaThumbnail({
       blob={data}
       alt={alt}
       interactive={interactive}
+      videoPath={videoPath}
     />
   );
 }

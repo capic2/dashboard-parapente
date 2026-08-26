@@ -4,6 +4,7 @@ import { Download, LoaderCircle, Sparkles, Trash2 } from 'lucide-react';
 import type { HighlightVideoJob } from '@dashboard-parapente/shared-types';
 import type { Flight } from '../../../types';
 import { FlightYoutubeUploadControls } from './FlightYoutubeUploadControls';
+import { FlightMediaThumbnail } from './FlightMediaThumbnail';
 
 interface HighlightVideoJobCardProps {
   job: HighlightVideoJob | null;
@@ -81,6 +82,13 @@ export function HighlightVideoJobCard({
               className="h-2 w-full accent-blue-600 dark:accent-blue-400"
             />
           </div>
+        )}
+        {status === 'completed' && job && (
+          <FlightMediaThumbnail
+            path={`/flights/${flight.id}/highlight-videos/${job.job_id}/thumbnail`}
+            videoPath={`/flights/${flight.id}/highlight-videos/${job.job_id}/download`}
+            alt={t('flights.highlightVideoThumbnailAlt')}
+          />
         )}
         {status === 'completed' && job && (
           <div className="mt-3 space-y-2">

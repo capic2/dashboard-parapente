@@ -547,6 +547,51 @@ class TestFlightsListEndpoint:
         assert response.status_code == 404
         assert response.json()["detail"] == "No Pano video available for this flight"
 
+    def test_stream_flight_pano(self, client, db_session, tmp_path):
+        pano_path = tmp_path / "pano.mp4"
+        pano_path.write_bytes(b"pano")
+        flight = Flight(
+            id="flight-pano-stream",
+            name="Flight Pano stream",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/{flight.id}/pano")
+
+        assert response.status_code == 200
+        assert response.content == b"pano"
+        assert response.headers["content-type"] == "video/mp4"
+        assert response.headers["content-disposition"].startswith("inline")
+
+    def test_stream_flight_pano_returns_404_when_unavailable(self, client, db_session, tmp_path):
+        response = client.get(f"{API_PREFIX}/flights/missing-flight/pano")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Flight not found"
+
+        flight = Flight(
+            id="flight-no-pano-stream",
+            name="Flight without Pano stream",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/{flight.id}/pano")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "No Pano video available for this flight"
+
+        flight.pano_video_file_path = str(tmp_path / "missing-pano.mp4")
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/{flight.id}/pano")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "No Pano video available for this flight"
+
     def test_download_flight_gopro_overlay(self, client, db_session, monkeypatch, tmp_path):
         """GET /flights/{id}/gopro-overlay downloads the generated overlay."""
         monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))

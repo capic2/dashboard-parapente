@@ -1048,6 +1048,8 @@
     "mediaFileAvailable": "Ready to download",
     "openMediaThumbnail": "Enlarge {{name}}",
     "enlargeMediaThumbnail": "Enlarge",
+    "playMediaVideo": "Play {{name}}",
+    "playMediaVideoShort": "Play",
     "mediaThumbnailUnavailable": "Thumbnail unavailable",
     "gpxThumbnailAlt": "Flight GPS track preview",
     "gpxThumbnailUnavailable": "GPS track unavailable",
