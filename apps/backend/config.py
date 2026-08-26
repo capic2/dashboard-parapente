@@ -180,11 +180,10 @@ GEMINI_MODEL = os.getenv("BACKEND_GEMINI_MODEL", "gemini-2.5-flash")
 GROQ_API_KEY = os.getenv("BACKEND_GROQ_API_KEY")
 GROQ_MODEL = os.getenv("BACKEND_GROQ_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
 OPENROUTER_API_KEY = os.getenv("BACKEND_OPENROUTER_API_KEY")
-OPENROUTER_MODEL = os.getenv("BACKEND_OPENROUTER_MODEL", "qwen/qwen2.5-vl-72b-instruct:free")
+OPENROUTER_MODEL = os.getenv("BACKEND_OPENROUTER_MODEL", "openrouter/free")
 OPENROUTER_MODELS = _csv_env(
     "BACKEND_OPENROUTER_MODELS",
-    OPENROUTER_MODEL
-    + ",google/gemini-2.0-flash-exp:free,mistralai/mistral-small-3.2-24b-instruct:free",
+    OPENROUTER_MODEL,
 )
 GITHUB_MODELS_API_KEY = os.getenv("BACKEND_GITHUB_MODELS_API_KEY")
 GITHUB_MODELS_BASE_URL = os.getenv(
