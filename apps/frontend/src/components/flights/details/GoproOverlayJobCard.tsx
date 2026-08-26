@@ -25,8 +25,9 @@ export function GoproOverlayJobCard({
   onDelete,
 }: GoproOverlayJobCardProps) {
   const { t } = useTranslation();
+  const renderHasStarted = ['running', 'completed', 'failed', 'cancelled'].includes(job.status);
   const renderMethodLabel =
-    job.render_method && ['cpu', 'gpu'].includes(job.render_method)
+    renderHasStarted && job.render_method && ['cpu', 'gpu'].includes(job.render_method)
       ? t(`flights.generationLogs.method.${job.render_method}`)
       : null;
   const resolutionLabel =
