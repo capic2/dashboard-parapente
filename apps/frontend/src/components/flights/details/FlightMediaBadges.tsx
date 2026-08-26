@@ -247,6 +247,19 @@ export function FlightMediaBadges({
                     {t('flights.mediaFileAvailable')}
                   </span>
                 </span>
+                {highlightVideo?.status === 'completed' && (
+                  <Button
+                    variant="danger"
+                    className="shrink-0 rounded-lg px-2.5 py-2 text-xs sm:px-3 sm:text-sm"
+                    onPress={onDeleteHighlightVideo}
+                    isDisabled={isHighlightDeletionPending}
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    {isHighlightDeletionPending
+                      ? t('flights.highlightVideoDeleting')
+                      : t('flights.highlightVideoDelete')}
+                  </Button>
+                )}
               </div>
               <div className="mt-3">
                 <FlightYoutubeUploadControls
@@ -332,17 +345,6 @@ export function FlightMediaBadges({
                   >
                     <Download className="h-4 w-4" aria-hidden="true" />
                     {t('flights.highlightVideoDownload')}
-                  </Button>
-                  <Button
-                    variant="danger"
-                    className="min-h-10 w-full rounded-lg px-3 py-2 text-sm"
-                    onPress={onDeleteHighlightVideo}
-                    isDisabled={isHighlightDeletionPending}
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    {isHighlightDeletionPending
-                      ? t('flights.highlightVideoDeleting')
-                      : t('flights.highlightVideoDelete')}
                   </Button>
                   <FlightYoutubeUploadControls
                     flight={flight}
