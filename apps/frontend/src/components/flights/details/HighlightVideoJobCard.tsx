@@ -1,6 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@dashboard-parapente/design-system';
-import { Download, LoaderCircle, Sparkles, Trash2 } from 'lucide-react';
+import {
+  Download,
+  LoaderCircle,
+  LockKeyhole,
+  Sparkles,
+  Trash2,
+} from 'lucide-react';
 import type { HighlightVideoJob } from '@dashboard-parapente/shared-types';
 import type { Flight } from '../../../types';
 import { FlightYoutubeUploadControls } from './FlightYoutubeUploadControls';
@@ -9,6 +15,7 @@ import { FlightMediaThumbnail } from './FlightMediaThumbnail';
 interface HighlightVideoJobCardProps {
   job: HighlightVideoJob | null;
   flight: Flight;
+  hasPanoVideo: boolean;
   isDownloadingAnyMedia: boolean;
   isGenerationPending: boolean;
   isCancellationPending: boolean;
@@ -22,6 +29,7 @@ interface HighlightVideoJobCardProps {
 export function HighlightVideoJobCard({
   job,
   flight,
+  hasPanoVideo,
   isDownloadingAnyMedia,
   isGenerationPending,
   isCancellationPending,
@@ -34,13 +42,21 @@ export function HighlightVideoJobCard({
   const { t } = useTranslation();
   const status = job?.status ?? null;
   const isProcessing = status === 'queued' || status === 'running';
+  const isGenerationLocked = !hasPanoVideo;
   const progress = Math.max(0, Math.min(100, Math.round(job?.progress ?? 0)));
   const statusLabel = status
     ? t(`flights.generationLogs.status.${status}`)
     : t('flights.videoNotGenerated');
 
   return (
-    <div className="overflow-hidden rounded-xl border border-violet-200 bg-white shadow-sm dark:border-violet-800 dark:bg-slate-900/60">
+    <div
+      aria-disabled={isGenerationLocked}
+      className={`overflow-hidden rounded-xl border bg-white shadow-sm dark:bg-slate-900/60 ${
+        isGenerationLocked
+          ? 'border-slate-300 opacity-75 dark:border-slate-700'
+          : 'border-violet-200 dark:border-violet-800'
+      }`}
+    >
       <div className="p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
@@ -56,10 +72,20 @@ export function HighlightVideoJobCard({
               </p>
             </div>
           </div>
-          <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-            {statusLabel}
+          <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+            {isGenerationLocked && (
+              <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+            {isGenerationLocked
+              ? t('flights.highlightVideoLocked')
+              : statusLabel}
           </span>
         </div>
+        {isGenerationLocked && (
+          <p className="mt-3 rounded-lg bg-amber-50 p-2 text-xs font-medium text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+            {t('flights.highlightVideoRequiresPano')}
+          </p>
+        )}
         {isProcessing && (
           <div className="mt-3">
             <div className="mb-1 flex items-center justify-between text-xs font-semibold text-blue-800 dark:text-blue-200">
@@ -143,7 +169,7 @@ export function HighlightVideoJobCard({
               variant="outline"
               className="mt-3 min-h-10 w-full rounded-lg border-violet-300 px-3 py-2 text-sm dark:border-violet-700"
               onPress={onGenerate}
-              isDisabled={isGenerationPending}
+              isDisabled={isGenerationPending || isGenerationLocked}
             >
               <Sparkles className="h-4 w-4" aria-hidden="true" />
               {isGenerationPending

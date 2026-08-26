@@ -932,6 +932,7 @@ export function FlightDetails({
           <HighlightVideoJobCard
             job={latestHighlightVideo}
             flight={flight}
+            hasPanoVideo={hasPanoVideo}
             isDownloadingAnyMedia={isDownloadingAnyMedia}
             isGenerationPending={createHighlightVideo.isPending}
             isCancellationPending={cancelHighlightVideo.isPending}

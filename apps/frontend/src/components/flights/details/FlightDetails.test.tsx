@@ -226,6 +226,9 @@ vi.mock('react-i18next', () => ({
           'flights.goproOverlayStackExpand': 'Show overlay versions',
           'flights.goproOverlayStackCollapse': 'Hide overlay versions',
           'flights.highlightVideoTitle': 'Best moments',
+          'flights.highlightVideoLocked': 'Locked',
+          'flights.highlightVideoRequiresPano':
+            'Add the pano.mp4 file to generate best moments.',
           'flights.highlightVideoGenerate': 'Generate best moments',
           'flights.highlightVideoDownload': 'Download video',
           'flights.highlightVideoThumbnailAlt': 'Best moments thumbnail',
@@ -796,6 +799,25 @@ describe('FlightDetails GoPro overlay action', () => {
     expect(
       screen.getByRole('button', { name: 'Generate best moments' })
     ).toBeInTheDocument();
+  });
+
+  it('locks best moments generation when pano.mp4 is missing', () => {
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    openTab('Media');
+
+    expect(
+      screen.getByText('Add the pano.mp4 file to generate best moments.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Generate best moments' })
+    ).toBeDisabled();
   });
 
   it('shows why overlay generation is unavailable', () => {

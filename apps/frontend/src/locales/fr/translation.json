@@ -1031,6 +1031,8 @@
     "mediaPageDescription": "Retrouvez le replay, les fichiers générés et les publications associés à ce vol.",
     "highlightVideoTitle": "Meilleurs moments",
     "highlightVideoDescription": "Sélectionnez automatiquement les meilleurs passages de la vidéo pano en conservant son format d’origine, avec l’overlay synchronisé.",
+    "highlightVideoLocked": "Verrouillé",
+    "highlightVideoRequiresPano": "Ajoutez le fichier pano.mp4 pour générer les meilleurs moments.",
     "highlightVideoGenerate": "Générer les meilleurs moments",
     "highlightVideoDownload": "Télécharger la vidéo",
     "highlightVideoDownloadError": "Impossible de télécharger la vidéo des meilleurs moments.",
