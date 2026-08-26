@@ -60,6 +60,7 @@ import { formatMediaProgressLabel } from '../table/mediaProgress';
 import type { DownloadableFlightMedia } from './FlightDetails.types';
 import { FlightGenerationLogsPanel } from './FlightGenerationLogsPanel';
 import { FlightMediaBadges } from './FlightMediaBadges';
+import { HighlightVideoJobCard } from './HighlightVideoJobCard';
 import { FlightNotesSection } from './FlightNotesSection';
 import { FlightReplayCard } from './FlightReplayCard';
 import { FlightStatsGrid } from './FlightStatsGrid';
@@ -925,56 +926,62 @@ export function FlightDetails({
           onDownloadPersistedGoproOverlay={() =>
             void handleDownloadPersistedGoproOverlay()
           }
-          highlightVideo={latestHighlightVideo}
-          isHighlightGenerationPending={createHighlightVideo.isPending}
-          isHighlightCancellationPending={cancelHighlightVideo.isPending}
-          onGenerateHighlightVideo={() => {
-            createHighlightVideo.mutate(undefined, {
-              onSuccess: () =>
-                toast.success(t('flights.highlightVideoStarted')),
-              onError: async (error) =>
-                toast.error(
-                  await getApiErrorMessage(
-                    error,
-                    t('flights.highlightVideoStartError')
-                  )
-                ),
-            });
-          }}
-          onDownloadHighlightVideo={() => void handleDownloadHighlightVideo()}
-          isHighlightDeletionPending={deleteHighlightVideo.isPending}
-          onDeleteHighlightVideo={() => {
-            if (
-              !latestHighlightVideo ||
-              !confirm(t('flights.highlightVideoConfirmDelete'))
-            ) {
-              return;
-            }
-            deleteHighlightVideo.mutate(latestHighlightVideo.job_id, {
-              onSuccess: () =>
-                toast.success(t('flights.highlightVideoDeleted')),
-              onError: async (error) =>
-                toast.error(
-                  await getApiErrorMessage(
-                    error,
-                    t('flights.highlightVideoDeleteError')
-                  )
-                ),
-            });
-          }}
-          onCancelHighlightVideo={() => {
-            if (!latestHighlightVideo) return;
-            cancelHighlightVideo.mutate(latestHighlightVideo.job_id, {
-              onError: async (error) =>
-                toast.error(
-                  await getApiErrorMessage(
-                    error,
-                    t('flights.highlightVideoCancelError')
-                  )
-                ),
-            });
-          }}
         >
+          {hasPanoVideo && (
+            <HighlightVideoJobCard
+              job={latestHighlightVideo}
+              flight={flight}
+              isDownloadingAnyMedia={isDownloadingAnyMedia}
+              isGenerationPending={createHighlightVideo.isPending}
+              isCancellationPending={cancelHighlightVideo.isPending}
+              isDeletionPending={deleteHighlightVideo.isPending}
+              onGenerate={() => {
+                createHighlightVideo.mutate(undefined, {
+                  onSuccess: () =>
+                    toast.success(t('flights.highlightVideoStarted')),
+                  onError: async (error) =>
+                    toast.error(
+                      await getApiErrorMessage(
+                        error,
+                        t('flights.highlightVideoStartError')
+                      )
+                    ),
+                });
+              }}
+              onDownload={() => void handleDownloadHighlightVideo()}
+              onDelete={() => {
+                if (
+                  !latestHighlightVideo ||
+                  !confirm(t('flights.highlightVideoConfirmDelete'))
+                ) {
+                  return;
+                }
+                deleteHighlightVideo.mutate(latestHighlightVideo.job_id, {
+                  onSuccess: () =>
+                    toast.success(t('flights.highlightVideoDeleted')),
+                  onError: async (error) =>
+                    toast.error(
+                      await getApiErrorMessage(
+                        error,
+                        t('flights.highlightVideoDeleteError')
+                      )
+                    ),
+                });
+              }}
+              onCancel={() => {
+                if (!latestHighlightVideo) return;
+                cancelHighlightVideo.mutate(latestHighlightVideo.job_id, {
+                  onError: async (error) =>
+                    toast.error(
+                      await getApiErrorMessage(
+                        error,
+                        t('flights.highlightVideoCancelError')
+                      )
+                    ),
+                });
+              }}
+            />
+          )}
           {visibleGoproOverlays.length > 0 && (
             <GoproOverlayJobStack
               jobs={visibleGoproOverlays}
