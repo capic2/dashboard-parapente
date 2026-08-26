@@ -912,6 +912,7 @@ export function FlightDetails({
           hasGpx={hasGpx}
           hasVideo={hasVideo}
           hasPanoVideo={hasPanoVideo}
+          hasGoproCameraVideo={hasGoproCameraVideo}
           hasPersistedGoproOverlay={hasPersistedGoproOverlay}
           hasCompletedGoproOverlayJob={visibleGoproOverlays.some(
             (overlay) => overlay.status === 'completed'
@@ -921,6 +922,7 @@ export function FlightDetails({
           isDownloadingAnyMedia={isDownloadingAnyMedia}
           videoProcessingLabel={videoProcessingLabel}
           onDownloadGpx={() => void handleDownloadGpx()}
+          onUploadGpx={() => fileInputRef.current?.click()}
           onDownloadVideo={() => void handleDownloadVideo()}
           onDownloadPersistedGoproOverlay={() =>
             void handleDownloadPersistedGoproOverlay()
