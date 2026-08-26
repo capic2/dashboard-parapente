@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, Layers3 } from 'lucide-react';
 import type { GoproOverlayJob } from '../../../hooks/gopro/useGoproOverlay';
@@ -12,6 +13,7 @@ interface GoproOverlayJobStackProps {
   deletingJobId: string | null;
   onDownload: (job: GoproOverlayJob) => void;
   onDelete: (job: GoproOverlayJob) => void;
+  generationCard: ReactNode;
 }
 
 export function GoproOverlayJobStack({
@@ -21,6 +23,7 @@ export function GoproOverlayJobStack({
   deletingJobId,
   onDownload,
   onDelete,
+  generationCard,
 }: GoproOverlayJobStackProps) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -28,16 +31,19 @@ export function GoproOverlayJobStack({
   if (jobs.length === 1) {
     const [job] = jobs;
     return (
-      <GoproOverlayJobCard
-        job={job}
-        youtubeUploadFlight={
-          job.status === 'completed' ? youtubeUploadFlight : undefined
-        }
-        isDownloadingAnyMedia={isDownloadingAnyMedia}
-        isDeleting={deletingJobId === job.job_id}
-        onDownload={() => onDownload(job)}
-        onDelete={() => onDelete(job)}
-      />
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+        <GoproOverlayJobCard
+          job={job}
+          youtubeUploadFlight={
+            job.status === 'completed' ? youtubeUploadFlight : undefined
+          }
+          isDownloadingAnyMedia={isDownloadingAnyMedia}
+          isDeleting={deletingJobId === job.job_id}
+          onDownload={() => onDownload(job)}
+          onDelete={() => onDelete(job)}
+        />
+        {generationCard}
+      </div>
     );
   }
 
@@ -102,6 +108,9 @@ export function GoproOverlayJobStack({
           ))}
         </div>
       )}
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+        {generationCard}
+      </div>
     </div>
   );
 }
