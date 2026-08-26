@@ -18,6 +18,7 @@ vi.mock('@dashboard-parapente/design-system', () => ({
 
 vi.mock('../../../lib/api', () => ({
   api: { get: apiGet },
+  getApiUrlWithSearchParams: (path: string) => `/api${path}`,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -93,6 +94,33 @@ describe('FlightMediaThumbnail', () => {
       screen.getByText('flights.mediaThumbnailUnavailable')
     ).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('starts the video instead of opening the image lightbox when a video path is provided', async () => {
+    renderThumbnail(
+      <FlightMediaThumbnail
+        path="/flights/flight-1/video/thumbnail"
+        videoPath="/flights/flight-1/video"
+        alt="Flight video thumbnail"
+      />
+    );
+
+    await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument());
+    fireEvent.click(
+      screen.getByRole('button', { name: 'flights.playMediaVideo' })
+    );
+
+    await waitFor(() =>
+      expect(document.querySelector('video')).toBeInTheDocument()
+    );
+    expect(document.querySelector('video')).toHaveAttribute(
+      'src',
+      'blob:thumbnail'
+    );
+    expect(apiGet).toHaveBeenLastCalledWith('/flights/flight-1/video', {
+      signal: expect.any(AbortSignal),
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('loads a new thumbnail after the path changes', async () => {

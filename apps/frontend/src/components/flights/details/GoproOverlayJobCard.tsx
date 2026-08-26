@@ -25,9 +25,16 @@ export function GoproOverlayJobCard({
   onDelete,
 }: GoproOverlayJobCardProps) {
   const { t } = useTranslation();
-  const renderHasStarted = ['running', 'completed', 'failed', 'cancelled'].includes(job.status);
+  const renderHasStarted = [
+    'running',
+    'completed',
+    'failed',
+    'cancelled',
+  ].includes(job.status);
   const renderMethodLabel =
-    renderHasStarted && job.render_method && ['cpu', 'gpu'].includes(job.render_method)
+    renderHasStarted &&
+    job.render_method &&
+    ['cpu', 'gpu'].includes(job.render_method)
       ? t(`flights.generationLogs.method.${job.render_method}`)
       : null;
   const resolutionLabel =
@@ -42,6 +49,7 @@ export function GoproOverlayJobCard({
       {job.status === 'completed' && (
         <FlightMediaThumbnail
           path={`/gopro-overlays/jobs/${job.job_id}/thumbnail`}
+          videoPath={`/gopro-overlays/jobs/${job.job_id}/download`}
           alt={t('flights.goproOverlayJobThumbnailAlt', {
             name: job.output_filename,
           })}

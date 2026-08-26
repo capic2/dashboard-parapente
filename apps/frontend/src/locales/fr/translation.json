@@ -1052,6 +1052,8 @@
     "mediaFileAvailable": "Prêt à télécharger",
     "openMediaThumbnail": "Agrandir {{name}}",
     "enlargeMediaThumbnail": "Agrandir",
+    "playMediaVideo": "Lire {{name}}",
+    "playMediaVideoShort": "Lire",
     "mediaThumbnailUnavailable": "Miniature indisponible",
     "gpxThumbnailAlt": "Aperçu de la trace GPS du vol",
     "gpxThumbnailUnavailable": "Trace GPS indisponible",
