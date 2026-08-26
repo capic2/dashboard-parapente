@@ -829,8 +829,8 @@ jobs:
                         readiness_failed=1
                       fi
                     done
-                    for worker_log in parapente-backend-worker parapente-gopro-overlay-worker youtube-upload-worker; do
-                      if ! docker logs "parapente-$worker_log" 2>&1 | grep -q "Listening on"; then
+                    for worker_log in parapente-backend-worker parapente-gopro-overlay-worker parapente-youtube-upload-worker; do
+                      if ! docker logs "$worker_log" 2>&1 | grep -q "Listening on"; then
                         readiness_failed=1
                       fi
                     done
