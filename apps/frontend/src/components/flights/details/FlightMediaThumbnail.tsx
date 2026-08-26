@@ -8,32 +8,43 @@ import { api } from '../../../lib/api';
 interface FlightMediaThumbnailProps {
   path: string;
   alt: string;
+  interactive?: boolean;
 }
 
-function ThumbnailUnavailable() {
+function ThumbnailUnavailable({ inline = false }: { inline?: boolean }) {
   const { t } = useTranslation();
+  const Container = inline ? 'span' : 'div';
   return (
-    <div className="flex aspect-video w-full items-center justify-center bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+    <Container className="flex aspect-video w-full items-center justify-center bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
       <ImageOff className="h-7 w-7" aria-hidden="true" />
       <span className="sr-only">{t('flights.mediaThumbnailUnavailable')}</span>
-    </div>
+    </Container>
   );
 }
 
-function ThumbnailLoading() {
+function ThumbnailLoading({ inline = false }: { inline?: boolean }) {
   const { t } = useTranslation();
+  const Container = inline ? 'span' : 'div';
   return (
-    <div className="flex aspect-video w-full items-center justify-center bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+    <Container className="flex aspect-video w-full items-center justify-center bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
       <LoaderCircle
         className="h-6 w-6 motion-safe:animate-spin"
         aria-hidden="true"
       />
       <span className="sr-only">{t('common.loading')}</span>
-    </div>
+    </Container>
   );
 }
 
-function LoadedThumbnail({ blob, alt }: { blob: Blob; alt: string }) {
+function LoadedThumbnail({
+  blob,
+  alt,
+  interactive,
+}: {
+  blob: Blob;
+  alt: string;
+  interactive: boolean;
+}) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -46,8 +57,25 @@ function LoadedThumbnail({ blob, alt }: { blob: Blob; alt: string }) {
     return () => URL.revokeObjectURL(objectUrl);
   }, [blob]);
 
-  if (hasError) return <ThumbnailUnavailable />;
-  if (!src) return <ThumbnailLoading />;
+  if (hasError) return <ThumbnailUnavailable inline={!interactive} />;
+  if (!src) return <ThumbnailLoading inline={!interactive} />;
+
+  if (!interactive) {
+    return (
+      <span className="relative block aspect-video w-full overflow-hidden bg-slate-200 dark:bg-slate-800">
+        <img
+          src={src}
+          alt={alt}
+          loading="lazy"
+          className="h-full w-full object-cover"
+          onError={() => {
+            URL.revokeObjectURL(src);
+            setHasError(true);
+          }}
+        />
+      </span>
+    );
+  }
 
   return (
     <>
@@ -81,17 +109,26 @@ function LoadedThumbnail({ blob, alt }: { blob: Blob; alt: string }) {
   );
 }
 
-export function FlightMediaThumbnail({ path, alt }: FlightMediaThumbnailProps) {
+export function FlightMediaThumbnail({
+  path,
+  alt,
+  interactive = true,
+}: FlightMediaThumbnailProps) {
   const { data, dataUpdatedAt, isError } = useQuery({
     queryKey: ['flight-media-thumbnail', path],
     queryFn: ({ signal }) => api.get(path, { signal }).blob(),
     retry: false,
   });
 
-  if (isError) return <ThumbnailUnavailable />;
-  if (!data) return <ThumbnailLoading />;
+  if (isError) return <ThumbnailUnavailable inline={!interactive} />;
+  if (!data) return <ThumbnailLoading inline={!interactive} />;
 
   return (
-    <LoadedThumbnail key={`${path}:${dataUpdatedAt}`} blob={data} alt={alt} />
+    <LoadedThumbnail
+      key={`${path}:${dataUpdatedAt}`}
+      blob={data}
+      alt={alt}
+      interactive={interactive}
+    />
   );
 }

@@ -880,6 +880,9 @@ describe('FlightDetails GoPro overlay action', () => {
     openTab('Media');
 
     expect(screen.getByText('Legacy overlay thumbnail')).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Show overlay versions' })
+    );
     expect(
       screen.getByRole('button', { name: 'flights.goproOverlayDownload' })
     ).toBeInTheDocument();
@@ -937,8 +940,9 @@ describe('FlightDetails GoPro overlay action', () => {
 
     expect(screen.getByText('Generated overlays')).toBeInTheDocument();
     expect(screen.getByText('2 overlay versions')).toBeInTheDocument();
-    expect(screen.queryByText('overlay-1080p.mp4')).not.toBeInTheDocument();
-    expect(screen.queryByText('overlay-4k.mp4')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Delete overlay' })
+    ).not.toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Show overlay versions' })
@@ -1674,6 +1678,10 @@ describe('FlightDetails GoPro overlay action', () => {
     );
 
     openTab('Media');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Show overlay versions' })
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete overlay' }));
 
