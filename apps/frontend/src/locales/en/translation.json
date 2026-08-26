@@ -1027,6 +1027,8 @@
     "mediaPageDescription": "Find the replay, generated files, and publications associated with this flight.",
     "highlightVideoTitle": "Best moments",
     "highlightVideoDescription": "Automatically select the best parts of the pano video while preserving its original format, with synchronized overlay.",
+    "highlightVideoLocked": "Locked",
+    "highlightVideoRequiresPano": "Add the pano.mp4 file to generate best moments.",
     "highlightVideoGenerate": "Generate best moments",
     "highlightVideoDownload": "Download video",
     "highlightVideoDownloadError": "Unable to download the best-moments video.",
