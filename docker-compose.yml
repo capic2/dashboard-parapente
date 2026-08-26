@@ -298,7 +298,7 @@ services:
     init: true
     stop_grace_period: 30s
     command: ['python', 'gopro_overlay_worker.py']
-    cpus: '${GOPRO_OVERLAY_WORKER_CPUS:-4.0}'
+    cpus: '${GOPRO_OVERLAY_WORKER_CPUS:-8.0}'
     mem_limit: ${GOPRO_OVERLAY_WORKER_MEM_LIMIT:-12g}
     pids_limit: ${GOPRO_OVERLAY_WORKER_PIDS_LIMIT:-1024}
     labels:
