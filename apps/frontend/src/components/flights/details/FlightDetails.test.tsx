@@ -715,9 +715,7 @@ describe('FlightDetails GoPro overlay action', () => {
     );
 
     openTab('Media');
-    expect(
-      screen.queryByText('Best moments thumbnail')
-    ).not.toBeInTheDocument();
+    expect(screen.getByText('Best moments thumbnail')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Download video' })
     ).toBeInTheDocument();
