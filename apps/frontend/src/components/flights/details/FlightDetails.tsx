@@ -913,6 +913,7 @@ export function FlightDetails({
           hasGpx={hasGpx}
           hasVideo={hasVideo}
           hasPanoVideo={hasPanoVideo}
+          hasGoproCameraVideo={hasGoproCameraVideo}
           hasPersistedGoproOverlay={hasPersistedGoproOverlay}
           hasCompletedGoproOverlayJob={visibleGoproOverlays.some(
             (overlay) => overlay.status === 'completed'
@@ -922,66 +923,65 @@ export function FlightDetails({
           isDownloadingAnyMedia={isDownloadingAnyMedia}
           videoProcessingLabel={videoProcessingLabel}
           onDownloadGpx={() => void handleDownloadGpx()}
+          onUploadGpx={() => fileInputRef.current?.click()}
           onDownloadVideo={() => void handleDownloadVideo()}
           onDownloadPersistedGoproOverlay={() =>
             void handleDownloadPersistedGoproOverlay()
           }
         >
-          {hasPanoVideo && (
-            <HighlightVideoJobCard
-              job={latestHighlightVideo}
-              flight={flight}
-              isDownloadingAnyMedia={isDownloadingAnyMedia}
-              isGenerationPending={createHighlightVideo.isPending}
-              isCancellationPending={cancelHighlightVideo.isPending}
-              isDeletionPending={deleteHighlightVideo.isPending}
-              onGenerate={() => {
-                createHighlightVideo.mutate(undefined, {
-                  onSuccess: () =>
-                    toast.success(t('flights.highlightVideoStarted')),
-                  onError: async (error) =>
-                    toast.error(
-                      await getApiErrorMessage(
-                        error,
-                        t('flights.highlightVideoStartError')
-                      )
-                    ),
-                });
-              }}
-              onDownload={() => void handleDownloadHighlightVideo()}
-              onDelete={() => {
-                if (
-                  !latestHighlightVideo ||
-                  !confirm(t('flights.highlightVideoConfirmDelete'))
-                ) {
-                  return;
-                }
-                deleteHighlightVideo.mutate(latestHighlightVideo.job_id, {
-                  onSuccess: () =>
-                    toast.success(t('flights.highlightVideoDeleted')),
-                  onError: async (error) =>
-                    toast.error(
-                      await getApiErrorMessage(
-                        error,
-                        t('flights.highlightVideoDeleteError')
-                      )
-                    ),
-                });
-              }}
-              onCancel={() => {
-                if (!latestHighlightVideo) return;
-                cancelHighlightVideo.mutate(latestHighlightVideo.job_id, {
-                  onError: async (error) =>
-                    toast.error(
-                      await getApiErrorMessage(
-                        error,
-                        t('flights.highlightVideoCancelError')
-                      )
-                    ),
-                });
-              }}
-            />
-          )}
+          <HighlightVideoJobCard
+            job={latestHighlightVideo}
+            flight={flight}
+            isDownloadingAnyMedia={isDownloadingAnyMedia}
+            isGenerationPending={createHighlightVideo.isPending}
+            isCancellationPending={cancelHighlightVideo.isPending}
+            isDeletionPending={deleteHighlightVideo.isPending}
+            onGenerate={() => {
+              createHighlightVideo.mutate(undefined, {
+                onSuccess: () =>
+                  toast.success(t('flights.highlightVideoStarted')),
+                onError: async (error) =>
+                  toast.error(
+                    await getApiErrorMessage(
+                      error,
+                      t('flights.highlightVideoStartError')
+                    )
+                  ),
+              });
+            }}
+            onDownload={() => void handleDownloadHighlightVideo()}
+            onDelete={() => {
+              if (
+                !latestHighlightVideo ||
+                !confirm(t('flights.highlightVideoConfirmDelete'))
+              ) {
+                return;
+              }
+              deleteHighlightVideo.mutate(latestHighlightVideo.job_id, {
+                onSuccess: () =>
+                  toast.success(t('flights.highlightVideoDeleted')),
+                onError: async (error) =>
+                  toast.error(
+                    await getApiErrorMessage(
+                      error,
+                      t('flights.highlightVideoDeleteError')
+                    )
+                  ),
+              });
+            }}
+            onCancel={() => {
+              if (!latestHighlightVideo) return;
+              cancelHighlightVideo.mutate(latestHighlightVideo.job_id, {
+                onError: async (error) =>
+                  toast.error(
+                    await getApiErrorMessage(
+                      error,
+                      t('flights.highlightVideoCancelError')
+                    )
+                  ),
+              });
+            }}
+          />
           {visibleGoproOverlays.length > 0 && (
             <GoproOverlayJobStack
               jobs={visibleGoproOverlays}
@@ -990,37 +990,70 @@ export function FlightDetails({
               deletingJobId={deletingGoproOverlayJobId}
               onDownload={(overlay) => void handleDownloadGoproOverlay(overlay)}
               onDelete={(overlay) => void handleDeleteGoproOverlay(overlay)}
+              generationCard={
+                <div className="flex min-h-48 flex-col justify-between rounded-xl border border-dashed border-cyan-300 bg-cyan-50/60 p-3 dark:border-cyan-800 dark:bg-cyan-950/20">
+                  <div>
+                    <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
+                      <Wand2 className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <p className="mt-3 font-semibold text-slate-950 dark:text-white">
+                      {t('flights.goproOverlayAddCardTitle')}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">
+                      {goproOverlayUnavailableReason ??
+                        t('flights.goproOverlayAddCardDescription')}
+                    </p>
+                  </div>
+                  <Button
+                    variant={isGoproOverlayRunning ? 'danger' : 'outline'}
+                    className="mt-4 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
+                    onPress={goproOverlayAction}
+                    isDisabled={
+                      !canUseGoproOverlayAction ||
+                      createGoproOverlayJob.isPending ||
+                      isCancellingGoproOverlay
+                    }
+                    title={goproOverlayTitle}
+                    aria-label={goproOverlayLabel}
+                  >
+                    <Wand2 className="h-4 w-4" aria-hidden="true" />
+                    {goproOverlayCompactLabel}
+                  </Button>
+                </div>
+              }
             />
           )}
-          <div className="flex min-h-48 flex-col justify-between rounded-xl border border-dashed border-cyan-300 bg-cyan-50/60 p-3 dark:border-cyan-800 dark:bg-cyan-950/20">
-            <div>
-              <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
-                <Wand2 className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <p className="mt-3 font-semibold text-slate-950 dark:text-white">
-                {t('flights.goproOverlayAddCardTitle')}
-              </p>
-              <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">
-                {goproOverlayUnavailableReason ??
-                  t('flights.goproOverlayAddCardDescription')}
-              </p>
+          {visibleGoproOverlays.length === 0 && (
+            <div className="flex min-h-48 flex-col justify-between rounded-xl border border-dashed border-cyan-300 bg-cyan-50/60 p-3 dark:border-cyan-800 dark:bg-cyan-950/20">
+              <div>
+                <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
+                  <Wand2 className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <p className="mt-3 font-semibold text-slate-950 dark:text-white">
+                  {t('flights.goproOverlayAddCardTitle')}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">
+                  {goproOverlayUnavailableReason ??
+                    t('flights.goproOverlayAddCardDescription')}
+                </p>
+              </div>
+              <Button
+                variant={isGoproOverlayRunning ? 'danger' : 'outline'}
+                className="mt-4 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
+                onPress={goproOverlayAction}
+                isDisabled={
+                  !canUseGoproOverlayAction ||
+                  createGoproOverlayJob.isPending ||
+                  isCancellingGoproOverlay
+                }
+                title={goproOverlayTitle}
+                aria-label={goproOverlayLabel}
+              >
+                <Wand2 className="h-4 w-4" aria-hidden="true" />
+                {goproOverlayCompactLabel}
+              </Button>
             </div>
-            <Button
-              variant={isGoproOverlayRunning ? 'danger' : 'outline'}
-              className="mt-4 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
-              onPress={goproOverlayAction}
-              isDisabled={
-                !canUseGoproOverlayAction ||
-                createGoproOverlayJob.isPending ||
-                isCancellingGoproOverlay
-              }
-              title={goproOverlayTitle}
-              aria-label={goproOverlayLabel}
-            >
-              <Wand2 className="h-4 w-4" aria-hidden="true" />
-              {goproOverlayCompactLabel}
-            </Button>
-          </div>
+          )}
         </FlightMediaBadges>
 
         {(flight.youtube_urls?.length ?? 0) > 0 && (

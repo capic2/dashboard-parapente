@@ -179,6 +179,12 @@ const defaultHandlers = [
         headers: { 'Content-Type': 'video/mp4' },
       })
   ),
+  http.get('*/api/flights/:id/gopro-camera/thumbnail', () =>
+    HttpResponse.text(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#111827"/><circle cx="320" cy="150" r="70" fill="#f59e0b"/><path d="M120 330 280 180 390 250 520 120 640 300V360H120Z" fill="#38bdf8"/></svg>',
+      { headers: { 'Content-Type': 'image/svg+xml' } }
+    )
+  ),
   http.get('*/api/flights/:id/gopro-overlay/preview', () =>
     HttpResponse.json({
       video: {
