@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, Layers3, Wand2 } from 'lucide-react';
+import { ChevronDown, Layers3 } from 'lucide-react';
 import type { GoproOverlayJob } from '../../../hooks/gopro/useGoproOverlay';
 import type { Flight } from '../../../types';
 import { GoproOverlayJobCard } from './GoproOverlayJobCard';
@@ -42,10 +42,12 @@ export function GoproOverlayJobStack({
   }
 
   return (
-    <div className="min-w-0">
+    <div
+      className={`min-w-0 ${isExpanded ? 'sm:col-span-2 2xl:col-span-3' : ''}`}
+    >
       <button
         type="button"
-        className="group relative min-h-48 w-full cursor-pointer rounded-xl border border-cyan-200 bg-white p-3 text-left shadow-sm transition-colors duration-200 hover:border-cyan-400 hover:bg-cyan-50/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 dark:border-cyan-800 dark:bg-slate-900/60 dark:hover:border-cyan-600 dark:hover:bg-cyan-950/20 dark:focus-visible:ring-offset-slate-900"
+        className="group flex min-h-24 w-full cursor-pointer items-center gap-3 rounded-xl border border-cyan-200 bg-white p-3 text-left shadow-sm transition-colors duration-200 hover:border-cyan-400 hover:bg-cyan-50/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 dark:border-cyan-800 dark:bg-slate-900/60 dark:hover:border-cyan-600 dark:hover:bg-cyan-950/20 dark:focus-visible:ring-offset-slate-900"
         aria-expanded={isExpanded}
         aria-controls="gopro-overlay-job-stack-panel"
         aria-label={t(
@@ -55,42 +57,35 @@ export function GoproOverlayJobStack({
         )}
         onClick={() => setIsExpanded((expanded) => !expanded)}
       >
-        <span className="pointer-events-none absolute inset-x-3 top-3 h-full translate-x-1.5 translate-y-1.5 rounded-xl border border-cyan-200 bg-cyan-50/70 dark:border-cyan-900 dark:bg-cyan-950/30" />
-        <span className="pointer-events-none absolute inset-x-3 top-3 h-full translate-x-3 translate-y-3 rounded-xl border border-cyan-200 bg-cyan-50/50 dark:border-cyan-900 dark:bg-cyan-950/20" />
-        <span className="relative flex h-full min-h-40 flex-col justify-between rounded-lg bg-white/95 dark:bg-slate-900/95">
-          <span className="flex items-start justify-between gap-3">
-            <span className="flex min-w-0 items-start gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
-                <Layers3 className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  {t('flights.goproOverlayStackTitle')}
-                </span>
-                <span className="mt-1 block text-xs text-slate-600 dark:text-slate-300">
-                  {t('flights.goproOverlayStackCount', { count: jobs.length })}
-                </span>
-              </span>
-            </span>
-            <ChevronDown
-              className={`h-5 w-5 shrink-0 text-slate-500 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-              aria-hidden="true"
-            />
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
+          <Layers3 className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">
+            {t('flights.goproOverlayStackTitle')}
           </span>
-          <span className="flex items-center gap-2 text-xs font-semibold text-cyan-700 dark:text-cyan-300">
-            <Wand2 className="h-4 w-4" aria-hidden="true" />
+          <span className="mt-1 block text-xs text-slate-600 dark:text-slate-300">
+            {t('flights.goproOverlayStackCount', { count: jobs.length })}
+          </span>
+        </span>
+        <span className="flex shrink-0 items-center gap-2 text-xs font-semibold text-cyan-700 dark:text-cyan-300">
+          <span className="hidden sm:inline">
             {t(
               isExpanded
                 ? 'flights.goproOverlayStackCollapse'
                 : 'flights.goproOverlayStackExpand'
             )}
           </span>
+          <ChevronDown
+            className={`h-5 w-5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+            aria-hidden="true"
+          />
         </span>
       </button>
       {isExpanded && (
         <div
           id="gopro-overlay-job-stack-panel"
-          className="mt-3 grid gap-3 sm:col-span-2 2xl:col-span-3"
+          className="mt-3 grid gap-3 sm:grid-cols-2 2xl:grid-cols-3"
         >
           {jobs.map((job) => (
             <GoproOverlayJobCard

@@ -540,14 +540,14 @@ jobs:
                   fi
                 done
                 for worker_log in parapente-backend-worker parapente-gopro-overlay-worker parapente-youtube-upload-worker; do
-                  if ! docker logs "$worker_log" 2>&1 | grep -q 'Listening on'; then
+                  if ! docker logs "$worker_log" 2>&1 | grep -q "Listening on"; then
                     failed=1
                   fi
                 done
                 if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
                   gpu_devices=$(docker inspect --format '{{json .HostConfig.DeviceRequests}}' parapente-gopro-overlay-worker 2>/dev/null || true)
-                  gpu_accelerator=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' parapente-gopro-overlay-worker 2>/dev/null | grep '^BACKEND_VIDEO_ACCELERATOR=' || true)
-                  if ! echo "$gpu_devices" | grep -q '"Driver":"nvidia"' || [ "$gpu_accelerator" != "BACKEND_VIDEO_ACCELERATOR=nvidia" ]; then
+                  gpu_accelerator=$(docker inspect --format "{{range .Config.Env}}{{println .}}{{end}}" parapente-gopro-overlay-worker 2>/dev/null | grep "^BACKEND_VIDEO_ACCELERATOR=" || true)
+                  if ! echo "$gpu_devices" | grep -q "\"Driver\":\"nvidia\"" || [ "$gpu_accelerator" != "BACKEND_VIDEO_ACCELERATOR=nvidia" ]; then
                     echo "GoPro worker was started without the requested NVIDIA device"
                     failed=1
                   fi
@@ -748,6 +748,8 @@ jobs:
                 -e TARGET_VERSION="$TARGET_VERSION" \
                 -e STACK_ID="$STACK_ID" \
                 -e NVIDIA_GPU_ENABLED="$NVIDIA_GPU_ENABLED" \
+                -e LOCAL_VERIFY_MAX_ATTEMPTS="$LOCAL_VERIFY_MAX_ATTEMPTS" \
+                -e LOCAL_VERIFY_SLEEP_SECONDS="$LOCAL_VERIFY_SLEEP_SECONDS" \
                 -v /var/run/docker.sock:/var/run/docker.sock \
                 -v "$PORTAINER_VOLUME:/data" \
                 -w "/data/compose/$STACK_ID" \
@@ -802,7 +804,7 @@ jobs:
 
                   if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
                     echo "Verifying NVIDIA Docker runtime before replacing production containers"
-                    if ! docker info --format '{{json .Runtimes}}' | grep -q '"nvidia"'; then
+                    if ! docker info --format "{{json .Runtimes}}" | grep -q "\"nvidia\""; then
                       echo "NVIDIA runtime is not registered in Docker"
                       exit 1
                     fi
@@ -816,26 +818,41 @@ jobs:
 
                   compose_cmd pull backend backend-worker youtube-upload-worker gopro-overlay-worker redis
                   compose_cmd up -d --force-recreate --remove-orphans backend backend-worker youtube-upload-worker gopro-overlay-worker redis
-                  for container_name in parapente-backend parapente-backend-worker parapente-youtube-upload-worker parapente-gopro-overlay-worker parapente-redis; do
-                    state=$(docker inspect --format '{{.State.Status}}' "$container_name" 2>/dev/null || true)
-                    if [ "$state" != "running" ]; then
-                      echo "Container $container_name is not running after deployment"
-                      exit 1
+                  readiness_attempt=1
+                  readiness_ok=0
+                  while [ "$readiness_attempt" -le "$LOCAL_VERIFY_MAX_ATTEMPTS" ]; do
+                    readiness_failed=0
+                    for container_name in parapente-backend parapente-backend-worker parapente-youtube-upload-worker parapente-gopro-overlay-worker parapente-redis; do
+                      state=$(docker inspect --format "{{.State.Status}}" "$container_name" 2>/dev/null || true)
+                      health=$(docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" "$container_name" 2>/dev/null || true)
+                      if [ "$state" != "running" ] || [ "$health" != "healthy" ]; then
+                        readiness_failed=1
+                      fi
+                    done
+                    for worker_log in parapente-backend-worker parapente-gopro-overlay-worker parapente-youtube-upload-worker; do
+                      if ! docker logs "$worker_log" 2>&1 | grep -q "Listening on"; then
+                        readiness_failed=1
+                      fi
+                    done
+                    if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
+                      gpu_devices=$(docker inspect --format "{{json .HostConfig.DeviceRequests}}" parapente-gopro-overlay-worker 2>/dev/null || true)
+                      if ! echo "$gpu_devices" | grep -q "\"Driver\":\"nvidia\""; then
+                        readiness_failed=1
+                      fi
                     fi
+                    if [ "$readiness_failed" -eq 0 ]; then
+                      readiness_ok=1
+                      break
+                    fi
+                    echo "Worker readiness check attempt $readiness_attempt/$LOCAL_VERIFY_MAX_ATTEMPTS failed"
+                    [ "$readiness_attempt" -lt "$LOCAL_VERIFY_MAX_ATTEMPTS" ] && sleep "$LOCAL_VERIFY_SLEEP_SECONDS"
+                    readiness_attempt=$((readiness_attempt + 1))
                   done
-                  for worker_log in parapente-backend-worker parapente-gopro-overlay-worker parapente-youtube-upload-worker; do
-                    if ! docker logs "$worker_log" 2>&1 | grep -q 'Listening on'; then
-                      echo "Worker $worker_log did not announce an RQ queue"
-                      exit 1
-                    fi
-                  done
-                  if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
-                    gpu_devices=$(docker inspect --format '{{json .HostConfig.DeviceRequests}}' parapente-gopro-overlay-worker 2>/dev/null || true)
-                    if ! echo "$gpu_devices" | grep -q '"Driver":"nvidia"'; then
-                      echo "GoPro worker has no NVIDIA device request after deployment"
-                      exit 1
-                    fi
+                  if [ "$readiness_ok" -ne 1 ]; then
+                    echo "Production worker readiness verification failed"
+                    exit 1
                   fi
+                  echo "Production backend and all RQ workers are running"
                 '; then
                 print_backend_diagnostics
                 return 1
