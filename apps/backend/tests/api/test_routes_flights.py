@@ -1512,6 +1512,65 @@ class TestHighlightVideoEndpoints:
         )
         assert response.status_code == 409
 
+    def test_delete_completed_highlight_removes_job_and_output(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        """Deleting a completed highlight removes its generated output and row."""
+        pano_path = tmp_path / "pano.mp4"
+        output_path = tmp_path / "highlights" / "highlights-original-format.mp4"
+        pano_path.write_bytes(b"pano")
+        output_path.parent.mkdir()
+        output_path.write_bytes(b"highlights")
+        flight = self._flight(db_session, "highlight-delete", pano_path)
+        db_session.add(
+            HighlightVideoJob(
+                id="highlight-to-delete",
+                flight_id=flight.id,
+                status="completed",
+                source_video_path=str(pano_path),
+                output_path=str(output_path),
+                output_format="original",
+            )
+        )
+        db_session.commit()
+
+        response = client.delete(
+            f"{API_PREFIX}/flights/{flight.id}/highlight-videos/highlight-to-delete"
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "job_id": "highlight-to-delete",
+            "deleted": True,
+            "files_deleted": 1,
+        }
+        assert not output_path.exists()
+        assert db_session.get(HighlightVideoJob, "highlight-to-delete") is None
+
+    def test_delete_active_highlight_returns_conflict(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        """Active highlight jobs cannot be deleted."""
+        pano_path = tmp_path / "pano.mp4"
+        pano_path.write_bytes(b"pano")
+        flight = self._flight(db_session, "highlight-delete-active", pano_path)
+        db_session.add(
+            HighlightVideoJob(
+                id="highlight-active-delete",
+                flight_id=flight.id,
+                status="running",
+                source_video_path=str(pano_path),
+                output_format="original",
+            )
+        )
+        db_session.commit()
+
+        response = client.delete(
+            f"{API_PREFIX}/flights/{flight.id}/highlight-videos/highlight-active-delete"
+        )
+
+        assert response.status_code == 409
+
 
 class TestHealthCheck:
     """Tests for /health endpoint"""

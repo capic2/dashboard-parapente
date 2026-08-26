@@ -278,6 +278,7 @@ vi.mock('../../../hooks/flights/useHighlightVideos', () => ({
   }),
   useCreateFlightHighlightVideo: () => ({ isPending: false, mutate: vi.fn() }),
   useCancelFlightHighlightVideo: () => ({ isPending: false, mutate: vi.fn() }),
+  useDeleteFlightHighlightVideo: () => ({ isPending: false, mutate: vi.fn() }),
 }));
 
 vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({

@@ -10,6 +10,7 @@ import {
   LoaderCircle,
   Orbit,
   Sparkles,
+  Trash2,
   Video,
   Wand2,
 } from 'lucide-react';
@@ -40,6 +41,8 @@ interface FlightMediaBadgesProps {
   onGenerateHighlightVideo: () => void;
   onCancelHighlightVideo: () => void;
   onDownloadHighlightVideo: () => void;
+  isHighlightDeletionPending: boolean;
+  onDeleteHighlightVideo: () => void;
   children: ReactNode;
 }
 
@@ -64,6 +67,8 @@ export function FlightMediaBadges({
   onGenerateHighlightVideo,
   onCancelHighlightVideo,
   onDownloadHighlightVideo,
+  isHighlightDeletionPending,
+  onDeleteHighlightVideo,
   children,
 }: FlightMediaBadgesProps) {
   const { t } = useTranslation();
@@ -327,6 +332,17 @@ export function FlightMediaBadges({
                   >
                     <Download className="h-4 w-4" aria-hidden="true" />
                     {t('flights.highlightVideoDownload')}
+                  </Button>
+                  <Button
+                    variant="danger"
+                    className="min-h-10 w-full rounded-lg px-3 py-2 text-sm"
+                    onPress={onDeleteHighlightVideo}
+                    isDisabled={isHighlightDeletionPending}
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    {isHighlightDeletionPending
+                      ? t('flights.highlightVideoDeleting')
+                      : t('flights.highlightVideoDelete')}
                   </Button>
                   <FlightYoutubeUploadControls
                     flight={flight}

@@ -210,6 +210,12 @@ class HighlightVideoJobResponse(BaseModel):
     completed_at: datetime | None = None
 
 
+class HighlightVideoDeleteResponse(BaseModel):
+    job_id: str
+    deleted: bool
+    files_deleted: int = Field(ge=0)
+
+
 class DeploymentDrainRequest(BaseModel):
     deployment_id: str = Field(min_length=1)
     target_version: str = Field(min_length=1)

@@ -131,6 +131,7 @@ from schemas import (
     GoproOverlayLayoutsResponse,
     GoproOverlayProbeResponse,
     HighlightVideoClipResponse,
+    HighlightVideoDeleteResponse,
     HighlightVideoJobResponse,
     IntervalsPreviewResponse,
     IntervalsStatus,
@@ -4744,7 +4745,7 @@ def download_flight_highlight_video(
 
 
 @router.delete(
-    "/flights/{flight_id}/highlight-videos/{job_id}",
+    "/flights/{flight_id}/highlight-videos/{job_id}/cancel",
     response_model=HighlightVideoJobResponse,
 )
 def cancel_flight_highlight_video(
@@ -4765,6 +4766,42 @@ def cancel_flight_highlight_video(
     db.commit()
     db.refresh(job)
     return _highlight_job_payload(job)
+
+
+@router.delete(
+    "/flights/{flight_id}/highlight-videos/{job_id}",
+    response_model=HighlightVideoDeleteResponse,
+)
+def delete_flight_highlight_video(
+    flight_id: str, job_id: str, db: Session = Depends(get_db)
+) -> HighlightVideoDeleteResponse:
+    """Delete a terminal best-moments job and its generated files."""
+    job = (
+        db.query(HighlightVideoJob)
+        .filter(HighlightVideoJob.id == job_id, HighlightVideoJob.flight_id == flight_id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Highlight video job not found")
+    if job.status in {HIGHLIGHT_STATUS_QUEUED, "running"}:
+        raise HTTPException(
+            status_code=409, detail="Highlight video cannot be deleted while active"
+        )
+
+    deleted_files = 0
+    if job.output_path:
+        output_path = Path(job.output_path)
+        if output_path.is_file():
+            output_path.unlink()
+            deleted_files = 1
+            try:
+                output_path.parent.rmdir()
+            except OSError:
+                pass
+
+    db.delete(job)
+    db.commit()
+    return HighlightVideoDeleteResponse(job_id=job_id, deleted=True, files_deleted=deleted_files)
 
 
 @router.get("/flights/{flight_id}/highlight-videos/{job_id}/thumbnail")
@@ -6503,7 +6540,12 @@ async def create_flight_gopro_overlay_job(
         resolved_pip_path = _resolve_gopro_paragliding_path(pip_path)
         auto_video_path = input_dir / "camera.mp4"
         auto_gpx_path = first_matching_file(input_dir, "Zepp*.gpx")
-        auto_pip_path = latest_matching_file(input_dir, "flight*.mp4")
+        previous_overlay_path = _resolve_flight_file_path(flight.gopro_overlay_file_path)
+        auto_pip_path = latest_matching_file(
+            input_dir,
+            "flight*.mp4",
+            (previous_overlay_path,) if previous_overlay_path else (),
+        )
         auto_osv_paths = _matching_files_by_mtime(input_dir, "*.osv")
         logger.info(
             "GoPro overlay auto inputs for flight %s in %s: camera=%s, gpx=%s, pip=%s, osv=%s",
