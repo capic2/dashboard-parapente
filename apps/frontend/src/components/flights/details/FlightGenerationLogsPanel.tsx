@@ -252,7 +252,13 @@ export function FlightGenerationLogsPanel({
           <LogSourceCard
             key={`gopro-${goproOverlayJob?.job_id ?? goproOverlayJobId ?? 'fallback'}`}
             title={t('flights.generationLogs.goproOverlayTitle')}
-            renderMethod={goproOverlayJob?.render_method ?? null}
+            renderMethod={
+              goproOverlayJob && ['running', 'completed', 'failed', 'cancelled'].includes(
+                goproOverlayJob.status
+              )
+                ? (goproOverlayJob.render_method ?? null)
+                : null
+            }
             status={goproOverlayStatusValue}
             isInProgress={isGoproOverlayInProgress(goproOverlayStatusValue)}
             statusLabel={
