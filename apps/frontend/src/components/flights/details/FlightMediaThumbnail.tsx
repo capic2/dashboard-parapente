@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Lightbox } from '@dashboard-parapente/design-system';
 import { ImageOff, LoaderCircle, Maximize2, Play } from 'lucide-react';
-import { api } from '../../../lib/api';
+import { api, getApiUrl } from '../../../lib/api';
 
 interface FlightMediaThumbnailProps {
   path: string;
@@ -51,8 +51,6 @@ function LoadedThumbnail({
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [videoSrc, setVideoSrc] = useState<string | null>(null);
-  const [isVideoLoading, setIsVideoLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [src, setSrc] = useState<string | null>(null);
 
@@ -62,39 +60,6 @@ function LoadedThumbnail({
     setSrc(objectUrl);
     return () => URL.revokeObjectURL(objectUrl);
   }, [blob]);
-
-  useEffect(() => {
-    if (!isPlaying || !videoPath) return;
-
-    const controller = new AbortController();
-    let isActive = true;
-    setIsVideoLoading(true);
-    void api
-      .get(videoPath, { signal: controller.signal })
-      .blob()
-      .then((videoBlob) => {
-        if (!isActive) return;
-        setVideoSrc(URL.createObjectURL(videoBlob));
-        setIsVideoLoading(false);
-      })
-      .catch(() => {
-        if (isActive) {
-          setHasError(true);
-          setIsVideoLoading(false);
-        }
-      });
-
-    return () => {
-      isActive = false;
-      controller.abort();
-    };
-  }, [isPlaying, videoPath]);
-
-  useEffect(() => {
-    return () => {
-      if (videoSrc) URL.revokeObjectURL(videoSrc);
-    };
-  }, [videoSrc]);
 
   if (hasError) return <ThumbnailUnavailable inline={!interactive} />;
   if (!src) return <ThumbnailLoading inline={!interactive} />;
@@ -116,18 +81,15 @@ function LoadedThumbnail({
     );
   }
 
-  if (videoPath && isPlaying && isVideoLoading) {
-    return <ThumbnailLoading />;
-  }
-
-  if (videoPath && isPlaying && videoSrc) {
+  if (videoPath && isPlaying) {
     return (
       <div className="relative block aspect-video w-full overflow-hidden bg-black">
         <video
           className="h-full w-full object-contain"
-          src={videoSrc}
+          src={getApiUrl(videoPath)}
           controls
           autoPlay
+          playsInline
           preload="metadata"
           aria-label={alt}
         >

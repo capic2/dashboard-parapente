@@ -18,7 +18,7 @@ vi.mock('@dashboard-parapente/design-system', () => ({
 
 vi.mock('../../../lib/api', () => ({
   api: { get: apiGet },
-  getApiUrlWithSearchParams: (path: string) => `/api${path}`,
+  getApiUrl: (path: string) => `/api${path}`,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -115,11 +115,9 @@ describe('FlightMediaThumbnail', () => {
     );
     expect(document.querySelector('video')).toHaveAttribute(
       'src',
-      'blob:thumbnail'
+      '/api/flights/flight-1/video'
     );
-    expect(apiGet).toHaveBeenLastCalledWith('/flights/flight-1/video', {
-      signal: expect.any(AbortSignal),
-    });
+    expect(apiGet).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
