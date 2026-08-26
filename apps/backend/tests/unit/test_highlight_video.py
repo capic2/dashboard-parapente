@@ -4,6 +4,7 @@ from unittest.mock import patch
 from highlight_video import HighlightClip, clamp_clip, overlay_interval_for_clip
 from highlight_video_worker import (
     _probe_video_dimensions,
+    _render_clip,
     _set_job_stage,
     select_flight_event_clips,
 )
@@ -88,3 +89,32 @@ def test_set_job_stage_persists_progress_and_logs_stage():
         10,
         "Analyse des images",
     )
+
+
+def test_render_clip_uses_overlay_as_full_frame_without_picture_in_picture(tmp_path):
+    source_path = tmp_path / "pano.mp4"
+    overlay_path = tmp_path / "overlay.mp4"
+    output_path = tmp_path / "clip.mp4"
+    source_path.touch()
+    overlay_path.touch()
+
+    with (
+        patch("highlight_video_worker._probe_duration", return_value=120),
+        patch("highlight_video_worker._output_dimensions", return_value=(1920, 1080)),
+        patch("highlight_video_worker.select_video_accelerator", return_value="cpu"),
+        patch("highlight_video_worker.h264_encode_args", return_value=["-f", "mp4"]),
+        patch("highlight_video_worker.subprocess.run") as run,
+    ):
+        _render_clip(
+            source_path,
+            output_path,
+            HighlightClip(start_seconds=12.5, duration_seconds=6.0, yaw_degrees=90),
+            overlay_path,
+            overlay_offset_seconds=2.25,
+        )
+
+    command = run.call_args.args[0]
+    assert command[command.index("-ss") + 1] == "14.750"
+    assert str(overlay_path) in command
+    assert "-filter_complex" not in command
+    assert "overlay=W-w-32:H-h-32:eof_action=pass[v]" not in command

@@ -3,7 +3,6 @@ import { Button } from '@dashboard-parapente/design-system';
 import { Download, LoaderCircle, Sparkles, Trash2 } from 'lucide-react';
 import type { HighlightVideoJob } from '@dashboard-parapente/shared-types';
 import type { Flight } from '../../../types';
-import { FlightMediaThumbnail } from './FlightMediaThumbnail';
 import { FlightYoutubeUploadControls } from './FlightYoutubeUploadControls';
 
 interface HighlightVideoJobCardProps {
@@ -41,12 +40,6 @@ export function HighlightVideoJobCard({
 
   return (
     <div className="overflow-hidden rounded-xl border border-violet-200 bg-white shadow-sm dark:border-violet-800 dark:bg-slate-900/60">
-      {status === 'completed' && job && (
-        <FlightMediaThumbnail
-          path={`/flights/${flight.id}/highlight-videos/${job.job_id}/thumbnail`}
-          alt={t('flights.highlightVideoThumbnailAlt')}
-        />
-      )}
       <div className="p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
