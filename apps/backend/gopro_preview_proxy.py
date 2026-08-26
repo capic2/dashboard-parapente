@@ -400,7 +400,7 @@ def _ffmpeg_command(
             video_scale = (
                 f"scale_cuda=w={config.GOPRO_PREVIEW_MAX_WIDTH}:"
                 f"h={config.GOPRO_PREVIEW_MAX_HEIGHT}:"
-                "force_original_aspect_ratio=decrease:force_divisible_by=2,"
+                "force_original_aspect_ratio=decrease:force_divisible_by=2:format=yuv420p,"
                 "hwdownload,format=yuv420p"
             )
         filters.append(
