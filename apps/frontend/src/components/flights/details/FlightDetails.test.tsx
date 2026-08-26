@@ -719,6 +719,9 @@ describe('FlightDetails GoPro overlay action', () => {
     expect(
       screen.getByRole('button', { name: 'Download video' })
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'flights.highlightVideoDelete' })
+    ).toBeInTheDocument();
 
     openTab('Processing');
     expect(screen.getByText('Best moments')).toBeInTheDocument();
