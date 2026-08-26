@@ -247,19 +247,6 @@ export function FlightMediaBadges({
                     {t('flights.mediaFileAvailable')}
                   </span>
                 </span>
-                {highlightVideo?.status === 'completed' && (
-                  <Button
-                    variant="danger"
-                    className="shrink-0 rounded-lg px-2.5 py-2 text-xs sm:px-3 sm:text-sm"
-                    onPress={onDeleteHighlightVideo}
-                    isDisabled={isHighlightDeletionPending}
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    {isHighlightDeletionPending
-                      ? t('flights.highlightVideoDeleting')
-                      : t('flights.highlightVideoDelete')}
-                  </Button>
-                )}
               </div>
               <div className="mt-3">
                 <FlightYoutubeUploadControls
@@ -353,6 +340,23 @@ export function FlightMediaBadges({
                       highlight_video_job_id: highlightVideo.job_id,
                     }}
                   />
+                </div>
+              )}
+              {['completed', 'failed', 'cancelled'].includes(
+                highlightVideo?.status ?? ''
+              ) && (
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    variant="ghost"
+                    className="min-h-10 cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed dark:text-red-300 dark:hover:bg-red-950/30"
+                    onPress={onDeleteHighlightVideo}
+                    isDisabled={isHighlightDeletionPending}
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    {isHighlightDeletionPending
+                      ? t('flights.highlightVideoDeleting')
+                      : t('flights.highlightVideoDelete')}
+                  </Button>
                 </div>
               )}
               {highlightVideo?.status !== 'completed' &&
