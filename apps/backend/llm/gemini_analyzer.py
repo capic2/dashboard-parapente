@@ -90,6 +90,7 @@ def analyze_emagram_with_gemini(
                     "top_p": 0.8,
                     "top_k": 40,
                     "max_output_tokens": 8192,  # Increased significantly
+                    "response_mime_type": "application/json",
                 },
             )
 
@@ -254,52 +255,22 @@ def _parse_gemini_response(response_text: str) -> dict:
 
     text = text.strip()
 
-    # Try to fix incomplete JSON
-    if not text.endswith("}"):
-        logger.warning("JSON appears incomplete, attempting to close it")
-        # Count opening and closing braces
-        open_braces = text.count("{")
-        close_braces = text.count("}")
-
-        # Add missing closing braces
-        if open_braces > close_braces:
-            text += "}" * (open_braces - close_braces)
-            logger.info(f"Added {open_braces - close_braces} closing braces")
-
     try:
         analysis = json.loads(text)
-
-        # Validate required fields
-        required_fields = [
-            "plafond_thermique_m",
-            "force_thermique_ms",
-            "heures_volables",
-            "score_volabilite",
-            "conseils_vol",
-            "alertes_securite",
-            "details_analyse",
-        ]
-
-        for field in required_fields:
-            if field not in analysis:
-                logger.warning(f"Missing field in Gemini response: {field}")
-                analysis[field] = _get_default_value(field)
-
-        # Type conversions and validation
-        analysis["plafond_thermique_m"] = int(analysis["plafond_thermique_m"])
-        analysis["force_thermique_ms"] = float(analysis["force_thermique_ms"])
-        analysis["score_volabilite"] = max(0, min(100, int(analysis["score_volabilite"])))
-
-        if not isinstance(analysis["alertes_securite"], list):
-            analysis["alertes_securite"] = []
-
-        analysis.setdefault("explication_analyse", None)
-
-        return analysis
+        return _normalize_parsed_analysis(analysis)
 
     except json.JSONDecodeError as e:
+        repaired_text = _repair_truncated_json(text)
+        if repaired_text != text:
+            try:
+                analysis = json.loads(repaired_text)
+                logger.warning("Repaired truncated Gemini JSON response")
+                return _normalize_parsed_analysis(analysis)
+            except json.JSONDecodeError:
+                pass
+
         logger.error(f"Failed to parse Gemini response as JSON: {e}")
-        logger.error(f"Full response text ({len(response_text)} chars): {response_text}")
+        logger.error("Gemini response was %s characters long", len(response_text))
 
         # Return fallback analysis
         return {
@@ -312,6 +283,72 @@ def _parse_gemini_response(response_text: str) -> dict:
             "details_analyse": f"Erreur de parsing JSON: {str(e)}\n\nRéponse brute: {response_text[:1000]}",
             "explication_analyse": None,
         }
+
+
+def _normalize_parsed_analysis(analysis: dict) -> dict:
+    """Fill and normalize the fields shared by all Gemini responses."""
+    required_fields = [
+        "plafond_thermique_m",
+        "force_thermique_ms",
+        "heures_volables",
+        "score_volabilite",
+        "conseils_vol",
+        "alertes_securite",
+        "details_analyse",
+    ]
+
+    for field in required_fields:
+        if field not in analysis:
+            logger.warning("Missing field in Gemini response: %s", field)
+            analysis[field] = _get_default_value(field)
+
+    analysis["plafond_thermique_m"] = int(analysis["plafond_thermique_m"])
+    analysis["force_thermique_ms"] = float(analysis["force_thermique_ms"])
+    analysis["score_volabilite"] = max(0, min(100, int(analysis["score_volabilite"])))
+
+    if not isinstance(analysis["alertes_securite"], list):
+        analysis["alertes_securite"] = []
+
+    analysis.setdefault("explication_analyse", None)
+    return analysis
+
+
+def _repair_truncated_json(text: str) -> str:
+    """Close JSON truncated by an LLM while preserving its completed values."""
+    output = text.rstrip()
+    stack: list[str] = []
+    in_string = False
+    escaped = False
+
+    for char in output:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+
+        if char == '"':
+            in_string = True
+        elif char in "[{":
+            stack.append(char)
+        elif char in "]}":
+            matching = (char == "]" and stack[-1:] == ["["]) or (
+                char == "}" and stack[-1:] == ["{"]
+            )
+            if stack and matching:
+                stack.pop()
+
+    if not in_string and not stack:
+        return output
+
+    repaired = output
+    if in_string:
+        repaired += '"'
+    repaired += "".join("}" if opener == "{" else "]" for opener in reversed(stack))
+    return repaired
 
 
 def _get_default_value(field: str):
