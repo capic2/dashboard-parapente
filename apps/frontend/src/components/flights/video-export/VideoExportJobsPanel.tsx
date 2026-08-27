@@ -377,7 +377,13 @@ function FramesCell({ job }: { job: VideoExportJob }) {
 }
 
 function isActiveJob(job: VideoExportJob) {
-  return activeStatusLabels.has(job.internal_status || job.status);
+  if (['queued', 'blocked', 'stalled'].includes(job.status)) {
+    return false;
+  }
+  return (
+    activeStatusLabels.has(job.status) ||
+    activeStatusLabels.has(job.internal_status || '')
+  );
 }
 
 function FpsCell({ job }: { job: VideoExportJob }) {

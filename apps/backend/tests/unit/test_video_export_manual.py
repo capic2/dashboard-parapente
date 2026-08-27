@@ -45,6 +45,17 @@ def test_video_export_log_survives_temp_cleanup_until_job_deletion(tmp_path, mon
     assert not log_path.exists()
 
 
+def test_video_export_log_refreshes_runtime_activity(tmp_path, monkeypatch):
+    monkeypatch.setattr(video_export_manual, "_video_export_dir", lambda: tmp_path)
+    video_export_manual._JOB_RUNTIME.clear()
+
+    video_export_manual._log_job("job-activity", "Captured 10/100 frames")
+
+    updated_at = video_export_manual._JOB_RUNTIME["job-activity"]["updated_at"]
+    assert datetime.fromisoformat(updated_at).tzinfo is not None
+    video_export_manual._JOB_RUNTIME.clear()
+
+
 def test_resolve_frontend_url_uses_backend_static_in_production(monkeypatch):
     """Production should avoid localhost:5173 when static frontend is bundled."""
     monkeypatch.setattr(video_export_manual.Path, "exists", lambda _self: True)
