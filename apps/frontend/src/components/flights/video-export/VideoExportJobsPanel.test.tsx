@@ -234,6 +234,15 @@ describe('VideoExportJobsPanel', () => {
         can_resume: true,
       },
       {
+        job_id: 'job-queued',
+        flight_title: 'Vol en attente',
+        status: 'queued',
+        progress: 0,
+        fps: 15,
+        can_cancel: true,
+        can_delete: true,
+      },
+      {
         job_id: 'job-overlay-done',
         flight_name: 'Nom du vol overlay terminé',
         flight_title: 'final.mp4',
