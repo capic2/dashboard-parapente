@@ -28,7 +28,7 @@ from gopro_overlay_export import cancel_gopro_overlay_job
 from gopro_overlay_export import create_gopro_overlay_job
 from gopro_overlay_export import create_gopro_overlay_job_from_paths
 from gopro_overlay_export import delete_gopro_overlay_job
-from models import Flight
+from models import Flight, GoproOverlayJob
 from models import VideoExportJob
 
 API_PREFIX = "/api"
@@ -2383,6 +2383,83 @@ def test_prepare_pip_video_delays_pip_until_gpx_start(tmp_path, monkeypatch):
     assert "tpad=stop_mode=clone:stop=150" in video_filter
     assert "setpts=N/(10*TB)" in video_filter
     assert command[command.index("-c:v") + 1] == "libx264"
+
+
+def test_claim_job_for_preparation_allows_only_one_worker(monkeypatch: pytest.MonkeyPatch) -> None:
+    class MissingOverlayJobsTableSession:
+        def __enter__(self) -> None:
+            raise gopro_overlay_export.OperationalError(
+                "select", {}, Exception("no such table: gopro_overlay_jobs")
+            )
+
+        def __exit__(self, *_args: object) -> bool:
+            return False
+
+    job_id = "job-preparation-claim"
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", MissingOverlayJobsTableSession)
+    gopro_overlay_export._JOBS[job_id] = {
+        "job_id": job_id,
+        "status": gopro_overlay_export._STATUS_QUEUED,
+    }
+
+    try:
+        claimed = gopro_overlay_export._claim_job_for_preparation(job_id)
+        assert claimed is not None
+        assert claimed["status"] == gopro_overlay_export._STATUS_PREPARING
+        assert gopro_overlay_export._claim_job_for_preparation(job_id) is None
+    finally:
+        gopro_overlay_export._JOBS.pop(job_id, None)
+
+
+def test_claim_job_for_preparation_syncs_linked_flight(
+    tmp_path: Path, test_db, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job_id = "job-preparation-flight-sync"
+    flight_id = "flight-preparation-flight-sync"
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+    session = test_db()
+    try:
+        session.add(
+            Flight(
+                id=flight_id,
+                name="Flight preparation sync",
+                flight_date=date(2026, 3, 15),
+                gopro_overlay_job_id=job_id,
+                gopro_overlay_status="queued",
+            )
+        )
+        session.add(
+            GoproOverlayJob(
+                id=job_id,
+                flight_id=flight_id,
+                status="queued",
+                progress=0,
+                message="Overlay queued",
+                video_path=str(tmp_path / "camera.mp4"),
+                gpx_path=str(tmp_path / "track.gpx"),
+                layout_id="parapente-1080",
+                layout_label="Parapente 1920x1080",
+                layout_path=str(tmp_path / "layout.xml"),
+                output_path=str(tmp_path / "overlay.mp4"),
+                temp_output_path=str(tmp_path / "overlay.part.mp4"),
+                output_filename="overlay.mp4",
+            )
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    claimed = gopro_overlay_export._claim_job_for_preparation(job_id)
+
+    assert claimed is not None
+    assert claimed["status"] == gopro_overlay_export._STATUS_PREPARING
+    session = test_db()
+    try:
+        flight = session.get(Flight, flight_id)
+        assert flight is not None
+        assert flight.gopro_overlay_status == gopro_overlay_export._STATUS_PREPARING
+    finally:
+        session.close()
 
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is required")
