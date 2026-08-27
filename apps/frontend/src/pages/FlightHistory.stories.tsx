@@ -172,6 +172,7 @@ const toSummary = (flight: Record<string, unknown>) => ({
   youtube_upload_progress: null,
   has_gopro_overlay: Boolean(flight.gopro_overlay_file_path),
   has_pano_video: Boolean(flight.pano_video_file_exists),
+  has_highlight_video: false,
   video_export_job_id: flight.video_export_job_id ?? null,
   video_export_status: flight.video_export_status ?? null,
   video_export_progress: flight.video_export_progress ?? null,

@@ -1,10 +1,13 @@
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from unittest.mock import patch
 
+from fastapi.testclient import TestClient
 from sqlalchemy import event
+from sqlalchemy.orm import Session
 
 import config
-from models import Flight, GoproOverlayJob, YoutubeUploadJob
+from models import Flight, GoproOverlayJob, HighlightVideoJob, YoutubeUploadJob
 
 API_URL = "/api/flights/summaries"
 
@@ -121,6 +124,36 @@ def test_summaries_report_panorama_file(client, db_session, monkeypatch, tmp_pat
     assert response.json()["flights"][0]["has_pano_video"] is True
     db_session.refresh(flight)
     assert flight.pano_video_file_path == str((directory / "pano.mp4").resolve())
+
+
+def test_summaries_report_generated_highlight_video(
+    client: TestClient, db_session: Session, tmp_path: Path
+) -> None:
+    output_path = tmp_path / "highlights.mp4"
+    output_path.write_bytes(b"highlights")
+    flight = Flight(
+        id="summary-highlights",
+        title="Best moments",
+        flight_date=date(2026, 1, 1),
+    )
+    db_session.add(flight)
+    db_session.add(
+        HighlightVideoJob(
+            id="highlight-job",
+            flight_id=flight.id,
+            status="completed",
+            progress=100,
+            source_video_path="source.mp4",
+            output_path=str(output_path),
+            output_format="original",
+        )
+    )
+    db_session.commit()
+
+    response = client.get(API_URL)
+
+    assert response.status_code == 200
+    assert response.json()["flights"][0]["has_highlight_video"] is True
 
 
 def test_summaries_search_is_case_and_accent_insensitive(client, db_session) -> None:
