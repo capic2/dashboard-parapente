@@ -198,10 +198,22 @@ export function Flight({
                   {t('flights.cameraBadge')}
                 </span>
               )}
+              {hasPanoVideo && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
+                  <Orbit className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.panoBadge')}
+                </span>
+              )}
               {hasCompletedGoproOverlay && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200">
                   <Wand2 className="h-3 w-3" aria-hidden="true" />
                   {t('flights.goproOverlayBadge')}
+                </span>
+              )}
+              {hasHighlightVideo && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-fuchsia-200 bg-fuchsia-50 px-2 py-0.5 text-[11px] font-medium text-fuchsia-800 dark:border-fuchsia-800 dark:bg-fuchsia-950/40 dark:text-fuchsia-200">
+                  <Wand2 className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.highlightVideoBadge')}
                 </span>
               )}
               {(hasYoutubeVideo || isYoutubeUploadRunning) && (
@@ -211,18 +223,6 @@ export function Flight({
                 >
                   <Play className="h-3 w-3" aria-hidden="true" />
                   {youtubeLabel}
-                </span>
-              )}
-              {hasPanoVideo && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
-                  <Orbit className="h-3 w-3" aria-hidden="true" />
-                  {t('flights.panoBadge')}
-                </span>
-              )}
-              {hasHighlightVideo && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-fuchsia-200 bg-fuchsia-50 px-2 py-0.5 text-[11px] font-medium text-fuchsia-800 dark:border-fuchsia-800 dark:bg-fuchsia-950/40 dark:text-fuchsia-200">
-                  <Wand2 className="h-3 w-3" aria-hidden="true" />
-                  {t('flights.highlightVideoBadge')}
                 </span>
               )}
               {isVideoExportRunning && (

@@ -122,6 +122,8 @@ test('renders available media badges in the expected order', () => {
         has_video: true,
         has_camera: true,
         has_gopro_overlay: true,
+        has_pano_video: true,
+        has_highlight_video: true,
         has_youtube_video: true,
       }}
       isActive={false}
@@ -136,7 +138,9 @@ test('renders available media badges in the expected order', () => {
     'flights.gpxBadge',
     'flights.videoBadge',
     'flights.cameraBadge',
+    'flights.panoBadge',
     'flights.goproOverlayBadge',
+    'flights.highlightVideoBadge',
     'flights.youtubeBadge',
   ].map((label) => screen.getByText(label));
 

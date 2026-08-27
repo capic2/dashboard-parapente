@@ -40,7 +40,7 @@ export function GoproOverlayJobStack({
 
   return (
     <div
-      className={`min-w-0 ${isExpanded ? 'sm:col-span-2 2xl:col-span-3' : ''}`}
+      className={`order-5 min-w-0 ${isExpanded ? 'sm:col-span-2 2xl:col-span-3' : ''}`}
     >
       {isCollapsed ? (
         <button

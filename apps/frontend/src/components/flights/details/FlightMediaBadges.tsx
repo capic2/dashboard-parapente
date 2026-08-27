@@ -97,7 +97,7 @@ export function FlightMediaBadges({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
-        <div className="overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm dark:border-emerald-800 dark:bg-slate-900/60">
+        <div className="order-1 overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm dark:border-emerald-800 dark:bg-slate-900/60">
           {hasGpx && <FlightGpxThumbnail flightId={flightId} />}
           {!hasGpx && (
             <div className="flex aspect-video items-center justify-center bg-emerald-50/70 p-6 text-center dark:bg-emerald-950/20">
@@ -143,7 +143,7 @@ export function FlightMediaBadges({
             </Button>
           </div>
         </div>
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
+        <div className="order-3 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
           {hasGoproCameraVideo ? (
             <FlightMediaThumbnail
               path={`/flights/${flightId}/gopro-camera/thumbnail`}
@@ -173,7 +173,7 @@ export function FlightMediaBadges({
             </span>
           </div>
         </div>
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
+        <div className="order-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
           {hasVideo && (
             <FlightMediaThumbnail
               path={`/flights/${flightId}/video/thumbnail`}
@@ -268,7 +268,7 @@ export function FlightMediaBadges({
             </div>
           </div>
         </div>
-        <div className="overflow-hidden rounded-xl border border-violet-200 bg-white shadow-sm dark:border-violet-800 dark:bg-slate-900/60">
+        <div className="order-4 overflow-hidden rounded-xl border border-violet-200 bg-white shadow-sm dark:border-violet-800 dark:bg-slate-900/60">
           {hasPanoVideo ? (
             <FlightMediaThumbnail
               path={`/flights/${flightId}/pano/thumbnail`}
@@ -306,7 +306,7 @@ export function FlightMediaBadges({
           </div>
         </div>
         {showPersistedOverlayBadge && (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
+          <div className="order-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
             <FlightMediaThumbnail
               path={`/flights/${flightId}/gopro-overlay/thumbnail`}
               videoPath={`/flights/${flightId}/gopro-overlay`}

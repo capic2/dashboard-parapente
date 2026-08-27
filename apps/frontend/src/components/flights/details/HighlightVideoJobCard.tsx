@@ -51,7 +51,7 @@ export function HighlightVideoJobCard({
   return (
     <div
       aria-disabled={isGenerationLocked}
-      className={`overflow-hidden rounded-xl border bg-white shadow-sm dark:bg-slate-900/60 ${
+      className={`order-6 overflow-hidden rounded-xl border bg-white shadow-sm dark:bg-slate-900/60 ${
         isGenerationLocked
           ? 'border-slate-300 opacity-75 dark:border-slate-700'
           : 'border-violet-200 dark:border-violet-800'
