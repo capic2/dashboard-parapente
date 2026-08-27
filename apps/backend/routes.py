@@ -132,7 +132,6 @@ from schemas import (
     GoproOverlayLayoutsResponse,
     GoproOverlayProbeResponse,
     HighlightVideoClipResponse,
-    HighlightVideoCreateRequest,
     HighlightVideoDeleteResponse,
     HighlightVideoJobResponse,
     IntervalsPreviewResponse,
@@ -4759,18 +4758,10 @@ def _highlight_job_payload(job: HighlightVideoJob) -> HighlightVideoJobResponse:
         output_format=job.output_format,
         overlay_offset_seconds=float(job.overlay_offset_seconds or 0.0),
         selection=selection,
-        prompt=job.prompt,
         created_at=job.created_at,
         updated_at=job.updated_at,
         completed_at=job.completed_at,
     )
-
-
-def _normalize_highlight_prompt(prompt: str | None) -> str | None:
-    """Store absent prompts consistently instead of preserving whitespace-only input."""
-    if prompt is None:
-        return None
-    return prompt.strip() or None
 
 
 @router.get(
@@ -4906,7 +4897,6 @@ def get_flight_highlight_video_thumbnail(
 def create_flight_highlight_video(
     flight_id: str,
     background_tasks: BackgroundTasks,
-    payload: HighlightVideoCreateRequest | None = None,
     db: Session = Depends(get_db),
 ) -> HighlightVideoJobResponse:
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
@@ -4939,7 +4929,6 @@ def create_flight_highlight_video(
         source_video_path=str(pano_path),
         overlay_video_path=overlay_path,
         output_format="original",
-        prompt=_normalize_highlight_prompt(payload.prompt if payload else None),
         overlay_offset_seconds=float(flight.gopro_overlay_gpx_offset or 0.0),
     )
     db.add(job)

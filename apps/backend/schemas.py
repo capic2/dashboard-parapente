@@ -196,10 +196,6 @@ class HighlightVideoClipResponse(BaseModel):
     category: str
 
 
-class HighlightVideoCreateRequest(BaseModel):
-    prompt: str | None = Field(default=None, max_length=4000)
-
-
 class HighlightVideoJobResponse(BaseModel):
     job_id: str
     flight_id: str
@@ -210,7 +206,6 @@ class HighlightVideoJobResponse(BaseModel):
     output_format: str
     overlay_offset_seconds: float
     selection: list[HighlightVideoClipResponse] = Field(default_factory=list)
-    prompt: str | None = None
     created_at: datetime
     updated_at: datetime
     completed_at: datetime | None = None
