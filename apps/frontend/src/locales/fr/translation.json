@@ -43,6 +43,7 @@
     "reset": "Réinitialiser",
     "dataUnavailable": "Données non disponibles",
     "loadingError": "Erreur de chargement",
+    "stopping": "Arrêt...",
     "wind": "Vent",
     "temperature": "Température",
     "gusts": "Rafales",
@@ -113,7 +114,41 @@
       "gpu": "GPU"
     },
     "table": {
-      "method": "Méthode"
+      "method": "Méthode",
+      "actions": "Actions",
+      "status": "Statut",
+      "flight": "Nom",
+      "type": "Type",
+      "progress": "Progression",
+      "lastActivity": "Dernière activité",
+      "frames": "Images",
+      "fps": "Images par seconde",
+      "eta": "Temps restant"
+    },
+    "resumeSuccess": "Génération reprise",
+    "resumeError": "Impossible de reprendre la génération",
+    "downloadError": "Impossible de télécharger la vidéo",
+    "viewFlight": "Voir le vol",
+    "download": "Télécharger",
+    "resuming": "Reprise...",
+    "resume": "Reprendre",
+    "done": "Terminé",
+    "summary": {
+      "active_one": "{{count}} active",
+      "active_other": "{{count}} actives",
+      "completed_one": "{{count}} terminée",
+      "completed_other": "{{count}} terminées",
+      "failed_one": "{{count}} erreur",
+      "failed_other": "{{count}} erreurs",
+      "cancelled_one": "{{count}} annulée",
+      "cancelled_other": "{{count}} annulées"
+    },
+    "emptyFiltered": "Aucune génération ne correspond à ce filtre.",
+    "pagination": {
+      "label": "Pagination",
+      "previous": "Précédente",
+      "page": "Page {{page}} sur {{pages}}",
+      "next": "Suivante"
     },
     "typeFilters": {
       "all": "Tous les types",
@@ -147,7 +182,9 @@
     "allSitesConditions": "Conditions actuelles — tous les sites",
     "noSites": "Aucun site configuré",
     "noSitesDescription": "Ajoutez votre premier site de vol pour commencer.",
-    "addSite": "Ajouter un site"
+    "addSite": "Ajouter un site",
+    "homeTitle": "Météo et vols du jour",
+    "homeDescription": "Suivez rapidement les sites exploitables, les meilleurs créneaux et vos indicateurs de vol."
   },
   "stats": {
     "title": "Statistiques",
@@ -880,6 +917,8 @@
     "site": "Site :",
     "duration": "Durée :",
     "distance": "Distance :",
+    "altitude": "Altitude",
+    "speed": "Vitesse",
     "createError": "Erreur lors de la création",
     "selectValidFile": "Veuillez sélectionner un fichier GPX ou IGC valide",
     "createdSuccess": "Vol créé avec succès :",
@@ -1022,6 +1061,7 @@
     "videoBadge": "Vidéo",
     "cameraBadge": "Caméra",
     "panoBadge": "Pano",
+    "highlightVideoBadge": "Meilleurs moments",
     "youtubeBadge": "YouTube",
     "videoProcessingBadge": "Vidéo: en cours",
     "videoErrorBadge": "Vidéo: erreur",
@@ -1175,6 +1215,7 @@
       },
       "progress": "Progression",
       "error": "Erreur",
+      "stalled": "Aucune progression depuis {{minutes}} min. La tâche semble bloquée.",
       "activity": "Journal d’activité",
       "technicalDetails": "Détails techniques",
       "lineCount_one": "{{count}} ligne",
@@ -1489,6 +1530,7 @@
   },
   "cache": {
     "title": "Visualiseur de Cache Redis",
+    "description": "Inspectez les clés actives, leur TTL et les groupes les plus volumineux.",
     "totalKeys": "Clés totales",
     "memoryUsage": "Utilisation mémoire",
     "groups": "Groupes",
@@ -1522,10 +1564,16 @@
   },
   "infrastructure": {
     "title": "Infrastructure",
+    "overviewLabel": "Monitoring",
+    "subtitle": "Vue opérationnelle des intégrations, exports vidéo et données du cache.",
     "tabs": {
       "intervals": "Intervals.icu",
       "videoExports": "Exportations vidéo",
       "cache": "Cache Redis"
+    },
+    "videoExports": {
+      "ready": "File",
+      "description": "Suivez les exports et nettoyez les fichiers temporaires."
     },
     "intervals": {
       "title": "Synchronisation Intervals.icu",
