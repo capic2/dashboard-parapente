@@ -578,6 +578,55 @@ def _update_job(job_id: str, **changes: Any) -> dict[str, Any]:
         return job.copy()
 
 
+def _claim_job_for_preparation(job_id: str) -> dict[str, Any] | None:
+    """Atomically reserve a queued job before creating shared temporary files."""
+    try:
+        with SessionLocal() as db:
+            claimed_count = (
+                db.query(GoproOverlayJob)
+                .filter(
+                    GoproOverlayJob.id == job_id,
+                    GoproOverlayJob.status == _STATUS_QUEUED,
+                )
+                .update(
+                    {
+                        GoproOverlayJob.status: _STATUS_PREPARING,
+                        GoproOverlayJob.progress: 5,
+                        GoproOverlayJob.message: "Preparing overlay files",
+                        GoproOverlayJob.updated_at: _utc_now_dt(),
+                    },
+                    synchronize_session=False,
+                )
+            )
+            if claimed_count != 1:
+                db.rollback()
+                return None
+            job = db.query(GoproOverlayJob).filter(GoproOverlayJob.id == job_id).first()
+            if not job:
+                db.rollback()
+                return None
+            _sync_flights_from_job(db, job)
+            db.commit()
+            payload = _job_to_payload(job, include_command=True)
+            _set_memory_snapshot(payload)
+            return payload
+    except OperationalError as exc:
+        if "no such table: gopro_overlay_jobs" not in str(exc):
+            raise
+
+    with _LOCK:
+        job = _JOBS.get(job_id)
+        if not job or job["status"] != _STATUS_QUEUED:
+            return None
+        job.update(
+            status=_STATUS_PREPARING,
+            progress=5,
+            message="Preparing overlay files",
+            updated_at=_utc_now(),
+        )
+        return job.copy()
+
+
 def _sync_flights_from_job(db: Any, job: GoproOverlayJob) -> None:
     flights = db.query(Flight).filter(Flight.gopro_overlay_job_id == job.id).all()
     for flight in flights:
@@ -1388,12 +1437,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
 
     try:
         _append_job_log(log_path, "Preparing overlay files")
-        current_job = _update_job(
-            job_id,
-            status=_STATUS_PREPARING,
-            progress=5,
-            message="Preparing overlay files",
-        )
+        current_job = _claim_job_for_preparation(job_id)
         if not current_job or current_job.get("status") != _STATUS_PREPARING:
             return None
         work_dir = Path(str(job["layout_path"])).parent
