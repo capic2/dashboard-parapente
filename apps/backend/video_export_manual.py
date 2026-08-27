@@ -81,6 +81,7 @@ def _log_job(job_id: str, message: str) -> None:
         log_path = _job_log_path(job_id)
         log_path.parent.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        _set_job_runtime(job_id, updated_at=timestamp)
         with log_path.open("a", encoding="utf-8") as log_file:
             log_file.write(f"[{timestamp}] {message}\n")
     except OSError:
