@@ -111,6 +111,7 @@ vi.mock('../../../hooks/useToast', () => ({
 }));
 
 vi.mock('../../../hooks/flights/useVideoExportJobs', () => ({
+  VIDEO_EXPORT_JOBS_PAGE_SIZE: 25,
   useVideoExportJobs: () => ({
     data: {
       jobs,
@@ -191,6 +192,7 @@ describe('VideoExportJobsPanel', () => {
         message: 'Capturing frames',
         mode: 'manual_fast',
         render_method: 'gpu',
+        fps_actual: 12.4,
         log_tail: ['Opening viewer', 'Captured 10/100 frames'],
         can_cancel: true,
         can_delete: true,
@@ -201,6 +203,7 @@ describe('VideoExportJobsPanel', () => {
         status: 'completed',
         internal_status: 'completed',
         progress: 100,
+        fps: 30,
         has_output_file: true,
         can_cancel: false,
         can_delete: true,
@@ -263,6 +266,8 @@ describe('VideoExportJobsPanel', () => {
     expect(screen.getAllByText('GPU').length).toBeGreaterThan(0);
     expect(screen.getAllByText('CPU').length).toBeGreaterThan(0);
     expect(screen.getAllByText('42%').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('12.4 fps').length).toBeGreaterThan(0);
+    expect(screen.queryByText('30.0 fps')).not.toBeInTheDocument();
     expect(screen.getAllByText('En cours').length).toBeGreaterThan(1);
     expect(
       screen.getAllByRole('button', { name: 'Actions' }).length
