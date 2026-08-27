@@ -360,11 +360,7 @@ function FramesCell({ job }: { job: VideoExportJob }) {
 }
 
 function isActiveJob(job: VideoExportJob) {
-  return (
-    job.can_cancel ||
-    activeStatusLabels.has(job.internal_status || job.status) ||
-    ['queued', 'running', 'processing'].includes(job.status)
-  );
+  return activeStatusLabels.has(job.internal_status || job.status);
 }
 
 function FpsCell({ job }: { job: VideoExportJob }) {
