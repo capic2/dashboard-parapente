@@ -85,6 +85,11 @@ Before pushing changes to a branch associated with a PR, check the PR state with
 create a new branch from the current `origin/main` and open a new PR for the
 follow-up changes.
 
+Before creating or updating a PR, fetch the latest `origin/main` and integrate
+it into the working branch. If conflicts occur, resolve every conflict before
+continuing, verify that no conflict markers remain, and rerun the impacted
+checks before pushing.
+
 Run the `coderabbit-cli` skill at the end of implementation, after relevant validation and before marking the work ready to ship, unless the user explicitly skips it. Do not defer CodeRabbit to the push step.
 
 For CodeRabbit comments, inspect only relevant PR conversations directly by default. Delegate discovery and triage only when the user requests it or the PR has enough independent conversations to justify the extra agent.
