@@ -36,6 +36,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
+from pydantic import BaseModel
 
 import config
 from auth import (
@@ -704,7 +705,22 @@ def _build_video_export_jobs_payload(
     return sorted(jobs, key=_video_export_sort_value, reverse=True)
 
 
-def _get_video_export_jobs_payload(db: Session, active_only: bool = False) -> dict[str, Any]:
+class VideoExportJobsResponse(BaseModel):
+    jobs: list[dict[str, Any]]
+    page: int
+    page_size: int
+    total: int
+    total_pages: int
+
+
+def _get_video_export_jobs_payload(
+    db: Session,
+    active_only: bool = False,
+    status_filter: str | None = None,
+    type_filter: str | None = None,
+    page: int | None = None,
+    page_size: int | None = None,
+) -> dict[str, Any]:
     jobs = _build_video_export_jobs_payload(
         list_exports_manual()
         + list_exports_stream()
@@ -735,7 +751,34 @@ def _get_video_export_jobs_payload(db: Session, active_only: bool = False) -> di
             ),
             reverse=True,
         )
-    return {"jobs": jobs}
+    if type_filter == "video":
+        jobs = [job for job in jobs if job.get("mode") != "gopro_overlay"]
+    elif type_filter == "gopro":
+        jobs = [job for job in jobs if job.get("mode") == "gopro_overlay"]
+    if status_filter == "active":
+        jobs = [
+            job
+            for job in jobs
+            if job.get("can_cancel")
+            or job.get("status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
+        ]
+    elif status_filter and status_filter != "all":
+        jobs = [job for job in jobs if job.get("status") == status_filter]
+    payload: dict[str, Any] = {"jobs": jobs}
+    if page is not None and page_size is not None:
+        total = len(jobs)
+        total_pages = max(1, math.ceil(total / page_size))
+        start = (page - 1) * page_size
+        payload.update(
+            {
+                "jobs": jobs[start : start + page_size],
+                "page": page,
+                "page_size": page_size,
+                "total": total,
+                "total_pages": total_pages,
+            }
+        )
+    return payload
 
 
 def _active_deployment_job_count(db: Session) -> int:
@@ -6063,19 +6106,43 @@ def get_video_export_status(job_id: str):
 @router.get("/video-export-jobs")
 def list_video_export_jobs(
     active_only: bool = False,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=1, le=100),
+    status_filter: Literal["all", "active", "completed", "failed", "cancelled"] = Query(default="all"),
+    type_filter: Literal["all", "video", "gopro"] = Query(default="all"),
     db: Session = Depends(get_db),
-):
+) -> VideoExportJobsResponse:
     """List video export jobs across all flights."""
-    return _get_video_export_jobs_payload(db, active_only=active_only)
+    payload = _get_video_export_jobs_payload(
+        db,
+        active_only=active_only,
+        status_filter=status_filter,
+        type_filter=type_filter,
+        page=page,
+        page_size=page_size,
+    )
+    return VideoExportJobsResponse(**payload)
 
 
 @router.get("/video-export-jobs/stream")
-async def stream_video_export_jobs(request: Request) -> StreamingResponse:
+async def stream_video_export_jobs(
+    request: Request,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=1, le=100),
+    status_filter: Literal["all", "active", "completed", "failed", "cancelled"] = Query(default="all"),
+    type_filter: Literal["all", "video", "gopro"] = Query(default="all"),
+) -> StreamingResponse:
     """Stream video export job list updates without frontend polling."""
 
     def read_payload() -> dict[str, Any]:
         with SessionLocal() as db:
-            return _get_video_export_jobs_payload(db)
+            return _get_video_export_jobs_payload(
+                db,
+                status_filter=status_filter,
+                type_filter=type_filter,
+                page=page,
+                page_size=page_size,
+            )
 
     async def event_stream():
         yield "retry: 5000\n\n"

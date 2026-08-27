@@ -1,6 +1,7 @@
 import preview from '../../.storybook/preview';
 import { expect, within } from 'storybook/test';
 import InfrastructurePage from './InfrastructurePage';
+import { validateInfrastructureSearch } from '../routes/infrastructure';
 import {
   defaultHandlers,
   intervalsNoActivityTypesHandlers,
@@ -26,6 +27,23 @@ const meta = preview.meta({
 export const Default = meta.story({
   name: 'Default',
   beforeEach: resetCacheDb,
+});
+
+export const VideoExports = meta.story({
+  name: 'Video Exports',
+  beforeEach: resetCacheDb,
+  parameters: {
+    router: {
+      initialPath: '/infrastructure/video-exports',
+      routes: [
+        {
+          path: '/infrastructure/$tab',
+          element: 'story',
+          validateSearch: validateInfrastructureSearch,
+        },
+      ],
+    },
+  },
 });
 
 export const AwaitingActivityType = meta.story({

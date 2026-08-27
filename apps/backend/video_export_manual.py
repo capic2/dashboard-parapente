@@ -2102,6 +2102,7 @@ async def _export_video_manual_render(job_id: str):
                         phase=_STATUS_CAPTURING,
                         eta_seconds=eta_seconds_int,
                         frames_captured=frame_count,
+                        fps_actual=round(fps_actual, 1),
                     )
 
                     _update_job(

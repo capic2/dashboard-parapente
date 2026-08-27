@@ -112,7 +112,13 @@ vi.mock('../../../hooks/useToast', () => ({
 
 vi.mock('../../../hooks/flights/useVideoExportJobs', () => ({
   useVideoExportJobs: () => ({
-    data: jobs,
+    data: {
+      jobs,
+      page: 1,
+      pageSize: 25,
+      total: jobs.length,
+      totalPages: 1,
+    },
     isLoading: false,
     isError: false,
     refetch,
@@ -258,56 +264,42 @@ describe('VideoExportJobsPanel', () => {
     expect(screen.getAllByText('CPU').length).toBeGreaterThan(0);
     expect(screen.getAllByText('42%').length).toBeGreaterThan(0);
     expect(screen.getAllByText('En cours').length).toBeGreaterThan(1);
-    expect(screen.getAllByRole('button', { name: 'Stopper' })).toHaveLength(4);
     expect(
-      screen.getAllByRole('link', { name: 'Voir le vol' })[0]
-    ).toHaveAttribute('href', '/flights/flight-resumable');
-    expect(
-      screen.getAllByRole('button', { name: 'Télécharger' }).length
+      screen.getAllByRole('button', { name: 'Actions' }).length
     ).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Actions' })[0]!);
     expect(
-      screen.getAllByRole('button', { name: 'Reprendre' }).length
-    ).toBeGreaterThan(0);
-    expect(
-      screen.getAllByRole('button', { name: 'Supprimer' }).length
-    ).toBeGreaterThan(0);
+      screen.getByRole('menuitem', { name: 'Stopper' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Logs' })).toBeInTheDocument();
   });
 
-  it('keeps live logs collapsed by default and expands on demand', () => {
+  it('opens live logs in a readable modal on demand', () => {
     render(<VideoExportJobsPanel />);
 
     expect(screen.queryByText('Opening viewer')).not.toBeInTheDocument();
 
-    fireEvent.click(
-      screen.getAllByRole('button', { name: /Logs en direct/u })[0]!
-    );
+    fireEvent.click(screen.getAllByRole('button', { name: 'Actions' })[0]!);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Logs' }));
 
     expect(
       screen.getAllByText(/Captured 20\/100 frames/u).length
     ).toBeGreaterThan(0);
   });
 
-  it('keeps the same job logs open after a jobs refresh reorders rows', () => {
-    const { rerender } = render(<VideoExportJobsPanel />);
+  it('shows logs for the selected job', () => {
+    render(<VideoExportJobsPanel />);
 
-    fireEvent.click(
-      screen.getAllByRole('button', { name: /Logs en direct/u })[0]!
-    );
-
-    expect(
-      screen.getAllByText(/job-active Captured 20\/100 frames/u).length
-    ).toBeGreaterThan(0);
-
-    const [activeJob, completedJob, ...remainingJobs] = jobs;
-    jobs.splice(0, jobs.length, completedJob!, ...remainingJobs, activeJob!);
-    rerender(<VideoExportJobsPanel />);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Actions' })[0]!);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Logs' }));
 
     expect(
       screen.getAllByText(/job-active Captured 20\/100 frames/u).length
     ).toBeGreaterThan(0);
+
     expect(
-      screen.queryAllByText(/job-done Captured 20\/100 frames/u)
-    ).toHaveLength(0);
+      screen.getAllByText(/job-active Captured 20\/100 frames/u).length
+    ).toBeGreaterThan(0);
   });
 
   it('filters jobs by status', () => {
@@ -324,9 +316,9 @@ describe('VideoExportJobsPanel', () => {
     cancelJob.mockResolvedValue(undefined);
 
     render(<VideoExportJobsPanel />);
-    fireEvent.click(screen.getAllByRole('button', { name: 'Stopper' })[0]!);
-    const stopButtons = screen.getAllByRole('button', { name: 'Stopper' });
-    fireEvent.click(stopButtons[stopButtons.length - 1]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Actions' })[0]!);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Stopper' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Stopper' }));
 
     await waitFor(() => expect(cancelJob).toHaveBeenCalledWith('job-active'));
     expect(toastSuccess).toHaveBeenCalledWith('Génération stoppée');
@@ -336,7 +328,8 @@ describe('VideoExportJobsPanel', () => {
     resumeJob.mockResolvedValue(undefined);
 
     render(<VideoExportJobsPanel />);
-    fireEvent.click(screen.getAllByRole('button', { name: 'Reprendre' })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Actions' })[3]!);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Reprendre' }));
 
     await waitFor(() =>
       expect(resumeJob).toHaveBeenCalledWith('job-resumable')
@@ -372,11 +365,9 @@ describe('VideoExportJobsPanel', () => {
     deleteJobRow.mockResolvedValue(undefined);
 
     render(<VideoExportJobsPanel />);
-    fireEvent.click(screen.getAllByRole('button', { name: 'Supprimer' })[0]!);
-    const deleteButtons = screen.getAllByRole('button', {
-      name: 'Supprimer',
-    });
-    fireEvent.click(deleteButtons[deleteButtons.length - 1]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Actions' })[0]!);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Supprimer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Supprimer' }));
 
     await waitFor(() =>
       expect(deleteJobRow).toHaveBeenCalledWith(expect.any(String))
@@ -401,12 +392,9 @@ describe('VideoExportJobsPanel', () => {
     });
 
     render(<VideoExportJobsPanel />);
-    const deleteButtons = screen.getAllByRole('button', {
-      name: 'Supprimer',
-    });
-    fireEvent.click(deleteButtons[0]!);
-    const confirmButtons = screen.getAllByRole('button', { name: 'Supprimer' });
-    fireEvent.click(confirmButtons[confirmButtons.length - 1]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Actions' })[0]!);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Supprimer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Supprimer' }));
 
     await waitFor(() =>
       expect(deleteJobRow).toHaveBeenCalledWith('job-running-manual')

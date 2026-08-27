@@ -144,10 +144,20 @@ const initialMockVideoJobs: VideoExportJob[] = [
     status: 'processing',
     internal_status: 'encoding',
     progress: 68,
+    total_frames: 4200,
+    frames_captured: 2856,
+    fps: 15,
+    fps_actual: 12.4,
+    eta_seconds: 108,
     message: 'Encoding 68%',
+    render_method: 'gpu',
     mode: 'manual_fast',
     started_at: '2026-01-15T09:15:00Z',
     updated_at: '2026-01-15T10:05:00Z',
+    log_tail: [
+      '[2026-01-15T10:04:10Z] Capture completed: 2856/4200 frames',
+      '[2026-01-15T10:05:00Z] Encoding 68% (12.4 fps, ETA: 1min)',
+    ],
     can_cancel: true,
     can_delete: true,
   },
@@ -191,7 +201,7 @@ const mockVideoJobs: VideoExportJob[] = initialMockVideoJobs.map((job) => ({
   ...job,
 }));
 
-const resetMockVideoJobs = () => {
+export const resetMockVideoJobs = () => {
   mockVideoJobs.length = 0;
   mockVideoJobs.push(...initialMockVideoJobs.map((job) => ({ ...job })));
 };
@@ -424,7 +434,15 @@ export const videoExportHandlers = [
   http.get('*/api/video-export-jobs', () =>
     HttpResponse.json({
       jobs: mockVideoJobs,
+      page: 1,
+      page_size: 25,
+      total: 26,
+      total_pages: 2,
     })
+  ),
+  http.get(
+    '*/api/video-export-jobs/stream',
+    () => new HttpResponse(null, { status: 204 })
   ),
 
   http.delete('*/api/exports/:jobId/cancel', ({ params }) => {
