@@ -482,6 +482,9 @@ def _job_to_payload(
         ),
         "video_width": job.video_width,
         "video_height": job.video_height,
+        "output_resolution": (
+            command.get("output_resolution") if isinstance(command, dict) else None
+        ),
         "gpx_offset": _gpx_offset_from_command_metadata(command),
         "render_method": _render_method_from_command(command),
         "created_at": _to_iso(job.created_at),
@@ -2131,6 +2134,7 @@ def _create_gopro_overlay_job_from_paths(
         "log_path": str(log_path),
         "video_width": None,
         "video_height": None,
+        "output_resolution": output_resolution,
         "gpx_offset": gpx_offset,
         "created_at": _utc_now(),
         "updated_at": _utc_now(),
@@ -2321,12 +2325,20 @@ def _run_job(job_id: str) -> None:
         if return_code != 0 and gpu_render_enabled:
             _unlink_if_exists(temp_output_path)
             _append_job_log(log_path, "GPU overlay failed; retrying with CPU rendering")
+            fallback_metadata = current_job.get("command") if current_job else None
+            if not isinstance(fallback_metadata, dict):
+                fallback_metadata = {}
+            fallback_metadata = {
+                **fallback_metadata,
+                "command": cpu_command,
+                "render_method": "cpu",
+            }
             _update_job(
                 job_id,
                 message="GPU unavailable; retrying overlay on CPU",
                 render_method="cpu",
                 command=cpu_command,
-                command_json=json.dumps({"command": cpu_command, "render_method": "cpu"}),
+                command_json=json.dumps(fallback_metadata),
             )
             logger.warning("GPU overlay failed for job %s; retrying on CPU", job_id)
             try:

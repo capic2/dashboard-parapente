@@ -82,6 +82,7 @@ export const GoproOverlayJobSchema = z.object({
   output_filename: z.string(),
   video_width: z.number().nullish(),
   video_height: z.number().nullish(),
+  output_resolution: z.enum(['1080p', '4k', 'source']).nullish(),
   gpx_offset: z.number().optional().default(0),
   created_at: z.string(),
   updated_at: z.string(),
