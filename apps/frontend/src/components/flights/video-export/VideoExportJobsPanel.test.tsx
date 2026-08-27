@@ -289,6 +289,27 @@ describe('VideoExportJobsPanel', () => {
     expect(screen.getByRole('menuitem', { name: 'Logs' })).toBeInTheDocument();
   });
 
+  it('shows a stuck warning when an active job has not updated recently', () => {
+    jobs.push({
+      job_id: 'job-stuck',
+      flight_title: 'Vol bloqué',
+      status: 'processing',
+      internal_status: 'capturing',
+      progress: 0,
+      updated_at: '2020-01-01T00:00:00.000Z',
+      can_cancel: true,
+      can_delete: true,
+    });
+
+    render(<VideoExportJobsPanel limit={null} />);
+
+    expect(screen.getAllByText('Bloqué').length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(/Aucune progression depuis .* Le traitement semble bloqué/u)
+        .length
+    ).toBeGreaterThan(0);
+  });
+
   it('opens live logs in a readable modal on demand', () => {
     render(<VideoExportJobsPanel />);
 

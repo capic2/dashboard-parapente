@@ -20,6 +20,7 @@ export interface YoutubeUploadJob {
   progress: number;
   youtube_url?: string | null;
   error?: string | null;
+  updated_at?: string | null;
   log_tail: string[];
 }
 

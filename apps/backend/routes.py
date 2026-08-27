@@ -4760,6 +4760,7 @@ def _highlight_job_payload(job: HighlightVideoJob) -> HighlightVideoJobResponse:
         overlay_offset_seconds=float(job.overlay_offset_seconds or 0.0),
         selection=selection,
         created_at=job.created_at,
+        updated_at=job.updated_at,
         completed_at=job.completed_at,
     )
 
