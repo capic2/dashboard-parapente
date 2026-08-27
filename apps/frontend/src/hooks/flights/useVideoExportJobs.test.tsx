@@ -72,9 +72,9 @@ function createWrapper() {
 }
 
 function TestHarness() {
-  const { data = [] } = useVideoExportJobs();
+  const { data } = useVideoExportJobs();
 
-  return <div>{data.map((job) => job.job_id).join(',')}</div>;
+  return <div>{data?.jobs.map((job) => job.job_id).join(',')}</div>;
 }
 
 describe('useVideoExportJobs', () => {

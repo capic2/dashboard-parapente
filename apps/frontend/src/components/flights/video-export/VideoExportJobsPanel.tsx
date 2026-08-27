@@ -1,5 +1,5 @@
 /* eslint-disable react/no-unstable-nested-components */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   createColumnHelper,
@@ -10,12 +10,28 @@ import {
 } from '@tanstack/react-table';
 import { Button, DataTable, Modal } from '@dashboard-parapente/design-system';
 import {
+  Download,
+  FileText,
+  MoreHorizontal,
+  Play,
+  Square,
+  Trash2,
+} from 'lucide-react';
+import {
+  Button as AriaButton,
+  Menu,
+  MenuItem,
+  MenuTrigger,
+  Popover,
+} from 'react-aria-components';
+import {
   type VideoExportJob,
   useCancelVideoExportJob,
   useCleanupVideoExportTempFiles,
   useDeleteVideoExportJobRow,
   useResumeVideoExportJob,
   useVideoExportJobs,
+  VIDEO_EXPORT_JOBS_PAGE_SIZE,
 } from '../../../hooks/flights/useVideoExportJobs';
 import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
 import { useGoproOverlayJobStream } from '../../../hooks/gopro/useGoproOverlay';
@@ -78,9 +94,6 @@ const activeStatusLabels = new Set([
 ]);
 
 const columnHelper = createColumnHelper<VideoExportJob>();
-
-const actionButtonClassName =
-  'cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500';
 
 type PendingVideoConfirm = {
   message: string;
@@ -170,6 +183,16 @@ function getDateLabel(job: VideoExportJob) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
+}
+
+function formatDuration(seconds?: number | null) {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0)
+    return '-';
+  const roundedSeconds = Math.round(seconds);
+  if (roundedSeconds < 60) return `${roundedSeconds} s`;
+  const minutes = Math.floor(roundedSeconds / 60);
+  const remainingSeconds = roundedSeconds % 60;
+  return `${minutes} min${remainingSeconds > 0 ? ` ${remainingSeconds} s` : ''}`;
 }
 
 function isJobInFilter(job: VideoExportJob, filter: StatusFilter) {
@@ -288,17 +311,6 @@ function ProgressMeter({ progress }: { progress: number }) {
   );
 }
 
-function JobModeBadge({ mode }: { mode: string }) {
-  const { t } = useTranslation();
-  const modeLabel = getModeLabelParts(mode);
-
-  return (
-    <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-200">
-      {t(modeLabel.key, modeLabel.fallback)}
-    </span>
-  );
-}
-
 function JobTypeBadge({ job }: { job: VideoExportJob }) {
   const { t } = useTranslation();
   const typeLabel = getJobTypeLabelParts(job);
@@ -329,6 +341,32 @@ function JobRenderMethodBadge({ job }: { job: VideoExportJob }) {
     >
       {t(`videoJobs.method.${method}`, method.toUpperCase())}
     </span>
+  );
+}
+
+function FramesCell({ job }: { job: VideoExportJob }) {
+  const captured = job.frames_captured;
+  const total = job.total_frames ?? job.resume_from_frame;
+  if (typeof captured !== 'number' && typeof total !== 'number')
+    return <span>-</span>;
+  return (
+    <span className="whitespace-nowrap font-mono text-xs text-gray-700 dark:text-gray-200">
+      {typeof captured === 'number' ? captured : '-'}
+      {typeof total === 'number' && (
+        <span className="text-gray-500 dark:text-gray-400"> / {total}</span>
+      )}
+    </span>
+  );
+}
+
+function FpsCell({ job }: { job: VideoExportJob }) {
+  const fps = job.fps_actual ?? job.fps;
+  return typeof fps === 'number' && Number.isFinite(fps) ? (
+    <span className="whitespace-nowrap font-mono text-xs text-gray-700 dark:text-gray-200">
+      {fps.toFixed(1)} fps
+    </span>
+  ) : (
+    <span>-</span>
   );
 }
 
@@ -378,11 +416,27 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
     useState<PendingVideoConfirm | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
-  const [openLogJobIds, setOpenLogJobIds] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(1);
+  const [selectedLogJob, setSelectedLogJob] = useState<VideoExportJob | null>(
+    null
+  );
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'last_activity', desc: true },
   ]);
-  const { data: jobs = [], isLoading, isError, refetch } = useVideoExportJobs();
+  const {
+    data: jobsPage,
+    isLoading,
+    isError,
+    refetch,
+  } = useVideoExportJobs({
+    page,
+    pageSize: VIDEO_EXPORT_JOBS_PAGE_SIZE,
+    statusFilter,
+    typeFilter,
+  });
+  const jobs = jobsPage?.jobs ?? [];
+  const totalJobs = jobsPage?.total ?? jobs.length;
+  const totalPages = jobsPage?.totalPages ?? 1;
   const cancelJob = useCancelVideoExportJob();
   const resumeJob = useResumeVideoExportJob();
   const deleteJobRow = useDeleteVideoExportJobRow();
@@ -400,6 +454,10 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
   const visibleJobs =
     typeof limit === 'number' ? filteredJobs.slice(0, limit) : filteredJobs;
   const isFiltering = statusFilter !== 'all' || typeFilter !== 'all';
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, typeFilter]);
 
   const activeCount = jobs.filter((job) => job.can_cancel).length;
   const completedCount = jobs.filter(
@@ -517,62 +575,76 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
 
   const renderJobActions = useCallback(
     (job: VideoExportJob) => (
-      <div className="flex flex-wrap gap-2">
-        {job.flight_id && (
-          <a
-            href={`/flights/${job.flight_id}`}
-            className={`${actionButtonClassName} border border-sky-200 bg-white text-sky-700 hover:bg-sky-50 focus-visible:outline-sky-500 dark:border-sky-800 dark:bg-gray-800 dark:text-sky-300 dark:hover:bg-sky-950/40`}
-          >
-            {t('videoJobs.viewFlight', 'Voir le vol')}
-          </a>
-        )}
-        {canDownloadJob(job) && (
-          <Button
-            onClick={() => void handleDownload(job)}
-            className={`${actionButtonClassName} bg-sky-100 text-sky-800 hover:bg-sky-200 focus-visible:outline-sky-500 dark:bg-sky-900/40 dark:text-sky-200 dark:hover:bg-sky-900/60`}
-          >
-            {t('videoJobs.download', 'Télécharger')}
-          </Button>
-        )}
-        {!isGoproOverlayJob(job) && job.can_resume && (
-          <Button
-            onClick={() => void handleResume(job)}
-            isDisabled={resumeJob.isPending}
-            className={`${actionButtonClassName} bg-green-100 text-green-800 hover:bg-green-200 focus-visible:outline-green-500 dark:bg-green-900/40 dark:text-green-200 dark:hover:bg-green-900/60`}
-          >
-            {resumeJob.isPending
-              ? t('videoJobs.resuming', 'Relance...')
-              : t('videoJobs.resume', 'Reprendre')}
-          </Button>
-        )}
-        {job.can_cancel && (
-          <Button
-            onClick={() => handleCancel(job)}
-            isDisabled={cancelJob.isPending}
-            className={`${actionButtonClassName} bg-red-600 text-white hover:bg-red-700 focus-visible:outline-red-500`}
-          >
-            {cancelJob.isPending
-              ? t('videoJobs.stopping', 'Arrêt...')
-              : t('videoJobs.stop', 'Stopper')}
-          </Button>
-        )}
-        {canDeleteJobRow(job) && (
-          <Button
-            onClick={() => handleDeleteJobRow(job)}
-            isDisabled={deleteJobRow.isPending}
-            className={`${actionButtonClassName} bg-gray-100 text-gray-800 hover:bg-gray-200 focus-visible:outline-gray-500 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600`}
-          >
-            {t('videoJobs.deleteRow', 'Supprimer')}
-          </Button>
-        )}
-        {!job.flight_id &&
-          !canDownloadJob(job) &&
-          !job.can_resume &&
-          !job.can_cancel &&
-          !canDeleteJobRow(job) && (
-            <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
-          )}
-      </div>
+      <MenuTrigger>
+        <AriaButton
+          aria-label={t('videoJobs.table.actions', 'Actions')}
+          className="flex min-h-10 min-w-10 cursor-pointer items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+        >
+          <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+        </AriaButton>
+        <Popover className="z-40 mt-2 w-56 rounded-xl border border-gray-200 bg-white p-1 shadow-xl dark:border-gray-700 dark:bg-gray-800">
+          <Menu className="outline-none">
+            {job.flight_id && (
+              <MenuItem
+                href={`/flights/${job.flight_id}`}
+                className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+              >
+                {t('videoJobs.viewFlight', 'Voir le vol')}
+              </MenuItem>
+            )}
+            {canDownloadJob(job) && (
+              <MenuItem
+                onAction={() => void handleDownload(job)}
+                className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+              >
+                <Download className="h-4 w-4" aria-hidden="true" />
+                {t('videoJobs.download', 'Télécharger')}
+              </MenuItem>
+            )}
+            {!isGoproOverlayJob(job) && job.can_resume && (
+              <MenuItem
+                onAction={() => void handleResume(job)}
+                isDisabled={resumeJob.isPending}
+                className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+              >
+                <Play className="h-4 w-4" aria-hidden="true" />
+                {resumeJob.isPending
+                  ? t('videoJobs.resuming', 'Relance...')
+                  : t('videoJobs.resume', 'Reprendre')}
+              </MenuItem>
+            )}
+            {job.can_cancel && (
+              <MenuItem
+                onAction={() => handleCancel(job)}
+                isDisabled={cancelJob.isPending}
+                className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-700 outline-none hover:bg-red-50 focus:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-300 dark:hover:bg-red-950/40 dark:focus:bg-red-950/40"
+              >
+                <Square className="h-4 w-4" aria-hidden="true" />
+                {cancelJob.isPending
+                  ? t('videoJobs.stopping', 'Arrêt...')
+                  : t('videoJobs.stop', 'Stopper')}
+              </MenuItem>
+            )}
+            {canDeleteJobRow(job) && (
+              <MenuItem
+                onAction={() => handleDeleteJobRow(job)}
+                isDisabled={deleteJobRow.isPending}
+                className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                {t('videoJobs.deleteRow', 'Supprimer')}
+              </MenuItem>
+            )}
+            <MenuItem
+              onAction={() => setSelectedLogJob(job)}
+              className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+            >
+              <FileText className="h-4 w-4" aria-hidden="true" />
+              {t('videoJobs.liveLogs.show', 'Logs')}
+            </MenuItem>
+          </Menu>
+        </Popover>
+      </MenuTrigger>
     ),
     [
       cancelJob.isPending,
@@ -586,29 +658,6 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
     ]
   );
 
-  const toggleJobLogs = useCallback((jobId: string) => {
-    setOpenLogJobIds((current) => {
-      const next = new Set(current);
-      if (next.has(jobId)) {
-        next.delete(jobId);
-      } else {
-        next.add(jobId);
-      }
-      return next;
-    });
-  }, []);
-
-  const renderJobLogs = useCallback(
-    (job: VideoExportJob) => (
-      <JobLogsDetails
-        job={job}
-        isOpen={openLogJobIds.has(job.job_id)}
-        onToggle={() => toggleJobLogs(job.job_id)}
-      />
-    ),
-    [openLogJobIds, toggleJobLogs]
-  );
-
   const columns = useMemo(
     () => [
       columnHelper.accessor('status', {
@@ -618,7 +667,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
       }),
       columnHelper.accessor((job) => getFlightLabel(job), {
         id: 'flight',
-        header: t('videoJobs.table.flight', 'Vol'),
+        header: t('videoJobs.table.flight', 'Nom'),
         cell: ({ row, getValue }) => (
           <div className="max-w-64">
             <p className="truncate font-semibold text-gray-900 dark:text-white">
@@ -645,14 +694,6 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
         cell: ({ row }) => <JobTypeBadge job={row.original} />,
         sortingFn: 'alphanumeric',
       }),
-      columnHelper.accessor('mode', {
-        header: t('videoJobs.table.mode', 'Mode'),
-        cell: ({ getValue }) => {
-          const mode = getValue();
-          return mode ? <JobModeBadge mode={mode} /> : <span>-</span>;
-        },
-        sortingFn: 'alphanumeric',
-      }),
       columnHelper.accessor('render_method', {
         header: t('videoJobs.table.method', 'Méthode'),
         cell: ({ row }) => <JobRenderMethodBadge job={row.original} />,
@@ -664,18 +705,6 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
         cell: ({ getValue }) => <ProgressMeter progress={getValue()} />,
         sortingFn: 'basic',
       }),
-      columnHelper.accessor((job) => getJobPhase(job), {
-        id: 'phase',
-        header: t('videoJobs.table.phase', 'Phase'),
-        cell: ({ getValue }) => {
-          const phase = getValue();
-          return t(
-            `videoJobs.status.${phase}`,
-            statusLabelFallbacks[phase] || phase
-          );
-        },
-        sortingFn: 'alphanumeric',
-      }),
       columnHelper.accessor((job) => getLastActivityTime(job), {
         id: 'last_activity',
         header: t('videoJobs.table.lastActivity', 'Dernière activité'),
@@ -685,39 +714,31 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
       columnHelper.display({
         id: 'frames',
         header: t('videoJobs.table.frames', 'Frames'),
-        cell: ({ row }) => {
-          const { frames_captured: frames, resume_from_frame: resumeFrom } =
-            row.original;
-          if (typeof frames !== 'number' && typeof resumeFrom !== 'number') {
-            return <span>-</span>;
-          }
-          return (
-            <span className="text-gray-700 dark:text-gray-200">
-              {typeof frames === 'number' ? frames : '-'}
-              {typeof resumeFrom === 'number' && (
-                <span className="text-gray-500 dark:text-gray-400">
-                  {' '}
-                  / {resumeFrom}
-                </span>
-              )}
-            </span>
-          );
-        },
+        cell: ({ row }) => <FramesCell job={row.original} />,
+      }),
+      columnHelper.display({
+        id: 'fps',
+        header: t('videoJobs.table.fps', 'Frame / seconde'),
+        cell: ({ row }) => <FpsCell job={row.original} />,
+      }),
+      columnHelper.display({
+        id: 'eta',
+        header: t('videoJobs.table.eta', 'Temps restant'),
+        cell: ({ row }) => (
+          <span className="whitespace-nowrap text-xs text-gray-700 dark:text-gray-200">
+            {row.original.status === 'completed'
+              ? t('videoJobs.done', 'Terminé')
+              : formatDuration(row.original.eta_seconds)}
+          </span>
+        ),
       }),
       columnHelper.display({
         id: 'actions',
         header: t('videoJobs.table.actions', 'Actions'),
         cell: ({ row }) => renderJobActions(row.original),
       }),
-      columnHelper.display({
-        id: 'logs',
-        header: t('videoJobs.table.logs', 'Logs'),
-        cell: ({ row }) => (
-          <div className="min-w-72">{renderJobLogs(row.original)}</div>
-        ),
-      }),
     ],
-    [renderJobActions, renderJobLogs, t]
+    [renderJobActions, t]
   );
 
   const table = useReactTable({
@@ -870,11 +891,16 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
           </div>
           <div className="flex flex-col gap-2 text-sm text-gray-600 dark:text-gray-300 sm:flex-row sm:items-center sm:justify-between">
             <span>
-              {isFiltering || visibleJobs.length !== jobs.length
+              {isFiltering || visibleJobs.length !== totalJobs || totalPages > 1
                 ? t(
                     'videoJobs.filteredSummary',
-                    '{{visible}} génération(s) affichée(s) sur {{total}}',
-                    { visible: visibleJobs.length, total: jobs.length }
+                    '{{visible}} génération(s) affichée(s) sur {{total}} · page {{page}}/{{pages}}',
+                    {
+                      visible: visibleJobs.length,
+                      total: totalJobs,
+                      page,
+                      pages: totalPages,
+                    }
                   )
                 : t(
                     'videoJobs.visibleSummary',
@@ -978,11 +1004,71 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
                     </div>
                   </div>
 
-                  {renderJobLogs(job)}
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                    <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-900/50">
+                      <div className="text-gray-500 dark:text-gray-400">
+                        {t('videoJobs.table.method', 'Méthode')}
+                      </div>
+                      <div className="mt-0.5 font-semibold text-gray-800 dark:text-gray-100">
+                        {job.render_method?.toUpperCase() || '-'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-900/50">
+                      <div className="text-gray-500 dark:text-gray-400">
+                        {t('videoJobs.table.frames', 'Frames')}
+                      </div>
+                      <div className="mt-0.5 font-mono font-semibold text-gray-800 dark:text-gray-100">
+                        <FramesCell job={job} />
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-900/50">
+                      <div className="text-gray-500 dark:text-gray-400">
+                        {t('videoJobs.table.fps', 'Frame / seconde')}
+                      </div>
+                      <div className="mt-0.5 font-semibold text-gray-800 dark:text-gray-100">
+                        <FpsCell job={job} />
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-900/50">
+                      <div className="text-gray-500 dark:text-gray-400">
+                        {t('videoJobs.table.eta', 'Temps restant')}
+                      </div>
+                      <div className="mt-0.5 font-semibold text-gray-800 dark:text-gray-100">
+                        {formatDuration(job.eta_seconds)}
+                      </div>
+                    </div>
+                  </div>
                 </article>
               );
             })}
           </div>
+          {limit === null && totalPages > 1 && (
+            <nav
+              aria-label={t('videoJobs.pagination.label', 'Pagination')}
+              className="flex items-center justify-between border-t border-gray-100 px-4 py-3 dark:border-gray-700"
+            >
+              <Button
+                isDisabled={page === 1 || isLoading}
+                onClick={() => setPage((currentPage) => currentPage - 1)}
+                className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-100"
+              >
+                {t('videoJobs.pagination.previous', 'Précédente')}
+              </Button>
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                {t('videoJobs.pagination.page', 'Page {{page}} sur {{pages}}', {
+                  page,
+                  pages: totalPages,
+                })}
+              </span>
+              <Button
+                isDisabled={page >= totalPages || isLoading}
+                onClick={() => setPage((currentPage) => currentPage + 1)}
+                className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-100"
+              >
+                {t('videoJobs.pagination.next', 'Suivante')}
+              </Button>
+            </nav>
+          )}
         </>
       )}
       <Modal
@@ -1016,6 +1102,24 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
               </Button>
             </div>
           </div>
+        )}
+      </Modal>
+      <Modal
+        isOpen={selectedLogJob !== null}
+        onClose={() => setSelectedLogJob(null)}
+        title={
+          selectedLogJob
+            ? `${t('videoJobs.liveLogs.title', 'Logs')} — ${getFlightLabel(selectedLogJob)}`
+            : t('videoJobs.liveLogs.title', 'Logs')
+        }
+        size="lg"
+      >
+        {selectedLogJob && (
+          <JobLogsDetails
+            job={selectedLogJob}
+            isOpen
+            onToggle={() => setSelectedLogJob(null)}
+          />
         )}
       </Modal>
     </section>

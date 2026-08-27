@@ -601,6 +601,42 @@ class TestVideoExportJobsEndpoint:
             == "gpu"
         )
 
+    def test_video_export_jobs_supports_server_side_pagination(
+        self, client: TestClient, sample_flight
+    ):
+        jobs = [
+            {
+                "job_id": "job-newest",
+                "flight_id": sample_flight.id,
+                "status": "completed",
+                "updated_at": "2026-04-30T12:00:00",
+            },
+            {
+                "job_id": "job-oldest",
+                "flight_id": sample_flight.id,
+                "status": "failed",
+                "updated_at": "2026-04-30T10:00:00",
+            },
+        ]
+
+        with (
+            patch("routes.list_exports_manual", return_value=jobs),
+            patch("routes.list_exports_stream", return_value=[]),
+            patch("routes.list_gopro_overlay_jobs", return_value=[]),
+        ):
+            response = client.get(
+                f"{API_PREFIX}/video-export-jobs",
+                params={"page": 2, "page_size": 1},
+            )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["jobs"][0]["job_id"] == "job-oldest"
+        assert payload["page"] == 2
+        assert payload["page_size"] == 1
+        assert payload["total"] == 2
+        assert payload["total_pages"] == 2
+
     def test_active_jobs_include_youtube_upload_progress(
         self, client: TestClient, db_session, sample_flight
     ) -> None:
