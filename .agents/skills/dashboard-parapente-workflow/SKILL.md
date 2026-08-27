@@ -80,6 +80,11 @@ Use `gh` for all GitHub interactions: issues, PRs, checks, releases, comments, A
 
 Before creating or updating a PR, check branch status, review commits and diff against the base branch, run impacted checks, and fix failures.
 
+Before pushing changes to a branch associated with a PR, check the PR state with
+`gh`. Never push additional commits to a PR that is already merged or closed;
+create a new branch from the current `origin/main` and open a new PR for the
+follow-up changes.
+
 Run the `coderabbit-cli` skill at the end of implementation, after relevant validation and before marking the work ready to ship, unless the user explicitly skips it. Do not defer CodeRabbit to the push step.
 
 For CodeRabbit comments, inspect only relevant PR conversations directly by default. Delegate discovery and triage only when the user requests it or the PR has enough independent conversations to justify the extra agent.
