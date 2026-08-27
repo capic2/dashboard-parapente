@@ -255,6 +255,10 @@ def test_capture_progress_percent_spans_capture_phase_range():
     assert video_export_manual._capture_progress_percent(100, 100) == 80
 
 
+def test_capture_fps_excludes_frames_restored_during_resume():
+    assert video_export_manual._capture_fps(150, 100, 5) == 10
+
+
 def test_parse_ffmpeg_out_time_seconds_parses_progress_lines():
     assert video_export_manual._parse_ffmpeg_out_time_seconds("out_time_ms=3000000") == 3.0
     assert video_export_manual._parse_ffmpeg_out_time_seconds("out_time_us=1500000") == 1.5
