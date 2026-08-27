@@ -386,6 +386,35 @@ function isActiveJob(job: VideoExportJob) {
   );
 }
 
+function getLastLogMetrics(job: VideoExportJob) {
+  const lastLogLine = job.log_tail?.[job.log_tail.length - 1];
+  if (!lastLogLine) {
+    return { fps: undefined, etaSeconds: undefined };
+  }
+
+  const fpsValue = lastLogLine.match(/\(([\d.,]+)\s*fps\b/iu)?.[1];
+  const etaMatch = lastLogLine.match(
+    /\bETA:\s*([\d.,]+)\s*(s|sec|min|h)\b/iu
+  );
+  const fps = fpsValue
+    ? Number.parseFloat(fpsValue.replace(',', '.'))
+    : undefined;
+  const etaValue = etaMatch?.[1]
+    ? Number.parseFloat(etaMatch[1].replace(',', '.'))
+    : undefined;
+  const etaUnit = etaMatch?.[2]?.toLowerCase();
+  const etaSeconds =
+    typeof etaValue === 'number' && Number.isFinite(etaValue)
+      ? etaUnit === 'h'
+        ? etaValue * 3600
+        : etaUnit === 'min'
+          ? etaValue * 60
+          : etaValue
+      : undefined;
+
+  return { fps, etaSeconds };
+}
+
 function FpsCell({ job }: { job: VideoExportJob }) {
   if (!isActiveJob(job)) {
     return (
@@ -394,7 +423,8 @@ function FpsCell({ job }: { job: VideoExportJob }) {
       </span>
     );
   }
-  const fps = job.fps_actual;
+  const { fps: loggedFps } = getLastLogMetrics(job);
+  const fps = loggedFps ?? job.fps_actual;
   return typeof fps === 'number' && Number.isFinite(fps) ? (
     <span className="whitespace-nowrap font-mono text-xs text-gray-700 dark:text-gray-200">
       {fps.toFixed(1)} fps
@@ -762,7 +792,10 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
           <span className="whitespace-nowrap text-xs text-gray-700 dark:text-gray-200">
             {row.original.status === 'completed'
               ? t('videoJobs.done', 'Terminé')
-              : formatDuration(row.original.eta_seconds)}
+              : formatDuration(
+                  getLastLogMetrics(row.original).etaSeconds ??
+                    row.original.eta_seconds
+                )}
           </span>
         ),
       }),
@@ -1079,7 +1112,9 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
                         {t('videoJobs.table.eta', 'Temps restant')}
                       </div>
                       <div className="mt-0.5 font-semibold text-gray-800 dark:text-gray-100">
-                        {formatDuration(job.eta_seconds)}
+                        {formatDuration(
+                          getLastLogMetrics(job).etaSeconds ?? job.eta_seconds
+                        )}
                       </div>
                     </div>
                   </div>
