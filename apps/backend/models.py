@@ -352,7 +352,6 @@ class HighlightVideoJob(Base):
     overlay_video_path = Column(String)
     output_path = Column(String)
     selection_json = Column(Text)
-    prompt = Column(Text)
     output_format = Column(String, nullable=False, default="original")
     overlay_offset_seconds = Column(Float, nullable=False, default=0.0)
     started_at = Column(DateTime)

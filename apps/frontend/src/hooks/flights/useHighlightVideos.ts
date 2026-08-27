@@ -26,9 +26,9 @@ export function useFlightHighlightVideos(flightId: string) {
 export function useCreateFlightHighlightVideo(flightId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (prompt: string) => {
+    mutationFn: async () => {
       const payload = await api
-        .post(`flights/${flightId}/highlight-videos`, { json: { prompt } })
+        .post(`flights/${flightId}/highlight-videos`)
         .json<unknown>();
       return HighlightVideoJobSchema.parse(payload);
     },

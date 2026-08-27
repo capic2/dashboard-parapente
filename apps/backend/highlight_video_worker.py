@@ -408,9 +408,46 @@ def select_flight_event_clips(
     track_points: list[TrackPoint] | None,
     visual_clips: list[HighlightClip],
 ) -> list[HighlightClip]:
-    """Guarantee flight phases while filling remaining slots with visual highlights."""
+    """Select visually detected phase changes and use telemetry for thermals."""
+    if not visual_clips and not track_points:
+        return []
+
+    clip_length = min(8.0, max(3.0, duration_seconds / 8))
+
+    def visual_phase_clip(category: str) -> HighlightClip | None:
+        # The visual scorer provides the evidence. If it finds no candidate in
+        # a phase window, leave that phase absent instead of inventing a fixed
+        # timestamp (the camera may have started long before takeoff).
+        if category == "takeoff":
+            candidates = [
+                clip for clip in visual_clips if clip.start_seconds <= duration_seconds * 0.5
+            ]
+            return min(candidates, key=lambda clip: clip.start_seconds) if candidates else None
+        candidates = [clip for clip in visual_clips if clip.start_seconds >= duration_seconds * 0.5]
+        return max(candidates, key=lambda clip: clip.start_seconds) if candidates else None
+
+    selected: list[HighlightClip] = []
+    takeoff_clip = visual_phase_clip("takeoff")
+    if takeoff_clip:
+        selected.append(replace(takeoff_clip, category="takeoff"))
+    landing_clip = visual_phase_clip("landing")
+    if landing_clip and (
+        takeoff_clip is None or landing_clip.start_seconds != takeoff_clip.start_seconds
+    ):
+        selected.append(replace(landing_clip, category="landing"))
+
+    def fill_with_visual_clips() -> list[HighlightClip]:
+        for clip in visual_clips:
+            if len(selected) >= 6:
+                break
+            if all(
+                abs(clip.start_seconds - chosen.start_seconds) >= clip_length for chosen in selected
+            ):
+                selected.append(clip)
+        return sorted(selected, key=lambda clip: clip.start_seconds)
+
     if not track_points:
-        return visual_clips
+        return fill_with_visual_clips()
     samples = [
         (point.get("timestamp", 0), point.get("elevation", 0.0))
         for point in track_points
@@ -418,33 +455,13 @@ def select_flight_event_clips(
     ]
     timestamps = [timestamp for timestamp, _elevation in samples]
     if len(samples) < 2:
-        return visual_clips
+        return fill_with_visual_clips()
     track_duration = max(1.0, (timestamps[-1] - timestamps[0]) / 1000)
 
     def video_time(track_seconds: float) -> float:
         return min(duration_seconds, max(0.0, track_seconds / track_duration * duration_seconds))
 
-    clip_length = min(8.0, max(3.0, duration_seconds / 8))
-    # The first useful visual movement is a better takeoff anchor than the
-    # first GPS sample: cameras often keep recording while the wing is being
-    # prepared. Keep a little lead-in so the inflation is visible.
-    early_visual = [clip for clip in visual_clips if clip.start_seconds <= duration_seconds * 0.25]
-    takeoff_anchor = (
-        min(
-            early_visual,
-            key=lambda clip: abs(clip.start_seconds - duration_seconds * 0.12),
-        ).start_seconds
-        if early_visual
-        else duration_seconds * 0.04
-    )
-    takeoff_start = max(
-        0.0,
-        min(
-            duration_seconds - clip_length,
-            takeoff_anchor - clip_length,
-        ),
-    )
-    phases = [("takeoff", takeoff_start + clip_length / 2)]
+    phases: list[tuple[str, float]] = []
     elevations = [elevation for _timestamp, elevation in samples]
     climb_candidates: list[tuple[float, float]] = []
     for index in range(1, len(elevations)):
@@ -467,25 +484,11 @@ def select_flight_event_clips(
         _, best_index = max(climb_candidates)
         phases.append(("thermal", (timestamps[best_index] - timestamps[0]) / 1000))
 
-    phases.append(("landing", duration_seconds * 0.96))
-
-    selected: list[HighlightClip] = []
     for category, position in phases:
-        center = (
-            position
-            if category == "takeoff"
-            else (video_time(position) if category == "thermal" else position)
-        )
+        center = video_time(position)
         start = max(0.0, min(duration_seconds - clip_length, center - clip_length / 2))
         selected.append(HighlightClip(start, clip_length, 0.0, category))
-    for clip in visual_clips:
-        if len(selected) >= 6:
-            break
-        if all(
-            abs(clip.start_seconds - chosen.start_seconds) >= clip_length for chosen in selected
-        ):
-            selected.append(clip)
-    return sorted(selected, key=lambda clip: clip.start_seconds)
+    return fill_with_visual_clips()
 
 
 def _render_clip(

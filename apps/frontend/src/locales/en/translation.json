@@ -1033,8 +1033,6 @@
     "highlightVideoLocked": "Locked",
     "highlightVideoRequiresPano": "Add the pano.mp4 file to generate best moments.",
     "highlightVideoGenerate": "Generate best moments",
-    "highlightVideoPromptLabel": "Selection instructions",
-    "highlightVideoPromptPlaceholder": "Describe which moments should be prioritized…",
     "highlightVideoDownload": "Download video",
     "highlightVideoDownloadError": "Unable to download the best-moments video.",
     "highlightVideoStarting": "Starting…",

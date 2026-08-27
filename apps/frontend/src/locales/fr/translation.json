@@ -1037,8 +1037,6 @@
     "highlightVideoLocked": "Verrouillé",
     "highlightVideoRequiresPano": "Ajoutez le fichier pano.mp4 pour générer les meilleurs moments.",
     "highlightVideoGenerate": "Générer les meilleurs moments",
-    "highlightVideoPromptLabel": "Instructions de sélection",
-    "highlightVideoPromptPlaceholder": "Décris le type de moments à privilégier…",
     "highlightVideoDownload": "Télécharger la vidéo",
     "highlightVideoDownloadError": "Impossible de télécharger la vidéo des meilleurs moments.",
     "highlightVideoStarting": "Lancement…",

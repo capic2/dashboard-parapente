@@ -45,10 +45,27 @@ def test_event_selection_guarantees_takeoff_landing_and_thermal():
     clips = select_flight_event_clips(
         600,
         points,
-        [HighlightClip(300, 8, 0, "dynamic")],
+        [
+            HighlightClip(30, 8, 0, "dynamic"),
+            HighlightClip(300, 8, 0, "dynamic"),
+            HighlightClip(540, 8, 0, "dynamic"),
+        ],
     )
 
     assert {clip.category for clip in clips} >= {"takeoff", "landing", "thermal"}
+
+
+def test_event_selection_uses_visual_activity_for_phases_without_fixed_offsets():
+    clips = select_flight_event_clips(
+        600,
+        None,
+        [HighlightClip(42, 8, 0, "dynamic"), HighlightClip(520, 8, 0, "dynamic")],
+    )
+
+    assert [(clip.category, clip.start_seconds) for clip in clips[:2]] == [
+        ("takeoff", 42),
+        ("landing", 520),
+    ]
 
 
 def test_thermal_selection_uses_sustained_climb_not_single_altitude_spike():

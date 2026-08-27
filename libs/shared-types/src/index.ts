@@ -108,7 +108,6 @@ export const HighlightVideoJobSchema = z.object({
   output_format: z.string(),
   overlay_offset_seconds: z.number(),
   selection: z.array(HighlightVideoClipSchema).default([]),
-  prompt: z.string().nullish(),
   created_at: z.string(),
   updated_at: z.string().nullish(),
   completed_at: z.string().nullish(),
