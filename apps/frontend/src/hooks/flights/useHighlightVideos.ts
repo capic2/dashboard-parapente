@@ -36,6 +36,7 @@ export function useCreateFlightHighlightVideo(flightId: string) {
       void queryClient.invalidateQueries({
         queryKey: ['flights', flightId, 'highlight-videos'],
       });
+      void queryClient.invalidateQueries({ queryKey: ['flights', 'summaries'] });
     },
   });
 }
@@ -53,6 +54,7 @@ export function useCancelFlightHighlightVideo(flightId: string) {
       void queryClient.invalidateQueries({
         queryKey: ['flights', flightId, 'highlight-videos'],
       });
+      void queryClient.invalidateQueries({ queryKey: ['flights', 'summaries'] });
     },
   });
 }
@@ -68,6 +70,7 @@ export function useDeleteFlightHighlightVideo(flightId: string) {
       void queryClient.invalidateQueries({
         queryKey: ['flights', flightId, 'highlight-videos'],
       });
+      void queryClient.invalidateQueries({ queryKey: ['flights', 'summaries'] });
     },
   });
 }
