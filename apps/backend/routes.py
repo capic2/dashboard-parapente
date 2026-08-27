@@ -132,6 +132,7 @@ from schemas import (
     GoproOverlayLayoutsResponse,
     GoproOverlayProbeResponse,
     HighlightVideoClipResponse,
+    HighlightVideoCreateRequest,
     HighlightVideoDeleteResponse,
     HighlightVideoJobResponse,
     IntervalsPreviewResponse,
@@ -759,8 +760,7 @@ def _get_video_export_jobs_payload(
         jobs = [
             job
             for job in jobs
-            if job.get("can_cancel")
-            or job.get("status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
+            if job.get("can_cancel") or job.get("status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
         ]
     elif status_filter and status_filter != "all":
         jobs = [job for job in jobs if job.get("status") == status_filter]
@@ -4759,10 +4759,18 @@ def _highlight_job_payload(job: HighlightVideoJob) -> HighlightVideoJobResponse:
         output_format=job.output_format,
         overlay_offset_seconds=float(job.overlay_offset_seconds or 0.0),
         selection=selection,
+        prompt=job.prompt,
         created_at=job.created_at,
         updated_at=job.updated_at,
         completed_at=job.completed_at,
     )
+
+
+def _normalize_highlight_prompt(prompt: str | None) -> str | None:
+    """Store absent prompts consistently instead of preserving whitespace-only input."""
+    if prompt is None:
+        return None
+    return prompt.strip() or None
 
 
 @router.get(
@@ -4898,6 +4906,7 @@ def get_flight_highlight_video_thumbnail(
 def create_flight_highlight_video(
     flight_id: str,
     background_tasks: BackgroundTasks,
+    payload: HighlightVideoCreateRequest | None = None,
     db: Session = Depends(get_db),
 ) -> HighlightVideoJobResponse:
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
@@ -4930,6 +4939,7 @@ def create_flight_highlight_video(
         source_video_path=str(pano_path),
         overlay_video_path=overlay_path,
         output_format="original",
+        prompt=_normalize_highlight_prompt(payload.prompt if payload else None),
         overlay_offset_seconds=float(flight.gopro_overlay_gpx_offset or 0.0),
     )
     db.add(job)
@@ -6109,7 +6119,9 @@ def list_video_export_jobs(
     active_only: bool = False,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=25, ge=1, le=100),
-    status_filter: Literal["all", "active", "completed", "failed", "cancelled"] = Query(default="all"),
+    status_filter: Literal["all", "active", "completed", "failed", "cancelled"] = Query(
+        default="all"
+    ),
     type_filter: Literal["all", "video", "gopro"] = Query(default="all"),
     db: Session = Depends(get_db),
 ) -> VideoExportJobsResponse:
@@ -6130,7 +6142,9 @@ async def stream_video_export_jobs(
     request: Request,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=25, ge=1, le=100),
-    status_filter: Literal["all", "active", "completed", "failed", "cancelled"] = Query(default="all"),
+    status_filter: Literal["all", "active", "completed", "failed", "cancelled"] = Query(
+        default="all"
+    ),
     type_filter: Literal["all", "video", "gopro"] = Query(default="all"),
 ) -> StreamingResponse:
     """Stream video export job list updates without frontend polling."""

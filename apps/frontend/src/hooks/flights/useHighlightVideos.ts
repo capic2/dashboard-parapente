@@ -26,9 +26,9 @@ export function useFlightHighlightVideos(flightId: string) {
 export function useCreateFlightHighlightVideo(flightId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (prompt: string) => {
       const payload = await api
-        .post(`flights/${flightId}/highlight-videos`)
+        .post(`flights/${flightId}/highlight-videos`, { json: { prompt } })
         .json<unknown>();
       return HighlightVideoJobSchema.parse(payload);
     },
@@ -36,7 +36,9 @@ export function useCreateFlightHighlightVideo(flightId: string) {
       void queryClient.invalidateQueries({
         queryKey: ['flights', flightId, 'highlight-videos'],
       });
-      void queryClient.invalidateQueries({ queryKey: ['flights', 'summaries'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['flights', 'summaries'],
+      });
     },
   });
 }
@@ -54,7 +56,9 @@ export function useCancelFlightHighlightVideo(flightId: string) {
       void queryClient.invalidateQueries({
         queryKey: ['flights', flightId, 'highlight-videos'],
       });
-      void queryClient.invalidateQueries({ queryKey: ['flights', 'summaries'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['flights', 'summaries'],
+      });
     },
   });
 }
@@ -70,7 +74,9 @@ export function useDeleteFlightHighlightVideo(flightId: string) {
       void queryClient.invalidateQueries({
         queryKey: ['flights', flightId, 'highlight-videos'],
       });
-      void queryClient.invalidateQueries({ queryKey: ['flights', 'summaries'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['flights', 'summaries'],
+      });
     },
   });
 }

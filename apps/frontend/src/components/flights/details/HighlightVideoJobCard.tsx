@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@dashboard-parapente/design-system';
 import {
@@ -20,7 +21,7 @@ interface HighlightVideoJobCardProps {
   isGenerationPending: boolean;
   isCancellationPending: boolean;
   isDeletionPending: boolean;
-  onGenerate: () => void;
+  onGenerate: (prompt: string) => void;
   onCancel: () => void;
   onDownload: () => void;
   onDelete: () => void;
@@ -40,6 +41,8 @@ export function HighlightVideoJobCard({
   onDelete,
 }: HighlightVideoJobCardProps) {
   const { t } = useTranslation();
+  const [editedPrompt, setEditedPrompt] = useState<string | null>(null);
+  const prompt = editedPrompt ?? job?.prompt ?? '';
   const status = job?.status ?? null;
   const isProcessing = status === 'queued' || status === 'running';
   const isGenerationLocked = !hasPanoVideo;
@@ -109,6 +112,29 @@ export function HighlightVideoJobCard({
             />
           </div>
         )}
+        {!isProcessing && (
+          <div className="mt-3">
+            <label
+              htmlFor="highlight-video-prompt"
+              className="mb-1 block text-xs font-semibold text-slate-800 dark:text-slate-200"
+            >
+              {t('flights.highlightVideoPromptLabel')}
+            </label>
+            <textarea
+              id="highlight-video-prompt"
+              value={prompt}
+              onChange={(event) => setEditedPrompt(event.target.value)}
+              placeholder={t('flights.highlightVideoPromptPlaceholder')}
+              maxLength={4000}
+              rows={4}
+              className="w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              disabled={isGenerationLocked}
+            />
+            <p className="mt-1 text-right text-[11px] text-slate-500 dark:text-slate-400">
+              {prompt.length}/4000
+            </p>
+          </div>
+        )}
         {status === 'completed' && job && (
           <FlightMediaThumbnail
             path={`/flights/${flight.id}/highlight-videos/${job.job_id}/thumbnail`}
@@ -152,31 +178,30 @@ export function HighlightVideoJobCard({
             </Button>
           </div>
         )}
-        {status !== 'completed' &&
-          (isProcessing ? (
-            <Button
-              variant="danger"
-              className="mt-3 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
-              onPress={onCancel}
-              isDisabled={isCancellationPending}
-            >
-              {isCancellationPending
-                ? t('common.stopping')
-                : t('flights.highlightVideoCancel')}
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              className="mt-3 min-h-10 w-full rounded-lg border-violet-300 px-3 py-2 text-sm dark:border-violet-700"
-              onPress={onGenerate}
-              isDisabled={isGenerationPending || isGenerationLocked}
-            >
-              <Sparkles className="h-4 w-4" aria-hidden="true" />
-              {isGenerationPending
-                ? t('flights.highlightVideoStarting')
-                : t('flights.highlightVideoGenerate')}
-            </Button>
-          ))}
+        {isProcessing ? (
+          <Button
+            variant="danger"
+            className="mt-3 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
+            onPress={onCancel}
+            isDisabled={isCancellationPending}
+          >
+            {isCancellationPending
+              ? t('common.stopping')
+              : t('flights.highlightVideoCancel')}
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            className="mt-3 min-h-10 w-full rounded-lg border-violet-300 px-3 py-2 text-sm dark:border-violet-700"
+            onPress={() => onGenerate(prompt)}
+            isDisabled={isGenerationPending || isGenerationLocked}
+          >
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            {isGenerationPending
+              ? t('flights.highlightVideoStarting')
+              : t('flights.highlightVideoGenerate')}
+          </Button>
+        )}
       </div>
     </div>
   );

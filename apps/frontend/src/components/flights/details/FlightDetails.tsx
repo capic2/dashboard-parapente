@@ -937,8 +937,8 @@ export function FlightDetails({
             isGenerationPending={createHighlightVideo.isPending}
             isCancellationPending={cancelHighlightVideo.isPending}
             isDeletionPending={deleteHighlightVideo.isPending}
-            onGenerate={() => {
-              createHighlightVideo.mutate(undefined, {
+            onGenerate={(prompt) => {
+              createHighlightVideo.mutate(prompt, {
                 onSuccess: () =>
                   toast.success(t('flights.highlightVideoStarted')),
                 onError: async (error) =>
