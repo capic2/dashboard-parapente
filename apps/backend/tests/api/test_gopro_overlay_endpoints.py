@@ -3426,6 +3426,7 @@ def test_cancel_queued_gopro_overlay_job_removes_rq_job(monkeypatch):
         "pip_path": None,
         "video_width": None,
         "video_height": None,
+        "command": {"output_resolution": "4k"},
         "updated_at": "2026-01-01T00:00:00+00:00",
     }
     monkeypatch.setattr(gopro_overlay_export.config, "JOB_QUEUE_BACKEND", "rq")
@@ -3842,6 +3843,9 @@ def test_run_job_passes_configured_overlay_gpu_args(monkeypatch, tmp_path):
         assert fallback_command[fallback_command.index("--config-dir") + 1] == "/config"
         assert "--profile" not in fallback_command
         assert "--double-buffer" not in fallback_command
+        fallback_job = gopro_overlay_export.get_gopro_overlay_job(job_id, include_command=True)
+        assert fallback_job is not None
+        assert fallback_job["command"]["output_resolution"] == "4k"
     finally:
         gopro_overlay_export._JOBS.pop(job_id, None)
         gopro_overlay_export._PROCESSES.pop(job_id, None)

@@ -73,6 +73,15 @@ export type VideoExportTempCleanupResult = {
 
 const videoExportJobsQueryKey = ['video-export-jobs'];
 
+function videoExportJobsQueryKeyFor(
+  page: number,
+  pageSize: number,
+  statusFilter: string,
+  typeFilter: string
+) {
+  return [...videoExportJobsQueryKey, page, pageSize, statusFilter, typeFilter];
+}
+
 function toVideoExportJobsResponse(value: unknown): VideoExportJobsPage | null {
   if (!value || typeof value !== 'object' || !('jobs' in value)) {
     return null;
@@ -92,7 +101,8 @@ function toVideoExportJobsResponse(value: unknown): VideoExportJobsPage | null {
     page,
     pageSize,
     total,
-    totalPages: response.total_pages ?? Math.max(1, Math.ceil(total / pageSize)),
+    totalPages:
+      response.total_pages ?? Math.max(1, Math.ceil(total / pageSize)),
   };
 }
 
@@ -103,7 +113,12 @@ export const videoExportJobsQueryOptions = ({
   typeFilter = 'all',
 }: { page?: number; pageSize?: number } & VideoExportJobsFilters = {}) =>
   queryOptions<VideoExportJobsPage>({
-    queryKey: [...videoExportJobsQueryKey, page, pageSize],
+    queryKey: videoExportJobsQueryKeyFor(
+      page,
+      pageSize,
+      statusFilter,
+      typeFilter
+    ),
     queryFn: async () => {
       const data = await api
         .get('video-export-jobs', {
@@ -126,7 +141,9 @@ export function useVideoExportJobs({
   typeFilter = 'all',
 }: { page?: number; pageSize?: number } & VideoExportJobsFilters = {}) {
   const queryClient = useQueryClient();
-  const query = useQuery(videoExportJobsQueryOptions({ page, pageSize }));
+  const query = useQuery(
+    videoExportJobsQueryOptions({ page, pageSize, statusFilter, typeFilter })
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -160,7 +177,7 @@ export function useVideoExportJobs({
       }
 
       queryClient.setQueryData(
-        [...videoExportJobsQueryKey, page, pageSize],
+        videoExportJobsQueryKeyFor(page, pageSize, statusFilter, typeFilter),
         data
       );
     };

@@ -117,6 +117,7 @@ class GoproOverlayJob(BaseModel):
     output_filename: str
     video_width: int | None = None
     video_height: int | None = None
+    output_resolution: Literal["1080p", "4k", "source"] | None = None
     gpx_offset: float = 0.0
     created_at: datetime
     updated_at: datetime
