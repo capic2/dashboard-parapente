@@ -20,6 +20,7 @@ export type VideoExportStatusPayload = {
   progress?: number;
   message?: string | null;
   error?: string | null;
+  updated_at?: string | null;
   eta_seconds?: number;
   can_resume?: boolean;
   frames_captured?: number;
@@ -69,6 +70,7 @@ export const toStatusPayload = (
     progress: typeof value.progress === 'number' ? value.progress : undefined,
     message: typeof value.message === 'string' ? value.message : null,
     error: typeof value.error === 'string' ? value.error : null,
+    updated_at: typeof value.updated_at === 'string' ? value.updated_at : null,
     eta_seconds:
       typeof value.eta_seconds === 'number'
         ? Math.max(0, value.eta_seconds)

@@ -86,6 +86,7 @@
     "cleanupPartialError": "{{count}} élément(s) supprimé(s), mais certains fichiers n’ont pas pu être supprimés",
     "cleanupError": "Impossible de supprimer les fichiers temporaires",
     "loadError": "Impossible de charger les générations vidéo",
+    "stalled": "Aucune progression depuis {{minutes}} min. Le traitement semble bloqué.",
     "empty": "Aucune génération vidéo pour le moment.",
     "confirmDeleteRow": "Supprimer cette ligne et ses fichiers temporaires ?",
     "deleteRow": "Supprimer",
@@ -135,6 +136,7 @@
       "processing": "En cours",
       "completed": "Terminé",
       "failed": "Erreur",
+      "stalled": "Bloqué",
       "cancelled": "Annulé"
     }
   },
@@ -603,6 +605,7 @@
       "loadError": "Erreur lors du chargement des sources météo",
       "active": "Actif",
       "error": "Erreur",
+      "stalled": "Aucune progression depuis {{minutes}} min. Le traitement semble bloqué. Vous pouvez l’arrêter et le relancer.",
       "disabled": "Désactivé",
       "untested": "Non testé",
       "cannotDisableLast": "Impossible de désactiver la dernière source active. Au moins une source doit rester activée.",

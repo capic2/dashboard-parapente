@@ -92,6 +92,7 @@ const activeStatusLabels = new Set([
   'encoding',
   'processing',
 ]);
+const STALLED_JOB_THRESHOLD_MS = 5 * 60 * 1000;
 
 const columnHelper = createColumnHelper<VideoExportJob>();
 
@@ -159,6 +160,17 @@ function getLastActivityTime(job: VideoExportJob) {
 
   const time = new Date(rawDate).getTime();
   return Number.isNaN(time) ? 0 : time;
+}
+
+function getStalledJobMinutes(job: VideoExportJob): number | null {
+  const phase = getJobPhase(job);
+  if (!activeStatusLabels.has(phase) || !job.updated_at) return null;
+  const lastActivity = new Date(job.updated_at).getTime();
+  if (!Number.isFinite(lastActivity)) return null;
+  const elapsedMs = Date.now() - lastActivity;
+  return elapsedMs >= STALLED_JOB_THRESHOLD_MS
+    ? Math.max(1, Math.floor(elapsedMs / 60000))
+    : null;
 }
 
 function getDateLabel(job: VideoExportJob) {
@@ -280,8 +292,11 @@ function canDeleteJobRow(job: VideoExportJob) {
 function JobStatusBadge({ job }: { job: VideoExportJob }) {
   const { t } = useTranslation();
   const phase = getJobPhase(job);
+  const stalled = getStalledJobMinutes(job) !== null;
   const statusLabel = getStatusLabelParts(job);
   const statusClassName =
+    (stalled &&
+      'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300') ||
     statusClassNames[job.status] ||
     statusClassNames[phase] ||
     statusClassNames.processing;
@@ -290,7 +305,9 @@ function JobStatusBadge({ job }: { job: VideoExportJob }) {
     <span
       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClassName}`}
     >
-      {t(statusLabel.key, statusLabel.fallback)}
+      {stalled
+        ? t('videoJobs.status.stalled', 'Bloqué')
+        : t(statusLabel.key, statusLabel.fallback)}
     </span>
   );
 }
@@ -984,6 +1001,17 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
                       <h3 className="mt-2 truncate text-sm font-semibold text-gray-900 dark:text-white">
                         {getFlightLabel(job)}
                       </h3>
+                      {getStalledJobMinutes(job) !== null && !job.error && (
+                        <p className="mt-1 text-sm font-medium text-red-600 dark:text-red-300">
+                          {t(
+                            'videoJobs.stalled',
+                            'Aucune progression depuis {{minutes}} min. Le traitement semble bloqué.',
+                            {
+                              minutes: getStalledJobMinutes(job),
+                            }
+                          )}
+                        </p>
+                      )}
                       {(job.message || job.error) && (
                         <p
                           className={`mt-1 text-sm ${
