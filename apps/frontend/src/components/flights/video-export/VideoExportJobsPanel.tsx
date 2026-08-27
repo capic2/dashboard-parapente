@@ -359,7 +359,18 @@ function FramesCell({ job }: { job: VideoExportJob }) {
   );
 }
 
+function isActiveJob(job: VideoExportJob) {
+  return (
+    job.can_cancel ||
+    activeStatusLabels.has(job.internal_status || job.status) ||
+    ['queued', 'running', 'processing'].includes(job.status)
+  );
+}
+
 function FpsCell({ job }: { job: VideoExportJob }) {
+  if (!isActiveJob(job)) {
+    return <span>-</span>;
+  }
   const fps = job.fps_actual ?? job.fps;
   return typeof fps === 'number' && Number.isFinite(fps) ? (
     <span className="whitespace-nowrap font-mono text-xs text-gray-700 dark:text-gray-200">
