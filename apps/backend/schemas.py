@@ -207,6 +207,7 @@ class HighlightVideoJobResponse(BaseModel):
     overlay_offset_seconds: float
     selection: list[HighlightVideoClipResponse] = Field(default_factory=list)
     created_at: datetime
+    updated_at: datetime
     completed_at: datetime | None = None
 
 

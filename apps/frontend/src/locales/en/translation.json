@@ -86,6 +86,7 @@
     "cleanupPartialError": "{{count}} item(s) deleted, but some files could not be removed",
     "cleanupError": "Unable to delete temporary files",
     "loadError": "Unable to load video generations",
+    "stalled": "No progress for {{minutes}} min. The job appears to be stuck.",
     "empty": "No video generation yet.",
     "confirmDeleteRow": "Delete this row and its temporary files?",
     "deleteRow": "Delete",
@@ -135,6 +136,7 @@
       "processing": "In progress",
       "completed": "Completed",
       "failed": "Error",
+      "stalled": "Stuck",
       "cancelled": "Cancelled"
     }
   },
@@ -603,6 +605,7 @@
       "loadError": "Error loading weather sources",
       "active": "Active",
       "error": "Error",
+      "stalled": "No progress for {{minutes}} min. The job appears to be stuck. You can stop it and retry.",
       "disabled": "Disabled",
       "untested": "Untested",
       "cannotDisableLast": "Cannot disable the last active source. At least one source must remain active.",
