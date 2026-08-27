@@ -111,6 +111,7 @@ vi.mock('../../../hooks/useToast', () => ({
 }));
 
 vi.mock('../../../hooks/flights/useVideoExportJobs', () => ({
+  VIDEO_EXPORT_JOBS_PAGE_SIZE: 25,
   useVideoExportJobs: () => ({
     data: {
       jobs,
