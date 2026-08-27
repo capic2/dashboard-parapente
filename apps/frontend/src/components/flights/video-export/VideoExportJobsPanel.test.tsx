@@ -290,7 +290,7 @@ describe('VideoExportJobsPanel', () => {
     expect(screen.getByRole('menuitem', { name: 'Logs' })).toBeInTheDocument();
   });
 
-  it('shows a stuck warning when an active job has not updated recently', () => {
+  it('keeps the real status when an active job has not updated recently', () => {
     jobs.push({
       job_id: 'job-stuck',
       flight_title: 'Vol bloqué',
@@ -304,7 +304,8 @@ describe('VideoExportJobsPanel', () => {
 
     render(<VideoExportJobsPanel limit={null} />);
 
-    expect(screen.getAllByText('Bloqué').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('En cours').length).toBeGreaterThan(1);
+    expect(screen.queryByText('Bloqué')).not.toBeInTheDocument();
     expect(
       screen.getAllByText(/Aucune progression depuis .* Le traitement semble bloqué/u)
         .length
