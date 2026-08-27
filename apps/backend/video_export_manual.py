@@ -1175,6 +1175,12 @@ def _capture_progress_percent(frame_count: int, total_frames: int) -> int:
     return min(80, max(5, int(5 + ratio * 75)))
 
 
+def _capture_fps(frame_count: int, resume_from_frame: int, elapsed: float) -> float:
+    """Return capture throughput excluding frames restored from disk."""
+    captured_since_start = max(0, frame_count - resume_from_frame)
+    return captured_since_start / elapsed if elapsed > 0 else 0
+
+
 def _parse_ffmpeg_out_time_seconds(line: str) -> float | None:
     if "=" not in line:
         return None
@@ -1950,7 +1956,6 @@ async def _export_video_manual_render(job_id: str):
             frame_count = 0
             ms_per_frame = (duration_seconds * 1000) / max(total_frames, 1)
             _log_job(job_id, f"Capturing 1 frame every {ms_per_frame:.1f}ms")
-            start_time = time.time()
             resume_from_frame = _first_missing_frame_index(frames_dir, total_frames)
             if resume_from_frame > 0:
                 frame_count = resume_from_frame
@@ -1969,6 +1974,7 @@ async def _export_video_manual_render(job_id: str):
                 )
                 _log_job(job_id, f"Resuming capture from frame {resume_from_frame}/{total_frames}")
 
+            start_time = time.time()
             encoding_output_file = temp_dir / "encoding.mp4"
             concurrent_encoding = is_fast_mode and accelerator == "cpu"
             ffmpeg_cmd = _ffmpeg_command(
@@ -2094,7 +2100,7 @@ async def _export_video_manual_render(job_id: str):
                 if frame_count % 10 == 0:
                     progress = _capture_progress_percent(frame_count, total_frames)
                     elapsed = time.time() - start_time
-                    fps_actual = frame_count / elapsed if elapsed > 0 else 0
+                    fps_actual = _capture_fps(frame_count, resume_from_frame, elapsed)
                     eta_seconds = (total_frames - frame_count) / fps_actual if fps_actual > 0 else 0
                     eta_seconds_int = max(0, int(eta_seconds)) if eta_seconds > 0 else None
 

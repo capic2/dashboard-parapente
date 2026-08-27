@@ -33,6 +33,7 @@ const {
       progress: 42,
       message: 'Capturing frames',
       mode: 'manual_fast',
+      fps: 30,
       log_tail: ['Opening viewer', 'Captured 10/100 frames'],
       can_cancel: true,
       can_delete: true,

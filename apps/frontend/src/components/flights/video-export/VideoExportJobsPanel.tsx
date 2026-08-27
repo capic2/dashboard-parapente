@@ -394,7 +394,7 @@ function FpsCell({ job }: { job: VideoExportJob }) {
       </span>
     );
   }
-  const fps = job.fps_actual ?? job.fps;
+  const fps = job.fps_actual;
   return typeof fps === 'number' && Number.isFinite(fps) ? (
     <span className="whitespace-nowrap font-mono text-xs text-gray-700 dark:text-gray-200">
       {fps.toFixed(1)} fps
