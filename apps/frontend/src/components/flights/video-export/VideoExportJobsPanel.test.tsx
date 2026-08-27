@@ -267,6 +267,7 @@ describe('VideoExportJobsPanel', () => {
     expect(screen.getAllByText('CPU').length).toBeGreaterThan(0);
     expect(screen.getAllByText('42%').length).toBeGreaterThan(0);
     expect(screen.getAllByText('12.4 fps').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('0.0 fps').length).toBeGreaterThan(0);
     expect(screen.queryByText('30.0 fps')).not.toBeInTheDocument();
     expect(screen.getAllByText('En cours').length).toBeGreaterThan(1);
     expect(
