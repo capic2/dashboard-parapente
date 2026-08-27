@@ -292,11 +292,8 @@ function canDeleteJobRow(job: VideoExportJob) {
 function JobStatusBadge({ job }: { job: VideoExportJob }) {
   const { t } = useTranslation();
   const phase = getJobPhase(job);
-  const stalled = getStalledJobMinutes(job) !== null;
   const statusLabel = getStatusLabelParts(job);
   const statusClassName =
-    (stalled &&
-      'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300') ||
     statusClassNames[job.status] ||
     statusClassNames[phase] ||
     statusClassNames.processing;
@@ -305,9 +302,7 @@ function JobStatusBadge({ job }: { job: VideoExportJob }) {
     <span
       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClassName}`}
     >
-      {stalled
-        ? t('videoJobs.status.stalled', 'Bloqué')
-        : t(statusLabel.key, statusLabel.fallback)}
+      {t(statusLabel.key, statusLabel.fallback)}
     </span>
   );
 }
