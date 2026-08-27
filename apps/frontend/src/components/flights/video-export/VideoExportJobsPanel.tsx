@@ -369,7 +369,11 @@ function isActiveJob(job: VideoExportJob) {
 
 function FpsCell({ job }: { job: VideoExportJob }) {
   if (!isActiveJob(job)) {
-    return <span>-</span>;
+    return (
+      <span className="whitespace-nowrap font-mono text-xs text-gray-500 dark:text-gray-400">
+        0.0 fps
+      </span>
+    );
   }
   const fps = job.fps_actual ?? job.fps;
   return typeof fps === 'number' && Number.isFinite(fps) ? (
