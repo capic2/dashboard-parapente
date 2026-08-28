@@ -384,7 +384,7 @@ describe('VideoExportJobsPanel', () => {
 
     render(<VideoExportJobsPanel />);
     fireEvent.click(screen.getAllByRole('button', { name: 'Actions' })[3]!);
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Reprendre' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Relancer' }));
 
     await waitFor(() =>
       expect(resumeJob).toHaveBeenCalledWith('job-resumable')

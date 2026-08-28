@@ -127,13 +127,13 @@
       "fps": "Images par seconde",
       "eta": "Temps restant"
     },
-    "resumeSuccess": "Génération reprise",
-    "resumeError": "Impossible de reprendre la génération",
+    "resumeSuccess": "Génération relancée",
+    "resumeError": "Impossible de relancer la génération",
     "downloadError": "Impossible de télécharger la vidéo",
     "viewFlight": "Voir le vol",
     "download": "Télécharger",
-    "resuming": "Reprise...",
-    "resume": "Reprendre",
+    "resuming": "Relance...",
+    "resume": "Relancer",
     "done": "Terminé",
     "summary": {
       "active_one": "{{count}} active",
