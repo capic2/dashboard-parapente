@@ -75,11 +75,7 @@ export function useJobCompletionNotifications() {
 
     for (const job of jobsQuery.data.jobs) {
       const previousStatus = previousStatuses.current.get(job.job_id);
-      if (
-        !previousStatus ||
-        previousStatus === job.status ||
-        !TERMINAL_STATUSES.has(job.status)
-      ) {
+      if (previousStatus === job.status || !TERMINAL_STATUSES.has(job.status)) {
         continue;
       }
 
