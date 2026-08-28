@@ -50,6 +50,8 @@ export type VideoExportJobsPage = {
   pageSize: number;
   total: number;
   totalPages: number;
+  statusCounts: Record<string, number>;
+  typeCounts: Record<string, number>;
 };
 
 type VideoExportJobsResponse = {
@@ -58,6 +60,8 @@ type VideoExportJobsResponse = {
   page_size?: number;
   total?: number;
   total_pages?: number;
+  status_counts?: Record<string, number>;
+  type_counts?: Record<string, number>;
 };
 
 export type VideoExportJobsFilters = {
@@ -105,6 +109,8 @@ function toVideoExportJobsResponse(value: unknown): VideoExportJobsPage | null {
     total,
     totalPages:
       response.total_pages ?? Math.max(1, Math.ceil(total / pageSize)),
+    statusCounts: response.status_counts ?? {},
+    typeCounts: response.type_counts ?? {},
   };
 }
 

@@ -793,6 +793,8 @@ class VideoExportJobsResponse(BaseModel):
     page_size: int
     total: int
     total_pages: int
+    status_counts: dict[str, int] = Field(default_factory=dict)
+    type_counts: dict[str, int] = Field(default_factory=dict)
 
 
 def _get_video_export_jobs_payload(
@@ -831,6 +833,15 @@ def _get_video_export_jobs_payload(
             ),
             reverse=True,
         )
+    type_counts = {
+        "all": len(jobs),
+        "video": sum(
+            job.get("mode") in {"manual", "manual_fast", "stream"} for job in jobs
+        ),
+        "gopro": sum(job.get("mode") == "gopro_overlay" for job in jobs),
+        "highlight": sum(job.get("mode") == "highlight" for job in jobs),
+        "youtube": sum(job.get("mode") in {"youtube", "youtube_upload"} for job in jobs),
+    }
     if type_filter == "video":
         jobs = [
             job
@@ -842,7 +853,21 @@ def _get_video_export_jobs_payload(
     elif type_filter == "highlight":
         jobs = [job for job in jobs if job.get("mode") == "highlight"]
     elif type_filter == "youtube":
-        jobs = [job for job in jobs if job.get("mode") == "youtube_upload"]
+        jobs = [
+            job for job in jobs if job.get("mode") in {"youtube", "youtube_upload"}
+        ]
+    status_counts = {
+        "all": len(jobs),
+        "active": sum(
+            job.get("can_cancel")
+            or job.get("status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
+            or job.get("status") == "uploading"
+            for job in jobs
+        ),
+        "completed": sum(job.get("status") == "completed" for job in jobs),
+        "failed": sum(job.get("status") == "failed" for job in jobs),
+        "cancelled": sum(job.get("status") == "cancelled" for job in jobs),
+    }
     if status_filter == "active":
         jobs = [
             job
@@ -853,7 +878,11 @@ def _get_video_export_jobs_payload(
         ]
     elif status_filter and status_filter != "all":
         jobs = [job for job in jobs if job.get("status") == status_filter]
-    payload: dict[str, Any] = {"jobs": jobs}
+    payload: dict[str, Any] = {
+        "jobs": jobs,
+        "status_counts": status_counts,
+        "type_counts": type_counts,
+    }
     if page is not None and page_size is not None:
         total = len(jobs)
         total_pages = max(1, math.ceil(total / page_size))
