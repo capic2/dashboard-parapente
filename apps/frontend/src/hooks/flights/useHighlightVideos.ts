@@ -33,6 +33,7 @@ export function useCreateFlightHighlightVideo(flightId: string) {
       return HighlightVideoJobSchema.parse(payload);
     },
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });
       void queryClient.invalidateQueries({
         queryKey: ['flights', flightId, 'highlight-videos'],
       });
@@ -43,18 +44,25 @@ export function useCreateFlightHighlightVideo(flightId: string) {
   });
 }
 
-export function useCancelFlightHighlightVideo(flightId: string) {
+export function useCancelFlightHighlightVideo(_flightId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (jobId: string) => {
+    mutationFn: async ({
+      targetFlightId,
+      jobId,
+    }: {
+      targetFlightId: string;
+      jobId: string;
+    }) => {
       const payload = await api
-        .delete(`flights/${flightId}/highlight-videos/${jobId}/cancel`)
+        .delete(`flights/${targetFlightId}/highlight-videos/${jobId}/cancel`)
         .json<unknown>();
       return HighlightVideoJobSchema.parse(payload);
     },
-    onSuccess: () => {
+    onSuccess: (_job, { targetFlightId }) => {
+      void queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });
       void queryClient.invalidateQueries({
-        queryKey: ['flights', flightId, 'highlight-videos'],
+        queryKey: ['flights', targetFlightId, 'highlight-videos'],
       });
       void queryClient.invalidateQueries({
         queryKey: ['flights', 'summaries'],
@@ -63,16 +71,23 @@ export function useCancelFlightHighlightVideo(flightId: string) {
   });
 }
 
-export function useDeleteFlightHighlightVideo(flightId: string) {
+export function useDeleteFlightHighlightVideo(_flightId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (jobId: string) =>
+    mutationFn: async ({
+      targetFlightId,
+      jobId,
+    }: {
+      targetFlightId: string;
+      jobId: string;
+    }) =>
       api
-        .delete(`flights/${flightId}/highlight-videos/${jobId}`)
+        .delete(`flights/${targetFlightId}/highlight-videos/${jobId}`)
         .json<unknown>(),
-    onSuccess: () => {
+    onSuccess: (_response, { targetFlightId }) => {
+      void queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });
       void queryClient.invalidateQueries({
-        queryKey: ['flights', flightId, 'highlight-videos'],
+        queryKey: ['flights', targetFlightId, 'highlight-videos'],
       });
       void queryClient.invalidateQueries({
         queryKey: ['flights', 'summaries'],

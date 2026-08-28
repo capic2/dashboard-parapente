@@ -958,29 +958,41 @@ export function FlightDetails({
               ) {
                 return;
               }
-              deleteHighlightVideo.mutate(latestHighlightVideo.job_id, {
-                onSuccess: () =>
-                  toast.success(t('flights.highlightVideoDeleted')),
-                onError: async (error) =>
-                  toast.error(
-                    await getApiErrorMessage(
-                      error,
-                      t('flights.highlightVideoDeleteError')
-                    )
-                  ),
-              });
+              deleteHighlightVideo.mutate(
+                {
+                  targetFlightId: flight.id,
+                  jobId: latestHighlightVideo.job_id,
+                },
+                {
+                  onSuccess: () =>
+                    toast.success(t('flights.highlightVideoDeleted')),
+                  onError: async (error) =>
+                    toast.error(
+                      await getApiErrorMessage(
+                        error,
+                        t('flights.highlightVideoDeleteError')
+                      )
+                    ),
+                }
+              );
             }}
             onCancel={() => {
               if (!latestHighlightVideo) return;
-              cancelHighlightVideo.mutate(latestHighlightVideo.job_id, {
-                onError: async (error) =>
-                  toast.error(
-                    await getApiErrorMessage(
-                      error,
-                      t('flights.highlightVideoCancelError')
-                    )
-                  ),
-              });
+              cancelHighlightVideo.mutate(
+                {
+                  targetFlightId: flight.id,
+                  jobId: latestHighlightVideo.job_id,
+                },
+                {
+                  onError: async (error) =>
+                    toast.error(
+                      await getApiErrorMessage(
+                        error,
+                        t('flights.highlightVideoCancelError')
+                      )
+                    ),
+                }
+              );
             }}
           />
           {visibleGoproOverlays.length > 0 && (

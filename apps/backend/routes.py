@@ -609,7 +609,12 @@ def _video_export_public_status(export: dict[str, Any]) -> str:
 
 def _video_export_can_cancel(export: dict[str, Any]) -> bool:
     if export.get("mode") in {"highlight", "youtube_upload"}:
-        return False
+        return (
+            export.get("mode") == "highlight"
+            and export.get("status") in {"queued", "running"}
+            and bool(export.get("job_id"))
+            and bool(export.get("flight_id"))
+        )
     if export.get("mode") == "gopro_overlay":
         return export.get("status") in {"queued", "running"} and bool(export.get("job_id"))
 
@@ -625,10 +630,15 @@ def _video_export_can_cancel(export: dict[str, Any]) -> bool:
 
 
 def _video_export_can_delete(export: dict[str, Any]) -> bool:
-    if export.get("mode") in {"highlight", "youtube_upload"}:
+    if export.get("mode") == "youtube_upload":
         return False
     if not export.get("job_id"):
         return False
+
+    if export.get("mode") == "highlight":
+        return export.get("status") in _VIDEO_EXPORT_TERMINAL_STATUSES and bool(
+            export.get("flight_id")
+        )
 
     if export.get("mode") in {"manual", "manual_fast"}:
         return True
