@@ -12,7 +12,16 @@
     "logout": "Logout",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
-    "menu": "Menu"
+    "menu": "Menu",
+    "enableNotifications": "Enable job notifications"
+  },
+  "notifications": {
+    "jobCompleted": "Job completed",
+    "jobCompletedDetail": "{{job}} is complete",
+    "jobFailed": "Job failed",
+    "jobFailedDetail": "{{job}} failed",
+    "jobCancelled": "Job cancelled",
+    "jobCancelledDetail": "{{job}} was cancelled"
   },
   "login": {
     "title": "Paragliding Dashboard",
