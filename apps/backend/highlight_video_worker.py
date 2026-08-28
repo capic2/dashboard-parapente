@@ -455,16 +455,15 @@ def _flight_phase_times(
     ]
     if descent_indices:
         descent_end = descent_indices[-1]
-        # The event is touchdown, not the beginning of final approach. If the
-        # log has post-landing points, use the first stable altitude after the
-        # descent; otherwise use the end of the descent.
+        # Estimate touchdown halfway between the end of the descent trend and
+        # the first stable post-landing point. Using the stable point itself
+        # pushed the rendered clip past touchdown and hid the actual contact.
+        landing = float(times[descent_end])
         for index in range(descent_end + 1, len(samples)):
             recent = elevations[descent_end : index + 1]
             if times[index] - times[descent_end] >= 8 and float(np.ptp(recent)) <= 8:
-                landing = float(times[index])
+                landing = float(times[descent_end] + (times[index] - times[descent_end]) / 2)
                 break
-        if landing is None:
-            landing = float(times[descent_end])
 
     return takeoff, landing
 
