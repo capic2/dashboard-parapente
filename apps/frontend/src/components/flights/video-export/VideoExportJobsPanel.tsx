@@ -75,6 +75,8 @@ const typeFilters = [
   { id: 'all', label: 'Tous les types' },
   { id: 'video', label: 'Exports vidéo' },
   { id: 'gopro', label: 'Overlay GoPro' },
+  { id: 'highlight', label: 'Meilleurs moments' },
+  { id: 'youtube', label: 'Upload YouTube' },
 ] as const;
 
 type TypeFilter = (typeof typeFilters)[number]['id'];
@@ -124,12 +126,24 @@ function getModeLabelParts(mode: string) {
   if (mode === 'gopro_overlay') {
     return { key: 'videoJobs.mode.goproOverlay', fallback: 'Overlay GoPro' };
   }
+  if (mode === 'highlight') {
+    return { key: 'videoJobs.mode.highlight', fallback: 'Meilleurs moments' };
+  }
+  if (mode === 'youtube_upload') {
+    return { key: 'videoJobs.mode.youtubeUpload', fallback: 'Upload YouTube' };
+  }
   return { key: `videoJobs.mode.${mode}`, fallback: mode };
 }
 
 function getJobTypeLabelParts(job: VideoExportJob) {
   if (isGoproOverlayJob(job)) {
     return { key: 'videoJobs.type.goproOverlay', fallback: 'GoPro overlay' };
+  }
+  if (job.mode === 'highlight') {
+    return { key: 'videoJobs.type.highlight', fallback: 'Meilleurs moments' };
+  }
+  if (job.mode === 'youtube_upload') {
+    return { key: 'videoJobs.type.youtube', fallback: 'YouTube' };
   }
 
   return { key: 'videoJobs.type.video', fallback: 'Video' };
@@ -213,7 +227,7 @@ function isJobInFilter(job: VideoExportJob, filter: StatusFilter) {
   }
   if (filter === 'active') {
     return (
-      job.can_cancel || ['queued', 'running', 'processing'].includes(job.status)
+      job.can_cancel || ['queued', 'running', 'processing', 'uploading'].includes(job.status)
     );
   }
   return job.status === filter;
@@ -223,11 +237,21 @@ function isGoproOverlayJob(job: VideoExportJob) {
   return job.mode === 'gopro_overlay';
 }
 
+function isHighlightJob(job: VideoExportJob) {
+  return job.mode === 'highlight';
+}
+
+function isYoutubeJob(job: VideoExportJob) {
+  return job.mode === 'youtube_upload';
+}
+
 function isJobInTypeFilter(job: VideoExportJob, filter: TypeFilter) {
   return (
     filter === 'all' ||
     (filter === 'gopro' && isGoproOverlayJob(job)) ||
-    (filter === 'video' && !isGoproOverlayJob(job))
+    (filter === 'video' && !isGoproOverlayJob(job) && !isHighlightJob(job) && !isYoutubeJob(job)) ||
+    (filter === 'highlight' && isHighlightJob(job)) ||
+    (filter === 'youtube' && isYoutubeJob(job))
   );
 }
 
@@ -282,7 +306,12 @@ function SegmentedFilter<T extends string>({
 }
 
 function canDownloadJob(job: VideoExportJob) {
-  return job.status === 'completed' && job.has_output_file !== false;
+  return (
+    job.status === 'completed' &&
+    job.has_output_file !== false &&
+    !isYoutubeJob(job) &&
+    (!isHighlightJob(job) || Boolean(job.flight_id))
+  );
 }
 
 function canDeleteJobRow(job: VideoExportJob) {
@@ -440,7 +469,9 @@ function JobLogsDetails({
 }) {
   const { t } = useTranslation();
   const { status: videoStatus } = useVideoExportStatus(
-    isGoproOverlayJob(job) ? null : job.job_id,
+    isGoproOverlayJob(job) || isHighlightJob(job) || isYoutubeJob(job)
+      ? null
+      : job.job_id,
     isOpen
   );
   const { job: goproJob } = useGoproOverlayJobStream(
@@ -518,7 +549,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
     setPage(1);
   }, [statusFilter, typeFilter]);
 
-  const activeCount = jobs.filter((job) => job.can_cancel).length;
+  const activeCount = jobs.filter((job) => isJobInFilter(job, 'active')).length;
   const completedCount = jobs.filter(
     (job) => job.status === 'completed'
   ).length;
@@ -589,6 +620,8 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
       try {
         const endpoint = isGoproOverlayJob(job)
           ? `gopro-overlays/jobs/${job.job_id}/download`
+          : isHighlightJob(job)
+            ? `flights/${job.flight_id}/highlight-videos/${job.job_id}/download`
           : `exports/${job.job_id}/download`;
         const response = await api.get(endpoint, { timeout: false });
         const blob = await response.blob();
