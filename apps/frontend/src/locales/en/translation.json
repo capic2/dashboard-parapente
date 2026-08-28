@@ -107,7 +107,9 @@
       "hide": "Hide"
     },
     "mode": {
-      "goproOverlay": "GoPro overlay"
+      "goproOverlay": "GoPro overlay",
+      "highlight": "Best moments",
+      "youtubeUpload": "YouTube upload"
     },
     "method": {
       "cpu": "CPU",
@@ -153,7 +155,9 @@
     "typeFilters": {
       "all": "All types",
       "video": "Video exports",
-      "gopro": "GoPro overlay"
+      "gopro": "GoPro overlay",
+      "highlight": "Best moments",
+      "youtube": "YouTube upload"
     },
     "filters": {
       "all": "All",
