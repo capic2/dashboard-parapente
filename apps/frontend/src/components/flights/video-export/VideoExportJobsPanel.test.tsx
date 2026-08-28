@@ -141,6 +141,10 @@ vi.mock('../../../hooks/flights/useVideoExportJobs', () => ({
     mutateAsync: deleteJobRow,
     isPending: false,
   }),
+  useDeleteVideoExportOutput: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
   useCleanupVideoExportTempFiles: () => ({
     mutateAsync: cleanupTempFiles,
     isPending: false,
@@ -158,6 +162,13 @@ vi.mock('../../../hooks/flights/useVideoExportStatus', () => ({
           }
         : null,
     isConnected: Boolean(enabled && jobId),
+  }),
+}));
+
+vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
+  useCancelYoutubeUpload: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
   }),
 }));
 

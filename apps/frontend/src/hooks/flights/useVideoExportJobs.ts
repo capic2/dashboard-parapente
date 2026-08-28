@@ -78,6 +78,8 @@ export type VideoExportTempCleanupResult = {
   errors: { path: string; error: string }[];
 };
 
+export type VideoExportOutputKind = 'video' | 'gopro';
+
 const videoExportJobsQueryKey = ['video-export-jobs'];
 
 function videoExportJobsQueryKeyFor(
@@ -245,6 +247,30 @@ export function useDeleteVideoExportJobRow() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });
       queryClient.invalidateQueries({ queryKey: ['flights'] });
+    },
+  });
+}
+
+export function useDeleteVideoExportOutput() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      jobId,
+      kind,
+    }: {
+      jobId: string;
+      kind: VideoExportOutputKind;
+    }) => {
+      const endpoint =
+        kind === 'gopro'
+          ? `gopro-overlays/jobs/${jobId}/video`
+          : `exports/${jobId}/video`;
+      await api.delete(endpoint).json();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });
+      void queryClient.invalidateQueries({ queryKey: ['flights'] });
     },
   });
 }
