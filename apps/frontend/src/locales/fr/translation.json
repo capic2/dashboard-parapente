@@ -12,7 +12,16 @@
     "logout": "Déconnexion",
     "openMenu": "Ouvrir le menu",
     "closeMenu": "Fermer le menu",
-    "menu": "Menu"
+    "menu": "Menu",
+    "enableNotifications": "Activer les notifications de jobs"
+  },
+  "notifications": {
+    "jobCompleted": "Job terminé",
+    "jobCompletedDetail": "{{job}} est terminé",
+    "jobFailed": "Job échoué",
+    "jobFailedDetail": "{{job}} a échoué",
+    "jobCancelled": "Job annulé",
+    "jobCancelledDetail": "{{job}} a été annulé"
   },
   "login": {
     "title": "Dashboard Parapente",
