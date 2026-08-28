@@ -129,6 +129,20 @@ vi.mock('../../../hooks/flights/useVideoExportJobs', () => ({
     isError: false,
     refetch,
   }),
+  useVideoExportGpuStatus: () => ({
+    data: {
+      available: true,
+      devices: [
+        {
+          name: 'NVIDIA test GPU',
+          utilization_percent: 42,
+          memory_used_mb: 1234,
+          memory_total_mb: 24576,
+        },
+      ],
+    },
+    isLoading: false,
+  }),
   useCancelVideoExportJob: () => ({
     mutateAsync: cancelJob,
     isPending: false,

@@ -9,6 +9,49 @@ from typing import Literal
 VideoAccelerator = Literal["cpu", "nvidia"]
 
 
+def get_gpu_runtime_status() -> dict[str, object]:
+    """Return a live NVIDIA status suitable for the infrastructure dashboard."""
+
+    command = [
+        "nvidia-smi",
+        "--query-gpu=name,utilization.gpu,memory.used,memory.total",
+        "--format=csv,noheader,nounits",
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError, TimeoutError):
+        return {"available": False, "driver": "nvidia-smi unavailable", "devices": []}
+
+    if result.returncode != 0:
+        return {"available": False, "driver": (result.stderr or "").strip(), "devices": []}
+
+    devices: list[dict[str, object]] = []
+    for line in result.stdout.splitlines():
+        values = [value.strip() for value in line.split(",")]
+        if len(values) != 4:
+            continue
+        name, utilization, memory_used, memory_total = values
+        try:
+            devices.append(
+                {
+                    "name": name,
+                    "utilization_percent": int(utilization),
+                    "memory_used_mb": int(memory_used),
+                    "memory_total_mb": int(memory_total),
+                }
+            )
+        except ValueError:
+            continue
+
+    return {"available": bool(devices), "driver": "nvidia", "devices": devices}
+
+
 @lru_cache(maxsize=1)
 def ffmpeg_can_encode_nvenc() -> bool:
     """Run a real encode so advertised-but-unusable NVENC is rejected."""

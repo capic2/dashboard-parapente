@@ -19,6 +19,40 @@ def test_select_video_accelerator_falls_back_to_cpu_after_failed_probe() -> None
         assert video_acceleration.select_video_accelerator("nvidia") == "cpu"
 
 
+def test_gpu_runtime_status_parses_live_nvidia_smi_output() -> None:
+    class Result:
+        returncode = 0
+        stdout = "NVIDIA RTX 4090, 42, 1234, 24576\n"
+        stderr = ""
+
+    with patch("video_acceleration.subprocess.run", return_value=Result()) as run:
+        status = video_acceleration.get_gpu_runtime_status()
+
+    assert status["available"] is True
+    assert status["devices"] == [
+        {
+            "name": "NVIDIA RTX 4090",
+            "utilization_percent": 42,
+            "memory_used_mb": 1234,
+            "memory_total_mb": 24576,
+        }
+    ]
+    assert run.call_args.args[0][0] == "nvidia-smi"
+
+
+def test_gpu_runtime_status_reports_unavailable_when_nvidia_smi_fails() -> None:
+    class Result:
+        returncode = 1
+        stdout = ""
+        stderr = "No devices were found"
+
+    with patch("video_acceleration.subprocess.run", return_value=Result()):
+        status = video_acceleration.get_gpu_runtime_status()
+
+    assert status["available"] is False
+    assert status["devices"] == []
+
+
 def test_nvenc_probe_runs_a_real_encode() -> None:
     video_acceleration.ffmpeg_can_encode_nvenc.cache_clear()
 
