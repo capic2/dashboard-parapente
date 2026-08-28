@@ -11,6 +11,7 @@ import {
 import { Button, DataTable, Modal } from '@dashboard-parapente/design-system';
 import {
   Download,
+  ExternalLink,
   FileText,
   MoreHorizontal,
   Play,
@@ -29,6 +30,7 @@ import {
   useCancelVideoExportJob,
   useCleanupVideoExportTempFiles,
   useDeleteVideoExportJobRow,
+  useDeleteVideoExportOutput,
   useResumeVideoExportJob,
   useVideoExportJobs,
   VIDEO_EXPORT_JOBS_PAGE_SIZE,
@@ -39,6 +41,7 @@ import {
   useDeleteFlightHighlightVideo,
 } from '../../../hooks/flights/useHighlightVideos';
 import { useGoproOverlayJobStream } from '../../../hooks/gopro/useGoproOverlay';
+import { useCancelYoutubeUpload } from '../../../hooks/flights/useYoutubeUpload';
 import { api } from '../../../lib/api';
 import { useToast } from '../../../hooks/useToast';
 import { JobLiveLogsPanel } from './JobLiveLogsPanel';
@@ -326,6 +329,14 @@ function canDeleteJobRow(job: VideoExportJob) {
   return job.can_delete;
 }
 
+function canDeleteVideoOutput(job: VideoExportJob) {
+  return (
+    job.status === 'completed' &&
+    job.has_output_file === true &&
+    (isGoproOverlayJob(job) || (!isHighlightJob(job) && !isYoutubeJob(job)))
+  );
+}
+
 function JobStatusBadge({ job }: { job: VideoExportJob }) {
   const { t } = useTranslation();
   const phase = getJobPhase(job);
@@ -556,6 +567,8 @@ export function VideoExportJobsPanel({
   const cancelHighlightJob = useCancelFlightHighlightVideo('');
   const resumeJob = useResumeVideoExportJob();
   const deleteJobRow = useDeleteVideoExportJobRow();
+  const deleteVideoOutput = useDeleteVideoExportOutput();
+  const cancelYoutubeUpload = useCancelYoutubeUpload('');
   const deleteHighlightJob = useDeleteFlightHighlightVideo('');
   const cleanupTempFiles = useCleanupVideoExportTempFiles();
 
@@ -629,6 +642,8 @@ export function VideoExportJobsPanel({
                 targetFlightId: job.flight_id,
                 jobId: job.job_id,
               });
+            } else if (isYoutubeJob(job) && job.flight_id) {
+              await cancelYoutubeUpload.mutateAsync(job.flight_id);
             } else {
               await cancelJob.mutateAsync(job.job_id);
             }
@@ -641,7 +656,7 @@ export function VideoExportJobsPanel({
         },
       });
     },
-    [cancelHighlightJob, cancelJob, t, toast]
+    [cancelHighlightJob, cancelJob, cancelYoutubeUpload, t, toast]
   );
 
   const handleResume = useCallback(
@@ -715,6 +730,32 @@ export function VideoExportJobsPanel({
     [deleteHighlightJob, deleteJobRow, t, toast]
   );
 
+  const handleDeleteVideoOutput = useCallback(
+    (job: VideoExportJob) => {
+      setPendingConfirm({
+        message: t(
+          'videoJobs.confirmDeleteVideo',
+          'Supprimer le fichier vidéo généré ? Cette action est irréversible.'
+        ),
+        confirmLabel: t('videoJobs.deleteVideo', 'Supprimer la vidéo'),
+        onConfirm: async () => {
+          try {
+            await deleteVideoOutput.mutateAsync({
+              jobId: job.job_id,
+              kind: isGoproOverlayJob(job) ? 'gopro' : 'video',
+            });
+            toast.success(t('videoJobs.deleteVideoSuccess', 'Vidéo supprimée'));
+          } catch {
+            toast.error(
+              t('videoJobs.deleteVideoError', 'Impossible de supprimer la vidéo')
+            );
+          }
+        },
+      });
+    },
+    [deleteVideoOutput, t, toast]
+  );
+
   const renderJobActions = useCallback(
     (job: VideoExportJob) => (
       <MenuTrigger>
@@ -732,6 +773,17 @@ export function VideoExportJobsPanel({
                 className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
               >
                 {t('videoJobs.viewFlight', 'Voir le vol')}
+              </MenuItem>
+            )}
+            {isYoutubeJob(job) && job.youtube_url && (
+              <MenuItem
+                href={job.youtube_url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+              >
+                <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                {t('videoJobs.openYoutube', 'Ouvrir sur YouTube')}
               </MenuItem>
             )}
             {canDownloadJob(job) && (
@@ -758,7 +810,11 @@ export function VideoExportJobsPanel({
             {job.can_cancel && (
               <MenuItem
                 onAction={() => handleCancel(job)}
-                isDisabled={cancelJob.isPending || cancelHighlightJob.isPending}
+                isDisabled={
+                  cancelJob.isPending ||
+                  cancelHighlightJob.isPending ||
+                  cancelYoutubeUpload.isPending
+                }
                 className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-700 outline-none hover:bg-red-50 focus:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-300 dark:hover:bg-red-950/40 dark:focus:bg-red-950/40"
               >
                 <Square className="h-4 w-4" aria-hidden="true" />
@@ -779,6 +835,16 @@ export function VideoExportJobsPanel({
                 {t('videoJobs.deleteRow', 'Supprimer')}
               </MenuItem>
             )}
+            {canDeleteVideoOutput(job) && (
+              <MenuItem
+                onAction={() => handleDeleteVideoOutput(job)}
+                isDisabled={deleteVideoOutput.isPending}
+                className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                {t('videoJobs.deleteVideo', 'Supprimer la vidéo')}
+              </MenuItem>
+            )}
             <MenuItem
               onAction={() => setSelectedLogJob(job)}
               className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
@@ -793,10 +859,13 @@ export function VideoExportJobsPanel({
     [
       cancelJob.isPending,
       cancelHighlightJob.isPending,
+      cancelYoutubeUpload.isPending,
       deleteHighlightJob.isPending,
       deleteJobRow.isPending,
+      deleteVideoOutput.isPending,
       handleCancel,
       handleDeleteJobRow,
+      handleDeleteVideoOutput,
       handleDownload,
       handleResume,
       resumeJob.isPending,
