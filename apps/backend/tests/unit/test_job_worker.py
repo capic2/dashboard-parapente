@@ -5,6 +5,48 @@ from __future__ import annotations
 import job_worker
 
 
+def test_main_runs_one_worker_without_spawning(monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(job_worker.config, "JOB_WORKER_COUNT", 1)
+    monkeypatch.setattr(job_worker, "_run_worker", lambda: calls.append(True))
+
+    job_worker.main()
+
+    assert calls == [True]
+
+
+def test_main_spawns_configured_number_of_workers(monkeypatch) -> None:
+    started = []
+
+    class FakeProcess:
+        def __init__(self, **kwargs):
+            self.name = kwargs["name"]
+
+        def start(self):
+            started.append(("start", self.name))
+
+        def join(self, timeout=None):
+            started.append(("join", self.name, timeout))
+
+    monkeypatch.setattr(job_worker.config, "JOB_WORKER_COUNT", 5)
+    monkeypatch.setattr(job_worker.multiprocessing, "Process", FakeProcess)
+
+    job_worker.main()
+
+    assert started == [
+        ("start", "rq-worker-0"),
+        ("start", "rq-worker-1"),
+        ("start", "rq-worker-2"),
+        ("start", "rq-worker-3"),
+        ("start", "rq-worker-4"),
+        ("join", "rq-worker-0", None),
+        ("join", "rq-worker-1", None),
+        ("join", "rq-worker-2", None),
+        ("join", "rq-worker-3", None),
+        ("join", "rq-worker-4", None),
+    ]
+
+
 class _StopAfterFirstWait:
     def __init__(self) -> None:
         self.waited: list[float] = []
