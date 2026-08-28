@@ -375,6 +375,100 @@ def classify_visual_clip(source_path: Path, clip: HighlightClip) -> HighlightCli
     return clip
 
 
+def _smoothed_track_elevations(track_points: list[TrackPoint]) -> list[float]:
+    """Remove GPS altitude spikes while retaining the takeoff/landing trend."""
+    elevations = np.asarray(
+        [float(point.get("elevation", 0.0)) for point in track_points], dtype=np.float64
+    )
+    if elevations.size < 3:
+        return elevations.tolist()
+    # A median filter is enough here and avoids treating one bad GPS sample as
+    # a phase change. Keep the window odd and small for short activities.
+    window = min(9, elevations.size if elevations.size % 2 else elevations.size - 1)
+    if window < 3:
+        return elevations.tolist()
+    half_window = window // 2
+    padded = np.pad(elevations, (half_window, half_window), mode="edge")
+    return [float(np.median(padded[index : index + window])) for index in range(elevations.size)]
+
+
+def _flight_phase_times(
+    track_points: list[TrackPoint],
+) -> tuple[float | None, float | None]:
+    """Return takeoff and landing timestamps, in seconds from the track start.
+
+    Takeoff is the first sustained climb after the initial altitude plateau.
+    Landing is the end of the final sustained descent; a quiet altitude
+    plateau after that descent is preferred when the recorder continued after
+    touchdown.
+    """
+    samples = [
+        (int(point.get("timestamp", 0)), elevation)
+        for point, elevation in zip(
+            track_points, _smoothed_track_elevations(track_points), strict=True
+        )
+        if "timestamp" in point and int(point["timestamp"]) >= 0
+    ]
+    if len(samples) < 3 or samples[-1][0] <= samples[0][0]:
+        return None, None
+
+    start_timestamp = samples[0][0]
+    times = np.asarray([(timestamp - start_timestamp) / 1000 for timestamp, _ in samples])
+    elevations = np.asarray([elevation for _, elevation in samples])
+    track_duration = float(times[-1])
+    window_seconds = min(30.0, max(10.0, track_duration / 12))
+
+    def trend(index: int, direction: int) -> float | None:
+        target = times[index] - window_seconds
+        previous = np.searchsorted(times, target, side="right") - 1
+        if previous < 0 or times[index] <= times[previous]:
+            return None
+        return (
+            float((elevations[index] - elevations[previous]) / (times[index] - times[previous]))
+            * direction
+        )
+
+    takeoff: float | None = None
+    # Ignore a possible pre-flight GPS wobble and require several consecutive
+    # climbing samples before calling it a takeoff.
+    initial_window_end = min(60.0, track_duration * 0.2)
+    initial_indices = np.searchsorted(times, initial_window_end, side="right")
+    initial_plateau = float(np.ptp(elevations[: max(2, initial_indices)])) <= 25
+    for index in range(1, len(samples)):
+        if not initial_plateau or times[index] < initial_window_end:
+            continue
+        current_trend = trend(index, 1)
+        if current_trend is None or current_trend < 0.12:
+            continue
+        following = [
+            trend(next_index, 1) for next_index in range(index, min(len(samples), index + 4))
+        ]
+        if sum(value is not None and value >= 0.08 for value in following) >= 3:
+            takeoff = float(times[index] - window_seconds / 2)
+            break
+
+    landing: float | None = None
+    descent_indices = [
+        index
+        for index in range(1, len(samples))
+        if (current_trend := trend(index, -1)) is not None and current_trend >= 0.08
+    ]
+    if descent_indices:
+        descent_end = descent_indices[-1]
+        # The event is touchdown, not the beginning of final approach. If the
+        # log has post-landing points, use the first stable altitude after the
+        # descent; otherwise use the end of the descent.
+        for index in range(descent_end + 1, len(samples)):
+            recent = elevations[descent_end : index + 1]
+            if times[index] - times[descent_end] >= 8 and float(np.ptp(recent)) <= 8:
+                landing = float(times[index])
+                break
+        if landing is None:
+            landing = float(times[descent_end])
+
+    return takeoff, landing
+
+
 def select_highlight_clips(
     duration_seconds: float, source_path: Path | None = None
 ) -> list[HighlightClip]:
@@ -427,10 +521,11 @@ def select_flight_event_clips(
         return max(candidates, key=lambda clip: clip.start_seconds) if candidates else None
 
     selected: list[HighlightClip] = []
-    takeoff_clip = visual_phase_clip("takeoff")
+    phase_times = _flight_phase_times(track_points) if track_points else (None, None)
+    takeoff_clip = visual_phase_clip("takeoff") if phase_times[0] is None else None
     if takeoff_clip:
         selected.append(replace(takeoff_clip, category="takeoff"))
-    landing_clip = visual_phase_clip("landing")
+    landing_clip = visual_phase_clip("landing") if phase_times[1] is None else None
     if landing_clip and (
         takeoff_clip is None or landing_clip.start_seconds != takeoff_clip.start_seconds
     ):
@@ -451,7 +546,7 @@ def select_flight_event_clips(
     samples = [
         (point.get("timestamp", 0), point.get("elevation", 0.0))
         for point in track_points
-        if point.get("timestamp", 0)
+        if "timestamp" in point and point["timestamp"] >= 0
     ]
     timestamps = [timestamp for timestamp, _elevation in samples]
     if len(samples) < 2:
@@ -462,6 +557,10 @@ def select_flight_event_clips(
         return min(duration_seconds, max(0.0, track_seconds / track_duration * duration_seconds))
 
     phases: list[tuple[str, float]] = []
+    if phase_times[0] is not None:
+        phases.append(("takeoff", phase_times[0]))
+    if phase_times[1] is not None:
+        phases.append(("landing", phase_times[1]))
     elevations = [elevation for _timestamp, elevation in samples]
     climb_candidates: list[tuple[float, float]] = []
     for index in range(1, len(elevations)):
@@ -484,7 +583,10 @@ def select_flight_event_clips(
         _, best_index = max(climb_candidates)
         phases.append(("thermal", (timestamps[best_index] - timestamps[0]) / 1000))
 
+    selected_categories = {clip.category for clip in selected}
     for category, position in phases:
+        if category in selected_categories:
+            continue
         center = video_time(position)
         start = max(0.0, min(duration_seconds - clip_length, center - clip_length / 2))
         selected.append(HighlightClip(start, clip_length, 0.0, category))
