@@ -123,6 +123,7 @@ _MAX_PENDING_FRAME_WRITES = 4
 _MAX_FFMPEG_STDERR_LINES = 200
 _FFMPEG_PIPE_POLL_SECONDS = 1.0
 _EXPORT_VIEWER_READY_TIMEOUT_SECONDS = 180
+_EXPORT_PAGE_EVALUATE_TIMEOUT_SECONDS = 120
 _FFMPEG_STALL_TIMEOUT_SECONDS = 10 * 60
 _ORPHAN_TEMP_CLEANUP_GRACE_SECONDS = 30
 _EXPORT_FRAME_TERRAIN_TIMEOUT_SECONDS = 10.0
@@ -1502,6 +1503,24 @@ async def _wait_for_export_frame_terrain(
         await asyncio.sleep(min(poll_seconds, remaining_seconds))
 
 
+async def _evaluate_export_page(page: Any, expression: str, arg: Any = None) -> Any:
+    """Evaluate export-viewer JavaScript without allowing Chromium to hang the job."""
+    try:
+        if arg is None:
+            evaluation = page.evaluate(expression)
+        else:
+            evaluation = page.evaluate(expression, arg)
+        return await asyncio.wait_for(
+            evaluation,
+            timeout=_EXPORT_PAGE_EVALUATE_TIMEOUT_SECONDS,
+        )
+    except TimeoutError as exc:
+        raise RuntimeError(
+            "Chromium export-viewer evaluation timed out after "
+            f"{_EXPORT_PAGE_EVALUATE_TIMEOUT_SECONDS}s"
+        ) from exc
+
+
 def _ffmpeg_output_file_activity(
     output_file: Path, last_size: int, last_mtime_ns: int
 ) -> tuple[bool, int, int]:
@@ -1763,7 +1782,7 @@ async def _export_video_manual_render(job_id: str):
                     timeout=_EXPORT_VIEWER_READY_TIMEOUT_SECONDS * 1000,
                 )
             except PlaywrightTimeoutError as exc:
-                viewer_state = await page.evaluate(_EXPORT_VIEWER_STATE_SCRIPT)
+                viewer_state = await _evaluate_export_page(page, _EXPORT_VIEWER_STATE_SCRIPT)
                 body_text = str(viewer_state.get("bodyText") or "").strip()
                 raise Exception(
                     "Export viewer did not become ready within "
@@ -1775,7 +1794,7 @@ async def _export_video_manual_render(job_id: str):
                     f"body={body_text[:300]!r})"
                 ) from exc
 
-            viewer_state = await page.evaluate(_EXPORT_VIEWER_STATE_SCRIPT)
+            viewer_state = await _evaluate_export_page(page, _EXPORT_VIEWER_STATE_SCRIPT)
 
             if viewer_state.get("isLoginPage"):
                 raise Exception(
@@ -1799,7 +1818,7 @@ async def _export_video_manual_render(job_id: str):
 
             _log_job(job_id, "Cesium viewer found")
 
-            renderer_info = await page.evaluate(_WEBGL_RENDERER_SCRIPT)
+            renderer_info = await _evaluate_export_page(page, _WEBGL_RENDERER_SCRIPT)
             renderer = str(renderer_info.get("renderer") or "unknown")
             vendor = str(renderer_info.get("vendor") or "unknown")
             if not renderer_info.get("available"):
@@ -1819,7 +1838,9 @@ async def _export_video_manual_render(job_id: str):
 
             _update_job(job_id, message="Configuring manual render mode")
 
-            setup_result = await page.evaluate("""
+            setup_result = await _evaluate_export_page(
+                page,
+                """
                 () => {
                     const cesiumContainer = document.querySelector('.cesium-viewer');
                     if (!cesiumContainer) {
@@ -1849,7 +1870,8 @@ async def _export_video_manual_render(job_id: str):
                         checkViewer();
                     });
                 }
-            """)
+            """,
+            )
 
             if not setup_result.get("success"):
                 raise Exception("Failed to configure Cesium manual render mode")
@@ -1871,7 +1893,9 @@ async def _export_video_manual_render(job_id: str):
 
             _update_job(job_id, message="Extracting GPS data")
 
-            flight_data = await page.evaluate("""
+            flight_data = await _evaluate_export_page(
+                page,
+                """
                 () => {
                     if (typeof window._getExportMetadata === 'function') {
                         return window._getExportMetadata();
@@ -1887,7 +1911,8 @@ async def _export_video_manual_render(job_id: str):
                         duration: coordinates.length > 0 ? coordinates.length : 300
                     };
                 }
-            """)
+            """,
+            )
 
             total_gps_points = flight_data["totalPoints"]
             duration_seconds = flight_data["duration"]
@@ -1939,7 +1964,9 @@ async def _export_video_manual_render(job_id: str):
                     timeout=30000,
                 )
             else:
-                await page.evaluate("""
+                await _evaluate_export_page(
+                    page,
+                    """
                     () => {
                         const playButton = Array.from(document.querySelectorAll('button'))
                             .find(btn =>
@@ -1951,7 +1978,8 @@ async def _export_video_manual_render(job_id: str):
                             console.log('▶️  Play button clicked');
                         }
                     }
-                """)
+                """,
+                )
 
             frame_count = 0
             ms_per_frame = (duration_seconds * 1000) / max(total_frames, 1)
@@ -2039,7 +2067,8 @@ async def _export_video_manual_render(job_id: str):
                     return
 
                 if is_fast_mode:
-                    frame_state = await page.evaluate(
+                    frame_state = await _evaluate_export_page(
+                        page,
                         """
                         ({ frameIndex, totalFrames }) => {
                             return window._setExportFrame(frameIndex, totalFrames);
