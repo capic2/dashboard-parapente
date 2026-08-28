@@ -1076,6 +1076,7 @@
     "cameraBadge": "Camera",
     "panoBadge": "Pano",
     "highlightVideoBadge": "Best moments",
+    "highlightVideoErrorBadge": "Best moments: error",
     "youtubeBadge": "YouTube",
     "videoProcessingBadge": "Video: in progress",
     "videoErrorBadge": "Video: error",

@@ -182,6 +182,30 @@ test('renders a best moments badge when the video is generated', () => {
   expect(screen.getByText('flights.highlightVideoBadge')).toBeInTheDocument();
 });
 
+test('renders best moments progress instead of regular video progress', () => {
+  render(
+    <Flight
+      flight={{
+        ...flight,
+        highlight_video_status: 'running',
+        highlight_video_progress: 42,
+      }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(
+    screen.getByText('flights.highlightVideoBadge 42%')
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByText('flights.videoProcessingBadge 42%')
+  ).not.toBeInTheDocument();
+});
+
 test('renders YouTube upload progress in the media badge', () => {
   render(
     <Flight
