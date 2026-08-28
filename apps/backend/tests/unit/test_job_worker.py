@@ -9,6 +9,8 @@ def test_main_runs_one_worker_without_spawning(monkeypatch) -> None:
     calls = []
     monkeypatch.setattr(job_worker.config, "JOB_WORKER_COUNT", 1)
     monkeypatch.setattr(job_worker, "_run_worker", lambda: calls.append(True))
+    monkeypatch.setattr(job_worker, "enqueue_pending_video_export_jobs", lambda **_kwargs: 0)
+    monkeypatch.setattr(job_worker, "enqueue_pending_highlight_video_jobs", lambda **_kwargs: 0)
 
     job_worker.main()
 
@@ -30,6 +32,8 @@ def test_main_spawns_configured_number_of_workers(monkeypatch) -> None:
 
     monkeypatch.setattr(job_worker.config, "JOB_WORKER_COUNT", 5)
     monkeypatch.setattr(job_worker.multiprocessing, "Process", FakeProcess)
+    monkeypatch.setattr(job_worker, "enqueue_pending_video_export_jobs", lambda **_kwargs: 0)
+    monkeypatch.setattr(job_worker, "enqueue_pending_highlight_video_jobs", lambda **_kwargs: 0)
 
     job_worker.main()
 
@@ -70,10 +74,15 @@ def test_reconciliation_loop_requeues_pending_jobs(monkeypatch) -> None:
         "enqueue_pending_video_export_jobs",
         lambda: reconciled.append(True) or 1,
     )
+    monkeypatch.setattr(
+        job_worker,
+        "enqueue_pending_highlight_video_jobs",
+        lambda: reconciled.append(True) or 1,
+    )
 
     job_worker._reconciliation_loop(stop_event)  # type: ignore[arg-type]
 
-    assert reconciled == [True]
+    assert reconciled == [True, True]
     assert stop_event.waited == [30, 30]
 
 
@@ -92,6 +101,7 @@ def test_reconciliation_loop_survives_redis_errors(monkeypatch) -> None:
         1,
     )
     monkeypatch.setattr(job_worker, "enqueue_pending_video_export_jobs", fail_reconciliation)
+    monkeypatch.setattr(job_worker, "enqueue_pending_highlight_video_jobs", lambda: 0)
 
     job_worker._reconciliation_loop(stop_event)  # type: ignore[arg-type]
 
