@@ -129,7 +129,7 @@ function getModeLabelParts(mode: string) {
   if (mode === 'highlight') {
     return { key: 'videoJobs.mode.highlight', fallback: 'Meilleurs moments' };
   }
-  if (mode === 'youtube_upload') {
+  if (mode === 'youtube' || mode === 'youtube_upload') {
     return { key: 'videoJobs.mode.youtubeUpload', fallback: 'Upload YouTube' };
   }
   return { key: `videoJobs.mode.${mode}`, fallback: mode };
@@ -227,7 +227,8 @@ function isJobInFilter(job: VideoExportJob, filter: StatusFilter) {
   }
   if (filter === 'active') {
     return (
-      job.can_cancel || ['queued', 'running', 'processing', 'uploading'].includes(job.status)
+      job.can_cancel ||
+      ['queued', 'running', 'processing', 'uploading'].includes(job.status)
     );
   }
   return job.status === filter;
@@ -242,14 +243,17 @@ function isHighlightJob(job: VideoExportJob) {
 }
 
 function isYoutubeJob(job: VideoExportJob) {
-  return job.mode === 'youtube_upload';
+  return job.mode === 'youtube' || job.mode === 'youtube_upload';
 }
 
 function isJobInTypeFilter(job: VideoExportJob, filter: TypeFilter) {
   return (
     filter === 'all' ||
     (filter === 'gopro' && isGoproOverlayJob(job)) ||
-    (filter === 'video' && !isGoproOverlayJob(job) && !isHighlightJob(job) && !isYoutubeJob(job)) ||
+    (filter === 'video' &&
+      !isGoproOverlayJob(job) &&
+      !isHighlightJob(job) &&
+      !isYoutubeJob(job)) ||
     (filter === 'highlight' && isHighlightJob(job)) ||
     (filter === 'youtube' && isYoutubeJob(job))
   );
@@ -417,9 +421,7 @@ function getLastLogMetrics(job: VideoExportJob) {
   }
 
   const fpsValue = lastLogLine.match(/\(([\d.,]+)\s*fps\b/iu)?.[1];
-  const etaMatch = lastLogLine.match(
-    /\bETA:\s*([\d.,]+)\s*(s|sec|min|h)\b/iu
-  );
+  const etaMatch = lastLogLine.match(/\bETA:\s*([\d.,]+)\s*(s|sec|min|h)\b/iu);
   const fps = fpsValue
     ? Number.parseFloat(fpsValue.replace(',', '.'))
     : undefined;
@@ -499,13 +501,32 @@ function JobLogsDetails({
   );
 }
 
-export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
+type VideoExportJobsPanelProps = {
+  limit?: number | null;
+  statusFilter?: StatusFilter;
+  typeFilter?: TypeFilter;
+  onStatusFilterChange?: (value: StatusFilter) => void;
+  onTypeFilterChange?: (value: TypeFilter) => void;
+};
+
+export function VideoExportJobsPanel({
+  limit = 6,
+  statusFilter: controlledStatusFilter,
+  typeFilter: controlledTypeFilter,
+  onStatusFilterChange,
+  onTypeFilterChange,
+}: VideoExportJobsPanelProps) {
   const { t } = useTranslation();
   const toast = useToast();
   const [pendingConfirm, setPendingConfirm] =
     useState<PendingVideoConfirm | null>(null);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+  const [localStatusFilter, setLocalStatusFilter] =
+    useState<StatusFilter>('all');
+  const [localTypeFilter, setLocalTypeFilter] = useState<TypeFilter>('all');
+  const statusFilter = controlledStatusFilter ?? localStatusFilter;
+  const typeFilter = controlledTypeFilter ?? localTypeFilter;
+  const setStatusFilter = onStatusFilterChange ?? setLocalStatusFilter;
+  const setTypeFilter = onTypeFilterChange ?? setLocalTypeFilter;
   const [page, setPage] = useState(1);
   const [selectedLogJob, setSelectedLogJob] = useState<VideoExportJob | null>(
     null
@@ -549,14 +570,19 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
     setPage(1);
   }, [statusFilter, typeFilter]);
 
-  const activeCount = jobs.filter((job) => isJobInFilter(job, 'active')).length;
-  const completedCount = jobs.filter(
-    (job) => job.status === 'completed'
-  ).length;
-  const failedCount = jobs.filter((job) => job.status === 'failed').length;
-  const cancelledCount = jobs.filter(
-    (job) => job.status === 'cancelled'
-  ).length;
+  const statusCounts = jobsPage?.statusCounts ?? {};
+  const typeCounts = jobsPage?.typeCounts ?? {};
+  const activeCount =
+    statusCounts.active ??
+    jobs.filter((job) => isJobInFilter(job, 'active')).length;
+  const completedCount =
+    statusCounts.completed ??
+    jobs.filter((job) => job.status === 'completed').length;
+  const failedCount =
+    statusCounts.failed ?? jobs.filter((job) => job.status === 'failed').length;
+  const cancelledCount =
+    statusCounts.cancelled ??
+    jobs.filter((job) => job.status === 'cancelled').length;
   const jobsInSelectedType = useMemo(
     () => jobs.filter((job) => isJobInTypeFilter(job, typeFilter)),
     [jobs, typeFilter]
@@ -566,19 +592,23 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
       typeFilters.map((filter) => ({
         id: filter.id,
         label: t(`videoJobs.typeFilters.${filter.id}`, filter.label),
-        count: jobs.filter((job) => isJobInTypeFilter(job, filter.id)).length,
+        count:
+          typeCounts[filter.id] ??
+          jobs.filter((job) => isJobInTypeFilter(job, filter.id)).length,
       })),
-    [jobs, t]
+    [jobs, t, typeCounts]
   );
   const statusFilterOptions = useMemo<FilterOption<StatusFilter>[]>(
     () =>
       statusFilters.map((filter) => ({
         id: filter.id,
         label: t(`videoJobs.filters.${filter.id}`, filter.label),
-        count: jobsInSelectedType.filter((job) => isJobInFilter(job, filter.id))
-          .length,
+        count:
+          statusCounts[filter.id] ??
+          jobsInSelectedType.filter((job) => isJobInFilter(job, filter.id))
+            .length,
       })),
-    [jobsInSelectedType, t]
+    [jobsInSelectedType, t, statusCounts]
   );
 
   const handleCancel = useCallback(
@@ -622,7 +652,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
           ? `gopro-overlays/jobs/${job.job_id}/download`
           : isHighlightJob(job)
             ? `flights/${job.flight_id}/highlight-videos/${job.job_id}/download`
-          : `exports/${job.job_id}/download`;
+            : `exports/${job.job_id}/download`;
         const response = await api.get(endpoint, { timeout: false });
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
