@@ -2,11 +2,13 @@ import { useTranslation } from 'react-i18next';
 import { Button, Card } from '@dashboard-parapente/design-system';
 import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
 import {
+  Camera,
   Clock3,
-  Download,
   FileText,
   MapPin,
   Mountain,
+  Orbit,
+  Play,
   Ruler,
   Trash2,
   Video,
@@ -21,25 +23,13 @@ import {
 } from '../../../stores/appSettingsStore';
 import { isGoproOverlayInProgress } from '../../../lib/flightMediaState';
 
-export interface DownloadingMedia {
-  flightId: string;
-  type: 'gpx' | 'video' | 'overlay';
-}
-
-const EMPTY_UNAVAILABLE_MEDIA = new Set<string>();
-
 interface FlightProps {
   flight: FlightSummary;
   isActive: boolean;
   isSelected: boolean;
   selectionMode: boolean;
-  downloadingMedia: DownloadingMedia | null;
-  unavailableMedia?: ReadonlySet<string>;
   onSelectFlight: (flight: FlightSummary) => void;
   onDeleteFlight: (flight: FlightSummary) => void;
-  onDownloadGpx: (flight: FlightSummary) => void;
-  onDownloadVideo: (flight: FlightSummary) => void;
-  onDownloadOverlay: (flight: FlightSummary) => void;
 }
 
 function formatFlightDate(date: string, language: string) {
@@ -66,28 +56,27 @@ export function Flight({
   isActive,
   isSelected,
   selectionMode,
-  downloadingMedia,
-  unavailableMedia = EMPTY_UNAVAILABLE_MEDIA,
   onSelectFlight,
   onDeleteFlight,
-  onDownloadGpx,
-  onDownloadVideo,
-  onDownloadOverlay,
 }: FlightProps) {
   const { t, i18n } = useTranslation();
   const units = useAppSettingsStore((state) => state.settings.units);
   const isHighlighted = isActive || isSelected;
   const hasGpx = flight.has_gpx;
   const hasVideo = flight.has_video;
+  const hasCamera = flight.has_camera;
+  const hasYoutubeVideo = flight.has_youtube_video;
+  const isYoutubeUploadRunning =
+    flight.youtube_upload_status === 'queued' ||
+    flight.youtube_upload_status === 'uploading';
+  const hasPanoVideo = flight.has_pano_video;
+  const hasHighlightVideo = flight.has_highlight_video;
   const hasPersistedGoproOverlay = flight.has_gopro_overlay;
-  const isGpxUnavailable = unavailableMedia.has(`${flight.id}:gpx`);
-  const isVideoUnavailable = unavailableMedia.has(`${flight.id}:video`);
-  const isOverlayUnavailable = unavailableMedia.has(`${flight.id}:overlay`);
   const isGoproOverlayRunning = isGoproOverlayInProgress(
     flight.gopro_overlay_status
   );
   const isGoproOverlayFailed = flight.gopro_overlay_status === 'failed';
-  const canDownloadGoproOverlay =
+  const hasCompletedGoproOverlay =
     hasPersistedGoproOverlay && !isGoproOverlayRunning && !isGoproOverlayFailed;
   const isVideoExportRunning = Boolean(
     flight.video_export_status &&
@@ -101,6 +90,10 @@ export function Flight({
   const goproOverlayProcessingLabel = formatMediaProgressLabel(
     t('flights.goproOverlayProcessingBadge'),
     flight.gopro_overlay_progress
+  );
+  const youtubeLabel = formatMediaProgressLabel(
+    t('flights.youtubeBadge'),
+    isYoutubeUploadRunning ? flight.youtube_upload_progress : null
   );
   const selectFlight = () => {
     if (!selectionMode) {
@@ -119,6 +112,11 @@ export function Flight({
   const hasMediaStatus =
     hasGpx ||
     hasVideo ||
+    hasCamera ||
+    hasYoutubeVideo ||
+    isYoutubeUploadRunning ||
+    hasPanoVideo ||
+    hasHighlightVideo ||
     isVideoExportRunning ||
     isVideoExportFailed ||
     hasPersistedGoproOverlay ||
@@ -183,44 +181,49 @@ export function Flight({
           {!selectionMode && hasMediaStatus && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {hasGpx && (
-                <button
-                  type="button"
-                  className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-green-800 transition-colors hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200 dark:hover:bg-green-900/50 dark:focus:ring-offset-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onDownloadGpx(flight);
-                  }}
-                  disabled={Boolean(downloadingMedia) || isGpxUnavailable}
-                  aria-label={t('flights.downloadGpx')}
-                >
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
                   <FileText className="h-3 w-3" aria-hidden="true" />
-                  {isGpxUnavailable
-                    ? t('flights.mediaUnavailable')
-                    : t('flights.gpxBadge')}
-                  {!isGpxUnavailable && (
-                    <Download className="h-3 w-3" aria-hidden="true" />
-                  )}
-                </button>
+                  {t('flights.gpxBadge')}
+                </span>
               )}
               {hasVideo && (
-                <button
-                  type="button"
-                  className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-800 transition-colors hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200 dark:hover:bg-indigo-900/50 dark:focus:ring-offset-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onDownloadVideo(flight);
-                  }}
-                  disabled={Boolean(downloadingMedia) || isVideoUnavailable}
-                  aria-label={t('flights.viewer.downloadVideo')}
-                >
+                <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
                   <Video className="h-3 w-3" aria-hidden="true" />
-                  {isVideoUnavailable
-                    ? t('flights.mediaUnavailable')
-                    : t('flights.videoBadge')}
-                  {!isVideoUnavailable && (
-                    <Download className="h-3 w-3" aria-hidden="true" />
-                  )}
-                </button>
+                  {t('flights.videoBadge')}
+                </span>
+              )}
+              {hasCamera && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                  <Camera className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.cameraBadge')}
+                </span>
+              )}
+              {hasPanoVideo && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
+                  <Orbit className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.panoBadge')}
+                </span>
+              )}
+              {hasCompletedGoproOverlay && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200">
+                  <Wand2 className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.goproOverlayBadge')}
+                </span>
+              )}
+              {hasHighlightVideo && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-fuchsia-200 bg-fuchsia-50 px-2 py-0.5 text-[11px] font-medium text-fuchsia-800 dark:border-fuchsia-800 dark:bg-fuchsia-950/40 dark:text-fuchsia-200">
+                  <Wand2 className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.highlightVideoBadge')}
+                </span>
+              )}
+              {(hasYoutubeVideo || isYoutubeUploadRunning) && (
+                <span
+                  aria-live={isYoutubeUploadRunning ? 'polite' : undefined}
+                  className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
+                >
+                  <Play className="h-3 w-3" aria-hidden="true" />
+                  {youtubeLabel}
+                </span>
               )}
               {isVideoExportRunning && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
@@ -231,26 +234,6 @@ export function Flight({
                 <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
                   {t('flights.videoErrorBadge')}
                 </span>
-              )}
-              {canDownloadGoproOverlay && (
-                <button
-                  type="button"
-                  className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-cyan-800 transition-colors hover:bg-cyan-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200 dark:hover:bg-cyan-900/50 dark:focus:ring-offset-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onDownloadOverlay(flight);
-                  }}
-                  disabled={Boolean(downloadingMedia) || isOverlayUnavailable}
-                  aria-label={t('flights.goproOverlayDownload')}
-                >
-                  <Wand2 className="h-3 w-3" aria-hidden="true" />
-                  {isOverlayUnavailable
-                    ? t('flights.mediaUnavailable')
-                    : t('flights.goproOverlayBadge')}
-                  {!isOverlayUnavailable && (
-                    <Download className="h-3 w-3" aria-hidden="true" />
-                  )}
-                </button>
               )}
               {isGoproOverlayRunning && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">

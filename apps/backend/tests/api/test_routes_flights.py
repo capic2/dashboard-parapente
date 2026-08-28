@@ -10,7 +10,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 import config
-from models import Flight
+from fastapi.testclient import TestClient
+from models import Flight, GoproOverlayJob, HighlightVideoJob
+from sqlalchemy.orm import Session
+from video_thumbnail import VideoThumbnailError
 
 # API prefix for all routes
 API_PREFIX = "/api"
@@ -46,6 +49,57 @@ class TestFlightsListEndpoint:
         data = response.json()
         assert "flights" in data
         assert len(data["flights"]) == 3
+
+    def test_get_flights_returns_all_gopro_overlays(self, client, db_session, arguel_site):
+        flight = Flight(
+            id="flight-multi-overlay",
+            name="Flight with multiple overlays",
+            flight_date=date(2026, 3, 15),
+            site_id=arguel_site.id,
+        )
+        db_session.add(flight)
+        for job_id, width, height, created_at in (
+            ("overlay-1080p", 1920, 1080, datetime(2026, 3, 15, 12)),
+            ("overlay-4k", 3840, 2160, datetime(2026, 3, 15, 13)),
+        ):
+            db_session.add(
+                GoproOverlayJob(
+                    id=job_id,
+                    flight_id=flight.id,
+                    status="completed",
+                    progress=100,
+                    message="Overlay ready",
+                    video_path="camera.mp4",
+                    gpx_path="track.gpx",
+                    layout_id="parapente",
+                    layout_label="Parapente",
+                    layout_path="layout.xml",
+                    output_path=f"{job_id}.mp4",
+                    temp_output_path=f"{job_id}.tmp.mp4",
+                    output_filename=f"{job_id}.mp4",
+                    video_width=width,
+                    video_height=height,
+                    created_at=created_at,
+                    updated_at=created_at,
+                    completed_at=created_at,
+                )
+            )
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights")
+
+        assert response.status_code == 200
+        returned = next(
+            item for item in response.json()["flights"] if item["id"] == "flight-multi-overlay"
+        )
+        assert [overlay["job_id"] for overlay in returned["gopro_overlays"]] == [
+            "overlay-4k",
+            "overlay-1080p",
+        ]
+        assert [
+            (overlay["video_width"], overlay["video_height"])
+            for overlay in returned["gopro_overlays"]
+        ] == [(3840, 2160), (1920, 1080)]
 
     def test_get_flights_includes_video_export_fields(self, client, db_session, arguel_site):
         """GET /flights includes video fields used by flight details actions."""
@@ -391,6 +445,153 @@ class TestFlightsListEndpoint:
         assert response.status_code == 404
         assert response.json()["detail"] == "No video file available for this flight"
 
+    def test_get_flight_video_thumbnail(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        video_path = tmp_path / "flight.mp4"
+        video_path.write_bytes(b"video")
+        thumbnail_path = tmp_path / "thumbnail.jpg"
+        thumbnail_path.write_bytes(b"jpeg")
+        flight = Flight(
+            id="flight-video-thumbnail",
+            name="Flight video thumbnail",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            video_file_path=str(video_path),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        with patch("routes.get_video_thumbnail", return_value=thumbnail_path):
+            response = client.get(f"{API_PREFIX}/flights/{flight.id}/video/thumbnail")
+
+        assert response.status_code == 200
+        assert response.content == b"jpeg"
+        assert response.headers["content-type"] == "image/jpeg"
+        assert response.headers["cache-control"] == "no-cache"
+
+    def test_get_flight_video_thumbnail_returns_422_when_generation_fails(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        video_path = tmp_path / "flight.mp4"
+        video_path.write_bytes(b"video")
+        flight = Flight(
+            id="flight-video-thumbnail-error",
+            name="Flight video thumbnail error",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            video_file_path=str(video_path),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        with patch(
+            "routes.get_video_thumbnail",
+            side_effect=VideoThumbnailError("invalid video"),
+        ):
+            response = client.get(f"{API_PREFIX}/flights/{flight.id}/video/thumbnail")
+
+        assert response.status_code == 422
+        assert response.json()["detail"] == "Unable to generate video thumbnail"
+
+    def test_get_flight_pano_thumbnail(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        pano_path = tmp_path / "pano.mp4"
+        pano_path.write_bytes(b"pano")
+        thumbnail_path = tmp_path / "pano-thumbnail.jpg"
+        thumbnail_path.write_bytes(b"jpeg")
+        flight = Flight(
+            id="flight-pano-thumbnail",
+            name="Flight Pano thumbnail",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        with patch("routes.get_video_thumbnail", return_value=thumbnail_path) as get_thumbnail:
+            response = client.get(f"{API_PREFIX}/flights/{flight.id}/pano/thumbnail")
+
+        assert response.status_code == 200
+        assert response.content == b"jpeg"
+        assert response.headers["content-type"] == "image/jpeg"
+        assert response.headers["cache-control"] == "no-cache"
+        get_thumbnail.assert_called_once_with(pano_path)
+
+    def test_get_flight_pano_thumbnail_returns_404_when_unavailable(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        response = client.get(f"{API_PREFIX}/flights/missing-flight/pano/thumbnail")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Flight not found"
+
+        flight = Flight(
+            id="flight-no-pano-thumbnail",
+            name="Flight without Pano thumbnail",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/{flight.id}/pano/thumbnail")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "No Pano video available for this flight"
+
+        flight.pano_video_file_path = str(tmp_path / "missing-pano.mp4")
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/{flight.id}/pano/thumbnail")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "No Pano video available for this flight"
+
+    def test_stream_flight_pano(self, client, db_session, tmp_path):
+        pano_path = tmp_path / "pano.mp4"
+        pano_path.write_bytes(b"pano")
+        flight = Flight(
+            id="flight-pano-stream",
+            name="Flight Pano stream",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/{flight.id}/pano")
+
+        assert response.status_code == 200
+        assert response.content == b"pano"
+        assert response.headers["content-type"] == "video/mp4"
+        assert response.headers["content-disposition"].startswith("inline")
+
+    def test_stream_flight_pano_returns_404_when_unavailable(self, client, db_session, tmp_path):
+        response = client.get(f"{API_PREFIX}/flights/missing-flight/pano")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Flight not found"
+
+        flight = Flight(
+            id="flight-no-pano-stream",
+            name="Flight without Pano stream",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/{flight.id}/pano")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "No Pano video available for this flight"
+
+        flight.pano_video_file_path = str(tmp_path / "missing-pano.mp4")
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/{flight.id}/pano")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "No Pano video available for this flight"
+
     def test_download_flight_gopro_overlay(self, client, db_session, monkeypatch, tmp_path):
         """GET /flights/{id}/gopro-overlay downloads the generated overlay."""
         monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
@@ -431,6 +632,30 @@ class TestFlightsListEndpoint:
 
         assert response.status_code == 400
         assert response.json()["detail"] == "GoPro overlay paragliding root is not configured"
+
+    def test_get_flight_gopro_overlay_thumbnail(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        overlay_path = tmp_path / "overlay.mp4"
+        overlay_path.write_bytes(b"overlay")
+        thumbnail_path = tmp_path / "overlay-thumbnail.jpg"
+        thumbnail_path.write_bytes(b"jpeg")
+        flight = Flight(
+            id="flight-overlay-thumbnail",
+            name="Flight overlay thumbnail",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            gopro_overlay_file_path=str(overlay_path),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        with patch("routes.get_video_thumbnail", return_value=thumbnail_path):
+            response = client.get(f"{API_PREFIX}/flights/{flight.id}/gopro-overlay/thumbnail")
+
+        assert response.status_code == 200
+        assert response.content == b"jpeg"
+        assert response.headers["content-type"] == "image/jpeg"
 
     def test_get_flights_filter_by_site(self, client, db_session, arguel_site, chalais_site):
         """GET /flights?site_id=X filters by site"""
@@ -956,6 +1181,15 @@ class TestFlightDetailEndpoint:
         assert "site" in data
         assert data["site"]["name"] == "Arguel"
 
+    def test_get_flight_includes_youtube_urls(self, client, db_session, sample_flight):
+        sample_flight.youtube_urls = ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/flight-test-001")
+
+        assert response.status_code == 200
+        assert response.json()["youtube_urls"] == ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
+
     def test_get_flight_does_not_backfill_missing_max_speed(self, client, db_session):
         flight = Flight(
             id="flight-detail-missing-speed",
@@ -1013,6 +1247,35 @@ class TestUpdateFlightEndpoint:
         # Verify in DB
         db_session.refresh(sample_flight)
         assert sample_flight.notes == "Great thermal conditions!"
+
+    def test_update_flight_youtube_urls_normalizes_and_deduplicates(
+        self, client, db_session, sample_flight
+    ):
+        response = client.patch(
+            f"{API_PREFIX}/flights/flight-test-001",
+            json={
+                "youtube_urls": [
+                    "https://youtu.be/dQw4w9WgXcQ?t=12",
+                    "https://www.youtube.com/shorts/dQw4w9WgXcQ",
+                    "https://youtube.com/watch?v=9bZkp7q19f0",
+                ]
+            },
+        )
+
+        assert response.status_code == 200
+        db_session.refresh(sample_flight)
+        assert sample_flight.youtube_urls == [
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://www.youtube.com/watch?v=9bZkp7q19f0",
+        ]
+
+    def test_update_flight_rejects_non_youtube_urls(self, client, db_session, sample_flight):
+        response = client.patch(
+            f"{API_PREFIX}/flights/flight-test-001",
+            json={"youtube_urls": ["https://example.com/watch?v=dQw4w9WgXcQ"]},
+        )
+
+        assert response.status_code == 422
 
     def test_update_flight_multiple_fields(self, client, db_session, sample_flight):
         """PATCH /flights/{flight_id} updates multiple fields"""
@@ -1194,6 +1457,164 @@ class TestCreateFlightFromGPX:
         data = {"site_id": "site-arguel"}
         response = client.post(f"{API_PREFIX}/flights/create-from-gpx", data=data)
         assert response.status_code in [400, 422]
+
+
+class TestHighlightVideoEndpoints:
+    def _flight(self, db_session, flight_id: str, pano_path: Path | None = None) -> Flight:
+        flight = Flight(
+            id=flight_id,
+            name=f"Highlight {flight_id}",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            pano_video_file_path=str(pano_path) if pano_path else None,
+        )
+        db_session.add(flight)
+        db_session.commit()
+        return flight
+
+    def test_create_returns_409_when_pano_is_unavailable(self, client, db_session):
+        flight = self._flight(db_session, "highlight-no-pano")
+        response = client.post(f"{API_PREFIX}/flights/{flight.id}/highlight-videos")
+        assert response.status_code == 409
+
+    def test_create_queues_job_without_exposing_paths(
+        self, client, db_session, monkeypatch, tmp_path
+    ):
+        pano_path = tmp_path / "pano.mp4"
+        pano_path.write_bytes(b"pano")
+        flight = self._flight(db_session, "highlight-queue", pano_path)
+        enqueue = patch("job_queue.enqueue_once")
+        monkeypatch.setattr("job_queue.is_rq_enabled", lambda: True)
+        with enqueue as enqueue_mock:
+            response = client.post(f"{API_PREFIX}/flights/{flight.id}/highlight-videos")
+
+        assert response.status_code == 202
+        payload = response.json()
+        assert payload["output_format"] == "original"
+        assert "source_video_path" not in payload
+        assert "output_path" not in payload
+        enqueue_mock.assert_called_once()
+
+    def test_create_reuses_active_job(self, client, db_session, tmp_path):
+        pano_path = tmp_path / "pano.mp4"
+        pano_path.write_bytes(b"pano")
+        flight = self._flight(db_session, "highlight-active", pano_path)
+        job = HighlightVideoJob(
+            id="highlight-existing",
+            flight_id=flight.id,
+            status="queued",
+            source_video_path=str(pano_path),
+            output_format="original",
+        )
+        db_session.add(job)
+        db_session.commit()
+
+        response = client.post(f"{API_PREFIX}/flights/{flight.id}/highlight-videos")
+        assert response.status_code == 202
+        assert response.json()["job_id"] == job.id
+
+    def test_download_completed_highlight(self, client, db_session, tmp_path):
+        pano_path = tmp_path / "pano.mp4"
+        output_path = tmp_path / "highlights.mp4"
+        pano_path.write_bytes(b"pano")
+        output_path.write_bytes(b"highlights")
+        flight = self._flight(db_session, "highlight-download", pano_path)
+        db_session.add(
+            HighlightVideoJob(
+                id="highlight-completed",
+                flight_id=flight.id,
+                status="completed",
+                source_video_path=str(pano_path),
+                output_path=str(output_path),
+                output_format="original",
+            )
+        )
+        db_session.commit()
+
+        response = client.get(
+            f"{API_PREFIX}/flights/{flight.id}/highlight-videos/highlight-completed/download"
+        )
+        assert response.status_code == 200
+        assert response.content == b"highlights"
+
+    def test_download_unfinished_highlight_returns_conflict(self, client, db_session, tmp_path):
+        pano_path = tmp_path / "pano.mp4"
+        pano_path.write_bytes(b"pano")
+        flight = self._flight(db_session, "highlight-unfinished", pano_path)
+        db_session.add(
+            HighlightVideoJob(
+                id="highlight-running",
+                flight_id=flight.id,
+                status="running",
+                source_video_path=str(pano_path),
+                output_format="original",
+            )
+        )
+        db_session.commit()
+
+        response = client.get(
+            f"{API_PREFIX}/flights/{flight.id}/highlight-videos/highlight-running/download"
+        )
+        assert response.status_code == 409
+
+    def test_delete_completed_highlight_removes_job_and_output(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        """Deleting a completed highlight removes its generated output and row."""
+        pano_path = tmp_path / "pano.mp4"
+        output_path = tmp_path / "highlights" / "highlights-original-format.mp4"
+        pano_path.write_bytes(b"pano")
+        output_path.parent.mkdir()
+        output_path.write_bytes(b"highlights")
+        flight = self._flight(db_session, "highlight-delete", pano_path)
+        db_session.add(
+            HighlightVideoJob(
+                id="highlight-to-delete",
+                flight_id=flight.id,
+                status="completed",
+                source_video_path=str(pano_path),
+                output_path=str(output_path),
+                output_format="original",
+            )
+        )
+        db_session.commit()
+
+        response = client.delete(
+            f"{API_PREFIX}/flights/{flight.id}/highlight-videos/highlight-to-delete"
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "job_id": "highlight-to-delete",
+            "deleted": True,
+            "files_deleted": 1,
+        }
+        assert not output_path.exists()
+        assert db_session.get(HighlightVideoJob, "highlight-to-delete") is None
+
+    def test_delete_active_highlight_returns_conflict(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        """Active highlight jobs cannot be deleted."""
+        pano_path = tmp_path / "pano.mp4"
+        pano_path.write_bytes(b"pano")
+        flight = self._flight(db_session, "highlight-delete-active", pano_path)
+        db_session.add(
+            HighlightVideoJob(
+                id="highlight-active-delete",
+                flight_id=flight.id,
+                status="running",
+                source_video_path=str(pano_path),
+                output_format="original",
+            )
+        )
+        db_session.commit()
+
+        response = client.delete(
+            f"{API_PREFIX}/flights/{flight.id}/highlight-videos/highlight-active-delete"
+        )
+
+        assert response.status_code == 409
 
 
 class TestHealthCheck:

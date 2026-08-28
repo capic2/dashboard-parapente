@@ -19,7 +19,7 @@ services:
       - monitoring
 
   prometheus:
-    image: prom/prometheus:v3.13.2
+    image: prom/prometheus:v3.14.0
     container_name: monitoring-prometheus
     restart: unless-stopped
     extra_hosts:
@@ -42,7 +42,7 @@ services:
       - monitoring
 
   alertmanager:
-    image: prom/alertmanager:v0.33.1
+    image: prom/alertmanager:v0.34.0
     container_name: monitoring-alertmanager
     restart: unless-stopped
     ports:
@@ -57,7 +57,7 @@ services:
       - monitoring
 
   loki:
-    image: grafana/loki:3.7.6
+    image: grafana/loki:3.7.7
     container_name: monitoring-loki
     restart: unless-stopped
     ports:

@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from '@tanstack/react-form';
 import { tv } from 'tailwind-variants';
@@ -10,14 +11,37 @@ import {
   TextArea,
 } from 'react-aria-components';
 import { Select, Button } from '@dashboard-parapente/design-system';
+import type { YoutubeVideoAssociation } from '@dashboard-parapente/shared-types';
 import type { Key } from 'react-aria-components';
 import type { Flight, FlightFormData, Site } from '../../../types';
 import { getSiteDisplayName } from '../../../lib/siteDisplay';
+import { Plus, Trash2 } from 'lucide-react';
+import { YoutubeAssociationRemovalModal } from '../YoutubeAssociationRemovalModal';
+
+export interface PendingYoutubeRemoval {
+  url: string;
+  videoId: string;
+  deleteFromYoutube: boolean;
+}
+
+export interface FlightEditSubmission {
+  values: FlightFormData;
+  pendingYoutubeRemovals: PendingYoutubeRemoval[];
+}
+
+interface YoutubeUrlRow {
+  id: string;
+  value: string;
+  originalUrl?: string;
+}
+
+const EMPTY_YOUTUBE_ASSOCIATIONS: YoutubeVideoAssociation[] = [];
 
 interface FlightEditFormProps {
   flight: Flight;
   sites: Site[];
-  onSubmit: (values: FlightFormData) => Promise<void>;
+  youtubeAssociations?: YoutubeVideoAssociation[];
+  onSubmit: (submission: FlightEditSubmission) => Promise<void>;
   onCancel: () => void;
   onShowCreateSiteModal: () => void;
 }
@@ -67,11 +91,30 @@ const styles = tv({
 export function FlightEditForm({
   flight,
   sites,
+  youtubeAssociations = EMPTY_YOUTUBE_ASSOCIATIONS,
   onSubmit,
   onCancel,
   onShowCreateSiteModal,
 }: FlightEditFormProps) {
   const { t } = useTranslation();
+  const initialYoutubeUrls = flight.youtube_urls ?? [];
+  const initialYoutubeRows = initialYoutubeUrls.map((url, index) => ({
+    id: `persisted-${index}`,
+    value: url,
+    originalUrl: url,
+  }));
+  const nextYoutubeRowId = useRef(0);
+  const [youtubeRows, setYoutubeRows] =
+    useState<YoutubeUrlRow[]>(initialYoutubeRows);
+  const [pendingYoutubeRemovals, setPendingYoutubeRemovals] = useState<
+    PendingYoutubeRemoval[]
+  >([]);
+  const [removalRow, setRemovalRow] = useState<YoutubeUrlRow | null>(null);
+  const removalAssociation = removalRow?.originalUrl
+    ? (youtubeAssociations.find(
+        (association) => association.url === removalRow.originalUrl
+      ) ?? null)
+    : null;
 
   const form = useForm({
     defaultValues: {
@@ -88,25 +131,68 @@ export function FlightEditForm({
       notes: flight.notes ?? '',
     },
     onSubmit: async ({ value }) => {
+      const removedUrls = new Set(
+        pendingYoutubeRemovals.map((removal) => removal.url)
+      );
       await onSubmit({
-        name: value.name,
-        title: value.title,
-        site_id: value.site_id || null,
-        flight_date: value.flight_date,
-        departure_time: value.departure_time || null,
-        duration_minutes: value.duration_minutes,
-        max_altitude_m: value.max_altitude_m,
-        distance_km: value.distance_km,
-        elevation_gain_m: value.elevation_gain_m,
-        max_speed_kmh: value.max_speed_kmh,
-        notes: value.notes,
+        values: {
+          name: value.name,
+          title: value.title,
+          site_id: value.site_id || null,
+          flight_date: value.flight_date,
+          departure_time: value.departure_time || null,
+          duration_minutes: value.duration_minutes,
+          max_altitude_m: value.max_altitude_m,
+          distance_km: value.distance_km,
+          elevation_gain_m: value.elevation_gain_m,
+          max_speed_kmh: value.max_speed_kmh,
+          notes: value.notes,
+          youtube_urls: youtubeRows
+            .map((row) => row.value.trim())
+            .filter((url) => Boolean(url) && !removedUrls.has(url)),
+        },
+        pendingYoutubeRemovals,
       });
     },
   });
 
   const handleCancel = () => {
     form.reset();
+    setYoutubeRows(initialYoutubeRows);
+    setPendingYoutubeRemovals([]);
+    setRemovalRow(null);
     onCancel();
+  };
+
+  const removeYoutubeRow = (row: YoutubeUrlRow) => {
+    if (!row.originalUrl) {
+      setYoutubeRows((rows) =>
+        rows.filter((candidate) => candidate.id !== row.id)
+      );
+      return;
+    }
+
+    const association = youtubeAssociations.find(
+      (candidate) => candidate.url === row.originalUrl
+    );
+    if (association) setRemovalRow(row);
+  };
+
+  const queueYoutubeRemoval = (deleteFromYoutube: boolean) => {
+    if (!removalRow?.originalUrl || !removalAssociation) return;
+
+    setPendingYoutubeRemovals((removals) => [
+      ...removals,
+      {
+        url: removalRow.originalUrl as string,
+        videoId: removalAssociation.video_id,
+        deleteFromYoutube,
+      },
+    ]);
+    setYoutubeRows((rows) =>
+      rows.filter((candidate) => candidate.id !== removalRow.id)
+    );
+    setRemovalRow(null);
   };
 
   const siteOptions = sites.map((site) => ({
@@ -342,6 +428,76 @@ export function FlightEditForm({
         </form.Field>
       </div>
 
+      <div className="mb-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div>
+            <h3 className={md.label()}>{t('flights.youtubeVideos')}</h3>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {t('flights.youtubeVideosHint')}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            className="min-h-10 rounded-lg px-3 py-2 text-sm"
+            onPress={() => {
+              const id = nextYoutubeRowId.current++;
+              setYoutubeRows((rows) => [
+                ...rows,
+                { id: `new-${id}`, value: '' },
+              ]);
+            }}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {t('flights.addYoutubeVideo')}
+          </Button>
+        </div>
+        <div className="space-y-2">
+          {youtubeRows.map((row, index) => (
+            <div key={row.id} className="flex items-end gap-2">
+              <TextField
+                className="min-w-0 flex-1"
+                value={row.value}
+                onChange={(nextUrl) =>
+                  setYoutubeRows((rows) =>
+                    rows.map((candidate) =>
+                      candidate.id === row.id
+                        ? { ...candidate, value: nextUrl }
+                        : candidate
+                    )
+                  )
+                }
+              >
+                <Label className={s.label()}>
+                  {t('flights.youtubeVideoLabel', { count: index + 1 })}
+                </Label>
+                <Input
+                  type="url"
+                  className={md.input()}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  readOnly={Boolean(row.originalUrl)}
+                />
+              </TextField>
+              <Button
+                variant="ghost"
+                className="min-h-10 rounded-lg px-3 py-2 text-sm text-red-600 dark:text-red-400"
+                aria-label={t('flights.removeYoutubeVideo', {
+                  count: index + 1,
+                })}
+                isDisabled={
+                  Boolean(row.originalUrl) &&
+                  !youtubeAssociations.some(
+                    (association) => association.url === row.originalUrl
+                  )
+                }
+                onPress={() => removeYoutubeRow(row)}
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Notes */}
       <div>
         <label htmlFor="flight-notes" className={md.label() + ' mb-2 block'}>
@@ -360,6 +516,13 @@ export function FlightEditForm({
           )}
         </form.Field>
       </div>
+
+      <YoutubeAssociationRemovalModal
+        association={removalAssociation}
+        isPending={false}
+        onCancel={() => setRemovalRow(null)}
+        onRemove={queueYoutubeRemoval}
+      />
     </Form>
   );
 }

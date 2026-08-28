@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 from sqlalchemy import (
@@ -14,6 +15,7 @@ from sqlalchemy import (
     Text,
     Time,
     func,
+    text,
 )
 from sqlalchemy.orm import relationship
 
@@ -30,6 +32,22 @@ class User(Base):
     hashed_password = Column(String(1024), nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, default=func.now())
+
+
+class YoutubeCredential(Base):
+    """Encrypted OAuth refresh token for one application user."""
+
+    __tablename__ = "youtube_credentials"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    refresh_token_encrypted = Column(Text, nullable=False)
+    oauth_scope = Column(
+        Text,
+        nullable=False,
+        default="https://www.googleapis.com/auth/youtube.force-ssl",
+    )
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 
 class AppSetting(Base):
@@ -174,14 +192,17 @@ class Flight(Base):
     gpx_max_altitude_m = Column(Integer)
     gpx_elevation_gain_m = Column(Integer)
     external_url = Column(String)
+    youtube_urls_json = Column("youtube_urls", Text, nullable=False, default="[]")
     # Video export fields
     video_export_job_id = Column(String, nullable=True)  # Background job ID for video conversion
     video_export_status = Column(String, nullable=True)  # "processing", "completed", "failed"
     video_file_path = Column(String, nullable=True)  # Path to generated MP4 file
+    pano_video_file_path = Column(String, nullable=True)
     # GoPro overlay export fields
     gopro_overlay_job_id = Column(String, nullable=True)
     gopro_overlay_status = Column(String, nullable=True)
     gopro_overlay_file_path = Column(String, nullable=True)
+    gopro_overlay_gpx_offset = Column(Float, nullable=False, default=0.0)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -193,6 +214,38 @@ class Flight(Base):
         passive_deletes=True,
         order_by="VideoExportJob.created_at",
     )
+    gopro_overlay_jobs = relationship(
+        "GoproOverlayJob",
+        back_populates="flight",
+        cascade="all, delete-orphan",
+        order_by="GoproOverlayJob.created_at",
+    )
+    highlight_video_jobs = relationship(
+        "HighlightVideoJob",
+        back_populates="flight",
+        cascade="all, delete-orphan",
+        order_by="HighlightVideoJob.created_at",
+    )
+    youtube_upload_jobs = relationship(
+        "YoutubeUploadJob",
+        back_populates="flight",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="YoutubeUploadJob.created_at",
+    )
+
+    @property
+    def youtube_urls(self) -> list[str]:
+        """Return persisted YouTube links as a list, including for legacy rows."""
+        try:
+            value = json.loads(self.youtube_urls_json or "[]")
+        except (TypeError, json.JSONDecodeError):
+            return []
+        return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
+
+    @youtube_urls.setter
+    def youtube_urls(self, value: list[str] | None) -> None:
+        self.youtube_urls_json = json.dumps(value or [])
 
 
 Index(
@@ -227,6 +280,7 @@ class VideoExportJob(Base):
     speed = Column(Integer, default=1)
     progress = Column(Integer, default=0)
     message = Column(Text)
+    render_method = Column(String, nullable=True)
     frontend_url = Column(String)
     auth_token = Column(Text)
     video_path = Column(String)
@@ -245,10 +299,17 @@ class GoproOverlayJob(Base):
     __tablename__ = "gopro_overlay_jobs"
 
     id = Column(String, primary_key=True)
+    flight_id = Column(
+        String,
+        ForeignKey("flights.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     status = Column(String, nullable=False, index=True)
     progress = Column(Integer, default=0)
     message = Column(Text)
     error = Column(Text)
+    render_method = Column(String, nullable=True)
     video_path = Column(String, nullable=False)
     gpx_path = Column(String, nullable=False)
     pip_path = Column(String)
@@ -267,6 +328,80 @@ class GoproOverlayJob(Base):
     cancelled_at = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    flight = relationship("Flight", back_populates="gopro_overlay_jobs")
+
+
+class HighlightVideoJob(Base):
+    """Durable job for selecting and rendering social clips from a pano flight video."""
+
+    __tablename__ = "highlight_video_jobs"
+
+    id = Column(String, primary_key=True)
+    flight_id = Column(
+        String,
+        ForeignKey("flights.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    status = Column(String, nullable=False, index=True)
+    progress = Column(Integer, nullable=False, default=0)
+    message = Column(Text)
+    error = Column(Text)
+    source_video_path = Column(String, nullable=False)
+    overlay_video_path = Column(String)
+    output_path = Column(String)
+    selection_json = Column(Text)
+    output_format = Column(String, nullable=False, default="original")
+    overlay_offset_seconds = Column(Float, nullable=False, default=0.0)
+    started_at = Column(DateTime)
+    completed_at = Column(DateTime)
+    cancelled_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    flight = relationship("Flight", back_populates="highlight_video_jobs")
+
+
+class YoutubeUploadJob(Base):
+    """Durable state for a flight video upload to YouTube."""
+
+    __tablename__ = "youtube_upload_jobs"
+
+    id = Column(String, primary_key=True)
+    flight_id = Column(
+        String,
+        ForeignKey("flights.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    source_type = Column(String(32), nullable=False, default="gopro_overlay", index=True)
+    gopro_overlay_job_id = Column(String, nullable=True, index=True)
+    highlight_video_job_id = Column(String, nullable=True, index=True)
+    status = Column(String, nullable=False, index=True)
+    progress = Column(Integer, nullable=False, default=0)
+    title = Column(String(100), nullable=False)
+    description = Column(Text, nullable=False, default="")
+    privacy_status = Column(String(16), nullable=False, default="private")
+    upload_session_encrypted = Column(Text)
+    youtube_video_id = Column(String(32))
+    youtube_url = Column(String)
+    error = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    started_at = Column(DateTime)
+    completed_at = Column(DateTime)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    flight = relationship("Flight", back_populates="youtube_upload_jobs")
+
+
+Index(
+    "uq_youtube_upload_jobs_active_flight",
+    YoutubeUploadJob.flight_id,
+    unique=True,
+    sqlite_where=text("status IN ('queued', 'uploading')"),
+)
 
 
 class WeatherForecast(Base):

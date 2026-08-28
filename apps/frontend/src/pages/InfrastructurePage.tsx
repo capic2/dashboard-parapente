@@ -916,6 +916,8 @@ export default function InfrastructurePage() {
       search: {
         cacheSearch: nextSearch.cacheSearch || undefined,
         cacheAutoRefresh: nextSearch.cacheAutoRefresh ? true : undefined,
+        videoExportStatus: nextSearch.videoExportStatus || undefined,
+        videoExportType: nextSearch.videoExportType || undefined,
       },
     });
   };
@@ -982,7 +984,23 @@ export default function InfrastructurePage() {
           <IntervalsStatusSection />
         </TabPanel>
         <TabPanel id="video-exports" className="outline-none">
-          <VideoExportJobsPanel limit={null} />
+          <VideoExportJobsPanel
+            limit={null}
+            statusFilter={search.videoExportStatus}
+            typeFilter={search.videoExportType}
+            onStatusFilterChange={(videoExportStatus) =>
+              navigateToInfrastructure(activeTab, {
+                ...search,
+                videoExportStatus,
+              })
+            }
+            onTypeFilterChange={(videoExportType) =>
+              navigateToInfrastructure(activeTab, {
+                ...search,
+                videoExportType,
+              })
+            }
+          />
         </TabPanel>
         <TabPanel id="cache" className="outline-none">
           <CacheSection

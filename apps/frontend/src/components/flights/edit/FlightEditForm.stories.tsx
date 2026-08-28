@@ -106,17 +106,21 @@ Default.test(
 
     await step('the query is sent to the backend', async () => {
       await expect(onSubmit).toHaveBeenCalledWith({
-        departure_time: '2026-03-15T14:00:00',
-        distance_km: 18.5,
-        duration_minutes: 95,
-        elevation_gain_m: 1200,
-        flight_date: '2026-03-15',
-        max_altitude_m: 1850,
-        max_speed_kmh: 52.3,
-        name: 'Arguel 15-03 14h00 modifié ',
-        notes: 'Superbe vol thermique, base cumulus 1800m',
-        site_id: 'site-arguel',
-        title: 'Vol thermique Arguel',
+        values: {
+          departure_time: '2026-03-15T14:00:00',
+          distance_km: 18.5,
+          duration_minutes: 95,
+          elevation_gain_m: 1200,
+          flight_date: '2026-03-15',
+          max_altitude_m: 1850,
+          max_speed_kmh: 52.3,
+          name: 'Arguel 15-03 14h00 modifié ',
+          notes: 'Superbe vol thermique, base cumulus 1800m',
+          site_id: 'site-arguel',
+          title: 'Vol thermique Arguel',
+          youtube_urls: [],
+        },
+        pendingYoutubeRemovals: [],
       });
     });
   }

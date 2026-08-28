@@ -13,9 +13,12 @@ interface FlightStatsGridProps {
   sites: Site[];
 }
 
-const labelClass = 'text-xs text-gray-600 dark:text-gray-300';
+const labelClass =
+  'text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400';
 const valueClass =
-  'block text-sm font-medium text-gray-900 dark:text-white mt-1';
+  'mt-1 block text-base font-semibold text-gray-950 dark:text-white';
+const statClass =
+  'rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-900/50';
 
 export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
   const { t, i18n } = useTranslation();
@@ -48,12 +51,12 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
     flight.max_speed_kmh == null
       ? 'N/A'
       : formatSpeedKmh(flight.max_speed_kmh, units.speed);
+  const trackFileName = flight.gpx_file_path?.split(/[\\/]/u).pop();
 
   return (
-    <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3">
-      <div>
-        <span className={labelClass}>{t('flights.dateLabel')}</span>
-        <span className={valueClass}>
+    <div className="mb-4">
+      <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-600 dark:text-gray-300">
+        <span className="font-medium text-gray-900 dark:text-white">
           {localDate.toLocaleDateString(i18n.language, {
             weekday: 'long',
             day: 'numeric',
@@ -61,42 +64,54 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
             year: 'numeric',
           })}
         </span>
-      </div>
-      <div>
-        <span className={labelClass}>{t('flights.departureTime')}</span>
-        <span className={valueClass}>
-          {flight.departure_time
-            ? new Date(flight.departure_time).toLocaleTimeString(
+        {flight.departure_time && (
+          <>
+            <span aria-hidden="true">·</span>
+            <span>
+              {new Date(flight.departure_time).toLocaleTimeString(
                 i18n.language,
                 { hour: '2-digit', minute: '2-digit' }
-              )
-            : 'N/A'}
-        </span>
+              )}
+            </span>
+          </>
+        )}
+        <span aria-hidden="true">·</span>
+        <span>{siteLabel}</span>
       </div>
-      <div className="col-span-2 md:col-span-3">
-        <span className={labelClass}>{t('flights.siteLabel')}</span>
-        <span className={valueClass}>{siteLabel}</span>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+        <div className={statClass}>
+          <span className={labelClass}>{t('flights.durationLabel')}</span>
+          <span className={valueClass}>{durationLabel}</span>
+        </div>
+        <div className={statClass}>
+          <span className={labelClass}>{t('flights.distanceLabel')}</span>
+          <span className={valueClass}>{distanceLabel}</span>
+        </div>
+        <div className={statClass}>
+          <span className={labelClass}>{t('flights.maxAltitudeLabel')}</span>
+          <span className={valueClass}>{maxAltitudeLabel}</span>
+        </div>
+        <div className={statClass}>
+          <span className={labelClass}>{t('flights.elevationGainLabel')}</span>
+          <span className={valueClass}>{elevationGainLabel}</span>
+        </div>
+        <div className={statClass}>
+          <span className={labelClass}>{t('flights.maxSpeedLabel')}</span>
+          <span className={valueClass}>{maxSpeedLabel}</span>
+        </div>
       </div>
-      <div>
-        <span className={labelClass}>{t('flights.durationLabel')}</span>
-        <span className={valueClass}>{durationLabel}</span>
-      </div>
-      <div>
-        <span className={labelClass}>{t('flights.distanceLabel')}</span>
-        <span className={valueClass}>{distanceLabel}</span>
-      </div>
-      <div>
-        <span className={labelClass}>{t('flights.maxAltitudeLabel')}</span>
-        <span className={valueClass}>{maxAltitudeLabel}</span>
-      </div>
-      <div>
-        <span className={labelClass}>{t('flights.elevationGainLabel')}</span>
-        <span className={valueClass}>{elevationGainLabel}</span>
-      </div>
-      <div>
-        <span className={labelClass}>{t('flights.maxSpeedLabel')}</span>
-        <span className={valueClass}>{maxSpeedLabel}</span>
-      </div>
+      {trackFileName && (
+        <div className="mt-3 min-w-0">
+          <span className={labelClass}>{t('flights.trackFileLabel')}</span>
+          <span
+            className="mt-1 block truncate text-xs text-gray-600 dark:text-gray-300"
+            title={trackFileName}
+          >
+            {trackFileName}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

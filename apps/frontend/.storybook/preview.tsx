@@ -25,6 +25,7 @@ const defaultMswHandlers = [
   http.get('*/api/flights/stats', () => HttpResponse.json({})),
   http.get('*/api/flights/records', () => HttpResponse.json({ records: {} })),
   http.get('*/api/flights/:id', () => HttpResponse.json({})),
+  http.get('*/api/flights/:id/youtube-upload', () => HttpResponse.json(null)),
   http.get('*/api/spots', () => HttpResponse.json({ sites: [] })),
   http.get('*/api/spots/:id', () => HttpResponse.json({})),
   http.get('*/api/weather/:spotId/daily-summary', () =>

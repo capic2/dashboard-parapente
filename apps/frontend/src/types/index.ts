@@ -124,4 +124,5 @@ export interface FlightFormData {
   notes?: string;
   description?: string;
   external_url?: string;
+  youtube_urls?: string[];
 }

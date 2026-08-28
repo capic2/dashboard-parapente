@@ -84,6 +84,10 @@ def _int_env_at_least(name: str, default: int, minimum: int) -> int:
     return max(minimum, int(os.getenv(name, str(default))))
 
 
+def _int_env_between(name: str, default: int, minimum: int, maximum: int) -> int:
+    return min(maximum, _int_env_at_least(name, default, minimum))
+
+
 def _intervals_sync_enabled(api_key: str | None) -> bool:
     requested = os.getenv("BACKEND_INTERVALS_ICU_SYNC_ENABLED", "false").lower() == "true"
     if requested and not api_key:
@@ -92,6 +96,13 @@ def _intervals_sync_enabled(api_key: str | None) -> bool:
             "BACKEND_INTERVALS_ICU_API_KEY is missing"
         )
     return requested and bool(api_key)
+
+
+def _youtube_upload_chunk_size() -> int:
+    chunk_size = _int_env_at_least("BACKEND_YOUTUBE_UPLOAD_CHUNK_SIZE", 8 * 1024 * 1024, 256 * 1024)
+    if chunk_size % (256 * 1024) != 0:
+        raise ValueError("BACKEND_YOUTUBE_UPLOAD_CHUNK_SIZE must be a multiple of 256 KiB")
+    return chunk_size
 
 
 # ============================================================================
@@ -114,8 +125,15 @@ JOB_QUEUE_BACKEND = os.getenv(
     _default_job_queue_backend(),
 ).lower()
 JOB_QUEUE_NAME = os.getenv("BACKEND_JOB_QUEUE_NAME", "video_exports")
+JOB_WORKER_COUNT = _int_env_between("BACKEND_WORKER_COUNT", 5, 1, 5)
+YOUTUBE_UPLOAD_QUEUE_NAME = os.getenv("BACKEND_YOUTUBE_UPLOAD_QUEUE_NAME", "youtube_uploads")
 GOPRO_OVERLAY_QUEUE_NAME = os.getenv("BACKEND_GOPRO_OVERLAY_QUEUE_NAME", "gopro_overlays")
+GOPRO_PREVIEW_QUEUE_NAME = os.getenv("BACKEND_GOPRO_PREVIEW_QUEUE_NAME", "gopro_previews")
 JOB_QUEUE_TIMEOUT_SECONDS = int(os.getenv("BACKEND_JOB_QUEUE_TIMEOUT_SECONDS", "21600"))
+JOB_QUEUE_RECONCILIATION_INTERVAL_SECONDS = _int_env_at_least(
+    "BACKEND_JOB_QUEUE_RECONCILIATION_INTERVAL_SECONDS", 30, 1
+)
+GOPRO_OVERLAY_SEGMENT_SECONDS = int(os.getenv("BACKEND_GOPRO_OVERLAY_SEGMENT_SECONDS", "300"))
 
 # Deployment drain coordination
 DEPLOY_DRAIN_TOKEN = os.getenv("BACKEND_DEPLOY_DRAIN_TOKEN")
@@ -167,11 +185,10 @@ GEMINI_MODEL = os.getenv("BACKEND_GEMINI_MODEL", "gemini-2.5-flash")
 GROQ_API_KEY = os.getenv("BACKEND_GROQ_API_KEY")
 GROQ_MODEL = os.getenv("BACKEND_GROQ_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
 OPENROUTER_API_KEY = os.getenv("BACKEND_OPENROUTER_API_KEY")
-OPENROUTER_MODEL = os.getenv("BACKEND_OPENROUTER_MODEL", "qwen/qwen2.5-vl-72b-instruct:free")
+OPENROUTER_MODEL = os.getenv("BACKEND_OPENROUTER_MODEL", "openrouter/free")
 OPENROUTER_MODELS = _csv_env(
     "BACKEND_OPENROUTER_MODELS",
-    OPENROUTER_MODEL
-    + ",google/gemini-2.0-flash-exp:free,mistralai/mistral-small-3.2-24b-instruct:free",
+    OPENROUTER_MODEL,
 )
 GITHUB_MODELS_API_KEY = os.getenv("BACKEND_GITHUB_MODELS_API_KEY")
 GITHUB_MODELS_BASE_URL = os.getenv(
@@ -221,6 +238,14 @@ ADMIN_EMAIL = os.getenv("BACKEND_ADMIN_EMAIL")
 ADMIN_PASSWORD = os.getenv("BACKEND_ADMIN_PASSWORD")
 
 # ============================================================================
+# YOUTUBE UPLOAD (Optional)
+# ============================================================================
+YOUTUBE_CLIENT_ID = os.getenv("BACKEND_YOUTUBE_CLIENT_ID")
+YOUTUBE_CLIENT_SECRET = os.getenv("BACKEND_YOUTUBE_CLIENT_SECRET")
+YOUTUBE_REDIRECT_URI = os.getenv("BACKEND_YOUTUBE_REDIRECT_URI")
+YOUTUBE_UPLOAD_CHUNK_SIZE = _youtube_upload_chunk_size()
+
+# ============================================================================
 # LOGGING
 # ============================================================================
 LOG_LEVEL = os.getenv("BACKEND_LOG_LEVEL", "INFO")
@@ -264,6 +289,10 @@ VIDEO_TEMP_IMAGES_DIR = _configured_storage_dir(
         Path(PARAGLIDING_DATA_ROOT),
     ),
 )
+VIDEO_ACCELERATOR = os.getenv("BACKEND_VIDEO_ACCELERATOR", "cpu").strip().lower()
+if VIDEO_ACCELERATOR not in {"cpu", "nvidia"}:
+    logger.warning("Unknown BACKEND_VIDEO_ACCELERATOR=%s; using cpu", VIDEO_ACCELERATOR)
+    VIDEO_ACCELERATOR = "cpu"
 
 # ============================================================================
 # GOPRO OVERLAY EXPORT
@@ -274,6 +303,9 @@ GOPRO_OVERLAY_LAYOUT_DIR = GOPRO_OVERLAY_ROOT
 GOPRO_OVERLAY_PARAGLIDING_ROOT = PARAGLIDING_DATA_ROOT
 GOPRO_OVERLAY_OUTPUT_DIR = PARAGLIDING_DATA_ROOT
 GOPRO_OVERLAY_UPLOAD_DIR = str(Path(PARAGLIDING_DATA_ROOT) / ".tmp" / "gopro-uploads")
+GOPRO_OVERLAY_RENDER_DEVICE = os.getenv(
+    "BACKEND_GOPRO_OVERLAY_RENDER_DEVICE", "/dev/dri/renderD128"
+)
 GOPRO_OVERLAY_CONFIG_DIR = os.getenv("BACKEND_GOPRO_OVERLAY_CONFIG_DIR")
 GOPRO_OVERLAY_PROFILE = os.getenv("BACKEND_GOPRO_OVERLAY_PROFILE")
 GOPRO_OVERLAY_EXTRA_ARGS = os.getenv("BACKEND_GOPRO_OVERLAY_EXTRA_ARGS")
@@ -284,8 +316,11 @@ GOPRO_OVERLAY_FONT = os.getenv(
 GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS = int(
     os.getenv("BACKEND_GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS", "1800")
 )
-GOPRO_OVERLAY_PROCESS_NICE = int(os.getenv("BACKEND_GOPRO_OVERLAY_PROCESS_NICE", "19"))
-GOPRO_OVERLAY_PROCESS_IONICE_CLASS = os.getenv("BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS", "3")
+GOPRO_OVERLAY_JOB_TIMEOUT_SECONDS = _int_env_at_least(
+    "BACKEND_GOPRO_OVERLAY_JOB_TIMEOUT_SECONDS", 12 * 60 * 60, 1
+)
+GOPRO_OVERLAY_PROCESS_NICE = int(os.getenv("BACKEND_GOPRO_OVERLAY_PROCESS_NICE", "0"))
+GOPRO_OVERLAY_PROCESS_IONICE_CLASS = os.getenv("BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS", "")
 GOPRO_OVERLAY_MAX_AUTO_LAYOUT_WIDTH = int(
     os.getenv("BACKEND_GOPRO_OVERLAY_MAX_AUTO_LAYOUT_WIDTH", "1920")
 )
@@ -293,15 +328,30 @@ GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT = int(
     os.getenv("BACKEND_GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT", "1080")
 )
 
+# Short browser-friendly camera preview used to synchronize the GoPro overlay.
+GOPRO_PREVIEW_ENABLED = os.getenv("BACKEND_GOPRO_PREVIEW_ENABLED", "true").lower() == "true"
+GOPRO_PREVIEW_DEFAULT_SECONDS = _int_env_at_least("BACKEND_GOPRO_PREVIEW_DEFAULT_SECONDS", 180, 180)
+GOPRO_PREVIEW_MAX_SECONDS = _int_env_at_least(
+    "BACKEND_GOPRO_PREVIEW_MAX_SECONDS", 900, GOPRO_PREVIEW_DEFAULT_SECONDS
+)
+GOPRO_PREVIEW_MAX_WIDTH = _int_env_at_least("BACKEND_GOPRO_PREVIEW_MAX_WIDTH", 854, 2)
+GOPRO_PREVIEW_MAX_HEIGHT = _int_env_at_least("BACKEND_GOPRO_PREVIEW_MAX_HEIGHT", 480, 2)
+GOPRO_PREVIEW_QUALITY = _int_env_at_least("BACKEND_GOPRO_PREVIEW_QUALITY", 28, 0)
+GOPRO_PREVIEW_SCAN_INTERVAL_SECONDS = _int_env_at_least(
+    "BACKEND_GOPRO_PREVIEW_SCAN_INTERVAL_SECONDS", 30, 1
+)
+GOPRO_PREVIEW_STABLE_SECONDS = _int_env_at_least("BACKEND_GOPRO_PREVIEW_STABLE_SECONDS", 30, 1)
+GOPRO_PREVIEW_TIMEOUT_SECONDS = _int_env_at_least("BACKEND_GOPRO_PREVIEW_TIMEOUT_SECONDS", 1800, 1)
+
 # ============================================================================
 # VALIDATION
 # ============================================================================
 
-# Valider les variables critiques (sauf en mode test)
-if not IS_TEST_ENV:
-    if not JWT_SECRET:
-        logger.error("❌ BACKEND_JWT_SECRET is required")
-        raise ValueError("BACKEND_JWT_SECRET environment variable is required")
+
+def validate_api_configuration() -> None:
+    """Validate configuration required specifically by the HTTP API."""
+    if IS_TEST_ENV:
+        return
 
     if not WEATHERAPI_KEY:
         logger.error("❌ WEATHERAPI_KEY is required")
@@ -309,6 +359,13 @@ if not IS_TEST_ENV:
 
     if not METEOBLUE_API_KEY:
         logger.warning("⚠️ METEOBLUE_API_KEY is missing")
+
+
+# Valider les variables critiques (sauf en mode test)
+if not IS_TEST_ENV:
+    if not JWT_SECRET:
+        logger.error("❌ BACKEND_JWT_SECRET is required")
+        raise ValueError("BACKEND_JWT_SECRET environment variable is required")
 
     if ENVIRONMENT == "production" and not METRICS_TOKEN:
         logger.error("❌ BACKEND_METRICS_TOKEN is required in production")

@@ -20,7 +20,7 @@ services:
       - parapente-network
 
   backend:
-    image: ${BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
+    image: ${CI_BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
     container_name: parapente-backend
     restart: unless-stopped
     ports:
@@ -43,7 +43,9 @@ services:
       - BACKEND_USE_FAKE_REDIS=${BACKEND_USE_FAKE_REDIS:-false}
       - BACKEND_JOB_QUEUE_BACKEND=${BACKEND_JOB_QUEUE_BACKEND:-rq}
       - BACKEND_JOB_QUEUE_NAME=${BACKEND_JOB_QUEUE_NAME:-video_exports}
+      - BACKEND_YOUTUBE_UPLOAD_QUEUE_NAME=${BACKEND_YOUTUBE_UPLOAD_QUEUE_NAME:-youtube_uploads}
       - BACKEND_GOPRO_OVERLAY_QUEUE_NAME=${BACKEND_GOPRO_OVERLAY_QUEUE_NAME:-gopro_overlays}
+      - BACKEND_GOPRO_PREVIEW_QUEUE_NAME=${BACKEND_GOPRO_PREVIEW_QUEUE_NAME:-gopro_previews}
 
       # Backend - API
       - BACKEND_API_HOST=${BACKEND_API_HOST:-0.0.0.0}
@@ -66,8 +68,8 @@ services:
       - BACKEND_GROQ_API_KEY=${BACKEND_GROQ_API_KEY}
       - BACKEND_GROQ_MODEL=${BACKEND_GROQ_MODEL:-meta-llama/llama-4-scout-17b-16e-instruct}
       - BACKEND_OPENROUTER_API_KEY=${BACKEND_OPENROUTER_API_KEY}
-      - BACKEND_OPENROUTER_MODEL=${BACKEND_OPENROUTER_MODEL:-qwen/qwen2.5-vl-72b-instruct:free}
-      - BACKEND_OPENROUTER_MODELS=${BACKEND_OPENROUTER_MODELS:-qwen/qwen2.5-vl-72b-instruct:free,google/gemini-2.0-flash-exp:free,mistralai/mistral-small-3.2-24b-instruct:free}
+      - BACKEND_OPENROUTER_MODEL=${BACKEND_OPENROUTER_MODEL:-openrouter/free}
+      - BACKEND_OPENROUTER_MODELS=${BACKEND_OPENROUTER_MODELS:-openrouter/free}
       - BACKEND_GITHUB_MODELS_API_KEY=${BACKEND_GITHUB_MODELS_API_KEY}
       - BACKEND_GITHUB_MODELS_BASE_URL=${BACKEND_GITHUB_MODELS_BASE_URL:-https://models.github.ai/inference/v1/chat/completions}
       - BACKEND_GITHUB_MODELS_MODELS=${BACKEND_GITHUB_MODELS_MODELS:-openai/gpt-4o-mini}
@@ -109,6 +111,12 @@ services:
       - BACKEND_ADMIN_EMAIL=${BACKEND_ADMIN_EMAIL:?required}
       - BACKEND_ADMIN_PASSWORD=${BACKEND_ADMIN_PASSWORD:?required}
 
+      # Backend - YouTube upload (optional)
+      - BACKEND_YOUTUBE_CLIENT_ID=${BACKEND_YOUTUBE_CLIENT_ID:-}
+      - BACKEND_YOUTUBE_CLIENT_SECRET=${BACKEND_YOUTUBE_CLIENT_SECRET:-}
+      - BACKEND_YOUTUBE_REDIRECT_URI=${BACKEND_YOUTUBE_REDIRECT_URI:-}
+      - BACKEND_YOUTUBE_UPLOAD_CHUNK_SIZE=${BACKEND_YOUTUBE_UPLOAD_CHUNK_SIZE:-8388608}
+
       # Backend - Frontend URL
       # Video export runs in a separate worker container; use Docker DNS by default.
       - BACKEND_FRONTEND_URL=${BACKEND_FRONTEND_URL:-http://backend:8001}
@@ -116,6 +124,8 @@ services:
       # Backend - Video export storage
       - BACKEND_VIDEO_EXPORT_DIR=${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
       - BACKEND_VIDEO_TEMP_IMAGES_DIR=${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
+      - BACKEND_VIDEO_ACCELERATOR=${BACKEND_VIDEO_ACCELERATOR:-cpu}
+      - BACKEND_GOPRO_OVERLAY_JOB_TIMEOUT_SECONDS=${BACKEND_GOPRO_OVERLAY_JOB_TIMEOUT_SECONDS:-43200}
       - BACKEND_EMAGRAM_CACHE_DIR=${BACKEND_EMAGRAM_CACHE_DIR:-/app/emagram-cache}
 
       # Backend - GoPro overlay toolchain
@@ -128,13 +138,12 @@ services:
       - BACKEND_GOPRO_OVERLAY_PROFILE=${BACKEND_GOPRO_OVERLAY_PROFILE:-}
       - BACKEND_GOPRO_OVERLAY_EXTRA_ARGS=${BACKEND_GOPRO_OVERLAY_EXTRA_ARGS:-}
       - BACKEND_GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS=${BACKEND_GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS:-1800}
-      - BACKEND_GOPRO_OVERLAY_PROCESS_NICE=${BACKEND_GOPRO_OVERLAY_PROCESS_NICE:-19}
-      - BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS=${BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS:-3}
+      - BACKEND_GOPRO_OVERLAY_PROCESS_NICE=${BACKEND_GOPRO_OVERLAY_PROCESS_NICE:-0}
+      - BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS=${BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS:-}
       - BACKEND_GOPRO_OVERLAY_MAX_AUTO_LAYOUT_WIDTH=${BACKEND_GOPRO_OVERLAY_MAX_AUTO_LAYOUT_WIDTH:-1920}
       - BACKEND_GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT=${BACKEND_GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT:-1080}
 
       # Backend - Deployment metadata
-      - BACKEND_DEPLOY_VERSION=${BACKEND_DEPLOY_VERSION}
       - BACKEND_VERSION_STATE_FILE=${BACKEND_VERSION_STATE_FILE:?BACKEND_VERSION_STATE_FILE is required}
     depends_on:
       redis:
@@ -156,7 +165,7 @@ services:
       - parapente-network
 
   backend-worker:
-    image: ${BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
+    image: ${CI_BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
     container_name: parapente-backend-worker
     restart: unless-stopped
     command: ['python', 'job_worker.py']
@@ -173,7 +182,10 @@ services:
       - BACKEND_USE_FAKE_REDIS=${BACKEND_USE_FAKE_REDIS:-false}
       - BACKEND_JOB_QUEUE_BACKEND=${BACKEND_JOB_QUEUE_BACKEND:-rq}
       - BACKEND_JOB_QUEUE_NAME=${BACKEND_JOB_QUEUE_NAME:-video_exports}
+      # Run multiple consumers so long video jobs do not block other jobs.
+      - BACKEND_WORKER_COUNT=${BACKEND_WORKER_COUNT:-5}
       - BACKEND_GOPRO_OVERLAY_QUEUE_NAME=${BACKEND_GOPRO_OVERLAY_QUEUE_NAME:-gopro_overlays}
+      - BACKEND_GOPRO_PREVIEW_QUEUE_NAME=${BACKEND_GOPRO_PREVIEW_QUEUE_NAME:-gopro_previews}
       - BACKEND_API_HOST=${BACKEND_API_HOST:-0.0.0.0}
       - BACKEND_API_PORT=${BACKEND_API_PORT:-8001}
       - BACKEND_DEPLOY_DRAIN_TOKEN=${BACKEND_DEPLOY_DRAIN_TOKEN:-}
@@ -188,6 +200,8 @@ services:
       - BACKEND_FRONTEND_URL=${BACKEND_FRONTEND_URL:-http://backend:8001}
       - BACKEND_VIDEO_EXPORT_DIR=${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
       - BACKEND_VIDEO_TEMP_IMAGES_DIR=${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
+      - BACKEND_VIDEO_ACCELERATOR=${BACKEND_VIDEO_ACCELERATOR:-cpu}
+      - BACKEND_GOPRO_OVERLAY_JOB_TIMEOUT_SECONDS=${BACKEND_GOPRO_OVERLAY_JOB_TIMEOUT_SECONDS:-43200}
       - BACKEND_GOPRO_OVERLAY_ROOT=/app/gopro-overlay
       - BACKEND_GOPRO_OVERLAY_BIN=/app/gopro-overlay/venv/bin/gopro-dashboard.py
       - BACKEND_GOPRO_OVERLAY_LAYOUT_DIR=/app/gopro-overlay
@@ -197,8 +211,8 @@ services:
       - BACKEND_GOPRO_OVERLAY_PROFILE=${BACKEND_GOPRO_OVERLAY_PROFILE:-}
       - BACKEND_GOPRO_OVERLAY_EXTRA_ARGS=${BACKEND_GOPRO_OVERLAY_EXTRA_ARGS:-}
       - BACKEND_GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS=${BACKEND_GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS:-1800}
-      - BACKEND_GOPRO_OVERLAY_PROCESS_NICE=${BACKEND_GOPRO_OVERLAY_PROCESS_NICE:-19}
-      - BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS=${BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS:-3}
+      - BACKEND_GOPRO_OVERLAY_PROCESS_NICE=${BACKEND_GOPRO_OVERLAY_PROCESS_NICE:-0}
+      - BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS=${BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS:-}
       - BACKEND_GOPRO_OVERLAY_MAX_AUTO_LAYOUT_WIDTH=${BACKEND_GOPRO_OVERLAY_MAX_AUTO_LAYOUT_WIDTH:-1920}
       - BACKEND_GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT=${BACKEND_GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT:-1080}
       - BACKEND_VERSION_STATE_FILE=${BACKEND_VERSION_STATE_FILE:?BACKEND_VERSION_STATE_FILE is required}
@@ -225,14 +239,70 @@ services:
     networks:
       - parapente-network
 
-  gopro-overlay-worker:
-    image: ${BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
-    container_name: parapente-gopro-overlay-worker
+  youtube-upload-worker:
+    image: ${CI_BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
+    container_name: parapente-youtube-upload-worker
     restart: unless-stopped
+    command: ['python', 'youtube_upload_worker.py']
+    labels:
+      project: dashboard-parapente
+      service: youtube-upload-worker
+      env: ${ENVIRONMENT:-production}
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - BACKEND_DATABASE_URL=${BACKEND_DATABASE_URL:?BACKEND_DATABASE_URL is required}
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
+      - BACKEND_REDIS_HOST=redis
+      - BACKEND_REDIS_PORT=6379
+      - BACKEND_USE_FAKE_REDIS=${BACKEND_USE_FAKE_REDIS:-false}
+      - BACKEND_JOB_QUEUE_BACKEND=${BACKEND_JOB_QUEUE_BACKEND:-rq}
+      - BACKEND_JOB_QUEUE_NAME=${BACKEND_JOB_QUEUE_NAME:-video_exports}
+      - BACKEND_YOUTUBE_UPLOAD_QUEUE_NAME=${BACKEND_YOUTUBE_UPLOAD_QUEUE_NAME:-youtube_uploads}
+      - BACKEND_JOB_QUEUE_TIMEOUT_SECONDS=${BACKEND_JOB_QUEUE_TIMEOUT_SECONDS:-21600}
+      - BACKEND_LOG_LEVEL=${BACKEND_LOG_LEVEL:-INFO}
+      - BACKEND_LOG_FILE=${BACKEND_LOG_FILE:?BACKEND_LOG_FILE is required}
+      - BACKEND_METRICS_TOKEN=${BACKEND_METRICS_TOKEN:?required}
+      - BACKEND_JWT_SECRET=${BACKEND_JWT_SECRET:?required}
+      - BACKEND_YOUTUBE_CLIENT_ID=${BACKEND_YOUTUBE_CLIENT_ID:-}
+      - BACKEND_YOUTUBE_CLIENT_SECRET=${BACKEND_YOUTUBE_CLIENT_SECRET:-}
+      - BACKEND_YOUTUBE_REDIRECT_URI=${BACKEND_YOUTUBE_REDIRECT_URI:-}
+      - BACKEND_YOUTUBE_UPLOAD_CHUNK_SIZE=${BACKEND_YOUTUBE_UPLOAD_CHUNK_SIZE:-8388608}
+      - BACKEND_VIDEO_EXPORT_DIR=${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
+      - BACKEND_VERSION_STATE_FILE=${BACKEND_VERSION_STATE_FILE:?BACKEND_VERSION_STATE_FILE is required}
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    volumes:
+      - /home/capic/docker-data/dashboard-parapente/db:/app/db
+      - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
+      - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'python -c "from job_queue import get_redis_connection; get_redis_connection().ping()"',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    networks:
+      - parapente-network
+
+  gopro-overlay-worker:
+    image: ${CI_BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
+    container_name: parapente-gopro-overlay-worker
+    # This worker may be stopped during a deployment while an ffmpeg child is
+    # still running. Always restart it so queued jobs cannot remain orphaned.
+    restart: always
+    init: true
+    stop_grace_period: 30s
     command: ['python', 'gopro_overlay_worker.py']
-    cpus: '${GOPRO_OVERLAY_WORKER_CPUS:-4.0}'
+    cpus: '${GOPRO_OVERLAY_WORKER_CPUS:-8.0}'
     mem_limit: ${GOPRO_OVERLAY_WORKER_MEM_LIMIT:-12g}
-    pids_limit: ${GOPRO_OVERLAY_WORKER_PIDS_LIMIT:-256}
+    pids_limit: ${GOPRO_OVERLAY_WORKER_PIDS_LIMIT:-1024}
     labels:
       project: dashboard-parapente
       service: gopro-overlay-worker
@@ -247,6 +317,7 @@ services:
       - BACKEND_JOB_QUEUE_BACKEND=${BACKEND_JOB_QUEUE_BACKEND:-rq}
       - BACKEND_JOB_QUEUE_NAME=${BACKEND_JOB_QUEUE_NAME:-video_exports}
       - BACKEND_GOPRO_OVERLAY_QUEUE_NAME=${BACKEND_GOPRO_OVERLAY_QUEUE_NAME:-gopro_overlays}
+      - BACKEND_GOPRO_PREVIEW_QUEUE_NAME=${BACKEND_GOPRO_PREVIEW_QUEUE_NAME:-gopro_previews}
       - BACKEND_DEPLOY_DRAIN_TOKEN=${BACKEND_DEPLOY_DRAIN_TOKEN:-}
       - BACKEND_DEPLOY_DRAIN_LEASE_SECONDS=${BACKEND_DEPLOY_DRAIN_LEASE_SECONDS:-4500}
       - BACKEND_LOG_LEVEL=${BACKEND_LOG_LEVEL:-INFO}
@@ -255,14 +326,19 @@ services:
       - BACKEND_JWT_SECRET=${BACKEND_JWT_SECRET:?required}
       - BACKEND_WEATHERAPI_KEY=${BACKEND_WEATHERAPI_KEY}
       - BACKEND_METEOBLUE_API_KEY=${BACKEND_METEOBLUE_API_KEY}
+      - BACKEND_VIDEO_ACCELERATOR=${BACKEND_VIDEO_ACCELERATOR:-cpu}
+      - BACKEND_GOPRO_OVERLAY_JOB_TIMEOUT_SECONDS=${BACKEND_GOPRO_OVERLAY_JOB_TIMEOUT_SECONDS:-43200}
       - BACKEND_GOPRO_OVERLAY_ROOT=/app/gopro-overlay
       - BACKEND_GOPRO_OVERLAY_BIN=/app/gopro-overlay/venv/bin/gopro-dashboard.py
       - BACKEND_GOPRO_OVERLAY_LAYOUT_DIR=/app/gopro-overlay
       - BACKEND_GOPRO_OVERLAY_PARAGLIDING_ROOT=/app/parapente
       - BACKEND_GOPRO_OVERLAY_FONT=/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf
+      - BACKEND_GOPRO_OVERLAY_CONFIG_DIR=${BACKEND_GOPRO_OVERLAY_CONFIG_DIR:-}
+      - BACKEND_GOPRO_OVERLAY_PROFILE=${BACKEND_GOPRO_OVERLAY_PROFILE:-}
+      - BACKEND_GOPRO_OVERLAY_EXTRA_ARGS=${BACKEND_GOPRO_OVERLAY_EXTRA_ARGS:-}
       - BACKEND_GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS=${BACKEND_GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS:-1800}
-      - BACKEND_GOPRO_OVERLAY_PROCESS_NICE=${BACKEND_GOPRO_OVERLAY_PROCESS_NICE:-19}
-      - BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS=${BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS:-3}
+      - BACKEND_GOPRO_OVERLAY_PROCESS_NICE=${BACKEND_GOPRO_OVERLAY_PROCESS_NICE:-0}
+      - BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS=${BACKEND_GOPRO_OVERLAY_PROCESS_IONICE_CLASS:-}
       - BACKEND_GOPRO_OVERLAY_MAX_AUTO_LAYOUT_WIDTH=${BACKEND_GOPRO_OVERLAY_MAX_AUTO_LAYOUT_WIDTH:-1920}
       - BACKEND_GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT=${BACKEND_GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT:-1080}
       - BACKEND_VERSION_STATE_FILE=${BACKEND_VERSION_STATE_FILE:?BACKEND_VERSION_STATE_FILE is required}

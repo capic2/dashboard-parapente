@@ -7,8 +7,10 @@ import logging
 from rq import Worker
 
 import config
+from gopro_overlay_export import check_gopro_overlay_dependencies
 from gopro_overlay_export import enqueue_pending_gopro_overlay_jobs
 from job_queue import get_queue, get_redis_connection, is_rq_enabled
+from video_acceleration import select_video_accelerator
 
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL, logging.INFO),
@@ -17,17 +19,54 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _gpu_runtime_summary() -> str:
+    return (
+        "requested_accelerator={requested} selected_accelerator={selected} profile={profile} "
+        "config_dir={config_dir} extra_args={extra_args}"
+    ).format(
+        requested=config.VIDEO_ACCELERATOR,
+        selected=select_video_accelerator(config.VIDEO_ACCELERATOR),
+        profile=config.GOPRO_OVERLAY_PROFILE or "<none>",
+        config_dir=config.GOPRO_OVERLAY_CONFIG_DIR or "<none>",
+        extra_args=config.GOPRO_OVERLAY_EXTRA_ARGS or "<none>",
+    )
+
+
+def _require_gpu_runtime() -> None:
+    dependencies = check_gopro_overlay_dependencies()
+    missing = [
+        name for name, available in dependencies.items() if not available and name != "ffmpeg_vaapi"
+    ]
+    if missing:
+        raise RuntimeError(
+            f"GoPro overlay GPU runtime dependencies are missing: {', '.join(missing)}"
+        )
+    if config.VIDEO_ACCELERATOR == "nvidia" and select_video_accelerator("nvidia") == "cpu":
+        raise RuntimeError(
+            "NVIDIA accelerator was requested but NVENC is unavailable; "
+            "refusing to start the overlay worker instead of silently falling back to CPU"
+        )
+
+
 def main() -> None:
     if not is_rq_enabled():
         raise RuntimeError("GoPro overlay RQ worker requires BACKEND_JOB_QUEUE_BACKEND=rq")
+
+    logger.info("GoPro overlay GPU runtime preflight: %s", _gpu_runtime_summary())
+    _require_gpu_runtime()
 
     queued_count = enqueue_pending_gopro_overlay_jobs(mark_interrupted=True)
     if queued_count:
         logger.info("Enqueued %s pending GoPro overlay job(s)", queued_count)
 
-    queue = get_queue(config.GOPRO_OVERLAY_QUEUE_NAME)
-    worker = Worker([queue], connection=get_redis_connection())
-    logger.info("Starting GoPro overlay RQ worker for queue '%s'", config.GOPRO_OVERLAY_QUEUE_NAME)
+    queue_names = [config.GOPRO_OVERLAY_QUEUE_NAME, config.GOPRO_PREVIEW_QUEUE_NAME]
+    queues = [get_queue(queue_name) for queue_name in queue_names]
+    worker = Worker(queues, connection=get_redis_connection())
+    logger.info(
+        "Starting GoPro RQ worker for queues '%s' in priority order (%s)",
+        ", ".join(queue_names),
+        _gpu_runtime_summary(),
+    )
     worker.work(with_scheduler=True)
 
 

@@ -19,12 +19,15 @@ import config
 import models  # noqa: F401 - imported for side effects (model registration)
 from database import Base, SessionLocal, engine
 from gopro_overlay_export import start_gopro_overlay_worker, stop_gopro_overlay_worker
+from gopro_preview_proxy import start_preview_scanner, stop_preview_scanner
+from job_queue import is_rq_enabled
 from metrics import setup_metrics
 from models import Site  # Needed for database initialization
 from routes import public_router, router
 from scheduler import start_scheduler, stop_scheduler
 from versioning import initialize_deployment_version
 from video_export_manual import start_video_export_worker, stop_video_export_worker
+from youtube_upload import enqueue_pending_youtube_uploads
 
 # Configure logging
 logging.basicConfig(
@@ -463,6 +466,7 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger.info("🚀 Starting Dashboard Parapente API...")
+    config.validate_api_configuration()
 
     try:
         initialize_deployment_version()
@@ -502,11 +506,15 @@ async def lifespan(app: FastAPI):
     if not config.TESTING:
         start_video_export_worker()
         start_gopro_overlay_worker()
+        start_preview_scanner()
+        if not is_rq_enabled():
+            enqueue_pending_youtube_uploads(recover_active=True)
 
     yield
 
     # Shutdown
     logger.info("⏹️ Shutting down Dashboard Parapente API...")
+    stop_preview_scanner()
     stop_gopro_overlay_worker()
     stop_video_export_worker()
     stop_scheduler()

@@ -3,12 +3,15 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { VideoExportJob } from '../../../hooks/flights/useVideoExportJobs';
 import { VideoExportJobsPanel } from './VideoExportJobsPanel';
 
 const {
   cancelJob,
+  cancelHighlightJob,
   cleanupTempFiles,
   deleteJobRow,
+  deleteHighlightJob,
   resumeJob,
   toastError,
   toastSuccess,
@@ -16,8 +19,10 @@ const {
   jobs,
 } = vi.hoisted(() => ({
   cancelJob: vi.fn(),
+  cancelHighlightJob: vi.fn(),
   cleanupTempFiles: vi.fn(),
   deleteJobRow: vi.fn(),
+  deleteHighlightJob: vi.fn(),
   resumeJob: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
@@ -32,6 +37,7 @@ const {
       progress: 42,
       message: 'Capturing frames',
       mode: 'manual_fast',
+      fps: 30,
       log_tail: ['Opening viewer', 'Captured 10/100 frames'],
       can_cancel: true,
       can_delete: true,
@@ -83,7 +89,7 @@ const {
       can_cancel: false,
       can_delete: true,
     },
-  ],
+  ] as VideoExportJob[],
 }));
 
 vi.mock('react-i18next', () => ({
@@ -110,8 +116,15 @@ vi.mock('../../../hooks/useToast', () => ({
 }));
 
 vi.mock('../../../hooks/flights/useVideoExportJobs', () => ({
+  VIDEO_EXPORT_JOBS_PAGE_SIZE: 25,
   useVideoExportJobs: () => ({
-    data: jobs,
+    data: {
+      jobs,
+      page: 1,
+      pageSize: 25,
+      total: jobs.length,
+      totalPages: 1,
+    },
     isLoading: false,
     isError: false,
     refetch,
@@ -145,6 +158,17 @@ vi.mock('../../../hooks/flights/useVideoExportStatus', () => ({
           }
         : null,
     isConnected: Boolean(enabled && jobId),
+  }),
+}));
+
+vi.mock('../../../hooks/flights/useHighlightVideos', () => ({
+  useCancelFlightHighlightVideo: () => ({
+    mutateAsync: cancelHighlightJob,
+    isPending: false,
+  }),
+  useDeleteFlightHighlightVideo: () => ({
+    mutateAsync: deleteHighlightJob,
+    isPending: false,
   }),
 }));
 
@@ -183,6 +207,8 @@ describe('VideoExportJobsPanel', () => {
         progress: 42,
         message: 'Capturing frames',
         mode: 'manual_fast',
+        render_method: 'gpu',
+        fps_actual: 12.4,
         log_tail: ['Opening viewer', 'Captured 10/100 frames'],
         can_cancel: true,
         can_delete: true,
@@ -193,6 +219,7 @@ describe('VideoExportJobsPanel', () => {
         status: 'completed',
         internal_status: 'completed',
         progress: 100,
+        fps: 30,
         has_output_file: true,
         can_cancel: false,
         can_delete: true,
@@ -206,6 +233,7 @@ describe('VideoExportJobsPanel', () => {
         progress: 50,
         message: 'Rendering overlay',
         mode: 'gopro_overlay',
+        render_method: 'cpu',
         log_tail: ['Starting overlay', 'Rendering overlay: 50%'],
         can_cancel: true,
         can_delete: false,
@@ -220,6 +248,15 @@ describe('VideoExportJobsPanel', () => {
         can_cancel: false,
         can_delete: true,
         can_resume: true,
+      },
+      {
+        job_id: 'job-queued',
+        flight_title: 'Vol en attente',
+        status: 'queued',
+        progress: 0,
+        fps: 15,
+        can_cancel: true,
+        can_delete: true,
       },
       {
         job_id: 'job-overlay-done',
@@ -251,58 +288,89 @@ describe('VideoExportJobsPanel', () => {
     expect(screen.queryByText('vol-overlay.mp4')).not.toBeInTheDocument();
     expect(screen.queryByText('final.mp4')).not.toBeInTheDocument();
     expect(screen.getAllByText('Overlay GoPro').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('GPU').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('CPU').length).toBeGreaterThan(0);
     expect(screen.getAllByText('42%').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('12.4 fps').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('0.0 fps').length).toBeGreaterThan(0);
+    expect(screen.queryByText('30.0 fps')).not.toBeInTheDocument();
     expect(screen.getAllByText('En cours').length).toBeGreaterThan(1);
-    expect(screen.getAllByRole('button', { name: 'Stopper' })).toHaveLength(4);
     expect(
-      screen.getAllByRole('link', { name: 'Voir le vol' })[0]
-    ).toHaveAttribute('href', '/flights/flight-resumable');
-    expect(
-      screen.getAllByRole('button', { name: 'Télécharger' }).length
+      screen.getAllByRole('button', { name: 'Actions' }).length
     ).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Actions' })[0]!);
     expect(
-      screen.getAllByRole('button', { name: 'Reprendre' }).length
-    ).toBeGreaterThan(0);
+      screen.getByRole('menuitem', { name: 'Stopper' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Logs' })).toBeInTheDocument();
+  });
+
+  it('uses the FPS from the last log line when it is available', () => {
+    jobs[0] = {
+      ...jobs[0],
+      fps_actual: 12.4,
+      log_tail: [
+        'Opening viewer',
+        '2026-08-27T18:15:22Z Captured 910/45525 frames (1.1 fps, ETA: 679min)',
+      ],
+    };
+
+    render(<VideoExportJobsPanel />);
+
+    expect(screen.getAllByText('1.1 fps').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('679 min').length).toBeGreaterThan(0);
+    expect(screen.queryByText('12.4 fps')).not.toBeInTheDocument();
+  });
+
+  it('shows a stuck warning when an active job has not updated recently', () => {
+    jobs.push({
+      job_id: 'job-stuck',
+      flight_title: 'Vol bloqué',
+      status: 'processing',
+      internal_status: 'capturing',
+      progress: 0,
+      updated_at: '2020-01-01T00:00:00.000Z',
+      can_cancel: true,
+      can_delete: true,
+    });
+
+    render(<VideoExportJobsPanel limit={null} />);
+
+    expect(screen.getAllByText('En cours').length).toBeGreaterThan(1);
+    expect(screen.queryByText('Bloqué')).not.toBeInTheDocument();
     expect(
-      screen.getAllByRole('button', { name: 'Supprimer' }).length
+      screen.getAllByText(
+        /Aucune progression depuis .* Le traitement semble bloqué/u
+      ).length
     ).toBeGreaterThan(0);
   });
 
-  it('keeps live logs collapsed by default and expands on demand', () => {
+  it('opens live logs in a readable modal on demand', () => {
     render(<VideoExportJobsPanel />);
 
     expect(screen.queryByText('Opening viewer')).not.toBeInTheDocument();
 
-    fireEvent.click(
-      screen.getAllByRole('button', { name: /Logs en direct/u })[0]!
-    );
+    fireEvent.click(screen.getAllByRole('button', { name: 'Actions' })[0]!);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Logs' }));
 
     expect(
       screen.getAllByText(/Captured 20\/100 frames/u).length
     ).toBeGreaterThan(0);
   });
 
-  it('keeps the same job logs open after a jobs refresh reorders rows', () => {
-    const { rerender } = render(<VideoExportJobsPanel />);
+  it('shows logs for the selected job', () => {
+    render(<VideoExportJobsPanel />);
 
-    fireEvent.click(
-      screen.getAllByRole('button', { name: /Logs en direct/u })[0]!
-    );
-
-    expect(
-      screen.getAllByText(/job-active Captured 20\/100 frames/u).length
-    ).toBeGreaterThan(0);
-
-    const [activeJob, completedJob, ...remainingJobs] = jobs;
-    jobs.splice(0, jobs.length, completedJob!, ...remainingJobs, activeJob!);
-    rerender(<VideoExportJobsPanel />);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Actions' })[0]!);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Logs' }));
 
     expect(
       screen.getAllByText(/job-active Captured 20\/100 frames/u).length
     ).toBeGreaterThan(0);
+
     expect(
-      screen.queryAllByText(/job-done Captured 20\/100 frames/u)
-    ).toHaveLength(0);
+      screen.getAllByText(/job-active Captured 20\/100 frames/u).length
+    ).toBeGreaterThan(0);
   });
 
   it('filters jobs by status', () => {
@@ -319,19 +387,70 @@ describe('VideoExportJobsPanel', () => {
     cancelJob.mockResolvedValue(undefined);
 
     render(<VideoExportJobsPanel />);
-    fireEvent.click(screen.getAllByRole('button', { name: 'Stopper' })[0]!);
-    const stopButtons = screen.getAllByRole('button', { name: 'Stopper' });
-    fireEvent.click(stopButtons[stopButtons.length - 1]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Actions' })[0]!);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Stopper' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Stopper' }));
 
     await waitFor(() => expect(cancelJob).toHaveBeenCalledWith('job-active'));
     expect(toastSuccess).toHaveBeenCalledWith('Génération stoppée');
+  });
+
+  it('uses the highlight endpoints for best-moments actions', async () => {
+    cancelHighlightJob.mockResolvedValue(undefined);
+    deleteHighlightJob.mockResolvedValue(undefined);
+    jobs.push(
+      {
+        job_id: 'job-highlight-running',
+        flight_id: 'flight-highlight',
+        flight_title: 'Vol meilleurs moments',
+        status: 'running',
+        mode: 'highlight',
+        can_cancel: true,
+        can_delete: false,
+      },
+      {
+        job_id: 'job-highlight-done',
+        flight_id: 'flight-highlight',
+        flight_title: 'Vol meilleurs moments terminé',
+        status: 'completed',
+        mode: 'highlight',
+        has_output_file: true,
+        can_cancel: false,
+        can_delete: true,
+      }
+    );
+
+    render(<VideoExportJobsPanel limit={null} />);
+    const actions = screen.getAllByRole('button', { name: 'Actions' });
+    fireEvent.click(actions[actions.length - 2]!);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Stopper' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Stopper' }));
+
+    await waitFor(() =>
+      expect(cancelHighlightJob).toHaveBeenCalledWith({
+        targetFlightId: 'flight-highlight',
+        jobId: 'job-highlight-running',
+      })
+    );
+
+    fireEvent.click(actions[actions.length - 1]!);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Supprimer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Supprimer' }));
+
+    await waitFor(() =>
+      expect(deleteHighlightJob).toHaveBeenCalledWith({
+        targetFlightId: 'flight-highlight',
+        jobId: 'job-highlight-done',
+      })
+    );
   });
 
   it('resumes a cancelled export', async () => {
     resumeJob.mockResolvedValue(undefined);
 
     render(<VideoExportJobsPanel />);
-    fireEvent.click(screen.getAllByRole('button', { name: 'Reprendre' })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Actions' })[3]!);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Relancer' }));
 
     await waitFor(() =>
       expect(resumeJob).toHaveBeenCalledWith('job-resumable')
@@ -367,11 +486,9 @@ describe('VideoExportJobsPanel', () => {
     deleteJobRow.mockResolvedValue(undefined);
 
     render(<VideoExportJobsPanel />);
-    fireEvent.click(screen.getAllByRole('button', { name: 'Supprimer' })[0]!);
-    const deleteButtons = screen.getAllByRole('button', {
-      name: 'Supprimer',
-    });
-    fireEvent.click(deleteButtons[deleteButtons.length - 1]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Actions' })[0]!);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Supprimer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Supprimer' }));
 
     await waitFor(() =>
       expect(deleteJobRow).toHaveBeenCalledWith(expect.any(String))
@@ -396,12 +513,9 @@ describe('VideoExportJobsPanel', () => {
     });
 
     render(<VideoExportJobsPanel />);
-    const deleteButtons = screen.getAllByRole('button', {
-      name: 'Supprimer',
-    });
-    fireEvent.click(deleteButtons[0]!);
-    const confirmButtons = screen.getAllByRole('button', { name: 'Supprimer' });
-    fireEvent.click(confirmButtons[confirmButtons.length - 1]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Actions' })[0]!);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Supprimer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Supprimer' }));
 
     await waitFor(() =>
       expect(deleteJobRow).toHaveBeenCalledWith('job-running-manual')

@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import preview from '../../../../.storybook/preview';
-import { expect, fn, userEvent } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { FlightDetails } from './FlightDetails';
 import { ToastContainer } from '@dashboard-parapente/design-system';
 import { useToastStore } from '../../../hooks/useToast';
@@ -59,6 +59,48 @@ const fullFlight: Flight = {
   gopro_overlay_file_path: '/data/flights/final.mp4',
 };
 
+const flightWithMediaThumbnails: Flight = {
+  ...fullFlight,
+  pano_video_file_exists: true,
+  gopro_overlay_file_exists: true,
+  gopro_overlays: [
+    {
+      job_id: 'overlay-1080p',
+      flight_id: fullFlight.id,
+      status: 'completed',
+      progress: 100,
+      message: 'Overlay ready',
+      layout_id: 'parapente-1080',
+      layout_label: 'Parapente 1920x1080',
+      output_filename: 'vol-arguel-1080p.mp4',
+      video_width: 1920,
+      video_height: 1080,
+      gpx_offset: 0,
+      created_at: '2026-03-15T14:00:00Z',
+      updated_at: '2026-03-15T15:00:00Z',
+      completed_at: '2026-03-15T15:00:00Z',
+      log_tail: [],
+    },
+    {
+      job_id: 'overlay-4k',
+      flight_id: fullFlight.id,
+      status: 'completed',
+      progress: 100,
+      message: 'Overlay ready',
+      layout_id: 'parapente-4k',
+      layout_label: 'Parapente 3840x2160',
+      output_filename: 'vol-arguel-4k.mp4',
+      video_width: 3840,
+      video_height: 2160,
+      gpx_offset: 0,
+      created_at: '2026-03-15T14:10:00Z',
+      updated_at: '2026-03-15T15:20:00Z',
+      completed_at: '2026-03-15T15:20:00Z',
+      log_tail: [],
+    },
+  ],
+};
+
 const flightWithoutGpx: Flight = {
   id: 'flight-002',
   name: 'Chalais 10-03 11h00',
@@ -101,11 +143,84 @@ const mockGPXData = {
     lat: 47.2 + i * 0.001,
     lon: 6.0 + i * 0.001,
     elevation: 800 + Math.sin(i / 10) * 400,
-    time: new Date(1773842400000 + i * 60000).toISOString(),
+    timestamp: 1773842400000 + i * 60000,
   })),
 };
 
 const defaultHandlers = [
+  http.get('*/api/flights/:id/video/thumbnail', () =>
+    HttpResponse.text(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="#312e81"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs><rect width="640" height="360" fill="url(#g)"/><path d="M0 290 170 145 280 245 420 100 640 290V360H0Z" fill="#e0f2fe"/><circle cx="505" cy="78" r="32" fill="#fef3c7"/></svg>',
+      { headers: { 'Content-Type': 'image/svg+xml' } }
+    )
+  ),
+  http.get('*/api/flights/:id/pano/thumbnail', () =>
+    HttpResponse.text(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="p" x2="1"><stop stop-color="#4c1d95"/><stop offset="1" stop-color="#c4b5fd"/></linearGradient></defs><rect width="640" height="360" fill="url(#p)"/><circle cx="320" cy="180" r="110" fill="none" stroke="white" stroke-width="8"/><path d="M50 270 210 130 320 230 460 105 610 270" fill="none" stroke="white" stroke-width="12"/></svg>',
+      { headers: { 'Content-Type': 'image/svg+xml' } }
+    )
+  ),
+  http.get('*/api/gopro-overlays/jobs/:jobId/thumbnail', ({ params }) =>
+    HttpResponse.text(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#083344"/><path d="M0 300 190 120 320 250 470 90 640 280V360H0Z" fill="#67e8f9"/><rect x="24" y="24" width="260" height="72" rx="12" fill="#0f172a"/><text x="44" y="68" fill="white" font-size="22">${String(params.jobId)}</text></svg>`,
+      { headers: { 'Content-Type': 'image/svg+xml' } }
+    )
+  ),
+  http.get('*/api/flights/:id/gopro-overlay/thumbnail', () =>
+    HttpResponse.text(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#083344"/><path d="M0 300 190 120 320 250 470 90 640 280V360H0Z" fill="#67e8f9"/><rect x="24" y="24" width="180" height="72" rx="12" fill="#0f172a"/><text x="44" y="68" fill="white" font-size="24">GoPro overlay</text></svg>',
+      { headers: { 'Content-Type': 'image/svg+xml' } }
+    )
+  ),
+  http.get(
+    '*/api/flights/:id/gopro-camera/preview',
+    () =>
+      new HttpResponse(new Uint8Array(), {
+        headers: { 'Content-Type': 'video/mp4' },
+      })
+  ),
+  http.get('*/api/flights/:id/gopro-camera/thumbnail', () =>
+    HttpResponse.text(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#111827"/><circle cx="320" cy="150" r="70" fill="#f59e0b"/><path d="M120 330 280 180 390 250 520 120 640 300V360H120Z" fill="#38bdf8"/></svg>',
+      { headers: { 'Content-Type': 'image/svg+xml' } }
+    )
+  ),
+  http.get('*/api/flights/:id/gopro-overlay/preview', () =>
+    HttpResponse.json({
+      video: {
+        duration_seconds: 600,
+        start_time: '2026-03-18T10:00:00Z',
+        preview_target_end_seconds: 600,
+        preview_segments: [
+          {
+            preview_start_seconds: 0,
+            source_start_seconds: 0,
+            duration_seconds: 180,
+          },
+          {
+            preview_start_seconds: 180,
+            source_start_seconds: 420,
+            duration_seconds: 180,
+          },
+        ],
+        preview_status: 'ready',
+        preview_available_duration_seconds: 180,
+        preview_requested_duration_seconds: 180,
+        preview_max_duration_seconds: 600,
+      },
+      gpx: {
+        start_time: '2026-03-18T10:00:08Z',
+        end_time: '2026-03-18T11:39:08Z',
+        duration_seconds: 5940,
+        coordinates: mockGPXData.coordinates,
+      },
+      alignment: {
+        automatic_offset_seconds: 8,
+        manual_offset_seconds: 0,
+        effective_offset_seconds: 8,
+      },
+    })
+  ),
   http.get('*/api/flights/:id/gpx-data', () =>
     HttpResponse.json({ data: mockGPXData })
   ),
@@ -124,6 +239,11 @@ const defaultHandlers = [
       headers: { 'Content-Type': 'video/mp4' },
     })
   ),
+  http.get('*/api/youtube/status', () =>
+    HttpResponse.json({ configured: true, connected: false })
+  ),
+  http.get('*/api/flights/:id/youtube-upload', () => HttpResponse.json(null)),
+  http.get('*/api/flights/:id/youtube-videos', () => HttpResponse.json([])),
   http.get('*/api/flights/:id', () => HttpResponse.json(fullFlight)),
   http.patch('*/api/flights/:id', async ({ request }) => {
     const body = await request.json();
@@ -145,7 +265,7 @@ const defaultHandlers = [
       message: 'queued',
       layout_id: 'parapente-1080',
       layout_label: 'Parapente 1920x1080',
-      output_filename: 'final.mp4',
+      output_filename: 'Vol_à_Arguel-1080p.mp4',
       created_at: '2026-03-15T14:00:00Z',
       updated_at: '2026-03-15T14:00:00Z',
       job_token: 'token-gopro-overlay',
@@ -184,6 +304,12 @@ const meta = preview.meta({
 export const Default = meta.story({
   name: 'Default',
   args: { flight: fullFlight, mobileMode: true },
+});
+Default.test('The stored track file name is displayed', async ({ canvas }) => {
+  await expect(canvas.getByText('arguel-001.gpx')).toBeInTheDocument();
+  await expect(
+    canvas.queryByText('/data/flights/arguel-001.gpx')
+  ).not.toBeInTheDocument();
 });
 Default.test(
   'The flight can be edited',
@@ -228,11 +354,20 @@ Default.test('The GPX can be replaced', async ({ canvas, step }) => {
 
 Default.test(
   'The GoPro overlay action starts with default values',
-  async ({ canvas, userEvent, step }) => {
+  async ({ canvas, canvasElement, userEvent, step }) => {
     await step('start the GoPro overlay generation', async () => {
+      await userEvent.click(
+        canvas.getByRole('tab', { name: i18n.t('flights.replayTab') })
+      );
       await userEvent.click(
         await canvas.findByRole('button', {
           name: i18n.t('flights.goproOverlayGenerate'),
+        })
+      );
+      const modal = within(canvasElement.ownerDocument.body);
+      await userEvent.click(
+        await modal.findByRole('button', {
+          name: i18n.t('flights.goproOverlayLaunch'),
         })
       );
       await expect(
@@ -251,6 +386,40 @@ export const Mobile = meta.story({
   name: 'Mobile',
   args: { flight: fullFlight, mobileMode: true },
 });
+
+export const MediaThumbnails = meta.story({
+  name: 'Media thumbnails',
+  args: { flight: flightWithMediaThumbnails, mobileMode: true },
+});
+
+MediaThumbnails.test(
+  'shows video, Pano, and overlay thumbnails',
+  async ({ canvas, userEvent }) => {
+    await userEvent.click(
+      canvas.getByRole('tab', { name: i18n.t('flights.replayTab') })
+    );
+    await expect(
+      await canvas.findByAltText(i18n.t('flights.videoThumbnailAlt'))
+    ).toBeVisible();
+    await expect(
+      await canvas.findByAltText(i18n.t('flights.panoThumbnailAlt'))
+    ).toBeVisible();
+    await expect(
+      await canvas.findByAltText(
+        i18n.t('flights.goproOverlayJobThumbnailAlt', {
+          name: 'vol-arguel-1080p.mp4',
+        })
+      )
+    ).toBeVisible();
+    await expect(
+      await canvas.findByAltText(
+        i18n.t('flights.goproOverlayJobThumbnailAlt', {
+          name: 'vol-arguel-4k.mp4',
+        })
+      )
+    ).toBeVisible();
+  }
+);
 
 Mobile.test('shows compact mobile infos tab by default', async ({ canvas }) => {
   await expect(
@@ -314,6 +483,11 @@ MobileWithoutGpx.test(
       name: i18n.t('flights.replayTab'),
     });
     await userEvent.click(replayTab);
+    await userEvent.click(
+      canvas.getByRole('button', {
+        name: i18n.t('flights.mediaReplayTitle'),
+      })
+    );
     await expect(
       await canvas.findByText(i18n.t('flights.replayUnavailable'))
     ).toBeInTheDocument();

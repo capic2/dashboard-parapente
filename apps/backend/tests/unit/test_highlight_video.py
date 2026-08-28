@@ -1,0 +1,137 @@
+from pathlib import Path
+from unittest.mock import patch
+
+from highlight_video import HighlightClip, clamp_clip, overlay_interval_for_clip
+from highlight_video_worker import (
+    _probe_video_dimensions,
+    _render_clip,
+    _set_job_stage,
+    select_flight_event_clips,
+)
+
+
+def test_clip_maps_pano_time_to_overlay_time():
+    clip = HighlightClip(start_seconds=12.5, duration_seconds=6.0, yaw_degrees=90)
+
+    assert clip.overlay_start_seconds(2.25) == 14.75
+    assert clip.overlay_end_seconds(2.25) == 20.75
+
+
+def test_overlay_interval_is_clamped_to_overlay_duration():
+    clip = HighlightClip(start_seconds=98, duration_seconds=8, yaw_degrees=0)
+
+    assert overlay_interval_for_clip(clip, 3, 105) == (101, 105)
+
+
+def test_overlay_interval_is_missing_when_clip_is_after_overlay():
+    clip = HighlightClip(start_seconds=30, duration_seconds=5, yaw_degrees=0)
+
+    assert overlay_interval_for_clip(clip, 10, 20) is None
+
+
+def test_clamp_clip_keeps_source_bounds():
+    clip = clamp_clip(-2, 12, 10)
+
+    assert clip.start_seconds == 0
+    assert clip.duration_seconds == 10
+
+
+def test_event_selection_guarantees_takeoff_landing_and_thermal():
+    points = [
+        {"timestamp": index * 60_000, "elevation": elevation}
+        for index, elevation in enumerate([500, 510, 530, 570, 590, 580])
+    ]
+
+    clips = select_flight_event_clips(
+        600,
+        points,
+        [
+            HighlightClip(30, 8, 0, "dynamic"),
+            HighlightClip(300, 8, 0, "dynamic"),
+            HighlightClip(540, 8, 0, "dynamic"),
+        ],
+    )
+
+    assert {clip.category for clip in clips} >= {"takeoff", "landing", "thermal"}
+
+
+def test_event_selection_uses_visual_activity_for_phases_without_fixed_offsets():
+    clips = select_flight_event_clips(
+        600,
+        None,
+        [HighlightClip(42, 8, 0, "dynamic"), HighlightClip(520, 8, 0, "dynamic")],
+    )
+
+    assert [(clip.category, clip.start_seconds) for clip in clips[:2]] == [
+        ("takeoff", 42),
+        ("landing", 520),
+    ]
+
+
+def test_thermal_selection_uses_sustained_climb_not_single_altitude_spike():
+    points = [
+        {"timestamp": index * 10_000, "elevation": elevation}
+        for index, elevation in enumerate([500, 501, 550, 502, 503, 504, 505])
+    ]
+
+    clips = select_flight_event_clips(120, points, [])
+
+    thermal = next(clip for clip in clips if clip.category == "thermal")
+    assert thermal.start_seconds > 20
+
+
+def test_probe_video_dimensions_accepts_ffprobe_trailing_separator():
+    result = type("Result", (), {"stdout": "6000x3000x\n"})()
+    with patch("highlight_video_worker.subprocess.run", return_value=result):
+        assert _probe_video_dimensions(Path("/tmp/pano.mp4")) == (6000, 3000)
+
+
+def test_set_job_stage_persists_progress_and_logs_stage():
+    with (
+        patch("highlight_video_worker._update_job") as update_job,
+        patch("highlight_video_worker.logger") as logger,
+    ):
+        _set_job_stage(
+            "highlight-1",
+            progress=10,
+            stage="frame_scoring",
+            message="Analyse des images",
+        )
+
+    update_job.assert_called_once_with("highlight-1", progress=10, message="Analyse des images")
+    logger.info.assert_called_once_with(
+        "Highlight job stage: job_id=%s stage=%s progress=%d message=%s",
+        "highlight-1",
+        "frame_scoring",
+        10,
+        "Analyse des images",
+    )
+
+
+def test_render_clip_uses_overlay_as_full_frame_without_picture_in_picture(tmp_path):
+    source_path = tmp_path / "pano.mp4"
+    overlay_path = tmp_path / "overlay.mp4"
+    output_path = tmp_path / "clip.mp4"
+    source_path.touch()
+    overlay_path.touch()
+
+    with (
+        patch("highlight_video_worker._probe_duration", return_value=120),
+        patch("highlight_video_worker._output_dimensions", return_value=(1920, 1080)),
+        patch("highlight_video_worker.select_video_accelerator", return_value="cpu"),
+        patch("highlight_video_worker.h264_encode_args", return_value=["-f", "mp4"]),
+        patch("highlight_video_worker.subprocess.run") as run,
+    ):
+        _render_clip(
+            source_path,
+            output_path,
+            HighlightClip(start_seconds=12.5, duration_seconds=6.0, yaw_degrees=90),
+            overlay_path,
+            overlay_offset_seconds=2.25,
+        )
+
+    command = run.call_args.args[0]
+    assert command[command.index("-ss") + 1] == "14.750"
+    assert str(overlay_path) in command
+    assert "-filter_complex" not in command
+    assert "overlay=W-w-32:H-h-32:eof_action=pass[v]" not in command

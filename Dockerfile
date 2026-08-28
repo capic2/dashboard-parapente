@@ -35,6 +35,9 @@ FROM python:3.14-slim
 
 WORKDIR /app
 
+ARG BACKEND_DEPLOY_VERSION
+ENV BACKEND_DEPLOY_VERSION=${BACKEND_DEPLOY_VERSION}
+
 ARG CODEX_CLI_VERSION=0.146.0
 ENV CODEX_HOME=/app/codex-home
 
@@ -61,6 +64,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libegl-mesa0 \
     libgbm1 \
     libgl1-mesa-dri \
+    libva-drm2 \
+    libva2 \
     libgtk-3-0 \
     libnspr4 \
     libnss3 \
@@ -71,9 +76,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxkbcommon0 \
     libxrandr2 \
     mesa-vulkan-drivers \
+    mesa-va-drivers \
     xdg-utils \
     curl \
     ffmpeg \
+    patch \
     nodejs \
     npm \
     sqlite3 \
@@ -91,7 +98,11 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 
 # Installer GoPro Dashboard Overlay dans un venv créé dans l'image.
 COPY --from=gopro-overlay-src / /app/gopro-overlay
+# Prevent floating-point frame timestamps from repeatedly restarting the PIP decoder.
+COPY docker/gopro-overlay/video-frame-source.patch /tmp/video-frame-source.patch
 RUN rm -rf /app/gopro-overlay/venv && \
+    patch -d /app/gopro-overlay -p1 < /tmp/video-frame-source.patch && \
+    rm /tmp/video-frame-source.patch && \
     python -m venv /app/gopro-overlay/venv && \
     /app/gopro-overlay/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel && \
     /app/gopro-overlay/venv/bin/pip install --no-cache-dir -e /app/gopro-overlay

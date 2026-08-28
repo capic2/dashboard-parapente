@@ -41,6 +41,7 @@ import {
   useFlightDecision,
 } from '../hooks/weather/useFlightDecision';
 import { useAzbaAirspace } from '../hooks/weather/useAzbaAirspace';
+import { useEmagramHours } from '../hooks/weather/useEmagramAnalysis';
 import type { FlightObjective } from '@dashboard-parapente/shared-types';
 import { useAppSettings } from '../hooks/settings/useAppSettings';
 import WeatherPageMobileLayout from './WeatherPage.mobile';
@@ -254,6 +255,7 @@ export default function WeatherPage() {
     sites[0]?.id ??
     '';
   const selectedSite = sites.find((site) => site.id === selectedSiteId);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const flightDecision = useFlightDecision(
     !selectedSearchTarget && selectedSiteId ? selectedSiteId : undefined,
     selectedDayIndex,
@@ -262,6 +264,24 @@ export default function WeatherPage() {
   const azbaAirspace = useAzbaAirspace(
     !selectedSearchTarget && selectedSiteId ? selectedSiteId : undefined,
     selectedDayIndex
+  );
+  const emagramHours = useEmagramHours(
+    selectedSearchTarget ? '' : (selectedSiteId ?? ''),
+    selectedDayIndex,
+    {
+      enabled:
+        isAuthenticated && !selectedSearchTarget && Boolean(selectedSiteId),
+    }
+  );
+  const thermalCeilingByHour = useMemo(
+    () =>
+      new Map(
+        (emagramHours.data?.hours ?? []).map((entry) => [
+          entry.hour,
+          entry.ceiling_m ?? null,
+        ])
+      ),
+    [emagramHours.data?.hours]
   );
   const selectedSearchTitle = getSearchTargetName(selectedSearchTarget);
   const selectedSearchLocation = getSearchTargetLocation(selectedSearchTarget);
@@ -286,7 +306,6 @@ export default function WeatherPage() {
     ? coordinateWeather.isError
     : false;
 
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const weatherSearch = {
     siteId: selectedSiteId,
     day: getForecastDaySearch(selectedDayIndex),
@@ -578,6 +597,7 @@ export default function WeatherPage() {
         isForceRefreshing={isForceRefreshing}
         onForceRefresh={handleForceRefresh}
         flightDecision={flightDecision.data}
+        thermalCeilingByHour={thermalCeilingByHour}
       />
     ) : undefined;
 
@@ -705,6 +725,7 @@ export default function WeatherPage() {
             isForceRefreshing={isForceRefreshing}
             onForceRefresh={handleForceRefresh}
             flightDecision={flightDecision.data}
+            thermalCeilingByHour={thermalCeilingByHour}
           />
         )}
       </div>

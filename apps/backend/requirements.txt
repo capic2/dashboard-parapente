@@ -6,12 +6,12 @@
 # FastAPI Framework & Server
 # ============================================
 fastapi==0.141.1
-uvicorn[standard]==0.52.1
+uvicorn[standard]==0.52.4
 
 # ============================================
 # Database ORM
 # ============================================
-sqlalchemy==2.0.51
+sqlalchemy==2.0.52
 
 # ============================================
 # Data Validation & Settings
@@ -22,7 +22,7 @@ pydantic-settings==2.15.0
 # ============================================
 # Configuration Management
 # ============================================
-python-dotenv==1.2.2
+python-dotenv==1.2.3
 tzdata==2026.3
 
 # ============================================
@@ -34,7 +34,7 @@ aiofiles==25.1.0
 # Web Scraping & Browser Automation
 # ============================================
 playwright==1.62.0
-scrapling==0.4.12
+scrapling==0.4.15
 beautifulsoup4==4.15.0
 
 # ============================================
@@ -53,7 +53,7 @@ apscheduler==3.11.3
 # Caching (Redis)
 # ============================================
 redis==8.1.0
-rq==2.10.0
+rq==2.11.0
 
 # ============================================
 # Testing & Development
@@ -61,14 +61,14 @@ rq==2.10.0
 pytest==9.1.1
 pytest-asyncio==1.4.0
 pytest-cov==7.1.0
-fakeredis==2.37.0
+fakeredis==2.37.1
 
 # ============================================
 # Code Quality & Linting
 # ============================================
-ruff==0.16.2
+ruff==0.16.5
 black==26.5.1
-isort==8.0.1
+isort==9.0.1
 
 # ============================================
 # File Upload Support
@@ -76,11 +76,16 @@ isort==8.0.1
 python-multipart==0.0.32
 
 # ============================================
+# 360 Video Metadata
+# ============================================
+spatialmedia @ https://github.com/google/spatial-media/archive/2308497c39bb604a7c3ba56ac17e302f2b1b6a96.zip
+
+# ============================================
 # Meteorology & Scientific Computing
 # ============================================
 metpy==1.7.1
 matplotlib==3.11.1
-numpy==2.5.1
+numpy==2.5.2
 pillow==12.3.0
 
 # ============================================
@@ -93,4 +98,4 @@ bcrypt>=4.0.0
 # AI/LLM Integration
 # ============================================
 google-generativeai==0.8.6
-groq==1.6.0
+groq==1.7.0

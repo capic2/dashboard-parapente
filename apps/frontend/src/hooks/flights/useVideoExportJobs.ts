@@ -15,8 +15,13 @@ export type VideoExportJob = {
   status: string;
   internal_status?: string | null;
   progress?: number | null;
+  total_frames?: number | null;
+  fps?: number | null;
+  fps_actual?: number | null;
+  eta_seconds?: number | null;
   message?: string | null;
   error?: string | null;
+  render_method?: 'cpu' | 'gpu' | null;
   gpx_path?: string | null;
   mode?: string | null;
   started_at?: string | null;
@@ -29,14 +34,39 @@ export type VideoExportJob = {
   resume_from_frame?: number | null;
   output_filename?: string | null;
   layout_label?: string | null;
+  source_type?: string | null;
+  youtube_url?: string | null;
   log_tail?: string[];
   has_output_file?: boolean;
   can_cancel: boolean;
   can_delete: boolean;
 };
 
+export const VIDEO_EXPORT_JOBS_PAGE_SIZE = 25;
+
+export type VideoExportJobsPage = {
+  jobs: VideoExportJob[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  statusCounts: Record<string, number>;
+  typeCounts: Record<string, number>;
+};
+
 type VideoExportJobsResponse = {
   jobs: VideoExportJob[];
+  page?: number;
+  page_size?: number;
+  total?: number;
+  total_pages?: number;
+  status_counts?: Record<string, number>;
+  type_counts?: Record<string, number>;
+};
+
+export type VideoExportJobsFilters = {
+  statusFilter?: string;
+  typeFilter?: string;
 };
 
 export type VideoExportTempCleanupResult = {
@@ -49,9 +79,16 @@ export type VideoExportTempCleanupResult = {
 
 const videoExportJobsQueryKey = ['video-export-jobs'];
 
-function toVideoExportJobsResponse(
-  value: unknown
-): VideoExportJobsResponse | null {
+function videoExportJobsQueryKeyFor(
+  page: number,
+  pageSize: number,
+  statusFilter: string,
+  typeFilter: string
+) {
+  return [...videoExportJobsQueryKey, page, pageSize, statusFilter, typeFilter];
+}
+
+function toVideoExportJobsResponse(value: unknown): VideoExportJobsPage | null {
   if (!value || typeof value !== 'object' || !('jobs' in value)) {
     return null;
   }
@@ -61,23 +98,60 @@ function toVideoExportJobsResponse(
     return null;
   }
 
-  return { jobs: jobs as VideoExportJob[] };
+  const response = value as Partial<VideoExportJobsResponse>;
+  const page = response.page ?? 1;
+  const pageSize = response.page_size ?? VIDEO_EXPORT_JOBS_PAGE_SIZE;
+  const total = response.total ?? jobs.length;
+  return {
+    jobs: jobs as VideoExportJob[],
+    page,
+    pageSize,
+    total,
+    totalPages:
+      response.total_pages ?? Math.max(1, Math.ceil(total / pageSize)),
+    statusCounts: response.status_counts ?? {},
+    typeCounts: response.type_counts ?? {},
+  };
 }
 
-export const videoExportJobsQueryOptions = () =>
-  queryOptions<VideoExportJob[]>({
-    queryKey: videoExportJobsQueryKey,
+export const videoExportJobsQueryOptions = ({
+  page = 1,
+  pageSize = VIDEO_EXPORT_JOBS_PAGE_SIZE,
+  statusFilter = 'all',
+  typeFilter = 'all',
+}: { page?: number; pageSize?: number } & VideoExportJobsFilters = {}) =>
+  queryOptions<VideoExportJobsPage>({
+    queryKey: videoExportJobsQueryKeyFor(
+      page,
+      pageSize,
+      statusFilter,
+      typeFilter
+    ),
     queryFn: async () => {
       const data = await api
-        .get('video-export-jobs')
+        .get('video-export-jobs', {
+          searchParams: {
+            page: String(page),
+            page_size: String(pageSize),
+            status_filter: statusFilter,
+            type_filter: typeFilter,
+          },
+        })
         .json<VideoExportJobsResponse>();
-      return data.jobs;
+      return toVideoExportJobsResponse(data) as VideoExportJobsPage;
     },
   });
 
-export function useVideoExportJobs() {
+export function useVideoExportJobs({
+  page = 1,
+  pageSize = VIDEO_EXPORT_JOBS_PAGE_SIZE,
+  statusFilter = 'all',
+  typeFilter = 'all',
+}: { page?: number; pageSize?: number } & VideoExportJobsFilters = {}) {
   const queryClient = useQueryClient();
-  const query = useQuery(videoExportJobsQueryOptions());
+  const query = useQuery(
+    videoExportJobsQueryOptions({ page, pageSize, statusFilter, typeFilter })
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -88,6 +162,10 @@ export function useVideoExportJobs() {
       '/api/video-export-jobs/stream',
       window.location.origin
     );
+    streamUrl.searchParams.set('page', String(page));
+    streamUrl.searchParams.set('page_size', String(pageSize));
+    streamUrl.searchParams.set('status_filter', statusFilter);
+    streamUrl.searchParams.set('type_filter', typeFilter);
     const eventSource = new EventSource(streamUrl.toString(), {
       withCredentials: true,
     });
@@ -106,7 +184,10 @@ export function useVideoExportJobs() {
         return;
       }
 
-      queryClient.setQueryData(videoExportJobsQueryKey, data.jobs);
+      queryClient.setQueryData(
+        videoExportJobsQueryKeyFor(page, pageSize, statusFilter, typeFilter),
+        data
+      );
     };
 
     eventSource.addEventListener('jobs', handleJobsEvent);
@@ -115,7 +196,7 @@ export function useVideoExportJobs() {
       eventSource.removeEventListener('jobs', handleJobsEvent);
       eventSource.close();
     };
-  }, [queryClient]);
+  }, [page, pageSize, queryClient, statusFilter, typeFilter]);
 
   return query;
 }

@@ -1,31 +1,80 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import type { GoproOverlayJob } from '@dashboard-parapente/shared-types';
 import { api } from '../../lib/api';
+import type { GeoPoint } from '../../types/flight';
 
-export type GoproOverlayJob = {
-  job_id: string;
-  status:
-    | 'queued'
-    | 'preparing'
-    | 'running'
-    | 'completed'
-    | 'failed'
-    | 'cancelled';
-  progress: number;
-  message: string;
-  error?: string | null;
-  gpx_path?: string | null;
-  layout_id: string;
-  layout_label: string;
-  output_filename: string;
-  video_width?: number | null;
-  video_height?: number | null;
-  created_at: string;
-  updated_at: string;
-  completed_at?: string | null;
-  log_tail?: string[];
-  job_token?: string | null;
+export type { GoproOverlayJob } from '@dashboard-parapente/shared-types';
+
+export type GoproOverlayPreview = {
+  video: {
+    duration_seconds: number;
+    start_time: string;
+    preview_target_end_seconds: number;
+    preview_segments: {
+      preview_start_seconds: number;
+      source_start_seconds: number;
+      duration_seconds: number;
+    }[];
+    preview_status: 'missing' | 'generating' | 'ready' | 'failed';
+    preview_available_duration_seconds: number;
+    preview_requested_duration_seconds: number;
+    preview_max_duration_seconds: number;
+    preview_error?: string | null;
+  };
+  gpx: {
+    start_time: string;
+    end_time: string;
+    duration_seconds: number;
+    coordinates: GeoPoint[];
+  };
+  alignment: {
+    automatic_offset_seconds: number;
+    manual_offset_seconds: number;
+    effective_offset_seconds: number;
+  };
 };
+
+export function goproPreviewRefetchInterval(
+  status?: GoproOverlayPreview['video']['preview_status']
+) {
+  if (status === 'generating') return 2000;
+  if (status === 'missing') return 30_000;
+  return false;
+}
+
+export function useGoproOverlayPreview(flightId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['flights', flightId, 'gopro-overlay-preview'],
+    queryFn: () =>
+      api
+        .get(`flights/${flightId}/gopro-overlay/preview`)
+        .json<GoproOverlayPreview>(),
+    enabled,
+    refetchInterval: (query) =>
+      goproPreviewRefetchInterval(query.state.data?.video.preview_status),
+  });
+}
+
+export function useGenerateGoproPreview(flightId: string) {
+  return useMutation({
+    mutationFn: ({
+      durationSeconds,
+      targetEndSeconds,
+    }: {
+      durationSeconds: number;
+      targetEndSeconds: number;
+    }) =>
+      api
+        .post(`flights/${flightId}/gopro-camera/preview`, {
+          json: {
+            duration_seconds: durationSeconds,
+            target_end_seconds: targetEndSeconds,
+          },
+        })
+        .json(),
+  });
+}
 
 export function useCreateFlightGoproOverlayJob(flightId: string) {
   return useMutation({

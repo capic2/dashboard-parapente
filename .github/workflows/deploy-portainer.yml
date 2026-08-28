@@ -192,8 +192,9 @@ jobs:
           push: true
           build-args: |
             VITE_CESIUM_ION_TOKEN=${{ secrets.VITE_CESIUM_ION_TOKEN }}
+            BACKEND_DEPLOY_VERSION=${{ steps.version.outputs.version }}
           build-contexts: |
-            gopro-overlay-src=${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT || 'https://github.com/capic2/gopro-dashboard-overlay.git#main' }}
+            gopro-overlay-src=${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT || 'https://github.com/capic2/gopro-dashboard-overlay.git#657dd07a7d7e2f58ade271641326d0e00ff0027b' }}
           tags: |
             ghcr.io/${{ github.repository }}/backend:${{ steps.version.outputs.version }}
             ghcr.io/${{ github.repository }}/backend:main
@@ -408,6 +409,9 @@ jobs:
             BACKEND_IMAGE="ghcr.io/${{ github.repository }}/backend:${{ steps.version.outputs.version }}"
             GHCR_USERNAME="${{ github.actor }}"
             GHCR_TOKEN="${{ secrets.GHCR_READ_TOKEN }}"
+            NVIDIA_GPU_ENABLED="${{ vars.NVIDIA_GPU_ENABLED || 'false' }}"
+            LOCAL_VERIFY_MAX_ATTEMPTS="${{ vars.DEPLOY_LOCAL_VERIFY_MAX_ATTEMPTS || vars.DEPLOY_VERIFY_MAX_ATTEMPTS || '30' }}"
+            LOCAL_VERIFY_SLEEP_SECONDS="${{ vars.DEPLOY_LOCAL_VERIFY_SLEEP_SECONDS || vars.DEPLOY_VERIFY_SLEEP_SECONDS || '10' }}"
 
             if [ -z "$GHCR_TOKEN" ]; then
               echo "Missing GHCR_READ_TOKEN secret for production image pull"
@@ -463,7 +467,7 @@ jobs:
 
             configure_compose_cmd() {
               compose_files="-f docker-compose.yml"
-              if [ -f docker-compose.gpu.yml ]; then
+              if [ "$NVIDIA_GPU_ENABLED" = "true" ] && [ -f docker-compose.gpu.yml ]; then
                 compose_files="$compose_files -f docker-compose.gpu.yml"
                 echo "Using GPU compose override"
               fi
@@ -480,7 +484,186 @@ jobs:
               fi
             }
 
+            print_backend_diagnostics() {
+              echo "Backend deployment diagnostics"
+              docker ps -a \
+                --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" || true
+
+              for container_name in \
+                parapente-backend \
+                parapente-backend-worker \
+                parapente-youtube-upload-worker \
+                parapente-gopro-overlay-worker \
+                parapente-redis; do
+                if ! docker inspect "$container_name" >/dev/null 2>&1; then
+                  continue
+                fi
+
+                echo "Container state: $container_name"
+                docker inspect \
+                  --format 'status={{.State.Status}} exit_code={{.State.ExitCode}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
+                  "$container_name" || true
+              done
+
+              echo "Recent backend logs"
+              docker logs --tail 200 parapente-backend 2>&1 || true
+              echo "Recent YouTube upload worker logs"
+              docker logs --tail 200 parapente-youtube-upload-worker 2>&1 || true
+              echo "Recent GoPro overlay worker logs"
+              docker logs --tail 200 parapente-gopro-overlay-worker 2>&1 || true
+              echo "Recent backend worker logs"
+              docker logs --tail 200 parapente-backend-worker 2>&1 || true
+            }
+
+            verify_gpu_prerequisites() {
+              [ "$NVIDIA_GPU_ENABLED" = "true" ] || return 0
+              echo "Verifying NVIDIA Docker runtime before replacing production containers"
+              if ! docker info --format '{{json .Runtimes}}' | grep -q '"nvidia"'; then
+                echo "NVIDIA runtime is not registered in Docker"
+                return 1
+              fi
+              if ! docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi -L; then
+                echo "NVIDIA GPU preflight failed; keeping the current production stack"
+                return 1
+              fi
+            }
+
+            verify_workers_started() {
+              attempts=1
+              while [ "$attempts" -le "$LOCAL_VERIFY_MAX_ATTEMPTS" ]; do
+                failed=0
+                for container_name in parapente-backend parapente-backend-worker parapente-youtube-upload-worker parapente-gopro-overlay-worker parapente-redis; do
+                  state=$(docker inspect --format '{{.State.Status}}' "$container_name" 2>/dev/null || true)
+                  health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_name" 2>/dev/null || true)
+                  if [ "$state" != "running" ] || [ "$health" != "healthy" ]; then
+                    failed=1
+                  fi
+                done
+                for worker_log in parapente-backend-worker parapente-gopro-overlay-worker parapente-youtube-upload-worker; do
+                  if ! docker logs "$worker_log" 2>&1 | grep -q "Listening on"; then
+                    failed=1
+                  fi
+                done
+                if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
+                  gpu_devices=$(docker inspect --format '{{json .HostConfig.DeviceRequests}}' parapente-gopro-overlay-worker 2>/dev/null || true)
+                  gpu_accelerator=$(docker inspect --format "{{range .Config.Env}}{{println .}}{{end}}" parapente-gopro-overlay-worker 2>/dev/null | grep "^BACKEND_VIDEO_ACCELERATOR=" || true)
+                  if ! echo "$gpu_devices" | grep -q "\"Driver\":\"nvidia\"" || [ "$gpu_accelerator" != "BACKEND_VIDEO_ACCELERATOR=nvidia" ]; then
+                    echo "GoPro worker was started without the requested NVIDIA device"
+                    failed=1
+                  fi
+                fi
+                if [ "$failed" -eq 0 ]; then
+                  echo "Production backend and all RQ workers are running"
+                  return 0
+                fi
+                echo "Worker readiness check attempt $attempts/$LOCAL_VERIFY_MAX_ATTEMPTS failed"
+                [ "$attempts" -lt "$LOCAL_VERIFY_MAX_ATTEMPTS" ] && sleep "$LOCAL_VERIFY_SLEEP_SECONDS"
+                attempts=$((attempts + 1))
+              done
+              echo "Production worker readiness verification failed"
+              return 1
+            }
+
+            describe_version_response() {
+              response_file="$1"
+              if ! docker run --rm -i --entrypoint python "$BACKEND_IMAGE" -c '
+            import hashlib
+            import json
+            import re
+            import sys
+
+            body = sys.stdin.buffer.read()
+            print(f"response_bytes={len(body)} response_sha256={hashlib.sha256(body).hexdigest()}")
+            try:
+                payload = json.loads(body)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                text = body.decode("utf-8", errors="replace")
+                title = re.search(r"<title[^>]*>(.*?)</title>", text, re.IGNORECASE | re.DOTALL)
+                if title:
+                    normalized_title = " ".join(title.group(1).split())[:200]
+                    print(f"response_kind=html title={normalized_title}")
+                else:
+                    print("response_kind=non_json")
+            else:
+                if isinstance(payload, dict):
+                    keys = json.dumps(sorted(str(key) for key in payload))
+                    version = json.dumps(str(payload.get("version", "")))
+                    print(f"response_kind=json_object keys={keys} version={version}")
+                else:
+                    print(f"response_kind=json_{type(payload).__name__}")
+            ' < "$response_file"; then
+                echo "response_parser=failed"
+              fi
+            }
+
+            verify_local_backend_version() {
+              endpoint="http://127.0.0.1:8001/api/version"
+              case "$LOCAL_VERIFY_MAX_ATTEMPTS" in
+                ''|*[!0-9]*|0)
+                  echo "DEPLOY_LOCAL_VERIFY_MAX_ATTEMPTS must be a positive integer"
+                  return 1
+                  ;;
+              esac
+              case "$LOCAL_VERIFY_SLEEP_SECONDS" in
+                ''|*[!0-9]*|0)
+                  echo "DEPLOY_LOCAL_VERIFY_SLEEP_SECONDS must be a positive integer"
+                  return 1
+                  ;;
+              esac
+
+              response_file=$(mktemp)
+              headers_file=$(mktemp)
+              error_file=$(mktemp)
+
+              attempt=1
+              while [ "$attempt" -le "$LOCAL_VERIFY_MAX_ATTEMPTS" ]; do
+                if http_status=$(curl --silent --show-error --location \
+                  --connect-timeout 5 --max-time 10 \
+                  --header 'Accept: application/json' \
+                  --header 'Cache-Control: no-cache' \
+                  --output "$response_file" \
+                  --dump-header "$headers_file" \
+                  --write-out '%{http_code}' \
+                  "$endpoint" 2>"$error_file"); then
+                  curl_status=0
+                else
+                  curl_status=$?
+                fi
+
+                content_type=$(awk 'tolower($0) ~ /^content-type:/ { value=$0 } END { sub(/^[^:]*:[[:space:]]*/, "", value); sub(/\r$/, "", value); print value }' "$headers_file")
+                if deployed_version=$(docker run --rm -i --entrypoint python "$BACKEND_IMAGE" -c 'import json, re, sys; payload = json.load(sys.stdin); version = payload.get("version", "") if isinstance(payload, dict) else ""; print(version if isinstance(version, str) and re.fullmatch(r"\d{4}\.\d{2}\.\d{2}\.\d+", version) else "")' < "$response_file" 2>/dev/null); then
+                  parser_status=0
+                else
+                  parser_status=$?
+                  deployed_version=""
+                fi
+
+                if [ "$curl_status" -eq 0 ] && [ "$http_status" -ge 200 ] && [ "$http_status" -lt 300 ] && [ "$deployed_version" = "$TARGET_VERSION" ]; then
+                  echo "Local backend version verified: $deployed_version"
+                  rm -f "$response_file" "$headers_file" "$error_file"
+                  return 0
+                fi
+
+                curl_error=$(tr -d '\n' < "$error_file")
+                echo "Local version check attempt $attempt/$LOCAL_VERIFY_MAX_ATTEMPTS: curl_exit=$curl_status parser_exit=$parser_status http_status=${http_status:-000} content_type=${content_type:-unknown} expected=$TARGET_VERSION actual=${deployed_version:-missing} error=${curl_error:-none}"
+                describe_version_response "$response_file"
+                if [ "$attempt" -lt "$LOCAL_VERIFY_MAX_ATTEMPTS" ]; then
+                  sleep "$LOCAL_VERIFY_SLEEP_SECONDS"
+                fi
+                attempt=$((attempt + 1))
+              done
+
+              rm -f "$response_file" "$headers_file" "$error_file"
+              echo "Local backend version verification failed"
+              return 1
+            }
+
             download_gpu_compose_override() {
+              if [ "$NVIDIA_GPU_ENABLED" != "true" ]; then
+                rm -f docker-compose.gpu.yml.tmp docker-compose.gpu.yml
+                echo "NVIDIA GPU deployment disabled; using CPU compose"
+                return 0
+              fi
               gpu_url="https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.gpu.yml"
               if ! gpu_status=$(curl --silent --show-error --location \
                 --output docker-compose.gpu.yml.tmp \
@@ -497,7 +680,8 @@ jobs:
                   ;;
                 404)
                   rm -f docker-compose.gpu.yml.tmp docker-compose.gpu.yml
-                  echo "GPU compose override not present at target commit; using CPU compose"
+                  echo "GPU compose override is missing from the target commit"
+                  return 1
                   ;;
                 *)
                   rm -f docker-compose.gpu.yml.tmp
@@ -529,18 +713,33 @@ jobs:
 
               configure_compose_cmd
 
+              verify_gpu_prerequisites
+
               printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
-              export BACKEND_IMAGE
-              export BACKEND_DEPLOY_VERSION="$TARGET_VERSION"
+              export CI_BACKEND_IMAGE="$BACKEND_IMAGE"
 
-              compose_cmd pull backend backend-worker gopro-overlay-worker redis
-              compose_cmd up -d --force-recreate --remove-orphans backend backend-worker gopro-overlay-worker redis
+              if ! compose_cmd pull backend backend-worker youtube-upload-worker gopro-overlay-worker redis ||
+                ! compose_cmd up -d --force-recreate --remove-orphans backend backend-worker youtube-upload-worker gopro-overlay-worker redis; then
+                print_backend_diagnostics
+                return 1
+              fi
+              # Compose can report success while a worker exits during its
+              # startup preflight. Re-apply the worker once before failing the
+              # deployment; its restart policy then keeps it supervised.
+              if ! verify_workers_started; then
+                echo "RQ worker readiness check failed; restarting GoPro worker once"
+                compose_cmd up -d --no-deps --force-recreate gopro-overlay-worker || true
+              fi
+              verify_workers_started || {
+                print_backend_diagnostics
+                return 1
+              }
             }
 
             deploy_from_portainer_volume() {
-              docker run --rm \
-                -e BACKEND_IMAGE="$BACKEND_IMAGE" \
+              if ! docker run --rm \
+                -e CI_BACKEND_IMAGE="$BACKEND_IMAGE" \
                 -e COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" \
                 -e GHCR_TOKEN="$GHCR_TOKEN" \
                 -e GHCR_USERNAME="$GHCR_USERNAME" \
@@ -548,6 +747,9 @@ jobs:
                 -e TARGET_SHA="$TARGET_SHA" \
                 -e TARGET_VERSION="$TARGET_VERSION" \
                 -e STACK_ID="$STACK_ID" \
+                -e NVIDIA_GPU_ENABLED="$NVIDIA_GPU_ENABLED" \
+                -e LOCAL_VERIFY_MAX_ATTEMPTS="$LOCAL_VERIFY_MAX_ATTEMPTS" \
+                -e LOCAL_VERIFY_SLEEP_SECONDS="$LOCAL_VERIFY_SLEEP_SECONDS" \
                 -v /var/run/docker.sock:/var/run/docker.sock \
                 -v "$PORTAINER_VOLUME:/data" \
                 -w "/data/compose/$STACK_ID" \
@@ -559,30 +761,36 @@ jobs:
                   curl -fsSL "https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.yml" -o docker-compose.yml.tmp
                   mv docker-compose.yml.tmp docker-compose.yml
 
-                  gpu_url="https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.gpu.yml"
-                  if ! gpu_status=$(curl --silent --show-error --location \
-                    --output docker-compose.gpu.yml.tmp \
-                    --write-out "%{http_code}" \
-                    "$gpu_url"); then
-                    rm -f docker-compose.gpu.yml.tmp
-                    echo "Failed to download GPU compose override"
-                    exit 1
-                  fi
-                  case "$gpu_status" in
-                    200) mv docker-compose.gpu.yml.tmp docker-compose.gpu.yml ;;
-                    404)
-                      rm -f docker-compose.gpu.yml.tmp docker-compose.gpu.yml
-                      echo "GPU compose override not present at target commit; using CPU compose"
-                      ;;
-                    *)
+                  if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
+                    gpu_url="https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.gpu.yml"
+                    if ! gpu_status=$(curl --silent --show-error --location \
+                      --output docker-compose.gpu.yml.tmp \
+                      --write-out "%{http_code}" \
+                      "$gpu_url"); then
                       rm -f docker-compose.gpu.yml.tmp
-                      echo "GPU compose override download returned HTTP $gpu_status"
+                      echo "Failed to download GPU compose override"
                       exit 1
-                      ;;
-                  esac
+                    fi
+                    case "$gpu_status" in
+                      200) mv docker-compose.gpu.yml.tmp docker-compose.gpu.yml ;;
+                      404)
+                        rm -f docker-compose.gpu.yml.tmp docker-compose.gpu.yml
+                        echo "GPU compose override is missing from the target commit"
+                        exit 1
+                        ;;
+                      *)
+                        rm -f docker-compose.gpu.yml.tmp
+                        echo "GPU compose override download returned HTTP $gpu_status"
+                        exit 1
+                        ;;
+                    esac
+                  else
+                    rm -f docker-compose.gpu.yml.tmp docker-compose.gpu.yml
+                    echo "NVIDIA GPU deployment disabled; using CPU compose"
+                  fi
 
                   compose_files="-f docker-compose.yml"
-                  if [ -f docker-compose.gpu.yml ]; then
+                  if [ "$NVIDIA_GPU_ENABLED" = "true" ] && [ -f docker-compose.gpu.yml ]; then
                     compose_files="$compose_files -f docker-compose.gpu.yml"
                   fi
 
@@ -594,19 +802,96 @@ jobs:
                     compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files "$@"; }
                   fi
 
+                  if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
+                    echo "Verifying NVIDIA Docker runtime before replacing production containers"
+                    if ! docker info --format "{{json .Runtimes}}" | grep -q "\"nvidia\""; then
+                      echo "NVIDIA runtime is not registered in Docker"
+                      exit 1
+                    fi
+                    if ! docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi -L; then
+                      echo "NVIDIA GPU preflight failed; keeping the current production stack"
+                      exit 1
+                    fi
+                  fi
+
                   printf "%s" "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
-                  export BACKEND_IMAGE
-                  export BACKEND_DEPLOY_VERSION="$TARGET_VERSION"
+                  compose_cmd pull backend backend-worker youtube-upload-worker gopro-overlay-worker redis
+                  compose_cmd up -d --force-recreate --remove-orphans backend backend-worker youtube-upload-worker gopro-overlay-worker redis
+                  readiness_attempt=1
+                  readiness_ok=0
+                  while [ "$readiness_attempt" -le "$LOCAL_VERIFY_MAX_ATTEMPTS" ]; do
+                    readiness_failed=0
+                    for container_name in parapente-backend parapente-backend-worker parapente-youtube-upload-worker parapente-gopro-overlay-worker parapente-redis; do
+                      state=$(docker inspect --format "{{.State.Status}}" "$container_name" 2>/dev/null || true)
+                      health=$(docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" "$container_name" 2>/dev/null || true)
+                      if [ "$state" != "running" ] || [ "$health" != "healthy" ]; then
+                        readiness_failed=1
+                      fi
+                    done
+                    for worker_log in parapente-backend-worker parapente-gopro-overlay-worker parapente-youtube-upload-worker; do
+                      if ! docker logs "$worker_log" 2>&1 | grep -q "Listening on"; then
+                        readiness_failed=1
+                      fi
+                    done
+                    if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
+                      gpu_devices=$(docker inspect --format "{{json .HostConfig.DeviceRequests}}" parapente-gopro-overlay-worker 2>/dev/null || true)
+                      if ! echo "$gpu_devices" | grep -q "\"Driver\":\"nvidia\""; then
+                        readiness_failed=1
+                      fi
+                    fi
+                    if [ "$readiness_failed" -eq 0 ]; then
+                      readiness_ok=1
+                      break
+                    fi
+                    echo "Worker readiness check attempt $readiness_attempt/$LOCAL_VERIFY_MAX_ATTEMPTS failed"
+                    [ "$readiness_attempt" -lt "$LOCAL_VERIFY_MAX_ATTEMPTS" ] && sleep "$LOCAL_VERIFY_SLEEP_SECONDS"
+                    readiness_attempt=$((readiness_attempt + 1))
+                  done
+                  if [ "$readiness_ok" -ne 1 ]; then
+                    echo "Production worker readiness verification failed"
+                    exit 1
+                  fi
+                  echo "Production backend and all RQ workers are running"
+                '; then
+                print_backend_diagnostics
+                return 1
+              fi
+            }
 
-                  compose_cmd pull backend backend-worker gopro-overlay-worker redis
-                  compose_cmd up -d --force-recreate --remove-orphans backend backend-worker gopro-overlay-worker redis
-                '
+            deploy_with_retry() {
+              deploy_name="$1"
+              deploy_attempt=1
+              deploy_max_attempts=2
+
+              while [ "$deploy_attempt" -le "$deploy_max_attempts" ]; do
+                echo "Starting $deploy_name deployment attempt $deploy_attempt/$deploy_max_attempts"
+                if [ "$deploy_name" = "configured compose path" ]; then
+                  deploy_from_compose_path "$DEPLOY_PATH" && return 0
+                else
+                  deploy_from_portainer_volume && return 0
+                fi
+
+                if [ "$deploy_attempt" -lt "$deploy_max_attempts" ]; then
+                  echo "Deployment attempt failed; waiting 20 seconds before retrying the stack"
+                  sleep 20
+                fi
+                deploy_attempt=$((deploy_attempt + 1))
+              done
+
+              echo "$deploy_name deployment failed after $deploy_max_attempts attempts"
+              return 1
             }
 
             if [ -n "$DEPLOY_PATH" ] && [ -d "$DEPLOY_PATH" ]; then
               echo "Deploying from configured compose path: $DEPLOY_PATH"
-              deploy_from_compose_path "$DEPLOY_PATH"
+              if ! deploy_with_retry "configured compose path"; then
+                exit 1
+              fi
+              if ! verify_local_backend_version; then
+                print_backend_diagnostics
+                exit 1
+              fi
               exit 0
             fi
 
@@ -616,7 +901,13 @@ jobs:
 
             if resolve_from_portainer_volume; then
               echo "Configured host path unavailable, deploying compose from Portainer volume $PORTAINER_VOLUME (stack $STACK_ID)"
-              deploy_from_portainer_volume
+              if ! deploy_with_retry "Portainer volume"; then
+                exit 1
+              fi
+              if ! verify_local_backend_version; then
+                print_backend_diagnostics
+                exit 1
+              fi
               exit 0
             fi
 
@@ -637,6 +928,8 @@ jobs:
           MAX_ATTEMPTS: ${{ vars.DEPLOY_VERIFY_MAX_ATTEMPTS || '30' }}
           SLEEP_SECONDS: ${{ vars.DEPLOY_VERIFY_SLEEP_SECONDS || '10' }}
         run: |
+          set -u
+
           if [ -z "$VERSION_ENDPOINT_URL" ]; then
             echo "Missing PRODUCTION_VERSION_URL secret"
             exit 1
@@ -647,26 +940,73 @@ jobs:
             exit 1
           fi
 
+          response_file=$(mktemp)
+          headers_file=$(mktemp)
+          error_file=$(mktemp)
+          trap 'rm -f "$response_file" "$headers_file" "$error_file"' EXIT
+
+          describe_response() {
+            python3 - "$response_file" <<'PY'
+          import hashlib
+          import json
+          import re
+          import sys
+
+          path = sys.argv[1]
+          with open(path, "rb") as file:
+              body = file.read()
+
+          print(f"response_bytes={len(body)} response_sha256={hashlib.sha256(body).hexdigest()}")
+          try:
+              payload = json.loads(body)
+          except (json.JSONDecodeError, UnicodeDecodeError):
+              text = body.decode("utf-8", errors="replace")
+              title = re.search(r"<title[^>]*>(.*?)</title>", text, re.IGNORECASE | re.DOTALL)
+              if title:
+                  normalized_title = " ".join(title.group(1).split())[:200]
+                  print(f"response_kind=html title={normalized_title}")
+              else:
+                  print("response_kind=non_json")
+          else:
+              if isinstance(payload, dict):
+                  keys = json.dumps(sorted(str(key) for key in payload))
+                  version = json.dumps(str(payload.get("version", "")))
+                  print(f"response_kind=json_object keys={keys} version={version}")
+              else:
+                  print(f"response_kind=json_{type(payload).__name__}")
+          PY
+          }
+
           attempt=1
           while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
-            response=$(curl --show-error --silent --fail --max-time 10 "$VERSION_ENDPOINT_URL" 2>/tmp/version-check.err || true)
-            deployed_version=$(python -c "import json,sys; data=json.load(sys.stdin); print(data.get('version',''))" <<< "$response" 2>/dev/null || true)
+            : > "$response_file"
+            : > "$headers_file"
+            : > "$error_file"
+            if http_status=$(curl --silent --show-error --location \
+              --connect-timeout 5 --max-time 10 \
+              --header 'Accept: application/json' \
+              --header 'Cache-Control: no-cache' \
+              --header 'Pragma: no-cache' \
+              --output "$response_file" \
+              --dump-header "$headers_file" \
+              --write-out '%{http_code}' \
+              "$VERSION_ENDPOINT_URL" 2>"$error_file"); then
+              curl_status=0
+            else
+              curl_status=$?
+            fi
 
-            if [ "$deployed_version" = "$EXPECTED_VERSION" ]; then
+            content_type=$(awk 'tolower($0) ~ /^content-type:/ { value=$0 } END { sub(/^[^:]*:[[:space:]]*/, "", value); sub(/\r$/, "", value); print value }' "$headers_file")
+            deployed_version=$(python3 -c 'import json, re, sys; payload = json.load(sys.stdin); version = payload.get("version", "") if isinstance(payload, dict) else ""; print(version if isinstance(version, str) and re.fullmatch(r"\d{4}\.\d{2}\.\d{2}\.\d+", version) else "")' < "$response_file" 2>/dev/null || true)
+
+            if [ "$curl_status" -eq 0 ] && [ "$http_status" -ge 200 ] && [ "$http_status" -lt 300 ] && [ "$deployed_version" = "$EXPECTED_VERSION" ]; then
               echo "Deployment version verified: $deployed_version"
               exit 0
             fi
 
-            if [ -n "$deployed_version" ]; then
-              echo "Attempt $attempt/$MAX_ATTEMPTS: expected $EXPECTED_VERSION, got $deployed_version"
-            else
-              curl_error=$(tr -d '\n' </tmp/version-check.err)
-              if [ -n "$curl_error" ]; then
-                echo "Attempt $attempt/$MAX_ATTEMPTS: version endpoint unreachable ($curl_error)"
-              else
-                echo "Attempt $attempt/$MAX_ATTEMPTS: version endpoint not ready"
-              fi
-            fi
+            curl_error=$(tr -d '\n' < "$error_file")
+            echo "Attempt $attempt/$MAX_ATTEMPTS: curl_exit=$curl_status http_status=${http_status:-000} content_type=${content_type:-unknown} expected=$EXPECTED_VERSION actual=${deployed_version:-missing} error=${curl_error:-none}"
+            describe_response
 
             sleep "$SLEEP_SECONDS"
             attempt=$((attempt + 1))

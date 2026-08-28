@@ -8,7 +8,7 @@ import type {
 } from '@tanstack/react-table';
 import type { Selection } from 'react-aria-components';
 import { DataList } from '@dashboard-parapente/design-system';
-import { Flight, type DownloadingMedia } from './Flight';
+import { Flight } from './Flight';
 import { useFlightsTable } from './useFlightsTable';
 import type { FlightSummary } from '@dashboard-parapente/shared-types';
 
@@ -18,15 +18,13 @@ interface FlightsTableProps {
   selectionMode: boolean;
   onSelectFlight: (flight: FlightSummary) => void;
   onDeleteFlight: (flight: FlightSummary) => void;
-  onDownloadGpx: (flight: FlightSummary) => void;
-  onDownloadVideo: (flight: FlightSummary) => void;
-  onDownloadOverlay: (flight: FlightSummary) => void;
-  downloadingMedia: DownloadingMedia | null;
-  unavailableMedia: ReadonlySet<string>;
   rowSelection: RowSelectionState;
   onRowSelectionChange: OnChangeFn<RowSelectionState>;
   sorting: SortingState;
   onSortingChange: OnChangeFn<SortingState>;
+  hasMoreFlights?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 export function FlightsTable({
@@ -35,15 +33,13 @@ export function FlightsTable({
   selectionMode,
   onSelectFlight,
   onDeleteFlight,
-  onDownloadGpx,
-  onDownloadVideo,
-  onDownloadOverlay,
-  downloadingMedia,
-  unavailableMedia,
   rowSelection,
   onRowSelectionChange,
   sorting,
   onSortingChange,
+  hasMoreFlights = false,
+  isLoadingMore = false,
+  onLoadMore,
 }: FlightsTableProps) {
   const { t } = useTranslation();
   const { table } = useFlightsTable({
@@ -101,27 +97,12 @@ export function FlightsTable({
           isActive={selectedFlightId === flight.id}
           isSelected={isSelected}
           selectionMode={selectionMode}
-          downloadingMedia={downloadingMedia}
-          unavailableMedia={unavailableMedia}
           onSelectFlight={onSelectFlight}
           onDeleteFlight={onDeleteFlight}
-          onDownloadGpx={onDownloadGpx}
-          onDownloadVideo={onDownloadVideo}
-          onDownloadOverlay={onDownloadOverlay}
         />
       );
     },
-    [
-      selectionMode,
-      selectedFlightId,
-      onSelectFlight,
-      onDeleteFlight,
-      onDownloadGpx,
-      onDownloadVideo,
-      onDownloadOverlay,
-      downloadingMedia,
-      unavailableMedia,
-    ]
+    [selectionMode, selectedFlightId, onSelectFlight, onDeleteFlight]
   );
 
   return (
@@ -132,18 +113,16 @@ export function FlightsTable({
       emptyMessage={t('flights.noFlights')}
       ariaLabel={t('flights.listAriaLabel')}
       isVirtualized
-      className="flex h-full flex-col lg:min-h-[calc(100vh-22rem)]"
-      itemsClassName="min-h-72 flex-1 overflow-y-auto pr-1"
-      virtualizedLayoutOptions={{ estimatedRowSize: 136, gap: 8 }}
-      renderDependencies={[
-        selectedFlightId,
-        selectionMode,
-        rowSelection,
-        unavailableMedia,
-      ]}
+      className="flex flex-col"
+      itemsClassName="h-[calc(100vh-23rem)] min-h-72 overflow-y-auto pr-1 xl:h-[calc(100vh-19rem)]"
+      virtualizedLayoutOptions={{ estimatedRowSize: 132, gap: 8 }}
+      renderDependencies={[selectedFlightId, selectionMode, rowSelection]}
       selectionMode={selectionMode ? 'multiple' : 'none'}
       selectedKeys={selectedKeys}
       onSelectionChange={handleSelectionChange}
+      onLoadMore={hasMoreFlights ? onLoadMore : undefined}
+      isLoadingMore={isLoadingMore}
+      loadingMoreMessage={t('flights.loadingMore')}
       getTextValue={(row) =>
         row.original.title || row.original.site_name || t('common.flight_one')
       }
