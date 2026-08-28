@@ -495,6 +495,19 @@ class _HangingTerrainPage:
         return True
 
 
+class _HangingEvaluatePage:
+    async def evaluate(self, _expression: str) -> None:
+        await asyncio.sleep(60)
+
+
+@pytest.mark.asyncio
+async def test_export_page_evaluation_fails_when_chromium_hangs(monkeypatch):
+    monkeypatch.setattr(video_export_manual, "_EXPORT_PAGE_EVALUATE_TIMEOUT_SECONDS", 0.01)
+
+    with pytest.raises(RuntimeError, match="evaluation timed out"):
+        await video_export_manual._evaluate_export_page(_HangingEvaluatePage(), "() => true")
+
+
 @pytest.mark.asyncio
 async def test_wait_for_export_frame_terrain_waits_until_tiles_loaded():
     page = _FakeTerrainPage([False, False, True])
