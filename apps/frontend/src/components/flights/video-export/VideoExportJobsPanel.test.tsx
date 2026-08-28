@@ -8,8 +8,10 @@ import { VideoExportJobsPanel } from './VideoExportJobsPanel';
 
 const {
   cancelJob,
+  cancelHighlightJob,
   cleanupTempFiles,
   deleteJobRow,
+  deleteHighlightJob,
   resumeJob,
   toastError,
   toastSuccess,
@@ -17,8 +19,10 @@ const {
   jobs,
 } = vi.hoisted(() => ({
   cancelJob: vi.fn(),
+  cancelHighlightJob: vi.fn(),
   cleanupTempFiles: vi.fn(),
   deleteJobRow: vi.fn(),
+  deleteHighlightJob: vi.fn(),
   resumeJob: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
@@ -154,6 +158,17 @@ vi.mock('../../../hooks/flights/useVideoExportStatus', () => ({
           }
         : null,
     isConnected: Boolean(enabled && jobId),
+  }),
+}));
+
+vi.mock('../../../hooks/flights/useHighlightVideos', () => ({
+  useCancelFlightHighlightVideo: () => ({
+    mutateAsync: cancelHighlightJob,
+    isPending: false,
+  }),
+  useDeleteFlightHighlightVideo: () => ({
+    mutateAsync: deleteHighlightJob,
+    isPending: false,
   }),
 }));
 
@@ -324,8 +339,9 @@ describe('VideoExportJobsPanel', () => {
     expect(screen.getAllByText('En cours').length).toBeGreaterThan(1);
     expect(screen.queryByText('Bloqué')).not.toBeInTheDocument();
     expect(
-      screen.getAllByText(/Aucune progression depuis .* Le traitement semble bloqué/u)
-        .length
+      screen.getAllByText(
+        /Aucune progression depuis .* Le traitement semble bloqué/u
+      ).length
     ).toBeGreaterThan(0);
   });
 
@@ -377,6 +393,56 @@ describe('VideoExportJobsPanel', () => {
 
     await waitFor(() => expect(cancelJob).toHaveBeenCalledWith('job-active'));
     expect(toastSuccess).toHaveBeenCalledWith('Génération stoppée');
+  });
+
+  it('uses the highlight endpoints for best-moments actions', async () => {
+    cancelHighlightJob.mockResolvedValue(undefined);
+    deleteHighlightJob.mockResolvedValue(undefined);
+    jobs.push(
+      {
+        job_id: 'job-highlight-running',
+        flight_id: 'flight-highlight',
+        flight_title: 'Vol meilleurs moments',
+        status: 'running',
+        mode: 'highlight',
+        can_cancel: true,
+        can_delete: false,
+      },
+      {
+        job_id: 'job-highlight-done',
+        flight_id: 'flight-highlight',
+        flight_title: 'Vol meilleurs moments terminé',
+        status: 'completed',
+        mode: 'highlight',
+        has_output_file: true,
+        can_cancel: false,
+        can_delete: true,
+      }
+    );
+
+    render(<VideoExportJobsPanel limit={null} />);
+    const actions = screen.getAllByRole('button', { name: 'Actions' });
+    fireEvent.click(actions[actions.length - 2]!);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Stopper' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Stopper' }));
+
+    await waitFor(() =>
+      expect(cancelHighlightJob).toHaveBeenCalledWith({
+        targetFlightId: 'flight-highlight',
+        jobId: 'job-highlight-running',
+      })
+    );
+
+    fireEvent.click(actions[actions.length - 1]!);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Supprimer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Supprimer' }));
+
+    await waitFor(() =>
+      expect(deleteHighlightJob).toHaveBeenCalledWith({
+        targetFlightId: 'flight-highlight',
+        jobId: 'job-highlight-done',
+      })
+    );
   });
 
   it('resumes a cancelled export', async () => {
