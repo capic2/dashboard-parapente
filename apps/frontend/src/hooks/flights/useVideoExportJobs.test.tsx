@@ -4,7 +4,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useVideoExportJobs } from './useVideoExportJobs';
+import {
+  useVideoExportJobs,
+  videoExportJobsQueryOptions,
+} from './useVideoExportJobs';
 
 const { apiGet } = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -86,6 +89,11 @@ describe('useVideoExportJobs', () => {
     });
     globalThis.EventSource =
       eventSourceMock.MockEventSource as unknown as typeof EventSource;
+  });
+
+  it('refreshes the list periodically when the SSE connection cannot update it', () => {
+    expect(videoExportJobsQueryOptions().refetchInterval).toBe(3000);
+    expect(videoExportJobsQueryOptions().refetchOnWindowFocus).toBe('always');
   });
 
   it('updates cached jobs from the global SSE stream', async () => {

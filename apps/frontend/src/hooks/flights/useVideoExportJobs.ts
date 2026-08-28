@@ -43,6 +43,7 @@ export type VideoExportJob = {
 };
 
 export const VIDEO_EXPORT_JOBS_PAGE_SIZE = 25;
+const VIDEO_EXPORT_JOBS_REFRESH_INTERVAL_MS = 3000;
 
 export type VideoExportJobsPage = {
   jobs: VideoExportJob[];
@@ -76,6 +77,8 @@ export type VideoExportTempCleanupResult = {
   paths_deleted: string[];
   errors: { path: string; error: string }[];
 };
+
+export type VideoExportOutputKind = 'video' | 'gopro';
 
 const videoExportJobsQueryKey = ['video-export-jobs'];
 
@@ -140,6 +143,11 @@ export const videoExportJobsQueryOptions = ({
         .json<VideoExportJobsResponse>();
       return toVideoExportJobsResponse(data) as VideoExportJobsPage;
     },
+    // EventSource cannot attach the bearer token used by the protected API.
+    // Keep polling as a reliable fallback so the infrastructure table updates
+    // even when the SSE connection is rejected by authentication or a proxy.
+    refetchInterval: VIDEO_EXPORT_JOBS_REFRESH_INTERVAL_MS,
+    refetchOnWindowFocus: 'always',
   });
 
 export function useVideoExportJobs({
@@ -239,6 +247,30 @@ export function useDeleteVideoExportJobRow() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });
       queryClient.invalidateQueries({ queryKey: ['flights'] });
+    },
+  });
+}
+
+export function useDeleteVideoExportOutput() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      jobId,
+      kind,
+    }: {
+      jobId: string;
+      kind: VideoExportOutputKind;
+    }) => {
+      const endpoint =
+        kind === 'gopro'
+          ? `gopro-overlays/jobs/${jobId}/video`
+          : `exports/${jobId}/video`;
+      await api.delete(endpoint).json();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });
+      void queryClient.invalidateQueries({ queryKey: ['flights'] });
     },
   });
 }
