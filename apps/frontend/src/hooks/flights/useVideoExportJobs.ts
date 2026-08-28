@@ -43,6 +43,7 @@ export type VideoExportJob = {
 };
 
 export const VIDEO_EXPORT_JOBS_PAGE_SIZE = 25;
+const VIDEO_EXPORT_JOBS_REFRESH_INTERVAL_MS = 3000;
 
 export type VideoExportJobsPage = {
   jobs: VideoExportJob[];
@@ -140,6 +141,11 @@ export const videoExportJobsQueryOptions = ({
         .json<VideoExportJobsResponse>();
       return toVideoExportJobsResponse(data) as VideoExportJobsPage;
     },
+    // EventSource cannot attach the bearer token used by the protected API.
+    // Keep polling as a reliable fallback so the infrastructure table updates
+    // even when the SSE connection is rejected by authentication or a proxy.
+    refetchInterval: VIDEO_EXPORT_JOBS_REFRESH_INTERVAL_MS,
+    refetchOnWindowFocus: 'always',
   });
 
 export function useVideoExportJobs({
