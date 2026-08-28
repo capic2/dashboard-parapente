@@ -25,6 +25,7 @@ from flight_tracks import TrackPoint, normalize_track
 from gopro_overlay_inputs import resolve_automatic_overlay_inputs
 from highlight_video import HighlightClip, overlay_interval_for_clip
 from models import Flight, HighlightVideoJob
+from spots.distance import haversine_distance
 from visual_event_detector import classify_motion_mask
 from video_acceleration import h264_encode_args, select_video_accelerator
 
@@ -454,6 +455,42 @@ def _flight_phase_times(
         if (current_trend := trend(index, -1)) is not None and current_trend >= 0.08
     ]
     if descent_indices:
+        descent_end = descent_indices[-1]
+        # A barometric altitude sensor can keep drifting after touchdown. A
+        # stable horizontal position is stronger evidence of the actual
+        # landing than requiring the altitude to plateau, especially when the
+        # watch keeps recording on the ground.
+        stationary_window_seconds = min(10.0, max(6.0, track_duration / 18))
+        for index in range(1, len(samples)):
+            if times[index] < track_duration * 0.5:
+                continue
+            window_start = np.searchsorted(
+                times, times[index] - stationary_window_seconds, side="left"
+            )
+            if window_start >= index:
+                continue
+            previous_point = track_points[window_start]
+            current_point = track_points[index]
+            if not all(key in previous_point and key in current_point for key in ("lat", "lon")):
+                continue
+            horizontal_distance_m = (
+                haversine_distance(
+                    previous_point["lat"],
+                    previous_point["lon"],
+                    current_point["lat"],
+                    current_point["lon"],
+                )
+                * 1000
+            )
+            if horizontal_distance_m <= 20:
+                preceding_descent = any(
+                    descent_index <= index and times[index] - times[descent_index] <= 60
+                    for descent_index in descent_indices
+                )
+                if preceding_descent:
+                    landing = float(times[index] - stationary_window_seconds / 2)
+                    break
+    if landing is None and descent_indices:
         descent_end = descent_indices[-1]
         # Estimate touchdown halfway between the end of the descent trend and
         # the first stable post-landing point. Using the stable point itself

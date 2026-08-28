@@ -94,6 +94,29 @@ def test_flight_phase_detection_uses_sustained_altitude_trends():
     assert landing is not None and 300 < landing < 400
 
 
+def test_flight_phase_detection_uses_stationary_position_when_altitude_drifts():
+    points = []
+    for index in range(60):
+        if index < 10:
+            elevation = 500
+        elif index < 25:
+            elevation = 500 + (index - 10) * 8
+        else:
+            elevation = 620 - (index - 25) * 2
+        points.append(
+            {
+                "timestamp": index * 1_000,
+                "elevation": elevation,
+                "lat": 47.0 if index >= 50 else 47.0 + index * 0.0001,
+                "lon": 6.0,
+            }
+        )
+
+    _takeoff, landing = _flight_phase_times(points)
+
+    assert landing is not None and 45 < landing < 55
+
+
 def test_event_selection_prefers_gpx_phases_over_visual_activity():
     points = [
         {"timestamp": index * 30_000, "elevation": elevation}
