@@ -702,7 +702,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
                 <Play className="h-4 w-4" aria-hidden="true" />
                 {resumeJob.isPending
                   ? t('videoJobs.resuming', 'Relance...')
-                  : t('videoJobs.resume', 'Reprendre')}
+                  : t('videoJobs.resume', 'Relancer')}
               </MenuItem>
             )}
             {job.can_cancel && (
