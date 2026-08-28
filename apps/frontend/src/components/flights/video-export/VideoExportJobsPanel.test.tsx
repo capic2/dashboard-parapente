@@ -290,7 +290,24 @@ describe('VideoExportJobsPanel', () => {
     expect(screen.getByRole('menuitem', { name: 'Logs' })).toBeInTheDocument();
   });
 
-  it('keeps the real status when an active job has not updated recently', () => {
+  it('uses the FPS from the last log line when it is available', () => {
+    jobs[0] = {
+      ...jobs[0],
+      fps_actual: 12.4,
+      log_tail: [
+        'Opening viewer',
+        '2026-08-27T18:15:22Z Captured 910/45525 frames (1.1 fps, ETA: 679min)',
+      ],
+    };
+
+    render(<VideoExportJobsPanel />);
+
+    expect(screen.getAllByText('1.1 fps').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('679 min').length).toBeGreaterThan(0);
+    expect(screen.queryByText('12.4 fps')).not.toBeInTheDocument();
+  });
+
+  it('shows a stuck warning when an active job has not updated recently', () => {
     jobs.push({
       job_id: 'job-stuck',
       flight_title: 'Vol bloqué',
