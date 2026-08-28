@@ -94,6 +94,7 @@ from gopro_overlay_export import (
     stream_gopro_overlay_job,
 )
 import gopro_preview_proxy
+from video_acceleration import get_gpu_runtime_status
 from models import (
     EmagramAnalysis,
     Flight,
@@ -6255,6 +6256,14 @@ def list_video_export_jobs(
         page_size=page_size,
     )
     return VideoExportJobsResponse(**payload)
+
+
+@router.get("/video-export-gpu-status")
+def video_export_gpu_status(response: Response) -> dict[str, object]:
+    """Return live GPU telemetry for the infrastructure dashboard."""
+
+    response.headers["Cache-Control"] = "no-store"
+    return get_gpu_runtime_status()
 
 
 @router.get("/video-export-jobs/stream")
