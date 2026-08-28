@@ -34,6 +34,10 @@ import {
   VIDEO_EXPORT_JOBS_PAGE_SIZE,
 } from '../../../hooks/flights/useVideoExportJobs';
 import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
+import {
+  useCancelFlightHighlightVideo,
+  useDeleteFlightHighlightVideo,
+} from '../../../hooks/flights/useHighlightVideos';
 import { useGoproOverlayJobStream } from '../../../hooks/gopro/useGoproOverlay';
 import { api } from '../../../lib/api';
 import { useToast } from '../../../hooks/useToast';
@@ -227,7 +231,8 @@ function isJobInFilter(job: VideoExportJob, filter: StatusFilter) {
   }
   if (filter === 'active') {
     return (
-      job.can_cancel || ['queued', 'running', 'processing', 'uploading'].includes(job.status)
+      job.can_cancel ||
+      ['queued', 'running', 'processing', 'uploading'].includes(job.status)
     );
   }
   return job.status === filter;
@@ -249,7 +254,10 @@ function isJobInTypeFilter(job: VideoExportJob, filter: TypeFilter) {
   return (
     filter === 'all' ||
     (filter === 'gopro' && isGoproOverlayJob(job)) ||
-    (filter === 'video' && !isGoproOverlayJob(job) && !isHighlightJob(job) && !isYoutubeJob(job)) ||
+    (filter === 'video' &&
+      !isGoproOverlayJob(job) &&
+      !isHighlightJob(job) &&
+      !isYoutubeJob(job)) ||
     (filter === 'highlight' && isHighlightJob(job)) ||
     (filter === 'youtube' && isYoutubeJob(job))
   );
@@ -417,9 +425,7 @@ function getLastLogMetrics(job: VideoExportJob) {
   }
 
   const fpsValue = lastLogLine.match(/\(([\d.,]+)\s*fps\b/iu)?.[1];
-  const etaMatch = lastLogLine.match(
-    /\bETA:\s*([\d.,]+)\s*(s|sec|min|h)\b/iu
-  );
+  const etaMatch = lastLogLine.match(/\bETA:\s*([\d.,]+)\s*(s|sec|min|h)\b/iu);
   const fps = fpsValue
     ? Number.parseFloat(fpsValue.replace(',', '.'))
     : undefined;
@@ -528,8 +534,10 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
   const totalJobs = jobsPage?.total ?? jobs.length;
   const totalPages = jobsPage?.totalPages ?? 1;
   const cancelJob = useCancelVideoExportJob();
+  const cancelHighlightJob = useCancelFlightHighlightVideo('');
   const resumeJob = useResumeVideoExportJob();
   const deleteJobRow = useDeleteVideoExportJobRow();
+  const deleteHighlightJob = useDeleteFlightHighlightVideo('');
   const cleanupTempFiles = useCleanupVideoExportTempFiles();
 
   const filteredJobs = useMemo(
@@ -588,7 +596,14 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
         confirmLabel: t('videoJobs.stop', 'Stopper'),
         onConfirm: async () => {
           try {
-            await cancelJob.mutateAsync(job.job_id);
+            if (isHighlightJob(job) && job.flight_id) {
+              await cancelHighlightJob.mutateAsync({
+                targetFlightId: job.flight_id,
+                jobId: job.job_id,
+              });
+            } else {
+              await cancelJob.mutateAsync(job.job_id);
+            }
             toast.success(t('videoJobs.stopSuccess', 'Génération stoppée'));
           } catch {
             toast.error(
@@ -598,7 +613,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
         },
       });
     },
-    [cancelJob, t, toast]
+    [cancelHighlightJob, cancelJob, t, toast]
   );
 
   const handleResume = useCallback(
@@ -622,7 +637,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
           ? `gopro-overlays/jobs/${job.job_id}/download`
           : isHighlightJob(job)
             ? `flights/${job.flight_id}/highlight-videos/${job.job_id}/download`
-          : `exports/${job.job_id}/download`;
+            : `exports/${job.job_id}/download`;
         const response = await api.get(endpoint, { timeout: false });
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -652,7 +667,14 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
         confirmLabel: t('videoJobs.deleteRow', 'Supprimer'),
         onConfirm: async () => {
           try {
-            await deleteJobRow.mutateAsync(job.job_id);
+            if (isHighlightJob(job) && job.flight_id) {
+              await deleteHighlightJob.mutateAsync({
+                targetFlightId: job.flight_id,
+                jobId: job.job_id,
+              });
+            } else {
+              await deleteJobRow.mutateAsync(job.job_id);
+            }
             toast.success(t('videoJobs.deleteRowSuccess', 'Ligne supprimée'));
           } catch {
             toast.error(
@@ -662,7 +684,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
         },
       });
     },
-    [deleteJobRow, t, toast]
+    [deleteHighlightJob, deleteJobRow, t, toast]
   );
 
   const renderJobActions = useCallback(
@@ -708,7 +730,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
             {job.can_cancel && (
               <MenuItem
                 onAction={() => handleCancel(job)}
-                isDisabled={cancelJob.isPending}
+                isDisabled={cancelJob.isPending || cancelHighlightJob.isPending}
                 className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-700 outline-none hover:bg-red-50 focus:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-300 dark:hover:bg-red-950/40 dark:focus:bg-red-950/40"
               >
                 <Square className="h-4 w-4" aria-hidden="true" />
@@ -720,7 +742,9 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
             {canDeleteJobRow(job) && (
               <MenuItem
                 onAction={() => handleDeleteJobRow(job)}
-                isDisabled={deleteJobRow.isPending}
+                isDisabled={
+                  deleteJobRow.isPending || deleteHighlightJob.isPending
+                }
                 className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -740,6 +764,8 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
     ),
     [
       cancelJob.isPending,
+      cancelHighlightJob.isPending,
+      deleteHighlightJob.isPending,
       deleteJobRow.isPending,
       handleCancel,
       handleDeleteJobRow,

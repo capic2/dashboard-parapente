@@ -15,7 +15,85 @@ from fastapi.testclient import TestClient
 
 from auth import create_job_token
 from models import YoutubeUploadJob
-from routes import _get_video_export_jobs_payload, serialize_sse_event
+from routes import (
+    _get_video_export_jobs_payload,
+    _video_export_can_cancel,
+    _video_export_can_delete,
+    serialize_sse_event,
+)
+
+
+class TestHighlightExportLifecycleRules:
+    def test_highlight_can_cancel_only_with_flight_id_and_active_status(self):
+        assert _video_export_can_cancel(
+            {
+                "mode": "highlight",
+                "job_id": "highlight-1",
+                "flight_id": "flight-1",
+                "status": "queued",
+            }
+        )
+        assert _video_export_can_cancel(
+            {
+                "mode": "highlight",
+                "job_id": "highlight-1",
+                "flight_id": "flight-1",
+                "status": "running",
+            }
+        )
+        assert not _video_export_can_cancel(
+            {
+                "mode": "highlight",
+                "job_id": "highlight-1",
+                "flight_id": "flight-1",
+                "status": "completed",
+            }
+        )
+        assert not _video_export_can_cancel(
+            {
+                "mode": "highlight",
+                "job_id": "highlight-1",
+                "status": "running",
+            }
+        )
+
+    def test_highlight_can_delete_only_with_flight_id_and_terminal_status(self):
+        for status in ("completed", "failed", "cancelled"):
+            assert _video_export_can_delete(
+                {
+                    "mode": "highlight",
+                    "job_id": "highlight-1",
+                    "flight_id": "flight-1",
+                    "status": status,
+                }
+            )
+
+        assert not _video_export_can_delete(
+            {
+                "mode": "highlight",
+                "job_id": "highlight-1",
+                "flight_id": "flight-1",
+                "status": "running",
+            }
+        )
+        assert not _video_export_can_delete(
+            {
+                "mode": "highlight",
+                "job_id": "highlight-1",
+                "status": "completed",
+            }
+        )
+
+    def test_youtube_upload_never_exposes_highlight_lifecycle_actions(self):
+        job = {
+            "mode": "youtube_upload",
+            "job_id": "youtube-1",
+            "flight_id": "flight-1",
+            "status": "running",
+        }
+        assert not _video_export_can_cancel(job)
+        assert not _video_export_can_delete(job)
+
 
 API_PREFIX = "/api"
 
