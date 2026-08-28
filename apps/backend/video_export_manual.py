@@ -219,6 +219,10 @@ def _chromium_launch_args(accelerator: VideoAccelerator | None = None) -> list[s
     return chromium_launch_args(selected)
 
 
+def _render_method_for_accelerator(accelerator: VideoAccelerator) -> str:
+    return "gpu" if accelerator == "nvidia" else "cpu"
+
+
 def _to_public_status(status: str) -> str:
     """Map internal job status to frontend-compatible status."""
     if status == _STATUS_COMPLETED:
@@ -1607,6 +1611,11 @@ def _enqueue_video_export_job(
                 speed=speed,
                 progress=0,
                 message="Job enqueued",
+                # Expose the expected method immediately. The worker updates
+                # this value again after checking the actual WebGL renderer.
+                render_method=_render_method_for_accelerator(
+                    select_video_accelerator(config.VIDEO_ACCELERATOR)
+                ),
                 frontend_url=frontend_url,
                 started_at=None,
                 updated_at=now,
@@ -2197,6 +2206,7 @@ async def _export_video_manual_render(job_id: str):
                 if accelerator != "nvidia" or _is_cancelled(job_id):
                     raise
                 _log_job(job_id, "NVENC encoding failed; retrying with CPU encoding")
+                _set_job_render_method(job_id, "cpu")
                 encoding_output_file.unlink(missing_ok=True)
                 ffmpeg_cmd = _ffmpeg_command(
                     fps=fps,
