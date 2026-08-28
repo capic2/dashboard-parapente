@@ -122,6 +122,23 @@ describe('flight summary queries', () => {
     expect(flight.youtube_upload_progress).toBe(68);
   });
 
+  it('keeps highlight progress separate from regular video progress', () => {
+    const [flight] = mergeActiveMediaJobs(summary.flights, [
+      {
+        job_id: 'highlight-job',
+        flight_id: 'flight-1',
+        status: 'running',
+        progress: 37,
+        mode: 'highlight',
+      },
+    ]);
+
+    expect(flight.highlight_video_job_id).toBe('highlight-job');
+    expect(flight.highlight_video_status).toBe('running');
+    expect(flight.highlight_video_progress).toBe(37);
+    expect(flight.video_export_progress).toBeNull();
+  });
+
   it('identifies flights whose active jobs disappeared', () => {
     expect(
       getFinishedActiveFlightIds(
