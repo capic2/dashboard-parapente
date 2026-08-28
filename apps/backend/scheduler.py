@@ -40,6 +40,8 @@ DEFAULT_SITES = [
 
 scheduler = AsyncIOScheduler()
 
+_VIDEO_EXPORT_CLEANUP_INTERVAL_MINUTES = 15
+
 # Semaphore to limit concurrent database operations (prevent pool exhaustion)
 _db_semaphore = asyncio.Semaphore(5)
 
@@ -268,6 +270,29 @@ async def scheduled_weather_fetch():
         logger.error(f"Error refreshing best spot cache: {e}", exc_info=True)
 
 
+async def scheduled_video_export_cleanup() -> None:
+    """Remove temporary video artifacts left by finished or crashed exports."""
+    try:
+        from video_export import list_exports as list_stream_exports
+        from video_export_manual import (
+            cleanup_video_export_temp_files,
+            list_exports as list_manual_exports,
+        )
+
+        result = cleanup_video_export_temp_files(list_manual_exports() + list_stream_exports())
+        logger.info(
+            "Video export cleanup completed: %s files, %s directories, %s bytes deleted",
+            result["files_deleted"],
+            result["dirs_deleted"],
+            result["bytes_deleted"],
+        )
+        if result["errors"]:
+            logger.warning("Video export cleanup had %s errors", len(result["errors"]))
+    except Exception:
+        # Cleanup must never interfere with weather scheduling or API startup.
+        logger.exception("Video export cleanup failed")
+
+
 def _get_scheduler_interval() -> int:
     """Read scheduler interval from app_settings (fallback to config/default)."""
     try:
@@ -305,6 +330,14 @@ def start_scheduler():
         id="weather_fetch",
         name=f"Weather fetch every {interval} min (6 sites × 2 days)",
         replace_existing=True,
+    )
+    scheduler.add_job(
+        scheduled_video_export_cleanup,
+        trigger=IntervalTrigger(minutes=_VIDEO_EXPORT_CLEANUP_INTERVAL_MINUTES),
+        id="video_export_cleanup",
+        name="Video export temporary file cleanup",
+        replace_existing=True,
+        next_run_time=datetime.now(),
     )
 
     if not scheduler.running:
