@@ -6,6 +6,7 @@ from highlight_video_worker import (
     _probe_video_dimensions,
     _render_clip,
     _set_job_stage,
+    _flight_phase_times,
     select_flight_event_clips,
 )
 
@@ -78,6 +79,43 @@ def test_thermal_selection_uses_sustained_climb_not_single_altitude_spike():
 
     thermal = next(clip for clip in clips if clip.category == "thermal")
     assert thermal.start_seconds > 20
+
+
+def test_flight_phase_detection_uses_sustained_altitude_trends():
+    elevations = [500, 500, 500, 520, 540, 560, 580, 590, 570, 550, 530, 510, 500, 500, 500]
+    points = [
+        {"timestamp": index * 30_000, "elevation": elevation}
+        for index, elevation in enumerate(elevations)
+    ]
+
+    takeoff, landing = _flight_phase_times(points)
+
+    assert takeoff is not None and 30 < takeoff < 120
+    assert landing is not None and 300 < landing < 450
+
+
+def test_event_selection_prefers_gpx_phases_over_visual_activity():
+    points = [
+        {"timestamp": index * 30_000, "elevation": elevation}
+        for index, elevation in enumerate(
+            [500, 500, 500, 520, 540, 560, 580, 590, 570, 550, 530, 510, 500, 500]
+        )
+    ]
+
+    clips = select_flight_event_clips(
+        420,
+        points,
+        [
+            HighlightClip(12, 8, 0, "dynamic"),
+            HighlightClip(390, 8, 0, "dynamic"),
+        ],
+    )
+
+    phase_clips = {clip.category: clip for clip in clips if clip.category in {"takeoff", "landing"}}
+    assert round(phase_clips["takeoff"].start_seconds) == 77
+    assert round(phase_clips["landing"].start_seconds) == 412
+    assert phase_clips["takeoff"].start_seconds != 12
+    assert phase_clips["landing"].start_seconds != 390
 
 
 def test_probe_video_dimensions_accepts_ffprobe_trailing_separator():
