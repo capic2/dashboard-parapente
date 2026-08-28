@@ -562,7 +562,15 @@ def select_flight_event_clips(
     phase_times = _flight_phase_times(track_points) if track_points else (None, None)
     takeoff_clip = visual_phase_clip("takeoff") if phase_times[0] is None else None
     if takeoff_clip:
-        selected.append(replace(takeoff_clip, category="takeoff"))
+        # The visual candidate usually scores the wing already overhead. Add
+        # one clip length before it so the fallback includes the inflation and
+        # the actual launch when the GPX starts after takeoff.
+        takeoff_clip = replace(
+            takeoff_clip,
+            start_seconds=max(0.0, takeoff_clip.start_seconds - clip_length),
+            category="takeoff",
+        )
+        selected.append(takeoff_clip)
     landing_clip = visual_phase_clip("landing") if phase_times[1] is None else None
     if landing_clip and (
         takeoff_clip is None or landing_clip.start_seconds != takeoff_clip.start_seconds
@@ -574,7 +582,7 @@ def select_flight_event_clips(
             if len(selected) >= 6:
                 break
             if all(
-                abs(clip.start_seconds - chosen.start_seconds) >= clip_length for chosen in selected
+                abs(clip.start_seconds - chosen.start_seconds) > clip_length for chosen in selected
             ):
                 selected.append(clip)
         return sorted(selected, key=lambda clip: clip.start_seconds)
