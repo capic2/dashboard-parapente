@@ -113,7 +113,7 @@ catalogs:
       version: 6.32.3
     ky:
       specifier: ^2.0.0
-      version: 2.0.2
+      version: 2.1.0
     lint-staged:
       specifier: ^17.0.0
       version: 17.4.1
@@ -220,7 +220,7 @@ importers:
         version: 8.2.1
       ky:
         specifier: 'catalog:'
-        version: 2.0.2
+        version: 2.1.0
       react:
         specifier: 'catalog:'
         version: 19.2.8
@@ -3895,8 +3895,8 @@ packages:
   ktx-parse@1.1.0:
     resolution: {integrity: sha512-mKp3y+FaYgR7mXWAbyyzpa/r1zDWeaunH+INJO4fou3hb45XuNSwar+7llrRyvpMWafxSIi99RNFJ05MHedaJQ==}
 
-  ky@2.0.2:
-    resolution: {integrity: sha512-/GmXpo9F9W+f8n4Ivr2iH+7h7wL7jLbLKWkMlpflcCRb6kGjBfTlASEXaZ9qUgNTn4VgS0P2pwxxzQ4EM6Ulgg==}
+  ky@2.1.0:
+    resolution: {integrity: sha512-nIKwelw+7qVqKOlX4Eht6GXfEXlDHcdIjyLWV3s119kYt5s+70ayTnYS+0fRNmtgGRRAfqdeWQbh8YizqkS0ng==}
     engines: {node: '>=22'}
 
   lerc@2.0.0:
@@ -8467,7 +8467,7 @@ snapshots:
 
   ktx-parse@1.1.0: {}
 
-  ky@2.0.2: {}
+  ky@2.1.0: {}
 
   lerc@2.0.0: {}
 
