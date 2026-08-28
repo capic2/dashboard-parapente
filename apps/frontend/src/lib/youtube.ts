@@ -34,5 +34,12 @@ export function getYoutubeVideoId(rawUrl: string): string | null {
 
 export function getYoutubeEmbedUrl(rawUrl: string): string | null {
   const videoId = getYoutubeVideoId(rawUrl);
-  return videoId ? `https://www.youtube-nocookie.com/embed/${videoId}` : null;
+  if (!videoId) return null;
+
+  const embedUrl = new URL(`https://www.youtube-nocookie.com/embed/${videoId}`);
+  embedUrl.searchParams.set('enablejsapi', '1');
+  if (typeof window !== 'undefined' && window.location.origin !== 'null') {
+    embedUrl.searchParams.set('origin', window.location.origin);
+  }
+  return embedUrl.toString();
 }

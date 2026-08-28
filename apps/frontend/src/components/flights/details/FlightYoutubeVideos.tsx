@@ -47,8 +47,8 @@ export function FlightYoutubeVideos({
               title={t('flights.youtubeVideoTitle', { count: index + 1 })}
               className="aspect-video w-full"
               loading="lazy"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              referrerPolicy="strict-origin-when-cross-origin"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; xr-spatial-tracking"
+              referrerPolicy="origin"
               allowFullScreen
             />
             <div className="flex items-center justify-between gap-2 bg-gray-900 px-3 py-2">

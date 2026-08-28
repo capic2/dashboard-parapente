@@ -6,6 +6,7 @@ Covers fallback behavior between manual/stream modes and internal status guards.
 
 import json
 import tempfile
+from datetime import datetime
 from unittest.mock import patch
 
 from pathlib import Path
@@ -13,7 +14,86 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from auth import create_job_token
-from routes import _get_video_export_jobs_payload, serialize_sse_event
+from models import YoutubeUploadJob
+from routes import (
+    _get_video_export_jobs_payload,
+    _video_export_can_cancel,
+    _video_export_can_delete,
+    serialize_sse_event,
+)
+
+
+class TestHighlightExportLifecycleRules:
+    def test_highlight_can_cancel_only_with_flight_id_and_active_status(self):
+        assert _video_export_can_cancel(
+            {
+                "mode": "highlight",
+                "job_id": "highlight-1",
+                "flight_id": "flight-1",
+                "status": "queued",
+            }
+        )
+        assert _video_export_can_cancel(
+            {
+                "mode": "highlight",
+                "job_id": "highlight-1",
+                "flight_id": "flight-1",
+                "status": "running",
+            }
+        )
+        assert not _video_export_can_cancel(
+            {
+                "mode": "highlight",
+                "job_id": "highlight-1",
+                "flight_id": "flight-1",
+                "status": "completed",
+            }
+        )
+        assert not _video_export_can_cancel(
+            {
+                "mode": "highlight",
+                "job_id": "highlight-1",
+                "status": "running",
+            }
+        )
+
+    def test_highlight_can_delete_only_with_flight_id_and_terminal_status(self):
+        for status in ("completed", "failed", "cancelled"):
+            assert _video_export_can_delete(
+                {
+                    "mode": "highlight",
+                    "job_id": "highlight-1",
+                    "flight_id": "flight-1",
+                    "status": status,
+                }
+            )
+
+        assert not _video_export_can_delete(
+            {
+                "mode": "highlight",
+                "job_id": "highlight-1",
+                "flight_id": "flight-1",
+                "status": "running",
+            }
+        )
+        assert not _video_export_can_delete(
+            {
+                "mode": "highlight",
+                "job_id": "highlight-1",
+                "status": "completed",
+            }
+        )
+
+    def test_youtube_upload_never_exposes_highlight_lifecycle_actions(self):
+        job = {
+            "mode": "youtube_upload",
+            "job_id": "youtube-1",
+            "flight_id": "flight-1",
+            "status": "running",
+        }
+        assert not _video_export_can_cancel(job)
+        assert not _video_export_can_delete(job)
+
 
 API_PREFIX = "/api"
 
@@ -536,6 +616,20 @@ class TestVideoExportJobsEndpoint:
         assert jobs[2]["status"] == "cancelled"
         assert jobs[2]["can_cancel"] is False
         assert jobs[2]["can_delete"] is True
+        assert response.json()["status_counts"] == {
+            "all": 3,
+            "active": 2,
+            "completed": 0,
+            "failed": 0,
+            "cancelled": 1,
+        }
+        assert response.json()["type_counts"] == {
+            "all": 3,
+            "video": 2,
+            "gopro": 1,
+            "highlight": 0,
+            "youtube": 0,
+        }
 
     def test_video_export_jobs_can_filter_active_jobs(self, client: TestClient):
         with (
@@ -598,6 +692,115 @@ class TestVideoExportJobsEndpoint:
             next(job for job in jobs if job["job_id"] == "job-stream-encoding")["render_method"]
             == "gpu"
         )
+
+    def test_video_export_jobs_youtube_filter_accepts_both_mode_values(
+        self, client: TestClient
+    ):
+        with (
+            patch(
+                "routes.list_exports_manual",
+                return_value=[
+                    {"job_id": "youtube-upload-mode", "mode": "youtube_upload"},
+                    {"job_id": "youtube-mode", "mode": "youtube"},
+                ],
+            ),
+            patch("routes.list_exports_stream", return_value=[]),
+            patch("routes.list_gopro_overlay_jobs", return_value=[]),
+        ):
+            response = client.get(
+                f"{API_PREFIX}/video-export-jobs",
+                params={"type_filter": "youtube"},
+            )
+
+        assert response.status_code == 200
+        assert {job["job_id"] for job in response.json()["jobs"]} == {
+            "youtube-upload-mode",
+            "youtube-mode",
+        }
+
+    def test_video_export_jobs_supports_server_side_pagination(
+        self, client: TestClient, sample_flight
+    ):
+        jobs = [
+            {
+                "job_id": "job-newest",
+                "flight_id": sample_flight.id,
+                "status": "completed",
+                "updated_at": "2026-04-30T12:00:00",
+            },
+            {
+                "job_id": "job-oldest",
+                "flight_id": sample_flight.id,
+                "status": "failed",
+                "updated_at": "2026-04-30T10:00:00",
+            },
+        ]
+
+        with (
+            patch("routes.list_exports_manual", return_value=jobs),
+            patch("routes.list_exports_stream", return_value=[]),
+            patch("routes.list_gopro_overlay_jobs", return_value=[]),
+        ):
+            response = client.get(
+                f"{API_PREFIX}/video-export-jobs",
+                params={"page": 2, "page_size": 1},
+            )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["jobs"][0]["job_id"] == "job-oldest"
+        assert payload["page"] == 2
+        assert payload["page_size"] == 1
+        assert payload["total"] == 2
+        assert payload["total_pages"] == 2
+
+    def test_active_jobs_include_youtube_upload_progress(
+        self, client: TestClient, db_session, sample_flight
+    ) -> None:
+        db_session.add(
+            YoutubeUploadJob(
+                id="youtube-uploading",
+                flight_id=sample_flight.id,
+                user_id=1,
+                status="uploading",
+                progress=42,
+                title="Flight upload",
+                created_at=datetime(2026, 5, 2, 9),
+                updated_at=datetime(2026, 5, 2, 10),
+            )
+        )
+        db_session.commit()
+
+        with (
+            patch(
+                "routes.list_exports_manual",
+                return_value=[
+                    {
+                        "job_id": "video-exporting",
+                        "flight_id": sample_flight.id,
+                        "status": "processing",
+                        "progress": 12,
+                        "mode": "manual",
+                        "updated_at": "2026-05-01T10:00:00",
+                    }
+                ],
+            ),
+            patch("routes.list_exports_stream", return_value=[]),
+            patch("routes.list_gopro_overlay_jobs", return_value=[]),
+        ):
+            response = client.get(f"{API_PREFIX}/video-export-jobs?active_only=true")
+
+        assert response.status_code == 200
+        jobs = response.json()["jobs"]
+        assert [job["job_id"] for job in jobs] == [
+            "youtube-uploading",
+            "video-exporting",
+        ]
+        assert jobs[0]["flight_id"] == sample_flight.id
+        assert jobs[0]["status"] == "uploading"
+        assert jobs[0]["progress"] == 42
+        assert jobs[0]["mode"] == "youtube"
+        assert jobs[0]["can_cancel"] is True
 
     def test_export_status_passthrough_keeps_render_method(self, client: TestClient):
         with patch(

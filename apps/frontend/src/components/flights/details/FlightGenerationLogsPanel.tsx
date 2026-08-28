@@ -1,6 +1,9 @@
-import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
+import {
+  VIDEO_EXPORT_IN_PROGRESS_STATUSES,
+  type HighlightVideoJob,
+} from '@dashboard-parapente/shared-types';
 import { ChevronDown } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { VideoExportStatusPayload } from '../../../hooks/flights/useVideoExportStatus';
 import type { YoutubeUploadJob } from '../../../hooks/flights/useYoutubeUpload';
@@ -18,6 +21,7 @@ type FlightGenerationLogsPanelProps = {
   goproOverlayFallbackStatus?: string | null;
   goproOverlayFallbackProgress?: number | null;
   youtubeUploadJob: YoutubeUploadJob | null;
+  highlightVideo: HighlightVideoJob | null;
 };
 
 type LogSourceCardProps = {
@@ -29,8 +33,31 @@ type LogSourceCardProps = {
   progress?: number | null;
   message?: string | null;
   error?: string | null;
+  updatedAt?: string | null;
   logs?: string[] | null;
 };
+
+const STALLED_JOB_THRESHOLD_MS = 5 * 60 * 1000;
+
+function getStalledJobMinutes(
+  status: string | null,
+  updatedAt?: string | null,
+  now = Date.now()
+): number | null {
+  if (
+    !status ||
+    ['queued', 'cancelled', 'completed', 'failed'].includes(status)
+  ) {
+    return null;
+  }
+  if (!updatedAt) return null;
+  const lastActivity = new Date(updatedAt).getTime();
+  if (!Number.isFinite(lastActivity)) return null;
+  const elapsedMs = now - lastActivity;
+  if (elapsedMs < STALLED_JOB_THRESHOLD_MS) return null;
+  const minutes = Math.max(1, Math.floor(elapsedMs / 60000));
+  return minutes;
+}
 
 function clampProgress(progress?: number | null) {
   if (typeof progress !== 'number' || !Number.isFinite(progress)) {
@@ -65,6 +92,7 @@ function LogSourceCard({
   progress,
   message,
   error,
+  updatedAt,
   logs,
 }: LogSourceCardProps) {
   const { t } = useTranslation();
@@ -80,6 +108,16 @@ function LogSourceCard({
   const isLive = Boolean(
     status && !['cancelled', 'completed', 'failed'].includes(status)
   );
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!isLive) return;
+
+    const interval = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(interval);
+  }, [isLive]);
+
+  const stalledJobMinutes = getStalledJobMinutes(status, updatedAt, now);
   const renderMethodLabel =
     renderMethod && ['cpu', 'gpu'].includes(renderMethod)
       ? t(`flights.generationLogs.method.${renderMethod}`)
@@ -157,6 +195,14 @@ function LogSourceCard({
             </div>
           )}
 
+          {stalledJobMinutes && !error && (
+            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2 text-xs font-medium text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100">
+              {t('flights.generationLogs.stalled', {
+                minutes: stalledJobMinutes,
+              })}
+            </div>
+          )}
+
           <div className="mt-3">
             <JobLogViewer
               logs={lines}
@@ -184,6 +230,7 @@ export function FlightGenerationLogsPanel({
   goproOverlayFallbackStatus,
   goproOverlayFallbackProgress,
   youtubeUploadJob,
+  highlightVideo,
 }: FlightGenerationLogsPanelProps) {
   const { t } = useTranslation();
   const videoStatusValue =
@@ -200,11 +247,13 @@ export function FlightGenerationLogsPanel({
     goproOverlayStatusValue || goproOverlayJob?.job_id || goproOverlayJobId
   );
   const hasYoutubeUploadLogSource = Boolean(youtubeUploadJob?.job_id);
+  const hasHighlightLogSource = Boolean(highlightVideo?.job_id);
 
   if (
     !hasVideoLogSource &&
     !hasGoproOverlayLogSource &&
-    !hasYoutubeUploadLogSource
+    !hasYoutubeUploadLogSource &&
+    !hasHighlightLogSource
   ) {
     return null;
   }
@@ -238,6 +287,7 @@ export function FlightGenerationLogsPanel({
             progress={videoStatus?.progress ?? videoFallbackProgress}
             message={videoStatus?.message}
             error={videoStatus?.error}
+            updatedAt={videoStatus?.updated_at}
             logs={videoStatus?.log_tail}
           />
         )}
@@ -245,7 +295,14 @@ export function FlightGenerationLogsPanel({
           <LogSourceCard
             key={`gopro-${goproOverlayJob?.job_id ?? goproOverlayJobId ?? 'fallback'}`}
             title={t('flights.generationLogs.goproOverlayTitle')}
-            renderMethod={goproOverlayJob?.render_method ?? null}
+            renderMethod={
+              goproOverlayJob &&
+              ['running', 'completed', 'failed', 'cancelled'].includes(
+                goproOverlayJob.status
+              )
+                ? (goproOverlayJob.render_method ?? null)
+                : null
+            }
             status={goproOverlayStatusValue}
             isInProgress={isGoproOverlayInProgress(goproOverlayStatusValue)}
             statusLabel={
@@ -256,6 +313,7 @@ export function FlightGenerationLogsPanel({
             progress={goproOverlayJob?.progress ?? goproOverlayFallbackProgress}
             message={goproOverlayJob?.message}
             error={goproOverlayJob?.error}
+            updatedAt={goproOverlayJob?.updated_at}
             logs={goproOverlayJob?.log_tail}
           />
         )}
@@ -272,7 +330,23 @@ export function FlightGenerationLogsPanel({
             )}
             progress={youtubeUploadJob.progress}
             error={youtubeUploadJob.error}
+            updatedAt={youtubeUploadJob.updated_at}
             logs={youtubeUploadJob.log_tail}
+          />
+        )}
+        {hasHighlightLogSource && highlightVideo && (
+          <LogSourceCard
+            key={`highlight-${highlightVideo.job_id}`}
+            title={t('flights.generationLogs.highlightVideoTitle')}
+            status={highlightVideo.status}
+            isInProgress={['queued', 'running'].includes(highlightVideo.status)}
+            statusLabel={t(
+              `flights.generationLogs.status.${highlightVideo.status}`
+            )}
+            progress={highlightVideo.progress}
+            message={highlightVideo.message}
+            error={highlightVideo.error}
+            updatedAt={highlightVideo.updated_at}
           />
         )}
       </div>

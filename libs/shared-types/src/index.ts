@@ -82,6 +82,7 @@ export const GoproOverlayJobSchema = z.object({
   output_filename: z.string(),
   video_width: z.number().nullish(),
   video_height: z.number().nullish(),
+  output_resolution: z.enum(['1080p', '4k', 'source']).nullish(),
   gpx_offset: z.number().optional().default(0),
   created_at: z.string(),
   updated_at: z.string(),
@@ -89,6 +90,40 @@ export const GoproOverlayJobSchema = z.object({
   log_tail: z.array(z.string()).optional().default([]),
   job_token: z.string().nullish(),
 });
+
+export const HighlightVideoClipSchema = z.object({
+  start_seconds: z.number(),
+  duration_seconds: z.number(),
+  yaw_degrees: z.number(),
+  overlay_start_seconds: z.number(),
+  category: z.string(),
+});
+
+export const HighlightVideoJobSchema = z.object({
+  job_id: z.string(),
+  flight_id: z.string(),
+  status: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
+  progress: z.number(),
+  message: z.string().nullish(),
+  error: z.string().nullish(),
+  output_format: z.string(),
+  overlay_offset_seconds: z.number(),
+  selection: z.array(HighlightVideoClipSchema).default([]),
+  created_at: z.string(),
+  updated_at: z.string().nullish(),
+  completed_at: z.string().nullish(),
+});
+
+export const YoutubeVideoAssociationSchema = z.object({
+  url: z.string().url(),
+  video_id: z.string().min(1),
+  can_delete_from_youtube: z.boolean(),
+  exists_on_youtube: z.boolean().nullish(),
+});
+
+export const YoutubeVideoAssociationsSchema = z.array(
+  YoutubeVideoAssociationSchema
+);
 
 export const FlightSchema = z
   .object({
@@ -130,6 +165,7 @@ export const FlightSchema = z
     video_export_progress: z.number().nullish(),
     video_file_path: z.string().nullish(),
     video_file_exists: z.boolean().nullish(),
+    pano_video_file_exists: z.boolean().nullish(),
     gopro_camera_file_exists: z.boolean().nullish(),
     gopro_overlay_job_id: z.string().nullish(),
     gopro_overlay_status: z
@@ -177,7 +213,13 @@ export const FlightSummarySchema = z.object({
   elevation_gain_m: z.number().nullable(),
   has_gpx: z.boolean(),
   has_video: z.boolean(),
+  has_camera: z.boolean(),
+  has_youtube_video: z.boolean(),
+  youtube_upload_status: z.string().nullable(),
+  youtube_upload_progress: z.number().nullable(),
   has_gopro_overlay: z.boolean(),
+  has_pano_video: z.boolean(),
+  has_highlight_video: z.boolean(),
   video_export_job_id: z.string().nullable(),
   video_export_status: z.string().nullable(),
   video_export_progress: z.number().nullable(),
@@ -754,7 +796,11 @@ export type Site = z.infer<typeof SiteSchema>;
 export type SiteUpdate = z.infer<typeof SiteUpdateSchema>;
 export type CreateSiteData = z.infer<typeof CreateSiteSchema>;
 export type Flight = z.infer<typeof FlightSchema>;
+export type HighlightVideoJob = z.infer<typeof HighlightVideoJobSchema>;
 export type GoproOverlayJob = z.infer<typeof GoproOverlayJobSchema>;
+export type YoutubeVideoAssociation = z.infer<
+  typeof YoutubeVideoAssociationSchema
+>;
 export type FlightSummary = z.infer<typeof FlightSummarySchema>;
 export type FlightSummariesResponse = z.infer<
   typeof FlightSummariesResponseSchema

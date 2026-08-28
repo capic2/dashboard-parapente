@@ -34,7 +34,7 @@ aiofiles==25.1.0
 # Web Scraping & Browser Automation
 # ============================================
 playwright==1.62.0
-scrapling==0.4.14
+scrapling==0.4.15
 beautifulsoup4==4.15.0
 
 # ============================================
@@ -66,14 +66,19 @@ fakeredis==2.37.1
 # ============================================
 # Code Quality & Linting
 # ============================================
-ruff==0.16.4
+ruff==0.16.5
 black==26.5.1
-isort==8.0.1
+isort==9.0.1
 
 # ============================================
 # File Upload Support
 # ============================================
 python-multipart==0.0.32
+
+# ============================================
+# 360 Video Metadata
+# ============================================
+spatialmedia @ https://github.com/google/spatial-media/archive/2308497c39bb604a7c3ba56ac17e302f2b1b6a96.zip
 
 # ============================================
 # Meteorology & Scientific Computing
@@ -93,4 +98,4 @@ bcrypt>=4.0.0
 # AI/LLM Integration
 # ============================================
 google-generativeai==0.8.6
-groq==1.6.0
+groq==1.7.0

@@ -26,7 +26,13 @@ const summary = FlightSummariesResponseSchema.parse({
       elevation_gain_m: null,
       has_gpx: false,
       has_video: false,
+      has_camera: false,
+      has_youtube_video: false,
+      youtube_upload_status: null,
+      youtube_upload_progress: null,
       has_gopro_overlay: false,
+      has_pano_video: false,
+      has_highlight_video: false,
       video_export_job_id: null,
       video_export_status: null,
       video_export_progress: null,
@@ -86,7 +92,7 @@ describe('flight summary queries', () => {
     ).toBeUndefined();
   });
 
-  it('merges active video and overlay progress without refetching pages', () => {
+  it('merges active video, overlay, and YouTube progress without refetching pages', () => {
     const [flight] = mergeActiveMediaJobs(summary.flights, [
       {
         job_id: 'video-job',
@@ -102,9 +108,18 @@ describe('flight summary queries', () => {
         progress: 24,
         mode: 'gopro_overlay',
       },
+      {
+        job_id: 'youtube-job',
+        flight_id: 'flight-1',
+        status: 'uploading',
+        progress: 68,
+        mode: 'youtube',
+      },
     ]);
     expect(flight.video_export_progress).toBe(42);
     expect(flight.gopro_overlay_progress).toBe(24);
+    expect(flight.youtube_upload_status).toBe('uploading');
+    expect(flight.youtube_upload_progress).toBe(68);
   });
 
   it('identifies flights whose active jobs disappeared', () => {

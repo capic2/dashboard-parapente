@@ -57,6 +57,28 @@ def test_ffmpeg_command_concatenates_audio_with_video(tmp_path: Path) -> None:
     assert "-an" not in command
 
 
+def test_ffmpeg_command_uses_cuda_decode_and_scaling_for_nvidia(
+    tmp_path: Path,
+) -> None:
+    camera_path = tmp_path / "camera.mp4"
+    output_path = tmp_path / "preview.mp4"
+
+    command = gopro_preview_proxy._ffmpeg_command(
+        camera_path,
+        output_path,
+        gopro_preview_proxy.preview_segments(1000, 180),
+        "nvidia",
+        include_audio=False,
+    )
+
+    assert command.count("-hwaccel") == 2
+    assert command.count("cuda") >= 4
+    filters = command[command.index("-filter_complex") + 1]
+    assert "scale_cuda" in filters
+    assert "hwdownload,format=yuv420p" in filters
+    assert "h264_nvenc" in command
+
+
 def test_preview_segments_use_one_continuous_segment_when_extremities_overlap() -> None:
     assert gopro_preview_proxy.preview_segments(300, 180) == [
         gopro_preview_proxy.PreviewSegment(0.0, 0.0, 300.0)

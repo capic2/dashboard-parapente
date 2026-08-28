@@ -71,10 +71,10 @@ function createWrapper() {
   };
 }
 
-function TestHarness() {
-  const { data = [] } = useVideoExportJobs();
+function TestHarness({ typeFilter = 'all' }: { typeFilter?: string }) {
+  const { data } = useVideoExportJobs({ typeFilter });
 
-  return <div>{data.map((job) => job.job_id).join(',')}</div>;
+  return <div>{data?.jobs.map((job) => job.job_id).join(',')}</div>;
 }
 
 describe('useVideoExportJobs', () => {
@@ -112,6 +112,23 @@ describe('useVideoExportJobs', () => {
 
     await waitFor(() => {
       expect(screen.getByText('job-from-stream')).toBeInTheDocument();
+    });
+  });
+
+  it('requests and caches the selected job type', async () => {
+    render(<TestHarness typeFilter="gopro" />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(apiGet).toHaveBeenCalledWith(
+        'video-export-jobs',
+        expect.objectContaining({
+          searchParams: expect.objectContaining({ type_filter: 'gopro' }),
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(eventSourceMock.instances[0]?.url).toContain('type_filter=gopro');
     });
   });
 });

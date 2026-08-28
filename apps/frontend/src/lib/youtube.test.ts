@@ -22,8 +22,13 @@ describe('YouTube URL parsing', () => {
   });
 
   it('uses the privacy-enhanced embed domain', () => {
-    expect(getYoutubeEmbedUrl('https://youtu.be/dQw4w9WgXcQ')).toBe(
-      'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ'
+    const embedUrl = new URL(
+      getYoutubeEmbedUrl('https://youtu.be/dQw4w9WgXcQ') ?? ''
     );
+
+    expect(embedUrl.origin).toBe('https://www.youtube-nocookie.com');
+    expect(embedUrl.pathname).toBe('/embed/dQw4w9WgXcQ');
+    expect(embedUrl.searchParams.get('enablejsapi')).toBe('1');
+    expect(embedUrl.searchParams.get('origin')).toBe(window.location.origin);
   });
 });

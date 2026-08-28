@@ -1,9 +1,20 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@dashboard-parapente/design-system';
-import { Download, Trash2 } from 'lucide-react';
+import { Download, LoaderCircle, Trash2, Wand2 } from 'lucide-react';
 import type { GoproOverlayJob } from '../../../hooks/gopro/useGoproOverlay';
+import { isGoproOverlayInProgress } from '../../../lib/flightMediaState';
 import type { Flight } from '../../../types';
+import { FlightMediaThumbnail } from './FlightMediaThumbnail';
 import { FlightYoutubeUploadControls } from './FlightYoutubeUploadControls';
+
+function getResolutionLabel(job: GoproOverlayJob): string | null {
+  if (job.output_resolution === '4k') return '4K (3840 × 2160)';
+  if (job.output_resolution === '1080p') return '1080p (1920 × 1080)';
+  if (job.video_width && job.video_height) {
+    return `${job.video_width} × ${job.video_height}`;
+  }
+  return null;
+}
 
 interface GoproOverlayJobCardProps {
   job: GoproOverlayJob;
@@ -23,51 +34,93 @@ export function GoproOverlayJobCard({
   onDelete,
 }: GoproOverlayJobCardProps) {
   const { t } = useTranslation();
+  const renderHasStarted = [
+    'running',
+    'completed',
+    'failed',
+    'cancelled',
+  ].includes(job.status);
   const renderMethodLabel =
-    job.render_method && ['cpu', 'gpu'].includes(job.render_method)
+    renderHasStarted &&
+    job.render_method &&
+    ['cpu', 'gpu'].includes(job.render_method)
       ? t(`flights.generationLogs.method.${job.render_method}`)
       : null;
-  const resolutionLabel =
-    job.video_width && job.video_height
-      ? `${job.video_width} × ${job.video_height}`
-      : null;
+  const resolutionLabel = getResolutionLabel(job);
+  const isProcessing = isGoproOverlayInProgress(job.status);
+  const progress = Math.max(0, Math.min(100, Math.round(job.progress ?? 0)));
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            {t('flights.goproOverlayJobTitle')}
-          </p>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-            <p>
-              {job.layout_label} · {job.output_filename}
-            </p>
-            {resolutionLabel && (
-              <span className="rounded-full border border-slate-300 bg-white px-2 py-0.5 font-medium dark:border-slate-600 dark:bg-slate-800">
-                {resolutionLabel}
-              </span>
-            )}
-            {renderMethodLabel && (
-              <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
-                {renderMethodLabel}
-              </span>
-            )}
-          </div>
-        </div>
-        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm dark:bg-slate-800 dark:text-slate-200">
-          {t(`flights.goproOverlayStatus.${job.status}`)}
-        </span>
-      </div>
+    <div className="overflow-hidden rounded-xl border border-cyan-200 bg-white shadow-sm dark:border-cyan-800 dark:bg-slate-900/60">
       {job.status === 'completed' && (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 dark:border-emerald-800 dark:bg-emerald-950/30">
-          <span className="text-xs font-semibold text-emerald-900 dark:text-emerald-100">
-            {job.output_filename}
+        <FlightMediaThumbnail
+          path={`/gopro-overlays/jobs/${job.job_id}/thumbnail`}
+          videoPath={`/gopro-overlays/jobs/${job.job_id}/download`}
+          alt={t('flights.goproOverlayJobThumbnailAlt', {
+            name: job.output_filename,
+          })}
+        />
+      )}
+      <div className="p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
+              <Wand2 className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                {t('flights.goproOverlayJobTitle')}
+              </p>
+              <p className="truncate text-xs text-slate-600 dark:text-slate-300">
+                {job.output_filename}
+              </p>
+            </div>
+          </div>
+          <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+            {t(`flights.goproOverlayStatus.${job.status}`)}
           </span>
-          <div className="flex flex-wrap items-center justify-end gap-2">
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+          <span>{job.layout_label}</span>
+          {resolutionLabel && (
+            <span className="rounded-full border border-slate-300 bg-white px-2 py-0.5 font-medium dark:border-slate-600 dark:bg-slate-800">
+              {resolutionLabel}
+            </span>
+          )}
+          {renderMethodLabel && (
+            <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+              {renderMethodLabel}
+            </span>
+          )}
+        </div>
+        {isProcessing && (
+          <div className="mt-3">
+            <div className="mb-1 flex items-center justify-between text-xs font-semibold text-blue-800 dark:text-blue-200">
+              <span className="flex items-center gap-1.5">
+                <LoaderCircle
+                  className="h-3.5 w-3.5 motion-safe:animate-spin"
+                  aria-hidden="true"
+                />
+                {t('flights.mediaExportInProgress')}
+              </span>
+              <span>{progress}%</span>
+            </div>
+            <progress
+              aria-label={t('flights.goproOverlayProcessingBadge')}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress}
+              value={progress}
+              max={100}
+              className="h-2 w-full accent-blue-600 dark:accent-blue-400"
+            />
+          </div>
+        )}
+        {job.status === 'completed' && (
+          <div className="mt-3 space-y-2">
             <Button
               type="button"
-              className="min-h-10 cursor-pointer rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed"
+              className="min-h-10 w-full cursor-pointer rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed"
               onPress={onDownload}
               isDisabled={isDownloadingAnyMedia}
             >
@@ -75,32 +128,35 @@ export function GoproOverlayJobCard({
               {t('flights.goproOverlayDownload')}
             </Button>
             {youtubeUploadFlight && (
-              <div className="min-w-48">
+              <div>
                 <FlightYoutubeUploadControls
                   flight={youtubeUploadFlight}
-                  goproOverlayJobId={job.job_id}
+                  source={{
+                    source_type: 'gopro_overlay',
+                    gopro_overlay_job_id: job.job_id,
+                  }}
                 />
               </div>
             )}
           </div>
-        </div>
-      )}
-      {['completed', 'failed', 'cancelled'].includes(job.status) && (
-        <div className="mt-3 flex justify-end">
-          <Button
-            type="button"
-            variant="ghost"
-            className="min-h-10 cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed dark:text-red-300 dark:hover:bg-red-950/30"
-            onPress={onDelete}
-            isDisabled={isDeleting}
-          >
-            <Trash2 className="h-4 w-4" aria-hidden="true" />
-            {isDeleting
-              ? t('flights.goproOverlayDeleting')
-              : t('flights.goproOverlayDelete')}
-          </Button>
-        </div>
-      )}
+        )}
+        {['completed', 'failed', 'cancelled'].includes(job.status) && (
+          <div className="mt-2 flex justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-h-10 cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed dark:text-red-300 dark:hover:bg-red-950/30"
+              onPress={onDelete}
+              isDisabled={isDeleting}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+              {isDeleting
+                ? t('flights.goproOverlayDeleting')
+                : t('flights.goproOverlayDelete')}
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

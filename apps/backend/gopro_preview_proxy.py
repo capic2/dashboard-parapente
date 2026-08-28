@@ -385,16 +385,27 @@ def _ffmpeg_command(
         f"h='min({config.GOPRO_PREVIEW_MAX_HEIGHT},ih)':"
         "force_original_aspect_ratio=decrease:force_divisible_by=2"
     )
+    use_cuda = accelerator == "nvidia"
     input_args: list[str] = []
     filters: list[str] = []
     for index, segment in enumerate(segments):
         if segment.source_start_seconds > 0:
             input_args.extend(["-ss", f"{segment.source_start_seconds:g}"])
+        if use_cuda:
+            input_args.extend(["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"])
         input_args.extend(["-i", str(camera_path)])
         video_label = "outv" if len(segments) == 1 else f"v{index}"
+        video_scale = scale
+        if use_cuda:
+            video_scale = (
+                f"scale_cuda=w={config.GOPRO_PREVIEW_MAX_WIDTH}:"
+                f"h={config.GOPRO_PREVIEW_MAX_HEIGHT}:"
+                "force_original_aspect_ratio=decrease:force_divisible_by=2:format=yuv420p,"
+                "hwdownload,format=yuv420p"
+            )
         filters.append(
             f"[{index}:v:0]trim=duration={segment.duration_seconds:g},"
-            f"setpts=PTS-STARTPTS,{scale}[{video_label}]"
+            f"setpts=PTS-STARTPTS,{video_scale}[{video_label}]"
         )
         if include_audio:
             audio_label = "outa" if len(segments) == 1 else f"a{index}"

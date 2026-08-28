@@ -55,7 +55,13 @@ const flight = {
   elevation_gain_m: null,
   has_gpx: false,
   has_video: false,
+  has_camera: false,
+  has_youtube_video: false,
+  youtube_upload_status: null,
+  youtube_upload_progress: null,
   has_gopro_overlay: false,
+  has_pano_video: false,
+  has_highlight_video: false,
   video_export_job_id: null,
   video_export_status: null,
   video_export_progress: null,
@@ -104,4 +110,96 @@ test('renders media as a passive status in the flight list', () => {
   expect(
     screen.queryByRole('button', { name: 'flights.downloadGpx' })
   ).not.toBeInTheDocument();
+  expect(screen.queryByText('flights.youtubeBadge')).not.toBeInTheDocument();
+});
+
+test('renders available media badges in the expected order', () => {
+  render(
+    <Flight
+      flight={{
+        ...flight,
+        has_gpx: true,
+        has_video: true,
+        has_camera: true,
+        has_gopro_overlay: true,
+        has_pano_video: true,
+        has_highlight_video: true,
+        has_youtube_video: true,
+      }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  const badges = [
+    'flights.gpxBadge',
+    'flights.videoBadge',
+    'flights.cameraBadge',
+    'flights.panoBadge',
+    'flights.goproOverlayBadge',
+    'flights.highlightVideoBadge',
+    'flights.youtubeBadge',
+  ].map((label) => screen.getByText(label));
+
+  expect(badges).toEqual(
+    [...badges].sort((left, right) => {
+      const position = left.compareDocumentPosition(right);
+      return position & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+    })
+  );
+});
+
+test('renders a panorama badge when pano.mp4 exists', () => {
+  render(
+    <Flight
+      flight={{ ...flight, has_pano_video: true }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(screen.getByText('flights.panoBadge')).toBeInTheDocument();
+});
+
+test('renders a best moments badge when the video is generated', () => {
+  render(
+    <Flight
+      flight={{ ...flight, has_highlight_video: true }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(screen.getByText('flights.highlightVideoBadge')).toBeInTheDocument();
+});
+
+test('renders YouTube upload progress in the media badge', () => {
+  render(
+    <Flight
+      flight={{
+        ...flight,
+        youtube_upload_status: 'uploading',
+        youtube_upload_progress: 42,
+      }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(screen.getByText('flights.youtubeBadge 42%')).toHaveAttribute(
+    'aria-live',
+    'polite'
+  );
 });

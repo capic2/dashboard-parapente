@@ -28,7 +28,7 @@ from gopro_overlay_export import cancel_gopro_overlay_job
 from gopro_overlay_export import create_gopro_overlay_job
 from gopro_overlay_export import create_gopro_overlay_job_from_paths
 from gopro_overlay_export import delete_gopro_overlay_job
-from models import Flight
+from models import Flight, GoproOverlayJob
 from models import VideoExportJob
 
 API_PREFIX = "/api"
@@ -473,14 +473,17 @@ def test_create_gopro_overlay_job_rejects_non_finite_gpx_offset(
     assert response.json()["detail"] == "gpx_offset must be a finite number"
 
 
-def test_create_gopro_overlay_job_rejects_unknown_output_resolution(client: TestClient):
+@pytest.mark.parametrize("output_resolution", ["auto", "source", "720p"])
+def test_create_gopro_overlay_job_rejects_unsupported_output_resolution(
+    client: TestClient, output_resolution: str
+):
     response = client.post(
         f"{API_PREFIX}/gopro-overlays/jobs",
         files={
             "video_file": ("flight.mp4", b"video", "video/mp4"),
             "gpx_file": ("flight.gpx", b"<gpx />", "application/gpx+xml"),
         },
-        data={"output_resolution": "720p"},
+        data={"output_resolution": output_resolution},
     )
 
     assert response.status_code == 422
@@ -610,6 +613,20 @@ def test_create_flight_gopro_overlay_job_rejects_non_finite_gpx_offset(
     assert response.json()["detail"] == "gpx_offset must be a finite number"
 
 
+@pytest.mark.parametrize("output_resolution", ["auto", "source", "720p"])
+def test_create_flight_gopro_overlay_job_rejects_unsupported_output_resolution(
+    client: TestClient,
+    sample_flight,
+    output_resolution: str,
+):
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay",
+        data={"output_resolution": output_resolution},
+    )
+
+    assert response.status_code == 422
+
+
 def test_create_flight_gopro_overlay_job_resolves_paragliding_root_paths(
     client: TestClient,
     db_session,
@@ -695,17 +712,21 @@ def test_create_flight_gopro_overlay_job_uses_auto_flight_directory_files(
     second_gpx_path = input_dir / "Zepp-b.gpx"
     old_pip_path = input_dir / "flight-old.mp4"
     new_pip_path = input_dir / "flight-new.MP4"
+    previous_overlay_path = input_dir / "flight-overlay.mp4"
     camera_path.write_bytes(b"camera")
     first_gpx_path.write_text("<gpx>first</gpx>")
     second_gpx_path.write_text("<gpx>second</gpx>")
     old_pip_path.write_bytes(b"old")
     new_pip_path.write_bytes(b"new")
+    previous_overlay_path.write_bytes(b"already-overlayed")
     sample_flight.video_file_path = str(new_pip_path)
+    sample_flight.gopro_overlay_file_path = str(previous_overlay_path)
     db_session.commit()
     os.utime(first_gpx_path, (2, 2))
     os.utime(second_gpx_path, (1, 1))
     os.utime(old_pip_path, (1, 1))
     os.utime(new_pip_path, (2, 2))
+    os.utime(previous_overlay_path, (3, 3))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(paragliding_root))
 
     expected = {
@@ -826,7 +847,7 @@ def test_create_flight_gopro_overlay_job_uses_daily_departure_index(
     assert create_job.call_args.kwargs["output_resolution"] == "1080p"
 
 
-def test_create_flight_gopro_overlay_job_auto_uses_4k_output_resolution(
+def test_create_flight_gopro_overlay_job_uses_explicit_4k_output_resolution(
     client: TestClient,
     db_session,
     sample_flight,
@@ -877,7 +898,10 @@ def test_create_flight_gopro_overlay_job_auto_uses_4k_output_resolution(
         patch("routes.probe_video_resolution", return_value=(3840, 2160)),
         patch("routes.create_gopro_overlay_job_from_paths", return_value=expected) as create_job,
     ):
-        response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay")
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay",
+            data={"output_resolution": "4k"},
+        )
 
     assert response.status_code == 200
     assert create_job.call_args.kwargs["video_path"] == camera_path
@@ -1788,6 +1812,27 @@ def test_download_gopro_overlay_rejects_unfinished_job(client: TestClient):
     assert response.json()["detail"] == "GoPro overlay video is not ready"
 
 
+def test_get_gopro_overlay_job_thumbnail(client: TestClient, tmp_path: Path) -> None:
+    output_path = tmp_path / "overlay.mp4"
+    output_path.write_bytes(b"overlay")
+    thumbnail_path = tmp_path / "overlay-thumbnail.jpg"
+    thumbnail_path.write_bytes(b"jpeg")
+
+    with (
+        patch(
+            "routes.get_gopro_overlay_job",
+            return_value={"job_id": "job-gopro", "status": "completed"},
+        ),
+        patch("routes.gopro_overlay_output_path", return_value=output_path),
+        patch("routes.get_video_thumbnail", return_value=thumbnail_path),
+    ):
+        response = client.get(f"{API_PREFIX}/gopro-overlays/jobs/job-gopro/thumbnail")
+
+    assert response.status_code == 200
+    assert response.content == b"jpeg"
+    assert response.headers["content-type"] == "image/jpeg"
+
+
 def test_delete_gopro_overlay_video_removes_completed_output(client: TestClient):
     with patch(
         "routes.delete_gopro_overlay_output",
@@ -2028,6 +2073,74 @@ def test_delete_latest_overlay_restores_previous_flight_overlay(
         session.close()
 
 
+def test_delete_last_overlay_preserves_flight_gpx_offset(
+    tmp_path: Path,
+    test_db: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from models import GoproOverlayJob
+
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+    flight_id = "flight-last-overlay-offset"
+    output_path = tmp_path / "flight-overlay.mp4"
+    output_path.write_bytes(b"overlay")
+
+    session = test_db()
+    try:
+        flight = Flight(
+            id=flight_id,
+            name="Flight with saved offset",
+            flight_date=date(2026, 3, 15),
+            gopro_overlay_job_id="overlay-only",
+            gopro_overlay_status="completed",
+            gopro_overlay_file_path=str(output_path),
+            gopro_overlay_gpx_offset=2.5,
+        )
+        session.add(flight)
+        session.add(
+            GoproOverlayJob(
+                id="overlay-only",
+                flight_id=flight_id,
+                status="completed",
+                progress=100,
+                message="Overlay ready",
+                video_path=str(tmp_path / "camera.mp4"),
+                gpx_path=str(tmp_path / "track.gpx"),
+                layout_id="parapente",
+                layout_label="Parapente",
+                layout_path=str(tmp_path / "layout.xml"),
+                output_path=str(output_path),
+                temp_output_path=str(output_path.with_suffix(".part.mp4")),
+                output_filename=output_path.name,
+                command_json=json.dumps({"gpx_offset": 2.5}),
+                created_at=datetime(2026, 3, 15, 12),
+                updated_at=datetime(2026, 3, 15, 12),
+                completed_at=datetime(2026, 3, 15, 12),
+            )
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    result = delete_gopro_overlay_job("overlay-only")
+
+    assert result is not None
+    assert result["deleted"] is True
+    assert not output_path.exists()
+    session = test_db()
+    try:
+        flight = session.get(Flight, flight_id)
+        assert flight is not None
+        assert flight.gopro_overlay_job_id is None
+        assert flight.gopro_overlay_status is None
+        assert flight.gopro_overlay_file_path is None
+        assert flight.gopro_overlay_gpx_offset == 2.5
+        assert session.get(GoproOverlayJob, "overlay-only") is None
+    finally:
+        session.close()
+
+
 def test_overlay_log_survives_work_directory_cleanup(tmp_path, monkeypatch):
     job_id = "job-overlay-persistent-log"
     work_dir = tmp_path / ".gopro-overlay-work" / job_id
@@ -2079,7 +2192,7 @@ def test_reconcile_gopro_overlay_flight_refs_clears_missing_active_job(test_db, 
         session.close()
 
 
-def test_mark_interrupted_jobs_failed_marks_active_rows_failed(
+def test_mark_interrupted_jobs_requeues_active_rows_and_preserves_partial_outputs(
     test_db: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
@@ -2131,15 +2244,18 @@ def test_mark_interrupted_jobs_failed_marks_active_rows_failed(
         for job_id in ("job-preparing", "job-running"):
             refreshed = gopro_overlay_export.get_gopro_overlay_job(job_id)
             assert refreshed is not None
-            assert refreshed["status"] == "failed"
-            assert refreshed["message"] == "Overlay interrupted by backend restart"
+            assert refreshed["status"] == "queued"
+            assert refreshed["message"] == (
+                "Overlay interrupted; resuming from the last completed segment"
+            )
             refreshed_flight = session.get(Flight, f"flight-{job_id}")
             assert refreshed_flight is not None
-            assert refreshed_flight.gopro_overlay_status == "failed"
+            assert refreshed_flight.gopro_overlay_status == "queued"
         already_failed = gopro_overlay_export.get_gopro_overlay_job("job-already-failed")
         assert already_failed is not None
         assert already_failed["message"] == "Rendering overlay"
-        assert all(not temporary_path.exists() for temporary_path in temporary_paths)
+        assert all(temporary_path.exists() for temporary_path in temporary_paths[:2])
+        assert not temporary_paths[2].exists()
         assert final_output.read_bytes() == b"completed"
     finally:
         session.close()
@@ -2267,6 +2383,83 @@ def test_prepare_pip_video_delays_pip_until_gpx_start(tmp_path, monkeypatch):
     assert "tpad=stop_mode=clone:stop=150" in video_filter
     assert "setpts=N/(10*TB)" in video_filter
     assert command[command.index("-c:v") + 1] == "libx264"
+
+
+def test_claim_job_for_preparation_allows_only_one_worker(monkeypatch: pytest.MonkeyPatch) -> None:
+    class MissingOverlayJobsTableSession:
+        def __enter__(self) -> None:
+            raise gopro_overlay_export.OperationalError(
+                "select", {}, Exception("no such table: gopro_overlay_jobs")
+            )
+
+        def __exit__(self, *_args: object) -> bool:
+            return False
+
+    job_id = "job-preparation-claim"
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", MissingOverlayJobsTableSession)
+    gopro_overlay_export._JOBS[job_id] = {
+        "job_id": job_id,
+        "status": gopro_overlay_export._STATUS_QUEUED,
+    }
+
+    try:
+        claimed = gopro_overlay_export._claim_job_for_preparation(job_id)
+        assert claimed is not None
+        assert claimed["status"] == gopro_overlay_export._STATUS_PREPARING
+        assert gopro_overlay_export._claim_job_for_preparation(job_id) is None
+    finally:
+        gopro_overlay_export._JOBS.pop(job_id, None)
+
+
+def test_claim_job_for_preparation_syncs_linked_flight(
+    tmp_path: Path, test_db, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job_id = "job-preparation-flight-sync"
+    flight_id = "flight-preparation-flight-sync"
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+    session = test_db()
+    try:
+        session.add(
+            Flight(
+                id=flight_id,
+                name="Flight preparation sync",
+                flight_date=date(2026, 3, 15),
+                gopro_overlay_job_id=job_id,
+                gopro_overlay_status="queued",
+            )
+        )
+        session.add(
+            GoproOverlayJob(
+                id=job_id,
+                flight_id=flight_id,
+                status="queued",
+                progress=0,
+                message="Overlay queued",
+                video_path=str(tmp_path / "camera.mp4"),
+                gpx_path=str(tmp_path / "track.gpx"),
+                layout_id="parapente-1080",
+                layout_label="Parapente 1920x1080",
+                layout_path=str(tmp_path / "layout.xml"),
+                output_path=str(tmp_path / "overlay.mp4"),
+                temp_output_path=str(tmp_path / "overlay.part.mp4"),
+                output_filename="overlay.mp4",
+            )
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    claimed = gopro_overlay_export._claim_job_for_preparation(job_id)
+
+    assert claimed is not None
+    assert claimed["status"] == gopro_overlay_export._STATUS_PREPARING
+    session = test_db()
+    try:
+        flight = session.get(Flight, flight_id)
+        assert flight is not None
+        assert flight.gopro_overlay_status == gopro_overlay_export._STATUS_PREPARING
+    finally:
+        session.close()
 
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is required")
@@ -3090,7 +3283,7 @@ def test_enqueue_gopro_overlay_job_uses_dedicated_rq_queue(monkeypatch):
             "args": ("job-rq",),
             "kwargs": {
                 "job_id": "gopro-overlay-job-rq",
-                "timeout": config.JOB_QUEUE_TIMEOUT_SECONDS,
+                "timeout": config.GOPRO_OVERLAY_JOB_TIMEOUT_SECONDS,
                 "queue_name": "overlay-test-queue",
                 "at_front": True,
             },
@@ -3310,6 +3503,7 @@ def test_cancel_queued_gopro_overlay_job_removes_rq_job(monkeypatch):
         "pip_path": None,
         "video_width": None,
         "video_height": None,
+        "command": {"output_resolution": "4k"},
         "updated_at": "2026-01-01T00:00:00+00:00",
     }
     monkeypatch.setattr(gopro_overlay_export.config, "JOB_QUEUE_BACKEND", "rq")
@@ -3423,7 +3617,9 @@ def test_run_job_uses_preview_effective_offset_for_osv_merge(
     assert merge_calls[0][3]["gpx_offset"] == 295.9
     assert merge_calls[0][3]["first_gpx_at"] == pytest.approx(5.0)
     assert merge_calls[0][3]["video_duration"] == 421.483
-    assert gopro_overlay_export.get_gopro_overlay_job(job["job_id"])["status"] == "completed"
+    persisted_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"])
+    assert persisted_job["status"] == "completed"
+    assert persisted_job["gpx_offset"] == 295.9
     assert Path(job["output_path"]).read_bytes() == b"video"
     assert not Path(job["temp_output_path"]).exists()
     assert not work_dir.exists()
@@ -3724,6 +3920,9 @@ def test_run_job_passes_configured_overlay_gpu_args(monkeypatch, tmp_path):
         assert fallback_command[fallback_command.index("--config-dir") + 1] == "/config"
         assert "--profile" not in fallback_command
         assert "--double-buffer" not in fallback_command
+        fallback_job = gopro_overlay_export.get_gopro_overlay_job(job_id, include_command=True)
+        assert fallback_job is not None
+        assert fallback_job["command"]["output_resolution"] == "4k"
     finally:
         gopro_overlay_export._JOBS.pop(job_id, None)
         gopro_overlay_export._PROCESSES.pop(job_id, None)

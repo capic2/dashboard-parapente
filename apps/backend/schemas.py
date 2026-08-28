@@ -47,28 +47,34 @@ def normalize_youtube_urls(urls: list[str]) -> list[str]:
         if not url:
             continue
 
-        parsed = urlparse(url)
-        host = (parsed.hostname or "").lower()
-        video_id: str | None = None
-        if parsed.scheme not in {"http", "https"}:
-            raise ValueError("YouTube URLs must use http or https")
-        if host in {"youtu.be", "www.youtu.be"}:
-            video_id = parsed.path.strip("/").split("/")[0]
-        elif host in YOUTUBE_HOSTS:
-            if parsed.path.rstrip("/") == "/watch":
-                video_id = parse_qs(parsed.query).get("v", [None])[0]
-            else:
-                parts = parsed.path.strip("/").split("/")
-                if len(parts) >= 2 and parts[0] in {"embed", "shorts", "live"}:
-                    video_id = parts[1]
-
-        if not video_id or not YOUTUBE_VIDEO_ID_PATTERN.fullmatch(video_id):
-            raise ValueError(f"Unsupported YouTube URL: {url}")
+        video_id = youtube_video_id_from_url(url)
 
         canonical_url = f"https://www.youtube.com/watch?v={video_id}"
         if canonical_url not in normalized:
             normalized.append(canonical_url)
     return normalized
+
+
+def youtube_video_id_from_url(url: str) -> str:
+    """Extract a validated video ID from a supported YouTube URL."""
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    video_id: str | None = None
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError("YouTube URLs must use http or https")
+    if host in {"youtu.be", "www.youtu.be"}:
+        video_id = parsed.path.strip("/").split("/")[0]
+    elif host in YOUTUBE_HOSTS:
+        if parsed.path.rstrip("/") == "/watch":
+            video_id = parse_qs(parsed.query).get("v", [None])[0]
+        else:
+            parts = parsed.path.strip("/").split("/")
+            if len(parts) >= 2 and parts[0] in {"embed", "shorts", "live"}:
+                video_id = parts[1]
+
+    if not video_id or not YOUTUBE_VIDEO_ID_PATTERN.fullmatch(video_id):
+        raise ValueError(f"Unsupported YouTube URL: {url}")
+    return video_id
 
 
 class GoproOverlayDependencies(BaseModel):
@@ -111,6 +117,7 @@ class GoproOverlayJob(BaseModel):
     output_filename: str
     video_width: int | None = None
     video_height: int | None = None
+    output_resolution: Literal["1080p", "4k", "source"] | None = None
     gpx_offset: float = 0.0
     created_at: datetime
     updated_at: datetime
@@ -180,6 +187,35 @@ class GoproOverlayPreview(BaseModel):
 class GoproOverlayCancelResponse(BaseModel):
     job_id: str
     message: str
+
+
+class HighlightVideoClipResponse(BaseModel):
+    start_seconds: float
+    duration_seconds: float
+    yaw_degrees: float
+    overlay_start_seconds: float
+    category: str
+
+
+class HighlightVideoJobResponse(BaseModel):
+    job_id: str
+    flight_id: str
+    status: Literal["queued", "running", "completed", "failed", "cancelled"]
+    progress: int
+    message: str | None = None
+    error: str | None = None
+    output_format: str
+    overlay_offset_seconds: float
+    selection: list[HighlightVideoClipResponse] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+    completed_at: datetime | None = None
+
+
+class HighlightVideoDeleteResponse(BaseModel):
+    job_id: str
+    deleted: bool
+    files_deleted: int = Field(ge=0)
 
 
 class DeploymentDrainRequest(BaseModel):
@@ -459,17 +495,33 @@ class YoutubeAuthUrlRequest(BaseModel):
 
 
 class YoutubeUploadCreate(BaseModel):
-    gopro_overlay_job_id: str = Field(min_length=1)
+    source_type: Literal["gopro_overlay", "pano", "highlight"] = "gopro_overlay"
+    gopro_overlay_job_id: str | None = None
+    highlight_video_job_id: str | None = None
     title: str = Field(min_length=1, max_length=100)
     description: str = Field(default="", max_length=5000)
     privacy_status: Literal["private", "unlisted", "public"] = "private"
 
     @validator("gopro_overlay_job_id")
-    def trimmed_overlay_job_id(cls, value: str) -> str:
+    def trimmed_overlay_job_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         overlay_job_id = value.strip()
         if not overlay_job_id:
             raise ValueError("gopro_overlay_job_id must not be blank")
         return overlay_job_id
+
+    @model_validator(mode="after")
+    def valid_source(self) -> "YoutubeUploadCreate":
+        if self.source_type == "gopro_overlay" and self.gopro_overlay_job_id is None:
+            raise ValueError("gopro_overlay_job_id is required for a GoPro overlay upload")
+        if self.source_type != "gopro_overlay" and self.gopro_overlay_job_id is not None:
+            raise ValueError("gopro_overlay_job_id must be omitted for this upload")
+        if self.source_type == "highlight" and self.highlight_video_job_id is None:
+            raise ValueError("highlight_video_job_id is required for a highlights upload")
+        if self.source_type != "highlight" and self.highlight_video_job_id is not None:
+            raise ValueError("highlight_video_job_id must be omitted for this upload")
+        return self
 
     @validator("title")
     def trimmed_title(cls, value: str) -> str:
@@ -482,12 +534,25 @@ class YoutubeUploadCreate(BaseModel):
 class YoutubeUploadJobResponse(BaseModel):
     job_id: str
     flight_id: str
+    source_type: Literal["gopro_overlay", "pano", "highlight"]
     gopro_overlay_job_id: str | None = None
+    highlight_video_job_id: str | None = None
     status: Literal["queued", "uploading", "completed", "failed", "cancelled"]
     progress: int = Field(ge=0, le=100)
     youtube_url: str | None = None
     error: str | None = None
     log_tail: list[str] = Field(default_factory=list)
+
+
+class YoutubeVideoAssociation(BaseModel):
+    url: str
+    video_id: str = Field(pattern=YOUTUBE_VIDEO_ID_PATTERN.pattern)
+    can_delete_from_youtube: bool
+    exists_on_youtube: bool | None = None
+
+
+class YoutubeVideoRemoveRequest(BaseModel):
+    delete_from_youtube: bool
 
 
 # Site info included in Flight response (for camera orientation)
@@ -523,6 +588,7 @@ class Flight(FlightBase):
     video_export_progress: int | None = None
     video_file_path: str | None = None
     video_file_exists: bool = False
+    pano_video_file_exists: bool = False
     gopro_camera_file_exists: bool = False
     gopro_overlay_job_id: str | None = None
     gopro_overlay_status: str | None = None
@@ -567,10 +633,16 @@ class FlightSummary(BaseModel):
     video_export_status: str | None = None
     video_export_progress: int | None = None
     has_video: bool
+    has_camera: bool
+    has_youtube_video: bool
+    youtube_upload_status: str | None = None
+    youtube_upload_progress: int | None = None
     gopro_overlay_job_id: str | None = None
     gopro_overlay_status: str | None = None
     gopro_overlay_progress: int | None = None
     has_gopro_overlay: bool
+    has_pano_video: bool
+    has_highlight_video: bool
 
 
 class FlightSummariesResponse(BaseModel):
