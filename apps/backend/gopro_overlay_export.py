@@ -2674,14 +2674,14 @@ def _delete_rq_gopro_overlay_job(job_id: str) -> bool:
     return delete_job(_rq_job_id(job_id), queue_name=config.GOPRO_OVERLAY_QUEUE_NAME)
 
 
-def enqueue_pending_gopro_overlay_jobs(*, mark_interrupted: bool = False) -> int:
-    """Enqueue queued overlay jobs into the dedicated RQ queue."""
+def enqueue_pending_gopro_overlay_jobs(*, recover_active: bool = False) -> int:
+    """Enqueue durable overlay jobs, recovering interrupted work on worker startup."""
     from job_queue import is_rq_enabled
 
     if not is_rq_enabled():
         return 0
 
-    if mark_interrupted:
+    if recover_active:
         _mark_interrupted_jobs_failed()
     job_ids = _queued_job_ids()
     for job_id in job_ids:

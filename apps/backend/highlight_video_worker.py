@@ -37,6 +37,8 @@ STATUS_COMPLETED = "completed"
 STATUS_FAILED = "failed"
 STATUS_CANCELLED = "cancelled"
 
+_ACTIVE_STATUSES = {STATUS_QUEUED, STATUS_RUNNING}
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -744,11 +746,103 @@ def _is_cancelled(job_id: str) -> bool:
         return job is None or job.status == STATUS_CANCELLED
 
 
+def _rq_job_id(job_id: str) -> str:
+    return f"highlight-video-{job_id}"
+
+
+def _enqueue_highlight_video_job_in_rq(job_id: str) -> None:
+    from job_queue import enqueue_once
+
+    enqueue_once(
+        "highlight_video_worker.process_highlight_video_job",
+        job_id,
+        job_id=_rq_job_id(job_id),
+        timeout=config.JOB_QUEUE_TIMEOUT_SECONDS,
+        queue_name=config.JOB_QUEUE_NAME,
+    )
+
+
+def _queued_job_ids() -> list[str]:
+    with SessionLocal() as db:
+        jobs = (
+            db.query(HighlightVideoJob.id)
+            .filter(HighlightVideoJob.status == STATUS_QUEUED)
+            .order_by(HighlightVideoJob.created_at)
+            .all()
+        )
+    return [str(job_id) for (job_id,) in jobs]
+
+
+def _recover_active_jobs_after_worker_restart() -> int:
+    """Make interrupted highlight jobs eligible for a fresh RQ execution."""
+    now = _now()
+    with SessionLocal() as db:
+        recovered_count = (
+            db.query(HighlightVideoJob)
+            .filter(HighlightVideoJob.status.in_(_ACTIVE_STATUSES))
+            .update(
+                {
+                    "status": STATUS_QUEUED,
+                    "progress": 0,
+                    "message": "Récupéré après le redémarrage du worker",
+                    "error": None,
+                    "started_at": None,
+                    "updated_at": now,
+                },
+                synchronize_session=False,
+            )
+        )
+        db.commit()
+    return int(recovered_count)
+
+
+def enqueue_highlight_video_job(job_id: str) -> bool:
+    """Submit one durable highlight job to RQ when enabled."""
+    from job_queue import is_rq_enabled
+
+    if not is_rq_enabled():
+        return False
+    _enqueue_highlight_video_job_in_rq(job_id)
+    return True
+
+
+def enqueue_pending_highlight_video_jobs(*, recover_active: bool = False) -> int:
+    """Enqueue durable highlight jobs after API or worker restarts."""
+    from job_queue import is_rq_enabled
+
+    if not is_rq_enabled():
+        return 0
+    if recover_active:
+        _recover_active_jobs_after_worker_restart()
+    job_ids = _queued_job_ids()
+    for job_id in job_ids:
+        enqueue_highlight_video_job(job_id)
+    return len(job_ids)
+
+
 def process_highlight_video_job(job_id: str) -> None:
     """RQ target for a highlight render job."""
     started_monotonic = time.monotonic()
     logger.info("Highlight job started: job_id=%s", job_id)
     with SessionLocal() as db:
+        now = _now()
+        claimed = (
+            db.query(HighlightVideoJob)
+            .filter(HighlightVideoJob.id == job_id, HighlightVideoJob.status == STATUS_QUEUED)
+            .update(
+                {
+                    "status": STATUS_RUNNING,
+                    "progress": 5,
+                    "started_at": now,
+                    "message": "Analyse de la vidéo pano (initialisation)",
+                },
+                synchronize_session=False,
+            )
+        )
+        if claimed != 1:
+            db.rollback()
+            logger.info("Highlight job ignored: job_id=%s is no longer queued", job_id)
+            return
         job = db.query(HighlightVideoJob).filter(HighlightVideoJob.id == job_id).first()
         if job is None:
             raise ValueError(f"Highlight job not found: {job_id}")
@@ -761,12 +855,6 @@ def process_highlight_video_job(job_id: str) -> None:
         output_dir = ensure_flight_directory(db, flight) / "highlights" / job.id
         output_path = output_dir / "highlights-original-format.mp4"
         offset = float(job.overlay_offset_seconds or 0.0)
-        if job.status == STATUS_CANCELLED:
-            return
-        job.status = STATUS_RUNNING
-        job.progress = 5
-        job.started_at = _now()
-        job.message = "Analyse de la vidéo pano (initialisation)"
         db.commit()
         logger.info(
             "Highlight job running: job_id=%s flight_id=%s source=%s overlay=%s progress=5",

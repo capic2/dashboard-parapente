@@ -171,6 +171,7 @@ from gopro_overlay_inputs import first_matching_file, latest_matching_file
 from highlight_video_worker import (
     STATUS_QUEUED as HIGHLIGHT_STATUS_QUEUED,
     create_highlight_job_id,
+    enqueue_highlight_video_job,
     process_highlight_video_job,
 )
 from video_export import cancel_video_export as cancel_video_export_stream
@@ -5080,16 +5081,10 @@ def create_flight_highlight_video(
         raise
     db.refresh(job)
 
-    from job_queue import enqueue_once, is_rq_enabled
+    from job_queue import is_rq_enabled
 
     if is_rq_enabled():
-        enqueue_once(
-            "highlight_video_worker.process_highlight_video_job",
-            job.id,
-            job_id=f"highlight-video-{job.id}",
-            timeout=config.JOB_QUEUE_TIMEOUT_SECONDS,
-            queue_name=config.JOB_QUEUE_NAME,
-        )
+        enqueue_highlight_video_job(job.id)
     else:
         background_tasks.add_task(process_highlight_video_job, job.id)
     return _highlight_job_payload(job)

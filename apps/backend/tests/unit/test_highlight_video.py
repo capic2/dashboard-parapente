@@ -1,7 +1,10 @@
+from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
+from models import Flight, HighlightVideoJob
 from highlight_video import HighlightClip, clamp_clip, overlay_interval_for_clip
+import highlight_video_worker
 from highlight_video_worker import (
     _probe_video_dimensions,
     _render_clip,
@@ -9,6 +12,74 @@ from highlight_video_worker import (
     _flight_phase_times,
     select_flight_event_clips,
 )
+
+
+def test_worker_restart_recovers_and_requeues_active_highlight_jobs(test_db, monkeypatch):
+    monkeypatch.setattr(highlight_video_worker, "SessionLocal", test_db)
+    monkeypatch.setattr("job_queue.is_rq_enabled", lambda: True)
+    enqueued: list[str] = []
+    monkeypatch.setattr(
+        highlight_video_worker,
+        "_enqueue_highlight_video_job_in_rq",
+        lambda job_id: enqueued.append(job_id),
+    )
+    with test_db() as db:
+        db.add(Flight(id="flight-recover", name="Recover", flight_date=date(2026, 8, 28)))
+        db.add_all(
+            [
+                HighlightVideoJob(
+                    id="highlight-running",
+                    flight_id="flight-recover",
+                    status="running",
+                    progress=10,
+                    message="Analyse en cours",
+                    source_video_path="/tmp/pano.mp4",
+                ),
+                HighlightVideoJob(
+                    id="highlight-queued",
+                    flight_id="flight-recover",
+                    status="queued",
+                    progress=0,
+                    source_video_path="/tmp/pano.mp4",
+                ),
+            ]
+        )
+        db.commit()
+
+    assert highlight_video_worker.enqueue_pending_highlight_video_jobs(recover_active=True) == 2
+    assert enqueued == ["highlight-running", "highlight-queued"]
+
+    with test_db() as db:
+        recovered = db.get(HighlightVideoJob, "highlight-running")
+        assert recovered is not None
+        assert recovered.status == "queued"
+        assert recovered.progress == 0
+        assert recovered.message == "Récupéré après le redémarrage du worker"
+        assert recovered.started_at is None
+
+
+def test_duplicate_rq_execution_does_not_claim_running_highlight_job(test_db, monkeypatch):
+    monkeypatch.setattr(highlight_video_worker, "SessionLocal", test_db)
+    with test_db() as db:
+        db.add(Flight(id="flight-claimed", name="Claimed", flight_date=date(2026, 8, 28)))
+        db.add(
+            HighlightVideoJob(
+                id="highlight-claimed",
+                flight_id="flight-claimed",
+                status="running",
+                progress=10,
+                source_video_path="/tmp/pano.mp4",
+            )
+        )
+        db.commit()
+
+    highlight_video_worker.process_highlight_video_job("highlight-claimed")
+
+    with test_db() as db:
+        job = db.get(HighlightVideoJob, "highlight-claimed")
+        assert job is not None
+        assert job.status == "running"
+        assert job.progress == 10
 
 
 def test_clip_maps_pano_time_to_overlay_time():
