@@ -34,6 +34,8 @@ export type VideoExportJob = {
   resume_from_frame?: number | null;
   output_filename?: string | null;
   layout_label?: string | null;
+  source_type?: string | null;
+  youtube_url?: string | null;
   log_tail?: string[];
   has_output_file?: boolean;
   can_cancel: boolean;
