@@ -22,8 +22,25 @@ jobs:
     timeout-minutes: 120
 
     steps:
+      - name: Check deployment freshness
+        id: freshness
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { data } = await github.rest.repos.getBranch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: 'main',
+            });
+            const isCurrent = data.commit.sha === context.sha;
+            core.setOutput('is_current', String(isCurrent));
+            if (!isCurrent) {
+              core.notice('Skipping stale deployment ' + context.sha + '; main is now ' + data.commit.sha);
+            }
+
       - name: Compute deployment version
         id: version
+        if: steps.freshness.outputs.is_current == 'true'
         uses: actions/github-script@v9
         with:
           script: |
@@ -117,6 +134,7 @@ jobs:
             }
 
       - name: Reserve deployment tag
+        if: steps.freshness.outputs.is_current == 'true'
         uses: actions/github-script@v9
         env:
           TAG_NAME: ${{ steps.version.outputs.tag_name }}
@@ -160,9 +178,11 @@ jobs:
             }
 
       - name: Checkout source for image build
+        if: steps.freshness.outputs.is_current == 'true'
         uses: actions/checkout@v7
 
       - name: Verify GoPro overlay build context
+        if: steps.freshness.outputs.is_current == 'true'
         env:
           GOPRO_OVERLAY_BUILD_CONTEXT: ${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT || 'https://github.com/capic2/gopro-dashboard-overlay.git#main' }}
         run: |
@@ -173,9 +193,11 @@ jobs:
           fi
 
       - name: Set up Docker Buildx
+        if: steps.freshness.outputs.is_current == 'true'
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to GitHub Container Registry
+        if: steps.freshness.outputs.is_current == 'true'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -184,6 +206,7 @@ jobs:
 
       - name: Build and push backend image
         id: build_image
+        if: steps.freshness.outputs.is_current == 'true'
         continue-on-error: true
         uses: docker/build-push-action@v7
         with:
@@ -195,6 +218,8 @@ jobs:
             BACKEND_DEPLOY_VERSION=${{ steps.version.outputs.version }}
           build-contexts: |
             gopro-overlay-src=${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT || 'https://github.com/capic2/gopro-dashboard-overlay.git#657dd07a7d7e2f58ade271641326d0e00ff0027b' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ghcr.io/${{ github.repository }}/backend:${{ steps.version.outputs.version }}
             ghcr.io/${{ github.repository }}/backend:main
@@ -411,7 +436,7 @@ jobs:
             GHCR_TOKEN="${{ secrets.GHCR_READ_TOKEN }}"
             NVIDIA_GPU_ENABLED="${{ vars.NVIDIA_GPU_ENABLED || 'false' }}"
             LOCAL_VERIFY_MAX_ATTEMPTS="${{ vars.DEPLOY_LOCAL_VERIFY_MAX_ATTEMPTS || vars.DEPLOY_VERIFY_MAX_ATTEMPTS || '30' }}"
-            LOCAL_VERIFY_SLEEP_SECONDS="${{ vars.DEPLOY_LOCAL_VERIFY_SLEEP_SECONDS || vars.DEPLOY_VERIFY_SLEEP_SECONDS || '10' }}"
+            LOCAL_VERIFY_SLEEP_SECONDS="${{ vars.DEPLOY_LOCAL_VERIFY_SLEEP_SECONDS || vars.DEPLOY_VERIFY_SLEEP_SECONDS || '5' }}"
 
             if [ -z "$GHCR_TOKEN" ]; then
               echo "Missing GHCR_READ_TOKEN secret for production image pull"
@@ -719,8 +744,10 @@ jobs:
 
               export CI_BACKEND_IMAGE="$BACKEND_IMAGE"
 
-              if ! compose_cmd pull backend backend-worker youtube-upload-worker gopro-overlay-worker redis ||
-                ! compose_cmd up -d --force-recreate --remove-orphans backend backend-worker youtube-upload-worker gopro-overlay-worker redis; then
+              # Redis is not part of the backend image update. Keep it running
+              # so deployments do not pull and recreate the stateful service.
+              if ! compose_cmd pull backend backend-worker youtube-upload-worker gopro-overlay-worker ||
+                ! compose_cmd up -d --remove-orphans backend backend-worker youtube-upload-worker gopro-overlay-worker redis; then
                 print_backend_diagnostics
                 return 1
               fi
@@ -816,8 +843,10 @@ jobs:
 
                   printf "%s" "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
-                  compose_cmd pull backend backend-worker youtube-upload-worker gopro-overlay-worker redis
-                  compose_cmd up -d --force-recreate --remove-orphans backend backend-worker youtube-upload-worker gopro-overlay-worker redis
+                  # Redis is not part of the backend image update. Keep it running
+                  # so deployments do not pull and recreate the stateful service.
+                  compose_cmd pull backend backend-worker youtube-upload-worker gopro-overlay-worker
+                  compose_cmd up -d --remove-orphans backend backend-worker youtube-upload-worker gopro-overlay-worker redis
                   readiness_attempt=1
                   readiness_ok=0
                   while [ "$readiness_attempt" -le "$LOCAL_VERIFY_MAX_ATTEMPTS" ]; do
@@ -1302,7 +1331,7 @@ jobs:
 
       - name: Label merged PRs as non deployed when deployment fails
         if: >-
-          always() && (
+          always() && steps.freshness.outputs.is_current == 'true' && (
             steps.build_image.outcome != 'success' ||
             steps.trigger_deploy.outcome != 'success' ||
             steps.verify_deploy.outcome != 'success' ||
@@ -1450,7 +1479,7 @@ jobs:
 
       - name: Summarize deployment failure
         if: >-
-          always() && (
+          always() && steps.freshness.outputs.is_current == 'true' && (
             steps.build_image.outcome != 'success' ||
             steps.trigger_deploy.outcome != 'success' ||
             steps.verify_deploy.outcome != 'success' ||
@@ -1486,7 +1515,7 @@ jobs:
 
       - name: Notify deployment failure
         if: >-
-          always() && (
+          always() && steps.freshness.outputs.is_current == 'true' && (
             steps.build_image.outcome != 'success' ||
             steps.trigger_deploy.outcome != 'success' ||
             steps.verify_deploy.outcome != 'success' ||
@@ -1577,7 +1606,7 @@ jobs:
 
       - name: Fail job when deployment failed
         if: >-
-          always() && (
+          always() && steps.freshness.outputs.is_current == 'true' && (
             steps.build_image.outcome != 'success' ||
             steps.trigger_deploy.outcome != 'success' ||
             steps.verify_deploy.outcome != 'success' ||
