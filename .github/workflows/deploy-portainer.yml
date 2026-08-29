@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write
   contents: write
   issues: write
   packages: write
@@ -36,6 +37,13 @@ jobs:
             core.setOutput('is_current', String(isCurrent));
             if (!isCurrent) {
               core.notice('Skipping stale deployment ' + context.sha + '; main is now ' + data.commit.sha);
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'deploy-portainer.yml',
+                ref: 'main',
+              });
+              core.notice('Queued a deployment for current main ' + data.commit.sha);
             }
 
       - name: Compute deployment version

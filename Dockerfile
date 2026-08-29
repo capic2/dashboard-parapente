@@ -39,9 +39,6 @@ FROM python:3.14-slim
 
 WORKDIR /app
 
-ARG BACKEND_DEPLOY_VERSION
-ENV BACKEND_DEPLOY_VERSION=${BACKEND_DEPLOY_VERSION}
-
 ARG CODEX_CLI_VERSION=0.146.0
 ENV CODEX_HOME=/app/codex-home
 
@@ -128,6 +125,11 @@ RUN mkdir -p /app/db && chmod 755 /app/db && \
 
 # Rendre le script d'entrypoint exécutable
 RUN chmod +x entrypoint.sh
+
+# This changes for every deployment, so keep it after the expensive dependency
+# layers to preserve their BuildKit cache.
+ARG BACKEND_DEPLOY_VERSION
+ENV BACKEND_DEPLOY_VERSION=${BACKEND_DEPLOY_VERSION}
 
 # Exposer port
 EXPOSE 8001
