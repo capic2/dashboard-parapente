@@ -11,7 +11,7 @@ from rq.job import Job
 
 import config
 
-_PENDING_JOB_STATUSES = {"queued", "deferred", "scheduled"}
+_PENDING_JOB_STATUSES = {"queued", "deferred", "scheduled", "started"}
 _ENQUEUE_LOCK_TIMEOUT_SECONDS = 60
 _ENQUEUE_LOCK_WAIT_SECONDS = 30
 

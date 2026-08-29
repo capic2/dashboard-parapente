@@ -73,7 +73,7 @@ def test_enqueue_once_reuses_existing_pending_job(monkeypatch):
     assert queue.connection.lock_kwargs == {"timeout": 60, "blocking_timeout": 30}
 
 
-def test_enqueue_once_replaces_stale_started_job(monkeypatch):
+def test_enqueue_once_reuses_started_job(monkeypatch):
     existing_job = FakeJob("started")
     queue = FakeQueue(existing_job)
     monkeypatch.setattr(job_queue, "get_queue", lambda _name=None: queue)
@@ -84,9 +84,9 @@ def test_enqueue_once_replaces_stale_started_job(monkeypatch):
         job_id="video-export-job-recovered",
     )
 
-    assert existing_job.deleted is True
-    assert result == queue.enqueued[0]
-    assert queue.enqueued[0]["kwargs"]["job_id"] == "video-export-job-recovered"
+    assert existing_job.deleted is False
+    assert result is existing_job
+    assert queue.enqueued == []
 
 
 def test_enqueue_once_replaces_terminal_existing_job(monkeypatch):
