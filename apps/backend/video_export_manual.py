@@ -1222,6 +1222,17 @@ def _ffmpeg_encoding_settings(is_fast_mode: bool) -> tuple[str, str]:
     return "medium", "18"
 
 
+def _should_encode_concurrently(is_fast_mode: bool) -> bool:
+    """Stream fast-mode frames to FFmpeg while they are captured.
+
+    NVENC accepts the same PNG pipe input as the CPU encoder.  Keeping the
+    encoder running during capture removes the otherwise fully serial encoding
+    phase without giving up the on-disk frames used for job recovery.
+    """
+
+    return is_fast_mode
+
+
 def _ffmpeg_command(
     *,
     fps: int,
@@ -2013,7 +2024,7 @@ async def _export_video_manual_render(job_id: str):
 
             start_time = time.time()
             encoding_output_file = temp_dir / "encoding.mp4"
-            concurrent_encoding = is_fast_mode and accelerator == "cpu"
+            concurrent_encoding = _should_encode_concurrently(is_fast_mode)
             ffmpeg_cmd = _ffmpeg_command(
                 fps=fps,
                 output_file=encoding_output_file,

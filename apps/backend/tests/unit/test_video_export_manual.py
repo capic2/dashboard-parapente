@@ -309,6 +309,11 @@ def test_ffmpeg_encoding_settings_use_fast_preset_for_manual_fast():
     assert video_export_manual._ffmpeg_encoding_settings(False) == ("medium", "18")
 
 
+def test_manual_fast_streams_frames_to_ffmpeg_for_nvidia_and_cpu():
+    assert video_export_manual._should_encode_concurrently(True) is True
+    assert video_export_manual._should_encode_concurrently(False) is False
+
+
 def test_ffmpeg_command_streams_png_frames_for_manual_fast(tmp_path):
     output_file = tmp_path / "export.mp4"
 
