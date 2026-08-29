@@ -22,6 +22,8 @@ class FakeQueue:
     def __init__(self, existing_job: FakeJob | None):
         self.existing_job = existing_job
         self.enqueued: list[dict[str, object]] = []
+        self.name = "video_exports"
+        self.connection = FakeConnection()
 
     def fetch_job(self, job_id: str) -> FakeJob | None:
         return self.existing_job
@@ -30,6 +32,25 @@ class FakeQueue:
         enqueued_job = {"function_path": function_path, "args": args, "kwargs": kwargs}
         self.enqueued.append(enqueued_job)
         return enqueued_job
+
+
+class FakeConnection:
+    def __init__(self) -> None:
+        self.lock_args: tuple[object, ...] | None = None
+        self.lock_kwargs: dict[str, object] | None = None
+
+    def lock(self, *args: object, **kwargs: object) -> "FakeLock":
+        self.lock_args = args
+        self.lock_kwargs = kwargs
+        return FakeLock()
+
+
+class FakeLock:
+    def __enter__(self) -> "FakeLock":
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
 
 
 def test_enqueue_once_reuses_existing_pending_job(monkeypatch):
@@ -46,6 +67,10 @@ def test_enqueue_once_reuses_existing_pending_job(monkeypatch):
     assert result is existing_job
     assert existing_job.deleted is False
     assert queue.enqueued == []
+    assert queue.connection.lock_args == (
+        "rq:enqueue-once:video_exports:video-export-job-recovered",
+    )
+    assert queue.connection.lock_kwargs == {"timeout": 60, "blocking_timeout": 30}
 
 
 def test_enqueue_once_replaces_stale_started_job(monkeypatch):

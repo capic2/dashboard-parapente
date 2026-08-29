@@ -12,6 +12,8 @@ from rq.job import Job
 import config
 
 _PENDING_JOB_STATUSES = {"queued", "deferred", "scheduled"}
+_ENQUEUE_LOCK_TIMEOUT_SECONDS = 60
+_ENQUEUE_LOCK_WAIT_SECONDS = 30
 
 
 def _status_value(status: Any) -> str | None:
@@ -76,16 +78,22 @@ def enqueue_once(
     **kwargs: Any,
 ) -> Job:
     queue = get_queue(queue_name)
-    existing_job = queue.fetch_job(job_id)
-    if existing_job is not None:
-        if _job_status_value(existing_job) in _PENDING_JOB_STATUSES:
-            return existing_job
-        _delete_stale_job(existing_job)
+    lock_name = f"rq:enqueue-once:{queue.name}:{job_id}"
+    with queue.connection.lock(
+        lock_name,
+        timeout=_ENQUEUE_LOCK_TIMEOUT_SECONDS,
+        blocking_timeout=_ENQUEUE_LOCK_WAIT_SECONDS,
+    ):
+        existing_job = queue.fetch_job(job_id)
+        if existing_job is not None:
+            if _job_status_value(existing_job) in _PENDING_JOB_STATUSES:
+                return existing_job
+            _delete_stale_job(existing_job)
 
-    return queue.enqueue(
-        function_path,
-        *args,
-        job_id=job_id,
-        job_timeout=timeout or config.JOB_QUEUE_TIMEOUT_SECONDS,
-        **kwargs,
-    )
+        return queue.enqueue(
+            function_path,
+            *args,
+            job_id=job_id,
+            job_timeout=timeout or config.JOB_QUEUE_TIMEOUT_SECONDS,
+            **kwargs,
+        )
