@@ -105,6 +105,7 @@ export const HighlightVideoJobSchema = z.object({
   status: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
   progress: z.number(),
   message: z.string().nullish(),
+  log_tail: z.array(z.string()).default([]),
   error: z.string().nullish(),
   output_format: z.string(),
   overlay_offset_seconds: z.number(),

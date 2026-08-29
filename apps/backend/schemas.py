@@ -203,6 +203,7 @@ class HighlightVideoJobResponse(BaseModel):
     status: Literal["queued", "running", "completed", "failed", "cancelled"]
     progress: int
     message: str | None = None
+    log_tail: list[str] = Field(default_factory=list)
     error: str | None = None
     output_format: str
     overlay_offset_seconds: float

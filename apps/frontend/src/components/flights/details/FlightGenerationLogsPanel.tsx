@@ -347,6 +347,7 @@ export function FlightGenerationLogsPanel({
             message={highlightVideo.message}
             error={highlightVideo.error}
             updatedAt={highlightVideo.updated_at}
+            logs={highlightVideo.log_tail}
           />
         )}
       </div>
