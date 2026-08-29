@@ -264,6 +264,30 @@ export function useResumeVideoExportJob() {
   });
 }
 
+export function useRestartVideoExportJob() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      flightId,
+      mode,
+    }: {
+      flightId: string;
+      mode: 'manual' | 'manual_fast' | 'stream';
+    }) => {
+      await api
+        .post(`flights/${flightId}/export-video`, {
+          searchParams: { mode },
+        })
+        .json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['flights'] });
+    },
+  });
+}
+
 export function useDeleteVideoExportJobRow() {
   const queryClient = useQueryClient();
 

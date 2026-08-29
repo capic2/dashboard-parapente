@@ -12,6 +12,7 @@ const {
   cleanupTempFiles,
   deleteJobRow,
   deleteHighlightJob,
+  restartJob,
   resumeJob,
   toastError,
   toastSuccess,
@@ -23,6 +24,7 @@ const {
   cleanupTempFiles: vi.fn(),
   deleteJobRow: vi.fn(),
   deleteHighlightJob: vi.fn(),
+  restartJob: vi.fn(),
   resumeJob: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
@@ -149,6 +151,10 @@ vi.mock('../../../hooks/flights/useVideoExportJobs', () => ({
   }),
   useResumeVideoExportJob: () => ({
     mutateAsync: resumeJob,
+    isPending: false,
+  }),
+  useRestartVideoExportJob: () => ({
+    mutateAsync: restartJob,
     isPending: false,
   }),
   useDeleteVideoExportJobRow: () => ({
@@ -481,6 +487,27 @@ describe('VideoExportJobsPanel', () => {
       expect(resumeJob).toHaveBeenCalledWith('job-resumable')
     );
     expect(toastSuccess).toHaveBeenCalledWith('Génération relancée');
+  });
+
+  it('restarts a cancelled export when no frames can be resumed', async () => {
+    restartJob.mockResolvedValue(undefined);
+    jobs[3] = {
+      ...jobs[3],
+      can_resume: false,
+      mode: 'manual_fast',
+    };
+
+    render(<VideoExportJobsPanel />);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Actions' })[3]!);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Redémarrer' }));
+
+    await waitFor(() =>
+      expect(restartJob).toHaveBeenCalledWith({
+        flightId: 'flight-resumable',
+        mode: 'manual_fast',
+      })
+    );
+    expect(toastSuccess).toHaveBeenCalledWith('Génération redémarrée');
   });
 
   it('filters jobs by type', () => {

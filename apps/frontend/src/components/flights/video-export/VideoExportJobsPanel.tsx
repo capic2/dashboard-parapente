@@ -31,6 +31,7 @@ import {
   useCleanupVideoExportTempFiles,
   useDeleteVideoExportJobRow,
   useDeleteVideoExportOutput,
+  useRestartVideoExportJob,
   useResumeVideoExportJob,
   useVideoExportJobs,
   useVideoExportGpuStatus,
@@ -252,6 +253,28 @@ function isHighlightJob(job: VideoExportJob) {
 
 function isYoutubeJob(job: VideoExportJob) {
   return job.mode === 'youtube' || job.mode === 'youtube_upload';
+}
+
+function getRestartMode(job: VideoExportJob) {
+  if (
+    job.mode === 'manual' ||
+    job.mode === 'manual_fast' ||
+    job.mode === 'stream'
+  ) {
+    return job.mode;
+  }
+
+  return 'manual_fast';
+}
+
+function canRestartVideoExport(job: VideoExportJob) {
+  return Boolean(
+    job.flight_id &&
+    !isGoproOverlayJob(job) &&
+    !isHighlightJob(job) &&
+    !isYoutubeJob(job) &&
+    ['failed', 'cancelled'].includes(job.status)
+  );
 }
 
 function isJobInTypeFilter(job: VideoExportJob, filter: TypeFilter) {
@@ -568,6 +591,7 @@ export function VideoExportJobsPanel({
   const totalPages = jobsPage?.totalPages ?? 1;
   const cancelJob = useCancelVideoExportJob();
   const cancelHighlightJob = useCancelFlightHighlightVideo('');
+  const restartJob = useRestartVideoExportJob();
   const resumeJob = useResumeVideoExportJob();
   const deleteJobRow = useDeleteVideoExportJobRow();
   const deleteVideoOutput = useDeleteVideoExportOutput();
@@ -688,6 +712,25 @@ export function VideoExportJobsPanel({
     [resumeJob, t, toast]
   );
 
+  const handleRestart = useCallback(
+    async (job: VideoExportJob) => {
+      if (!job.flight_id) return;
+
+      try {
+        await restartJob.mutateAsync({
+          flightId: job.flight_id,
+          mode: getRestartMode(job),
+        });
+        toast.success(t('videoJobs.restartSuccess', 'Génération redémarrée'));
+      } catch {
+        toast.error(
+          t('videoJobs.restartError', 'Impossible de redémarrer la génération')
+        );
+      }
+    },
+    [restartJob, t, toast]
+  );
+
   const handleDownload = useCallback(
     async (job: VideoExportJob) => {
       try {
@@ -762,7 +805,10 @@ export function VideoExportJobsPanel({
             toast.success(t('videoJobs.deleteVideoSuccess', 'Vidéo supprimée'));
           } catch {
             toast.error(
-              t('videoJobs.deleteVideoError', 'Impossible de supprimer la vidéo')
+              t(
+                'videoJobs.deleteVideoError',
+                'Impossible de supprimer la vidéo'
+              )
             );
           }
         },
@@ -820,6 +866,18 @@ export function VideoExportJobsPanel({
                 {resumeJob.isPending
                   ? t('videoJobs.resuming', 'Relance...')
                   : t('videoJobs.resume', 'Relancer')}
+              </MenuItem>
+            )}
+            {!job.can_resume && canRestartVideoExport(job) && (
+              <MenuItem
+                onAction={() => void handleRestart(job)}
+                isDisabled={restartJob.isPending}
+                className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+              >
+                <Play className="h-4 w-4" aria-hidden="true" />
+                {restartJob.isPending
+                  ? t('videoJobs.restarting', 'Redémarrage...')
+                  : t('videoJobs.restart', 'Redémarrer')}
               </MenuItem>
             )}
             {job.can_cancel && (
@@ -882,7 +940,9 @@ export function VideoExportJobsPanel({
       handleDeleteJobRow,
       handleDeleteVideoOutput,
       handleDownload,
+      handleRestart,
       handleResume,
+      restartJob.isPending,
       resumeJob.isPending,
       t,
     ]
