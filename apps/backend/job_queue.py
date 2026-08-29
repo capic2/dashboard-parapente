@@ -47,6 +47,13 @@ def _delete_stale_job(job: Job) -> None:
         message = str(error)
         if "Execution" not in message or "not found in Redis" not in message:
             raise
+    except KeyError as error:
+        # RQ 2.x can leave an execution id in the registry after a worker
+        # interruption.  Fetching that execution then raises KeyError when
+        # its hash is missing the created_at field.  The job is stale anyway;
+        # allow enqueue_once() to replace it instead of blocking the queue.
+        if error.args != (b"created_at",):
+            raise
 
 
 def delete_job(job_id: str, queue_name: str | None = None) -> bool:
