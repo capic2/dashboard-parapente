@@ -1,6 +1,6 @@
 from datetime import date
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from models import Flight, HighlightVideoJob
 from highlight_video import HighlightClip, clamp_clip, overlay_interval_for_clip
@@ -56,6 +56,16 @@ def test_worker_restart_recovers_and_requeues_active_highlight_jobs(test_db, mon
         assert recovered.progress == 0
         assert recovered.message == "Récupéré après le redémarrage du worker"
         assert recovered.started_at is None
+
+
+def test_highlight_jobs_are_enqueued_on_the_dedicated_queue(monkeypatch) -> None:
+    enqueued = Mock()
+    monkeypatch.setattr(highlight_video_worker.config, "HIGHLIGHT_QUEUE_NAME", "highlight-queue")
+    monkeypatch.setattr("job_queue.enqueue_once", enqueued)
+
+    highlight_video_worker._enqueue_highlight_video_job_in_rq("highlight-123")
+
+    assert enqueued.call_args.kwargs["queue_name"] == "highlight-queue"
 
 
 def test_duplicate_rq_execution_does_not_claim_running_highlight_job(test_db, monkeypatch):

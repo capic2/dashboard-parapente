@@ -770,7 +770,7 @@ def _enqueue_highlight_video_job_in_rq(job_id: str) -> None:
         job_id,
         job_id=_rq_job_id(job_id),
         timeout=config.JOB_QUEUE_TIMEOUT_SECONDS,
-        queue_name=config.JOB_QUEUE_NAME,
+        queue_name=config.HIGHLIGHT_QUEUE_NAME,
     )
 
 
