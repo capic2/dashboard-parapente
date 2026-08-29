@@ -18,6 +18,7 @@ const {
   toastSuccess,
   refetch,
   jobs,
+  typeCounts,
 } = vi.hoisted(() => ({
   cancelJob: vi.fn(),
   cancelHighlightJob: vi.fn(),
@@ -29,6 +30,7 @@ const {
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
   refetch: vi.fn(),
+  typeCounts: { all: 0 },
   jobs: [
     {
       job_id: 'job-active',
@@ -126,6 +128,7 @@ vi.mock('../../../hooks/flights/useVideoExportJobs', () => ({
       pageSize: 25,
       total: jobs.length,
       totalPages: 1,
+      typeCounts,
     },
     isLoading: false,
     isError: false,
@@ -226,6 +229,7 @@ vi.mock('../../../hooks/gopro/useGoproOverlay', () => ({
 describe('VideoExportJobsPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    typeCounts.all = 0;
     jobs.splice(
       0,
       jobs.length,
@@ -605,6 +609,25 @@ describe('VideoExportJobsPanel', () => {
 
     expect(
       screen.getByText('Aucune génération vidéo pour le moment.')
+    ).toBeInTheDocument();
+  });
+
+  it('keeps filters available when the selected filter has no matching jobs', () => {
+    jobs.splice(0, jobs.length);
+    typeCounts.all = 1;
+
+    render(
+      <VideoExportJobsPanel typeFilter="gopro" onTypeFilterChange={vi.fn()} />
+    );
+
+    expect(
+      screen.getByRole('button', { name: /Tous les types/u })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Réinitialiser' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Aucune génération ne correspond à ce filtre.')
     ).toBeInTheDocument();
   });
 });
