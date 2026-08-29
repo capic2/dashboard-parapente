@@ -94,6 +94,7 @@ from gopro_overlay_export import (
     stream_gopro_overlay_job,
 )
 import gopro_preview_proxy
+from video_acceleration import get_gpu_runtime_status
 from models import (
     EmagramAnalysis,
     Flight,
@@ -759,8 +760,7 @@ def _get_video_export_jobs_payload(
         jobs = [
             job
             for job in jobs
-            if job.get("can_cancel")
-            or job.get("status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
+            if job.get("can_cancel") or job.get("status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
         ]
     elif status_filter and status_filter != "all":
         jobs = [job for job in jobs if job.get("status") == status_filter]
@@ -6108,7 +6108,9 @@ def list_video_export_jobs(
     active_only: bool = False,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=25, ge=1, le=100),
-    status_filter: Literal["all", "active", "completed", "failed", "cancelled"] = Query(default="all"),
+    status_filter: Literal["all", "active", "completed", "failed", "cancelled"] = Query(
+        default="all"
+    ),
     type_filter: Literal["all", "video", "gopro"] = Query(default="all"),
     db: Session = Depends(get_db),
 ) -> VideoExportJobsResponse:
@@ -6124,12 +6126,21 @@ def list_video_export_jobs(
     return VideoExportJobsResponse(**payload)
 
 
+@router.get("/video-export-gpu-status")
+def video_export_gpu_status() -> dict[str, object]:
+    """Return live GPU telemetry; this is intentionally not cached."""
+
+    return get_gpu_runtime_status()
+
+
 @router.get("/video-export-jobs/stream")
 async def stream_video_export_jobs(
     request: Request,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=25, ge=1, le=100),
-    status_filter: Literal["all", "active", "completed", "failed", "cancelled"] = Query(default="all"),
+    status_filter: Literal["all", "active", "completed", "failed", "cancelled"] = Query(
+        default="all"
+    ),
     type_filter: Literal["all", "video", "gopro"] = Query(default="all"),
 ) -> StreamingResponse:
     """Stream video export job list updates without frontend polling."""

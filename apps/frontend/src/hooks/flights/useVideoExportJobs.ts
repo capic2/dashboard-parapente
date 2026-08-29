@@ -71,6 +71,27 @@ export type VideoExportTempCleanupResult = {
   errors: { path: string; error: string }[];
 };
 
+export type VideoExportGpuStatus = {
+  available: boolean;
+  driver?: string;
+  devices: {
+    name: string;
+    utilization_percent: number;
+    memory_used_mb: number;
+    memory_total_mb: number;
+  }[];
+};
+
+export function useVideoExportGpuStatus() {
+  return useQuery({
+    queryKey: ['video-export-gpu-status'],
+    queryFn: () =>
+      api.get('video-export-gpu-status').json<VideoExportGpuStatus>(),
+    refetchInterval: 5_000,
+    staleTime: 0,
+  });
+}
+
 const videoExportJobsQueryKey = ['video-export-jobs'];
 
 function toVideoExportJobsResponse(value: unknown): VideoExportJobsPage | null {
@@ -92,7 +113,8 @@ function toVideoExportJobsResponse(value: unknown): VideoExportJobsPage | null {
     page,
     pageSize,
     total,
-    totalPages: response.total_pages ?? Math.max(1, Math.ceil(total / pageSize)),
+    totalPages:
+      response.total_pages ?? Math.max(1, Math.ceil(total / pageSize)),
   };
 }
 

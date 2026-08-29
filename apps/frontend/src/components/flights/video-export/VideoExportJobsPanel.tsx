@@ -31,6 +31,7 @@ import {
   useDeleteVideoExportJobRow,
   useResumeVideoExportJob,
   useVideoExportJobs,
+  useVideoExportGpuStatus,
   VIDEO_EXPORT_JOBS_PAGE_SIZE,
 } from '../../../hooks/flights/useVideoExportJobs';
 import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
@@ -434,7 +435,21 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
     statusFilter,
     typeFilter,
   });
-  const jobs = jobsPage?.jobs ?? [];
+  const { data: gpuStatus, isLoading: isGpuStatusLoading } =
+    useVideoExportGpuStatus();
+  let gpuStatusLabel = t(
+    'videoJobs.gpu.unavailable',
+    'GPU NVIDIA indisponible'
+  );
+  if (isGpuStatusLoading) {
+    gpuStatusLabel = t('videoJobs.gpu.checking', 'Vérification du GPU…');
+  } else if (gpuStatus?.available) {
+    gpuStatusLabel = t('videoJobs.gpu.available', 'GPU NVIDIA disponible');
+  }
+  const gpuStatusClassName = gpuStatus?.available
+    ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-900/20 dark:text-green-200'
+    : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-200';
+  const jobs = useMemo(() => jobsPage?.jobs ?? [], [jobsPage?.jobs]);
   const totalJobs = jobsPage?.total ?? jobs.length;
   const totalPages = jobsPage?.totalPages ?? 1;
   const cancelJob = useCancelVideoExportJob();
@@ -741,6 +756,8 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
     [renderJobActions, t]
   );
 
+  // TanStack Table exposes functions that React Compiler cannot safely memoize.
+  // oxlint-disable-next-line react/incompatible-library
   const table = useReactTable({
     data: visibleJobs,
     columns,
@@ -825,6 +842,21 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
               {t('videoJobs.summary.cancelled', '{{count}} annulés', {
                 count: cancelledCount,
               })}
+            </span>
+          </div>
+          <div
+            className={`mt-3 rounded-lg border px-3 py-2 text-xs ${gpuStatusClassName}`}
+            aria-live="polite"
+          >
+            {gpuStatusLabel}
+            {gpuStatus?.devices.map((device) => (
+              <span className="ml-2 font-mono" key={device.name}>
+                {device.name} · {device.utilization_percent}% ·{' '}
+                {device.memory_used_mb}/{device.memory_total_mb} MB
+              </span>
+            ))}
+            <span className="ml-2 opacity-70">
+              {t('videoJobs.gpu.live', 'mis à jour automatiquement')}
             </span>
           </div>
         </div>

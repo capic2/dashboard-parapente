@@ -111,6 +111,7 @@ vi.mock('../../../hooks/useToast', () => ({
 }));
 
 vi.mock('../../../hooks/flights/useVideoExportJobs', () => ({
+  VIDEO_EXPORT_JOBS_PAGE_SIZE: 25,
   useVideoExportJobs: () => ({
     data: {
       jobs,
@@ -138,6 +139,20 @@ vi.mock('../../../hooks/flights/useVideoExportJobs', () => ({
   useCleanupVideoExportTempFiles: () => ({
     mutateAsync: cleanupTempFiles,
     isPending: false,
+  }),
+  useVideoExportGpuStatus: () => ({
+    data: {
+      available: true,
+      devices: [
+        {
+          name: 'NVIDIA test GPU',
+          utilization_percent: 42,
+          memory_used_mb: 1234,
+          memory_total_mb: 24576,
+        },
+      ],
+    },
+    isLoading: false,
   }),
 }));
 
