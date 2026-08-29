@@ -12,7 +12,16 @@
     "logout": "Logout",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
-    "menu": "Menu"
+    "menu": "Menu",
+    "enableNotifications": "Enable job notifications"
+  },
+  "notifications": {
+    "jobCompleted": "Job completed",
+    "jobCompletedDetail": "{{job}} is complete",
+    "jobFailed": "Job failed",
+    "jobFailedDetail": "{{job}} failed",
+    "jobCancelled": "Job cancelled",
+    "jobCancelledDetail": "{{job}} was cancelled"
   },
   "login": {
     "title": "Paragliding Dashboard",
@@ -43,6 +52,7 @@
     "reset": "Reset",
     "dataUnavailable": "Data unavailable",
     "loadingError": "Loading error",
+    "stopping": "Stopping...",
     "wind": "Wind",
     "temperature": "Temperature",
     "gusts": "Gusts",
@@ -86,11 +96,17 @@
     "cleanupPartialError": "{{count}} item(s) deleted, but some files could not be removed",
     "cleanupError": "Unable to delete temporary files",
     "loadError": "Unable to load video generations",
+    "stalled": "No progress for {{minutes}} min. The job appears to be stuck.",
     "empty": "No video generation yet.",
     "confirmDeleteRow": "Delete this row and its temporary files?",
     "deleteRow": "Delete",
     "deleteRowSuccess": "Row deleted",
     "deleteRowError": "Unable to delete row",
+    "confirmDeleteVideo": "Delete the generated video file? This action cannot be undone.",
+    "deleteVideo": "Delete video",
+    "deleteVideoSuccess": "Video deleted",
+    "deleteVideoError": "Unable to delete video",
+    "openYoutube": "Open on YouTube",
     "resetFilters": "Reset",
     "visibleSummary": "{{visible}} generation(s) shown",
     "filteredSummary": "{{visible}} generation(s) shown out of {{total}}",
@@ -105,19 +121,57 @@
       "hide": "Hide"
     },
     "mode": {
-      "goproOverlay": "GoPro overlay"
+      "goproOverlay": "GoPro overlay",
+      "highlight": "Best moments",
+      "youtubeUpload": "YouTube upload"
     },
     "method": {
       "cpu": "CPU",
       "gpu": "GPU"
     },
     "table": {
-      "method": "Method"
+      "method": "Method",
+      "actions": "Actions",
+      "status": "Status",
+      "flight": "Name",
+      "type": "Type",
+      "progress": "Progress",
+      "lastActivity": "Last activity",
+      "frames": "Frames",
+      "fps": "Frames per second",
+      "eta": "Time remaining"
+    },
+    "resumeSuccess": "Generation resumed",
+    "resumeError": "Unable to resume generation",
+    "downloadError": "Unable to download the video",
+    "viewFlight": "View flight",
+    "download": "Download",
+    "resuming": "Resuming...",
+    "resume": "Resume",
+    "done": "Completed",
+    "summary": {
+      "active_one": "{{count}} active",
+      "active_other": "{{count}} active",
+      "completed_one": "{{count}} completed",
+      "completed_other": "{{count}} completed",
+      "failed_one": "{{count}} error",
+      "failed_other": "{{count}} errors",
+      "cancelled_one": "{{count}} cancelled",
+      "cancelled_other": "{{count}} cancelled"
+    },
+    "emptyFiltered": "No generation matches this filter.",
+    "pagination": {
+      "label": "Pagination",
+      "previous": "Previous",
+      "page": "Page {{page}} of {{pages}}",
+      "next": "Next"
     },
     "typeFilters": {
       "all": "All types",
       "video": "Video exports",
-      "gopro": "GoPro overlay"
+      "gopro": "GoPro overlay",
+      "highlight": "Best moments",
+      "youtube": "YouTube upload"
     },
     "filters": {
       "all": "All",
@@ -135,6 +189,7 @@
       "processing": "In progress",
       "completed": "Completed",
       "failed": "Error",
+      "stalled": "Stuck",
       "cancelled": "Cancelled"
     }
   },
@@ -145,7 +200,9 @@
     "allSitesConditions": "Current conditions — all sites",
     "noSites": "No site configured",
     "noSitesDescription": "Add your first flying site to get started.",
-    "addSite": "Add a site"
+    "addSite": "Add a site",
+    "homeTitle": "Today's weather and flights",
+    "homeDescription": "Quickly track flyable sites, the best time slots, and your flight indicators."
   },
   "stats": {
     "title": "Statistics",
@@ -603,6 +660,7 @@
       "loadError": "Error loading weather sources",
       "active": "Active",
       "error": "Error",
+      "stalled": "No progress for {{minutes}} min. The job appears to be stuck. You can stop it and retry.",
       "disabled": "Disabled",
       "untested": "Untested",
       "cannotDisableLast": "Cannot disable the last active source. At least one source must remain active.",
@@ -873,6 +931,8 @@
     "site": "Site:",
     "duration": "Duration:",
     "distance": "Distance:",
+    "altitude": "Altitude",
+    "speed": "Speed",
     "createError": "Error creating flight",
     "selectValidFile": "Please select a valid GPX or IGC file",
     "createdSuccess": "Flight created successfully:",
@@ -1170,6 +1230,7 @@
       },
       "progress": "Progress",
       "error": "Error",
+      "stalled": "No progress for {{minutes}} min. The job appears to be stuck.",
       "activity": "Activity log",
       "technicalDetails": "Technical details",
       "lineCount_one": "{{count}} line",
@@ -1484,6 +1545,7 @@
   },
   "cache": {
     "title": "Redis Cache Viewer",
+    "description": "Inspect active keys, their TTL, and the largest groups.",
     "totalKeys": "Total Keys",
     "memoryUsage": "Memory Usage",
     "groups": "Groups",
@@ -1517,10 +1579,16 @@
   },
   "infrastructure": {
     "title": "Infrastructure",
+    "overviewLabel": "Monitoring",
+    "subtitle": "Operational view of integrations, video exports, and cached data.",
     "tabs": {
       "intervals": "Intervals.icu",
       "videoExports": "Video exports",
       "cache": "Redis Cache"
+    },
+    "videoExports": {
+      "ready": "Queue",
+      "description": "Track exports and clean up temporary files."
     },
     "intervals": {
       "title": "Intervals.icu synchronization",

@@ -36,7 +36,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import config
 from auth import (
@@ -171,6 +171,7 @@ from gopro_overlay_inputs import first_matching_file, latest_matching_file
 from highlight_video_worker import (
     STATUS_QUEUED as HIGHLIGHT_STATUS_QUEUED,
     create_highlight_job_id,
+    enqueue_highlight_video_job,
     process_highlight_video_job,
 )
 from video_export import cancel_video_export as cancel_video_export_stream
@@ -609,6 +610,13 @@ def _video_export_public_status(export: dict[str, Any]) -> str:
 
 
 def _video_export_can_cancel(export: dict[str, Any]) -> bool:
+    if export.get("mode") in {"highlight", "youtube_upload"}:
+        return (
+            export.get("mode") == "highlight"
+            and export.get("status") in {"queued", "running"}
+            and bool(export.get("job_id"))
+            and bool(export.get("flight_id"))
+        )
     if export.get("mode") == "gopro_overlay":
         return export.get("status") in {"queued", "running"} and bool(export.get("job_id"))
 
@@ -624,8 +632,15 @@ def _video_export_can_cancel(export: dict[str, Any]) -> bool:
 
 
 def _video_export_can_delete(export: dict[str, Any]) -> bool:
+    if export.get("mode") == "youtube_upload":
+        return False
     if not export.get("job_id"):
         return False
+
+    if export.get("mode") == "highlight":
+        return export.get("status") in _VIDEO_EXPORT_TERMINAL_STATUSES and bool(
+            export.get("flight_id")
+        )
 
     if export.get("mode") in {"manual", "manual_fast"}:
         return True
@@ -654,6 +669,49 @@ def _gopro_overlay_export_job_payload(job: dict[str, Any]) -> dict[str, Any]:
         "layout_label": job.get("layout_label"),
         "log_tail": job.get("log_tail") or [],
         "has_output_file": bool(output_path and Path(str(output_path)).exists()),
+    }
+
+
+def _highlight_export_job_payload(job: HighlightVideoJob) -> dict[str, Any]:
+    output_path = job.output_path
+    return {
+        "job_id": job.id,
+        "flight_id": job.flight_id,
+        "status": job.status,
+        "internal_status": job.status,
+        "progress": job.progress,
+        "message": job.message,
+        "error": job.error,
+        "mode": "highlight",
+        "flight_title": "Meilleurs moments",
+        "output_filename": Path(output_path).name if output_path else None,
+        "created_at": job.created_at,
+        "updated_at": job.updated_at,
+        "started_at": job.started_at,
+        "completed_at": job.completed_at,
+        "cancelled_at": job.cancelled_at,
+        "has_output_file": bool(output_path and Path(output_path).is_file()),
+    }
+
+
+def _youtube_upload_export_job_payload(job: YoutubeUploadJob) -> dict[str, Any]:
+    return {
+        "job_id": job.id,
+        "flight_id": job.flight_id,
+        "status": job.status,
+        "internal_status": job.status,
+        "progress": job.progress,
+        "message": job.title,
+        "error": job.error,
+        "mode": "youtube_upload",
+        "source_type": job.source_type,
+        "youtube_url": job.youtube_url,
+        "created_at": job.created_at,
+        "updated_at": job.updated_at,
+        "started_at": job.started_at,
+        "completed_at": job.completed_at,
+        "log_tail": [],
+        "has_output_file": False,
     }
 
 
@@ -706,12 +764,49 @@ def _build_video_export_jobs_payload(
     return sorted(jobs, key=_video_export_sort_value, reverse=True)
 
 
+class VideoExportJobPayload(BaseModel):
+    job_id: str
+    flight_id: str | None = None
+    flight_name: str | None = None
+    flight_title: str | None = None
+    status: str
+    internal_status: str | None = None
+    progress: int | float | None = None
+    total_frames: int | None = None
+    fps: int | float | None = None
+    fps_actual: int | float | None = None
+    eta_seconds: int | float | None = None
+    message: str | None = None
+    error: str | None = None
+    render_method: str | None = None
+    gpx_path: str | None = None
+    mode: str | None = None
+    source_type: str | None = None
+    youtube_url: str | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    cancelled_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    can_resume: bool = False
+    frames_captured: int | None = None
+    resume_from_frame: int | None = None
+    output_filename: str | None = None
+    layout_label: str | None = None
+    log_tail: list[str] = Field(default_factory=list)
+    has_output_file: bool = False
+    can_cancel: bool = False
+    can_delete: bool = False
+
+
 class VideoExportJobsResponse(BaseModel):
-    jobs: list[dict[str, Any]]
+    jobs: list[VideoExportJobPayload]
     page: int
     page_size: int
     total: int
     total_pages: int
+    status_counts: dict[str, int] = Field(default_factory=dict)
+    type_counts: dict[str, int] = Field(default_factory=dict)
 
 
 def _get_video_export_jobs_payload(
@@ -725,26 +820,18 @@ def _get_video_export_jobs_payload(
     jobs = _build_video_export_jobs_payload(
         list_exports_manual()
         + list_exports_stream()
-        + [_gopro_overlay_export_job_payload(job) for job in list_gopro_overlay_jobs()],
+        + [_gopro_overlay_export_job_payload(job) for job in list_gopro_overlay_jobs()]
+        + [_highlight_export_job_payload(job) for job in db.query(HighlightVideoJob).all()]
+        + [_youtube_upload_export_job_payload(job) for job in db.query(YoutubeUploadJob).all()],
         db,
     )
     if active_only:
-        jobs = [job for job in jobs if job.get("can_cancel")]
-        jobs.extend(
-            {
-                "job_id": job.id,
-                "flight_id": job.flight_id,
-                "status": job.status,
-                "progress": job.progress,
-                "mode": "youtube",
-                "can_cancel": True,
-                "created_at": job.created_at,
-                "updated_at": job.updated_at,
-            }
-            for job in db.query(YoutubeUploadJob)
-            .filter(YoutubeUploadJob.status.in_(("queued", "uploading")))
-            .all()
-        )
+        jobs = [
+            job
+            for job in jobs
+            if job.get("can_cancel")
+            or job.get("status") in (_VIDEO_EXPORT_IN_PROGRESS_STATUSES | {"uploading"})
+        ]
         jobs.sort(
             key=lambda job: (
                 _video_export_sort_value(job),
@@ -752,19 +839,48 @@ def _get_video_export_jobs_payload(
             ),
             reverse=True,
         )
+    type_counts = {
+        "all": len(jobs),
+        "video": sum(job.get("mode") in {"manual", "manual_fast", "stream"} for job in jobs),
+        "gopro": sum(job.get("mode") == "gopro_overlay" for job in jobs),
+        "highlight": sum(job.get("mode") == "highlight" for job in jobs),
+        "youtube": sum(job.get("mode") in {"youtube", "youtube_upload"} for job in jobs),
+    }
     if type_filter == "video":
-        jobs = [job for job in jobs if job.get("mode") != "gopro_overlay"]
+        jobs = [job for job in jobs if job.get("mode") in {"manual", "manual_fast", "stream"}]
     elif type_filter == "gopro":
         jobs = [job for job in jobs if job.get("mode") == "gopro_overlay"]
+    elif type_filter == "highlight":
+        jobs = [job for job in jobs if job.get("mode") == "highlight"]
+    elif type_filter == "youtube":
+        jobs = [job for job in jobs if job.get("mode") in {"youtube", "youtube_upload"}]
+    status_counts = {
+        "all": len(jobs),
+        "active": sum(
+            job.get("can_cancel")
+            or job.get("status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
+            or job.get("status") == "uploading"
+            for job in jobs
+        ),
+        "completed": sum(job.get("status") == "completed" for job in jobs),
+        "failed": sum(job.get("status") == "failed" for job in jobs),
+        "cancelled": sum(job.get("status") == "cancelled" for job in jobs),
+    }
     if status_filter == "active":
         jobs = [
             job
             for job in jobs
-            if job.get("can_cancel") or job.get("status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
+            if job.get("can_cancel")
+            or job.get("status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
+            or job.get("status") == "uploading"
         ]
     elif status_filter and status_filter != "all":
         jobs = [job for job in jobs if job.get("status") == status_filter]
-    payload: dict[str, Any] = {"jobs": jobs}
+    payload: dict[str, Any] = {
+        "jobs": jobs,
+        "status_counts": status_counts,
+        "type_counts": type_counts,
+    }
     if page is not None and page_size is not None:
         total = len(jobs)
         total_pages = max(1, math.ceil(total / page_size))
@@ -4760,6 +4876,7 @@ def _highlight_job_payload(job: HighlightVideoJob) -> HighlightVideoJobResponse:
         overlay_offset_seconds=float(job.overlay_offset_seconds or 0.0),
         selection=selection,
         created_at=job.created_at,
+        updated_at=job.updated_at,
         completed_at=job.completed_at,
     )
 
@@ -4950,16 +5067,10 @@ def create_flight_highlight_video(
         raise
     db.refresh(job)
 
-    from job_queue import enqueue_once, is_rq_enabled
+    from job_queue import is_rq_enabled
 
     if is_rq_enabled():
-        enqueue_once(
-            "highlight_video_worker.process_highlight_video_job",
-            job.id,
-            job_id=f"highlight-video-{job.id}",
-            timeout=config.JOB_QUEUE_TIMEOUT_SECONDS,
-            queue_name=config.JOB_QUEUE_NAME,
-        )
+        enqueue_highlight_video_job(job.id)
     else:
         background_tasks.add_task(process_highlight_video_job, job.id)
     return _highlight_job_payload(job)
@@ -6111,7 +6222,7 @@ def list_video_export_jobs(
     status_filter: Literal["all", "active", "completed", "failed", "cancelled"] = Query(
         default="all"
     ),
-    type_filter: Literal["all", "video", "gopro"] = Query(default="all"),
+    type_filter: Literal["all", "video", "gopro", "highlight", "youtube"] = Query(default="all"),
     db: Session = Depends(get_db),
 ) -> VideoExportJobsResponse:
     """List video export jobs across all flights."""
@@ -6127,9 +6238,10 @@ def list_video_export_jobs(
 
 
 @router.get("/video-export-gpu-status")
-def video_export_gpu_status() -> dict[str, object]:
-    """Return live GPU telemetry; this is intentionally not cached."""
+def video_export_gpu_status(response: Response) -> dict[str, object]:
+    """Return live GPU telemetry for the infrastructure dashboard."""
 
+    response.headers["Cache-Control"] = "no-store"
     return get_gpu_runtime_status()
 
 
@@ -6141,7 +6253,7 @@ async def stream_video_export_jobs(
     status_filter: Literal["all", "active", "completed", "failed", "cancelled"] = Query(
         default="all"
     ),
-    type_filter: Literal["all", "video", "gopro"] = Query(default="all"),
+    type_filter: Literal["all", "video", "gopro", "highlight", "youtube"] = Query(default="all"),
 ) -> StreamingResponse:
     """Stream video export job list updates without frontend polling."""
 

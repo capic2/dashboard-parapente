@@ -7,6 +7,15 @@ import type { Flight } from '../../../types';
 import { FlightMediaThumbnail } from './FlightMediaThumbnail';
 import { FlightYoutubeUploadControls } from './FlightYoutubeUploadControls';
 
+function getResolutionLabel(job: GoproOverlayJob): string | null {
+  if (job.output_resolution === '4k') return '4K (3840 × 2160)';
+  if (job.output_resolution === '1080p') return '1080p (1920 × 1080)';
+  if (job.video_width && job.video_height) {
+    return `${job.video_width} × ${job.video_height}`;
+  }
+  return null;
+}
+
 interface GoproOverlayJobCardProps {
   job: GoproOverlayJob;
   youtubeUploadFlight?: Flight;
@@ -37,10 +46,7 @@ export function GoproOverlayJobCard({
     ['cpu', 'gpu'].includes(job.render_method)
       ? t(`flights.generationLogs.method.${job.render_method}`)
       : null;
-  const resolutionLabel =
-    job.video_width && job.video_height
-      ? `${job.video_width} × ${job.video_height}`
-      : null;
+  const resolutionLabel = getResolutionLabel(job);
   const isProcessing = isGoproOverlayInProgress(job.status);
   const progress = Math.max(0, Math.min(100, Math.round(job.progress ?? 0)));
 

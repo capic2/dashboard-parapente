@@ -182,6 +182,8 @@ services:
       - BACKEND_USE_FAKE_REDIS=${BACKEND_USE_FAKE_REDIS:-false}
       - BACKEND_JOB_QUEUE_BACKEND=${BACKEND_JOB_QUEUE_BACKEND:-rq}
       - BACKEND_JOB_QUEUE_NAME=${BACKEND_JOB_QUEUE_NAME:-video_exports}
+      # Run multiple consumers so long video jobs do not block other jobs.
+      - BACKEND_WORKER_COUNT=${BACKEND_WORKER_COUNT:-5}
       - BACKEND_GOPRO_OVERLAY_QUEUE_NAME=${BACKEND_GOPRO_OVERLAY_QUEUE_NAME:-gopro_overlays}
       - BACKEND_GOPRO_PREVIEW_QUEUE_NAME=${BACKEND_GOPRO_PREVIEW_QUEUE_NAME:-gopro_previews}
       - BACKEND_API_HOST=${BACKEND_API_HOST:-0.0.0.0}
@@ -296,7 +298,9 @@ services:
     # still running. Always restart it so queued jobs cannot remain orphaned.
     restart: always
     init: true
-    stop_grace_period: 30s
+    # Keep a short, configurable grace period so stopped video workers do not
+    # delay every deployment while still allowing operators to increase it.
+    stop_grace_period: ${GOPRO_OVERLAY_STOP_GRACE_PERIOD:-15s}
     command: ['python', 'gopro_overlay_worker.py']
     cpus: '${GOPRO_OVERLAY_WORKER_CPUS:-8.0}'
     mem_limit: ${GOPRO_OVERLAY_WORKER_MEM_LIMIT:-12g}

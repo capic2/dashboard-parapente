@@ -61,6 +61,7 @@ const flight = {
   youtube_upload_progress: null,
   has_gopro_overlay: false,
   has_pano_video: false,
+  has_highlight_video: false,
   video_export_job_id: null,
   video_export_status: null,
   video_export_progress: null,
@@ -121,6 +122,8 @@ test('renders available media badges in the expected order', () => {
         has_video: true,
         has_camera: true,
         has_gopro_overlay: true,
+        has_pano_video: true,
+        has_highlight_video: true,
         has_youtube_video: true,
       }}
       isActive={false}
@@ -135,7 +138,9 @@ test('renders available media badges in the expected order', () => {
     'flights.gpxBadge',
     'flights.videoBadge',
     'flights.cameraBadge',
+    'flights.panoBadge',
     'flights.goproOverlayBadge',
+    'flights.highlightVideoBadge',
     'flights.youtubeBadge',
   ].map((label) => screen.getByText(label));
 
@@ -160,6 +165,45 @@ test('renders a panorama badge when pano.mp4 exists', () => {
   );
 
   expect(screen.getByText('flights.panoBadge')).toBeInTheDocument();
+});
+
+test('renders a best moments badge when the video is generated', () => {
+  render(
+    <Flight
+      flight={{ ...flight, has_highlight_video: true }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(screen.getByText('flights.highlightVideoBadge')).toBeInTheDocument();
+});
+
+test('renders best moments progress instead of regular video progress', () => {
+  render(
+    <Flight
+      flight={{
+        ...flight,
+        highlight_video_status: 'running',
+        highlight_video_progress: 42,
+      }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(
+    screen.getByText('flights.highlightVideoBadge 42%')
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByText('flights.videoProcessingBadge 42%')
+  ).not.toBeInTheDocument();
 });
 
 test('renders YouTube upload progress in the media badge', () => {

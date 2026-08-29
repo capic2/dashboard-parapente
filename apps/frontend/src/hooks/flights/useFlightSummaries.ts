@@ -91,8 +91,13 @@ export function mergeActiveMediaJobs(
     const flightJobs = jobsByFlight.get(flight.id);
     if (!flightJobs) return flight;
     const videoJob = flightJobs.find(
-      (job) => job.mode !== 'gopro_overlay' && job.mode !== 'youtube'
+      (job) =>
+        job.mode !== 'gopro_overlay' &&
+        job.mode !== 'youtube' &&
+        job.mode !== 'youtube_upload' &&
+        job.mode !== 'highlight'
     );
+    const highlightJob = flightJobs.find((job) => job.mode === 'highlight');
     const overlayJob = flightJobs.find((job) => job.mode === 'gopro_overlay');
     const youtubeJob = flightJobs.find((job) => job.mode === 'youtube');
     return {
@@ -101,6 +106,11 @@ export function mergeActiveMediaJobs(
         video_export_job_id: videoJob.job_id,
         video_export_status: videoJob.status,
         video_export_progress: videoJob.progress ?? null,
+      }),
+      ...(highlightJob && {
+        highlight_video_job_id: highlightJob.job_id,
+        highlight_video_status: highlightJob.status,
+        highlight_video_progress: highlightJob.progress ?? null,
       }),
       ...(overlayJob && {
         gopro_overlay_job_id: overlayJob.job_id,

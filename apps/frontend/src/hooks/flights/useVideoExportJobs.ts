@@ -34,6 +34,8 @@ export type VideoExportJob = {
   resume_from_frame?: number | null;
   output_filename?: string | null;
   layout_label?: string | null;
+  source_type?: string | null;
+  youtube_url?: string | null;
   log_tail?: string[];
   has_output_file?: boolean;
   can_cancel: boolean;
@@ -41,6 +43,7 @@ export type VideoExportJob = {
 };
 
 export const VIDEO_EXPORT_JOBS_PAGE_SIZE = 25;
+const VIDEO_EXPORT_JOBS_REFRESH_INTERVAL_MS = 3000;
 
 export type VideoExportJobsPage = {
   jobs: VideoExportJob[];
@@ -48,6 +51,8 @@ export type VideoExportJobsPage = {
   pageSize: number;
   total: number;
   totalPages: number;
+  statusCounts: Record<string, number>;
+  typeCounts: Record<string, number>;
 };
 
 type VideoExportJobsResponse = {
@@ -56,6 +61,8 @@ type VideoExportJobsResponse = {
   page_size?: number;
   total?: number;
   total_pages?: number;
+  status_counts?: Record<string, number>;
+  type_counts?: Record<string, number>;
 };
 
 export type VideoExportJobsFilters = {
@@ -71,6 +78,7 @@ export type VideoExportTempCleanupResult = {
   errors: { path: string; error: string }[];
 };
 
+export type VideoExportOutputKind = 'video' | 'gopro';
 export type VideoExportGpuStatus = {
   available: boolean;
   driver?: string;
@@ -82,17 +90,33 @@ export type VideoExportGpuStatus = {
   }[];
 };
 
-export function useVideoExportGpuStatus() {
-  return useQuery({
+const VIDEO_EXPORT_GPU_REFRESH_INTERVAL_MS = 5000;
+
+export const videoExportGpuStatusQueryOptions = () =>
+  queryOptions<VideoExportGpuStatus>({
     queryKey: ['video-export-gpu-status'],
     queryFn: () =>
       api.get('video-export-gpu-status').json<VideoExportGpuStatus>(),
-    refetchInterval: 5_000,
+    refetchInterval: VIDEO_EXPORT_GPU_REFRESH_INTERVAL_MS,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: 'always',
     staleTime: 0,
   });
+
+export function useVideoExportGpuStatus() {
+  return useQuery(videoExportGpuStatusQueryOptions());
 }
 
 const videoExportJobsQueryKey = ['video-export-jobs'];
+
+function videoExportJobsQueryKeyFor(
+  page: number,
+  pageSize: number,
+  statusFilter: string,
+  typeFilter: string
+) {
+  return [...videoExportJobsQueryKey, page, pageSize, statusFilter, typeFilter];
+}
 
 function toVideoExportJobsResponse(value: unknown): VideoExportJobsPage | null {
   if (!value || typeof value !== 'object' || !('jobs' in value)) {
@@ -115,6 +139,8 @@ function toVideoExportJobsResponse(value: unknown): VideoExportJobsPage | null {
     total,
     totalPages:
       response.total_pages ?? Math.max(1, Math.ceil(total / pageSize)),
+    statusCounts: response.status_counts ?? {},
+    typeCounts: response.type_counts ?? {},
   };
 }
 
@@ -125,7 +151,12 @@ export const videoExportJobsQueryOptions = ({
   typeFilter = 'all',
 }: { page?: number; pageSize?: number } & VideoExportJobsFilters = {}) =>
   queryOptions<VideoExportJobsPage>({
-    queryKey: [...videoExportJobsQueryKey, page, pageSize],
+    queryKey: videoExportJobsQueryKeyFor(
+      page,
+      pageSize,
+      statusFilter,
+      typeFilter
+    ),
     queryFn: async () => {
       const data = await api
         .get('video-export-jobs', {
@@ -139,6 +170,11 @@ export const videoExportJobsQueryOptions = ({
         .json<VideoExportJobsResponse>();
       return toVideoExportJobsResponse(data) as VideoExportJobsPage;
     },
+    // EventSource cannot attach the bearer token used by the protected API.
+    // Keep polling as a reliable fallback so the infrastructure table updates
+    // even when the SSE connection is rejected by authentication or a proxy.
+    refetchInterval: VIDEO_EXPORT_JOBS_REFRESH_INTERVAL_MS,
+    refetchOnWindowFocus: 'always',
   });
 
 export function useVideoExportJobs({
@@ -148,7 +184,9 @@ export function useVideoExportJobs({
   typeFilter = 'all',
 }: { page?: number; pageSize?: number } & VideoExportJobsFilters = {}) {
   const queryClient = useQueryClient();
-  const query = useQuery(videoExportJobsQueryOptions({ page, pageSize }));
+  const query = useQuery(
+    videoExportJobsQueryOptions({ page, pageSize, statusFilter, typeFilter })
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -182,7 +220,7 @@ export function useVideoExportJobs({
       }
 
       queryClient.setQueryData(
-        [...videoExportJobsQueryKey, page, pageSize],
+        videoExportJobsQueryKeyFor(page, pageSize, statusFilter, typeFilter),
         data
       );
     };
@@ -226,6 +264,30 @@ export function useResumeVideoExportJob() {
   });
 }
 
+export function useRestartVideoExportJob() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      flightId,
+      mode,
+    }: {
+      flightId: string;
+      mode: 'manual' | 'manual_fast' | 'stream';
+    }) => {
+      await api
+        .post(`flights/${flightId}/export-video`, {
+          searchParams: { mode },
+        })
+        .json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['flights'] });
+    },
+  });
+}
+
 export function useDeleteVideoExportJobRow() {
   const queryClient = useQueryClient();
 
@@ -236,6 +298,30 @@ export function useDeleteVideoExportJobRow() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });
       queryClient.invalidateQueries({ queryKey: ['flights'] });
+    },
+  });
+}
+
+export function useDeleteVideoExportOutput() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      jobId,
+      kind,
+    }: {
+      jobId: string;
+      kind: VideoExportOutputKind;
+    }) => {
+      const endpoint =
+        kind === 'gopro'
+          ? `gopro-overlays/jobs/${jobId}/video`
+          : `exports/${jobId}/video`;
+      await api.delete(endpoint).json();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });
+      void queryClient.invalidateQueries({ queryKey: ['flights'] });
     },
   });
 }

@@ -13,6 +13,8 @@ export type InfrastructureTab = (typeof infrastructureTabs)[number];
 export type InfrastructureSearch = {
   cacheSearch?: string;
   cacheAutoRefresh?: boolean;
+  videoExportStatus?: 'all' | 'active' | 'completed' | 'failed' | 'cancelled';
+  videoExportType?: 'all' | 'video' | 'gopro' | 'highlight' | 'youtube';
 };
 
 export function normalizeInfrastructureTab(tab: unknown): InfrastructureTab {
@@ -33,6 +35,20 @@ export function validateInfrastructureSearch(
       search.cacheAutoRefresh === true || search.cacheAutoRefresh === 'true'
         ? true
         : undefined,
+    videoExportStatus: [
+      'all',
+      'active',
+      'completed',
+      'failed',
+      'cancelled',
+    ].includes(String(search.videoExportStatus))
+      ? (search.videoExportStatus as InfrastructureSearch['videoExportStatus'])
+      : undefined,
+    videoExportType: ['all', 'video', 'gopro', 'highlight', 'youtube'].includes(
+      String(search.videoExportType)
+    )
+      ? (search.videoExportType as InfrastructureSearch['videoExportType'])
+      : undefined,
   };
 }
 

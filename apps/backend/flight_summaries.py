@@ -13,7 +13,7 @@ from sqlalchemy.sql.elements import ColumnElement
 
 from flight_storage import flight_storage_root
 import config
-from models import Flight, GoproOverlayJob, Site, YoutubeUploadJob
+from models import Flight, GoproOverlayJob, HighlightVideoJob, Site, YoutubeUploadJob
 from schemas import FlightSummariesResponse, FlightSummary, youtube_video_id_from_url
 from youtube_upload import existing_youtube_video_ids
 
@@ -328,6 +328,17 @@ def list_flight_summaries(
         .correlate(Flight)
         .scalar_subquery()
     )
+    completed_highlight_path = (
+        select(HighlightVideoJob.output_path)
+        .where(
+            HighlightVideoJob.flight_id == Flight.id,
+            HighlightVideoJob.status == "completed",
+        )
+        .order_by(HighlightVideoJob.completed_at.desc(), HighlightVideoJob.created_at.desc())
+        .limit(1)
+        .correlate(Flight)
+        .scalar_subquery()
+    )
     completed_youtube_uploads = (
         select(
             func.json_group_array(
@@ -387,6 +398,7 @@ def list_flight_summaries(
         Flight.gopro_overlay_file_path,
         flight_sequences.c.flight_sequence,
         completed_overlay_path.label("completed_overlay_path"),
+        completed_highlight_path.label("completed_highlight_path"),
         completed_youtube_uploads.label("completed_youtube_uploads"),
         exists()
         .where(
@@ -475,6 +487,7 @@ def list_flight_summaries(
                 )
             ),
             has_pano_video=pano_flags[row.id],
+            has_highlight_video=bool(_file_exists(row.completed_highlight_path)),
         )
         for row in rows
     ]

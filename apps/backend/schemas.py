@@ -117,6 +117,7 @@ class GoproOverlayJob(BaseModel):
     output_filename: str
     video_width: int | None = None
     video_height: int | None = None
+    output_resolution: Literal["1080p", "4k", "source"] | None = None
     gpx_offset: float = 0.0
     created_at: datetime
     updated_at: datetime
@@ -207,6 +208,7 @@ class HighlightVideoJobResponse(BaseModel):
     overlay_offset_seconds: float
     selection: list[HighlightVideoClipResponse] = Field(default_factory=list)
     created_at: datetime
+    updated_at: datetime
     completed_at: datetime | None = None
 
 
@@ -640,6 +642,7 @@ class FlightSummary(BaseModel):
     gopro_overlay_progress: int | None = None
     has_gopro_overlay: bool
     has_pano_video: bool
+    has_highlight_video: bool
 
 
 class FlightSummariesResponse(BaseModel):

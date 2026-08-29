@@ -11,6 +11,7 @@ import {
 import { Button, DataTable, Modal } from '@dashboard-parapente/design-system';
 import {
   Download,
+  ExternalLink,
   FileText,
   MoreHorizontal,
   Play,
@@ -29,13 +30,20 @@ import {
   useCancelVideoExportJob,
   useCleanupVideoExportTempFiles,
   useDeleteVideoExportJobRow,
+  useDeleteVideoExportOutput,
+  useRestartVideoExportJob,
   useResumeVideoExportJob,
   useVideoExportJobs,
   useVideoExportGpuStatus,
   VIDEO_EXPORT_JOBS_PAGE_SIZE,
 } from '../../../hooks/flights/useVideoExportJobs';
 import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
+import {
+  useCancelFlightHighlightVideo,
+  useDeleteFlightHighlightVideo,
+} from '../../../hooks/flights/useHighlightVideos';
 import { useGoproOverlayJobStream } from '../../../hooks/gopro/useGoproOverlay';
+import { useCancelYoutubeUpload } from '../../../hooks/flights/useYoutubeUpload';
 import { api } from '../../../lib/api';
 import { useToast } from '../../../hooks/useToast';
 import { JobLiveLogsPanel } from './JobLiveLogsPanel';
@@ -76,6 +84,8 @@ const typeFilters = [
   { id: 'all', label: 'Tous les types' },
   { id: 'video', label: 'Exports vidéo' },
   { id: 'gopro', label: 'Overlay GoPro' },
+  { id: 'highlight', label: 'Meilleurs moments' },
+  { id: 'youtube', label: 'Upload YouTube' },
 ] as const;
 
 type TypeFilter = (typeof typeFilters)[number]['id'];
@@ -93,6 +103,7 @@ const activeStatusLabels = new Set([
   'encoding',
   'processing',
 ]);
+const STALLED_JOB_THRESHOLD_MS = 5 * 60 * 1000;
 
 const columnHelper = createColumnHelper<VideoExportJob>();
 
@@ -124,12 +135,24 @@ function getModeLabelParts(mode: string) {
   if (mode === 'gopro_overlay') {
     return { key: 'videoJobs.mode.goproOverlay', fallback: 'Overlay GoPro' };
   }
+  if (mode === 'highlight') {
+    return { key: 'videoJobs.mode.highlight', fallback: 'Meilleurs moments' };
+  }
+  if (mode === 'youtube' || mode === 'youtube_upload') {
+    return { key: 'videoJobs.mode.youtubeUpload', fallback: 'Upload YouTube' };
+  }
   return { key: `videoJobs.mode.${mode}`, fallback: mode };
 }
 
 function getJobTypeLabelParts(job: VideoExportJob) {
   if (isGoproOverlayJob(job)) {
     return { key: 'videoJobs.type.goproOverlay', fallback: 'GoPro overlay' };
+  }
+  if (job.mode === 'highlight') {
+    return { key: 'videoJobs.type.highlight', fallback: 'Meilleurs moments' };
+  }
+  if (job.mode === 'youtube_upload') {
+    return { key: 'videoJobs.type.youtube', fallback: 'YouTube' };
   }
 
   return { key: 'videoJobs.type.video', fallback: 'Video' };
@@ -160,6 +183,17 @@ function getLastActivityTime(job: VideoExportJob) {
 
   const time = new Date(rawDate).getTime();
   return Number.isNaN(time) ? 0 : time;
+}
+
+function getStalledJobMinutes(job: VideoExportJob): number | null {
+  const phase = getJobPhase(job);
+  if (!activeStatusLabels.has(phase) || !job.updated_at) return null;
+  const lastActivity = new Date(job.updated_at).getTime();
+  if (!Number.isFinite(lastActivity)) return null;
+  const elapsedMs = Date.now() - lastActivity;
+  return elapsedMs >= STALLED_JOB_THRESHOLD_MS
+    ? Math.max(1, Math.floor(elapsedMs / 60000))
+    : null;
 }
 
 function getDateLabel(job: VideoExportJob) {
@@ -202,7 +236,8 @@ function isJobInFilter(job: VideoExportJob, filter: StatusFilter) {
   }
   if (filter === 'active') {
     return (
-      job.can_cancel || ['queued', 'running', 'processing'].includes(job.status)
+      job.can_cancel ||
+      ['queued', 'running', 'processing', 'uploading'].includes(job.status)
     );
   }
   return job.status === filter;
@@ -212,11 +247,46 @@ function isGoproOverlayJob(job: VideoExportJob) {
   return job.mode === 'gopro_overlay';
 }
 
+function isHighlightJob(job: VideoExportJob) {
+  return job.mode === 'highlight';
+}
+
+function isYoutubeJob(job: VideoExportJob) {
+  return job.mode === 'youtube' || job.mode === 'youtube_upload';
+}
+
+function getRestartMode(job: VideoExportJob) {
+  if (
+    job.mode === 'manual' ||
+    job.mode === 'manual_fast' ||
+    job.mode === 'stream'
+  ) {
+    return job.mode;
+  }
+
+  return 'manual_fast';
+}
+
+function canRestartVideoExport(job: VideoExportJob) {
+  return Boolean(
+    job.flight_id &&
+    !isGoproOverlayJob(job) &&
+    !isHighlightJob(job) &&
+    !isYoutubeJob(job) &&
+    ['failed', 'cancelled'].includes(job.status)
+  );
+}
+
 function isJobInTypeFilter(job: VideoExportJob, filter: TypeFilter) {
   return (
     filter === 'all' ||
     (filter === 'gopro' && isGoproOverlayJob(job)) ||
-    (filter === 'video' && !isGoproOverlayJob(job))
+    (filter === 'video' &&
+      !isGoproOverlayJob(job) &&
+      !isHighlightJob(job) &&
+      !isYoutubeJob(job)) ||
+    (filter === 'highlight' && isHighlightJob(job)) ||
+    (filter === 'youtube' && isYoutubeJob(job))
   );
 }
 
@@ -271,11 +341,24 @@ function SegmentedFilter<T extends string>({
 }
 
 function canDownloadJob(job: VideoExportJob) {
-  return job.status === 'completed' && job.has_output_file !== false;
+  return (
+    job.status === 'completed' &&
+    job.has_output_file !== false &&
+    !isYoutubeJob(job) &&
+    (!isHighlightJob(job) || Boolean(job.flight_id))
+  );
 }
 
 function canDeleteJobRow(job: VideoExportJob) {
   return job.can_delete;
+}
+
+function canDeleteVideoOutput(job: VideoExportJob) {
+  return (
+    job.status === 'completed' &&
+    job.has_output_file === true &&
+    (isGoproOverlayJob(job) || (!isHighlightJob(job) && !isYoutubeJob(job)))
+  );
 }
 
 function JobStatusBadge({ job }: { job: VideoExportJob }) {
@@ -360,8 +443,53 @@ function FramesCell({ job }: { job: VideoExportJob }) {
   );
 }
 
+function isActiveJob(job: VideoExportJob) {
+  if (['queued', 'blocked', 'stalled'].includes(job.status)) {
+    return false;
+  }
+  return (
+    activeStatusLabels.has(job.status) ||
+    activeStatusLabels.has(job.internal_status || '')
+  );
+}
+
+function getLastLogMetrics(job: VideoExportJob) {
+  const lastLogLine = job.log_tail?.[job.log_tail.length - 1];
+  if (!lastLogLine) {
+    return { fps: undefined, etaSeconds: undefined };
+  }
+
+  const fpsValue = lastLogLine.match(/\(([\d.,]+)\s*fps\b/iu)?.[1];
+  const etaMatch = lastLogLine.match(/\bETA:\s*([\d.,]+)\s*(s|sec|min|h)\b/iu);
+  const fps = fpsValue
+    ? Number.parseFloat(fpsValue.replace(',', '.'))
+    : undefined;
+  const etaValue = etaMatch?.[1]
+    ? Number.parseFloat(etaMatch[1].replace(',', '.'))
+    : undefined;
+  const etaUnit = etaMatch?.[2]?.toLowerCase();
+  const etaSeconds =
+    typeof etaValue === 'number' && Number.isFinite(etaValue)
+      ? etaUnit === 'h'
+        ? etaValue * 3600
+        : etaUnit === 'min'
+          ? etaValue * 60
+          : etaValue
+      : undefined;
+
+  return { fps, etaSeconds };
+}
+
 function FpsCell({ job }: { job: VideoExportJob }) {
-  const fps = job.fps_actual ?? job.fps;
+  if (!isActiveJob(job)) {
+    return (
+      <span className="whitespace-nowrap font-mono text-xs text-gray-500 dark:text-gray-400">
+        0.0 fps
+      </span>
+    );
+  }
+  const { fps: loggedFps } = getLastLogMetrics(job);
+  const fps = loggedFps ?? job.fps_actual;
   return typeof fps === 'number' && Number.isFinite(fps) ? (
     <span className="whitespace-nowrap font-mono text-xs text-gray-700 dark:text-gray-200">
       {fps.toFixed(1)} fps
@@ -382,7 +510,9 @@ function JobLogsDetails({
 }) {
   const { t } = useTranslation();
   const { status: videoStatus } = useVideoExportStatus(
-    isGoproOverlayJob(job) ? null : job.job_id,
+    isGoproOverlayJob(job) || isHighlightJob(job) || isYoutubeJob(job)
+      ? null
+      : job.job_id,
     isOpen
   );
   const { job: goproJob } = useGoproOverlayJobStream(
@@ -410,13 +540,32 @@ function JobLogsDetails({
   );
 }
 
-export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
+type VideoExportJobsPanelProps = {
+  limit?: number | null;
+  statusFilter?: StatusFilter;
+  typeFilter?: TypeFilter;
+  onStatusFilterChange?: (value: StatusFilter) => void;
+  onTypeFilterChange?: (value: TypeFilter) => void;
+};
+
+export function VideoExportJobsPanel({
+  limit = 6,
+  statusFilter: controlledStatusFilter,
+  typeFilter: controlledTypeFilter,
+  onStatusFilterChange,
+  onTypeFilterChange,
+}: VideoExportJobsPanelProps) {
   const { t } = useTranslation();
   const toast = useToast();
   const [pendingConfirm, setPendingConfirm] =
     useState<PendingVideoConfirm | null>(null);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+  const [localStatusFilter, setLocalStatusFilter] =
+    useState<StatusFilter>('all');
+  const [localTypeFilter, setLocalTypeFilter] = useState<TypeFilter>('all');
+  const statusFilter = controlledStatusFilter ?? localStatusFilter;
+  const typeFilter = controlledTypeFilter ?? localTypeFilter;
+  const setStatusFilter = onStatusFilterChange ?? setLocalStatusFilter;
+  const setTypeFilter = onTypeFilterChange ?? setLocalTypeFilter;
   const [page, setPage] = useState(1);
   const [selectedLogJob, setSelectedLogJob] = useState<VideoExportJob | null>(
     null
@@ -437,24 +586,17 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
   });
   const { data: gpuStatus, isLoading: isGpuStatusLoading } =
     useVideoExportGpuStatus();
-  let gpuStatusLabel = t(
-    'videoJobs.gpu.unavailable',
-    'GPU NVIDIA indisponible'
-  );
-  if (isGpuStatusLoading) {
-    gpuStatusLabel = t('videoJobs.gpu.checking', 'Vérification du GPU…');
-  } else if (gpuStatus?.available) {
-    gpuStatusLabel = t('videoJobs.gpu.available', 'GPU NVIDIA disponible');
-  }
-  const gpuStatusClassName = gpuStatus?.available
-    ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-900/20 dark:text-green-200'
-    : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-200';
   const jobs = useMemo(() => jobsPage?.jobs ?? [], [jobsPage?.jobs]);
   const totalJobs = jobsPage?.total ?? jobs.length;
   const totalPages = jobsPage?.totalPages ?? 1;
   const cancelJob = useCancelVideoExportJob();
+  const cancelHighlightJob = useCancelFlightHighlightVideo('');
+  const restartJob = useRestartVideoExportJob();
   const resumeJob = useResumeVideoExportJob();
   const deleteJobRow = useDeleteVideoExportJobRow();
+  const deleteVideoOutput = useDeleteVideoExportOutput();
+  const cancelYoutubeUpload = useCancelYoutubeUpload('');
+  const deleteHighlightJob = useDeleteFlightHighlightVideo('');
   const cleanupTempFiles = useCleanupVideoExportTempFiles();
 
   const filteredJobs = useMemo(
@@ -474,14 +616,37 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
     setPage(1);
   }, [statusFilter, typeFilter]);
 
-  const activeCount = jobs.filter((job) => job.can_cancel).length;
-  const completedCount = jobs.filter(
-    (job) => job.status === 'completed'
-  ).length;
-  const failedCount = jobs.filter((job) => job.status === 'failed').length;
-  const cancelledCount = jobs.filter(
-    (job) => job.status === 'cancelled'
-  ).length;
+  const statusCounts = useMemo(
+    () => jobsPage?.statusCounts ?? {},
+    [jobsPage?.statusCounts]
+  );
+  const typeCounts = useMemo(
+    () => jobsPage?.typeCounts ?? {},
+    [jobsPage?.typeCounts]
+  );
+  const activeCount =
+    statusCounts.active ??
+    jobs.filter((job) => isJobInFilter(job, 'active')).length;
+  const completedCount =
+    statusCounts.completed ??
+    jobs.filter((job) => job.status === 'completed').length;
+  const failedCount =
+    statusCounts.failed ?? jobs.filter((job) => job.status === 'failed').length;
+  const cancelledCount =
+    statusCounts.cancelled ??
+    jobs.filter((job) => job.status === 'cancelled').length;
+  let gpuStatusLabel = t(
+    'videoJobs.gpu.unavailable',
+    'GPU NVIDIA indisponible'
+  );
+  if (isGpuStatusLoading) {
+    gpuStatusLabel = t('videoJobs.gpu.checking', 'Vérification du GPU…');
+  } else if (gpuStatus?.available) {
+    gpuStatusLabel = t('videoJobs.gpu.available', 'GPU NVIDIA disponible');
+  }
+  const gpuStatusClassName = gpuStatus?.available
+    ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-900/20 dark:text-green-200'
+    : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-200';
   const jobsInSelectedType = useMemo(
     () => jobs.filter((job) => isJobInTypeFilter(job, typeFilter)),
     [jobs, typeFilter]
@@ -491,19 +656,23 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
       typeFilters.map((filter) => ({
         id: filter.id,
         label: t(`videoJobs.typeFilters.${filter.id}`, filter.label),
-        count: jobs.filter((job) => isJobInTypeFilter(job, filter.id)).length,
+        count:
+          typeCounts[filter.id] ??
+          jobs.filter((job) => isJobInTypeFilter(job, filter.id)).length,
       })),
-    [jobs, t]
+    [jobs, t, typeCounts]
   );
   const statusFilterOptions = useMemo<FilterOption<StatusFilter>[]>(
     () =>
       statusFilters.map((filter) => ({
         id: filter.id,
         label: t(`videoJobs.filters.${filter.id}`, filter.label),
-        count: jobsInSelectedType.filter((job) => isJobInFilter(job, filter.id))
-          .length,
+        count:
+          statusCounts[filter.id] ??
+          jobsInSelectedType.filter((job) => isJobInFilter(job, filter.id))
+            .length,
       })),
-    [jobsInSelectedType, t]
+    [jobsInSelectedType, t, statusCounts]
   );
 
   const handleCancel = useCallback(
@@ -513,7 +682,16 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
         confirmLabel: t('videoJobs.stop', 'Stopper'),
         onConfirm: async () => {
           try {
-            await cancelJob.mutateAsync(job.job_id);
+            if (isHighlightJob(job) && job.flight_id) {
+              await cancelHighlightJob.mutateAsync({
+                targetFlightId: job.flight_id,
+                jobId: job.job_id,
+              });
+            } else if (isYoutubeJob(job) && job.flight_id) {
+              await cancelYoutubeUpload.mutateAsync(job.flight_id);
+            } else {
+              await cancelJob.mutateAsync(job.job_id);
+            }
             toast.success(t('videoJobs.stopSuccess', 'Génération stoppée'));
           } catch {
             toast.error(
@@ -523,7 +701,7 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
         },
       });
     },
-    [cancelJob, t, toast]
+    [cancelHighlightJob, cancelJob, cancelYoutubeUpload, t, toast]
   );
 
   const handleResume = useCallback(
@@ -540,12 +718,33 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
     [resumeJob, t, toast]
   );
 
+  const handleRestart = useCallback(
+    async (job: VideoExportJob) => {
+      if (!job.flight_id) return;
+
+      try {
+        await restartJob.mutateAsync({
+          flightId: job.flight_id,
+          mode: getRestartMode(job),
+        });
+        toast.success(t('videoJobs.restartSuccess', 'Génération redémarrée'));
+      } catch {
+        toast.error(
+          t('videoJobs.restartError', 'Impossible de redémarrer la génération')
+        );
+      }
+    },
+    [restartJob, t, toast]
+  );
+
   const handleDownload = useCallback(
     async (job: VideoExportJob) => {
       try {
         const endpoint = isGoproOverlayJob(job)
           ? `gopro-overlays/jobs/${job.job_id}/download`
-          : `exports/${job.job_id}/download`;
+          : isHighlightJob(job)
+            ? `flights/${job.flight_id}/highlight-videos/${job.job_id}/download`
+            : `exports/${job.job_id}/download`;
         const response = await api.get(endpoint, { timeout: false });
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -575,7 +774,14 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
         confirmLabel: t('videoJobs.deleteRow', 'Supprimer'),
         onConfirm: async () => {
           try {
-            await deleteJobRow.mutateAsync(job.job_id);
+            if (isHighlightJob(job) && job.flight_id) {
+              await deleteHighlightJob.mutateAsync({
+                targetFlightId: job.flight_id,
+                jobId: job.job_id,
+              });
+            } else {
+              await deleteJobRow.mutateAsync(job.job_id);
+            }
             toast.success(t('videoJobs.deleteRowSuccess', 'Ligne supprimée'));
           } catch {
             toast.error(
@@ -585,7 +791,36 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
         },
       });
     },
-    [deleteJobRow, t, toast]
+    [deleteHighlightJob, deleteJobRow, t, toast]
+  );
+
+  const handleDeleteVideoOutput = useCallback(
+    (job: VideoExportJob) => {
+      setPendingConfirm({
+        message: t(
+          'videoJobs.confirmDeleteVideo',
+          'Supprimer le fichier vidéo généré ? Cette action est irréversible.'
+        ),
+        confirmLabel: t('videoJobs.deleteVideo', 'Supprimer la vidéo'),
+        onConfirm: async () => {
+          try {
+            await deleteVideoOutput.mutateAsync({
+              jobId: job.job_id,
+              kind: isGoproOverlayJob(job) ? 'gopro' : 'video',
+            });
+            toast.success(t('videoJobs.deleteVideoSuccess', 'Vidéo supprimée'));
+          } catch {
+            toast.error(
+              t(
+                'videoJobs.deleteVideoError',
+                'Impossible de supprimer la vidéo'
+              )
+            );
+          }
+        },
+      });
+    },
+    [deleteVideoOutput, t, toast]
   );
 
   const renderJobActions = useCallback(
@@ -607,6 +842,17 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
                 {t('videoJobs.viewFlight', 'Voir le vol')}
               </MenuItem>
             )}
+            {isYoutubeJob(job) && job.youtube_url && (
+              <MenuItem
+                href={job.youtube_url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+              >
+                <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                {t('videoJobs.openYoutube', 'Ouvrir sur YouTube')}
+              </MenuItem>
+            )}
             {canDownloadJob(job) && (
               <MenuItem
                 onAction={() => void handleDownload(job)}
@@ -625,13 +871,29 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
                 <Play className="h-4 w-4" aria-hidden="true" />
                 {resumeJob.isPending
                   ? t('videoJobs.resuming', 'Relance...')
-                  : t('videoJobs.resume', 'Reprendre')}
+                  : t('videoJobs.resume', 'Relancer')}
+              </MenuItem>
+            )}
+            {!job.can_resume && canRestartVideoExport(job) && (
+              <MenuItem
+                onAction={() => void handleRestart(job)}
+                isDisabled={restartJob.isPending}
+                className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+              >
+                <Play className="h-4 w-4" aria-hidden="true" />
+                {restartJob.isPending
+                  ? t('videoJobs.restarting', 'Redémarrage...')
+                  : t('videoJobs.restart', 'Redémarrer')}
               </MenuItem>
             )}
             {job.can_cancel && (
               <MenuItem
                 onAction={() => handleCancel(job)}
-                isDisabled={cancelJob.isPending}
+                isDisabled={
+                  cancelJob.isPending ||
+                  cancelHighlightJob.isPending ||
+                  cancelYoutubeUpload.isPending
+                }
                 className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-700 outline-none hover:bg-red-50 focus:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-300 dark:hover:bg-red-950/40 dark:focus:bg-red-950/40"
               >
                 <Square className="h-4 w-4" aria-hidden="true" />
@@ -643,11 +905,23 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
             {canDeleteJobRow(job) && (
               <MenuItem
                 onAction={() => handleDeleteJobRow(job)}
-                isDisabled={deleteJobRow.isPending}
+                isDisabled={
+                  deleteJobRow.isPending || deleteHighlightJob.isPending
+                }
                 className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
                 {t('videoJobs.deleteRow', 'Supprimer')}
+              </MenuItem>
+            )}
+            {canDeleteVideoOutput(job) && (
+              <MenuItem
+                onAction={() => handleDeleteVideoOutput(job)}
+                isDisabled={deleteVideoOutput.isPending}
+                className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                {t('videoJobs.deleteVideo', 'Supprimer la vidéo')}
               </MenuItem>
             )}
             <MenuItem
@@ -663,11 +937,18 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
     ),
     [
       cancelJob.isPending,
+      cancelHighlightJob.isPending,
+      cancelYoutubeUpload.isPending,
+      deleteHighlightJob.isPending,
       deleteJobRow.isPending,
+      deleteVideoOutput.isPending,
       handleCancel,
       handleDeleteJobRow,
+      handleDeleteVideoOutput,
       handleDownload,
+      handleRestart,
       handleResume,
+      restartJob.isPending,
       resumeJob.isPending,
       t,
     ]
@@ -743,7 +1024,10 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
           <span className="whitespace-nowrap text-xs text-gray-700 dark:text-gray-200">
             {row.original.status === 'completed'
               ? t('videoJobs.done', 'Terminé')
-              : formatDuration(row.original.eta_seconds)}
+              : formatDuration(
+                  getLastLogMetrics(row.original).etaSeconds ??
+                    row.original.eta_seconds
+                )}
           </span>
         ),
       }),
@@ -1005,6 +1289,17 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
                       <h3 className="mt-2 truncate text-sm font-semibold text-gray-900 dark:text-white">
                         {getFlightLabel(job)}
                       </h3>
+                      {getStalledJobMinutes(job) !== null && !job.error && (
+                        <p className="mt-1 text-sm font-medium text-red-600 dark:text-red-300">
+                          {t(
+                            'videoJobs.stalled',
+                            'Aucune progression depuis {{minutes}} min. Le traitement semble bloqué.',
+                            {
+                              minutes: getStalledJobMinutes(job),
+                            }
+                          )}
+                        </p>
+                      )}
                       {(job.message || job.error) && (
                         <p
                           className={`mt-1 text-sm ${
@@ -1066,7 +1361,9 @@ export function VideoExportJobsPanel({ limit = 6 }: { limit?: number | null }) {
                         {t('videoJobs.table.eta', 'Temps restant')}
                       </div>
                       <div className="mt-0.5 font-semibold text-gray-800 dark:text-gray-100">
-                        {formatDuration(job.eta_seconds)}
+                        {formatDuration(
+                          getLastLogMetrics(job).etaSeconds ?? job.eta_seconds
+                        )}
                       </div>
                     </div>
                   </div>

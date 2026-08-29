@@ -25,6 +25,7 @@ from flight_tracks import TrackPoint, normalize_track
 from gopro_overlay_inputs import resolve_automatic_overlay_inputs
 from highlight_video import HighlightClip, overlay_interval_for_clip
 from models import Flight, HighlightVideoJob
+from spots.distance import haversine_distance
 from visual_event_detector import classify_motion_mask
 from video_acceleration import h264_encode_args, select_video_accelerator
 
@@ -35,6 +36,8 @@ STATUS_RUNNING = "running"
 STATUS_COMPLETED = "completed"
 STATUS_FAILED = "failed"
 STATUS_CANCELLED = "cancelled"
+
+_ACTIVE_STATUSES = {STATUS_QUEUED, STATUS_RUNNING}
 
 
 def _now() -> datetime:
@@ -375,6 +378,135 @@ def classify_visual_clip(source_path: Path, clip: HighlightClip) -> HighlightCli
     return clip
 
 
+def _smoothed_track_elevations(track_points: list[TrackPoint]) -> list[float]:
+    """Remove GPS altitude spikes while retaining the takeoff/landing trend."""
+    elevations = np.asarray(
+        [float(point.get("elevation", 0.0)) for point in track_points], dtype=np.float64
+    )
+    if elevations.size < 3:
+        return elevations.tolist()
+    # A median filter is enough here and avoids treating one bad GPS sample as
+    # a phase change. Keep the window odd and small for short activities.
+    window = min(9, elevations.size if elevations.size % 2 else elevations.size - 1)
+    if window < 3:
+        return elevations.tolist()
+    half_window = window // 2
+    padded = np.pad(elevations, (half_window, half_window), mode="edge")
+    return [float(np.median(padded[index : index + window])) for index in range(elevations.size)]
+
+
+def _flight_phase_times(
+    track_points: list[TrackPoint],
+) -> tuple[float | None, float | None]:
+    """Return takeoff and landing timestamps, in seconds from the track start.
+
+    Takeoff is the first sustained climb after the initial altitude plateau.
+    Landing is the end of the final sustained descent; a quiet altitude
+    plateau after that descent is preferred when the recorder continued after
+    touchdown.
+    """
+    samples = [
+        (int(point.get("timestamp", 0)), elevation)
+        for point, elevation in zip(
+            track_points, _smoothed_track_elevations(track_points), strict=True
+        )
+        if "timestamp" in point and int(point["timestamp"]) >= 0
+    ]
+    if len(samples) < 3 or samples[-1][0] <= samples[0][0]:
+        return None, None
+
+    start_timestamp = samples[0][0]
+    times = np.asarray([(timestamp - start_timestamp) / 1000 for timestamp, _ in samples])
+    elevations = np.asarray([elevation for _, elevation in samples])
+    track_duration = float(times[-1])
+    window_seconds = min(30.0, max(10.0, track_duration / 12))
+
+    def trend(index: int, direction: int) -> float | None:
+        target = times[index] - window_seconds
+        previous = np.searchsorted(times, target, side="right") - 1
+        if previous < 0 or times[index] <= times[previous]:
+            return None
+        return (
+            float((elevations[index] - elevations[previous]) / (times[index] - times[previous]))
+            * direction
+        )
+
+    takeoff: float | None = None
+    # Ignore a possible pre-flight GPS wobble and require several consecutive
+    # climbing samples before calling it a takeoff.
+    initial_window_end = min(60.0, track_duration * 0.2)
+    initial_indices = np.searchsorted(times, initial_window_end, side="right")
+    initial_plateau = float(np.ptp(elevations[: max(2, initial_indices)])) <= 25
+    for index in range(1, len(samples)):
+        if not initial_plateau or times[index] < initial_window_end:
+            continue
+        current_trend = trend(index, 1)
+        if current_trend is None or current_trend < 0.12:
+            continue
+        following = [
+            trend(next_index, 1) for next_index in range(index, min(len(samples), index + 4))
+        ]
+        if sum(value is not None and value >= 0.08 for value in following) >= 3:
+            takeoff = float(times[index] - window_seconds / 2)
+            break
+
+    landing: float | None = None
+    descent_indices = [
+        index
+        for index in range(1, len(samples))
+        if (current_trend := trend(index, -1)) is not None and current_trend >= 0.08
+    ]
+    if descent_indices:
+        descent_end = descent_indices[-1]
+        # A barometric altitude sensor can keep drifting after touchdown. A
+        # stable horizontal position is stronger evidence of the actual
+        # landing than requiring the altitude to plateau, especially when the
+        # watch keeps recording on the ground.
+        stationary_window_seconds = min(10.0, max(6.0, track_duration / 18))
+        for index in range(1, len(samples)):
+            if times[index] < track_duration * 0.5:
+                continue
+            window_start = np.searchsorted(
+                times, times[index] - stationary_window_seconds, side="left"
+            )
+            if window_start >= index:
+                continue
+            previous_point = track_points[window_start]
+            current_point = track_points[index]
+            if not all(key in previous_point and key in current_point for key in ("lat", "lon")):
+                continue
+            horizontal_distance_m = (
+                haversine_distance(
+                    previous_point["lat"],
+                    previous_point["lon"],
+                    current_point["lat"],
+                    current_point["lon"],
+                )
+                * 1000
+            )
+            if horizontal_distance_m <= 20:
+                preceding_descent = any(
+                    descent_index <= index and times[index] - times[descent_index] <= 60
+                    for descent_index in descent_indices
+                )
+                if preceding_descent:
+                    landing = float(times[index] - stationary_window_seconds / 2)
+                    break
+    if landing is None and descent_indices:
+        descent_end = descent_indices[-1]
+        # Estimate touchdown halfway between the end of the descent trend and
+        # the first stable post-landing point. Using the stable point itself
+        # pushed the rendered clip past touchdown and hid the actual contact.
+        landing = float(times[descent_end])
+        for index in range(descent_end + 1, len(samples)):
+            recent = elevations[descent_end : index + 1]
+            if times[index] - times[descent_end] >= 8 and float(np.ptp(recent)) <= 8:
+                landing = float(times[descent_end] + (times[index] - times[descent_end]) / 2)
+                break
+
+    return takeoff, landing
+
+
 def select_highlight_clips(
     duration_seconds: float, source_path: Path | None = None
 ) -> list[HighlightClip]:
@@ -408,43 +540,73 @@ def select_flight_event_clips(
     track_points: list[TrackPoint] | None,
     visual_clips: list[HighlightClip],
 ) -> list[HighlightClip]:
-    """Guarantee flight phases while filling remaining slots with visual highlights."""
+    """Select visually detected phase changes and use telemetry for thermals."""
+    if not visual_clips and not track_points:
+        return []
+
+    clip_length = min(8.0, max(3.0, duration_seconds / 8))
+
+    def visual_phase_clip(category: str) -> HighlightClip | None:
+        # The visual scorer provides the evidence. If it finds no candidate in
+        # a phase window, leave that phase absent instead of inventing a fixed
+        # timestamp (the camera may have started long before takeoff).
+        if category == "takeoff":
+            candidates = [
+                clip for clip in visual_clips if clip.start_seconds <= duration_seconds * 0.5
+            ]
+            return min(candidates, key=lambda clip: clip.start_seconds) if candidates else None
+        candidates = [clip for clip in visual_clips if clip.start_seconds >= duration_seconds * 0.5]
+        return max(candidates, key=lambda clip: clip.start_seconds) if candidates else None
+
+    selected: list[HighlightClip] = []
+    phase_times = _flight_phase_times(track_points) if track_points else (None, None)
+    takeoff_clip = visual_phase_clip("takeoff") if phase_times[0] is None else None
+    if takeoff_clip:
+        # The visual candidate usually scores the wing already overhead. Add
+        # one clip length before it so the fallback includes the inflation and
+        # the actual launch when the GPX starts after takeoff.
+        takeoff_clip = replace(
+            takeoff_clip,
+            start_seconds=max(0.0, takeoff_clip.start_seconds - clip_length),
+            category="takeoff",
+        )
+        selected.append(takeoff_clip)
+    landing_clip = visual_phase_clip("landing") if phase_times[1] is None else None
+    if landing_clip and (
+        takeoff_clip is None or landing_clip.start_seconds != takeoff_clip.start_seconds
+    ):
+        selected.append(replace(landing_clip, category="landing"))
+
+    def fill_with_visual_clips() -> list[HighlightClip]:
+        for clip in visual_clips:
+            if len(selected) >= 6:
+                break
+            if all(
+                abs(clip.start_seconds - chosen.start_seconds) > clip_length for chosen in selected
+            ):
+                selected.append(clip)
+        return sorted(selected, key=lambda clip: clip.start_seconds)
+
     if not track_points:
-        return visual_clips
+        return fill_with_visual_clips()
     samples = [
         (point.get("timestamp", 0), point.get("elevation", 0.0))
         for point in track_points
-        if point.get("timestamp", 0)
+        if "timestamp" in point and point["timestamp"] >= 0
     ]
     timestamps = [timestamp for timestamp, _elevation in samples]
     if len(samples) < 2:
-        return visual_clips
+        return fill_with_visual_clips()
     track_duration = max(1.0, (timestamps[-1] - timestamps[0]) / 1000)
 
     def video_time(track_seconds: float) -> float:
         return min(duration_seconds, max(0.0, track_seconds / track_duration * duration_seconds))
 
-    clip_length = min(8.0, max(3.0, duration_seconds / 8))
-    # The first useful visual movement is a better takeoff anchor than the
-    # first GPS sample: cameras often keep recording while the wing is being
-    # prepared. Keep a little lead-in so the inflation is visible.
-    early_visual = [clip for clip in visual_clips if clip.start_seconds <= duration_seconds * 0.25]
-    takeoff_anchor = (
-        min(
-            early_visual,
-            key=lambda clip: abs(clip.start_seconds - duration_seconds * 0.12),
-        ).start_seconds
-        if early_visual
-        else duration_seconds * 0.04
-    )
-    takeoff_start = max(
-        0.0,
-        min(
-            duration_seconds - clip_length,
-            takeoff_anchor - clip_length,
-        ),
-    )
-    phases = [("takeoff", takeoff_start + clip_length / 2)]
+    phases: list[tuple[str, float]] = []
+    if phase_times[0] is not None:
+        phases.append(("takeoff", phase_times[0]))
+    if phase_times[1] is not None:
+        phases.append(("landing", phase_times[1]))
     elevations = [elevation for _timestamp, elevation in samples]
     climb_candidates: list[tuple[float, float]] = []
     for index in range(1, len(elevations)):
@@ -467,25 +629,14 @@ def select_flight_event_clips(
         _, best_index = max(climb_candidates)
         phases.append(("thermal", (timestamps[best_index] - timestamps[0]) / 1000))
 
-    phases.append(("landing", duration_seconds * 0.96))
-
-    selected: list[HighlightClip] = []
+    selected_categories = {clip.category for clip in selected}
     for category, position in phases:
-        center = (
-            position
-            if category == "takeoff"
-            else (video_time(position) if category == "thermal" else position)
-        )
+        if category in selected_categories:
+            continue
+        center = video_time(position)
         start = max(0.0, min(duration_seconds - clip_length, center - clip_length / 2))
         selected.append(HighlightClip(start, clip_length, 0.0, category))
-    for clip in visual_clips:
-        if len(selected) >= 6:
-            break
-        if all(
-            abs(clip.start_seconds - chosen.start_seconds) >= clip_length for chosen in selected
-        ):
-            selected.append(clip)
-    return sorted(selected, key=lambda clip: clip.start_seconds)
+    return fill_with_visual_clips()
 
 
 def _render_clip(
@@ -603,11 +754,103 @@ def _is_cancelled(job_id: str) -> bool:
         return job is None or job.status == STATUS_CANCELLED
 
 
+def _rq_job_id(job_id: str) -> str:
+    return f"highlight-video-{job_id}"
+
+
+def _enqueue_highlight_video_job_in_rq(job_id: str) -> None:
+    from job_queue import enqueue_once
+
+    enqueue_once(
+        "highlight_video_worker.process_highlight_video_job",
+        job_id,
+        job_id=_rq_job_id(job_id),
+        timeout=config.JOB_QUEUE_TIMEOUT_SECONDS,
+        queue_name=config.JOB_QUEUE_NAME,
+    )
+
+
+def _queued_job_ids() -> list[str]:
+    with SessionLocal() as db:
+        jobs = (
+            db.query(HighlightVideoJob.id)
+            .filter(HighlightVideoJob.status == STATUS_QUEUED)
+            .order_by(HighlightVideoJob.created_at)
+            .all()
+        )
+    return [str(job_id) for (job_id,) in jobs]
+
+
+def _recover_active_jobs_after_worker_restart() -> int:
+    """Make interrupted highlight jobs eligible for a fresh RQ execution."""
+    now = _now()
+    with SessionLocal() as db:
+        recovered_count = (
+            db.query(HighlightVideoJob)
+            .filter(HighlightVideoJob.status.in_(_ACTIVE_STATUSES))
+            .update(
+                {
+                    "status": STATUS_QUEUED,
+                    "progress": 0,
+                    "message": "Récupéré après le redémarrage du worker",
+                    "error": None,
+                    "started_at": None,
+                    "updated_at": now,
+                },
+                synchronize_session=False,
+            )
+        )
+        db.commit()
+    return int(recovered_count)
+
+
+def enqueue_highlight_video_job(job_id: str) -> bool:
+    """Submit one durable highlight job to RQ when enabled."""
+    from job_queue import is_rq_enabled
+
+    if not is_rq_enabled():
+        return False
+    _enqueue_highlight_video_job_in_rq(job_id)
+    return True
+
+
+def enqueue_pending_highlight_video_jobs(*, recover_active: bool = False) -> int:
+    """Enqueue durable highlight jobs after API or worker restarts."""
+    from job_queue import is_rq_enabled
+
+    if not is_rq_enabled():
+        return 0
+    if recover_active:
+        _recover_active_jobs_after_worker_restart()
+    job_ids = _queued_job_ids()
+    for job_id in job_ids:
+        enqueue_highlight_video_job(job_id)
+    return len(job_ids)
+
+
 def process_highlight_video_job(job_id: str) -> None:
     """RQ target for a highlight render job."""
     started_monotonic = time.monotonic()
     logger.info("Highlight job started: job_id=%s", job_id)
     with SessionLocal() as db:
+        now = _now()
+        claimed = (
+            db.query(HighlightVideoJob)
+            .filter(HighlightVideoJob.id == job_id, HighlightVideoJob.status == STATUS_QUEUED)
+            .update(
+                {
+                    "status": STATUS_RUNNING,
+                    "progress": 5,
+                    "started_at": now,
+                    "message": "Analyse de la vidéo pano (initialisation)",
+                },
+                synchronize_session=False,
+            )
+        )
+        if claimed != 1:
+            db.rollback()
+            logger.info("Highlight job ignored: job_id=%s is no longer queued", job_id)
+            return
         job = db.query(HighlightVideoJob).filter(HighlightVideoJob.id == job_id).first()
         if job is None:
             raise ValueError(f"Highlight job not found: {job_id}")
@@ -620,12 +863,6 @@ def process_highlight_video_job(job_id: str) -> None:
         output_dir = ensure_flight_directory(db, flight) / "highlights" / job.id
         output_path = output_dir / "highlights-original-format.mp4"
         offset = float(job.overlay_offset_seconds or 0.0)
-        if job.status == STATUS_CANCELLED:
-            return
-        job.status = STATUS_RUNNING
-        job.progress = 5
-        job.started_at = _now()
-        job.message = "Analyse de la vidéo pano (initialisation)"
         db.commit()
         logger.info(
             "Highlight job running: job_id=%s flight_id=%s source=%s overlay=%s progress=5",

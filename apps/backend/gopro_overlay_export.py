@@ -482,6 +482,9 @@ def _job_to_payload(
         ),
         "video_width": job.video_width,
         "video_height": job.video_height,
+        "output_resolution": (
+            command.get("output_resolution") if isinstance(command, dict) else None
+        ),
         "gpx_offset": _gpx_offset_from_command_metadata(command),
         "render_method": _render_method_from_command(command),
         "created_at": _to_iso(job.created_at),
@@ -572,6 +575,55 @@ def _update_job(job_id: str, **changes: Any) -> dict[str, Any]:
             return job.copy()
         job.update(changes)
         job["updated_at"] = _utc_now()
+        return job.copy()
+
+
+def _claim_job_for_preparation(job_id: str) -> dict[str, Any] | None:
+    """Atomically reserve a queued job before creating shared temporary files."""
+    try:
+        with SessionLocal() as db:
+            claimed_count = (
+                db.query(GoproOverlayJob)
+                .filter(
+                    GoproOverlayJob.id == job_id,
+                    GoproOverlayJob.status == _STATUS_QUEUED,
+                )
+                .update(
+                    {
+                        GoproOverlayJob.status: _STATUS_PREPARING,
+                        GoproOverlayJob.progress: 5,
+                        GoproOverlayJob.message: "Preparing overlay files",
+                        GoproOverlayJob.updated_at: _utc_now_dt(),
+                    },
+                    synchronize_session=False,
+                )
+            )
+            if claimed_count != 1:
+                db.rollback()
+                return None
+            job = db.query(GoproOverlayJob).filter(GoproOverlayJob.id == job_id).first()
+            if not job:
+                db.rollback()
+                return None
+            _sync_flights_from_job(db, job)
+            db.commit()
+            payload = _job_to_payload(job, include_command=True)
+            _set_memory_snapshot(payload)
+            return payload
+    except OperationalError as exc:
+        if "no such table: gopro_overlay_jobs" not in str(exc):
+            raise
+
+    with _LOCK:
+        job = _JOBS.get(job_id)
+        if not job or job["status"] != _STATUS_QUEUED:
+            return None
+        job.update(
+            status=_STATUS_PREPARING,
+            progress=5,
+            message="Preparing overlay files",
+            updated_at=_utc_now(),
+        )
         return job.copy()
 
 
@@ -1385,12 +1437,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
 
     try:
         _append_job_log(log_path, "Preparing overlay files")
-        current_job = _update_job(
-            job_id,
-            status=_STATUS_PREPARING,
-            progress=5,
-            message="Preparing overlay files",
-        )
+        current_job = _claim_job_for_preparation(job_id)
         if not current_job or current_job.get("status") != _STATUS_PREPARING:
             return None
         work_dir = Path(str(job["layout_path"])).parent
@@ -2131,6 +2178,7 @@ def _create_gopro_overlay_job_from_paths(
         "log_path": str(log_path),
         "video_width": None,
         "video_height": None,
+        "output_resolution": output_resolution,
         "gpx_offset": gpx_offset,
         "created_at": _utc_now(),
         "updated_at": _utc_now(),
@@ -2321,12 +2369,20 @@ def _run_job(job_id: str) -> None:
         if return_code != 0 and gpu_render_enabled:
             _unlink_if_exists(temp_output_path)
             _append_job_log(log_path, "GPU overlay failed; retrying with CPU rendering")
+            fallback_metadata = current_job.get("command") if current_job else None
+            if not isinstance(fallback_metadata, dict):
+                fallback_metadata = {}
+            fallback_metadata = {
+                **fallback_metadata,
+                "command": cpu_command,
+                "render_method": "cpu",
+            }
             _update_job(
                 job_id,
                 message="GPU unavailable; retrying overlay on CPU",
                 render_method="cpu",
                 command=cpu_command,
-                command_json=json.dumps({"command": cpu_command, "render_method": "cpu"}),
+                command_json=json.dumps(fallback_metadata),
             )
             logger.warning("GPU overlay failed for job %s; retrying on CPU", job_id)
             try:
@@ -2618,14 +2674,14 @@ def _delete_rq_gopro_overlay_job(job_id: str) -> bool:
     return delete_job(_rq_job_id(job_id), queue_name=config.GOPRO_OVERLAY_QUEUE_NAME)
 
 
-def enqueue_pending_gopro_overlay_jobs(*, mark_interrupted: bool = False) -> int:
-    """Enqueue queued overlay jobs into the dedicated RQ queue."""
+def enqueue_pending_gopro_overlay_jobs(*, recover_active: bool = False) -> int:
+    """Enqueue durable overlay jobs, recovering interrupted work on worker startup."""
     from job_queue import is_rq_enabled
 
     if not is_rq_enabled():
         return 0
 
-    if mark_interrupted:
+    if recover_active:
         _mark_interrupted_jobs_failed()
     job_ids = _queued_job_ids()
     for job_id in job_ids:

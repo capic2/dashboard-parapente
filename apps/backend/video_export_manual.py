@@ -81,6 +81,7 @@ def _log_job(job_id: str, message: str) -> None:
         log_path = _job_log_path(job_id)
         log_path.parent.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        _set_job_runtime(job_id, updated_at=timestamp)
         with log_path.open("a", encoding="utf-8") as log_file:
             log_file.write(f"[{timestamp}] {message}\n")
     except OSError:
@@ -122,6 +123,7 @@ _MAX_PENDING_FRAME_WRITES = 4
 _MAX_FFMPEG_STDERR_LINES = 200
 _FFMPEG_PIPE_POLL_SECONDS = 1.0
 _EXPORT_VIEWER_READY_TIMEOUT_SECONDS = 180
+_EXPORT_PAGE_EVALUATE_TIMEOUT_SECONDS = 120
 _FFMPEG_STALL_TIMEOUT_SECONDS = 10 * 60
 _ORPHAN_TEMP_CLEANUP_GRACE_SECONDS = 30
 _EXPORT_FRAME_TERRAIN_TIMEOUT_SECONDS = 10.0
@@ -1178,6 +1180,12 @@ def _capture_progress_percent(frame_count: int, total_frames: int) -> int:
     return min(80, max(5, int(5 + ratio * 75)))
 
 
+def _capture_fps(frame_count: int, resume_from_frame: int, elapsed: float) -> float:
+    """Return capture throughput excluding frames restored from disk."""
+    captured_since_start = max(0, frame_count - resume_from_frame)
+    return captured_since_start / elapsed if elapsed > 0 else 0
+
+
 def _parse_ffmpeg_out_time_seconds(line: str) -> float | None:
     if "=" not in line:
         return None
@@ -1499,6 +1507,24 @@ async def _wait_for_export_frame_terrain(
         await asyncio.sleep(min(poll_seconds, remaining_seconds))
 
 
+async def _evaluate_export_page(page: Any, expression: str, arg: Any = None) -> Any:
+    """Evaluate export-viewer JavaScript without allowing Chromium to hang the job."""
+    try:
+        if arg is None:
+            evaluation = page.evaluate(expression)
+        else:
+            evaluation = page.evaluate(expression, arg)
+        return await asyncio.wait_for(
+            evaluation,
+            timeout=_EXPORT_PAGE_EVALUATE_TIMEOUT_SECONDS,
+        )
+    except TimeoutError as exc:
+        raise RuntimeError(
+            "Chromium export-viewer evaluation timed out after "
+            f"{_EXPORT_PAGE_EVALUATE_TIMEOUT_SECONDS}s"
+        ) from exc
+
+
 def _ffmpeg_output_file_activity(
     output_file: Path, last_size: int, last_mtime_ns: int
 ) -> tuple[bool, int, int]:
@@ -1765,7 +1791,7 @@ async def _export_video_manual_render(job_id: str):
                     timeout=_EXPORT_VIEWER_READY_TIMEOUT_SECONDS * 1000,
                 )
             except PlaywrightTimeoutError as exc:
-                viewer_state = await page.evaluate(_EXPORT_VIEWER_STATE_SCRIPT)
+                viewer_state = await _evaluate_export_page(page, _EXPORT_VIEWER_STATE_SCRIPT)
                 body_text = str(viewer_state.get("bodyText") or "").strip()
                 raise Exception(
                     "Export viewer did not become ready within "
@@ -1777,7 +1803,7 @@ async def _export_video_manual_render(job_id: str):
                     f"body={body_text[:300]!r})"
                 ) from exc
 
-            viewer_state = await page.evaluate(_EXPORT_VIEWER_STATE_SCRIPT)
+            viewer_state = await _evaluate_export_page(page, _EXPORT_VIEWER_STATE_SCRIPT)
 
             if viewer_state.get("isLoginPage"):
                 raise Exception(
@@ -1801,7 +1827,7 @@ async def _export_video_manual_render(job_id: str):
 
             _log_job(job_id, "Cesium viewer found")
 
-            renderer_info = await page.evaluate(_WEBGL_RENDERER_SCRIPT)
+            renderer_info = await _evaluate_export_page(page, _WEBGL_RENDERER_SCRIPT)
             renderer = str(renderer_info.get("renderer") or "unknown")
             vendor = str(renderer_info.get("vendor") or "unknown")
             if not renderer_info.get("available"):
@@ -1821,7 +1847,9 @@ async def _export_video_manual_render(job_id: str):
 
             _update_job(job_id, message="Configuring manual render mode")
 
-            setup_result = await page.evaluate("""
+            setup_result = await _evaluate_export_page(
+                page,
+                """
                 () => {
                     const cesiumContainer = document.querySelector('.cesium-viewer');
                     if (!cesiumContainer) {
@@ -1851,7 +1879,8 @@ async def _export_video_manual_render(job_id: str):
                         checkViewer();
                     });
                 }
-            """)
+            """,
+            )
 
             if not setup_result.get("success"):
                 raise Exception("Failed to configure Cesium manual render mode")
@@ -1873,7 +1902,9 @@ async def _export_video_manual_render(job_id: str):
 
             _update_job(job_id, message="Extracting GPS data")
 
-            flight_data = await page.evaluate("""
+            flight_data = await _evaluate_export_page(
+                page,
+                """
                 () => {
                     if (typeof window._getExportMetadata === 'function') {
                         return window._getExportMetadata();
@@ -1889,7 +1920,8 @@ async def _export_video_manual_render(job_id: str):
                         duration: coordinates.length > 0 ? coordinates.length : 300
                     };
                 }
-            """)
+            """,
+            )
 
             total_gps_points = flight_data["totalPoints"]
             duration_seconds = flight_data["duration"]
@@ -1941,7 +1973,9 @@ async def _export_video_manual_render(job_id: str):
                     timeout=30000,
                 )
             else:
-                await page.evaluate("""
+                await _evaluate_export_page(
+                    page,
+                    """
                     () => {
                         const playButton = Array.from(document.querySelectorAll('button'))
                             .find(btn =>
@@ -1953,12 +1987,12 @@ async def _export_video_manual_render(job_id: str):
                             console.log('▶️  Play button clicked');
                         }
                     }
-                """)
+                """,
+                )
 
             frame_count = 0
             ms_per_frame = (duration_seconds * 1000) / max(total_frames, 1)
             _log_job(job_id, f"Capturing 1 frame every {ms_per_frame:.1f}ms")
-            start_time = time.time()
             resume_from_frame = _first_missing_frame_index(frames_dir, total_frames)
             if resume_from_frame > 0:
                 frame_count = resume_from_frame
@@ -1977,6 +2011,7 @@ async def _export_video_manual_render(job_id: str):
                 )
                 _log_job(job_id, f"Resuming capture from frame {resume_from_frame}/{total_frames}")
 
+            start_time = time.time()
             encoding_output_file = temp_dir / "encoding.mp4"
             concurrent_encoding = is_fast_mode and accelerator == "cpu"
             ffmpeg_cmd = _ffmpeg_command(
@@ -2041,7 +2076,8 @@ async def _export_video_manual_render(job_id: str):
                     return
 
                 if is_fast_mode:
-                    frame_state = await page.evaluate(
+                    frame_state = await _evaluate_export_page(
+                        page,
                         """
                         ({ frameIndex, totalFrames }) => {
                             return window._setExportFrame(frameIndex, totalFrames);
@@ -2102,7 +2138,7 @@ async def _export_video_manual_render(job_id: str):
                 if frame_count % 10 == 0:
                     progress = _capture_progress_percent(frame_count, total_frames)
                     elapsed = time.time() - start_time
-                    fps_actual = frame_count / elapsed if elapsed > 0 else 0
+                    fps_actual = _capture_fps(frame_count, resume_from_frame, elapsed)
                     eta_seconds = (total_frames - frame_count) / fps_actual if fps_actual > 0 else 0
                     eta_seconds_int = max(0, int(eta_seconds)) if eta_seconds > 0 else None
 

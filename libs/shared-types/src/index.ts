@@ -82,6 +82,7 @@ export const GoproOverlayJobSchema = z.object({
   output_filename: z.string(),
   video_width: z.number().nullish(),
   video_height: z.number().nullish(),
+  output_resolution: z.enum(['1080p', '4k', 'source']).nullish(),
   gpx_offset: z.number().optional().default(0),
   created_at: z.string(),
   updated_at: z.string(),
@@ -109,6 +110,7 @@ export const HighlightVideoJobSchema = z.object({
   overlay_offset_seconds: z.number(),
   selection: z.array(HighlightVideoClipSchema).default([]),
   created_at: z.string(),
+  updated_at: z.string().nullish(),
   completed_at: z.string().nullish(),
 });
 
@@ -217,6 +219,10 @@ export const FlightSummarySchema = z.object({
   youtube_upload_progress: z.number().nullable(),
   has_gopro_overlay: z.boolean(),
   has_pano_video: z.boolean(),
+  has_highlight_video: z.boolean(),
+  highlight_video_job_id: z.string().nullable().optional(),
+  highlight_video_status: z.string().nullable().optional(),
+  highlight_video_progress: z.number().nullable().optional(),
   video_export_job_id: z.string().nullable(),
   video_export_status: z.string().nullable(),
   video_export_progress: z.number().nullable(),

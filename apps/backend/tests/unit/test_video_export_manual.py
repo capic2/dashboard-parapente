@@ -45,6 +45,17 @@ def test_video_export_log_survives_temp_cleanup_until_job_deletion(tmp_path, mon
     assert not log_path.exists()
 
 
+def test_video_export_log_refreshes_runtime_activity(tmp_path, monkeypatch):
+    monkeypatch.setattr(video_export_manual, "_video_export_dir", lambda: tmp_path)
+    video_export_manual._JOB_RUNTIME.clear()
+
+    video_export_manual._log_job("job-activity", "Captured 10/100 frames")
+
+    updated_at = video_export_manual._JOB_RUNTIME["job-activity"]["updated_at"]
+    assert datetime.fromisoformat(updated_at).tzinfo is not None
+    video_export_manual._JOB_RUNTIME.clear()
+
+
 def test_resolve_frontend_url_uses_backend_static_in_production(monkeypatch):
     """Production should avoid localhost:5173 when static frontend is bundled."""
     monkeypatch.setattr(video_export_manual.Path, "exists", lambda _self: True)
@@ -247,6 +258,10 @@ def test_capture_progress_percent_spans_capture_phase_range():
     assert video_export_manual._capture_progress_percent(0, 100) == 5
     assert video_export_manual._capture_progress_percent(50, 100) == 42
     assert video_export_manual._capture_progress_percent(100, 100) == 80
+
+
+def test_capture_fps_excludes_frames_restored_during_resume():
+    assert video_export_manual._capture_fps(150, 100, 5) == 10
 
 
 def test_parse_ffmpeg_out_time_seconds_parses_progress_lines():
@@ -483,6 +498,19 @@ class _HangingTerrainPage:
         self.evaluate_calls += 1
         await asyncio.sleep(60)
         return True
+
+
+class _HangingEvaluatePage:
+    async def evaluate(self, _expression: str) -> None:
+        await asyncio.sleep(60)
+
+
+@pytest.mark.asyncio
+async def test_export_page_evaluation_fails_when_chromium_hangs(monkeypatch):
+    monkeypatch.setattr(video_export_manual, "_EXPORT_PAGE_EVALUATE_TIMEOUT_SECONDS", 0.01)
+
+    with pytest.raises(RuntimeError, match="evaluation timed out"):
+        await video_export_manual._evaluate_export_page(_HangingEvaluatePage(), "() => true")
 
 
 @pytest.mark.asyncio

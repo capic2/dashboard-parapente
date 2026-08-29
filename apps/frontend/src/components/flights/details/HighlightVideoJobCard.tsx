@@ -51,7 +51,7 @@ export function HighlightVideoJobCard({
   return (
     <div
       aria-disabled={isGenerationLocked}
-      className={`overflow-hidden rounded-xl border bg-white shadow-sm dark:bg-slate-900/60 ${
+      className={`order-6 overflow-hidden rounded-xl border bg-white shadow-sm dark:bg-slate-900/60 ${
         isGenerationLocked
           ? 'border-slate-300 opacity-75 dark:border-slate-700'
           : 'border-violet-200 dark:border-violet-800'
@@ -152,31 +152,30 @@ export function HighlightVideoJobCard({
             </Button>
           </div>
         )}
-        {status !== 'completed' &&
-          (isProcessing ? (
-            <Button
-              variant="danger"
-              className="mt-3 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
-              onPress={onCancel}
-              isDisabled={isCancellationPending}
-            >
-              {isCancellationPending
-                ? t('common.stopping')
-                : t('flights.highlightVideoCancel')}
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              className="mt-3 min-h-10 w-full rounded-lg border-violet-300 px-3 py-2 text-sm dark:border-violet-700"
-              onPress={onGenerate}
-              isDisabled={isGenerationPending || isGenerationLocked}
-            >
-              <Sparkles className="h-4 w-4" aria-hidden="true" />
-              {isGenerationPending
-                ? t('flights.highlightVideoStarting')
-                : t('flights.highlightVideoGenerate')}
-            </Button>
-          ))}
+        {isProcessing ? (
+          <Button
+            variant="danger"
+            className="mt-3 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
+            onPress={onCancel}
+            isDisabled={isCancellationPending}
+          >
+            {isCancellationPending
+              ? t('common.stopping')
+              : t('flights.highlightVideoCancel')}
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            className="mt-3 min-h-10 w-full rounded-lg border-violet-300 px-3 py-2 text-sm dark:border-violet-700"
+            onPress={onGenerate}
+            isDisabled={isGenerationPending || isGenerationLocked}
+          >
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            {isGenerationPending
+              ? t('flights.highlightVideoStarting')
+              : t('flights.highlightVideoGenerate')}
+          </Button>
+        )}
       </div>
     </div>
   );

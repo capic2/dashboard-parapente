@@ -23,7 +23,6 @@ import {
   TabList,
   TabPanel,
   Tabs,
-  ToastContainer,
 } from '@dashboard-parapente/design-system';
 import {
   useCacheOverview,
@@ -34,7 +33,6 @@ import type { CacheKeyInfo } from '../hooks/admin/useCache';
 import { useIntervalsStatus } from '../hooks/admin/useIntervalsStatus';
 import { useDeploymentDrainStatus } from '../hooks/admin/useDeploymentDrainStatus';
 import { VideoExportJobsPanel } from '../components/flights/video-export/VideoExportJobsPanel';
-import { useToastStore } from '../hooks/useToast';
 import {
   normalizeInfrastructureTab,
   type InfrastructureSearch,
@@ -888,7 +886,6 @@ export default function InfrastructurePage() {
   const navigate = useNavigate();
   const params = useParams({ strict: false }) as { tab?: string };
   const search = useSearch({ strict: false }) as InfrastructureSearch;
-  const { toasts, removeToast } = useToastStore();
   const { data: intervalsStatus } = useIntervalsStatus();
   const { data: cacheOverview } = useCacheOverview();
   const activeTab = normalizeInfrastructureTab(params.tab);
@@ -916,6 +913,8 @@ export default function InfrastructurePage() {
       search: {
         cacheSearch: nextSearch.cacheSearch || undefined,
         cacheAutoRefresh: nextSearch.cacheAutoRefresh ? true : undefined,
+        videoExportStatus: nextSearch.videoExportStatus || undefined,
+        videoExportType: nextSearch.videoExportType || undefined,
       },
     });
   };
@@ -936,8 +935,6 @@ export default function InfrastructurePage() {
 
   return (
     <div className="py-4 space-y-8">
-      <ToastContainer toasts={toasts} onClose={removeToast} />
-
       <DeploymentStatusBanner />
 
       <InfrastructureOverview />
@@ -982,7 +979,23 @@ export default function InfrastructurePage() {
           <IntervalsStatusSection />
         </TabPanel>
         <TabPanel id="video-exports" className="outline-none">
-          <VideoExportJobsPanel limit={null} />
+          <VideoExportJobsPanel
+            limit={null}
+            statusFilter={search.videoExportStatus}
+            typeFilter={search.videoExportType}
+            onStatusFilterChange={(videoExportStatus) =>
+              navigateToInfrastructure(activeTab, {
+                ...search,
+                videoExportStatus,
+              })
+            }
+            onTypeFilterChange={(videoExportType) =>
+              navigateToInfrastructure(activeTab, {
+                ...search,
+                videoExportType,
+              })
+            }
+          />
         </TabPanel>
         <TabPanel id="cache" className="outline-none">
           <CacheSection
@@ -1030,6 +1043,7 @@ function GroupSection({
     [t, onViewKey, onDeleteKey, isPending]
   );
 
+  // oxlint-disable-next-line react/incompatible-library -- TanStack Table exposes non-memoizable functions; this component intentionally relies on its local table state.
   const table = useReactTable({
     data: group.keys,
     columns,

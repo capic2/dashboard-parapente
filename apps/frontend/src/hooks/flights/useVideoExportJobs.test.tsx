@@ -4,7 +4,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useVideoExportJobs } from './useVideoExportJobs';
+import {
+  useVideoExportJobs,
+  videoExportGpuStatusQueryOptions,
+  videoExportJobsQueryOptions,
+} from './useVideoExportJobs';
 
 const { apiGet } = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -71,8 +75,8 @@ function createWrapper() {
   };
 }
 
-function TestHarness() {
-  const { data } = useVideoExportJobs();
+function TestHarness({ typeFilter = 'all' }: { typeFilter?: string }) {
+  const { data } = useVideoExportJobs({ typeFilter });
 
   return <div>{data?.jobs.map((job) => job.job_id).join(',')}</div>;
 }
@@ -86,6 +90,19 @@ describe('useVideoExportJobs', () => {
     });
     globalThis.EventSource =
       eventSourceMock.MockEventSource as unknown as typeof EventSource;
+  });
+
+  it('refreshes the list periodically when the SSE connection cannot update it', () => {
+    expect(videoExportJobsQueryOptions().refetchInterval).toBe(3000);
+    expect(videoExportJobsQueryOptions().refetchOnWindowFocus).toBe('always');
+  });
+
+  it('keeps GPU telemetry fresh even when the tab is in the background', () => {
+    const options = videoExportGpuStatusQueryOptions();
+    expect(options.refetchInterval).toBe(5000);
+    expect(options.refetchIntervalInBackground).toBe(true);
+    expect(options.refetchOnWindowFocus).toBe('always');
+    expect(options.staleTime).toBe(0);
   });
 
   it('updates cached jobs from the global SSE stream', async () => {
@@ -112,6 +129,23 @@ describe('useVideoExportJobs', () => {
 
     await waitFor(() => {
       expect(screen.getByText('job-from-stream')).toBeInTheDocument();
+    });
+  });
+
+  it('requests and caches the selected job type', async () => {
+    render(<TestHarness typeFilter="gopro" />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(apiGet).toHaveBeenCalledWith(
+        'video-export-jobs',
+        expect.objectContaining({
+          searchParams: expect.objectContaining({ type_filter: 'gopro' }),
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(eventSourceMock.instances[0]?.url).toContain('type_filter=gopro');
     });
   });
 });

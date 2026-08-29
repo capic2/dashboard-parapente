@@ -70,6 +70,7 @@ export function Flight({
     flight.youtube_upload_status === 'queued' ||
     flight.youtube_upload_status === 'uploading';
   const hasPanoVideo = flight.has_pano_video;
+  const hasHighlightVideo = flight.has_highlight_video;
   const hasPersistedGoproOverlay = flight.has_gopro_overlay;
   const isGoproOverlayRunning = isGoproOverlayInProgress(
     flight.gopro_overlay_status
@@ -82,9 +83,19 @@ export function Flight({
     VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(flight.video_export_status)
   );
   const isVideoExportFailed = flight.video_export_status === 'failed';
+  const isHighlightVideoExportRunning = Boolean(
+    flight.highlight_video_status &&
+    VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(flight.highlight_video_status)
+  );
+  const isHighlightVideoExportFailed =
+    flight.highlight_video_status === 'failed';
   const videoProcessingLabel = formatMediaProgressLabel(
     t('flights.videoProcessingBadge'),
     flight.video_export_progress
+  );
+  const highlightVideoProcessingLabel = formatMediaProgressLabel(
+    t('flights.highlightVideoBadge'),
+    flight.highlight_video_progress
   );
   const goproOverlayProcessingLabel = formatMediaProgressLabel(
     t('flights.goproOverlayProcessingBadge'),
@@ -115,8 +126,11 @@ export function Flight({
     hasYoutubeVideo ||
     isYoutubeUploadRunning ||
     hasPanoVideo ||
+    hasHighlightVideo ||
     isVideoExportRunning ||
     isVideoExportFailed ||
+    isHighlightVideoExportRunning ||
+    isHighlightVideoExportFailed ||
     hasPersistedGoproOverlay ||
     isGoproOverlayRunning ||
     isGoproOverlayFailed;
@@ -196,10 +210,22 @@ export function Flight({
                   {t('flights.cameraBadge')}
                 </span>
               )}
+              {hasPanoVideo && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
+                  <Orbit className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.panoBadge')}
+                </span>
+              )}
               {hasCompletedGoproOverlay && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200">
                   <Wand2 className="h-3 w-3" aria-hidden="true" />
                   {t('flights.goproOverlayBadge')}
+                </span>
+              )}
+              {hasHighlightVideo && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-fuchsia-200 bg-fuchsia-50 px-2 py-0.5 text-[11px] font-medium text-fuchsia-800 dark:border-fuchsia-800 dark:bg-fuchsia-950/40 dark:text-fuchsia-200">
+                  <Wand2 className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.highlightVideoBadge')}
                 </span>
               )}
               {(hasYoutubeVideo || isYoutubeUploadRunning) && (
@@ -211,12 +237,6 @@ export function Flight({
                   {youtubeLabel}
                 </span>
               )}
-              {hasPanoVideo && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
-                  <Orbit className="h-3 w-3" aria-hidden="true" />
-                  {t('flights.panoBadge')}
-                </span>
-              )}
               {isVideoExportRunning && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
                   {videoProcessingLabel}
@@ -225,6 +245,16 @@ export function Flight({
               {isVideoExportFailed && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
                   {t('flights.videoErrorBadge')}
+                </span>
+              )}
+              {isHighlightVideoExportRunning && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-fuchsia-200 bg-fuchsia-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-fuchsia-800 dark:border-fuchsia-800 dark:bg-fuchsia-950/40 dark:text-fuchsia-200">
+                  {highlightVideoProcessingLabel}
+                </span>
+              )}
+              {isHighlightVideoExportFailed && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+                  {t('flights.highlightVideoErrorBadge')}
                 </span>
               )}
               {isGoproOverlayRunning && (
