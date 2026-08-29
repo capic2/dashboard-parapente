@@ -95,3 +95,18 @@ def test_enqueue_once_ignores_stale_rq_execution_metadata(monkeypatch):
 
     assert result == queue.enqueued[0]
     assert queue.enqueued[0]["kwargs"]["job_id"] == "video-export-job-recovered"
+
+
+def test_enqueue_once_ignores_incomplete_rq_execution_metadata(monkeypatch):
+    existing_job = FakeJob("failed", delete_error=KeyError(b"created_at"))
+    queue = FakeQueue(existing_job)
+    monkeypatch.setattr(job_queue, "get_queue", lambda _name=None: queue)
+
+    result = job_queue.enqueue_once(
+        "video_export_manual.process_video_export_job",
+        "job-recovered",
+        job_id="video-export-job-recovered",
+    )
+
+    assert result == queue.enqueued[0]
+    assert queue.enqueued[0]["kwargs"]["job_id"] == "video-export-job-recovered"
