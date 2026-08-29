@@ -24,7 +24,7 @@ import config
 from flight_storage import ensure_flight_directory
 from flight_tracks import TrackPoint, normalize_track
 from gopro_overlay_inputs import resolve_automatic_overlay_inputs
-from highlight_video import HighlightClip, overlay_interval_for_clip
+from highlight_video import HighlightClip
 from models import Flight, HighlightVideoJob
 from spots.distance import haversine_distance
 from visual_event_detector import classify_motion_mask
@@ -660,22 +660,9 @@ def _render_clip(
     source_path: Path,
     output_path: Path,
     clip: HighlightClip,
-    overlay_path: Path | None,
-    overlay_offset_seconds: float,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    render_path = source_path
-    render_start_seconds = clip.start_seconds
-    overlay_interval = None
-    if overlay_path and overlay_path.is_file():
-        overlay_interval = overlay_interval_for_clip(
-            clip, overlay_offset_seconds, _probe_duration(overlay_path)
-        )
-        if overlay_interval:
-            render_start_seconds, _ = overlay_interval
-            render_path = overlay_path
-
-    output_width, output_height = _output_dimensions(render_path)
+    output_width, output_height = _output_dimensions(source_path)
     pano_filter = (
         f"v360=input=e:output=rectilinear:yaw={clip.yaw_degrees}:pitch=0:"
         f"h_fov={HIGHLIGHT_HORIZONTAL_FOV_DEGREES}:w={output_width}:h={output_height},setsar=1"
@@ -684,36 +671,19 @@ def _render_clip(
         "ffmpeg",
         "-y",
         "-ss",
-        f"{render_start_seconds:.3f}",
+        f"{clip.start_seconds:.3f}",
         "-i",
-        str(render_path),
+        str(source_path),
+        "-t",
+        f"{clip.duration_seconds:.3f}",
+        "-vf",
+        pano_filter,
+        "-map",
+        "0:v:0",
+        "-map",
+        "0:a?",
+        "-shortest",
     ]
-    if overlay_interval:
-        command.extend(
-            [
-                "-t",
-                f"{clip.duration_seconds:.3f}",
-                "-map",
-                "0:v:0",
-                "-map",
-                "0:a?",
-                "-shortest",
-            ]
-        )
-    else:
-        command.extend(
-            [
-                "-t",
-                f"{clip.duration_seconds:.3f}",
-                "-vf",
-                pano_filter,
-                "-map",
-                "0:v:0",
-                "-map",
-                "0:a?",
-                "-shortest",
-            ]
-        )
     accelerator = select_video_accelerator(config.VIDEO_ACCELERATOR)
     encode_args = h264_encode_args(
         accelerator,
@@ -876,17 +846,15 @@ def process_highlight_video_job(job_id: str) -> None:
             raise ValueError(f"Flight not found for highlight job: {job.flight_id}")
         source_path = Path(job.source_video_path)
         gpx_file_path = flight.gpx_file_path
-        overlay_path = Path(job.overlay_video_path) if job.overlay_video_path else None
         output_dir = ensure_flight_directory(db, flight) / "highlights" / job.id
         output_path = output_dir / "highlights-original-format.mp4"
         offset = float(job.overlay_offset_seconds or 0.0)
         db.commit()
         logger.info(
-            "Highlight job running: job_id=%s flight_id=%s source=%s overlay=%s progress=5",
+            "Highlight job running: job_id=%s flight_id=%s source=%s progress=5",
             job.id,
             flight.id,
             source_path,
-            overlay_path or "none",
         )
 
     try:
@@ -906,24 +874,6 @@ def process_highlight_video_job(job_id: str) -> None:
             output_height,
         )
         output_dir.mkdir(parents=True, exist_ok=True)
-        if not overlay_path or not overlay_path.is_file():
-            _set_job_stage(
-                job_id,
-                progress=6,
-                stage="overlay",
-                message="Préparation de l’overlay télémétrique",
-            )
-            overlay_path = _ensure_overlay_video(
-                source_path,
-                gpx_file_path,
-                duration_seconds,
-                output_dir,
-            )
-            logger.info(
-                "Highlight overlay ready: job_id=%s overlay=%s",
-                job_id,
-                overlay_path or "none",
-            )
         _set_job_stage(
             job_id,
             progress=10,
@@ -998,7 +948,7 @@ def process_highlight_video_job(job_id: str) -> None:
                 clip.yaw_degrees,
                 clip.category,
             )
-            _render_clip(source_path, target, clip, overlay_path, offset)
+            _render_clip(source_path, target, clip)
             rendered.append(target)
             if _is_cancelled(job_id):
                 return
