@@ -249,6 +249,11 @@ def test_job_render_method_is_persisted_for_other_processes(test_db, monkeypatch
         assert job.render_method == "gpu"
 
 
+def test_render_method_is_available_before_worker_starts() -> None:
+    assert video_export_manual._render_method_for_accelerator("cpu") == "cpu"
+    assert video_export_manual._render_method_for_accelerator("nvidia") == "gpu"
+
+
 def test_capture_progress_percent_spans_capture_phase_range():
     assert video_export_manual._capture_progress_percent(0, 100) == 5
     assert video_export_manual._capture_progress_percent(50, 100) == 42
