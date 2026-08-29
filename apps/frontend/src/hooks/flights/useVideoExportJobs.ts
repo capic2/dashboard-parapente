@@ -79,7 +79,6 @@ export type VideoExportTempCleanupResult = {
 };
 
 export type VideoExportOutputKind = 'video' | 'gopro';
-
 export type VideoExportGpuStatus = {
   available: boolean;
   driver?: string;
@@ -96,7 +95,8 @@ const VIDEO_EXPORT_GPU_REFRESH_INTERVAL_MS = 5000;
 export const videoExportGpuStatusQueryOptions = () =>
   queryOptions<VideoExportGpuStatus>({
     queryKey: ['video-export-gpu-status'],
-    queryFn: () => api.get('video-export-gpu-status').json<VideoExportGpuStatus>(),
+    queryFn: () =>
+      api.get('video-export-gpu-status').json<VideoExportGpuStatus>(),
     refetchInterval: VIDEO_EXPORT_GPU_REFRESH_INTERVAL_MS,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: 'always',

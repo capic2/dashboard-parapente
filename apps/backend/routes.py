@@ -821,14 +821,8 @@ def _get_video_export_jobs_payload(
         list_exports_manual()
         + list_exports_stream()
         + [_gopro_overlay_export_job_payload(job) for job in list_gopro_overlay_jobs()]
-        + [
-            _highlight_export_job_payload(job)
-            for job in db.query(HighlightVideoJob).all()
-        ]
-        + [
-            _youtube_upload_export_job_payload(job)
-            for job in db.query(YoutubeUploadJob).all()
-        ],
+        + [_highlight_export_job_payload(job) for job in db.query(HighlightVideoJob).all()]
+        + [_youtube_upload_export_job_payload(job) for job in db.query(YoutubeUploadJob).all()],
         db,
     )
     if active_only:
@@ -847,27 +841,19 @@ def _get_video_export_jobs_payload(
         )
     type_counts = {
         "all": len(jobs),
-        "video": sum(
-            job.get("mode") in {"manual", "manual_fast", "stream"} for job in jobs
-        ),
+        "video": sum(job.get("mode") in {"manual", "manual_fast", "stream"} for job in jobs),
         "gopro": sum(job.get("mode") == "gopro_overlay" for job in jobs),
         "highlight": sum(job.get("mode") == "highlight" for job in jobs),
         "youtube": sum(job.get("mode") in {"youtube", "youtube_upload"} for job in jobs),
     }
     if type_filter == "video":
-        jobs = [
-            job
-            for job in jobs
-            if job.get("mode") in {"manual", "manual_fast", "stream"}
-        ]
+        jobs = [job for job in jobs if job.get("mode") in {"manual", "manual_fast", "stream"}]
     elif type_filter == "gopro":
         jobs = [job for job in jobs if job.get("mode") == "gopro_overlay"]
     elif type_filter == "highlight":
         jobs = [job for job in jobs if job.get("mode") == "highlight"]
     elif type_filter == "youtube":
-        jobs = [
-            job for job in jobs if job.get("mode") in {"youtube", "youtube_upload"}
-        ]
+        jobs = [job for job in jobs if job.get("mode") in {"youtube", "youtube_upload"}]
     status_counts = {
         "all": len(jobs),
         "active": sum(
@@ -6236,9 +6222,7 @@ def list_video_export_jobs(
     status_filter: Literal["all", "active", "completed", "failed", "cancelled"] = Query(
         default="all"
     ),
-    type_filter: Literal["all", "video", "gopro", "highlight", "youtube"] = Query(
-        default="all"
-    ),
+    type_filter: Literal["all", "video", "gopro", "highlight", "youtube"] = Query(default="all"),
     db: Session = Depends(get_db),
 ) -> VideoExportJobsResponse:
     """List video export jobs across all flights."""
@@ -6269,9 +6253,7 @@ async def stream_video_export_jobs(
     status_filter: Literal["all", "active", "completed", "failed", "cancelled"] = Query(
         default="all"
     ),
-    type_filter: Literal["all", "video", "gopro", "highlight", "youtube"] = Query(
-        default="all"
-    ),
+    type_filter: Literal["all", "video", "gopro", "highlight", "youtube"] = Query(default="all"),
 ) -> StreamingResponse:
     """Stream video export job list updates without frontend polling."""
 

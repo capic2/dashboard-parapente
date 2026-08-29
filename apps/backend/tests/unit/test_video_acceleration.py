@@ -28,16 +28,21 @@ def test_gpu_runtime_status_parses_live_nvidia_smi_output() -> None:
     with patch("video_acceleration.subprocess.run", return_value=Result()) as run:
         status = video_acceleration.get_gpu_runtime_status()
 
-    assert status["available"] is True
-    assert status["devices"] == [
-        {
-            "name": "NVIDIA RTX 4090",
-            "utilization_percent": 42,
-            "memory_used_mb": 1234,
-            "memory_total_mb": 24576,
-        }
-    ]
-    assert run.call_args.args[0][0] == "nvidia-smi"
+    assert status == {
+        "available": True,
+        "driver": "nvidia",
+        "devices": [
+            {
+                "name": "NVIDIA RTX 4090",
+                "utilization_percent": 42,
+                "memory_used_mb": 1234,
+                "memory_total_mb": 24576,
+            }
+        ],
+    }
+    command = run.call_args.args[0]
+    assert command[0] == "nvidia-smi"
+    assert "utilization.gpu" in command[2]
 
 
 def test_gpu_runtime_status_reports_unavailable_when_nvidia_smi_fails() -> None:

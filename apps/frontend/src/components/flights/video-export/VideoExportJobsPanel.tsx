@@ -586,7 +586,7 @@ export function VideoExportJobsPanel({
   });
   const { data: gpuStatus, isLoading: isGpuStatusLoading } =
     useVideoExportGpuStatus();
-  const jobs = jobsPage?.jobs ?? [];
+  const jobs = useMemo(() => jobsPage?.jobs ?? [], [jobsPage?.jobs]);
   const totalJobs = jobsPage?.total ?? jobs.length;
   const totalPages = jobsPage?.totalPages ?? 1;
   const cancelJob = useCancelVideoExportJob();
@@ -616,8 +616,14 @@ export function VideoExportJobsPanel({
     setPage(1);
   }, [statusFilter, typeFilter]);
 
-  const statusCounts = jobsPage?.statusCounts ?? {};
-  const typeCounts = jobsPage?.typeCounts ?? {};
+  const statusCounts = useMemo(
+    () => jobsPage?.statusCounts ?? {},
+    [jobsPage?.statusCounts]
+  );
+  const typeCounts = useMemo(
+    () => jobsPage?.typeCounts ?? {},
+    [jobsPage?.typeCounts]
+  );
   const activeCount =
     statusCounts.active ??
     jobs.filter((job) => isJobInFilter(job, 'active')).length;
@@ -1034,6 +1040,8 @@ export function VideoExportJobsPanel({
     [renderJobActions, t]
   );
 
+  // TanStack Table exposes functions that React Compiler cannot safely memoize.
+  // oxlint-disable-next-line react/incompatible-library
   const table = useReactTable({
     data: visibleJobs,
     columns,
