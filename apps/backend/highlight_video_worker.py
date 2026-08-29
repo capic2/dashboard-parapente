@@ -39,6 +39,10 @@ STATUS_CANCELLED = "cancelled"
 
 _ACTIVE_STATUSES = {STATUS_QUEUED, STATUS_RUNNING}
 
+# A wider projection keeps the wing, pilot and landscape legible.  A narrower
+# field of view tends to turn a 360° extract into an isolated, unclear detail.
+HIGHLIGHT_HORIZONTAL_FOV_DEGREES = 130
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -661,7 +665,7 @@ def _render_clip(
     output_width, output_height = _output_dimensions(render_path)
     pano_filter = (
         f"v360=input=e:output=rectilinear:yaw={clip.yaw_degrees}:pitch=0:"
-        f"h_fov=100:w={output_width}:h={output_height},setsar=1"
+        f"h_fov={HIGHLIGHT_HORIZONTAL_FOV_DEGREES}:w={output_width}:h={output_height},setsar=1"
     )
     command = [
         "ffmpeg",
