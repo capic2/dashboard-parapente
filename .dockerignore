@@ -60,11 +60,12 @@ frontend/dist/
 frontend/.next/
 frontend/out/
 
-# Backend
-backend/db/*.db
-backend/db/*.db-journal
-backend/exports/
-backend/static/
+# Backend runtime data and generated assets
+apps/backend/db/
+apps/backend/exports/
+apps/backend/static/
+apps/backend/cache_emagram/
+apps/backend/tests/
 
 # Environment
 .env
