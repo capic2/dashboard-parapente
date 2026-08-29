@@ -267,3 +267,26 @@ def test_render_clip_uses_overlay_as_full_frame_without_picture_in_picture(tmp_p
     assert str(overlay_path) in command
     assert "-filter_complex" not in command
     assert "overlay=W-w-32:H-h-32:eof_action=pass[v]" not in command
+
+
+def test_render_clip_uses_a_wide_projection_for_pano_source(tmp_path):
+    source_path = tmp_path / "pano.mp4"
+    output_path = tmp_path / "clip.mp4"
+    source_path.touch()
+
+    with (
+        patch("highlight_video_worker._output_dimensions", return_value=(1920, 960)),
+        patch("highlight_video_worker.select_video_accelerator", return_value="cpu"),
+        patch("highlight_video_worker.h264_encode_args", return_value=["-f", "mp4"]),
+        patch("highlight_video_worker.subprocess.run") as run,
+    ):
+        _render_clip(
+            source_path,
+            output_path,
+            HighlightClip(start_seconds=12.5, duration_seconds=6.0, yaw_degrees=90),
+            None,
+            overlay_offset_seconds=0,
+        )
+
+    command = run.call_args.args[0]
+    assert "h_fov=130:w=1920:h=960" in command[command.index("-vf") + 1]
