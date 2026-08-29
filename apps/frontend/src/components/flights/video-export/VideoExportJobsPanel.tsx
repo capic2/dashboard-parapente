@@ -624,6 +624,7 @@ export function VideoExportJobsPanel({
     () => jobsPage?.typeCounts ?? {},
     [jobsPage?.typeCounts]
   );
+  const hasJobs = jobs.length > 0 || (typeCounts.all ?? 0) > 0;
   const activeCount =
     statusCounts.active ??
     jobs.filter((job) => isJobInFilter(job, 'active')).length;
@@ -1183,13 +1184,13 @@ export function VideoExportJobsPanel({
         </div>
       )}
 
-      {!isLoading && !isError && jobs.length === 0 && (
+      {!isLoading && !isError && !hasJobs && (
         <div className="border-t border-gray-100 p-4 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300">
           {t('videoJobs.empty', 'Aucune génération vidéo pour le moment.')}
         </div>
       )}
 
-      {!isLoading && !isError && jobs.length > 0 && (
+      {!isLoading && !isError && hasJobs && (
         <div className="space-y-4 border-t border-gray-100 bg-gray-50/70 p-4 dark:border-gray-700 dark:bg-gray-900/20">
           <div className="flex flex-col gap-4 xl:flex-row">
             <SegmentedFilter
@@ -1239,17 +1240,14 @@ export function VideoExportJobsPanel({
         </div>
       )}
 
-      {!isLoading &&
-        !isError &&
-        jobs.length > 0 &&
-        visibleJobs.length === 0 && (
-          <div className="border-t border-gray-100 p-4 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300">
-            {t(
-              'videoJobs.emptyFiltered',
-              'Aucune génération ne correspond à ce filtre.'
-            )}
-          </div>
-        )}
+      {!isLoading && !isError && hasJobs && visibleJobs.length === 0 && (
+        <div className="border-t border-gray-100 p-4 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300">
+          {t(
+            'videoJobs.emptyFiltered',
+            'Aucune génération ne correspond à ce filtre.'
+          )}
+        </div>
+      )}
 
       {!isLoading && !isError && visibleJobs.length > 0 && (
         <>
