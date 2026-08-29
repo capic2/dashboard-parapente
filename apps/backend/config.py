@@ -126,6 +126,7 @@ JOB_QUEUE_BACKEND = os.getenv(
 ).lower()
 JOB_QUEUE_NAME = os.getenv("BACKEND_JOB_QUEUE_NAME", "video_exports")
 JOB_WORKER_COUNT = _int_env_between("BACKEND_WORKER_COUNT", 5, 1, 5)
+HIGHLIGHT_QUEUE_NAME = os.getenv("BACKEND_HIGHLIGHT_QUEUE_NAME", "highlight_videos")
 YOUTUBE_UPLOAD_QUEUE_NAME = os.getenv("BACKEND_YOUTUBE_UPLOAD_QUEUE_NAME", "youtube_uploads")
 GOPRO_OVERLAY_QUEUE_NAME = os.getenv("BACKEND_GOPRO_OVERLAY_QUEUE_NAME", "gopro_overlays")
 GOPRO_PREVIEW_QUEUE_NAME = os.getenv("BACKEND_GOPRO_PREVIEW_QUEUE_NAME", "gopro_previews")
