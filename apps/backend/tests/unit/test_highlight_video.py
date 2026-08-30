@@ -9,6 +9,7 @@ from highlight_video import HighlightClip, clamp_clip, overlay_interval_for_clip
 import highlight_video_worker
 from highlight_video_worker import (
     _probe_video_dimensions,
+    _output_dimensions,
     _render_clip,
     _set_job_stage,
     _flight_phase_times,
@@ -32,6 +33,13 @@ def test_best_yaw_allows_a_face_view_when_no_clearer_view_exists(tmp_path: Path)
         )
 
     assert yaw == -180
+
+
+def test_output_dimensions_keep_2_to_1_pano_at_4k_width(tmp_path: Path) -> None:
+    source_path = tmp_path / "pano.mp4"
+    source_path.touch()
+    with patch("highlight_video_worker._probe_video_dimensions", return_value=(7680, 3840)):
+        assert _output_dimensions(source_path) == (3840, 1920)
 
 
 def test_best_yaw_prefers_clear_centre_over_a_face_filling_the_view(tmp_path: Path) -> None:
@@ -345,7 +353,7 @@ def test_render_clip_incrusts_the_gopro_overlay_on_the_pano_source(tmp_path):
         patch("highlight_video_worker._probe_duration", return_value=120),
         patch("highlight_video_worker._output_dimensions", return_value=(1920, 1080)),
         patch("highlight_video_worker.select_video_accelerator", return_value="cpu"),
-        patch("highlight_video_worker.h264_encode_args", return_value=["-f", "mp4"]),
+        patch("highlight_video_worker.h264_encode_args", return_value=["-f", "mp4"]) as encode_args,
         patch("highlight_video_worker.subprocess.run") as run,
     ):
         _render_clip(
@@ -367,6 +375,7 @@ def test_render_clip_incrusts_the_gopro_overlay_on_the_pano_source(tmp_path):
     assert "scale=w=538:h=-2" in filter_complex
     assert "overlay=W-w-32:H-h-32:eof_action=pass[v]" in filter_complex
     assert command[command.index("-map") + 1] == "[v]"
+    assert encode_args.call_args.kwargs["quality"] == "18"
 
 
 def test_render_clip_uses_a_wide_projection_for_pano_source(tmp_path):
