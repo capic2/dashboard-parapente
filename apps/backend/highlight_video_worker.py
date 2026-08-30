@@ -157,6 +157,26 @@ def _clip_creation_time(
     return source_timeline_start + timedelta(seconds=clip.start_seconds)
 
 
+def _clip_is_covered_by_gpx(
+    source_timeline_start: datetime,
+    clip: HighlightClip,
+    track_points: list[TrackPoint],
+) -> bool:
+    """Return whether telemetry covers the complete source clip timeline."""
+    timestamps = [
+        int(point["timestamp"])
+        for point in track_points
+        if "timestamp" in point and int(point["timestamp"]) >= 0
+    ]
+    if not timestamps:
+        return False
+    clip_start = source_timeline_start + timedelta(seconds=clip.start_seconds)
+    clip_end = clip_start + timedelta(seconds=clip.duration_seconds)
+    gpx_start = datetime.fromtimestamp(min(timestamps) / 1000, tz=timezone.utc)
+    gpx_end = datetime.fromtimestamp(max(timestamps) / 1000, tz=timezone.utc)
+    return clip_start >= gpx_start and clip_end <= gpx_end
+
+
 def _render_gopro_overlay(
     video_path: Path,
     gpx_path: Path,
@@ -997,7 +1017,24 @@ def process_highlight_video_job(job_id: str) -> None:
                 )
             except (OSError, ValueError) as exc:
                 logger.warning("Unable to classify flight phases from GPX: %s", exc)
+        if gpx_path is None:
+            raise ValueError("Le véritable overlay GoPro nécessite un fichier GPX")
+        if pip_path is None or not pip_path.is_file():
+            raise ValueError("Le véritable overlay GoPro nécessite la vidéo PIP du vol")
+        if not track_points:
+            raise ValueError("Le fichier GPX ne contient aucune télémétrie exploitable")
+        source_timeline_start = _source_timeline_start(source_path, gpx_path)
+        visual_clips = [
+            clip
+            for clip in visual_clips
+            if _clip_is_covered_by_gpx(source_timeline_start, clip, track_points)
+        ]
         clips = select_flight_event_clips(duration_seconds, track_points, visual_clips)
+        clips = [
+            clip
+            for clip in clips
+            if _clip_is_covered_by_gpx(source_timeline_start, clip, track_points)
+        ]
         logger.info(
             "Highlight clip selection complete: job_id=%s clips=%d categories=%s",
             job_id,
@@ -1005,12 +1042,7 @@ def process_highlight_video_job(job_id: str) -> None:
             [clip.category for clip in clips],
         )
         if not clips:
-            raise ValueError("La vidéo pano ne contient aucune durée exploitable")
-        if gpx_path is None:
-            raise ValueError("Le véritable overlay GoPro nécessite un fichier GPX")
-        if pip_path is None or not pip_path.is_file():
-            raise ValueError("Le véritable overlay GoPro nécessite la vidéo PIP du vol")
-        source_timeline_start = _source_timeline_start(source_path, gpx_path)
+            raise ValueError("Aucun meilleur moment ne recoupe entièrement la télémétrie GPX")
         classified_clips: list[HighlightClip] = []
         for index, clip in enumerate(clips, start=1):
             classified_clips.append(

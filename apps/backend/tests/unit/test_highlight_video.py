@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -12,6 +12,7 @@ from highlight_video_worker import (
     _probe_video_dimensions,
     _output_dimensions,
     _clip_creation_time,
+    _clip_is_covered_by_gpx,
     _render_clip,
     _render_method_for_accelerator,
     _set_job_stage,
@@ -140,6 +141,45 @@ def test_clip_creation_time_uses_gpx_aligned_utc_timeline_without_legacy_offset(
 
     assert _clip_creation_time(timeline_start, clip, 15142.8) == datetime(
         2026, 8, 26, 17, 46, 6, tzinfo=timezone.utc
+    )
+
+
+def test_clip_gpx_coverage_rejects_clip_after_track_end() -> None:
+    timeline_start = datetime(2026, 8, 26, 17, 44, 47, tzinfo=timezone.utc)
+    track_points = [
+        {"timestamp": int(timeline_start.timestamp() * 1000)},
+        {"timestamp": int((timeline_start + timedelta(seconds=181)).timestamp() * 1000)},
+    ]
+
+    assert _clip_is_covered_by_gpx(
+        timeline_start,
+        HighlightClip(start_seconds=172, duration_seconds=8, yaw_degrees=0),
+        track_points,
+    )
+    assert not _clip_is_covered_by_gpx(
+        timeline_start,
+        HighlightClip(start_seconds=197, duration_seconds=8, yaw_degrees=0),
+        track_points,
+    )
+
+
+def test_clip_gpx_coverage_rejects_clip_before_track_start() -> None:
+    timeline_start = datetime(2026, 8, 26, 17, 44, 6, tzinfo=timezone.utc)
+    gpx_start = timeline_start + timedelta(seconds=41)
+    track_points = [
+        {"timestamp": int(gpx_start.timestamp() * 1000)},
+        {"timestamp": int((gpx_start + timedelta(seconds=181)).timestamp() * 1000)},
+    ]
+
+    assert not _clip_is_covered_by_gpx(
+        timeline_start,
+        HighlightClip(start_seconds=20, duration_seconds=8, yaw_degrees=0),
+        track_points,
+    )
+    assert _clip_is_covered_by_gpx(
+        timeline_start,
+        HighlightClip(start_seconds=41, duration_seconds=8, yaw_degrees=0),
+        track_points,
     )
 
 
