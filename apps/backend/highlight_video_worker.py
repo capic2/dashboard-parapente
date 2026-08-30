@@ -757,7 +757,9 @@ def _render_clip(
     encode_args = h264_encode_args(
         accelerator,
         quality="18" if accelerator == "cpu" else "18",
-        cpu_preset="fast",
+        # Highlight clips are short and generated on the CPU in production;
+        # ultrafast prevents an 8K pano projection from monopolising the worker.
+        cpu_preset="ultrafast",
         include_audio=False,
         pixel_format="yuv420p",
     )[:-1]
