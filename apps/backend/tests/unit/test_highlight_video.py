@@ -369,9 +369,11 @@ def test_render_clip_incrusts_the_gopro_overlay_on_the_pano_source(tmp_path):
     assert str(source_path) in command
     assert str(overlay_path) in command
     assert command[command.index("-ss", 3) + 1] == "14.750"
+    assert command[command.index("-t", 3) + 1] == "6.000"
     filter_complex = command[command.index("-filter_complex") + 1]
     assert "output=cylindrical" in filter_complex
     assert "h_fov=160:w=1920:h=1080" in filter_complex
+    assert "[1:v]fps=30,scale=w=538:h=-2[overlay]" in filter_complex
     assert "scale=w=538:h=-2" in filter_complex
     assert "overlay=W-w-32:H-h-32:eof_action=pass[v]" in filter_complex
     assert command[command.index("-map") + 1] == "[v]"
