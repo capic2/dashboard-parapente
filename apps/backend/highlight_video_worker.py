@@ -122,6 +122,37 @@ def _configured_gpx_path(value: str | None) -> Path | None:
     return Path(__file__).parent / path
 
 
+def _prepare_calibrated_highlight_gpx(
+    source_path: Path,
+    gpx_path: Path,
+    output_dir: Path,
+    *,
+    gpx_offset: float,
+    video_duration: float,
+) -> Path:
+    """Reuse the regular GoPro export OSV/GPX calibration for highlights."""
+    from gopro_overlay_export import _merge_osv_files_with_gpx
+
+    osv_paths = sorted(
+        (
+            path
+            for path in source_path.parent.iterdir()
+            if path.is_file() and path.suffix.lower() == ".osv"
+        ),
+        key=lambda path: (path.stat().st_mtime, path.name),
+    )
+    if not osv_paths:
+        raise ValueError("Le calage GoPro Overlay nécessite le fichier OSV du vol")
+    return _merge_osv_files_with_gpx(
+        osv_paths,
+        gpx_path,
+        output_dir,
+        gpx_offset=gpx_offset,
+        video_duration=video_duration,
+        first_gpx_at=0.0,
+    )
+
+
 def _source_timeline_start(source_path: Path, gpx_path: Path) -> datetime:
     """Resolve video time zero against the flight GPX without decoding the OSV."""
     from gopro_overlay_export import (
@@ -1011,6 +1042,19 @@ def process_highlight_video_job(job_id: str) -> None:
             gpx_path = None
         if gpx_path:
             try:
+                logger.info(
+                    "Highlight GPX calibration started: job_id=%s gpx=%s offset=%.3f",
+                    job_id,
+                    gpx_path,
+                    offset,
+                )
+                gpx_path = _prepare_calibrated_highlight_gpx(
+                    source_path,
+                    gpx_path,
+                    output_dir,
+                    gpx_offset=offset,
+                    video_duration=duration_seconds,
+                )
                 logger.info("Highlight GPX analysis started: job_id=%s gpx=%s", job_id, gpx_path)
                 _normalized_gpx, track_points = normalize_track(
                     gpx_path.read_bytes(), gpx_path.suffix
@@ -1023,7 +1067,11 @@ def process_highlight_video_job(job_id: str) -> None:
             raise ValueError("Le véritable overlay GoPro nécessite la vidéo PIP du vol")
         if not track_points:
             raise ValueError("Le fichier GPX ne contient aucune télémétrie exploitable")
-        source_timeline_start = _source_timeline_start(source_path, gpx_path)
+        from gopro_overlay_export import first_gpx_timestamp
+
+        source_timeline_start = first_gpx_timestamp(gpx_path)
+        if source_timeline_start is None:
+            raise ValueError("Le GPX calé ne contient aucun horodatage")
         visual_clips = [
             clip
             for clip in visual_clips

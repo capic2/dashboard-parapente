@@ -13,6 +13,7 @@ from highlight_video_worker import (
     _output_dimensions,
     _clip_creation_time,
     _clip_is_covered_by_gpx,
+    _prepare_calibrated_highlight_gpx,
     _render_clip,
     _render_method_for_accelerator,
     _set_job_stage,
@@ -180,6 +181,36 @@ def test_clip_gpx_coverage_rejects_clip_before_track_start() -> None:
         timeline_start,
         HighlightClip(start_seconds=41, duration_seconds=8, yaw_degrees=0),
         track_points,
+    )
+
+
+def test_highlight_gpx_reuses_regular_overlay_osv_calibration(tmp_path: Path) -> None:
+    source = tmp_path / "pano.mp4"
+    gpx = tmp_path / "external.gpx"
+    osv = tmp_path / "CAM_0001_D.OSV"
+    output_dir = tmp_path / "highlights"
+    source.touch()
+    gpx.touch()
+    osv.touch()
+    merged = output_dir / "merged-gopro-overlay.gpx"
+
+    with patch("gopro_overlay_export._merge_osv_files_with_gpx", return_value=merged) as merge:
+        result = _prepare_calibrated_highlight_gpx(
+            source,
+            gpx,
+            output_dir,
+            gpx_offset=15122.8,
+            video_duration=394.667,
+        )
+
+    assert result == merged
+    merge.assert_called_once_with(
+        [osv],
+        gpx,
+        output_dir,
+        gpx_offset=15122.8,
+        video_duration=394.667,
+        first_gpx_at=0.0,
     )
 
 
