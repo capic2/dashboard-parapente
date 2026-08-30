@@ -42,7 +42,9 @@ _ACTIVE_STATUSES = {STATUS_QUEUED, STATUS_RUNNING}
 
 # A wider projection keeps the wing, pilot and landscape legible.  A narrower
 # field of view tends to turn a 360° extract into an isolated, unclear detail.
-HIGHLIGHT_HORIZONTAL_FOV_DEGREES = 160
+# 130° gives a genuinely wide view while keeping a rectilinear projection
+# natural. Wider values noticeably stretch the pilot and the horizon.
+HIGHLIGHT_HORIZONTAL_FOV_DEGREES = 130
 HIGHLIGHT_OVERLAY_WIDTH_RATIO = 0.28
 HIGHLIGHT_OVERLAY_MARGIN_PX = 32
 
@@ -278,13 +280,14 @@ def _frame_scores(
 
 
 def _best_yaw(source_path: Path, clip: HighlightClip) -> float:
-    """Pick a clear view that also contains likely paraglider colors/silhouette."""
+    """Pick the clearest wide view, avoiding the pilot and camera obstruction."""
     yaws = tuple(range(-180, 180, 45))
     branches = "".join(
-        f"[a{index}]v360=input=e:output=rectilinear:yaw={yaw}:pitch=0:v_fov=80:w=160:h=284[v{index}];"
+        f"[a{index}]v360=input=e:output=rectilinear:yaw={yaw}:pitch=0:"
+        f"h_fov={HIGHLIGHT_HORIZONTAL_FOV_DEGREES}:w=320:h=160[v{index}];"
         for index, yaw in enumerate(yaws)
     )
-    layout = "|".join(f"{(index % 4) * 160}_{(index // 4) * 284}" for index in range(8))
+    layout = "|".join(f"{(index % 4) * 320}_{(index // 4) * 160}" for index in range(8))
     filter_value = (
         "[0:v]split=8"
         + "".join(f"[a{index}]" for index in range(8))
@@ -316,15 +319,15 @@ def _best_yaw(source_path: Path, clip: HighlightClip) -> float:
     )
     frame = np.frombuffer(result.stdout, dtype=np.uint8)
     scores: dict[int, float] = {}
-    if frame.size == 640 * 568 * 3:
-        tiled = frame.reshape(568, 640, 3).astype(np.float32)
+    if frame.size == 1280 * 320 * 3:
+        tiled = frame.reshape(320, 1280, 3).astype(np.float32)
         for index, yaw in enumerate(yaws):
             rgb = tiled[
-                (index // 4) * 284 : (index // 4 + 1) * 284,
-                (index % 4) * 160 : (index % 4 + 1) * 160,
+                (index // 4) * 160 : (index // 4 + 1) * 160,
+                (index % 4) * 320 : (index % 4 + 1) * 320,
             ]
             gray = rgb.mean(axis=2)
-            lower = rgb[70:]
+            lower = rgb[40:]
             red_wing = (
                 (lower[:, :, 0] > lower[:, :, 1] * 1.25) & (lower[:, :, 0] > lower[:, :, 2] * 1.15)
             ).mean()
@@ -338,7 +341,7 @@ def _best_yaw(source_path: Path, clip: HighlightClip) -> float:
             foreground_obstruction = min(1.0, dark_foreground * 0.7 + skin_foreground)
             sharpness = np.abs(np.diff(gray, axis=1)).mean()
             scores[yaw] = float(
-                sharpness + red_wing * 20 + saturated * 8 - foreground_obstruction * 120
+                sharpness + red_wing * 4 + saturated * 4 - foreground_obstruction * 160
             )
     return float(max(scores, key=scores.get)) if scores else 0.0
 
@@ -346,7 +349,7 @@ def _best_yaw(source_path: Path, clip: HighlightClip) -> float:
 def _gray_projection(source_path: Path, clip: HighlightClip, at_seconds: float) -> np.ndarray:
     filter_value = (
         f"v360=input=e:output=rectilinear:yaw={clip.yaw_degrees}:pitch=0:"
-        "v_fov=80:w=320:h=568,format=gray"
+        f"h_fov={HIGHLIGHT_HORIZONTAL_FOV_DEGREES}:w=320:h=160,format=gray"
     )
     result = subprocess.run(
         [
@@ -370,7 +373,7 @@ def _gray_projection(source_path: Path, clip: HighlightClip, at_seconds: float) 
         check=True,
         capture_output=True,
     )
-    return np.frombuffer(result.stdout, dtype=np.uint8).reshape(568, 320)
+    return np.frombuffer(result.stdout, dtype=np.uint8).reshape(160, 320)
 
 
 def classify_visual_clip(source_path: Path, clip: HighlightClip) -> HighlightClip:
