@@ -759,7 +759,9 @@ def _render_clip(
         )
     else:
         command.extend(["-vf", pano_filter, "-map", "0:v:0"])
-    command.extend(["-map", "0:a?", "-shortest"])
+    command.extend(
+        ["-map", "0:a?", "-shortest", "-t", f"{clip.duration_seconds:.3f}"]
+    )
     encode_args = h264_encode_args(
         accelerator,
         quality="18" if accelerator == "cpu" else "18",
