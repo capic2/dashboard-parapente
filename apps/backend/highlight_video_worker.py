@@ -143,9 +143,14 @@ def _source_timeline_start(source_path: Path, gpx_path: Path) -> datetime:
 def _clip_creation_time(
     source_timeline_start: datetime,
     clip: HighlightClip,
-    overlay_offset_seconds: float,
+    _legacy_overlay_offset_seconds: float = 0.0,
 ) -> datetime:
-    return source_timeline_start + timedelta(seconds=clip.start_seconds + overlay_offset_seconds)
+    """Timestamp a pano extract on its native OSV/GPX timeline.
+
+    ``overlay_offset_seconds`` belongs to the legacy secondary-video overlay.
+    Applying it here can move a clip completely outside the GPX time range.
+    """
+    return source_timeline_start + timedelta(seconds=clip.start_seconds)
 
 
 def _render_gopro_overlay(
