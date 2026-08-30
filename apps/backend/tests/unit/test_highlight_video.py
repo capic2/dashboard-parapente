@@ -2,6 +2,8 @@ from datetime import date
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import numpy as np
+
 from models import Flight, HighlightVideoJob
 from highlight_video import HighlightClip, clamp_clip, overlay_interval_for_clip
 import highlight_video_worker
@@ -12,6 +14,23 @@ from highlight_video_worker import (
     _flight_phase_times,
     select_flight_event_clips,
 )
+
+
+def test_best_yaw_allows_a_face_view_when_no_clearer_view_exists(tmp_path):
+    source_path = tmp_path / "pano.mp4"
+    source_path.touch()
+    tiled = np.full((320, 1280, 3), [200, 140, 120], dtype=np.uint8)
+
+    with patch(
+        "highlight_video_worker.subprocess.run",
+        return_value=Mock(stdout=tiled.tobytes()),
+    ):
+        yaw = highlight_video_worker._best_yaw(
+            source_path,
+            HighlightClip(start_seconds=0, duration_seconds=8, yaw_degrees=0),
+        )
+
+    assert yaw == -180
 
 
 def test_worker_restart_recovers_and_requeues_active_highlight_jobs(test_db, monkeypatch):
@@ -293,7 +312,8 @@ def test_render_clip_incrusts_the_gopro_overlay_on_the_pano_source(tmp_path):
     assert str(overlay_path) in command
     assert command[command.index("-ss", 3) + 1] == "14.750"
     filter_complex = command[command.index("-filter_complex") + 1]
-    assert "h_fov=130:w=1920:h=1080" in filter_complex
+    assert "output=cylindrical" in filter_complex
+    assert "h_fov=160:w=1920:h=1080" in filter_complex
     assert "scale=w=538:h=-2" in filter_complex
     assert "overlay=W-w-32:H-h-32:eof_action=pass[v]" in filter_complex
     assert command[command.index("-map") + 1] == "[v]"
@@ -319,4 +339,5 @@ def test_render_clip_uses_a_wide_projection_for_pano_source(tmp_path):
         )
 
     command = run.call_args.args[0]
-    assert "h_fov=130:w=1920:h=960" in command[command.index("-vf") + 1]
+    assert "output=cylindrical" in command[command.index("-vf") + 1]
+    assert "h_fov=160:w=1920:h=960" in command[command.index("-vf") + 1]
