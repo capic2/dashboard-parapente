@@ -46,6 +46,7 @@ _ACTIVE_STATUSES = {STATUS_QUEUED, STATUS_RUNNING}
 # stretching caused by a rectilinear projection at the same field of view.
 HIGHLIGHT_PROJECTION = "cylindrical"
 HIGHLIGHT_HORIZONTAL_FOV_DEGREES = 160
+HIGHLIGHT_OUTPUT_WIDTH = 3840
 HIGHLIGHT_OVERLAY_WIDTH_RATIO = 0.28
 HIGHLIGHT_OVERLAY_MARGIN_PX = 32
 
@@ -100,7 +101,7 @@ def _probe_video_dimensions(path: Path) -> tuple[int, int]:
 
 def _output_dimensions(source_path: Path) -> tuple[int, int]:
     source_width, source_height = _probe_video_dimensions(source_path)
-    output_width = 1920
+    output_width = HIGHLIGHT_OUTPUT_WIDTH
     output_height = max(2, round(output_width * source_height / source_width))
     return output_width, output_height
 
@@ -359,13 +360,17 @@ def _best_yaw(source_path: Path, clip: HighlightClip) -> float:
             centre_end = rgb.shape[1] - centre_start
             centre_skin = skin[:, centre_start:centre_end].mean()
             skin_ratio = skin.mean()
+            centre_dark = (gray[:, centre_start:centre_end] < 45).mean()
             foreground_obstruction = min(
                 1.0,
-                dark_foreground * 0.45 + centre_skin * 1.15 + skin_ratio * 0.2,
+                dark_foreground * 0.35
+                + centre_dark * 1.35
+                + centre_skin * 0.55
+                + skin_ratio * 0.05,
             )
             sharpness = np.abs(np.diff(gray, axis=1)).mean()
             scores[yaw] = float(
-                sharpness + red_wing * 4 + saturated * 4 - foreground_obstruction * 300
+                sharpness + red_wing * 1 + saturated * 3 - foreground_obstruction * 500
             )
     return float(max(scores, key=scores.get)) if scores else 0.0
 
@@ -747,7 +752,7 @@ def _render_clip(
     accelerator = select_video_accelerator(config.VIDEO_ACCELERATOR)
     encode_args = h264_encode_args(
         accelerator,
-        quality="21" if accelerator == "cpu" else "20",
+        quality="18" if accelerator == "cpu" else "18",
         cpu_preset="fast",
         include_audio=False,
         pixel_format="yuv420p",
