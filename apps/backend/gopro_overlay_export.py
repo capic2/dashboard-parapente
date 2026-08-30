@@ -10,6 +10,7 @@ import select
 import shutil
 import subprocess
 import threading
+import time
 import uuid
 import xml.etree.ElementTree as ET
 from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator
@@ -125,6 +126,7 @@ _LOCK = threading.Lock()
 _WORKER_THREAD: threading.Thread | None = None
 _WORKER_STOP = threading.Event()
 _WORKER_LOCK = threading.Lock()
+_JOB_HEARTBEAT_INTERVAL_SECONDS = 30.0
 
 
 def _utc_now() -> str:
@@ -714,10 +716,16 @@ def _read_process_updates_from_process(
         return
 
     current = ""
+    last_heartbeat = time.monotonic()
     while process.poll() is None:
         if _is_job_cancelled(job_id):
             process.terminate()
             return
+
+        now = time.monotonic()
+        if now - last_heartbeat >= _JOB_HEARTBEAT_INTERVAL_SECONDS:
+            _update_job(job_id)
+            last_heartbeat = now
 
         ready, _, _ = select.select([stream], [], [], 1)
         if not ready:
