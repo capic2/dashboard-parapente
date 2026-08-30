@@ -788,17 +788,24 @@ def _render_clip(
         ]
     )
     heartbeat_stop = threading.Event()
+    render_started_at = time.monotonic()
+    accelerator_label = "GPU" if accelerator == "nvidia" else "CPU"
 
     def log_render_heartbeat() -> None:
         while not heartbeat_stop.wait(15):
             size_mb = output_path.stat().st_size / (1024 * 1024) if output_path.exists() else 0
             logger.info(
-                "Highlight clip rendering still active: output=%s size_mb=%.1f",
+                "Highlight clip rendering still active: mode=%s elapsed_s=%.0f output=%s size_mb=%.1f",
+                accelerator_label,
+                time.monotonic() - render_started_at,
                 output_path,
                 size_mb,
             )
             if heartbeat_callback:
-                heartbeat_callback(f"Rendu en cours : {size_mb:.1f} Mo produits")
+                heartbeat_callback(
+                    f"{accelerator_label} — {size_mb:.1f} Mo produits — "
+                    f"{time.monotonic() - render_started_at:.0f}s"
+                )
 
     heartbeat = threading.Thread(target=log_render_heartbeat, daemon=True)
     heartbeat.start()
@@ -1066,10 +1073,20 @@ def process_highlight_video_job(job_id: str) -> None:
             )
             clip_progress = 10 + (index - 1) * 12
 
-            def render_heartbeat(message: str, *, current: int = clip_progress) -> None:
+            def render_heartbeat(
+                message: str,
+                *,
+                current: int = clip_progress,
+                segment: int = index,
+                total: int = len(clips),
+            ) -> None:
                 nonlocal clip_progress
                 clip_progress = min(current + 11, clip_progress + 1)
-                _update_job(job_id, progress=clip_progress, message=message)
+                _update_job(
+                    job_id,
+                    progress=clip_progress,
+                    message=f"Clip {segment}/{total} — {message}",
+                )
 
             _render_clip(source_path, target, clip, overlay_path, offset, render_heartbeat)
             rendered.append(target)
