@@ -160,6 +160,7 @@ def _clip_creation_time(
 def _render_gopro_overlay(
     video_path: Path,
     gpx_path: Path,
+    pip_path: Path,
     output_path: Path,
     progress_callback: Callable[[int, str], None] | None = None,
     cancellation_callback: Callable[[], bool] | None = None,
@@ -174,7 +175,7 @@ def _render_gopro_overlay(
     job = create_gopro_overlay_job_from_paths(
         video_path=video_path,
         gpx_path=gpx_path,
-        pip_path=None,
+        pip_path=pip_path,
         layout_id=HIGHLIGHT_OVERLAY_LAYOUT_ID,
         output_filename=output_path.name,
         output_resolution="source",
@@ -981,7 +982,7 @@ def process_highlight_video_job(job_id: str) -> None:
             len(visual_clips),
         )
         track_points: list[TrackPoint] | None = None
-        gpx_path, _pip_path = resolve_automatic_overlay_inputs(
+        gpx_path, pip_path = resolve_automatic_overlay_inputs(
             source_path.parent,
             _configured_gpx_path(gpx_file_path),
             source_path,
@@ -1007,6 +1008,8 @@ def process_highlight_video_job(job_id: str) -> None:
             raise ValueError("La vidéo pano ne contient aucune durée exploitable")
         if gpx_path is None:
             raise ValueError("Le véritable overlay GoPro nécessite un fichier GPX")
+        if pip_path is None or not pip_path.is_file():
+            raise ValueError("Le véritable overlay GoPro nécessite la vidéo PIP du vol")
         source_timeline_start = _source_timeline_start(source_path, gpx_path)
         classified_clips: list[HighlightClip] = []
         for index, clip in enumerate(clips, start=1):
@@ -1093,6 +1096,7 @@ def process_highlight_video_job(job_id: str) -> None:
             overlay_completed = _render_gopro_overlay(
                 raw_target,
                 gpx_path,
+                pip_path,
                 target,
                 overlay_progress,
                 lambda: _is_cancelled(job_id),

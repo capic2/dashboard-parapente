@@ -524,9 +524,10 @@ def test_render_clip_enables_cuda_decode_for_nvidia_inputs(tmp_path: Path) -> No
     assert all(command[index - 2 : index] == ["-hwaccel", "cuda"] for index in input_indexes)
 
 
-def test_render_gopro_overlay_uses_parapente_layout_without_pip(tmp_path: Path) -> None:
+def test_render_gopro_overlay_uses_parapente_layout_with_flight_pip(tmp_path: Path) -> None:
     montage = tmp_path / "highlights-pano.mp4"
     gpx = tmp_path / "highlights.gpx"
+    pip = tmp_path / "flight.mp4"
     output = tmp_path / "highlights.mp4"
     output.touch()
     completed = {"status": "completed", "progress": 100, "message": "done"}
@@ -538,14 +539,14 @@ def test_render_gopro_overlay_uses_parapente_layout_without_pip(tmp_path: Path) 
         ) as create_job,
         patch("gopro_overlay_export.get_gopro_overlay_job", return_value=completed),
     ):
-        completed_result = _render_gopro_overlay(montage, gpx, output)
+        completed_result = _render_gopro_overlay(montage, gpx, pip, output)
 
     assert completed_result is True
 
     create_job.assert_called_once_with(
         video_path=montage,
         gpx_path=gpx,
-        pip_path=None,
+        pip_path=pip,
         layout_id="parapente-3840",
         output_filename=output.name,
         output_resolution="source",
@@ -557,6 +558,7 @@ def test_render_gopro_overlay_uses_parapente_layout_without_pip(tmp_path: Path) 
 def test_render_gopro_overlay_cancels_its_child_job(tmp_path: Path) -> None:
     montage = tmp_path / "highlights-pano.mp4"
     gpx = tmp_path / "highlights.gpx"
+    pip = tmp_path / "flight.mp4"
     output = tmp_path / "highlights.mp4"
 
     with (
@@ -570,6 +572,7 @@ def test_render_gopro_overlay_cancels_its_child_job(tmp_path: Path) -> None:
         completed_result = _render_gopro_overlay(
             montage,
             gpx,
+            pip,
             output,
             cancellation_callback=lambda: True,
         )
@@ -591,7 +594,12 @@ def test_render_gopro_overlay_reports_child_failure(tmp_path: Path) -> None:
         patch("gopro_overlay_export.get_gopro_overlay_job", return_value=failed),
         pytest.raises(RuntimeError, match="renderer crashed"),
     ):
-        _render_gopro_overlay(tmp_path / "pano.mp4", tmp_path / "flight.gpx", output)
+        _render_gopro_overlay(
+            tmp_path / "pano.mp4",
+            tmp_path / "flight.gpx",
+            tmp_path / "flight.mp4",
+            output,
+        )
 
 
 def test_render_gopro_overlay_times_out(tmp_path: Path) -> None:
@@ -605,4 +613,9 @@ def test_render_gopro_overlay_times_out(tmp_path: Path) -> None:
         patch("highlight_video_worker.time.monotonic", side_effect=[0, 999999]),
         pytest.raises(TimeoutError, match="dépassé le délai"),
     ):
-        _render_gopro_overlay(tmp_path / "pano.mp4", tmp_path / "flight.gpx", output)
+        _render_gopro_overlay(
+            tmp_path / "pano.mp4",
+            tmp_path / "flight.gpx",
+            tmp_path / "flight.mp4",
+            output,
+        )
