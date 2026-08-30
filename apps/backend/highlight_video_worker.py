@@ -700,6 +700,7 @@ def _render_clip(
     clip: HighlightClip,
     overlay_path: Path | None,
     overlay_offset_seconds: float,
+    heartbeat_callback: Callable[[str], None] | None = None,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_width, output_height = _output_dimensions(source_path)
@@ -796,6 +797,8 @@ def _render_clip(
                 output_path,
                 size_mb,
             )
+            if heartbeat_callback:
+                heartbeat_callback(f"Rendu en cours : {size_mb:.1f} Mo produits")
 
     heartbeat = threading.Thread(target=log_render_heartbeat, daemon=True)
     heartbeat.start()
@@ -1061,7 +1064,14 @@ def process_highlight_video_job(job_id: str) -> None:
                 clip.yaw_degrees,
                 clip.category,
             )
-            _render_clip(source_path, target, clip, overlay_path, offset)
+            clip_progress = 10 + (index - 1) * 12
+
+            def render_heartbeat(message: str, *, current: int = clip_progress) -> None:
+                nonlocal clip_progress
+                clip_progress = min(current + 11, clip_progress + 1)
+                _update_job(job_id, progress=clip_progress, message=message)
+
+            _render_clip(source_path, target, clip, overlay_path, offset, render_heartbeat)
             rendered.append(target)
             if _is_cancelled(job_id):
                 return
