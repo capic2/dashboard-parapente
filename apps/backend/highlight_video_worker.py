@@ -735,12 +735,14 @@ def _render_clip(
             [
                 "-ss",
                 f"{overlay_start_seconds:.3f}",
+                "-t",
+                f"{clip.duration_seconds:.3f}",
                 "-i",
                 str(overlay_path),
                 "-filter_complex",
                 (
                     f"[0:v]{pano_filter}[pano];"
-                    f"[1:v]scale=w={overlay_width}:h=-2[overlay];"
+                    f"[1:v]fps=30,scale=w={overlay_width}:h=-2[overlay];"
                     f"[pano][overlay]overlay=W-w-{HIGHLIGHT_OVERLAY_MARGIN_PX}:"
                     f"H-h-{HIGHLIGHT_OVERLAY_MARGIN_PX}:eof_action=pass[v]"
                 ),
