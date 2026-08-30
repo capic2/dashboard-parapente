@@ -45,6 +45,7 @@ import {
 import { useGoproOverlayJobStream } from '../../../hooks/gopro/useGoproOverlay';
 import { useCancelYoutubeUpload } from '../../../hooks/flights/useYoutubeUpload';
 import { api } from '../../../lib/api';
+import { parseApiUtcDate } from '../../../lib/date';
 import { useToast } from '../../../hooks/useToast';
 import { JobLiveLogsPanel } from './JobLiveLogsPanel';
 
@@ -181,14 +182,14 @@ function getLastActivityTime(job: VideoExportJob) {
     return 0;
   }
 
-  const time = new Date(rawDate).getTime();
+  const time = parseApiUtcDate(rawDate).getTime();
   return Number.isNaN(time) ? 0 : time;
 }
 
 function getStalledJobMinutes(job: VideoExportJob): number | null {
   const phase = getJobPhase(job);
   if (!activeStatusLabels.has(phase) || !job.updated_at) return null;
-  const lastActivity = new Date(job.updated_at).getTime();
+  const lastActivity = parseApiUtcDate(job.updated_at).getTime();
   if (!Number.isFinite(lastActivity)) return null;
   const elapsedMs = Date.now() - lastActivity;
   return elapsedMs >= STALLED_JOB_THRESHOLD_MS
@@ -207,7 +208,7 @@ function getDateLabel(job: VideoExportJob) {
     return null;
   }
 
-  const date = new Date(rawDate);
+  const date = parseApiUtcDate(rawDate);
   if (Number.isNaN(date.getTime())) {
     return null;
   }

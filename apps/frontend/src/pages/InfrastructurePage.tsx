@@ -7,6 +7,7 @@ import {
 } from 'react';
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
+import { parseApiUtcDate } from '../lib/date';
 import { Checkbox, Input, TextField } from 'react-aria-components';
 import {
   createColumnHelper,
@@ -70,7 +71,7 @@ function DeploymentStatusBanner() {
     ? status.phase_changed_at
     : status.requested_at;
   const requestedAt = phaseStartedAt
-    ? new Date(phaseStartedAt).getTime()
+    ? parseApiUtcDate(phaseStartedAt).getTime()
     : Number.NaN;
   const elapsedMinutes = Number.isNaN(requestedAt)
     ? null

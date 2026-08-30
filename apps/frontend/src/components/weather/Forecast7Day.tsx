@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { getStaleTime } from '../../lib/cacheConfig';
+import { parseApiLocalDate } from '../../lib/date';
 import {
   useDailySummary,
   createWeatherQueryFn,
@@ -28,7 +29,7 @@ export default function Forecast7Day({
   const { t, i18n } = useTranslation();
 
   const formatDate = (dateStr: string): string => {
-    const date = new Date(dateStr);
+    const date = parseApiLocalDate(dateStr);
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);

@@ -19,6 +19,7 @@ import type { FlightDecisionResponse } from '@dashboard-parapente/shared-types';
 import { useAppSettings } from '../../hooks/settings/useAppSettings';
 import { useWeather } from '../../hooks/weather/useWeather';
 import type { HourlyForecastItem, WeatherData } from '../../types';
+import { parseApiUtcDate } from '../../lib/date';
 import CacheTimestamp from '../common/CacheTimestamp';
 import WindArrow from './WindArrow';
 import {
@@ -557,7 +558,7 @@ const formatTooltipDate = (cachedAt: string, language: string): string =>
   new Intl.DateTimeFormat(language, {
     dateStyle: 'medium',
     timeStyle: 'short',
-  }).format(new Date(cachedAt));
+  }).format(parseApiUtcDate(cachedAt));
 
 // ============================================================================
 // TOOLTIP COMPONENTS

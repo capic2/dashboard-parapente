@@ -39,6 +39,7 @@ from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel, Field
 
 import config
+from datetime_utils import to_api_utc
 from auth import (
     authenticate_user,
     create_access_token,
@@ -685,11 +686,11 @@ def _highlight_export_job_payload(job: HighlightVideoJob) -> dict[str, Any]:
         "mode": "highlight",
         "flight_title": "Meilleurs moments",
         "output_filename": Path(output_path).name if output_path else None,
-        "created_at": job.created_at,
-        "updated_at": job.updated_at,
-        "started_at": job.started_at,
-        "completed_at": job.completed_at,
-        "cancelled_at": job.cancelled_at,
+        "created_at": to_api_utc(job.created_at),
+        "updated_at": to_api_utc(job.updated_at),
+        "started_at": to_api_utc(job.started_at),
+        "completed_at": to_api_utc(job.completed_at),
+        "cancelled_at": to_api_utc(job.cancelled_at),
         "has_output_file": bool(output_path and Path(output_path).is_file()),
     }
 
@@ -706,10 +707,10 @@ def _youtube_upload_export_job_payload(job: YoutubeUploadJob) -> dict[str, Any]:
         "mode": "youtube_upload",
         "source_type": job.source_type,
         "youtube_url": job.youtube_url,
-        "created_at": job.created_at,
-        "updated_at": job.updated_at,
-        "started_at": job.started_at,
-        "completed_at": job.completed_at,
+        "created_at": to_api_utc(job.created_at),
+        "updated_at": to_api_utc(job.updated_at),
+        "started_at": to_api_utc(job.started_at),
+        "completed_at": to_api_utc(job.completed_at),
         "log_tail": [],
         "has_output_file": False,
     }
@@ -4140,8 +4141,8 @@ def get_flights(
             "gopro_overlay_gpx_offset": flight.gopro_overlay_gpx_offset,
             "gopro_overlays": _flight_gopro_overlay_jobs(flight),
             "external_url": flight.external_url,
-            "created_at": flight.created_at.isoformat() if flight.created_at else None,
-            "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
+            "created_at": to_api_utc(flight.created_at),
+            "updated_at": to_api_utc(flight.updated_at),
         }
         flights_data.append(flight_dict)
 
@@ -4602,8 +4603,8 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "gopro_overlay_file_exists": gopro_overlay["file_exists"],
         "gopro_overlay_gpx_offset": flight.gopro_overlay_gpx_offset,
         "gopro_overlays": _flight_gopro_overlay_jobs(flight),
-        "created_at": flight.created_at.isoformat() if flight.created_at else None,
-        "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
+        "created_at": to_api_utc(flight.created_at),
+        "updated_at": to_api_utc(flight.updated_at),
     }
 
     # Include site details with orientation
@@ -5192,8 +5193,8 @@ def create_flight(flight_data: FlightCreate, db: Session = Depends(get_db)):
         "gopro_overlay_progress": None,
         "gopro_overlay_file_path": None,
         "gopro_overlay_file_exists": False,
-        "created_at": flight.created_at.isoformat() if flight.created_at else None,
-        "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
+        "created_at": to_api_utc(flight.created_at),
+        "updated_at": to_api_utc(flight.updated_at),
     }
 
 

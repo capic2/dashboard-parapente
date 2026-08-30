@@ -27,6 +27,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 import config
+from datetime_utils import to_api_utc
 from deployment_drain import DeploymentDrainActive, job_admission
 from auth import create_job_token, decode_job_token
 from database import SessionLocal
@@ -235,7 +236,7 @@ def _to_public_status(status: str) -> str:
 
 
 def _to_iso(value: datetime | None) -> str | None:
-    return value.isoformat() if value else None
+    return to_api_utc(value)
 
 
 def _default_frontend_url() -> str:

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useFlightStats } from '../../hooks/flights/useFlights';
+import { parseApiLocalDate } from '../../lib/date';
 
 const iconClass = 'h-5 w-5';
 
@@ -152,7 +153,7 @@ export default function StatsPanel() {
       icon: CalendarDays,
       label: t('stats.lastFlight'),
       value: stats.last_flight_date
-        ? new Date(stats.last_flight_date).toLocaleDateString(
+        ? parseApiLocalDate(stats.last_flight_date).toLocaleDateString(
             i18n.language.startsWith('en') ? 'en-US' : 'fr-FR',
             {
               day: '2-digit',
