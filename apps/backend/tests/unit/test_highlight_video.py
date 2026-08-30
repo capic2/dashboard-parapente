@@ -128,12 +128,12 @@ def test_source_timeline_start_falls_back_to_gpx_when_osv_timestamp_is_missing(
     align.assert_not_called()
 
 
-def test_clip_creation_time_uses_gpx_aligned_utc_timeline() -> None:
+def test_clip_creation_time_uses_gpx_aligned_utc_timeline_without_legacy_offset() -> None:
     timeline_start = datetime(2026, 8, 26, 17, 44, 6, tzinfo=timezone.utc)
     clip = HighlightClip(start_seconds=120, duration_seconds=8, yaw_degrees=0)
 
-    assert _clip_creation_time(timeline_start, clip, 2.5) == datetime(
-        2026, 8, 26, 17, 46, 8, 500000, tzinfo=timezone.utc
+    assert _clip_creation_time(timeline_start, clip, 15142.8) == datetime(
+        2026, 8, 26, 17, 46, 6, tzinfo=timezone.utc
     )
 
 
