@@ -42,9 +42,10 @@ _ACTIVE_STATUSES = {STATUS_QUEUED, STATUS_RUNNING}
 
 # A wider projection keeps the wing, pilot and landscape legible.  A narrower
 # field of view tends to turn a 360° extract into an isolated, unclear detail.
-# 130° gives a genuinely wide view while keeping a rectilinear projection
-# natural. Wider values noticeably stretch the pilot and the horizon.
-HIGHLIGHT_HORIZONTAL_FOV_DEGREES = 130
+# Cylindrical projection gives a genuinely wide view without the severe edge
+# stretching caused by a rectilinear projection at the same field of view.
+HIGHLIGHT_PROJECTION = "cylindrical"
+HIGHLIGHT_HORIZONTAL_FOV_DEGREES = 160
 HIGHLIGHT_OVERLAY_WIDTH_RATIO = 0.28
 HIGHLIGHT_OVERLAY_MARGIN_PX = 32
 
@@ -283,7 +284,7 @@ def _best_yaw(source_path: Path, clip: HighlightClip) -> float:
     """Pick the clearest wide view, avoiding the pilot and camera obstruction."""
     yaws = tuple(range(-180, 180, 45))
     branches = "".join(
-        f"[a{index}]v360=input=e:output=rectilinear:yaw={yaw}:pitch=0:"
+        f"[a{index}]v360=input=e:output={HIGHLIGHT_PROJECTION}:yaw={yaw}:pitch=0:"
         f"h_fov={HIGHLIGHT_HORIZONTAL_FOV_DEGREES}:w=320:h=160[v{index}];"
         for index, yaw in enumerate(yaws)
     )
@@ -348,7 +349,7 @@ def _best_yaw(source_path: Path, clip: HighlightClip) -> float:
 
 def _gray_projection(source_path: Path, clip: HighlightClip, at_seconds: float) -> np.ndarray:
     filter_value = (
-        f"v360=input=e:output=rectilinear:yaw={clip.yaw_degrees}:pitch=0:"
+        f"v360=input=e:output={HIGHLIGHT_PROJECTION}:yaw={clip.yaw_degrees}:pitch=0:"
         f"h_fov={HIGHLIGHT_HORIZONTAL_FOV_DEGREES}:w=320:h=160,format=gray"
     )
     result = subprocess.run(
@@ -671,7 +672,7 @@ def _render_clip(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_width, output_height = _output_dimensions(source_path)
     pano_filter = (
-        f"v360=input=e:output=rectilinear:yaw={clip.yaw_degrees}:pitch=0:"
+        f"v360=input=e:output={HIGHLIGHT_PROJECTION}:yaw={clip.yaw_degrees}:pitch=0:"
         f"h_fov={HIGHLIGHT_HORIZONTAL_FOV_DEGREES}:w={output_width}:h={output_height},setsar=1"
     )
     command = [
