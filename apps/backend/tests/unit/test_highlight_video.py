@@ -12,11 +12,12 @@ from highlight_video_worker import (
     _render_clip,
     _set_job_stage,
     _flight_phase_times,
+    _ensure_overlay_video,
     select_flight_event_clips,
 )
 
 
-def test_best_yaw_allows_a_face_view_when_no_clearer_view_exists(tmp_path):
+def test_best_yaw_allows_a_face_view_when_no_clearer_view_exists(tmp_path: Path) -> None:
     source_path = tmp_path / "pano.mp4"
     source_path.touch()
     tiled = np.full((320, 1280, 3), [200, 140, 120], dtype=np.uint8)
@@ -31,6 +32,55 @@ def test_best_yaw_allows_a_face_view_when_no_clearer_view_exists(tmp_path):
         )
 
     assert yaw == -180
+
+
+def test_best_yaw_prefers_clear_centre_over_a_face_filling_the_view(tmp_path: Path) -> None:
+    source_path = tmp_path / "pano.mp4"
+    source_path.touch()
+    tiled = np.full((320, 1280, 3), [80, 120, 160], dtype=np.uint8)
+    # The first candidate is dominated by skin in the centre; the next yaw
+    # keeps the landscape clear and should therefore win despite the wider
+    # scorer still allowing a pilot at the edge of the frame.
+    tiled[40:280, 64:256] = [190, 135, 115]
+
+    with patch(
+        "highlight_video_worker.subprocess.run",
+        return_value=Mock(stdout=tiled.tobytes()),
+    ):
+        yaw = highlight_video_worker._best_yaw(
+            source_path,
+            HighlightClip(start_seconds=0, duration_seconds=8, yaw_degrees=0),
+        )
+
+    assert yaw == -135
+
+
+def test_best_yaw_keeps_a_clear_view_with_pilot_at_the_edge(tmp_path: Path) -> None:
+    source_path = tmp_path / "pano.mp4"
+    source_path.touch()
+    tiled = np.full((320, 1280, 3), [35, 35, 35], dtype=np.uint8)
+    tiled[:160, :320] = [80, 120, 160]
+    tiled[:160, :48] = [190, 135, 115]
+
+    with patch(
+        "highlight_video_worker.subprocess.run",
+        return_value=Mock(stdout=tiled.tobytes()),
+    ):
+        yaw = highlight_video_worker._best_yaw(
+            source_path,
+            HighlightClip(start_seconds=0, duration_seconds=8, yaw_degrees=0),
+        )
+
+    assert yaw == -180
+
+
+def test_existing_flight_export_is_reused_as_gopro_overlay(tmp_path: Path) -> None:
+    source_path = tmp_path / "pano.mp4"
+    source_path.touch()
+    overlay_path = tmp_path / "Vol_du_26_08_2026_à_19_44-4k.mp4"
+    overlay_path.touch()
+
+    assert _ensure_overlay_video(source_path, None, 120, tmp_path) == overlay_path
 
 
 def test_worker_restart_recovers_and_requeues_active_highlight_jobs(test_db, monkeypatch):
