@@ -339,6 +339,7 @@ export function FlightGenerationLogsPanel({
           <LogSourceCard
             key={`highlight-${highlightVideo.job_id}`}
             title={t('flights.generationLogs.highlightVideoTitle')}
+            renderMethod={highlightVideo.render_method ?? null}
             status={highlightVideo.status}
             isInProgress={['queued', 'running'].includes(highlightVideo.status)}
             statusLabel={t(

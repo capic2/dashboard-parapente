@@ -107,6 +107,7 @@ export const HighlightVideoJobSchema = z.object({
   message: z.string().nullish(),
   log_tail: z.array(z.string()).default([]),
   error: z.string().nullish(),
+  render_method: z.enum(['cpu', 'gpu']).nullish(),
   output_format: z.string(),
   overlay_offset_seconds: z.number(),
   selection: z.array(HighlightVideoClipSchema).default([]),

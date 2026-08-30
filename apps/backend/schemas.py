@@ -205,6 +205,7 @@ class HighlightVideoJobResponse(BaseModel):
     message: str | None = None
     log_tail: list[str] = Field(default_factory=list)
     error: str | None = None
+    render_method: Literal["cpu", "gpu"] | None = None
     output_format: str
     overlay_offset_seconds: float
     selection: list[HighlightVideoClipResponse] = Field(default_factory=list)

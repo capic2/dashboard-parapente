@@ -59,6 +59,10 @@ def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+def _render_method_for_accelerator(accelerator: str) -> str:
+    return "gpu" if accelerator == "nvidia" else "cpu"
+
+
 def _probe_duration(path: Path) -> float:
     result = subprocess.run(
         [
@@ -724,9 +728,7 @@ def _render_clip(
     overlay_interval = None
     if overlay_path and overlay_path.is_file():
         overlay_duration = _probe_duration(overlay_path)
-        overlay_interval = overlay_interval_for_clip(
-            clip, overlay_offset_seconds, overlay_duration
-        )
+        overlay_interval = overlay_interval_for_clip(clip, overlay_offset_seconds, overlay_duration)
         # Existing GoPro exports are rendered on the same flight timeline as
         # the pano. If an old database offset points outside that export,
         # falling back to the clip timestamp keeps the overlay visible instead
@@ -759,9 +761,7 @@ def _render_clip(
         )
     else:
         command.extend(["-vf", pano_filter, "-map", "0:v:0"])
-    command.extend(
-        ["-map", "0:a?", "-shortest", "-t", f"{clip.duration_seconds:.3f}"]
-    )
+    command.extend(["-map", "0:a?", "-shortest", "-t", f"{clip.duration_seconds:.3f}"])
     encode_args = h264_encode_args(
         accelerator,
         quality="18" if accelerator == "cpu" else "18",
@@ -923,6 +923,9 @@ def enqueue_pending_highlight_video_jobs(*, recover_active: bool = False) -> int
 def process_highlight_video_job(job_id: str) -> None:
     """RQ target for a highlight render job."""
     started_monotonic = time.monotonic()
+    render_method = _render_method_for_accelerator(
+        select_video_accelerator(config.VIDEO_ACCELERATOR)
+    )
     logger.info("Highlight job started: job_id=%s", job_id)
     with SessionLocal() as db:
         now = _now()
@@ -935,6 +938,7 @@ def process_highlight_video_job(job_id: str) -> None:
                     "progress": 5,
                     "started_at": now,
                     "message": "Analyse de la vidéo pano (initialisation)",
+                    "render_method": render_method,
                 },
                 synchronize_session=False,
             )
