@@ -369,6 +369,34 @@ def test_render_clip_incrusts_the_gopro_overlay_on_the_pano_source(tmp_path):
     assert command[command.index("-map") + 1] == "[v]"
 
 
+def test_render_clip_falls_back_to_pano_timestamp_for_full_flight_overlay(tmp_path):
+    source_path = tmp_path / "pano.mp4"
+    overlay_path = tmp_path / "Vol_du-flight-4k.mp4"
+    output_path = tmp_path / "clip.mp4"
+    source_path.touch()
+    overlay_path.touch()
+
+    with (
+        patch("highlight_video_worker._probe_duration", return_value=120),
+        patch("highlight_video_worker.overlay_interval_for_clip", return_value=None),
+        patch("highlight_video_worker._output_dimensions", return_value=(1920, 960)),
+        patch("highlight_video_worker.select_video_accelerator", return_value="cpu"),
+        patch("highlight_video_worker.h264_encode_args", return_value=["-f", "mp4"]),
+        patch("highlight_video_worker.subprocess.run") as run,
+    ):
+        _render_clip(
+            source_path,
+            output_path,
+            HighlightClip(start_seconds=12.5, duration_seconds=6.0, yaw_degrees=90),
+            overlay_path,
+            overlay_offset_seconds=-500,
+        )
+
+    command = run.call_args.args[0]
+    assert command[command.index("-ss", 3) + 1] == "12.500"
+    assert "-filter_complex" in command
+
+
 def test_render_clip_uses_a_wide_projection_for_pano_source(tmp_path):
     source_path = tmp_path / "pano.mp4"
     output_path = tmp_path / "clip.mp4"

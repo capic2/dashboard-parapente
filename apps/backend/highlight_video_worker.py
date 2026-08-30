@@ -710,9 +710,17 @@ def _render_clip(
     ]
     overlay_interval = None
     if overlay_path and overlay_path.is_file():
+        overlay_duration = _probe_duration(overlay_path)
         overlay_interval = overlay_interval_for_clip(
-            clip, overlay_offset_seconds, _probe_duration(overlay_path)
+            clip, overlay_offset_seconds, overlay_duration
         )
+        # Existing GoPro exports are rendered on the same flight timeline as
+        # the pano. If an old database offset points outside that export,
+        # falling back to the clip timestamp keeps the overlay visible instead
+        # of silently switching to a pano-only render.
+        clip_end_seconds = clip.start_seconds + clip.duration_seconds
+        if overlay_interval is None and overlay_duration >= clip_end_seconds:
+            overlay_interval = (clip.start_seconds, clip_end_seconds)
     if overlay_interval:
         overlay_start_seconds, _ = overlay_interval
         overlay_width = max(2, 2 * round(output_width * HIGHLIGHT_OVERLAY_WIDTH_RATIO / 2))
