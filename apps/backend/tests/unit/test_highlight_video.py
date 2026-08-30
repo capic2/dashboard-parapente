@@ -433,3 +433,30 @@ def test_render_clip_uses_a_wide_projection_for_pano_source(tmp_path):
     command = run.call_args.args[0]
     assert "output=cylindrical" in command[command.index("-vf") + 1]
     assert "h_fov=160:w=1920:h=960" in command[command.index("-vf") + 1]
+
+
+def test_render_clip_enables_cuda_decode_for_nvidia_inputs(tmp_path):
+    source_path = tmp_path / "pano.mp4"
+    overlay_path = tmp_path / "overlay.mp4"
+    output_path = tmp_path / "clip.mp4"
+    source_path.touch()
+    overlay_path.touch()
+
+    with (
+        patch("highlight_video_worker._probe_duration", return_value=120),
+        patch("highlight_video_worker._output_dimensions", return_value=(1920, 960)),
+        patch("highlight_video_worker.select_video_accelerator", return_value="nvidia"),
+        patch("highlight_video_worker.h264_encode_args", return_value=["-f", "mp4"]),
+        patch("highlight_video_worker.subprocess.run") as run,
+    ):
+        _render_clip(
+            source_path,
+            output_path,
+            HighlightClip(start_seconds=12.5, duration_seconds=6.0, yaw_degrees=90),
+            overlay_path,
+            overlay_offset_seconds=0,
+        )
+
+    command = run.call_args.args[0]
+    input_indexes = [index for index, value in enumerate(command) if value == "-i"]
+    assert all(command[index - 2 : index] == ["-hwaccel", "cuda"] for index in input_indexes)
