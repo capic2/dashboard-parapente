@@ -35,11 +35,11 @@ def test_best_yaw_allows_a_face_view_when_no_clearer_view_exists(tmp_path: Path)
     assert yaw == -180
 
 
-def test_output_dimensions_keep_2_to_1_pano_at_4k_width(tmp_path: Path) -> None:
+def test_output_dimensions_keep_2_to_1_pano_at_worker_width(tmp_path: Path) -> None:
     source_path = tmp_path / "pano.mp4"
     source_path.touch()
     with patch("highlight_video_worker._probe_video_dimensions", return_value=(7680, 3840)):
-        assert _output_dimensions(source_path) == (3840, 1920)
+        assert _output_dimensions(source_path) == (1920, 960)
 
 
 def test_best_yaw_prefers_clear_centre_over_a_face_filling_the_view(tmp_path: Path) -> None:

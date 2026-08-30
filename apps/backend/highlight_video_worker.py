@@ -46,7 +46,9 @@ _ACTIVE_STATUSES = {STATUS_QUEUED, STATUS_RUNNING}
 # stretching caused by a rectilinear projection at the same field of view.
 HIGHLIGHT_PROJECTION = "cylindrical"
 HIGHLIGHT_HORIZONTAL_FOV_DEGREES = 160
-HIGHLIGHT_OUTPUT_WIDTH = 3840
+# Keep the worker responsive on CPU-only deployments; CRF 18 preserves detail
+# without turning each 8-second clip into a multi-hour 4K render.
+HIGHLIGHT_OUTPUT_WIDTH = 1920
 HIGHLIGHT_OVERLAY_WIDTH_RATIO = 0.28
 HIGHLIGHT_OVERLAY_MARGIN_PX = 32
 
