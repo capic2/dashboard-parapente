@@ -9,3 +9,9 @@ export function parseApiUtcDate(value: string | Date): Date {
   if (ISO_TZ_SUFFIX_RE.test(value)) return new Date(value);
   return new Date(`${value}Z`);
 }
+
+/** Parse an API date-only value without letting UTC midnight alter its day. */
+export function parseApiLocalDate(value: string): Date {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}

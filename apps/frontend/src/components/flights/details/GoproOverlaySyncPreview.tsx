@@ -7,6 +7,7 @@ import {
   useGoproOverlayPreview,
 } from '../../../hooks/gopro/useGoproOverlay';
 import { getApiUrlWithSearchParams } from '../../../lib/api';
+import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
 import { telemetryAtTimestamp } from './goproSyncTelemetry';
 import type { GoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
@@ -70,7 +71,7 @@ export function GoproOverlaySyncPreview({
   const sourceVideoTime = sourceTimeAtPreviewTime(videoTime, previewSegments);
   const activeSegmentIndex = previewSegmentIndex(videoTime, previewSegments);
   const gpxStart = preview.data
-    ? new Date(preview.data.gpx.start_time).getTime()
+    ? parseApiUtcDate(preview.data.gpx.start_time).getTime()
     : 0;
   const telemetry = preview.data
     ? telemetryAtTimestamp(

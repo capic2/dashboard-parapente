@@ -21,6 +21,7 @@ from typing import Any
 from fastapi import UploadFile
 
 import config
+from datetime_utils import to_api_utc
 from database import SessionLocal
 from deployment_drain import job_admission
 from models import Flight, GoproOverlayJob
@@ -135,7 +136,7 @@ def _utc_now_dt() -> datetime:
 
 
 def _to_iso(value: datetime | None) -> str | None:
-    return value.isoformat() if value else None
+    return to_api_utc(value)
 
 
 def _coerce_datetime(value: Any) -> Any:
@@ -695,11 +696,7 @@ def _read_process_updates(stream: Any) -> Iterator[str]:
 def _is_job_cancelled(job_id: str) -> bool:
     try:
         with SessionLocal() as db:
-            status = (
-                db.query(GoproOverlayJob.status)
-                .filter(GoproOverlayJob.id == job_id)
-                .scalar()
-            )
+            status = db.query(GoproOverlayJob.status).filter(GoproOverlayJob.id == job_id).scalar()
             return status == _STATUS_CANCELLED
     except OperationalError as exc:
         if "no such table: gopro_overlay_jobs" not in str(exc):

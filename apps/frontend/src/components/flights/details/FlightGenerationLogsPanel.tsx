@@ -5,6 +5,7 @@ import {
 import { ChevronDown } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { parseApiUtcDate } from '../../../lib/date';
 import type { VideoExportStatusPayload } from '../../../hooks/flights/useVideoExportStatus';
 import type { YoutubeUploadJob } from '../../../hooks/flights/useYoutubeUpload';
 import type { GoproOverlayJob } from '../../../hooks/gopro/useGoproOverlay';
@@ -51,7 +52,7 @@ function getStalledJobMinutes(
     return null;
   }
   if (!updatedAt) return null;
-  const lastActivity = new Date(updatedAt).getTime();
+  const lastActivity = parseApiUtcDate(updatedAt).getTime();
   if (!Number.isFinite(lastActivity)) return null;
   const elapsedMs = now - lastActivity;
   if (elapsedMs < STALLED_JOB_THRESHOLD_MS) return null;
