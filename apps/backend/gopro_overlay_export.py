@@ -728,23 +728,26 @@ def _read_process_updates_from_process(
 
     current = ""
     last_heartbeat = time.monotonic()
-    while process.poll() is None:
-        if _is_job_cancelled(job_id):
-            process.terminate()
-            return
+    while True:
+        if process.poll() is None:
+            if _is_job_cancelled(job_id):
+                process.terminate()
+                return
 
-        now = time.monotonic()
-        if now - last_heartbeat >= _JOB_HEARTBEAT_INTERVAL_SECONDS:
-            _update_job(job_id)
-            last_heartbeat = now
+            now = time.monotonic()
+            if now - last_heartbeat >= _JOB_HEARTBEAT_INTERVAL_SECONDS:
+                _update_job(job_id)
+                last_heartbeat = now
 
-        ready, _, _ = select.select([stream], [], [], 1)
-        if not ready:
-            continue
+            ready, _, _ = select.select([stream], [], [], 1)
+            if not ready:
+                continue
 
         char = stream.read(1)
         if not char:
-            continue
+            if process.poll() is None:
+                continue
+            break
         if char in {"\n", "\r"}:
             if current.strip():
                 yield current.strip()

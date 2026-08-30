@@ -5,7 +5,7 @@ import re
 import shutil
 import subprocess
 from datetime import date, datetime
-from io import BytesIO
+from io import BytesIO, StringIO
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, patch
@@ -24,6 +24,7 @@ import routes
 from gopro_overlay_export import _prepare_layout_file
 from gopro_overlay_export import _progress_from_output_chunk
 from gopro_overlay_export import _read_process_updates
+from gopro_overlay_export import _read_process_updates_from_process
 from gopro_overlay_export import cancel_gopro_overlay_job
 from gopro_overlay_export import create_gopro_overlay_job
 from gopro_overlay_export import create_gopro_overlay_job_from_paths
@@ -2279,6 +2280,22 @@ def test_prepare_layout_file_removes_pip_without_video(tmp_path):
     _prepare_layout_file(source, destination, has_pip=False)
 
     assert 'type="video"' not in destination.read_text()
+
+
+def test_read_process_updates_drains_output_after_process_exit():
+    class ExitedProcess:
+        stdout = StringIO("last status line\nTraceback details\n")
+
+        @staticmethod
+        def poll() -> int:
+            return 1
+
+    process = ExitedProcess()
+
+    assert list(_read_process_updates_from_process(process, "job-id")) == [
+        "last status line",
+        "Traceback details",
+    ]
 
 
 def test_prepare_layout_file_sets_video_dimensions(tmp_path):
