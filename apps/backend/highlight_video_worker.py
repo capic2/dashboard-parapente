@@ -702,6 +702,8 @@ def _render_clip(
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_width, output_height = _output_dimensions(source_path)
+    accelerator = select_video_accelerator(config.VIDEO_ACCELERATOR)
+    hwaccel_args = ["-hwaccel", "cuda"] if accelerator == "nvidia" else []
     pano_filter = (
         f"scale={HIGHLIGHT_PROJECTION_INPUT_SIZE}:flags=fast_bilinear,v360=input=e:output={HIGHLIGHT_PROJECTION}:yaw={clip.yaw_degrees}:pitch=0:"
         f"h_fov={HIGHLIGHT_HORIZONTAL_FOV_DEGREES}:w={output_width}:h={output_height},setsar=1"
@@ -711,6 +713,7 @@ def _render_clip(
         "-y",
         "-ss",
         f"{clip.start_seconds:.3f}",
+        *hwaccel_args,
         "-i",
         str(source_path),
         "-t",
@@ -738,6 +741,7 @@ def _render_clip(
                 f"{overlay_start_seconds:.3f}",
                 "-t",
                 f"{clip.duration_seconds:.3f}",
+                *hwaccel_args,
                 "-i",
                 str(overlay_path),
                 "-filter_complex",
@@ -754,7 +758,6 @@ def _render_clip(
     else:
         command.extend(["-vf", pano_filter, "-map", "0:v:0"])
     command.extend(["-map", "0:a?", "-shortest"])
-    accelerator = select_video_accelerator(config.VIDEO_ACCELERATOR)
     encode_args = h264_encode_args(
         accelerator,
         quality="18" if accelerator == "cpu" else "18",
