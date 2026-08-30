@@ -23,7 +23,7 @@ from database import SessionLocal
 import config
 from flight_storage import ensure_flight_directory
 from flight_tracks import TrackPoint, normalize_track
-from gopro_overlay_inputs import resolve_automatic_overlay_inputs
+from gopro_overlay_inputs import latest_matching_file, resolve_automatic_overlay_inputs
 from highlight_video import HighlightClip, overlay_interval_for_clip
 from models import Flight, HighlightVideoJob
 from spots.distance import haversine_distance
@@ -122,6 +122,18 @@ def _ensure_overlay_video(
 ) -> Path | None:
     """Build a temporary telemetry overlay from raw camera inputs when needed."""
     camera_path = source_path.parent / "camera.mp4"
+    # A flight directory may already contain the rendered GoPro view (the
+    # ``Vol_du_*-4k.mp4`` export). Reuse it first so highlights get the exact
+    # same parapente overlay layout instead of silently falling back to a
+    # plain pano when the asynchronous overlay job is unavailable.
+    existing_overlay = latest_matching_file(
+        source_path.parent,
+        "Vol_du*.mp4",
+        (source_path, camera_path),
+    )
+    if existing_overlay and existing_overlay.is_file():
+        logger.info("Highlight overlay reused from flight export: output=%s", existing_overlay)
+        return existing_overlay
     if not camera_path.is_file():
         logger.info("Highlight overlay skipped: camera source is missing path=%s", camera_path)
         return None
@@ -334,15 +346,26 @@ def _best_yaw(source_path: Path, clip: HighlightClip) -> float:
             ).mean()
             saturated = ((lower.max(axis=2) - lower.min(axis=2)) > 45).mean()
             dark_foreground = (rgb.mean(axis=2) < 45).mean()
-            skin_foreground = (
+            skin = (
                 (rgb[:, :, 0] > rgb[:, :, 1] * 1.12)
                 & (rgb[:, :, 1] > rgb[:, :, 2] * 1.08)
                 & (rgb[:, :, 0] > 60)
-            ).mean()
-            foreground_obstruction = min(1.0, dark_foreground * 0.7 + skin_foreground)
+            )
+            # A pilot can remain visible at the edge of a useful 160° view,
+            # but a head/body covering the centre means the selected yaw is
+            # unusable. Weight the centre more heavily instead of rejecting
+            # every frame containing skin.
+            centre_start = rgb.shape[1] // 5
+            centre_end = rgb.shape[1] - centre_start
+            centre_skin = skin[:, centre_start:centre_end].mean()
+            skin_ratio = skin.mean()
+            foreground_obstruction = min(
+                1.0,
+                dark_foreground * 0.45 + centre_skin * 1.15 + skin_ratio * 0.2,
+            )
             sharpness = np.abs(np.diff(gray, axis=1)).mean()
             scores[yaw] = float(
-                sharpness + red_wing * 4 + saturated * 4 - foreground_obstruction * 160
+                sharpness + red_wing * 4 + saturated * 4 - foreground_obstruction * 300
             )
     return float(max(scores, key=scores.get)) if scores else 0.0
 
