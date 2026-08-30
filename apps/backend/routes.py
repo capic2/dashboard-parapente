@@ -4871,6 +4871,7 @@ def _highlight_job_payload(job: HighlightVideoJob) -> HighlightVideoJobResponse:
         status=job.status,
         progress=job.progress,
         message=job.message,
+        log_tail=[job.message] if job.message else [],
         error=job.error,
         output_format=job.output_format,
         overlay_offset_seconds=float(job.overlay_offset_seconds or 0.0),

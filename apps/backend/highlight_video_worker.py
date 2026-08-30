@@ -15,6 +15,7 @@ import uuid
 from datetime import datetime, timezone
 from dataclasses import replace
 from pathlib import Path
+from collections.abc import Callable
 
 import numpy as np
 
@@ -192,12 +193,18 @@ def _normalise(values: list[float]) -> list[float]:
     return [float(np.clip((value - low) / (high - low), 0, 1)) for value in values]
 
 
-def _frame_scores(source_path: Path, duration_seconds: float) -> list[tuple[float, float]]:
+def _frame_scores(
+    source_path: Path,
+    duration_seconds: float,
+    progress_callback: Callable[[int, int], None] | None = None,
+) -> list[tuple[float, float]]:
     """Score low-resolution samples without decoding full-resolution frames in Python."""
     width, height = 320, 160
     frame_size = width * height
     samples: list[tuple[float, np.ndarray]] = []
-    for segment_start in range(0, max(1, int(duration_seconds)), 30):
+    segment_starts = range(0, max(1, int(duration_seconds)), 30)
+    total_segments = len(segment_starts)
+    for segment_index, segment_start in enumerate(segment_starts, start=1):
         segment_duration = min(12, duration_seconds - segment_start)
         if segment_duration <= 0:
             break
@@ -237,6 +244,8 @@ def _frame_scores(source_path: Path, duration_seconds: float) -> list[tuple[floa
             for index in range(0, len(result.stdout) - frame_size + 1, frame_size)
         ]
         samples.extend((segment_start + index * 2.0, frame) for index, frame in enumerate(frames))
+        if progress_callback:
+            progress_callback(segment_index, total_segments)
     if not samples:
         return []
     sharpness: list[float] = []
@@ -514,7 +523,9 @@ def _flight_phase_times(
 
 
 def select_highlight_clips(
-    duration_seconds: float, source_path: Path | None = None
+    duration_seconds: float,
+    source_path: Path | None = None,
+    progress_callback: Callable[[int, int], None] | None = None,
 ) -> list[HighlightClip]:
     """Select high-interest windows using movement, sharpness and exposure."""
     if duration_seconds <= 0:
@@ -522,7 +533,9 @@ def select_highlight_clips(
     clip_length = min(8.0, max(3.0, duration_seconds / 8))
     if source_path:
         scored = sorted(
-            _frame_scores(source_path, duration_seconds), key=lambda item: item[1], reverse=True
+            _frame_scores(source_path, duration_seconds, progress_callback),
+            key=lambda item: item[1],
+            reverse=True,
         )
         starts: list[float] = []
         for center, _score in scored:
@@ -912,7 +925,15 @@ def process_highlight_video_job(job_id: str) -> None:
             stage="frame_scoring",
             message="Analyse des images pour sélectionner les meilleurs moments",
         )
-        visual_clips = select_highlight_clips(duration_seconds, source_path)
+        visual_clips = select_highlight_clips(
+            duration_seconds,
+            source_path,
+            lambda completed, total: _update_job(
+                job_id,
+                progress=10 + round(completed * 20 / total),
+                message=f"Analyse des images : segment {completed}/{total}",
+            ),
+        )
         logger.info(
             "Highlight visual selection complete: job_id=%s candidates=%d",
             job_id,
@@ -943,12 +964,19 @@ def process_highlight_video_job(job_id: str) -> None:
         )
         if not clips:
             raise ValueError("La vidéo pano ne contient aucune durée exploitable")
-        clips = [
-            classify_visual_clip(
-                source_path, replace(clip, yaw_degrees=_best_yaw(source_path, clip))
+        classified_clips: list[HighlightClip] = []
+        for index, clip in enumerate(clips, start=1):
+            classified_clips.append(
+                classify_visual_clip(
+                    source_path, replace(clip, yaw_degrees=_best_yaw(source_path, clip))
+                )
             )
-            for clip in clips
-        ]
+            _update_job(
+                job_id,
+                progress=35 + round(index * 10 / len(clips)),
+                message=f"Analyse des cadrages : clip {index}/{len(clips)}",
+            )
+        clips = classified_clips
         logger.info("Highlight viewpoints classified: job_id=%s clips=%d", job_id, len(clips))
         rendered: list[Path] = []
         for index, clip in enumerate(clips, start=1):

@@ -99,6 +99,21 @@ def test_clip_maps_pano_time_to_overlay_time():
     assert clip.overlay_end_seconds(2.25) == 20.75
 
 
+def test_select_highlight_clips_forwards_analysis_progress(tmp_path, monkeypatch):
+    progress: list[tuple[int, int]] = []
+    monkeypatch.setattr(
+        highlight_video_worker,
+        "_frame_scores",
+        lambda _source, _duration, callback=None: callback(1, 2) or [] if callback else [],
+    )
+
+    highlight_video_worker.select_highlight_clips(
+        60, tmp_path / "pano.mp4", lambda completed, total: progress.append((completed, total))
+    )
+
+    assert progress == [(1, 2)]
+
+
 def test_overlay_interval_is_clamped_to_overlay_duration():
     clip = HighlightClip(start_seconds=98, duration_seconds=8, yaw_degrees=0)
 
