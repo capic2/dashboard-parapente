@@ -13,7 +13,7 @@ import subprocess
 import threading
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from dataclasses import replace
 from pathlib import Path
 from collections.abc import Callable
@@ -25,7 +25,7 @@ import config
 from flight_storage import ensure_flight_directory
 from flight_tracks import TrackPoint, normalize_track
 from gopro_overlay_inputs import latest_matching_file, resolve_automatic_overlay_inputs
-from highlight_video import HighlightClip, overlay_interval_for_clip
+from highlight_video import HighlightClip
 from models import Flight, HighlightVideoJob
 from spots.distance import haversine_distance
 from visual_event_detector import classify_motion_mask
@@ -51,8 +51,7 @@ HIGHLIGHT_PROJECTION_INPUT_SIZE = "3840:1920"
 # Keep the worker responsive on CPU-only deployments; CRF 18 preserves detail
 # without turning each 8-second clip into a multi-hour 4K render.
 HIGHLIGHT_OUTPUT_WIDTH = 1920
-HIGHLIGHT_OVERLAY_WIDTH_RATIO = 0.28
-HIGHLIGHT_OVERLAY_MARGIN_PX = 32
+HIGHLIGHT_OVERLAY_LAYOUT_ID = "parapente-3840"
 
 
 def _now() -> datetime:
@@ -119,89 +118,81 @@ def _configured_gpx_path(value: str | None) -> Path | None:
     return Path(__file__).parent / path
 
 
-def _ensure_overlay_video(
-    source_path: Path,
-    configured_gpx_path: str | None,
-    duration_seconds: float,
-    output_dir: Path,
-) -> Path | None:
-    """Build a temporary telemetry overlay from raw camera inputs when needed."""
-    camera_path = source_path.parent / "camera.mp4"
-    # A flight directory may already contain the rendered GoPro view (the
-    # ``Vol_du_*-4k.mp4`` export). Reuse it first so highlights get the exact
-    # same parapente overlay layout instead of silently falling back to a
-    # plain pano when the asynchronous overlay job is unavailable.
-    existing_overlay = latest_matching_file(
-        source_path.parent,
-        "Vol_du*.mp4",
-        (source_path, camera_path),
+def _source_timeline_start(source_path: Path, gpx_path: Path) -> datetime:
+    """Resolve video time zero against the flight GPX without decoding the OSV."""
+    from gopro_overlay_export import (
+        align_video_start_time_to_gpx,
+        first_gpx_timestamp,
+        probe_video_start_time,
     )
-    if existing_overlay and existing_overlay.is_file():
-        logger.info("Highlight overlay reused from flight export: output=%s", existing_overlay)
-        return existing_overlay
-    if not camera_path.is_file():
-        logger.info("Highlight overlay skipped: camera source is missing path=%s", camera_path)
-        return None
-    gpx_path, pip_path = resolve_automatic_overlay_inputs(
-        source_path.parent,
-        _configured_gpx_path(configured_gpx_path),
-        source_path,
-    )
-    if gpx_path is None or not gpx_path.is_file() or pip_path is None or not pip_path.is_file():
-        logger.info(
-            "Highlight overlay skipped: inputs unavailable gpx=%s pip=%s",
-            gpx_path or "none",
-            pip_path or "none",
-        )
-        return None
 
-    from gopro_overlay_export import create_gopro_overlay_job_from_paths, get_gopro_overlay_job
+    gpx_start = first_gpx_timestamp(gpx_path)
+    if gpx_start is None:
+        raise ValueError("Le fichier GPX ne contient aucun horodatage")
+    osv_path = latest_matching_file(source_path.parent, "*.OSV", (source_path,))
+    if osv_path is None:
+        logger.warning("Highlight OSV source missing; aligning pano start to first GPX point")
+        return gpx_start
+    video_start = probe_video_start_time(osv_path)
+    if video_start is None:
+        logger.warning("Highlight OSV timestamp missing; aligning pano start to first GPX point")
+        return gpx_start
+    return align_video_start_time_to_gpx(video_start, gpx_start) or gpx_start
 
-    output_path = output_dir / "camera-overlay.mp4"
-    if output_path.is_file():
-        logger.info("Highlight overlay reused: output=%s", output_path)
-        return output_path
-    logger.info(
-        "Highlight overlay generation started: camera=%s gpx=%s pip=%s output=%s",
-        camera_path,
-        gpx_path,
-        pip_path,
-        output_path,
+
+def _clip_creation_time(
+    source_timeline_start: datetime,
+    clip: HighlightClip,
+    overlay_offset_seconds: float,
+) -> datetime:
+    return source_timeline_start + timedelta(seconds=clip.start_seconds + overlay_offset_seconds)
+
+
+def _render_gopro_overlay(
+    video_path: Path,
+    gpx_path: Path,
+    output_path: Path,
+    progress_callback: Callable[[int, str], None] | None = None,
+    cancellation_callback: Callable[[], bool] | None = None,
+) -> bool:
+    """Apply the real parapente telemetry layout directly to a video clip."""
+    from gopro_overlay_export import (
+        cancel_gopro_overlay_job,
+        create_gopro_overlay_job_from_paths,
+        get_gopro_overlay_job,
     )
+
     job = create_gopro_overlay_job_from_paths(
-        video_path=camera_path,
+        video_path=video_path,
         gpx_path=gpx_path,
-        pip_path=pip_path,
-        layout_id=None,
+        pip_path=None,
+        layout_id=HIGHLIGHT_OVERLAY_LAYOUT_ID,
         output_filename=output_path.name,
         output_resolution="source",
-        output_dir=str(output_dir),
+        output_dir=str(output_path.parent),
         flight_id=None,
     )
-    job_id = str(job["job_id"])
+    overlay_job_id = str(job["job_id"])
     deadline = time.monotonic() + config.JOB_QUEUE_TIMEOUT_SECONDS
-    last_status: object = None
+    last_progress = -1
     while time.monotonic() < deadline:
-        current = get_gopro_overlay_job(job_id)
-        current_status = current.get("status") if current else None
-        if current_status != last_status:
-            logger.info(
-                "Highlight overlay generation status: overlay_job_id=%s status=%s progress=%s message=%s",
-                job_id,
-                current_status or "missing",
-                current.get("progress") if current else "unknown",
-                current.get("message") if current else "unknown",
-            )
-            last_status = current_status
-        if current and current.get("status") == "completed" and output_path.is_file():
-            logger.info("Highlight overlay generation completed: overlay_job_id=%s", job_id)
-            return output_path
-        if current and current.get("status") in {"failed", "cancelled"}:
+        if cancellation_callback and cancellation_callback():
+            cancel_gopro_overlay_job(overlay_job_id)
+            return False
+        current = get_gopro_overlay_job(overlay_job_id)
+        status = current.get("status") if current else None
+        progress = int(current.get("progress") or 0) if current else 0
+        if progress != last_progress and progress_callback:
+            progress_callback(progress, str((current or {}).get("message") or "Overlay GoPro"))
+            last_progress = progress
+        if status == "completed" and output_path.is_file():
+            return True
+        if status in {"failed", "cancelled"}:
             raise RuntimeError(
-                f"Overlay temporaire impossible: {current.get('error') or current.get('message')}"
+                f"Overlay GoPro impossible: {current.get('error') or current.get('message')}"
             )
         time.sleep(1)
-    raise TimeoutError("La génération de l'overlay temporaire a dépassé le délai autorisé")
+    raise TimeoutError("La génération du véritable overlay GoPro a dépassé le délai autorisé")
 
 
 def _normalise(values: list[float]) -> list[float]:
@@ -698,9 +689,8 @@ def _render_clip(
     source_path: Path,
     output_path: Path,
     clip: HighlightClip,
-    overlay_path: Path | None,
-    overlay_offset_seconds: float,
     heartbeat_callback: Callable[[str], None] | None = None,
+    creation_time: datetime | None = None,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_width, output_height = _output_dimensions(source_path)
@@ -720,48 +710,12 @@ def _render_clip(
         str(source_path),
         "-t",
         f"{clip.duration_seconds:.3f}",
+        "-vf",
+        pano_filter,
+        "-map",
+        "0:v:0",
     ]
-    overlay_interval = None
-    if overlay_path and overlay_path.is_file():
-        overlay_duration = _probe_duration(overlay_path)
-        overlay_interval = overlay_interval_for_clip(
-            clip, overlay_offset_seconds, overlay_duration
-        )
-        # Existing GoPro exports are rendered on the same flight timeline as
-        # the pano. If an old database offset points outside that export,
-        # falling back to the clip timestamp keeps the overlay visible instead
-        # of silently switching to a pano-only render.
-        clip_end_seconds = clip.start_seconds + clip.duration_seconds
-        if overlay_interval is None and overlay_duration >= clip_end_seconds:
-            overlay_interval = (clip.start_seconds, clip_end_seconds)
-    if overlay_interval:
-        overlay_start_seconds, _ = overlay_interval
-        overlay_width = max(2, 2 * round(output_width * HIGHLIGHT_OVERLAY_WIDTH_RATIO / 2))
-        command.extend(
-            [
-                "-ss",
-                f"{overlay_start_seconds:.3f}",
-                "-t",
-                f"{clip.duration_seconds:.3f}",
-                *hwaccel_args,
-                "-i",
-                str(overlay_path),
-                "-filter_complex",
-                (
-                    f"[0:v]{pano_filter}[pano];"
-                    f"[1:v]fps=30,scale=w={overlay_width}:h=-2[overlay];"
-                    f"[pano][overlay]overlay=W-w-{HIGHLIGHT_OVERLAY_MARGIN_PX}:"
-                    f"H-h-{HIGHLIGHT_OVERLAY_MARGIN_PX}:eof_action=pass[v]"
-                ),
-                "-map",
-                "[v]",
-            ]
-        )
-    else:
-        command.extend(["-vf", pano_filter, "-map", "0:v:0"])
-    command.extend(
-        ["-map", "0:a?", "-shortest", "-t", f"{clip.duration_seconds:.3f}"]
-    )
+    command.extend(["-map", "0:a?", "-shortest", "-t", f"{clip.duration_seconds:.3f}"])
     encode_args = h264_encode_args(
         accelerator,
         quality="18" if accelerator == "cpu" else "18",
@@ -780,6 +734,20 @@ def _render_clip(
             f"{output_width}:{output_height}",
             "-metadata:s:v:0",
             "rotate=0",
+        ]
+    )
+    if creation_time is not None:
+        timestamp = creation_time.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+        command.extend(
+            [
+                "-metadata",
+                f"creation_time={timestamp}",
+                "-metadata:s:v:0",
+                f"creation_time={timestamp}",
+            ]
+        )
+    command.extend(
+        [
             "-c:a",
             "aac",
             "-b:a",
@@ -951,17 +919,15 @@ def process_highlight_video_job(job_id: str) -> None:
             raise ValueError(f"Flight not found for highlight job: {job.flight_id}")
         source_path = Path(job.source_video_path)
         gpx_file_path = flight.gpx_file_path
-        overlay_path = Path(job.overlay_video_path) if job.overlay_video_path else None
         output_dir = ensure_flight_directory(db, flight) / "highlights" / job.id
         output_path = output_dir / "highlights-original-format.mp4"
         offset = float(job.overlay_offset_seconds or 0.0)
         db.commit()
         logger.info(
-            "Highlight job running: job_id=%s flight_id=%s source=%s overlay=%s progress=5",
+            "Highlight job running: job_id=%s flight_id=%s source=%s progress=5",
             job.id,
             flight.id,
             source_path,
-            overlay_path or "none",
         )
 
     try:
@@ -981,24 +947,6 @@ def process_highlight_video_job(job_id: str) -> None:
             output_height,
         )
         output_dir.mkdir(parents=True, exist_ok=True)
-        if not overlay_path or not overlay_path.is_file():
-            _set_job_stage(
-                job_id,
-                progress=6,
-                stage="overlay",
-                message="Préparation de l’overlay télémétrique",
-            )
-            overlay_path = _ensure_overlay_video(
-                source_path,
-                gpx_file_path,
-                duration_seconds,
-                output_dir,
-            )
-            logger.info(
-                "Highlight overlay ready: job_id=%s overlay=%s",
-                job_id,
-                overlay_path or "none",
-            )
         _set_job_stage(
             job_id,
             progress=10,
@@ -1044,6 +992,9 @@ def process_highlight_video_job(job_id: str) -> None:
         )
         if not clips:
             raise ValueError("La vidéo pano ne contient aucune durée exploitable")
+        if gpx_path is None:
+            raise ValueError("Le véritable overlay GoPro nécessite un fichier GPX")
+        source_timeline_start = _source_timeline_start(source_path, gpx_path)
         classified_clips: list[HighlightClip] = []
         for index, clip in enumerate(clips, start=1):
             classified_clips.append(
@@ -1062,6 +1013,7 @@ def process_highlight_video_job(job_id: str) -> None:
         for index, clip in enumerate(clips, start=1):
             if _is_cancelled(job_id):
                 return
+            raw_target = output_dir / f"clip-{index:02d}-pano.mp4"
             target = output_dir / f"clip-{index:02d}.mp4"
             logger.info(
                 "Highlight clip rendering started: job_id=%s clip=%d/%d start=%.1fs duration=%.1fs yaw=%.0f category=%s",
@@ -1073,30 +1025,73 @@ def process_highlight_video_job(job_id: str) -> None:
                 clip.yaw_degrees,
                 clip.category,
             )
-            clip_progress = 10 + (index - 1) * 12
+            clip_start_progress = 45 + round((index - 1) * 48 / len(clips))
+            clip_end_progress = 45 + round(index * 48 / len(clips))
+            clip_progress = clip_start_progress
 
             def render_heartbeat(
                 message: str,
                 *,
-                current: int = clip_progress,
+                final_render_progress: int = max(clip_start_progress, clip_end_progress - 3),
                 segment: int = index,
                 total: int = len(clips),
             ) -> None:
                 nonlocal clip_progress
-                clip_progress = min(current + 11, clip_progress + 1)
+                clip_progress = min(final_render_progress, clip_progress + 1)
                 _update_job(
                     job_id,
                     progress=clip_progress,
                     message=f"Clip {segment}/{total} — {message}",
                 )
 
-            _render_clip(source_path, target, clip, overlay_path, offset, render_heartbeat)
+            clip_creation_time = _clip_creation_time(source_timeline_start, clip, offset)
+            _render_clip(
+                source_path,
+                raw_target,
+                clip,
+                render_heartbeat,
+                creation_time=clip_creation_time,
+            )
+            _update_job(
+                job_id,
+                progress=max(clip_progress, clip_end_progress - 3),
+                message=f"Clip {index}/{len(clips)} — application du GoPro Overlay",
+            )
+            overlay_start_progress = max(clip_progress, clip_end_progress - 3)
+
+            def overlay_progress(
+                progress: int,
+                message: str,
+                *,
+                segment: int = index,
+                total: int = len(clips),
+                base_progress: int = overlay_start_progress,
+                final_progress: int = clip_end_progress,
+            ) -> None:
+                _update_job(
+                    job_id,
+                    progress=min(
+                        final_progress,
+                        base_progress + round(progress * (final_progress - base_progress) / 100),
+                    ),
+                    message=f"Clip {segment}/{total} — GoPro Overlay : {message}",
+                )
+
+            overlay_completed = _render_gopro_overlay(
+                raw_target,
+                gpx_path,
+                target,
+                overlay_progress,
+                lambda: _is_cancelled(job_id),
+            )
+            if not overlay_completed:
+                return
             rendered.append(target)
             if _is_cancelled(job_id):
                 return
             _update_job(
                 job_id,
-                progress=min(90, 10 + index * 12),
+                progress=clip_end_progress,
                 message=f"Rendu du clip {index}/{len(clips)}",
             )
             logger.info(
@@ -1104,7 +1099,7 @@ def process_highlight_video_job(job_id: str) -> None:
                 job_id,
                 index,
                 len(clips),
-                min(90, 10 + index * 12),
+                clip_end_progress,
                 target,
             )
 

@@ -303,11 +303,23 @@ def _prepare_layout_file(
     has_pip: bool,
     target_width: int | None = None,
     target_height: int | None = None,
+    layout_width: int | None = None,
+    layout_height: int | None = None,
 ) -> Path:
     tree = ET.parse(layout_path)
     root = tree.getroot()
-    source_width = _parse_float(root.attrib.get("width"))
-    source_height = _parse_float(root.attrib.get("height"))
+    parsed_width = _parse_float(root.attrib.get("width"))
+    parsed_height = _parse_float(root.attrib.get("height"))
+    source_width = (
+        parsed_width
+        if parsed_width is not None and math.isfinite(parsed_width) and parsed_width > 0
+        else layout_width
+    )
+    source_height = (
+        parsed_height
+        if parsed_height is not None and math.isfinite(parsed_height) and parsed_height > 0
+        else layout_height
+    )
     scale_x = target_width / source_width if target_width and source_width else None
     scale_y = target_height / source_height if target_height and source_height else None
 
@@ -346,11 +358,10 @@ def _parse_float(value: str | None) -> float | None:
 
 
 def _format_scaled_number(value: float) -> str:
-    rounded = round(value)
-    if abs(value - rounded) < 1e-6:
-        return str(int(rounded))
-    text = f"{value:.6f}".rstrip("0").rstrip(".")
-    return text or "0"
+    # GoPro Overlay parses layout geometry with ``int()``. Rounded integer
+    # coordinates keep non-16:9 targets valid instead of producing XML values
+    # such as ``8.888889`` that make the renderer fail at startup.
+    return str(round(value))
 
 
 def _scale_layout_geometry(parent: ET.Element, scale_x: float, scale_y: float) -> None:
@@ -1552,6 +1563,8 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
             has_pip=pip_path is not None,
             target_width=render_width,
             target_height=render_height,
+            layout_width=selected_layout.width,
+            layout_height=selected_layout.height,
         )
 
         prepared_job = _update_job(
