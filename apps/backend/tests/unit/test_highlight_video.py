@@ -26,13 +26,15 @@ def test_best_yaw_allows_a_face_view_when_no_clearer_view_exists(tmp_path: Path)
     with patch(
         "highlight_video_worker.subprocess.run",
         return_value=Mock(stdout=tiled.tobytes()),
-    ):
+    ) as run:
         yaw = highlight_video_worker._best_yaw(
             source_path,
             HighlightClip(start_seconds=0, duration_seconds=8, yaw_degrees=0),
         )
 
     assert yaw == -180
+    command = run.call_args.args[0]
+    assert "scale=3840:1920:flags=fast_bilinear,v360" in command[command.index("-filter_complex") + 1]
 
 
 def test_output_dimensions_keep_2_to_1_pano_at_worker_width(tmp_path: Path) -> None:
@@ -372,6 +374,7 @@ def test_render_clip_incrusts_the_gopro_overlay_on_the_pano_source(tmp_path):
     assert command[command.index("-t", 3) + 1] == "6.000"
     filter_complex = command[command.index("-filter_complex") + 1]
     assert "output=cylindrical" in filter_complex
+    assert "scale=3840:1920:flags=fast_bilinear,v360" in filter_complex
     assert "h_fov=160:w=1920:h=1080" in filter_complex
     assert "[1:v]fps=30,scale=w=538:h=-2[overlay]" in filter_complex
     assert "scale=w=538:h=-2" in filter_complex
