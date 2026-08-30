@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import subprocess
+import threading
 import time
 import uuid
 from datetime import datetime, timezone
@@ -785,7 +786,24 @@ def _render_clip(
             str(output_path),
         ]
     )
-    subprocess.run(command, check=True)
+    heartbeat_stop = threading.Event()
+
+    def log_render_heartbeat() -> None:
+        while not heartbeat_stop.wait(15):
+            size_mb = output_path.stat().st_size / (1024 * 1024) if output_path.exists() else 0
+            logger.info(
+                "Highlight clip rendering still active: output=%s size_mb=%.1f",
+                output_path,
+                size_mb,
+            )
+
+    heartbeat = threading.Thread(target=log_render_heartbeat, daemon=True)
+    heartbeat.start()
+    try:
+        subprocess.run(command, check=True)
+    finally:
+        heartbeat_stop.set()
+        heartbeat.join(timeout=1)
 
 
 def _update_job(job_id: str, **values: object) -> None:
