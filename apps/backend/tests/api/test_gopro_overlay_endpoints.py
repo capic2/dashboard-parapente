@@ -2303,6 +2303,59 @@ def test_prepare_layout_file_sets_video_dimensions(tmp_path):
     assert 'height="200"' in prepared
 
 
+def test_prepare_layout_file_scales_layout_without_root_dimensions(tmp_path: Path) -> None:
+    source = tmp_path / "layout.xml"
+    destination = tmp_path / "prepared.xml"
+    source.write_text(
+        '<layout><composite x="3800" y="1780">'
+        '<component type="text" size="64" />'
+        "</composite></layout>"
+    )
+
+    _prepare_layout_file(
+        source,
+        destination,
+        has_pip=False,
+        target_width=1920,
+        target_height=960,
+        layout_width=3840,
+        layout_height=2160,
+    )
+
+    prepared = destination.read_text()
+    assert 'width="1920"' in prepared
+    assert 'height="960"' in prepared
+    assert 'x="1900"' in prepared
+    assert 'y="791"' in prepared
+    assert 'size="30"' in prepared
+
+
+@pytest.mark.parametrize("invalid_dimension", ["0", "-1", "nan", "inf"])
+def test_prepare_layout_file_rejects_invalid_root_dimensions(
+    tmp_path: Path, invalid_dimension: str
+) -> None:
+    source = tmp_path / "layout.xml"
+    destination = tmp_path / "prepared.xml"
+    source.write_text(
+        f'<layout width="{invalid_dimension}" height="{invalid_dimension}">'
+        '<composite x="3800" y="1780" /></layout>'
+    )
+
+    _prepare_layout_file(
+        source,
+        destination,
+        has_pip=False,
+        target_width=1920,
+        target_height=960,
+        layout_width=3840,
+        layout_height=2160,
+    )
+
+    prepared = destination.read_text()
+    assert 'x="1900"' in prepared
+    assert 'y="791"' in prepared
+
+
 def test_gopro_overlay_progress_is_parsed_from_render_output():
     assert _progress_from_output_chunk("Render: 42 [42%] [1.2/s] ETA: 00:10") == 42
 
