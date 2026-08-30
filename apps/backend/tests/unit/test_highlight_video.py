@@ -1,8 +1,9 @@
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 import numpy as np
+import pytest
 
 from models import Flight, HighlightVideoJob
 from highlight_video import HighlightClip, clamp_clip, overlay_interval_for_clip
@@ -10,11 +11,12 @@ import highlight_video_worker
 from highlight_video_worker import (
     _probe_video_dimensions,
     _output_dimensions,
+    _clip_creation_time,
     _render_clip,
     _render_method_for_accelerator,
     _set_job_stage,
     _flight_phase_times,
-    _ensure_overlay_video,
+    _render_gopro_overlay,
     select_flight_event_clips,
 )
 
@@ -92,13 +94,53 @@ def test_best_yaw_keeps_a_clear_view_with_pilot_at_the_edge(tmp_path: Path) -> N
     assert yaw == -180
 
 
-def test_existing_flight_export_is_reused_as_gopro_overlay(tmp_path: Path) -> None:
-    source_path = tmp_path / "pano.mp4"
-    source_path.touch()
-    overlay_path = tmp_path / "Vol_du_26_08_2026_à_19_44-4k.mp4"
-    overlay_path.touch()
+def test_source_timeline_start_aligns_the_osv_timestamp(tmp_path: Path) -> None:
+    source = tmp_path / "pano.mp4"
+    gpx = tmp_path / "external.gpx"
+    osv = tmp_path / "flight.OSV"
+    gpx_start = datetime(2026, 8, 26, 17, 44, 47, tzinfo=timezone.utc)
+    osv_start = datetime(2026, 8, 26, 18, 44, 6, tzinfo=timezone.utc)
+    aligned = datetime(2026, 8, 26, 17, 44, 6, tzinfo=timezone.utc)
 
-    assert _ensure_overlay_video(source_path, None, 120, tmp_path) == overlay_path
+    with (
+        patch("highlight_video_worker.latest_matching_file", return_value=osv),
+        patch("gopro_overlay_export.first_gpx_timestamp", return_value=gpx_start),
+        patch("gopro_overlay_export.probe_video_start_time", return_value=osv_start),
+        patch("gopro_overlay_export.align_video_start_time_to_gpx", return_value=aligned) as align,
+    ):
+        result = highlight_video_worker._source_timeline_start(source, gpx)
+
+    assert result == aligned
+    align.assert_called_once_with(osv_start, gpx_start)
+
+
+def test_source_timeline_start_falls_back_to_gpx_when_osv_timestamp_is_missing(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "pano.mp4"
+    gpx = tmp_path / "external.gpx"
+    osv = tmp_path / "flight.OSV"
+    gpx_start = datetime(2026, 8, 26, 17, 44, 47, tzinfo=timezone.utc)
+
+    with (
+        patch("highlight_video_worker.latest_matching_file", return_value=osv),
+        patch("gopro_overlay_export.first_gpx_timestamp", return_value=gpx_start),
+        patch("gopro_overlay_export.probe_video_start_time", return_value=None),
+        patch("gopro_overlay_export.align_video_start_time_to_gpx") as align,
+    ):
+        result = highlight_video_worker._source_timeline_start(source, gpx)
+
+    assert result == gpx_start
+    align.assert_not_called()
+
+
+def test_clip_creation_time_uses_gpx_aligned_utc_timeline() -> None:
+    timeline_start = datetime(2026, 8, 26, 17, 44, 6, tzinfo=timezone.utc)
+    clip = HighlightClip(start_seconds=120, duration_seconds=8, yaw_degrees=0)
+
+    assert _clip_creation_time(timeline_start, clip, 2.5) == datetime(
+        2026, 8, 26, 17, 46, 8, 500000, tzinfo=timezone.utc
+    )
 
 
 def test_worker_restart_recovers_and_requeues_active_highlight_jobs(test_db, monkeypatch):
@@ -383,15 +425,12 @@ def test_set_job_stage_persists_progress_and_logs_stage():
     )
 
 
-def test_render_clip_incrusts_the_gopro_overlay_on_the_pano_source(tmp_path):
+def test_render_clip_never_incrusts_an_existing_video_overlay(tmp_path: Path) -> None:
     source_path = tmp_path / "pano.mp4"
-    overlay_path = tmp_path / "overlay.mp4"
     output_path = tmp_path / "clip.mp4"
     source_path.touch()
-    overlay_path.touch()
 
     with (
-        patch("highlight_video_worker._probe_duration", return_value=120),
         patch("highlight_video_worker._output_dimensions", return_value=(1920, 1080)),
         patch("highlight_video_worker.select_video_accelerator", return_value="cpu"),
         patch("highlight_video_worker.h264_encode_args", return_value=["-f", "mp4"]) as encode_args,
@@ -401,58 +440,24 @@ def test_render_clip_incrusts_the_gopro_overlay_on_the_pano_source(tmp_path):
             source_path,
             output_path,
             HighlightClip(start_seconds=12.5, duration_seconds=6.0, yaw_degrees=90),
-            overlay_path,
-            overlay_offset_seconds=2.25,
         )
 
     command = run.call_args.args[0]
     assert command[command.index("-ss") + 1] == "12.500"
     assert str(source_path) in command
-    assert str(overlay_path) in command
-    assert command[command.index("-ss", 3) + 1] == "14.750"
-    assert command[command.index("-t", 3) + 1] == "6.000"
-    filter_complex = command[command.index("-filter_complex") + 1]
-    assert "output=cylindrical" in filter_complex
-    assert "scale=3840:1920:flags=fast_bilinear,v360" in filter_complex
-    assert "h_fov=160:w=1920:h=1080" in filter_complex
-    assert "[1:v]fps=30,scale=w=538:h=-2[overlay]" in filter_complex
-    assert "scale=w=538:h=-2" in filter_complex
-    assert "overlay=W-w-32:H-h-32:eof_action=pass[v]" in filter_complex
-    assert command[command.index("-map") + 1] == "[v]"
+    assert command.count("-i") == 1
+    assert "-filter_complex" not in command
+    video_filter = command[command.index("-vf") + 1]
+    assert "output=cylindrical" in video_filter
+    assert "scale=3840:1920:flags=fast_bilinear,v360" in video_filter
+    assert "h_fov=160:w=1920:h=1080" in video_filter
+    assert command[command.index("-map") + 1] == "0:v:0"
     shortest_index = command.index("-shortest")
     assert command[shortest_index + 1 : shortest_index + 3] == ["-t", "6.000"]
     assert encode_args.call_args.kwargs["quality"] == "18"
 
 
-def test_render_clip_falls_back_to_pano_timestamp_for_full_flight_overlay(tmp_path):
-    source_path = tmp_path / "pano.mp4"
-    overlay_path = tmp_path / "Vol_du-flight-4k.mp4"
-    output_path = tmp_path / "clip.mp4"
-    source_path.touch()
-    overlay_path.touch()
-
-    with (
-        patch("highlight_video_worker._probe_duration", return_value=120),
-        patch("highlight_video_worker.overlay_interval_for_clip", return_value=None),
-        patch("highlight_video_worker._output_dimensions", return_value=(1920, 960)),
-        patch("highlight_video_worker.select_video_accelerator", return_value="cpu"),
-        patch("highlight_video_worker.h264_encode_args", return_value=["-f", "mp4"]),
-        patch("highlight_video_worker.subprocess.run") as run,
-    ):
-        _render_clip(
-            source_path,
-            output_path,
-            HighlightClip(start_seconds=12.5, duration_seconds=6.0, yaw_degrees=90),
-            overlay_path,
-            overlay_offset_seconds=-500,
-        )
-
-    command = run.call_args.args[0]
-    assert command[command.index("-ss", 3) + 1] == "12.500"
-    assert "-filter_complex" in command
-
-
-def test_render_clip_uses_a_wide_projection_for_pano_source(tmp_path):
+def test_render_clip_uses_a_wide_projection_for_pano_source(tmp_path: Path) -> None:
     source_path = tmp_path / "pano.mp4"
     output_path = tmp_path / "clip.mp4"
     source_path.touch()
@@ -467,8 +472,6 @@ def test_render_clip_uses_a_wide_projection_for_pano_source(tmp_path):
             source_path,
             output_path,
             HighlightClip(start_seconds=12.5, duration_seconds=6.0, yaw_degrees=90),
-            None,
-            overlay_offset_seconds=0,
         )
 
     command = run.call_args.args[0]
@@ -476,15 +479,34 @@ def test_render_clip_uses_a_wide_projection_for_pano_source(tmp_path):
     assert "h_fov=160:w=1920:h=960" in command[command.index("-vf") + 1]
 
 
-def test_render_clip_enables_cuda_decode_for_nvidia_inputs(tmp_path):
+def test_render_clip_embeds_the_selected_source_time_for_gopro_overlay(tmp_path: Path) -> None:
     source_path = tmp_path / "pano.mp4"
-    overlay_path = tmp_path / "overlay.mp4"
     output_path = tmp_path / "clip.mp4"
     source_path.touch()
-    overlay_path.touch()
 
     with (
-        patch("highlight_video_worker._probe_duration", return_value=120),
+        patch("highlight_video_worker._output_dimensions", return_value=(1920, 960)),
+        patch("highlight_video_worker.select_video_accelerator", return_value="cpu"),
+        patch("highlight_video_worker.h264_encode_args", return_value=["-f", "mp4"]),
+        patch("highlight_video_worker.subprocess.run") as run,
+    ):
+        _render_clip(
+            source_path,
+            output_path,
+            HighlightClip(start_seconds=120, duration_seconds=8, yaw_degrees=0),
+            creation_time=datetime(2026, 8, 26, 17, 46, 6, tzinfo=timezone.utc),
+        )
+
+    command = run.call_args.args[0]
+    assert command.count("creation_time=2026-08-26T17:46:06Z") == 2
+
+
+def test_render_clip_enables_cuda_decode_for_nvidia_inputs(tmp_path: Path) -> None:
+    source_path = tmp_path / "pano.mp4"
+    output_path = tmp_path / "clip.mp4"
+    source_path.touch()
+
+    with (
         patch("highlight_video_worker._output_dimensions", return_value=(1920, 960)),
         patch("highlight_video_worker.select_video_accelerator", return_value="nvidia"),
         patch("highlight_video_worker.h264_encode_args", return_value=["-f", "mp4"]),
@@ -494,10 +516,93 @@ def test_render_clip_enables_cuda_decode_for_nvidia_inputs(tmp_path):
             source_path,
             output_path,
             HighlightClip(start_seconds=12.5, duration_seconds=6.0, yaw_degrees=90),
-            overlay_path,
-            overlay_offset_seconds=0,
         )
 
     command = run.call_args.args[0]
     input_indexes = [index for index, value in enumerate(command) if value == "-i"]
+    assert len(input_indexes) == 1
     assert all(command[index - 2 : index] == ["-hwaccel", "cuda"] for index in input_indexes)
+
+
+def test_render_gopro_overlay_uses_parapente_layout_without_pip(tmp_path: Path) -> None:
+    montage = tmp_path / "highlights-pano.mp4"
+    gpx = tmp_path / "highlights.gpx"
+    output = tmp_path / "highlights.mp4"
+    output.touch()
+    completed = {"status": "completed", "progress": 100, "message": "done"}
+
+    with (
+        patch(
+            "gopro_overlay_export.create_gopro_overlay_job_from_paths",
+            return_value={"job_id": "overlay-1"},
+        ) as create_job,
+        patch("gopro_overlay_export.get_gopro_overlay_job", return_value=completed),
+    ):
+        completed_result = _render_gopro_overlay(montage, gpx, output)
+
+    assert completed_result is True
+
+    create_job.assert_called_once_with(
+        video_path=montage,
+        gpx_path=gpx,
+        pip_path=None,
+        layout_id="parapente-3840",
+        output_filename=output.name,
+        output_resolution="source",
+        output_dir=str(tmp_path),
+        flight_id=None,
+    )
+
+
+def test_render_gopro_overlay_cancels_its_child_job(tmp_path: Path) -> None:
+    montage = tmp_path / "highlights-pano.mp4"
+    gpx = tmp_path / "highlights.gpx"
+    output = tmp_path / "highlights.mp4"
+
+    with (
+        patch(
+            "gopro_overlay_export.create_gopro_overlay_job_from_paths",
+            return_value={"job_id": "overlay-1"},
+        ),
+        patch("gopro_overlay_export.cancel_gopro_overlay_job") as cancel_job,
+        patch("gopro_overlay_export.get_gopro_overlay_job") as get_job,
+    ):
+        completed_result = _render_gopro_overlay(
+            montage,
+            gpx,
+            output,
+            cancellation_callback=lambda: True,
+        )
+
+    assert completed_result is False
+    cancel_job.assert_called_once_with("overlay-1")
+    get_job.assert_not_called()
+
+
+def test_render_gopro_overlay_reports_child_failure(tmp_path: Path) -> None:
+    output = tmp_path / "highlights.mp4"
+    failed = {"status": "failed", "progress": 10, "error": "renderer crashed"}
+
+    with (
+        patch(
+            "gopro_overlay_export.create_gopro_overlay_job_from_paths",
+            return_value={"job_id": "overlay-1"},
+        ),
+        patch("gopro_overlay_export.get_gopro_overlay_job", return_value=failed),
+        pytest.raises(RuntimeError, match="renderer crashed"),
+    ):
+        _render_gopro_overlay(tmp_path / "pano.mp4", tmp_path / "flight.gpx", output)
+
+
+def test_render_gopro_overlay_times_out(tmp_path: Path) -> None:
+    output = tmp_path / "highlights.mp4"
+
+    with (
+        patch(
+            "gopro_overlay_export.create_gopro_overlay_job_from_paths",
+            return_value={"job_id": "overlay-1"},
+        ),
+        patch("highlight_video_worker.time.monotonic", side_effect=[0, 999999]),
+        pytest.raises(TimeoutError, match="dépassé le délai"),
+    ):
+        _render_gopro_overlay(tmp_path / "pano.mp4", tmp_path / "flight.gpx", output)
