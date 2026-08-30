@@ -1491,6 +1491,7 @@ class TestHighlightVideoEndpoints:
         assert response.status_code == 202
         payload = response.json()
         assert payload["output_format"] == "original"
+        assert payload["render_method"] is None
         assert payload["log_tail"] == ["En attente du rendu"]
         assert "source_video_path" not in payload
         assert "output_path" not in payload

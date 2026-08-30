@@ -58,6 +58,10 @@ def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+def _render_method_for_accelerator(accelerator: str) -> str:
+    return "gpu" if accelerator == "nvidia" else "cpu"
+
+
 def _probe_duration(path: Path) -> float:
     result = subprocess.run(
         [
@@ -896,6 +900,9 @@ def enqueue_pending_highlight_video_jobs(*, recover_active: bool = False) -> int
 def process_highlight_video_job(job_id: str) -> None:
     """RQ target for a highlight render job."""
     started_monotonic = time.monotonic()
+    render_method = _render_method_for_accelerator(
+        select_video_accelerator(config.VIDEO_ACCELERATOR)
+    )
     logger.info("Highlight job started: job_id=%s", job_id)
     with SessionLocal() as db:
         now = _now()
@@ -908,6 +915,7 @@ def process_highlight_video_job(job_id: str) -> None:
                     "progress": 5,
                     "started_at": now,
                     "message": "Analyse de la vidéo pano (initialisation)",
+                    "render_method": render_method,
                 },
                 synchronize_session=False,
             )

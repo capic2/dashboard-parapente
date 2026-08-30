@@ -13,11 +13,17 @@ from highlight_video_worker import (
     _output_dimensions,
     _clip_creation_time,
     _render_clip,
+    _render_method_for_accelerator,
     _set_job_stage,
     _flight_phase_times,
     _render_gopro_overlay,
     select_flight_event_clips,
 )
+
+
+def test_render_method_matches_selected_accelerator() -> None:
+    assert _render_method_for_accelerator("nvidia") == "gpu"
+    assert _render_method_for_accelerator("cpu") == "cpu"
 
 
 def test_best_yaw_allows_a_face_view_when_no_clearer_view_exists(tmp_path: Path) -> None:
@@ -213,6 +219,37 @@ def test_duplicate_rq_execution_does_not_claim_running_highlight_job(test_db, mo
         assert job is not None
         assert job.status == "running"
         assert job.progress == 10
+
+
+def test_worker_persists_gpu_render_method_when_claiming_job(test_db, monkeypatch):
+    monkeypatch.setattr(highlight_video_worker, "SessionLocal", test_db)
+    monkeypatch.setattr(
+        highlight_video_worker, "select_video_accelerator", lambda _configured: "nvidia"
+    )
+    monkeypatch.setattr(
+        highlight_video_worker,
+        "_probe_duration",
+        Mock(side_effect=RuntimeError("stop after claim")),
+    )
+    with test_db() as db:
+        db.add(Flight(id="flight-gpu", name="GPU", flight_date=date(2026, 8, 30)))
+        db.add(
+            HighlightVideoJob(
+                id="highlight-gpu",
+                flight_id="flight-gpu",
+                status="queued",
+                progress=0,
+                source_video_path="/tmp/pano.mp4",
+            )
+        )
+        db.commit()
+
+    highlight_video_worker.process_highlight_video_job("highlight-gpu")
+
+    with test_db() as db:
+        job = db.get(HighlightVideoJob, "highlight-gpu")
+        assert job is not None
+        assert job.render_method == "gpu"
 
 
 def test_clip_maps_pano_time_to_overlay_time():
