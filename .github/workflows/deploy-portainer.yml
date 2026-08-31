@@ -555,12 +555,22 @@ jobs:
               [ "$NVIDIA_GPU_ENABLED" = "true" ] || return 0
               echo "Verifying NVIDIA Docker runtime before replacing production containers"
               if ! docker info --format '{{json .Runtimes}}' | grep -q '"nvidia"'; then
-                echo "NVIDIA runtime is not registered in Docker"
-                return 1
+                echo "NVIDIA runtime is not registered in Docker; falling back to CPU deployment"
+                NVIDIA_GPU_ENABLED=false
+                BACKEND_VIDEO_ACCELERATOR=cpu
+                export NVIDIA_GPU_ENABLED BACKEND_VIDEO_ACCELERATOR
+                rm -f docker-compose.gpu.yml
+                compose_files="-f docker-compose.yml"
+                return 0
               fi
               if ! docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi -L; then
-                echo "NVIDIA GPU preflight failed; keeping the current production stack"
-                return 1
+                echo "NVIDIA GPU preflight failed; falling back to CPU deployment"
+                NVIDIA_GPU_ENABLED=false
+                BACKEND_VIDEO_ACCELERATOR=cpu
+                export NVIDIA_GPU_ENABLED BACKEND_VIDEO_ACCELERATOR
+                rm -f docker-compose.gpu.yml
+                compose_files="-f docker-compose.yml"
+                return 0
               fi
             }
 
@@ -843,12 +853,20 @@ jobs:
                   if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
                     echo "Verifying NVIDIA Docker runtime before replacing production containers"
                     if ! docker info --format "{{json .Runtimes}}" | grep -q "\"nvidia\""; then
-                      echo "NVIDIA runtime is not registered in Docker"
-                      exit 1
+                      echo "NVIDIA runtime is not registered in Docker; falling back to CPU deployment"
+                      NVIDIA_GPU_ENABLED=false
+                      BACKEND_VIDEO_ACCELERATOR=cpu
+                      export NVIDIA_GPU_ENABLED BACKEND_VIDEO_ACCELERATOR
+                      rm -f docker-compose.gpu.yml
+                      compose_files="-f docker-compose.yml"
                     fi
-                    if ! docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi -L; then
-                      echo "NVIDIA GPU preflight failed; keeping the current production stack"
-                      exit 1
+                    if [ "$NVIDIA_GPU_ENABLED" = "true" ] && ! docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi -L; then
+                      echo "NVIDIA GPU preflight failed; falling back to CPU deployment"
+                      NVIDIA_GPU_ENABLED=false
+                      BACKEND_VIDEO_ACCELERATOR=cpu
+                      export NVIDIA_GPU_ENABLED BACKEND_VIDEO_ACCELERATOR
+                      rm -f docker-compose.gpu.yml
+                      compose_files="-f docker-compose.yml"
                     fi
                   fi
 
