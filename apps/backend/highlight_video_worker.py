@@ -52,6 +52,9 @@ HIGHLIGHT_PROJECTION_INPUT_SIZE = "3840:1920"
 # without turning each 8-second clip into a multi-hour 4K render.
 HIGHLIGHT_OUTPUT_WIDTH = 1920
 HIGHLIGHT_OVERLAY_LAYOUT_ID = "parapente-3840"
+# Phase clips must show context around the event: wing inflation before
+# takeoff, and the final approach before touchdown.
+HIGHLIGHT_EVENT_CLIP_LENGTH = 16.0
 
 
 def _now() -> datetime:
@@ -667,6 +670,10 @@ def select_flight_event_clips(
 
     selected: list[HighlightClip] = []
     phase_times = _flight_phase_times(track_points) if track_points else (None, None)
+    event_clip_length = min(
+        HIGHLIGHT_EVENT_CLIP_LENGTH,
+        max(clip_length, duration_seconds),
+    )
     takeoff_clip = visual_phase_clip("takeoff") if phase_times[0] is None else None
     if takeoff_clip:
         # The visual candidate usually scores the wing already overhead. Add
@@ -675,6 +682,7 @@ def select_flight_event_clips(
         takeoff_clip = replace(
             takeoff_clip,
             start_seconds=max(0.0, takeoff_clip.start_seconds - clip_length),
+            duration_seconds=event_clip_length,
             category="takeoff",
         )
         selected.append(takeoff_clip)
@@ -682,7 +690,18 @@ def select_flight_event_clips(
     if landing_clip and (
         takeoff_clip is None or landing_clip.start_seconds != takeoff_clip.start_seconds
     ):
-        selected.append(replace(landing_clip, category="landing"))
+        selected.append(
+            replace(
+                landing_clip,
+                start_seconds=max(
+                    0.0,
+                    landing_clip.start_seconds
+                    - (event_clip_length - landing_clip.duration_seconds) / 2,
+                ),
+                duration_seconds=event_clip_length,
+                category="landing",
+            )
+        )
 
     def fill_with_visual_clips() -> list[HighlightClip]:
         for clip in visual_clips:
@@ -741,8 +760,11 @@ def select_flight_event_clips(
         if category in selected_categories:
             continue
         center = video_time(position)
-        start = max(0.0, min(duration_seconds - clip_length, center - clip_length / 2))
-        selected.append(HighlightClip(start, clip_length, 0.0, category))
+        start = max(
+            0.0,
+            min(duration_seconds - event_clip_length, center - event_clip_length / 2),
+        )
+        selected.append(HighlightClip(start, event_clip_length, 0.0, category))
     return fill_with_visual_clips()
 
 
@@ -1033,11 +1055,17 @@ def process_highlight_video_job(job_id: str) -> None:
             len(visual_clips),
         )
         track_points: list[TrackPoint] | None = None
-        gpx_path, pip_path = resolve_automatic_overlay_inputs(
+        gpx_path, _pip_path = resolve_automatic_overlay_inputs(
             source_path.parent,
             _configured_gpx_path(gpx_file_path),
             source_path,
         )
+        # Best moments use the panoramic camera as the main image.  The flight
+        # PIP is intentionally disabled here: it is a separate Cesium/flight
+        # export, often with different timing and framing, and only distracts
+        # from the selected scene.
+        pip_path = None
+        logger.info("Highlight PIP disabled: job_id=%s", job_id)
         if gpx_path and not gpx_path.is_file():
             gpx_path = None
         if gpx_path:
