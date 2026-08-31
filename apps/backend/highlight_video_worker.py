@@ -110,10 +110,8 @@ def _probe_video_dimensions(path: Path) -> tuple[int, int]:
 
 
 def _output_dimensions(source_path: Path) -> tuple[int, int]:
-    source_width, source_height = _probe_video_dimensions(source_path)
-    output_width = HIGHLIGHT_OUTPUT_WIDTH
-    output_height = max(2, round(output_width * source_height / source_width))
-    return output_width, output_height
+    _probe_video_dimensions(source_path)
+    return HIGHLIGHT_OUTPUT_WIDTH, 1080
 
 
 def _configured_gpx_path(value: str | None) -> Path | None:
@@ -656,50 +654,22 @@ def select_flight_event_clips(
 
     clip_length = min(8.0, max(3.0, duration_seconds / 8))
 
-    def visual_phase_clip(category: str) -> HighlightClip | None:
-        # The visual scorer provides the evidence. If it finds no candidate in
-        # a phase window, leave that phase absent instead of inventing a fixed
-        # timestamp (the camera may have started long before takeoff).
-        if category == "takeoff":
-            candidates = [
-                clip for clip in visual_clips if clip.start_seconds <= duration_seconds * 0.5
-            ]
-            return min(candidates, key=lambda clip: clip.start_seconds) if candidates else None
-        candidates = [clip for clip in visual_clips if clip.start_seconds >= duration_seconds * 0.5]
-        return max(candidates, key=lambda clip: clip.start_seconds) if candidates else None
-
     selected: list[HighlightClip] = []
-    phase_times = _flight_phase_times(track_points) if track_points else (None, None)
     event_clip_length = min(
         HIGHLIGHT_EVENT_CLIP_LENGTH,
         max(clip_length, duration_seconds),
     )
-    takeoff_clip = visual_phase_clip("takeoff") if phase_times[0] is None else None
-    if takeoff_clip:
-        # When the GPX starts after takeoff, the first video frames are the
-        # only reliable evidence of inflation and launch. Anchor this fallback
-        # to video time zero instead of the first scored airborne frame.
-        takeoff_clip = replace(
-            takeoff_clip,
-            start_seconds=0.0,
-            duration_seconds=event_clip_length,
-            category="takeoff",
-        )
-        selected.append(takeoff_clip)
-    landing_clip = visual_phase_clip("landing") if phase_times[1] is None else None
-    if landing_clip and (
-        takeoff_clip is None or landing_clip.start_seconds != takeoff_clip.start_seconds
-    ):
-        selected.append(
-            replace(
-                landing_clip,
-                # The final video frames contain the approach/touchdown when
-                # telemetry ends at or before the actual landing.
-                start_seconds=max(0.0, duration_seconds - event_clip_length),
-                duration_seconds=event_clip_length,
-                category="landing",
-            )
-        )
+    # GPX can start after takeoff or stop before touchdown. The video itself
+    # is authoritative for these mandatory phases when it contains the ground
+    # sequence, so anchor them to its actual beginning and end.
+    takeoff_clip = HighlightClip(0.0, event_clip_length, 0.0, "takeoff")
+    landing_clip = HighlightClip(
+        max(0.0, duration_seconds - event_clip_length),
+        event_clip_length,
+        0.0,
+        "landing",
+    )
+    selected.extend((takeoff_clip, landing_clip))
 
     def fill_with_visual_clips() -> list[HighlightClip]:
         for clip in visual_clips:
@@ -727,10 +697,6 @@ def select_flight_event_clips(
         return min(duration_seconds, max(0.0, track_seconds / track_duration * duration_seconds))
 
     phases: list[tuple[str, float]] = []
-    if phase_times[0] is not None:
-        phases.append(("takeoff", phase_times[0]))
-    if phase_times[1] is not None:
-        phases.append(("landing", phase_times[1]))
     elevations = [elevation for _timestamp, elevation in samples]
     climb_candidates: list[tuple[float, float]] = []
     for index in range(1, len(elevations)):
