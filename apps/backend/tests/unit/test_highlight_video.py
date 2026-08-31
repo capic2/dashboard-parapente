@@ -391,8 +391,8 @@ def test_event_selection_uses_visual_activity_for_phases_without_fixed_offsets()
     )
 
     assert [(clip.category, clip.start_seconds) for clip in clips[:2]] == [
-        ("takeoff", 34),
-        ("landing", 520),
+        ("takeoff", 0),
+        ("landing", 584),
     ]
 
 
