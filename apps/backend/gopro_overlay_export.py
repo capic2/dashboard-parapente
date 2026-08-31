@@ -333,11 +333,12 @@ def _prepare_layout_file(
     def normalize_video_components(parent: ET.Element) -> None:
         for child in list(parent):
             if child.tag == "component" and child.attrib.get("type") == "video":
-                if child.attrib.get("file") or child.attrib.get("id"):
-                    continue
                 if has_pip:
-                    child.set("id", "pip")
-                else:
+                    continue
+                # The stock parapente layouts may declare the PIP explicitly
+                # as ``id="pip"``. Remove that component too when highlights
+                # intentionally run without a PIP input.
+                if child.attrib.get("id") == "pip" or not child.attrib.get("file"):
                     parent.remove(child)
                 continue
             normalize_video_components(child)
