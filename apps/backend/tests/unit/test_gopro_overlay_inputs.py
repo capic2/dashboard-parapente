@@ -56,3 +56,20 @@ def test_overlay_inputs_skip_the_previous_overlay_output(tmp_path: Path) -> None
     )
 
     assert pip_path == base_video
+
+
+def test_overlay_inputs_ignore_flight_export_from_another_date(tmp_path: Path) -> None:
+    flight_dir = tmp_path / "20260822" / "01"
+    flight_dir.mkdir(parents=True)
+    wrong_flight = flight_dir / "flight-20260824-071510.mp4"
+    source_video = flight_dir / "pano.mp4"
+    wrong_flight.write_bytes(b"wrong")
+    source_video.write_bytes(b"source")
+
+    _gpx_path, pip_path = resolve_automatic_overlay_inputs(
+        flight_dir,
+        None,
+        source_video,
+    )
+
+    assert pip_path is None

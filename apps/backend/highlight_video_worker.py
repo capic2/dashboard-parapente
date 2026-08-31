@@ -1064,7 +1064,10 @@ def process_highlight_video_job(job_id: str) -> None:
         if gpx_path is None:
             raise ValueError("Le véritable overlay GoPro nécessite un fichier GPX")
         if pip_path is None or not pip_path.is_file():
-            raise ValueError("Le véritable overlay GoPro nécessite la vidéo PIP du vol")
+            raise ValueError(
+                "Aucune vidéo flight*.mp4 correspondant à la date du vol n'a été trouvée "
+                f"dans {source_path.parent}"
+            )
         if not track_points:
             raise ValueError("Le fichier GPX ne contient aucune télémétrie exploitable")
         from gopro_overlay_export import first_gpx_timestamp
