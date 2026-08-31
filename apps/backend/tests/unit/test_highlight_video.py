@@ -462,8 +462,10 @@ def test_event_selection_prefers_gpx_phases_over_visual_activity():
     )
 
     phase_clips = {clip.category: clip for clip in clips if clip.category in {"takeoff", "landing"}}
-    assert round(phase_clips["takeoff"].start_seconds) == 77
-    assert round(phase_clips["landing"].start_seconds) == 400
+    assert round(phase_clips["takeoff"].start_seconds) == 69
+    assert round(phase_clips["landing"].start_seconds) == 392
+    assert phase_clips["takeoff"].duration_seconds == 16
+    assert phase_clips["landing"].duration_seconds == 16
     assert phase_clips["takeoff"].start_seconds != 12
     assert phase_clips["landing"].start_seconds != 390
 
