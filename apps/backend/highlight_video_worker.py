@@ -211,7 +211,7 @@ def _clip_is_covered_by_gpx(
 def _render_gopro_overlay(
     video_path: Path,
     gpx_path: Path,
-    pip_path: Path,
+    pip_path: Path | None,
     output_path: Path,
     progress_callback: Callable[[int, str], None] | None = None,
     cancellation_callback: Callable[[], bool] | None = None,
@@ -1064,10 +1064,11 @@ def process_highlight_video_job(job_id: str) -> None:
         if gpx_path is None:
             raise ValueError("Le véritable overlay GoPro nécessite un fichier GPX")
         if pip_path is None or not pip_path.is_file():
-            raise ValueError(
-                "Aucune vidéo flight*.mp4 correspondant à la date du vol n'a été trouvée "
-                f"dans {source_path.parent}"
+            logger.warning(
+                "Highlight PIP skipped: no flight video matching %s; overlay will contain telemetry only",
+                source_path.parent,
             )
+            pip_path = None
         if not track_points:
             raise ValueError("Le fichier GPX ne contient aucune télémétrie exploitable")
         from gopro_overlay_export import first_gpx_timestamp
