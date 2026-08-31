@@ -350,6 +350,19 @@ def _frame_scores(
     ]
 
 
+def _visual_phase_centers(source_path: Path, duration_seconds: float) -> tuple[float, float]:
+    """Find launch and touchdown candidates from image motion over the flight."""
+    scores = _frame_scores(source_path, duration_seconds)
+    if not scores:
+        return 0.0, max(0.0, duration_seconds)
+    edge_window = min(duration_seconds * 0.35, 90.0)
+    start_scores = [item for item in scores if item[0] <= edge_window]
+    end_scores = [item for item in scores if item[0] >= duration_seconds - edge_window]
+    takeoff = max(start_scores, key=lambda item: item[1])[0] if start_scores else 0.0
+    landing = max(end_scores, key=lambda item: item[1])[0] if end_scores else duration_seconds
+    return takeoff, landing
+
+
 def _best_yaw(source_path: Path, clip: HighlightClip) -> float:
     """Pick the clearest wide view, avoiding the pilot and camera obstruction."""
     yaws = tuple(range(-180, 180, 45))
@@ -647,6 +660,7 @@ def select_flight_event_clips(
     duration_seconds: float,
     track_points: list[TrackPoint] | None,
     visual_clips: list[HighlightClip],
+    visual_phase_centers: tuple[float, float] | None = None,
 ) -> list[HighlightClip]:
     """Select visually detected phase changes and use telemetry for thermals."""
     if not visual_clips and not track_points:
@@ -659,12 +673,15 @@ def select_flight_event_clips(
         HIGHLIGHT_EVENT_CLIP_LENGTH,
         max(clip_length, duration_seconds),
     )
-    # GPX can start after takeoff or stop before touchdown. The video itself
-    # is authoritative for these mandatory phases when it contains the ground
-    # sequence, so anchor them to its actual beginning and end.
-    takeoff_clip = HighlightClip(0.0, event_clip_length, 0.0, "takeoff")
+    takeoff_center, landing_center = visual_phase_centers or (0.0, duration_seconds)
+    takeoff_clip = HighlightClip(
+        max(0.0, min(duration_seconds - event_clip_length, takeoff_center - event_clip_length / 2)),
+        event_clip_length,
+        0.0,
+        "takeoff",
+    )
     landing_clip = HighlightClip(
-        max(0.0, duration_seconds - event_clip_length),
+        max(0.0, min(duration_seconds - event_clip_length, landing_center - event_clip_length / 2)),
         event_clip_length,
         0.0,
         "landing",
@@ -1073,7 +1090,13 @@ def process_highlight_video_job(job_id: str) -> None:
             for clip in visual_clips
             if _clip_is_covered_by_gpx(source_timeline_start, clip, track_points)
         ]
-        clips = select_flight_event_clips(duration_seconds, track_points, visual_clips)
+        phase_centers = _visual_phase_centers(source_path, duration_seconds)
+        clips = select_flight_event_clips(
+            duration_seconds,
+            track_points,
+            visual_clips,
+            phase_centers,
+        )
         clips = [
             clip
             for clip in clips
