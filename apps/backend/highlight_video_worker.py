@@ -676,12 +676,12 @@ def select_flight_event_clips(
     )
     takeoff_clip = visual_phase_clip("takeoff") if phase_times[0] is None else None
     if takeoff_clip:
-        # The visual candidate usually scores the wing already overhead. Add
-        # one clip length before it so the fallback includes the inflation and
-        # the actual launch when the GPX starts after takeoff.
+        # When the GPX starts after takeoff, the first video frames are the
+        # only reliable evidence of inflation and launch. Anchor this fallback
+        # to video time zero instead of the first scored airborne frame.
         takeoff_clip = replace(
             takeoff_clip,
-            start_seconds=max(0.0, takeoff_clip.start_seconds - clip_length),
+            start_seconds=0.0,
             duration_seconds=event_clip_length,
             category="takeoff",
         )
@@ -693,11 +693,9 @@ def select_flight_event_clips(
         selected.append(
             replace(
                 landing_clip,
-                start_seconds=max(
-                    0.0,
-                    landing_clip.start_seconds
-                    - (event_clip_length - landing_clip.duration_seconds) / 2,
-                ),
+                # The final video frames contain the approach/touchdown when
+                # telemetry ends at or before the actual landing.
+                start_seconds=max(0.0, duration_seconds - event_clip_length),
                 duration_seconds=event_clip_length,
                 category="landing",
             )
