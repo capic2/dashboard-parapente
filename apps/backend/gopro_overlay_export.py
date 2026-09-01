@@ -2269,8 +2269,6 @@ def _run_job(job_id: str) -> None:
     if video_time_start := prepared_command.get("video_time_start"):
         command[4:4] = ["--video-time-start", str(video_time_start)]
     overlay_only = bool(prepared_command.get("overlay_only"))
-    if overlay_only:
-        command.extend(["--generate", "overlay"])
     if config.GOPRO_OVERLAY_FONT:
         command.extend(["--font", config.GOPRO_OVERLAY_FONT])
     if config.GOPRO_OVERLAY_CONFIG_DIR:
@@ -2308,7 +2306,14 @@ def _run_job(job_id: str) -> None:
     log_path = Path(job.get("log_path") or temp_output_path.with_suffix(".log"))
     temp_output_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    common_args.extend([job["video_path"], str(temp_output_path)])
+    # GoPro Dashboard renders a transparent movie for a GPX-only command with
+    # no input video.  Passing the synthetic timeline would instead create an
+    # opaque video render, while adding ``--generate overlay`` is rejected in
+    # combination with ``--use-gpx-only``.  The timeline is only retained by
+    # the queued job preparation to establish the calibrated GPX range.
+    if not overlay_only:
+        common_args.append(job["video_path"])
+    common_args.append(str(temp_output_path))
     command.extend(common_args)
     cpu_command.extend(common_args)
 
@@ -2322,7 +2327,7 @@ def _run_job(job_id: str) -> None:
         render_method,
     )
 
-    video_duration = probe_video_duration(Path(str(job["video_path"])))
+    video_duration = None if overlay_only else probe_video_duration(Path(str(job["video_path"])))
     if (
         not overlay_only
         and video_duration is not None
