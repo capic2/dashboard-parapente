@@ -171,6 +171,7 @@ from video_thumbnail import VideoThumbnailError, get_video_thumbnail
 from gopro_overlay_inputs import first_matching_file, latest_matching_file
 from highlight_video_worker import (
     STATUS_QUEUED as HIGHLIGHT_STATUS_QUEUED,
+    cleanup_highlight_job_files,
     create_highlight_job_id,
     enqueue_highlight_video_job,
     process_highlight_video_job,
@@ -4973,14 +4974,21 @@ def delete_flight_highlight_video(
             status_code=409, detail="Highlight video cannot be deleted while active"
         )
 
-    deleted_files = 0
-    if job.output_path:
-        output_path = Path(job.output_path)
-        if output_path.is_file():
-            output_path.unlink()
+    output_dir = (
+        Path(job.output_path).parent
+        if job.output_path
+        else Path(job.source_video_path).parent / "highlights" / job.id
+    )
+    deleted_files = cleanup_highlight_job_files(output_dir, job_id=job.id)
+    # Preserve deletion of legacy rows whose final video predates the
+    # per-job highlights directory layout.
+    if deleted_files == 0 and job.output_path:
+        legacy_output_path = Path(job.output_path)
+        if legacy_output_path.is_file():
+            legacy_output_path.unlink()
             deleted_files = 1
             try:
-                output_path.parent.rmdir()
+                legacy_output_path.parent.rmdir()
             except OSError:
                 pass
 

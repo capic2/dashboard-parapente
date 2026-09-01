@@ -1562,11 +1562,13 @@ class TestHighlightVideoEndpoints:
     def test_delete_completed_highlight_removes_job_and_output(
         self, client: TestClient, db_session: Session, tmp_path: Path
     ) -> None:
-        """Deleting a completed highlight removes its generated output and row."""
+        """Deleting a completed highlight removes its per-job directory and row."""
         pano_path = tmp_path / "pano.mp4"
-        output_path = tmp_path / "highlights" / "highlights-original-format.mp4"
+        output_path = (
+            tmp_path / "highlights" / "highlight-to-delete" / "highlights-original-format.mp4"
+        )
         pano_path.write_bytes(b"pano")
-        output_path.parent.mkdir()
+        output_path.parent.mkdir(parents=True)
         output_path.write_bytes(b"highlights")
         flight = self._flight(db_session, "highlight-delete", pano_path)
         db_session.add(
@@ -1592,7 +1594,103 @@ class TestHighlightVideoEndpoints:
             "files_deleted": 1,
         }
         assert not output_path.exists()
+        assert not output_path.parent.exists()
         assert db_session.get(HighlightVideoJob, "highlight-to-delete") is None
+
+    def test_delete_completed_highlight_removes_legacy_output_file(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        """Legacy rows with a direct output file remain deletable."""
+        pano_path = tmp_path / "pano.mp4"
+        output_path = tmp_path / "legacy-highlights.mp4"
+        pano_path.write_bytes(b"pano")
+        output_path.write_bytes(b"highlights")
+        flight = self._flight(db_session, "highlight-delete-legacy", pano_path)
+        db_session.add(
+            HighlightVideoJob(
+                id="highlight-legacy-delete",
+                flight_id=flight.id,
+                status="completed",
+                source_video_path=str(pano_path),
+                output_path=str(output_path),
+                output_format="original",
+            )
+        )
+        db_session.commit()
+
+        response = client.delete(
+            f"{API_PREFIX}/flights/{flight.id}/highlight-videos/highlight-legacy-delete"
+        )
+
+        assert response.status_code == 200
+        assert response.json()["files_deleted"] == 1
+        assert not output_path.exists()
+        assert db_session.get(HighlightVideoJob, "highlight-legacy-delete") is None
+
+    def test_delete_completed_highlight_accepts_missing_output_files(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        """A missing output does not prevent deletion of the database row."""
+        pano_path = tmp_path / "pano.mp4"
+        output_path = (
+            tmp_path / "highlights" / "highlight-missing-delete" / "highlights-original-format.mp4"
+        )
+        pano_path.write_bytes(b"pano")
+        flight = self._flight(db_session, "highlight-delete-missing", pano_path)
+        db_session.add(
+            HighlightVideoJob(
+                id="highlight-missing-delete",
+                flight_id=flight.id,
+                status="completed",
+                source_video_path=str(pano_path),
+                output_path=str(output_path),
+                output_format="original",
+            )
+        )
+        db_session.commit()
+
+        response = client.delete(
+            f"{API_PREFIX}/flights/{flight.id}/highlight-videos/highlight-missing-delete"
+        )
+
+        assert response.status_code == 200
+        assert response.json()["files_deleted"] == 0
+        assert db_session.get(HighlightVideoJob, "highlight-missing-delete") is None
+
+    def test_delete_completed_highlight_removes_remaining_temporary_files(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        """Deleting a partially cleaned job removes every remaining artifact."""
+        pano_path = tmp_path / "pano.mp4"
+        job_dir = tmp_path / "highlights" / "highlight-partial-delete"
+        output_path = job_dir / "highlights-original-format.mp4"
+        work_file = job_dir / ".gopro-overlay-work" / "render" / "overlay.part.mp4"
+        pano_path.write_bytes(b"pano")
+        work_file.parent.mkdir(parents=True)
+        output_path.write_bytes(b"highlights")
+        (job_dir / "concat.txt").write_text("temporary", encoding="utf-8")
+        work_file.write_bytes(b"partial")
+        flight = self._flight(db_session, "highlight-delete-partial", pano_path)
+        db_session.add(
+            HighlightVideoJob(
+                id="highlight-partial-delete",
+                flight_id=flight.id,
+                status="completed",
+                source_video_path=str(pano_path),
+                output_path=str(output_path),
+                output_format="original",
+            )
+        )
+        db_session.commit()
+
+        response = client.delete(
+            f"{API_PREFIX}/flights/{flight.id}/highlight-videos/highlight-partial-delete"
+        )
+
+        assert response.status_code == 200
+        assert response.json()["files_deleted"] == 3
+        assert not job_dir.exists()
+        assert db_session.get(HighlightVideoJob, "highlight-partial-delete") is None
 
     def test_delete_active_highlight_returns_conflict(
         self, client: TestClient, db_session: Session, tmp_path: Path

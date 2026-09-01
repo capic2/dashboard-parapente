@@ -17,10 +17,55 @@ from highlight_video_worker import (
     _render_clip,
     _render_method_for_accelerator,
     _set_job_stage,
+    cleanup_highlight_job_files,
     _flight_phase_times,
     _render_gopro_overlay,
     select_flight_event_clips,
 )
+
+
+def test_cleanup_highlight_job_files_keeps_only_final_video(tmp_path: Path) -> None:
+    output_dir = tmp_path / "highlights" / "highlight-cleanup"
+    work_dir = output_dir / ".gopro-overlay-work" / "overlay-job"
+    work_dir.mkdir(parents=True)
+    final_output = output_dir / "highlights-original-format.mp4"
+    final_output.write_bytes(b"final")
+    (output_dir / "clip-01-pano.mp4").write_bytes(b"raw")
+    (output_dir / "clip-01.mp4").write_bytes(b"overlay")
+    (output_dir / "concat.txt").write_text("concat", encoding="utf-8")
+    (work_dir / "layout.xml").write_text("layout", encoding="utf-8")
+
+    deleted = cleanup_highlight_job_files(
+        output_dir,
+        job_id="highlight-cleanup",
+        keep_output_path=final_output,
+    )
+
+    assert deleted == 4
+    assert list(output_dir.iterdir()) == [final_output]
+
+
+def test_cleanup_highlight_job_files_removes_failed_job_directory(tmp_path: Path) -> None:
+    output_dir = tmp_path / "highlights" / "highlight-failed"
+    output_dir.mkdir(parents=True)
+    (output_dir / "partial.mp4").write_bytes(b"partial")
+
+    deleted = cleanup_highlight_job_files(output_dir, job_id="highlight-failed")
+
+    assert deleted == 1
+    assert not output_dir.exists()
+
+
+def test_cleanup_highlight_job_files_refuses_unexpected_directory(tmp_path: Path) -> None:
+    unsafe_dir = tmp_path / "highlight-cleanup"
+    unsafe_dir.mkdir()
+    temporary_file = unsafe_dir / "clip.mp4"
+    temporary_file.write_bytes(b"keep")
+
+    deleted = cleanup_highlight_job_files(unsafe_dir, job_id="highlight-cleanup")
+
+    assert deleted == 0
+    assert temporary_file.exists()
 
 
 def test_render_method_matches_selected_accelerator() -> None:

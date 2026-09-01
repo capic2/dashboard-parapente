@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 import subprocess
 import threading
 import time
@@ -39,6 +40,7 @@ STATUS_RUNNING = "running"
 STATUS_COMPLETED = "completed"
 STATUS_FAILED = "failed"
 STATUS_CANCELLED = "cancelled"
+_TERMINAL_STATUSES = {STATUS_COMPLETED, STATUS_FAILED, STATUS_CANCELLED}
 
 # A wider projection keeps the wing, pilot and landscape legible.  A narrower
 # field of view tends to turn a 360° extract into an isolated, unclear detail.
@@ -873,6 +875,61 @@ def _update_job(job_id: str, **values: object) -> None:
         db.commit()
 
 
+def cleanup_highlight_job_files(
+    output_dir: Path,
+    *,
+    job_id: str,
+    keep_output_path: Path | None = None,
+) -> int:
+    """Delete highlight intermediates while refusing paths outside the job directory."""
+    if (
+        output_dir.name != job_id
+        or output_dir.parent.name != "highlights"
+        or output_dir.is_symlink()
+        or not output_dir.exists()
+    ):
+        if output_dir.exists():
+            logger.warning("Refusing to clean unsafe highlight directory: %s", output_dir)
+        return 0
+
+    keep_path = keep_output_path.resolve() if keep_output_path else None
+    deleted_files = 0
+    for path in output_dir.iterdir():
+        if keep_path is not None and path.resolve() == keep_path:
+            continue
+        try:
+            if path.is_dir() and not path.is_symlink():
+                deleted_files += sum(1 for candidate in path.rglob("*") if candidate.is_file())
+                shutil.rmtree(path)
+            else:
+                path.unlink(missing_ok=True)
+                deleted_files += 1
+        except OSError:
+            logger.exception("Failed to clean highlight temporary path %s", path)
+
+    if keep_path is None:
+        try:
+            output_dir.rmdir()
+        except OSError:
+            logger.exception("Failed to remove empty highlight directory %s", output_dir)
+    return deleted_files
+
+
+def _terminal_status_for_execution(job_id: str, started_at: datetime) -> str | None:
+    """Return terminal status only for the execution that still owns the job."""
+    with SessionLocal() as db:
+        status = (
+            db.query(HighlightVideoJob.status)
+            .filter(
+                HighlightVideoJob.id == job_id,
+                HighlightVideoJob.started_at == started_at,
+                HighlightVideoJob.status.in_(_TERMINAL_STATUSES),
+            )
+            .scalar()
+        )
+    return str(status) if status else None
+
+
 def _set_job_stage(job_id: str, *, progress: int, message: str, stage: str) -> None:
     """Persist and log a stage so slow background work is diagnosable."""
     _update_job(job_id, progress=progress, message=message)
@@ -1381,6 +1438,16 @@ def process_highlight_video_job(job_id: str) -> None:
             job_id, status=STATUS_FAILED, progress=100, message="Échec du rendu", error=str(exc)
         )
     finally:
+        try:
+            terminal_status = _terminal_status_for_execution(job_id, now)
+            if terminal_status is not None:
+                cleanup_highlight_job_files(
+                    output_dir,
+                    job_id=job_id,
+                    keep_output_path=output_path if terminal_status == STATUS_COMPLETED else None,
+                )
+        except Exception:
+            logger.exception("Failed to clean highlight temporary files for job %s", job_id)
         with _ACTIVE_EXECUTION_LOCK:
             if _ACTIVE_EXECUTION_STARTED_AT.get(job_id) == now:
                 _ACTIVE_EXECUTION_STARTED_AT.pop(job_id, None)
