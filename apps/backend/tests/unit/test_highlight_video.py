@@ -22,6 +22,7 @@ from highlight_video_worker import (
     _flight_phase_times,
     _refine_visual_phase_time,
     _render_gopro_overlay,
+    _render_full_flight_overlay,
     select_flight_event_clips,
 )
 
@@ -34,6 +35,7 @@ def test_cleanup_highlight_job_files_keeps_only_final_video(tmp_path: Path) -> N
     final_output.write_bytes(b"final")
     (output_dir / "clip-01-pano.mp4").write_bytes(b"raw")
     (output_dir / "clip-01.mp4").write_bytes(b"overlay")
+    (output_dir / "full-flight-overlay.mov").write_bytes(b"temporary overlay")
     (output_dir / "concat.txt").write_text("concat", encoding="utf-8")
     (work_dir / "layout.xml").write_text("layout", encoding="utf-8")
 
@@ -43,7 +45,7 @@ def test_cleanup_highlight_job_files_keeps_only_final_video(tmp_path: Path) -> N
         keep_output_path=final_output,
     )
 
-    assert deleted == 4
+    assert deleted == 5
     assert list(output_dir.iterdir()) == [final_output]
 
 
@@ -73,6 +75,30 @@ def test_cleanup_highlight_job_files_refuses_unexpected_directory(tmp_path: Path
 def test_render_method_matches_selected_accelerator() -> None:
     assert _render_method_for_accelerator("nvidia") == "gpu"
     assert _render_method_for_accelerator("cpu") == "cpu"
+
+
+def test_full_flight_overlay_uses_one_transparent_full_timeline_job(tmp_path: Path) -> None:
+    timeline = tmp_path / "timeline.mp4"
+    gpx = tmp_path / "flight.gpx"
+    output = tmp_path / "full-overlay.mov"
+    timeline.touch()
+    gpx.touch()
+    output.touch()
+    job = {"job_id": "overlay-full-flight"}
+    with (
+        patch(
+            "gopro_overlay_export.create_gopro_overlay_job_from_paths", return_value=job
+        ) as create_job,
+        patch(
+            "gopro_overlay_export.get_gopro_overlay_job",
+            return_value={"status": "completed", "progress": 100},
+        ),
+    ):
+        assert _render_full_flight_overlay(timeline, gpx, output, (1920, 1080))
+
+    assert create_job.call_args.kwargs["overlay_only"] is True
+    assert create_job.call_args.kwargs["overlay_size"] == (1920, 1080)
+    assert create_job.call_args.kwargs["video_path"] == timeline
 
 
 def test_best_yaw_allows_a_face_view_when_no_clearer_view_exists(tmp_path: Path) -> None:

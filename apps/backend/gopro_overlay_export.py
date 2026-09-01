@@ -412,6 +412,8 @@ def _job_preparation_metadata(
     output_resolution: str,
     gpx_offset: float = 0.0,
     render_method: str | None = None,
+    overlay_only: bool = False,
+    overlay_size: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
     metadata = {
         "prepare_overlay_inputs": True,
@@ -419,7 +421,10 @@ def _job_preparation_metadata(
         "requested_layout_id": requested_layout_id,
         "output_resolution": output_resolution,
         "gpx_offset": gpx_offset,
+        "overlay_only": overlay_only,
     }
+    if overlay_size:
+        metadata["overlay_size"] = list(overlay_size)
     if render_method:
         metadata["render_method"] = render_method
     return metadata
@@ -1555,12 +1560,20 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         if not source_layout_path.exists():
             raise ValueError(f"Layout file not found: {source_layout_path}")
         _append_job_log(log_path, f"Using layout {selected_layout.label}")
-        render_width, render_height = _layout_render_size(
-            selected_layout,
-            width,
-            height,
-            output_resolution,
-        )
+        requested_overlay_size = command_metadata.get("overlay_size")
+        if (
+            isinstance(requested_overlay_size, list)
+            and len(requested_overlay_size) == 2
+            and all(isinstance(value, int) and value > 0 for value in requested_overlay_size)
+        ):
+            render_width, render_height = requested_overlay_size
+        else:
+            render_width, render_height = _layout_render_size(
+                selected_layout,
+                width,
+                height,
+                output_resolution,
+            )
         layout_path = _prepare_layout_file(
             source_layout_path,
             work_dir / source_layout_path.name,
@@ -2047,6 +2060,8 @@ def create_gopro_overlay_job_from_paths(
     output_dir: str | None = None,
     gpx_offset: float = 0.0,
     flight_id: str | None = None,
+    overlay_only: bool = False,
+    overlay_size: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
     _validate_file_extension(video_path, _VIDEO_EXTENSIONS)
     _validate_file_extension(gpx_path, _GPX_EXTENSIONS)
@@ -2071,6 +2086,8 @@ def create_gopro_overlay_job_from_paths(
                 output_dir=output_dir,
                 gpx_offset=gpx_offset,
                 flight_id=flight_id,
+                overlay_only=overlay_only,
+                overlay_size=overlay_size,
             )
     except Exception:
         shutil.rmtree(work_dir, ignore_errors=True)
@@ -2090,11 +2107,13 @@ def _create_gopro_overlay_job_from_paths(
     output_dir: str | None = None,
     gpx_offset: float = 0.0,
     flight_id: str | None = None,
+    overlay_only: bool = False,
+    overlay_size: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
     if output_resolution not in _OUTPUT_RESOLUTIONS:
         raise ValueError("Unknown output resolution")
     output_name = _safe_filename(output_filename, f"gopro-overlay-{job_id}.mp4")
-    if Path(output_name).suffix.lower() != ".mp4":
+    if not overlay_only and Path(output_name).suffix.lower() != ".mp4":
         output_name = f"{Path(output_name).stem}.mp4"
     output_path = _output_path_for_dir(output_dir, video_path, output_name)
 
@@ -2116,6 +2135,8 @@ def _create_gopro_overlay_job_from_paths(
         output_resolution=output_resolution,
         gpx_offset=gpx_offset,
         render_method=render_method,
+        overlay_only=overlay_only,
+        overlay_size=overlay_size,
     )
 
     now = _utc_now_dt()
@@ -2247,6 +2268,9 @@ def _run_job(job_id: str) -> None:
     ]
     if video_time_start := prepared_command.get("video_time_start"):
         command[4:4] = ["--video-time-start", str(video_time_start)]
+    overlay_only = bool(prepared_command.get("overlay_only"))
+    if overlay_only:
+        command.extend(["--generate", "overlay"])
     if config.GOPRO_OVERLAY_FONT:
         command.extend(["--font", config.GOPRO_OVERLAY_FONT])
     if config.GOPRO_OVERLAY_CONFIG_DIR:
@@ -2257,7 +2281,7 @@ def _run_job(job_id: str) -> None:
     if accelerator == "nvidia" and profile == "nnvgpu" and not ffmpeg_supports_cuda_overlay():
         logger.warning("CUDA overlay filters unavailable; using nvgpu profile")
         profile = "nvgpu"
-    gpu_render_enabled = accelerator == "nvidia" and bool(profile)
+    gpu_render_enabled = not overlay_only and accelerator == "nvidia" and bool(profile)
     render_method = "gpu" if gpu_render_enabled else "cpu"
 
     if gpu_render_enabled:
@@ -2271,6 +2295,9 @@ def _run_job(job_id: str) -> None:
             config.VIDEO_ACCELERATOR,
             profile or "<none>",
         )
+        if overlay_only:
+            command.extend(["--profile", "overlay"])
+            cpu_command.extend(["--profile", "overlay"])
     common_args: list[str] = []
     if job.get("video_width") and job.get("video_height"):
         common_args.extend(["--overlay-size", f"{job['video_width']}x{job['video_height']}"])
@@ -2296,8 +2323,10 @@ def _run_job(job_id: str) -> None:
     )
 
     video_duration = probe_video_duration(Path(str(job["video_path"])))
-    if video_duration is not None and video_duration > max(
-        30, config.GOPRO_OVERLAY_SEGMENT_SECONDS
+    if (
+        not overlay_only
+        and video_duration is not None
+        and video_duration > max(30, config.GOPRO_OVERLAY_SEGMENT_SECONDS)
     ):
         _run_segmented_overlay_job(
             job_id,
