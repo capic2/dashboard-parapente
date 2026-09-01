@@ -137,6 +137,7 @@ def _prepare_calibrated_highlight_gpx(
     *,
     gpx_offset: float,
     video_duration: float,
+    heartbeat_callback: Callable[[], None] | None = None,
 ) -> Path:
     """Reuse the regular GoPro export OSV/GPX calibration for highlights."""
     from gopro_overlay_export import _merge_osv_files_with_gpx
@@ -151,14 +152,36 @@ def _prepare_calibrated_highlight_gpx(
     )
     if not osv_paths:
         raise ValueError("Le calage GoPro Overlay nécessite le fichier OSV du vol")
-    return _merge_osv_files_with_gpx(
-        osv_paths,
-        gpx_path,
-        output_dir,
-        gpx_offset=gpx_offset,
-        video_duration=video_duration,
-        first_gpx_at=0.0,
-    )
+
+    heartbeat_stop = threading.Event()
+
+    def heartbeat() -> None:
+        if heartbeat_callback is None:
+            return
+        while not heartbeat_stop.wait(15):
+            heartbeat_callback()
+
+    if heartbeat_callback:
+        heartbeat_callback()
+        heartbeat_thread = threading.Thread(target=heartbeat, daemon=True)
+        heartbeat_thread.start()
+    else:
+        heartbeat_thread = None
+    try:
+        return _merge_osv_files_with_gpx(
+            osv_paths,
+            gpx_path,
+            output_dir,
+            gpx_offset=gpx_offset,
+            video_duration=video_duration,
+            first_gpx_at=0.0,
+        )
+    finally:
+        heartbeat_stop.set()
+        if heartbeat_thread is not None:
+            # Do not allow a final heartbeat to overwrite a later render
+            # stage after the OSV merge has completed.
+            heartbeat_thread.join()
 
 
 def _source_timeline_start(source_path: Path, gpx_path: Path) -> datetime:
@@ -1412,6 +1435,25 @@ def process_highlight_video_job(job_id: str) -> None:
             gpx_path = None
         if gpx_path:
             try:
+                calibration_started_at = time.monotonic()
+
+                def gpx_calibration_heartbeat() -> None:
+                    elapsed_seconds = max(0, round(time.monotonic() - calibration_started_at))
+                    _update_job(
+                        job_id,
+                        progress=31,
+                        message=(
+                            "Calage GPX : fusion des fichiers OSV en cours "
+                            f"({elapsed_seconds // 60} min {elapsed_seconds % 60:02d} s)"
+                        ),
+                    )
+
+                _set_job_stage(
+                    job_id,
+                    progress=31,
+                    stage="gpx_calibration",
+                    message="Calage GPX : préparation de la fusion des fichiers OSV",
+                )
                 logger.info(
                     "Highlight GPX calibration started: job_id=%s gpx=%s offset=%.3f",
                     job_id,
@@ -1424,6 +1466,7 @@ def process_highlight_video_job(job_id: str) -> None:
                     output_dir,
                     gpx_offset=offset,
                     video_duration=duration_seconds,
+                    heartbeat_callback=gpx_calibration_heartbeat,
                 )
                 logger.info("Highlight GPX analysis started: job_id=%s gpx=%s", job_id, gpx_path)
                 _normalized_gpx, track_points = normalize_track(
