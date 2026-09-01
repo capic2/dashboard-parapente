@@ -287,6 +287,29 @@ def test_highlight_gpx_reuses_regular_overlay_osv_calibration(tmp_path: Path) ->
     )
 
 
+def test_highlight_gpx_calibration_reports_a_heartbeat(tmp_path: Path) -> None:
+    source = tmp_path / "pano.mp4"
+    gpx = tmp_path / "external.gpx"
+    osv = tmp_path / "CAM_0001_D.OSV"
+    output_dir = tmp_path / "highlights"
+    source.touch()
+    gpx.touch()
+    osv.touch()
+    heartbeats: list[None] = []
+
+    with patch("gopro_overlay_export._merge_osv_files_with_gpx", return_value=gpx):
+        _prepare_calibrated_highlight_gpx(
+            source,
+            gpx,
+            output_dir,
+            gpx_offset=0.0,
+            video_duration=10.0,
+            heartbeat_callback=lambda: heartbeats.append(None),
+        )
+
+    assert heartbeats == [None]
+
+
 def test_worker_restart_recovers_and_requeues_active_highlight_jobs(test_db, monkeypatch):
     monkeypatch.setattr(highlight_video_worker, "SessionLocal", test_db)
     monkeypatch.setattr("job_queue.is_rq_enabled", lambda: True)
