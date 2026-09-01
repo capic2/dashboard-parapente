@@ -3911,6 +3911,7 @@ def test_run_job_passes_configured_font(monkeypatch: pytest.MonkeyPatch, tmp_pat
     monkeypatch.setattr(config, "GOPRO_OVERLAY_RENDER_DEVICE", str(render_device_path))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PROFILE", "nvgpu")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_FONT", "/fonts/LiberationSans-Regular.ttf")
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: None)
     monkeypatch.setattr(
         gopro_overlay_export,
         "check_gopro_overlay_dependencies",
@@ -3940,6 +3941,56 @@ def test_run_job_passes_configured_font(monkeypatch: pytest.MonkeyPatch, tmp_pat
         gopro_overlay_export._JOBS.pop(job_id, None)
         gopro_overlay_export._PROCESSES.pop(job_id, None)
         render_device_path.unlink(missing_ok=True)
+
+
+def test_run_job_generates_full_flight_overlay_from_gpx_only(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    job_id = "full-flight-overlay-job"
+    timeline_path = tmp_path / "timeline.mp4"
+    output_path = tmp_path / "full-flight-overlay.mov"
+    gopro_overlay_export._JOBS[job_id] = {
+        "job_id": job_id,
+        "status": "queued",
+        "progress": 0,
+        "message": "Overlay queued",
+        "gpx_path": str(tmp_path / "track.gpx"),
+        "layout_path": str(tmp_path / "layout.xml"),
+        "video_path": str(timeline_path),
+        "output_path": str(output_path),
+        "pip_path": None,
+        "video_width": 1920,
+        "video_height": 1080,
+        "command": {"overlay_only": True},
+        "updated_at": "2026-01-01T00:00:00+00:00",
+    }
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PROFILE", "nnvgpu")
+    monkeypatch.setattr(config, "VIDEO_ACCELERATOR", "cpu")
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "check_gopro_overlay_dependencies",
+        lambda: {"gopro_dashboard": True, "ffmpeg": True, "ffprobe": True},
+    )
+
+    class FailedProcess:
+        stdout: list[str] = []
+
+        def wait(self) -> int:
+            return 1
+
+    try:
+        with patch("gopro_overlay_export.subprocess.Popen", return_value=FailedProcess()) as popen:
+            gopro_overlay_export._run_job(job_id)
+
+        command = popen.call_args.args[0]
+        assert "--use-gpx-only" in command
+        assert "--generate" not in command
+        assert command[command.index("--profile") + 1] == "overlay"
+        assert str(timeline_path) not in command
+        assert command[-1] == str(output_path.with_name(f".full-flight-overlay.{job_id}.part.mov"))
+    finally:
+        gopro_overlay_export._JOBS.pop(job_id, None)
+        gopro_overlay_export._PROCESSES.pop(job_id, None)
 
 
 def test_run_job_passes_configured_overlay_gpu_args(monkeypatch, tmp_path):
