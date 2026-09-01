@@ -2294,8 +2294,11 @@ def _run_job(job_id: str) -> None:
             profile or "<none>",
         )
         if overlay_only:
-            command.extend(["--profile", "overlay"])
-            cpu_command.extend(["--profile", "overlay"])
+            # ``mov`` is GoPro Dashboard's built-in PNG-in-MOV profile.  It
+            # preserves the alpha channel needed when compositing each scene.
+            # There is no built-in ``overlay`` profile in Dashboard 0.133.
+            command.extend(["--profile", "mov"])
+            cpu_command.extend(["--profile", "mov"])
     common_args: list[str] = []
     if job.get("video_width") and job.get("video_height"):
         common_args.extend(["--overlay-size", f"{job['video_width']}x{job['video_height']}"])
