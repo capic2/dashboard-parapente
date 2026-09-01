@@ -519,6 +519,72 @@ def _smoothed_track_elevations(track_points: list[TrackPoint]) -> list[float]:
     return [float(np.median(padded[index : index + window])) for index in range(elevations.size)]
 
 
+def _horizontal_flight_phase_times(
+    track_points: list[TrackPoint],
+) -> tuple[float | None, float | None]:
+    """Detect sustained ground-to-flight and flight-to-ground transitions."""
+    samples = [
+        point
+        for point in track_points
+        if all(key in point for key in ("timestamp", "lat", "lon")) and int(point["timestamp"]) >= 0
+    ]
+    if len(samples) < 3:
+        return None, None
+
+    start_timestamp = int(samples[0]["timestamp"])
+    times = np.asarray(
+        [(int(point["timestamp"]) - start_timestamp) / 1000 for point in samples],
+        dtype=np.float64,
+    )
+    if times[-1] < 20:
+        return None, None
+
+    transition_window_seconds = min(8.0, max(4.0, float(times[-1]) / 40))
+
+    def window_index(index: int, seconds: float) -> int:
+        target = times[index] + seconds
+        if seconds >= 0:
+            return min(len(samples) - 1, int(np.searchsorted(times, target, side="left")))
+        return max(0, int(np.searchsorted(times, target, side="right") - 1))
+
+    def average_speed(start_index: int, end_index: int) -> float:
+        elapsed = float(times[end_index] - times[start_index])
+        if elapsed <= 0:
+            return 0.0
+        return (
+            haversine_distance(
+                samples[start_index]["lat"],
+                samples[start_index]["lon"],
+                samples[end_index]["lat"],
+                samples[end_index]["lon"],
+            )
+            * 1000
+            / elapsed
+        )
+
+    takeoff: float | None = None
+    for index in range(1, len(samples) - 1):
+        previous = window_index(index, -transition_window_seconds)
+        following = window_index(index, transition_window_seconds)
+        if following == index or times[following] - times[index] < transition_window_seconds * 0.8:
+            continue
+        if average_speed(previous, index) <= 1.5 and average_speed(index, following) >= 3.0:
+            takeoff = float(times[index] + transition_window_seconds / 2)
+            break
+
+    landing: float | None = None
+    for index in range(len(samples) // 2, len(samples) - 1):
+        previous = window_index(index, -transition_window_seconds)
+        following = window_index(index, transition_window_seconds)
+        if following == index or times[following] - times[index] < transition_window_seconds * 0.8:
+            continue
+        if average_speed(previous, index) >= 3.0 and average_speed(index, following) <= 1.0:
+            landing = float(times[index] + transition_window_seconds / 2)
+            break
+
+    return takeoff, landing
+
+
 def _flight_phase_times(
     track_points: list[TrackPoint],
 ) -> tuple[float | None, float | None]:
@@ -628,7 +694,68 @@ def _flight_phase_times(
                 landing = float(times[descent_end] + (times[index] - times[descent_end]) / 2)
                 break
 
-    return takeoff, landing
+    horizontal_takeoff, horizontal_landing = _horizontal_flight_phase_times(track_points)
+    return horizontal_takeoff or takeoff, horizontal_landing or landing
+
+
+def _refine_visual_phase_time(
+    source_path: Path,
+    candidate_seconds: float,
+    duration_seconds: float,
+) -> float:
+    """Refine a telemetry phase candidate using nearby full-panorama image motion."""
+    radius_seconds = 4.0
+    start_seconds = max(0.0, candidate_seconds - radius_seconds)
+    end_seconds = min(duration_seconds, candidate_seconds + radius_seconds)
+    sample_duration = end_seconds - start_seconds
+    width, height = 320, 160
+    frame_size = width * height
+    if sample_duration < 2:
+        return candidate_seconds
+    try:
+        result = subprocess.run(
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-skip_frame",
+                "nokey",
+                "-ss",
+                f"{start_seconds:.3f}",
+                "-i",
+                str(source_path),
+                "-t",
+                f"{sample_duration:.3f}",
+                "-vf",
+                "fps=1,scale=320:160,format=gray",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "gray",
+                "pipe:1",
+            ],
+            check=True,
+            capture_output=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        logger.exception("Unable to refine highlight phase visually at %.1fs", candidate_seconds)
+        return candidate_seconds
+
+    frames = [
+        np.frombuffer(result.stdout[index : index + frame_size], dtype=np.uint8).reshape(
+            height, width
+        )
+        for index in range(0, len(result.stdout) - frame_size + 1, frame_size)
+    ]
+    if len(frames) < 2:
+        return candidate_seconds
+    motion = [
+        float(np.abs(current.astype(np.int16) - previous.astype(np.int16)).mean())
+        for previous, current in zip(frames, frames[1:], strict=False)
+    ]
+    peak_index = int(np.argmax(motion)) + 1
+    refined = start_seconds + peak_index
+    return min(end_seconds, max(start_seconds, refined))
 
 
 def select_highlight_clips(
@@ -681,14 +808,18 @@ def select_flight_event_clips(
         max(clip_length, duration_seconds),
     )
     takeoff_center, landing_center = visual_phase_centers or (0.0, duration_seconds)
+    # Show the preparation/run before liftoff and the final approach before
+    # touchdown instead of centring both events in generic symmetric windows.
+    takeoff_context = event_clip_length * 0.75
+    landing_context = event_clip_length * 0.875
     takeoff_clip = HighlightClip(
-        max(0.0, min(duration_seconds - event_clip_length, takeoff_center - event_clip_length / 2)),
+        max(0.0, min(duration_seconds - event_clip_length, takeoff_center - takeoff_context)),
         event_clip_length,
         0.0,
         "takeoff",
     )
     landing_clip = HighlightClip(
-        max(0.0, min(duration_seconds - event_clip_length, landing_center - event_clip_length / 2)),
+        max(0.0, min(duration_seconds - event_clip_length, landing_center - landing_context)),
         event_clip_length,
         0.0,
         "landing",
@@ -715,10 +846,9 @@ def select_flight_event_clips(
     timestamps = [timestamp for timestamp, _elevation in samples]
     if len(samples) < 2:
         return fill_with_visual_clips()
-    track_duration = max(1.0, (timestamps[-1] - timestamps[0]) / 1000)
 
     def video_time(track_seconds: float) -> float:
-        return min(duration_seconds, max(0.0, track_seconds / track_duration * duration_seconds))
+        return min(duration_seconds, max(0.0, track_seconds))
 
     phases: list[tuple[str, float]] = []
     elevations = [elevation for _timestamp, elevation in samples]
@@ -1216,27 +1346,33 @@ def process_highlight_video_job(job_id: str) -> None:
         # pick a camera shake or a turn and cut away the real takeoff/landing.
         telemetry_takeoff, telemetry_landing = _flight_phase_times(track_points)
         if telemetry_takeoff is not None or telemetry_landing is not None:
-            track_timestamps = [
-                int(point["timestamp"])
-                for point in track_points
-                if "timestamp" in point and int(point["timestamp"]) >= 0
-            ]
-            track_duration = max(
-                1.0,
-                (max(track_timestamps) - min(track_timestamps)) / 1000,
-            )
 
             def to_video_time(track_seconds: float | None, fallback: float) -> float:
                 if track_seconds is None:
                     return fallback
-                return min(
-                    duration_seconds, max(0.0, track_seconds / track_duration * duration_seconds)
+                telemetry_candidate = min(duration_seconds, max(0.0, track_seconds))
+                return _refine_visual_phase_time(
+                    source_path,
+                    telemetry_candidate,
+                    duration_seconds,
                 )
 
-            visual_fallback = _visual_phase_centers(source_path, duration_seconds)
+            visual_fallback = (
+                _visual_phase_centers(source_path, duration_seconds)
+                if telemetry_takeoff is None or telemetry_landing is None
+                else (0.0, duration_seconds)
+            )
             phase_centers = (
                 to_video_time(telemetry_takeoff, visual_fallback[0]),
                 to_video_time(telemetry_landing, visual_fallback[1]),
+            )
+            logger.info(
+                "Highlight phase detection: job_id=%s telemetry_takeoff=%s telemetry_landing=%s visual_takeoff=%.1f visual_landing=%.1f",
+                job_id,
+                telemetry_takeoff,
+                telemetry_landing,
+                phase_centers[0],
+                phase_centers[1],
             )
         else:
             phase_centers = _visual_phase_centers(source_path, duration_seconds)

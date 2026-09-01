@@ -18,7 +18,9 @@ from highlight_video_worker import (
     _render_method_for_accelerator,
     _set_job_stage,
     cleanup_highlight_job_files,
+    _horizontal_flight_phase_times,
     _flight_phase_times,
+    _refine_visual_phase_time,
     _render_gopro_overlay,
     select_flight_event_clips,
 )
@@ -94,11 +96,11 @@ def test_best_yaw_allows_a_face_view_when_no_clearer_view_exists(tmp_path: Path)
     )
 
 
-def test_output_dimensions_keep_2_to_1_pano_at_worker_width(tmp_path: Path) -> None:
+def test_output_dimensions_use_the_16_to_9_highlight_export(tmp_path: Path) -> None:
     source_path = tmp_path / "pano.mp4"
     source_path.touch()
     with patch("highlight_video_worker._probe_video_dimensions", return_value=(7680, 3840)):
-        assert _output_dimensions(source_path) == (1920, 960)
+        assert _output_dimensions(source_path) == (1920, 1080)
 
 
 def test_best_yaw_prefers_clear_centre_over_a_face_filling_the_view(tmp_path: Path) -> None:
@@ -564,10 +566,9 @@ def test_event_selection_uses_visual_activity_for_phases_without_fixed_offsets()
         [HighlightClip(42, 8, 0, "dynamic"), HighlightClip(520, 8, 0, "dynamic")],
     )
 
-    assert [(clip.category, clip.start_seconds) for clip in clips[:2]] == [
-        ("takeoff", 0),
-        ("landing", 584),
-    ]
+    phases = {clip.category: clip.start_seconds for clip in clips}
+    assert phases["takeoff"] == 0
+    assert phases["landing"] == 584
 
 
 def test_thermal_selection_uses_sustained_climb_not_single_altitude_spike():
@@ -616,6 +617,67 @@ def test_flight_phase_detection_uses_stationary_position_when_altitude_drifts():
     _takeoff, landing = _flight_phase_times(points)
 
     assert landing is not None and 45 < landing < 55
+
+
+def test_horizontal_phase_detection_handles_a_downhill_takeoff_and_landing():
+    points = []
+    for second in range(50):
+        if 10 <= second < 35:
+            longitude = 6.0 + (second - 10) * 10 / 111_000
+        elif second >= 35:
+            longitude = 6.0 + 25 * 10 / 111_000
+        else:
+            longitude = 6.0
+        points.append(
+            {
+                "timestamp": second * 1_000,
+                "lat": 47.0,
+                "lon": longitude,
+                # A ridge launch can descend continuously after takeoff.
+                "elevation": 800 - max(0, second - 10),
+            }
+        )
+
+    takeoff, landing = _horizontal_flight_phase_times(points)
+
+    assert takeoff is not None and 10 <= takeoff <= 18
+    assert landing is not None and 35 <= landing <= 43
+
+
+def test_visual_phase_refinement_uses_the_strongest_nearby_image_transition(
+    tmp_path: Path,
+) -> None:
+    frames = [
+        np.zeros((160, 320), dtype=np.uint8),
+        np.full((160, 320), 1, dtype=np.uint8),
+        np.full((160, 320), 100, dtype=np.uint8),
+    ]
+    with patch(
+        "highlight_video_worker.subprocess.run",
+        return_value=Mock(stdout=b"".join(frame.tobytes() for frame in frames)),
+    ):
+        refined = _refine_visual_phase_time(tmp_path / "pano.mp4", 10, 60)
+
+    assert refined == 8
+
+
+def test_event_selection_keeps_context_before_takeoff_and_landing() -> None:
+    clips = select_flight_event_clips(
+        421,
+        None,
+        [HighlightClip(200, 8, 0, "dynamic")],
+        visual_phase_centers=(74, 396),
+    )
+
+    phase_clips = {clip.category: clip for clip in clips if clip.category in {"takeoff", "landing"}}
+    assert (phase_clips["takeoff"].start_seconds, phase_clips["takeoff"].duration_seconds) == (
+        62,
+        16,
+    )
+    assert (phase_clips["landing"].start_seconds, phase_clips["landing"].duration_seconds) == (
+        382,
+        16,
+    )
 
 
 def test_event_selection_prefers_gpx_phases_over_visual_activity():
