@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 import redis
@@ -65,6 +66,28 @@ def delete_job(job_id: str, queue_name: str | None = None) -> bool:
         return False
     if _job_status_value(job) == "started":
         send_stop_job_command(queue.connection, job_id)
+    _delete_stale_job(job)
+    return True
+
+
+def delete_stale_started_job(
+    job_id: str,
+    *,
+    stale_before: datetime,
+    queue_name: str | None = None,
+) -> bool:
+    """Delete an orphaned started job only after its RQ heartbeat expires."""
+    queue = get_queue(queue_name)
+    job = queue.fetch_job(job_id)
+    if job is None or _job_status_value(job) != "started":
+        return False
+    heartbeat = job.last_heartbeat or job.started_at or job.enqueued_at
+    if heartbeat is None:
+        return False
+    if heartbeat.tzinfo is not None and stale_before.tzinfo is None:
+        heartbeat = heartbeat.replace(tzinfo=None)
+    if heartbeat >= stale_before:
+        return False
     _delete_stale_job(job)
     return True
 

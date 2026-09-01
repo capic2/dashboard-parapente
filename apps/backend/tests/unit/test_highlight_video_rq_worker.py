@@ -1,3 +1,4 @@
+import threading
 from unittest.mock import Mock
 
 import config
@@ -26,3 +27,18 @@ def test_worker_listens_to_dedicated_highlight_queue(monkeypatch) -> None:
     recover_highlights.assert_called_once_with(recover_active=True)
     worker_factory.assert_called_once_with([queue], connection="redis")
     worker.work.assert_called_once_with(with_scheduler=True)
+
+
+def test_reconciliation_requeues_missing_highlight_jobs(monkeypatch) -> None:
+    stop_event = Mock(spec=threading.Event)
+    stop_event.wait.side_effect = [False, True]
+    enqueue = Mock(return_value=1)
+    monkeypatch.setattr(
+        highlight_video_rq_worker,
+        "enqueue_pending_highlight_video_jobs",
+        enqueue,
+    )
+
+    highlight_video_rq_worker._reconciliation_loop(stop_event)
+
+    enqueue.assert_called_once_with(recover_active=True)

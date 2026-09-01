@@ -56,9 +56,10 @@ def _run_worker() -> None:
 
 
 def main() -> None:
-    recovered_count = enqueue_pending_video_export_jobs(
-        recover_active=True
-    ) + enqueue_pending_highlight_video_jobs(recover_active=True)
+    # The dedicated highlight worker owns recovery of running highlight jobs.
+    # Recovering them here races with that worker during a deployment and can
+    # reset a job that has already started processing.
+    recovered_count = enqueue_pending_video_export_jobs(recover_active=True)
     if recovered_count:
         logger.info("Enqueued %s recovered media job(s)", recovered_count)
 

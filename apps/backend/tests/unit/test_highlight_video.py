@@ -223,6 +223,14 @@ def test_worker_restart_recovers_and_requeues_active_highlight_jobs(test_db, mon
         "_enqueue_highlight_video_job_in_rq",
         lambda job_id: enqueued.append(job_id),
     )
+    deleted: list[tuple[str, str | None]] = []
+    monkeypatch.setattr(
+        "job_queue.delete_stale_started_job",
+        lambda job_id, stale_before, queue_name=None: deleted.append((job_id, queue_name)) or True,
+    )
+    stale_at = datetime.utcnow() - timedelta(
+        seconds=highlight_video_worker.HIGHLIGHT_JOB_LEASE_SECONDS + 1
+    )
     with test_db() as db:
         db.add(Flight(id="flight-recover", name="Recover", flight_date=date(2026, 8, 28)))
         db.add_all(
@@ -234,6 +242,7 @@ def test_worker_restart_recovers_and_requeues_active_highlight_jobs(test_db, mon
                     progress=10,
                     message="Analyse en cours",
                     source_video_path="/tmp/pano.mp4",
+                    updated_at=stale_at,
                 ),
                 HighlightVideoJob(
                     id="highlight-queued",
@@ -248,6 +257,16 @@ def test_worker_restart_recovers_and_requeues_active_highlight_jobs(test_db, mon
 
     assert highlight_video_worker.enqueue_pending_highlight_video_jobs(recover_active=True) == 2
     assert enqueued == ["highlight-running", "highlight-queued"]
+    assert set(deleted) == {
+        (
+            "highlight-video-highlight-running",
+            highlight_video_worker.config.HIGHLIGHT_QUEUE_NAME,
+        ),
+        (
+            "highlight-video-highlight-queued",
+            highlight_video_worker.config.HIGHLIGHT_QUEUE_NAME,
+        ),
+    }
 
     with test_db() as db:
         recovered = db.get(HighlightVideoJob, "highlight-running")
@@ -256,6 +275,116 @@ def test_worker_restart_recovers_and_requeues_active_highlight_jobs(test_db, mon
         assert recovered.progress == 0
         assert recovered.message == "Récupéré après le redémarrage du worker"
         assert recovered.started_at is None
+
+
+def test_worker_restart_keeps_live_highlight_job_running(test_db, monkeypatch) -> None:
+    monkeypatch.setattr(highlight_video_worker, "SessionLocal", test_db)
+    monkeypatch.setattr("job_queue.is_rq_enabled", lambda: True)
+    enqueued = Mock()
+    delete_stale = Mock(return_value=False)
+    monkeypatch.setattr(highlight_video_worker, "_enqueue_highlight_video_job_in_rq", enqueued)
+    monkeypatch.setattr("job_queue.delete_stale_started_job", delete_stale)
+    with test_db() as db:
+        db.add(Flight(id="flight-live", name="Live", flight_date=date(2026, 9, 1)))
+        db.add(
+            HighlightVideoJob(
+                id="highlight-live",
+                flight_id="flight-live",
+                status="running",
+                progress=40,
+                source_video_path="/tmp/pano.mp4",
+                updated_at=datetime.utcnow(),
+            )
+        )
+        db.commit()
+
+    assert highlight_video_worker.enqueue_pending_highlight_video_jobs(recover_active=True) == 0
+    enqueued.assert_not_called()
+    delete_stale.assert_not_called()
+
+    with test_db() as db:
+        live = db.get(HighlightVideoJob, "highlight-live")
+        assert live is not None
+        assert live.status == "running"
+        assert live.progress == 40
+
+
+def test_atomic_recovery_rechecks_lease_after_candidate_selection(test_db, monkeypatch) -> None:
+    monkeypatch.setattr(highlight_video_worker, "SessionLocal", test_db)
+    stale_at = datetime.utcnow() - timedelta(
+        seconds=highlight_video_worker.HIGHLIGHT_JOB_LEASE_SECONDS + 1
+    )
+    heartbeat_at = datetime.utcnow()
+    with test_db() as db:
+        db.add(Flight(id="flight-race", name="Race", flight_date=date(2026, 9, 1)))
+        db.add(
+            HighlightVideoJob(
+                id="highlight-race",
+                flight_id="flight-race",
+                status="running",
+                progress=30,
+                source_video_path="/tmp/pano.mp4",
+                updated_at=stale_at,
+            )
+        )
+        db.commit()
+
+    # Simulate a heartbeat arriving after the stale candidate was read but
+    # immediately before the conditional recovery UPDATE.
+    with test_db() as db:
+        job = db.get(HighlightVideoJob, "highlight-race")
+        assert job is not None
+        job.updated_at = heartbeat_at
+        db.commit()
+        recovered = highlight_video_worker._recover_stale_running_job(
+            db,
+            "highlight-race",
+            stale_before=heartbeat_at - timedelta(minutes=5),
+            recovered_at=heartbeat_at,
+        )
+
+    assert recovered is False
+    with test_db() as db:
+        job = db.get(HighlightVideoJob, "highlight-race")
+        assert job is not None
+        assert job.status == "running"
+
+
+def test_old_execution_cannot_update_reclaimed_job(test_db, monkeypatch) -> None:
+    monkeypatch.setattr(highlight_video_worker, "SessionLocal", test_db)
+    old_started_at = datetime.utcnow() - timedelta(minutes=10)
+    new_started_at = datetime.utcnow()
+    with test_db() as db:
+        db.add(Flight(id="flight-fenced", name="Fenced", flight_date=date(2026, 9, 1)))
+        db.add(
+            HighlightVideoJob(
+                id="highlight-fenced",
+                flight_id="flight-fenced",
+                status="running",
+                progress=5,
+                source_video_path="/tmp/pano.mp4",
+                started_at=new_started_at,
+            )
+        )
+        db.commit()
+
+    with highlight_video_worker._ACTIVE_EXECUTION_LOCK:
+        highlight_video_worker._ACTIVE_EXECUTION_STARTED_AT["highlight-fenced"] = old_started_at
+    try:
+        highlight_video_worker._update_job(
+            "highlight-fenced",
+            status="completed",
+            progress=100,
+        )
+    finally:
+        with highlight_video_worker._ACTIVE_EXECUTION_LOCK:
+            highlight_video_worker._ACTIVE_EXECUTION_STARTED_AT.pop("highlight-fenced", None)
+
+    with test_db() as db:
+        job = db.get(HighlightVideoJob, "highlight-fenced")
+        assert job is not None
+        assert job.status == "running"
+        assert job.progress == 5
 
 
 def test_highlight_jobs_are_enqueued_on_the_dedicated_queue(monkeypatch) -> None:

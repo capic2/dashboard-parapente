@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 
 from rq import Worker
 
@@ -15,6 +16,17 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+def _reconciliation_loop(stop_event: threading.Event) -> None:
+    """Continuously restore queued database jobs missing from Redis."""
+    while not stop_event.wait(config.JOB_QUEUE_RECONCILIATION_INTERVAL_SECONDS):
+        try:
+            queued_count = enqueue_pending_highlight_video_jobs(recover_active=True)
+            if queued_count:
+                logger.info("Reconciled %s pending highlight video job(s)", queued_count)
+        except Exception:
+            logger.warning("Could not reconcile pending highlight video jobs", exc_info=True)
 
 
 def main() -> None:
@@ -31,7 +43,19 @@ def main() -> None:
         "Starting highlight video RQ worker for queue '%s'",
         config.HIGHLIGHT_QUEUE_NAME,
     )
-    worker.work(with_scheduler=True)
+    stop_reconciliation = threading.Event()
+    reconciliation_thread = threading.Thread(
+        target=_reconciliation_loop,
+        args=(stop_reconciliation,),
+        name="highlight-video-queue-reconciliation",
+        daemon=True,
+    )
+    reconciliation_thread.start()
+    try:
+        worker.work(with_scheduler=True)
+    finally:
+        stop_reconciliation.set()
+        reconciliation_thread.join(timeout=5)
 
 
 if __name__ == "__main__":

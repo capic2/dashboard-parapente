@@ -1,13 +1,23 @@
 """Unit tests for RQ queue helpers."""
 
+from datetime import datetime, timedelta
+
 import job_queue
 
 
 class FakeJob:
-    def __init__(self, status: str, delete_error: Exception | None = None):
+    def __init__(
+        self,
+        status: str,
+        delete_error: Exception | None = None,
+        last_heartbeat: datetime | None = None,
+    ):
         self.status = status
         self.delete_error = delete_error
         self.deleted = False
+        self.last_heartbeat = last_heartbeat
+        self.started_at = None
+        self.enqueued_at = None
 
     def get_status(self, refresh: bool = True) -> str:
         return self.status
@@ -135,3 +145,35 @@ def test_enqueue_once_ignores_incomplete_rq_execution_metadata(monkeypatch):
 
     assert result == queue.enqueued[0]
     assert queue.enqueued[0]["kwargs"]["job_id"] == "video-export-job-recovered"
+
+
+def test_delete_stale_started_job_preserves_live_heartbeat(monkeypatch) -> None:
+    now = datetime.utcnow()
+    existing_job = FakeJob("started", last_heartbeat=now)
+    queue = FakeQueue(existing_job)
+    monkeypatch.setattr(job_queue, "get_queue", lambda _name=None: queue)
+
+    deleted = job_queue.delete_stale_started_job(
+        "highlight-video-live",
+        stale_before=now - timedelta(minutes=5),
+        queue_name="highlight_videos",
+    )
+
+    assert deleted is False
+    assert existing_job.deleted is False
+
+
+def test_delete_stale_started_job_removes_expired_heartbeat(monkeypatch) -> None:
+    now = datetime.utcnow()
+    existing_job = FakeJob("started", last_heartbeat=now - timedelta(minutes=10))
+    queue = FakeQueue(existing_job)
+    monkeypatch.setattr(job_queue, "get_queue", lambda _name=None: queue)
+
+    deleted = job_queue.delete_stale_started_job(
+        "highlight-video-orphaned",
+        stale_before=now - timedelta(minutes=5),
+        queue_name="highlight_videos",
+    )
+
+    assert deleted is True
+    assert existing_job.deleted is True

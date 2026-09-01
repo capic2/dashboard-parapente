@@ -19,6 +19,7 @@ from pathlib import Path
 from collections.abc import Callable
 
 import numpy as np
+from sqlalchemy.orm import Session
 
 from database import SessionLocal
 import config
@@ -39,8 +40,6 @@ STATUS_COMPLETED = "completed"
 STATUS_FAILED = "failed"
 STATUS_CANCELLED = "cancelled"
 
-_ACTIVE_STATUSES = {STATUS_QUEUED, STATUS_RUNNING}
-
 # A wider projection keeps the wing, pilot and landscape legible.  A narrower
 # field of view tends to turn a 360° extract into an isolated, unclear detail.
 # Cylindrical projection gives a genuinely wide view without the severe edge
@@ -55,6 +54,12 @@ HIGHLIGHT_OVERLAY_LAYOUT_ID = "parapente-3840"
 # Phase clips must show context around the event: wing inflation before
 # takeoff, and the final approach before touchdown.
 HIGHLIGHT_EVENT_CLIP_LENGTH = 16.0
+# A live render updates its durable job throughout analysis and every 15 seconds
+# while ffmpeg is rendering. Five minutes tolerates slow storage and rolling
+# deployments while still recovering a genuinely orphaned execution promptly.
+HIGHLIGHT_JOB_LEASE_SECONDS = 300
+_ACTIVE_EXECUTION_STARTED_AT: dict[str, datetime] = {}
+_ACTIVE_EXECUTION_LOCK = threading.Lock()
 
 
 def _now() -> datetime:
@@ -851,8 +856,16 @@ def _render_clip(
 
 
 def _update_job(job_id: str, **values: object) -> None:
+    with _ACTIVE_EXECUTION_LOCK:
+        execution_started_at = _ACTIVE_EXECUTION_STARTED_AT.get(job_id)
     with SessionLocal() as db:
-        job = db.query(HighlightVideoJob).filter(HighlightVideoJob.id == job_id).first()
+        query = db.query(HighlightVideoJob).filter(HighlightVideoJob.id == job_id)
+        if execution_started_at is not None:
+            query = query.filter(
+                HighlightVideoJob.status == STATUS_RUNNING,
+                HighlightVideoJob.started_at == execution_started_at,
+            )
+        job = query.first()
         if job is None:
             return
         for key, value in values.items():
@@ -905,27 +918,64 @@ def _queued_job_ids() -> list[str]:
     return [str(job_id) for (job_id,) in jobs]
 
 
-def _recover_active_jobs_after_worker_restart() -> int:
-    """Make interrupted highlight jobs eligible for a fresh RQ execution."""
-    now = _now()
-    with SessionLocal() as db:
-        recovered_count = (
-            db.query(HighlightVideoJob)
-            .filter(HighlightVideoJob.status.in_(_ACTIVE_STATUSES))
-            .update(
-                {
-                    "status": STATUS_QUEUED,
-                    "progress": 0,
-                    "message": "Récupéré après le redémarrage du worker",
-                    "error": None,
-                    "started_at": None,
-                    "updated_at": now,
-                },
-                synchronize_session=False,
-            )
+def _recover_stale_running_job(
+    db: Session,
+    job_id: str,
+    *,
+    stale_before: datetime,
+    recovered_at: datetime,
+) -> bool:
+    """Atomically recover one job only if its lease is still expired."""
+    recovered = (
+        db.query(HighlightVideoJob)
+        .filter(
+            HighlightVideoJob.id == job_id,
+            HighlightVideoJob.status == STATUS_RUNNING,
+            HighlightVideoJob.updated_at < stale_before,
         )
+        .update(
+            {
+                "status": STATUS_QUEUED,
+                "progress": 0,
+                "message": "Récupéré après le redémarrage du worker",
+                "error": None,
+                "started_at": None,
+                "updated_at": recovered_at,
+            },
+            synchronize_session=False,
+        )
+    )
+    return recovered == 1
+
+
+def _recover_active_jobs_after_worker_restart() -> list[str]:
+    """Reset only running jobs whose durable heartbeat lease has expired."""
+    now = _now()
+    stale_before = now - timedelta(seconds=HIGHLIGHT_JOB_LEASE_SECONDS)
+    with SessionLocal() as db:
+        candidate_ids = [
+            str(job_id)
+            for (job_id,) in (
+                db.query(HighlightVideoJob.id)
+                .filter(
+                    HighlightVideoJob.status == STATUS_RUNNING,
+                    HighlightVideoJob.updated_at < stale_before,
+                )
+                .all()
+            )
+        ]
+        recovered_ids = [
+            job_id
+            for job_id in candidate_ids
+            if _recover_stale_running_job(
+                db,
+                job_id,
+                stale_before=stale_before,
+                recovered_at=now,
+            )
+        ]
         db.commit()
-    return int(recovered_count)
+    return recovered_ids
 
 
 def enqueue_highlight_video_job(job_id: str) -> bool:
@@ -947,6 +997,18 @@ def enqueue_pending_highlight_video_jobs(*, recover_active: bool = False) -> int
     if recover_active:
         _recover_active_jobs_after_worker_restart()
     job_ids = _queued_job_ids()
+    if recover_active:
+        from job_queue import delete_stale_started_job
+
+        stale_before = _now() - timedelta(seconds=HIGHLIGHT_JOB_LEASE_SECONDS)
+        for job_id in job_ids:
+            # A database job can be queued while RQ still retains an interrupted
+            # execution as started. Replace it only after its heartbeat expires.
+            delete_stale_started_job(
+                _rq_job_id(job_id),
+                stale_before=stale_before,
+                queue_name=config.HIGHLIGHT_QUEUE_NAME,
+            )
     for job_id in job_ids:
         enqueue_highlight_video_job(job_id)
     return len(job_ids)
@@ -991,6 +1053,8 @@ def process_highlight_video_job(job_id: str) -> None:
         output_path = output_dir / "highlights-original-format.mp4"
         offset = float(job.overlay_offset_seconds or 0.0)
         db.commit()
+        with _ACTIVE_EXECUTION_LOCK:
+            _ACTIVE_EXECUTION_STARTED_AT[job_id] = now
         logger.info(
             "Highlight job running: job_id=%s flight_id=%s source=%s progress=5",
             job.id,
@@ -1108,7 +1172,9 @@ def process_highlight_video_job(job_id: str) -> None:
             def to_video_time(track_seconds: float | None, fallback: float) -> float:
                 if track_seconds is None:
                     return fallback
-                return min(duration_seconds, max(0.0, track_seconds / track_duration * duration_seconds))
+                return min(
+                    duration_seconds, max(0.0, track_seconds / track_duration * duration_seconds)
+                )
 
             visual_fallback = _visual_phase_centers(source_path, duration_seconds)
             phase_centers = (
@@ -1314,6 +1380,10 @@ def process_highlight_video_job(job_id: str) -> None:
         _update_job(
             job_id, status=STATUS_FAILED, progress=100, message="Échec du rendu", error=str(exc)
         )
+    finally:
+        with _ACTIVE_EXECUTION_LOCK:
+            if _ACTIVE_EXECUTION_STARTED_AT.get(job_id) == now:
+                _ACTIVE_EXECUTION_STARTED_AT.pop(job_id, None)
 
 
 def create_highlight_job_id() -> str:
