@@ -1090,7 +1090,33 @@ def process_highlight_video_job(job_id: str) -> None:
             for clip in visual_clips
             if _clip_is_covered_by_gpx(source_timeline_start, clip, track_points)
         ]
-        phase_centers = _visual_phase_centers(source_path, duration_seconds)
+        # Telemetry gives the actual launch/touchdown timeline.  Visual motion
+        # is only a fallback: selecting the strongest motion near an edge can
+        # pick a camera shake or a turn and cut away the real takeoff/landing.
+        telemetry_takeoff, telemetry_landing = _flight_phase_times(track_points)
+        if telemetry_takeoff is not None or telemetry_landing is not None:
+            track_timestamps = [
+                int(point["timestamp"])
+                for point in track_points
+                if "timestamp" in point and int(point["timestamp"]) >= 0
+            ]
+            track_duration = max(
+                1.0,
+                (max(track_timestamps) - min(track_timestamps)) / 1000,
+            )
+
+            def to_video_time(track_seconds: float | None, fallback: float) -> float:
+                if track_seconds is None:
+                    return fallback
+                return min(duration_seconds, max(0.0, track_seconds / track_duration * duration_seconds))
+
+            visual_fallback = _visual_phase_centers(source_path, duration_seconds)
+            phase_centers = (
+                to_video_time(telemetry_takeoff, visual_fallback[0]),
+                to_video_time(telemetry_landing, visual_fallback[1]),
+            )
+        else:
+            phase_centers = _visual_phase_centers(source_path, duration_seconds)
         clips = select_flight_event_clips(
             duration_seconds,
             track_points,
