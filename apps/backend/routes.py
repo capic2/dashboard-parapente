@@ -193,7 +193,7 @@ from video_export_manual import (
     start_video_export_manual,
     start_video_export_manual_fast,
 )
-from weather_pipeline import get_daily_aggregate, get_normalized_forecast
+from weather_pipeline import filter_remaining_hours, get_daily_aggregate, get_normalized_forecast
 from weather_sources import ensure_weather_source_configs
 from youtube_upload import (
     YoutubeConfigurationError,
@@ -3439,6 +3439,8 @@ async def _build_coordinate_weather_payload(
         except (ValueError, IndexError):
             pass
 
+    if days == 1:
+        flyable_consensus = filter_remaining_hours(flyable_consensus, day_index)
     para_result = calculate_para_index(flyable_consensus)
     slots = analyze_hourly_slots(flyable_consensus)
 
@@ -3576,6 +3578,8 @@ async def get_weather(
             pass  # Keep all hours if parsing fails
 
     # Calculate para_index (using only flyable hours)
+    if days == 1:
+        flyable_consensus = filter_remaining_hours(flyable_consensus, day_index)
     para_result = calculate_para_index(flyable_consensus)
 
     # Calculate wind-adjusted score (same logic as best_spot)
@@ -3851,6 +3855,7 @@ async def get_weather_summary(
             pass  # Keep all hours if parsing fails
 
     # Calculate para_index (using only flyable hours)
+    flyable_consensus = filter_remaining_hours(flyable_consensus, day_index)
     para_result = calculate_para_index(flyable_consensus)
 
     # Calculate average wind speed for the day (simplified metric)

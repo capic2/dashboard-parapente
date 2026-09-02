@@ -44,6 +44,24 @@ interface HourlyForecastProps {
 
 type HourlyFlightDecision = FlightDecisionResponse['hourly'][number];
 
+export const isPastForecastHour = (
+  hourLabel: string,
+  dayIndex: number,
+  now: Date = new Date()
+): boolean => {
+  if (dayIndex !== 0) return false;
+
+  const hour = Number.parseInt(hourLabel.split(':')[0] ?? '', 10);
+  const currentHour = Number.parseInt(
+    new Intl.DateTimeFormat('fr-FR', {
+      hour: '2-digit',
+      hourCycle: 'h23',
+    }).format(now),
+    10
+  );
+  return Number.isFinite(hour) && hour < currentHour;
+};
+
 type LaunchWindStatus =
   | 'face'
   | 'travers_acceptable'
@@ -1286,11 +1304,13 @@ export default function HourlyForecast({
               flyabilityReasonLabels
             );
             const FlyabilityIcon = display.Icon;
+            const isPast = isPastForecastHour(hour.hour, dayIndex);
 
             return (
               <article
                 key={index}
-                className={`rounded-2xl border border-slate-200 p-3 shadow-sm dark:border-slate-700 ${getVerdictClass(displayedHour.verdict)}`}
+                className={`rounded-2xl border border-slate-200 p-3 shadow-sm dark:border-slate-700 ${getVerdictClass(displayedHour.verdict)} ${isPast ? 'grayscale opacity-50' : ''}`}
+                data-testid={`hour-card-${hour.hour}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -1543,11 +1563,13 @@ export default function HourlyForecast({
                   hour.sources?.['weatherapi']?.wind_gust ??
                   null;
                 const thermalCeiling = getThermalCeiling(hour);
+                const isPast = isPastForecastHour(hour.hour, dayIndex);
 
                 return (
                   <tr
                     key={index}
-                    className={`border-b border-gray-100 transition-colors dark:border-gray-700 ${getVerdictClass(displayedHour.verdict)}`}
+                    className={`border-b border-gray-100 transition-colors dark:border-gray-700 ${getVerdictClass(displayedHour.verdict)} ${isPast ? 'grayscale opacity-50' : ''}`}
+                    data-testid={`hour-row-${hour.hour}`}
                   >
                     <td className="py-2.5 px-2 font-medium text-center">
                       {hour.hour}
