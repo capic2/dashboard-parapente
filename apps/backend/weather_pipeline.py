@@ -11,6 +11,7 @@ import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from para_index import analyze_hourly_slots, calculate_para_index
 from weather_sources import WEATHER_SOURCE_REGISTRY
@@ -66,6 +67,20 @@ async def _apply_open_meteo_stale_fallback(
 
 
 FULL_CONFIDENCE_SOURCE_BASELINE = 5
+PARIS_TIME_ZONE = ZoneInfo("Europe/Paris")
+
+
+def filter_remaining_hours(
+    hours: list[dict[str, Any]],
+    day_index: int,
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """Keep only forecast hours that have not started yet for today."""
+    if day_index != 0:
+        return hours
+
+    current_time = now.astimezone(PARIS_TIME_ZONE) if now else datetime.now(PARIS_TIME_ZONE)
+    return [hour for hour in hours if int(hour.get("hour", -1)) >= current_time.hour]
 
 
 # ============================================================================
@@ -823,6 +838,9 @@ async def get_daily_aggregate(
             ]
         except (ValueError, IndexError, AttributeError):
             pass  # Keep all hours if parsing fails
+
+    # A "today" score should describe the flying window that is still ahead.
+    flyable_consensus = filter_remaining_hours(flyable_consensus, day_index)
 
     if not flyable_consensus:
         return None
