@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, DatePicker, Button } from '@dashboard-parapente/design-system';
 import { CheckCircle2, CircleAlert, LoaderCircle } from 'lucide-react';
@@ -30,6 +30,7 @@ export function IntervalsSyncModal({
   const [dateTo, setDateTo] = useState(
     () => new Date().toISOString().split('T')[0]
   );
+  const [selectedActivityIds, setSelectedActivityIds] = useState<string[]>([]);
 
   const statusQuery = useIntervalsStatus(isOpen);
   const canPreview = Boolean(statusQuery.data?.configured);
@@ -47,11 +48,33 @@ export function IntervalsSyncModal({
   } = useIntervalsSyncMutation();
   const toast = useToast();
   const invalidRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
+  const activities = previewQuery.data?.activities ?? [];
+
+  useEffect(() => {
+    setSelectedActivityIds(
+      previewQuery.data?.activities.map(({ id }) => id) ?? []
+    );
+  }, [previewQuery.data]);
+
+  const toggleActivity = (activityId: string) => {
+    setSelectedActivityIds((current) =>
+      current.includes(activityId)
+        ? current.filter((id) => id !== activityId)
+        : [...current, activityId]
+    );
+  };
+
+  const allActivitiesSelected =
+    activities.length > 0 && selectedActivityIds.length === activities.length;
 
   const handleSync = () => {
     resetSync();
     syncIntervals(
-      { date_from: dateFrom, date_to: dateTo },
+      {
+        date_from: dateFrom,
+        date_to: dateTo,
+        activity_ids: selectedActivityIds,
+      },
       {
         onSuccess: (result) => {
           toast.success(
@@ -192,36 +215,67 @@ export function IntervalsSyncModal({
                 </p>
               ) : (
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    {t('intervals.candidates', {
-                      count: previewQuery.data.activities.length,
-                    })}
-                  </h3>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      {t('intervals.candidates', { count: activities.length })}
+                    </h3>
+                    <div className="flex gap-2 text-xs">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedActivityIds(activities.map(({ id }) => id))
+                        }
+                        disabled={allActivitiesSelected}
+                        className="cursor-pointer rounded px-1 py-0.5 text-sky-700 underline hover:text-sky-900 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:cursor-default disabled:opacity-50 dark:text-sky-300 dark:hover:text-sky-100"
+                      >
+                        {t('intervals.selectAll')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedActivityIds([])}
+                        disabled={selectedActivityIds.length === 0}
+                        className="cursor-pointer rounded px-1 py-0.5 text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:cursor-default disabled:opacity-50 dark:text-gray-300 dark:hover:text-white"
+                      >
+                        {t('intervals.deselectAll')}
+                      </button>
+                    </div>
+                  </div>
                   <ul
                     className="mt-2 max-h-56 space-y-2 overflow-y-auto"
                     aria-label={t('intervals.candidateList')}
                   >
-                    {previewQuery.data.activities.map((activity) => (
+                    {activities.map((activity) => (
                       <li
                         key={activity.id}
                         className="rounded-md border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800"
                       >
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                              {activity.name}
-                            </p>
-                            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                              {new Date(
-                                activity.start_date_local
-                              ).toLocaleString()}{' '}
-                              · {activity.source} · {activity.file_type}
-                            </p>
+                        <label className="flex cursor-pointer items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedActivityIds.includes(activity.id)}
+                            onChange={() => toggleActivity(activity.id)}
+                            className="mt-0.5 h-4 w-4 cursor-pointer rounded border-gray-300 text-orange-600 focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700"
+                            aria-label={t('intervals.selectActivity', {
+                              name: activity.name,
+                            })}
+                          />
+                          <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                {activity.name}
+                              </p>
+                              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                {new Date(
+                                  activity.start_date_local
+                                ).toLocaleString()}{' '}
+                                · {activity.source} · {activity.file_type}
+                              </p>
+                            </div>
+                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                              {activity.type}
+                            </span>
                           </div>
-                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-200">
-                            {activity.type}
-                          </span>
-                        </div>
+                        </label>
                       </li>
                     ))}
                   </ul>
@@ -275,7 +329,7 @@ export function IntervalsSyncModal({
               !canImport ||
               previewQuery.isLoading ||
               previewQuery.isError ||
-              !previewQuery.data?.activities.length
+              selectedActivityIds.length === 0
             }
             className="min-h-11 cursor-pointer rounded-lg bg-orange-600 px-6 py-2 text-white transition-colors hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
           >

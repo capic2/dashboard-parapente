@@ -224,20 +224,22 @@ export function useIntervalsSyncMutation() {
   return useMutation<
     IntervalsSyncResponse,
     Error,
-    { date_from: string; date_to: string }
+    { date_from: string; date_to: string; activity_ids: string[] }
   >({
     mutationFn: async ({
       date_from,
       date_to,
+      activity_ids,
     }: {
       date_from: string;
       date_to: string;
+      activity_ids: string[];
     }) => {
       let data: unknown;
       try {
         data = await api
           .post('flights/sync-intervals', {
-            json: { date_from, date_to },
+            json: { date_from, date_to, activity_ids },
           })
           .json();
       } catch (error) {
