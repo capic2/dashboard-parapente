@@ -656,6 +656,7 @@ class FlightSummariesResponse(BaseModel):
 class IntervalsSyncRequest(BaseModel):
     date_from: date
     date_to: date
+    activity_ids: list[str] | None = None
 
     @model_validator(mode="after")
     def validate_date_range(self) -> "IntervalsSyncRequest":
