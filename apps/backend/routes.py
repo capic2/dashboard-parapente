@@ -4532,6 +4532,11 @@ async def sync_intervals_activities(
         activities = await client.list_activities(
             request.date_from, request.date_to, config.INTERVALS_ICU_ACTIVITY_TYPES
         )
+        if request.activity_ids is not None:
+            selected_activity_ids = set(request.activity_ids)
+            activities = [
+                activity for activity in activities if activity.id in selected_activity_ids
+            ]
         result = await import_external_activities(
             db,
             "intervals_icu",
