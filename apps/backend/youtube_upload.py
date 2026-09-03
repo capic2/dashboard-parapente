@@ -8,6 +8,7 @@ import logging
 import re
 import threading
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -42,6 +43,9 @@ _EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="youtube-upload
 _SUBMITTED: set[str] = set()
 _SUBMITTED_LOCK = threading.Lock()
 _LOG_TAIL_LINE_COUNT = 100
+_PANORAMA_PREPARATION_PROGRESS_MAX = 10
+_PANORAMA_PREPARATION_POLL_SECONDS = 10
+_PANORAMA_PREPARATION_HEARTBEAT_SECONDS = 60
 
 
 class YoutubeConfigurationError(RuntimeError):
@@ -661,7 +665,12 @@ def _has_spherical_panorama_metadata(video_path: Path) -> bool:
     )
 
 
-def _prepare_upload_video(job_id: str, source_type: str, source_path: Path) -> Path:
+def _prepare_upload_video(
+    job_id: str,
+    source_type: str,
+    source_path: Path,
+    progress_callback: Callable[[int], Any] | None = None,
+) -> Path:
     """Return a YouTube-ready source, injecting 360 metadata for panoramas."""
     if source_type != "pano":
         return source_path
@@ -675,11 +684,58 @@ def _prepare_upload_video(job_id: str, source_type: str, source_path: Path) -> P
     upload_path.parent.mkdir(parents=True, exist_ok=True)
     partial_path = upload_path.with_suffix(".part.mp4")
     partial_path.unlink(missing_ok=True)
+    source_size = source_path.stat().st_size
+    if progress_callback is not None:
+        progress_callback(1)
+    _log_job(
+        job_id,
+        f"Preparing panorama for YouTube: injecting 360° metadata into {source_size} bytes",
+    )
     spherical_xml = metadata_utils.generate_spherical_xml("equirectangular")
     if not isinstance(spherical_xml, str):
         raise RuntimeError("Unable to generate panorama metadata")
     metadata = metadata_utils.Metadata()
     metadata.video = spherical_xml
+    stop_monitor = threading.Event()
+
+    def monitor_preparation() -> None:
+        last_progress = 1
+        last_heartbeat = time.monotonic()
+        while not stop_monitor.wait(_PANORAMA_PREPARATION_POLL_SECONDS):
+            try:
+                prepared_size = partial_path.stat().st_size
+            except FileNotFoundError:
+                prepared_size = 0
+            fraction = min(1.0, prepared_size / source_size) if source_size else 0.0
+            progress = max(
+                1,
+                min(_PANORAMA_PREPARATION_PROGRESS_MAX - 1, int(fraction * 9) + 1),
+            )
+            now = time.monotonic()
+            if progress != last_progress:
+                if progress_callback is not None:
+                    progress_callback(progress)
+                _log_job(
+                    job_id,
+                    f"Panorama preparation progress: {progress}% "
+                    f"({prepared_size}/{source_size} bytes)",
+                )
+                last_progress = progress
+                last_heartbeat = now
+            elif now - last_heartbeat >= _PANORAMA_PREPARATION_HEARTBEAT_SECONDS:
+                _log_job(
+                    job_id,
+                    "Still preparing panorama metadata: "
+                    f"{prepared_size}/{source_size} bytes currently written",
+                )
+                last_heartbeat = now
+
+    preparation_monitor = threading.Thread(
+        target=monitor_preparation,
+        name=f"youtube-panorama-progress-{job_id}",
+        daemon=True,
+    )
+    preparation_monitor.start()
 
     def debug_metadata(message: object, *extra: object) -> None:
         logger.debug("Spatial metadata injector: %s", " ".join(map(str, (message, *extra))))
@@ -696,6 +752,15 @@ def _prepare_upload_video(job_id: str, source_type: str, source_path: Path) -> P
     except Exception:
         partial_path.unlink(missing_ok=True)
         raise
+    finally:
+        stop_monitor.set()
+        preparation_monitor.join()
+    if progress_callback is not None:
+        progress_callback(_PANORAMA_PREPARATION_PROGRESS_MAX)
+    _log_job(
+        job_id,
+        f"Panorama preparation complete: {upload_path.stat().st_size} bytes ready for upload",
+    )
     return upload_path
 
 
@@ -738,7 +803,12 @@ def process_youtube_upload(job_id: str) -> None:
         source_size = video_path.stat().st_size
         if source_size <= 0:
             raise RuntimeError("Source video is empty")
-        video_path = _prepare_upload_video(job_id, source_type, video_path)
+        video_path = _prepare_upload_video(
+            job_id,
+            source_type,
+            video_path,
+            progress_callback=lambda progress: _update_active_job(job_id, progress=progress),
+        )
         if source_type == "pano":
             prepared_video_path = video_path
             _log_job(job_id, "Panorama metadata ready for interactive 360° playback")
@@ -820,7 +890,12 @@ def process_youtube_upload(job_id: str) -> None:
                     raise RuntimeError("YouTube upload did not make progress")
                 offset = next_offset
                 video_file.seek(offset)
-                progress = min(99, int(offset * 100 / total_size))
+                progress = int(offset * 100 / total_size)
+                if source_type == "pano":
+                    progress = _PANORAMA_PREPARATION_PROGRESS_MAX + int(
+                        offset * (99 - _PANORAMA_PREPARATION_PROGRESS_MAX) / total_size
+                    )
+                progress = min(99, progress)
                 _update_active_job(job_id, progress=progress)
                 _log_job(job_id, f"YouTube upload progress: {progress}%")
         raise RuntimeError("YouTube upload ended without a video identifier")
