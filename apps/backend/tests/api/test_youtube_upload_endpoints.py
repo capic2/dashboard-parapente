@@ -59,6 +59,17 @@ def test_existing_youtube_video_ids_tolerates_token_refresh_failure(monkeypatch)
     assert youtube_upload.existing_youtube_video_ids({1: {"dQw4w9WgXcQ"}}) == set()
 
 
+def test_oauth_error_detail_exposes_provider_reason_without_tokens() -> None:
+    response = httpx.Response(
+        400,
+        json={"error": "invalid_grant", "error_description": "Token has been revoked."},
+    )
+
+    assert youtube_upload._oauth_error_detail(response) == (
+        "invalid_grant: Token has been revoked."
+    )
+
+
 def _create_completed_overlay(
     db_session: Session, sample_flight: Flight, output_path: Path
 ) -> GoproOverlayJob:
