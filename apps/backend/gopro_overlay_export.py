@@ -233,6 +233,8 @@ def _merge_osv_files_with_gpx(
         "python3",
         str(merge_script),
         "--progress",
+        "--exiftool-timeout",
+        str(config.GOPRO_OVERLAY_OSV_EXIFTOOL_TIMEOUT_SECONDS),
         "--sync",
         "gpx-start",
         *(["--video-duration", f"{video_duration:.3f}"] if video_duration is not None else []),
@@ -258,12 +260,12 @@ def _merge_osv_files_with_gpx(
     output_lines: list[str] = []
     current_line = ""
     deadline = time.monotonic() + config.GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS
+    last_heartbeat = time.monotonic()
+    last_cancellation_check = last_heartbeat
     try:
         while True:
-            if job_id and _is_job_cancelled(job_id):
-                process.terminate()
-                raise ValueError("OSV merge cancelled")
-            if time.monotonic() >= deadline:
+            now = time.monotonic()
+            if now >= deadline:
                 process.terminate()
                 raise ValueError("OSV merge timed out")
 
@@ -274,6 +276,15 @@ def _merge_osv_files_with_gpx(
             if not ready:
                 if process.poll() is not None:
                     break
+                now = time.monotonic()
+                if now - last_cancellation_check >= 5:
+                    if job_id and _is_job_cancelled(job_id):
+                        process.terminate()
+                        raise ValueError("OSV merge cancelled")
+                    last_cancellation_check = now
+                if job_id and now - last_heartbeat >= 30:
+                    _update_job(job_id, message="Reading OSV telemetry")
+                    last_heartbeat = now
                 continue
             char = stream.read(1)
             if not char:
@@ -299,6 +310,12 @@ def _merge_osv_files_with_gpx(
                         )
                 continue
             current_line += char
+            now = time.monotonic()
+            if job_id and now - last_cancellation_check >= 5:
+                if _is_job_cancelled(job_id):
+                    process.terminate()
+                    raise ValueError("OSV merge cancelled")
+                last_cancellation_check = now
 
         if current_line.strip():
             output_lines.append(current_line.strip())
