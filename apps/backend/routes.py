@@ -229,6 +229,7 @@ _VIDEO_EXPORT_IN_PROGRESS_STATUSES = {
     "capturing",
     "encoding",
     "preparing",
+    "uploading",
 }
 
 _VIDEO_EXPORT_CANCELLABLE_STATUSES = {
