@@ -113,6 +113,30 @@ test('renders media as a passive status in the flight list', () => {
   expect(screen.queryByText('flights.youtubeBadge')).not.toBeInTheDocument();
 });
 
+test('shows a queued GoPro overlay as waiting instead of in progress', () => {
+  render(
+    <Flight
+      flight={{
+        ...flight,
+        gopro_overlay_status: 'queued',
+        gopro_overlay_progress: 54,
+      }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(
+    screen.getByText('flights.goproOverlayQueuedBadge 54%')
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByText('flights.goproOverlayProcessingBadge 54%')
+  ).not.toBeInTheDocument();
+});
+
 test('renders available media badges in the expected order', () => {
   render(
     <Flight
