@@ -1087,6 +1087,7 @@
     "videoErrorBadge": "Vidéo: erreur",
     "goproOverlayBadge": "Overlay GoPro",
     "goproOverlayProcessingBadge": "Overlay GoPro: en cours",
+    "goproOverlayQueuedBadge": "Overlay GoPro: en attente",
     "goproOverlayErrorBadge": "Overlay GoPro: erreur",
     "mediaExportActions": "Exports média",
     "mediaExportInProgress": "En cours",
