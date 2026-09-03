@@ -105,6 +105,21 @@ def _safe_log_error(exc: Exception) -> str:
     return re.sub(r"https?://\S+", "[redacted-url]", str(exc))[:1000]
 
 
+def _oauth_error_detail(response: httpx.Response) -> str:
+    try:
+        payload = response.json()
+    except (ValueError, TypeError):
+        payload = None
+    if isinstance(payload, dict):
+        error = payload.get("error")
+        description = payload.get("error_description")
+        if isinstance(error, str) and isinstance(description, str):
+            return f"{error}: {description}"[:300]
+        if isinstance(error, str):
+            return error[:300]
+    return f"HTTP {response.status_code}"
+
+
 def is_configured() -> bool:
     return bool(
         config.YOUTUBE_CLIENT_ID and config.YOUTUBE_CLIENT_SECRET and config.YOUTUBE_REDIRECT_URI
@@ -238,7 +253,8 @@ def _access_token(user_id: int) -> str:
         timeout=30,
     )
     if response.is_error:
-        raise YoutubeOAuthError("Unable to refresh the YouTube authorization")
+        detail = _oauth_error_detail(response)
+        raise YoutubeOAuthError(f"Unable to refresh the YouTube authorization ({detail})")
     access_token = response.json().get("access_token")
     if not isinstance(access_token, str) or not access_token:
         raise YoutubeOAuthError("Google returned an invalid access token")
