@@ -105,6 +105,31 @@ def test_status_counts_manual_stream_and_gopro_preparing_jobs(client):
     assert response.json()["ready_for_deployment"] is False
 
 
+def test_status_counts_youtube_uploading_jobs(client, db_session):
+    from models import Flight, YoutubeUploadJob
+
+    flight = Flight(id="youtube-drain-flight", name="YouTube drain test", flight_date=date.today())
+    db_session.add(flight)
+    db_session.add(
+        YoutubeUploadJob(
+            id="youtube-drain-job",
+            flight_id=flight.id,
+            user_id=1,
+            status="uploading",
+            title="YouTube drain test",
+            description="",
+            privacy_status="private",
+        )
+    )
+    db_session.commit()
+
+    response = client.put("/api/deployment-drain", json=BEGIN_PAYLOAD, headers=AUTH)
+
+    assert response.status_code == 200
+    assert response.json()["active_jobs"] == 1
+    assert response.json()["ready_for_deployment"] is False
+
+
 def test_status_reports_admission_in_progress(client):
     with job_admission():
         response = client.put("/api/deployment-drain", json=BEGIN_PAYLOAD, headers=AUTH)
