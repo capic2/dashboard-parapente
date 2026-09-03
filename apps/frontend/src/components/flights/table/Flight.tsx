@@ -75,6 +75,7 @@ export function Flight({
   const isGoproOverlayRunning = isGoproOverlayInProgress(
     flight.gopro_overlay_status
   );
+  const isGoproOverlayQueued = flight.gopro_overlay_status === 'queued';
   const isGoproOverlayFailed = flight.gopro_overlay_status === 'failed';
   const hasCompletedGoproOverlay =
     hasPersistedGoproOverlay && !isGoproOverlayRunning && !isGoproOverlayFailed;
@@ -99,6 +100,10 @@ export function Flight({
   );
   const goproOverlayProcessingLabel = formatMediaProgressLabel(
     t('flights.goproOverlayProcessingBadge'),
+    flight.gopro_overlay_progress
+  );
+  const goproOverlayQueuedLabel = formatMediaProgressLabel(
+    t('flights.goproOverlayQueuedBadge'),
     flight.gopro_overlay_progress
   );
   const youtubeLabel = formatMediaProgressLabel(
@@ -259,7 +264,9 @@ export function Flight({
               )}
               {isGoproOverlayRunning && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
-                  {goproOverlayProcessingLabel}
+                  {isGoproOverlayQueued
+                    ? goproOverlayQueuedLabel
+                    : goproOverlayProcessingLabel}
                 </span>
               )}
               {isGoproOverlayFailed && (
