@@ -225,7 +225,7 @@ jobs:
             VITE_CESIUM_ION_TOKEN=${{ secrets.VITE_CESIUM_ION_TOKEN }}
             BACKEND_DEPLOY_VERSION=${{ steps.version.outputs.version }}
           build-contexts: |
-            gopro-overlay-src=${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT || 'https://github.com/capic2/gopro-dashboard-overlay.git#21c7f4191a3f6efd0b759d7cdbe378c74fdfc4f7' }}
+            gopro-overlay-src=${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT || 'https://github.com/capic2/gopro-dashboard-overlay.git#7cbf7be6499ee3cc3c968f0c3dedc7fa62d893c7' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: |
