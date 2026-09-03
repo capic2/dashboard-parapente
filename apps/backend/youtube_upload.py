@@ -114,10 +114,23 @@ def _oauth_error_detail(response: httpx.Response) -> str:
         error = payload.get("error")
         description = payload.get("error_description")
         if isinstance(error, str) and isinstance(description, str):
-            return f"{error}: {description}"[:300]
+            detail = f"{error}: {description}"
+            return re.sub(
+                r"(?i)\b(access_token|refresh_token|client_secret|token)\s*[=:]\s*\S+",
+                r"\1=[redacted]",
+                detail,
+            )[:300]
         if isinstance(error, str):
             return error[:300]
     return f"HTTP {response.status_code}"
+
+
+def _clear_invalid_youtube_authorization(user_id: int, encrypted_refresh_token: str) -> None:
+    with SessionLocal() as db:
+        credential = db.get(YoutubeCredential, user_id)
+        if credential is not None and credential.refresh_token_encrypted == encrypted_refresh_token:
+            db.delete(credential)
+            db.commit()
 
 
 def is_configured() -> bool:
@@ -241,7 +254,8 @@ def _access_token(user_id: int) -> str:
             raise YoutubeOAuthError("YouTube is not connected")
         if _OAUTH_SCOPE not in credential.oauth_scope.split():
             raise YoutubeOAuthError("YouTube authorization must be renewed before deleting videos")
-        refresh_token = decrypt_secret(credential.refresh_token_encrypted)
+        encrypted_refresh_token = credential.refresh_token_encrypted
+        refresh_token = decrypt_secret(encrypted_refresh_token)
     response = httpx.post(
         _TOKEN_URL,
         data={
@@ -254,6 +268,8 @@ def _access_token(user_id: int) -> str:
     )
     if response.is_error:
         detail = _oauth_error_detail(response)
+        if detail.startswith("invalid_grant"):
+            _clear_invalid_youtube_authorization(user_id, encrypted_refresh_token)
         raise YoutubeOAuthError(f"Unable to refresh the YouTube authorization ({detail})")
     access_token = response.json().get("access_token")
     if not isinstance(access_token, str) or not access_token:

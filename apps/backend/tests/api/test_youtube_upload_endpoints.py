@@ -62,12 +62,17 @@ def test_existing_youtube_video_ids_tolerates_token_refresh_failure(monkeypatch)
 def test_oauth_error_detail_exposes_provider_reason_without_tokens() -> None:
     response = httpx.Response(
         400,
-        json={"error": "invalid_grant", "error_description": "Token has been revoked."},
+        json={
+            "error": "invalid_grant",
+            "error_description": (
+                "Token has been revoked. refresh_token=super-secret-refresh-token"
+            ),
+        },
     )
 
-    assert youtube_upload._oauth_error_detail(response) == (
-        "invalid_grant: Token has been revoked."
-    )
+    detail = youtube_upload._oauth_error_detail(response)
+    assert detail == "invalid_grant: Token has been revoked. refresh_token=[redacted]"
+    assert "super-secret-refresh-token" not in detail
 
 
 def _create_completed_overlay(
