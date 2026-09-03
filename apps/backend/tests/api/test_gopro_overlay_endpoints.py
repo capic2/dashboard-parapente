@@ -1094,6 +1094,64 @@ def test_worker_merge_osv_files_with_gpx_uses_configured_timeout(
     assert run.call_args.kwargs["timeout"] == 456
 
 
+def test_worker_merge_osv_files_with_gpx_streams_progress(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    gopro_root = tmp_path / "gopro-overlay"
+    gopro_root.mkdir()
+    (gopro_root / "osv_merge.py").write_text("# merge")
+    input_dir = tmp_path / "20260315" / "01"
+    input_dir.mkdir(parents=True)
+    source_gpx = input_dir / "Zepp-track.gpx"
+    osv_path = input_dir / "flight.osv"
+    merged_gpx_path = input_dir / "merged-gopro-overlay.gpx"
+    source_gpx.write_text("<gpx>source</gpx>")
+    osv_path.write_bytes(b"osv")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_ROOT", str(gopro_root))
+
+    class FakeProcess:
+        returncode = 0
+
+        def __init__(self, command, **kwargs):
+            self.stdout = StringIO("OSV_PROGRESS 20\nOSV_PROGRESS 80\n")
+            Path(command[-1]).write_text("<gpx>merged</gpx>")
+
+        def poll(self):
+            return self.returncode
+
+        def wait(self, timeout=None):
+            return self.returncode
+
+        def terminate(self):
+            self.returncode = -15
+
+        def kill(self):
+            self.returncode = -9
+
+    updates = []
+    with (
+        patch("gopro_overlay_export.subprocess.Popen", side_effect=FakeProcess) as popen,
+        patch("gopro_overlay_export.select.select", return_value=([True], [], [])),
+        patch("gopro_overlay_export._is_job_cancelled", return_value=False),
+        patch(
+            "gopro_overlay_export._update_job",
+            side_effect=lambda job_id, **changes: updates.append(changes),
+        ),
+    ):
+        result = gopro_overlay_export._merge_osv_files_with_gpx(
+            [osv_path],
+            source_gpx,
+            input_dir,
+            job_id="job-progress",
+        )
+
+    assert result == merged_gpx_path
+    assert popen.call_args.args[0][2] == "--progress"
+    assert [update["progress"] for update in updates] == [11, 14, 15]
+    assert updates[-1]["message"] == "OSV telemetry merged"
+
+
 @pytest.mark.parametrize(
     ("gpx_offset", "first_gpx_at", "expected_first_gpx_at"),
     [(295.9, 5.0, "5.000"), (-15.0, -20.0, "0.000")],
