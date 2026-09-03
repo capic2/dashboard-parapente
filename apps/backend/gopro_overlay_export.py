@@ -55,6 +55,7 @@ _GPX_EXTENSIONS = {".gpx", ".fit"}
 _UPLOAD_WORK_ROOT = Path("/tmp/dashboard-parapente/gopro-overlays")
 _PATH_WORK_DIR_NAME = ".gopro-overlay-work"
 _PROGRESS_PERCENT_RE = re.compile(r"(?P<percent>\d{1,3})\s*%")
+_OSV_PROGRESS_RE = re.compile(r"^OSV_PROGRESS\s+(?P<percent>\d{1,3})\s*$")
 _LOG_TAIL_LINE_COUNT = 100
 _PIP_FRAME_RATE = 10
 _OUTPUT_RESOLUTIONS: dict[str, tuple[int, int] | None] = {
@@ -200,6 +201,7 @@ def _merge_osv_files_with_gpx(
     gpx_offset: float = 0.0,
     video_duration: float | None = None,
     first_gpx_at: float | None = None,
+    job_id: str | None = None,
 ) -> Path:
     if not osv_paths:
         return gpx_path
@@ -230,6 +232,7 @@ def _merge_osv_files_with_gpx(
     command = [
         "python3",
         str(merge_script),
+        "--progress",
         "--sync",
         "gpx-start",
         *(["--video-duration", f"{video_duration:.3f}"] if video_duration is not None else []),
@@ -244,30 +247,79 @@ def _merge_osv_files_with_gpx(
         str(merged_gpx_path),
     ]
 
+    process = subprocess.Popen(
+        command,
+        cwd=config.GOPRO_OVERLAY_ROOT or None,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    output_lines: list[str] = []
+    current_line = ""
+    deadline = time.monotonic() + config.GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS
     try:
-        result = subprocess.run(
-            command,
-            cwd=config.GOPRO_OVERLAY_ROOT or None,
-            capture_output=True,
-            check=False,
-            text=True,
-            timeout=config.GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS,
-        )
-    except subprocess.TimeoutExpired as exc:
-        detail = exc.stderr or exc.stdout or "OSV merge timed out"
-        if log_path:
-            _append_job_log(log_path, f"OSV merge timed out: {detail}")
-        raise ValueError(detail) from exc
+        while True:
+            if job_id and _is_job_cancelled(job_id):
+                process.terminate()
+                raise ValueError("OSV merge cancelled")
+            if time.monotonic() >= deadline:
+                process.terminate()
+                raise ValueError("OSV merge timed out")
 
-    if result.returncode != 0:
-        detail = result.stderr.strip() or result.stdout.strip() or "OSV merge failed"
+            stream = process.stdout
+            if stream is None:
+                break
+            ready, _, _ = select.select([stream], [], [], 1)
+            if not ready:
+                if process.poll() is not None:
+                    break
+                continue
+            char = stream.read(1)
+            if not char:
+                if process.poll() is not None:
+                    break
+                continue
+            if char in {"\n", "\r"}:
+                line = current_line.strip()
+                current_line = ""
+                if not line:
+                    continue
+                output_lines.append(line)
+                if log_path:
+                    _append_job_log(log_path, f"OSV merge: {line}")
+                progress_match = _OSV_PROGRESS_RE.fullmatch(line)
+                if progress_match:
+                    merge_progress = max(0, min(100, int(progress_match.group("percent"))))
+                    if job_id:
+                        _update_job(
+                            job_id,
+                            progress=10 + round(merge_progress * 5 / 100),
+                            message=f"Merging OSV telemetry: {merge_progress}%",
+                        )
+                continue
+            current_line += char
+
+        if current_line.strip():
+            output_lines.append(current_line.strip())
+        return_code = process.wait(timeout=5)
+    except subprocess.TimeoutExpired as exc:
+        process.kill()
+        process.wait()
+        raise ValueError("OSV merge timed out") from exc
+    except Exception:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+        raise
+
+    if return_code != 0:
+        detail = output_lines[-1] if output_lines else "OSV merge failed"
         if log_path:
             _append_job_log(log_path, f"OSV merge failed: {detail}")
         raise ValueError(detail)
-    if log_path:
-        for line in result.stdout.splitlines():
-            if line.strip():
-                _append_job_log(log_path, f"OSV merge: {line.strip()}")
+    if job_id:
+        _update_job(job_id, progress=15, message="OSV telemetry merged")
     if not merged_gpx_path.exists():
         if log_path:
             _append_job_log(log_path, "OSV merge did not create a GPX file")
@@ -1507,6 +1559,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 osv_paths,
                 render_gpx_path,
                 work_dir,
+                job_id=job_id,
                 log_path=log_path,
                 gpx_offset=gpx_offset,
                 video_duration=video_duration,
