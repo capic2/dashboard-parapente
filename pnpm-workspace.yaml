@@ -38,7 +38,7 @@ catalog:
   '@types/react-dom': ^19.0.0
   '@vitejs/plugin-react': ^6.0.0
   '@vitest/browser-playwright': 4.1.11
-  '@vitest/coverage-v8': 4.1.11
+  '@vitest/coverage-v8': 5.0.0
   '@vitest/ui': 4.1.11
   '@internationalized/date': ^3.7.0
   cesium: ^1.139.1
