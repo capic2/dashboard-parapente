@@ -311,6 +311,9 @@ def _merge_osv_files_with_gpx(
                 continue
             current_line += char
             now = time.monotonic()
+            if job_id and now - last_heartbeat >= 30:
+                _update_job(job_id, message="Reading OSV telemetry")
+                last_heartbeat = now
             if job_id and now - last_cancellation_check >= 5:
                 if _is_job_cancelled(job_id):
                     process.terminate()
