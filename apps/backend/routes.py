@@ -6612,14 +6612,25 @@ def get_flight_gopro_overlay_preview(
 
     camera_path, gpx_path = _flight_gopro_preview_inputs(db, flight)
     video_duration = probe_video_duration(camera_path)
+    gpx_start = first_gpx_timestamp(gpx_path)
+    gpx_duration = gpx_duration_seconds(gpx_path)
     video_start = probe_video_start_time(camera_path)
     if video_start is None:
         try:
-            video_start = datetime.fromtimestamp(camera_path.stat().st_mtime, tz=timezone.utc)
+            file_mtime = datetime.fromtimestamp(camera_path.stat().st_mtime, tz=timezone.utc)
+            if gpx_start is not None and abs((file_mtime - gpx_start).total_seconds()) <= 30 * 60:
+                video_start = file_mtime
+            else:
+                logger.warning(
+                    "Ignoring camera mtime for GoPro preview because it is too far from GPX: "
+                    "camera=%s mtime=%s gpx=%s",
+                    camera_path,
+                    file_mtime,
+                    gpx_start,
+                )
+                video_start = gpx_start
         except OSError:
-            video_start = None
-    gpx_start = first_gpx_timestamp(gpx_path)
-    gpx_duration = gpx_duration_seconds(gpx_path)
+            video_start = gpx_start
     coordinates = parse_gpx_file(gpx_path)
     if video_duration is None or video_start is None:
         raise HTTPException(status_code=422, detail="Camera video has no usable time metadata")
@@ -6631,7 +6642,8 @@ def get_flight_gopro_overlay_preview(
         raise HTTPException(status_code=422, detail="Unable to align camera video and GPX track")
     automatic_offset = (gpx_start - aligned_video_start).total_seconds()
     manual_offset = float(flight.gopro_overlay_gpx_offset or 0.0)
-    preview_target_end = min(video_duration, max(0.0, automatic_offset + gpx_duration))
+    effective_offset = automatic_offset + manual_offset
+    preview_target_end = min(video_duration, max(0.0, effective_offset + gpx_duration))
     preview_state = gopro_preview_proxy.get_preview_state(camera_path, preview_target_end)
     preview_segments = list(preview_state.segments)
     if preview_state.available_duration_seconds <= 0 or not preview_segments:
@@ -6660,7 +6672,7 @@ def get_flight_gopro_overlay_preview(
         alignment={
             "automatic_offset_seconds": automatic_offset,
             "manual_offset_seconds": manual_offset,
-            "effective_offset_seconds": automatic_offset + manual_offset,
+            "effective_offset_seconds": effective_offset,
         },
     )
 
