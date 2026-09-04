@@ -130,6 +130,23 @@ def _configured_gpx_path(value: str | None) -> Path | None:
     return Path(__file__).parent / path
 
 
+def _existing_calibrated_gpx(source_path: Path, output_dir: Path) -> Path | None:
+    """Find a completed GoPro calibration for this flight, excluding this job."""
+    cache_dir = source_path.parent / ".gopro-overlay-work"
+    if not cache_dir.is_dir():
+        return None
+    candidates = sorted(
+        (
+            path
+            for path in cache_dir.glob("*/merged-gopro-overlay.gpx")
+            if path.is_file() and path.parent != output_dir
+        ),
+        key=lambda path: (path.stat().st_mtime, path.name),
+        reverse=True,
+    )
+    return candidates[0] if candidates else None
+
+
 def _prepare_calibrated_highlight_gpx(
     source_path: Path,
     gpx_path: Path,
@@ -140,6 +157,11 @@ def _prepare_calibrated_highlight_gpx(
     heartbeat_callback: Callable[[], None] | None = None,
 ) -> Path:
     """Reuse the regular GoPro export OSV/GPX calibration for highlights."""
+    cached_gpx = _existing_calibrated_gpx(source_path, output_dir)
+    if cached_gpx is not None:
+        logger.info("Reusing existing GoPro calibration GPX: %s", cached_gpx)
+        return cached_gpx
+
     from gopro_overlay_export import _merge_osv_files_with_gpx
 
     osv_paths = sorted(
