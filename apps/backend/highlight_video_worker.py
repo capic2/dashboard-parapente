@@ -410,15 +410,23 @@ def _frame_scores(
     source_path: Path,
     duration_seconds: float,
     progress_callback: Callable[[int, int], None] | None = None,
+    analysis_windows: tuple[tuple[float, float], ...] | None = None,
 ) -> list[tuple[float, float]]:
     """Score low-resolution samples without decoding full-resolution frames in Python."""
     width, height = 320, 160
     frame_size = width * height
     samples: list[tuple[float, np.ndarray]] = []
-    segment_starts = range(0, max(1, int(duration_seconds)), 30)
-    total_segments = len(segment_starts)
-    for segment_index, segment_start in enumerate(segment_starts, start=1):
-        segment_duration = min(12, duration_seconds - segment_start)
+    accelerator = select_video_accelerator(config.VIDEO_ACCELERATOR)
+    hwaccel_args = ["-hwaccel", "cuda"] if accelerator == "nvidia" else []
+    # The usual highlight search sparsely samples the whole flight.  Phase
+    # detection instead supplies two continuous edge windows, because a
+    # takeoff or landing can happen between those sparse samples.
+    windows = analysis_windows or tuple(
+        (float(segment_start), min(12.0, duration_seconds - segment_start))
+        for segment_start in range(0, max(1, int(duration_seconds)), 30)
+    )
+    total_segments = len(windows)
+    for segment_index, (segment_start, segment_duration) in enumerate(windows, start=1):
         if segment_duration <= 0:
             break
         logger.info(
@@ -435,6 +443,7 @@ def _frame_scores(
                 "nokey",
                 "-ss",
                 str(segment_start),
+                *hwaccel_args,
                 "-i",
                 str(source_path),
                 "-t",
@@ -491,11 +500,24 @@ def _frame_scores(
 
 
 def _visual_phase_centers(source_path: Path, duration_seconds: float) -> tuple[float, float]:
-    """Find launch and touchdown candidates from image motion over the flight."""
-    scores = _frame_scores(source_path, duration_seconds)
+    """Find launch and touchdown candidates from continuous edge-frame analysis.
+
+    GPS timestamps describe the track, not necessarily the panorama timeline:
+    cameras and GPS recorders may start or stop at different times.  The two
+    flight phases are therefore selected from the source images themselves.
+    """
+    edge_window = min(duration_seconds * 0.35, 60.0)
+    edge_window = max(0.0, edge_window)
+    scores = _frame_scores(
+        source_path,
+        duration_seconds,
+        analysis_windows=(
+            (0.0, edge_window),
+            (max(0.0, duration_seconds - edge_window), edge_window),
+        ),
+    )
     if not scores:
         return 0.0, max(0.0, duration_seconds)
-    edge_window = min(duration_seconds * 0.35, 90.0)
     start_scores = [item for item in scores if item[0] <= edge_window]
     end_scores = [item for item in scores if item[0] >= duration_seconds - edge_window]
     takeoff = max(start_scores, key=lambda item: item[1])[0] if start_scores else 0.0
@@ -1494,41 +1516,20 @@ def process_highlight_video_job(job_id: str) -> None:
             for clip in visual_clips
             if _clip_is_covered_by_gpx(source_timeline_start, clip, track_points)
         ]
-        # Telemetry gives the actual launch/touchdown timeline.  Visual motion
-        # is only a fallback: selecting the strongest motion near an edge can
-        # pick a camera shake or a turn and cut away the real takeoff/landing.
+        # Track timestamps cannot be used as pano offsets: the camera and GPS
+        # recorder may start and stop independently.  Use telemetry only for
+        # diagnostics and thermal selection; launch and landing are detected
+        # directly in the beginning and end images of this source video.
         telemetry_takeoff, telemetry_landing = _flight_phase_times(track_points)
-        if telemetry_takeoff is not None or telemetry_landing is not None:
-
-            def to_video_time(track_seconds: float | None, fallback: float) -> float:
-                if track_seconds is None:
-                    return fallback
-                telemetry_candidate = min(duration_seconds, max(0.0, track_seconds))
-                return _refine_visual_phase_time(
-                    source_path,
-                    telemetry_candidate,
-                    duration_seconds,
-                )
-
-            visual_fallback = (
-                _visual_phase_centers(source_path, duration_seconds)
-                if telemetry_takeoff is None or telemetry_landing is None
-                else (0.0, duration_seconds)
-            )
-            phase_centers = (
-                to_video_time(telemetry_takeoff, visual_fallback[0]),
-                to_video_time(telemetry_landing, visual_fallback[1]),
-            )
-            logger.info(
-                "Highlight phase detection: job_id=%s telemetry_takeoff=%s telemetry_landing=%s visual_takeoff=%.1f visual_landing=%.1f",
-                job_id,
-                telemetry_takeoff,
-                telemetry_landing,
-                phase_centers[0],
-                phase_centers[1],
-            )
-        else:
-            phase_centers = _visual_phase_centers(source_path, duration_seconds)
+        phase_centers = _visual_phase_centers(source_path, duration_seconds)
+        logger.info(
+            "Highlight phase detection: job_id=%s telemetry_takeoff=%s telemetry_landing=%s visual_takeoff=%.1f visual_landing=%.1f",
+            job_id,
+            telemetry_takeoff,
+            telemetry_landing,
+            phase_centers[0],
+            phase_centers[1],
+        )
         clips = select_flight_event_clips(
             duration_seconds,
             track_points,
@@ -1538,7 +1539,11 @@ def process_highlight_video_job(job_id: str) -> None:
         clips = [
             clip
             for clip in clips
-            if _clip_is_covered_by_gpx(source_timeline_start, clip, track_points)
+            # Preserve source-video takeoff/landing even when a tracker ended
+            # a few seconds before the camera.  The calibrated full overlay
+            # remains the source of telemetry frames for those clips.
+            if clip.category in {"takeoff", "landing"}
+            or _clip_is_covered_by_gpx(source_timeline_start, clip, track_points)
         ]
         logger.info(
             "Highlight clip selection complete: job_id=%s clips=%d categories=%s",
