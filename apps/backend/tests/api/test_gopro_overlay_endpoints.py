@@ -3848,7 +3848,7 @@ def test_run_job_uses_manual_offset_as_authoritative_osv_timeline(
     assert len(merge_calls) == 1
     assert merge_calls[0][0] == [osv_path]
     assert merge_calls[0][3]["gpx_offset"] == 295.9
-    assert merge_calls[0][3]["first_gpx_at"] is None
+    assert merge_calls[0][3]["first_gpx_at"] == 0.0
     assert merge_calls[0][3]["video_duration"] == 421.483
     persisted_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"])
     assert persisted_job["status"] == "completed"
