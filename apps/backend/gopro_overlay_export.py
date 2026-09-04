@@ -236,7 +236,7 @@ def _merge_osv_files_with_gpx(
         "--exiftool-timeout",
         str(config.GOPRO_OVERLAY_OSV_EXIFTOOL_TIMEOUT_SECONDS),
         "--sync",
-        "gpx-start",
+        "absolute",
         *(["--video-duration", f"{video_duration:.3f}"] if video_duration is not None else []),
         *(
             ["--first-gpx-at", f"{effective_first_gpx_at:.3f}"]
@@ -1593,14 +1593,15 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         gpx_start = first_gpx_timestamp(render_gpx_path)
         alignment_video_start = resolve_gopro_video_start_time(video_path, gpx_start)
         aligned_video_start = align_video_start_time_to_gpx(alignment_video_start, gpx_start)
-        # A manually supplied GPX offset is the authoritative timeline.  Do not
-        # combine it with the automatic video/GPX alignment: the merger applies
-        # the manual offset to the GPX before synchronising the OSV samples.
-        # The merger auto-infers a start offset when this option is omitted.
-        # Explicitly anchor manually calibrated GPX data at the video start.
-        first_gpx_at = 0.0 if gpx_offset else None
-        if not gpx_offset and gpx_start is not None and aligned_video_start is not None:
-            first_gpx_at = (gpx_start - aligned_video_start).total_seconds()
+        # Keep the camera start as the timeline anchor while the merger shifts
+        # the GPX timestamps by the manual offset.  In its absolute mode, the
+        # first GPX position therefore includes both the detected alignment and
+        # the calibrated offset.
+        first_gpx_at = None
+        if gpx_start is not None and aligned_video_start is not None:
+            effective_first_gpx_at = (gpx_start - aligned_video_start).total_seconds() + gpx_offset
+            if effective_first_gpx_at > 0:
+                first_gpx_at = effective_first_gpx_at
         if osv_paths:
             _update_job(job_id, progress=10, message="Merging OSV telemetry")
             video_duration = probe_video_duration(video_path)
