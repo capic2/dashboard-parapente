@@ -13,6 +13,7 @@ from highlight_video_worker import (
     _output_dimensions,
     _clip_creation_time,
     _clip_is_covered_by_gpx,
+    _frame_scores,
     _prepare_calibrated_highlight_gpx,
     _render_clip,
     _render_method_for_accelerator,
@@ -21,6 +22,7 @@ from highlight_video_worker import (
     _horizontal_flight_phase_times,
     _flight_phase_times,
     _refine_visual_phase_time,
+    _visual_phase_centers,
     _render_gopro_overlay,
     _render_full_flight_overlay,
     select_flight_event_clips,
@@ -708,6 +710,36 @@ def test_visual_phase_refinement_uses_the_strongest_nearby_image_transition(
         refined = _refine_visual_phase_time(tmp_path / "pano.mp4", 10, 60)
 
     assert refined == 8
+
+
+def test_visual_phase_detection_continuously_analyses_both_video_edges(tmp_path: Path) -> None:
+    with patch(
+        "highlight_video_worker._frame_scores",
+        return_value=[(0, 0.1), (46, 0.9), (1_710, 0.2), (1_782, 1.0)],
+    ) as frame_scores:
+        phases = _visual_phase_centers(tmp_path / "pano.mp4", 1_806)
+
+    assert phases == (46, 1_782)
+    assert frame_scores.call_args.kwargs["analysis_windows"] == (
+        (0.0, 60.0),
+        (1_746.0, 60.0),
+    )
+
+
+def test_frame_analysis_uses_gpu_decoding_when_the_worker_uses_nvidia(tmp_path: Path) -> None:
+    frame = np.zeros((160, 320), dtype=np.uint8).tobytes()
+    with (
+        patch("highlight_video_worker.select_video_accelerator", return_value="nvidia"),
+        patch("highlight_video_worker.subprocess.run", return_value=Mock(stdout=frame)) as run,
+    ):
+        _frame_scores(
+            tmp_path / "pano.mp4",
+            10,
+            analysis_windows=((0.0, 2.0),),
+        )
+
+    command = run.call_args.args[0]
+    assert command[command.index("-hwaccel") + 1] == "cuda"
 
 
 def test_event_selection_keeps_context_before_takeoff_and_landing() -> None:
