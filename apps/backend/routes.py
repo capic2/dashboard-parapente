@@ -90,7 +90,7 @@ from gopro_overlay_export import (
     list_gopro_overlay_layouts,
     probe_video_duration,
     probe_video_resolution,
-    probe_video_start_time,
+    resolve_gopro_video_start_time,
     save_uploaded_file,
     stream_gopro_overlay_job,
 )
@@ -6614,42 +6614,7 @@ def get_flight_gopro_overlay_preview(
     video_duration = probe_video_duration(camera_path)
     gpx_start = first_gpx_timestamp(gpx_path)
     gpx_duration = gpx_duration_seconds(gpx_path)
-    video_start = probe_video_start_time(camera_path)
-    if video_start is None:
-        osv_paths = sorted(
-            (
-                path
-                for path in camera_path.parent.iterdir()
-                if path.is_file() and path.suffix.lower() == ".osv"
-            ),
-            key=lambda path: (path.stat().st_mtime, path.name),
-        )
-        for osv_path in osv_paths:
-            video_start = probe_video_start_time(osv_path)
-            if video_start is not None:
-                logger.info(
-                    "Using GoPro OSV timestamp for overlay preview: osv=%s start=%s",
-                    osv_path,
-                    video_start,
-                )
-                break
-
-    if video_start is None:
-        try:
-            file_mtime = datetime.fromtimestamp(camera_path.stat().st_mtime, tz=timezone.utc)
-            if gpx_start is not None and abs((file_mtime - gpx_start).total_seconds()) <= 30 * 60:
-                video_start = file_mtime
-            else:
-                logger.warning(
-                    "Ignoring camera mtime for GoPro preview because it is too far from GPX: "
-                    "camera=%s mtime=%s gpx=%s",
-                    camera_path,
-                    file_mtime,
-                    gpx_start,
-                )
-                video_start = gpx_start
-        except OSError:
-            video_start = gpx_start
+    video_start = resolve_gopro_video_start_time(camera_path, gpx_start)
     coordinates = parse_gpx_file(gpx_path)
     if video_duration is None or video_start is None:
         raise HTTPException(status_code=422, detail="Camera video has no usable time metadata")

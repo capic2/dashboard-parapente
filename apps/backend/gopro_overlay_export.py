@@ -1044,6 +1044,39 @@ def first_gpx_timestamp(gpx_path: Path) -> datetime | None:
     return None
 
 
+def resolve_gopro_video_start_time(video_path: Path, gpx_start: datetime | None) -> datetime | None:
+    """Resolve the camera timeline using the same metadata as the overlay preview."""
+    video_start = probe_video_start_time(video_path)
+    if video_start is not None:
+        return video_start
+
+    osv_paths = _matching_files_by_mtime(video_path.parent, "*.osv")
+    for osv_path in osv_paths:
+        video_start = probe_video_start_time(osv_path)
+        if video_start is not None:
+            logger.info(
+                "Using GoPro OSV timestamp for overlay alignment: osv=%s start=%s",
+                osv_path,
+                video_start,
+            )
+            return video_start
+
+    try:
+        file_mtime = datetime.fromtimestamp(video_path.stat().st_mtime, tz=timezone.utc)
+    except OSError:
+        return gpx_start
+    if gpx_start is None or abs((file_mtime - gpx_start).total_seconds()) <= 30 * 60:
+        return file_mtime
+    logger.warning(
+        "Ignoring camera mtime for GoPro alignment because it is too far from GPX: "
+        "camera=%s mtime=%s gpx=%s",
+        video_path,
+        file_mtime,
+        gpx_start,
+    )
+    return gpx_start
+
+
 def gpx_duration_seconds(gpx_path: Path) -> float | None:
     try:
         root = ET.parse(gpx_path).getroot()
@@ -1557,15 +1590,8 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         osv_paths = _matching_files_by_mtime(source_input_dir, "*.osv")
         gpx_offset = _gpx_offset_from_command_metadata(command_metadata)
         embedded_video_start = probe_video_start_time(video_path)
-        alignment_video_start = embedded_video_start
-        if alignment_video_start is None:
-            try:
-                alignment_video_start = datetime.fromtimestamp(
-                    video_path.stat().st_mtime, tz=timezone.utc
-                )
-            except OSError:
-                alignment_video_start = None
         gpx_start = first_gpx_timestamp(render_gpx_path)
+        alignment_video_start = resolve_gopro_video_start_time(video_path, gpx_start)
         aligned_video_start = align_video_start_time_to_gpx(alignment_video_start, gpx_start)
         first_gpx_at = (
             (gpx_start - aligned_video_start).total_seconds() + gpx_offset

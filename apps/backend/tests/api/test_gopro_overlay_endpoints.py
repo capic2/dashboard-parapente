@@ -55,7 +55,7 @@ def test_gopro_overlay_preview_returns_shared_timeline(
     with (
         patch("routes.probe_video_duration", return_value=120.0),
         patch(
-            "routes.probe_video_start_time",
+            "gopro_overlay_export.probe_video_start_time",
             return_value=datetime.fromisoformat("2026-03-15T10:00:00+00:00"),
         ),
     ):
@@ -104,7 +104,7 @@ def test_gopro_overlay_preview_falls_back_to_camera_mtime_when_creation_time_is_
 
     with (
         patch("routes.probe_video_duration", return_value=120.0),
-        patch("routes.probe_video_start_time", return_value=None),
+        patch("gopro_overlay_export.probe_video_start_time", return_value=None),
     ):
         response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay/preview")
 
@@ -134,7 +134,7 @@ def test_gopro_overlay_preview_ignores_camera_mtime_from_a_later_file_copy(
 
     with (
         patch("routes.probe_video_duration", return_value=120.0),
-        patch("routes.probe_video_start_time", return_value=None),
+        patch("gopro_overlay_export.probe_video_start_time", return_value=None),
     ):
         response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay/preview")
 
@@ -171,7 +171,7 @@ def test_gopro_overlay_preview_prefers_osv_timestamp_over_late_camera_mtime(
 
     with (
         patch(
-            "routes.probe_video_start_time",
+            "gopro_overlay_export.probe_video_start_time",
             side_effect=[
                 None,
                 datetime.fromisoformat("2026-03-15T11:03:00+00:00"),
@@ -183,6 +183,27 @@ def test_gopro_overlay_preview_prefers_osv_timestamp_over_late_camera_mtime(
 
     assert response.status_code == 200
     assert response.json()["alignment"]["automatic_offset_seconds"] == -170.0
+
+
+def test_overlay_render_alignment_uses_the_same_osv_timestamp_as_preview(
+    tmp_path, monkeypatch
+) -> None:
+    camera_path = tmp_path / "camera.mp4"
+    camera_path.write_bytes(b"video")
+    osv_path = tmp_path / "camera.osv"
+    osv_path.write_bytes(b"osv")
+    gpx_start = datetime.fromisoformat("2026-03-15T10:00:10+00:00")
+    osv_start = datetime.fromisoformat("2026-03-15T11:03:00+00:00")
+    copied_later = datetime.fromisoformat("2026-03-15T13:00:00+00:00").timestamp()
+    os.utime(camera_path, (copied_later, copied_later))
+
+    with patch(
+        "gopro_overlay_export.probe_video_start_time",
+        side_effect=[None, osv_start],
+    ):
+        resolved = gopro_overlay_export.resolve_gopro_video_start_time(camera_path, gpx_start)
+
+    assert resolved == osv_start
 
 
 def test_gopro_overlay_preview_prefers_flight_gpx_over_zepp_folder_file(
@@ -213,7 +234,7 @@ def test_gopro_overlay_preview_prefers_flight_gpx_over_zepp_folder_file(
     with (
         patch("routes.probe_video_duration", return_value=120.0),
         patch(
-            "routes.probe_video_start_time",
+            "gopro_overlay_export.probe_video_start_time",
             return_value=datetime.fromisoformat("2026-03-15T10:00:00+00:00"),
         ),
     ):
