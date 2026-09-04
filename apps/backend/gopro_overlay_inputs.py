@@ -45,8 +45,10 @@ def resolve_automatic_overlay_inputs(
     generated_video_path: Path | None,
     previous_overlay_path: Path | None = None,
 ) -> tuple[Path | None, Path | None]:
-    """Resolve GPX and PIP using the same fallback order as the overlay route."""
-    gpx_path = first_matching_file(input_directory, "Zepp*.gpx") or configured_gpx_path
+    """Resolve GPX from the flight record, with discovery only as a fallback."""
+    gpx_path = configured_gpx_path or first_matching_file(input_directory, "Zepp*.gpx")
     excluded_paths = (previous_overlay_path,) if previous_overlay_path else ()
-    pip_path = latest_matching_file(input_directory, "flight*.mp4", excluded_paths) or generated_video_path
+    pip_path = (
+        latest_matching_file(input_directory, "flight*.mp4", excluded_paths) or generated_video_path
+    )
     return gpx_path, pip_path
