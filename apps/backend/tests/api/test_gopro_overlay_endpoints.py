@@ -3755,7 +3755,7 @@ def test_cancel_queued_gopro_overlay_job_removes_rq_job(monkeypatch):
         gopro_overlay_export._PROCESSES.pop(job_id, None)
 
 
-def test_run_job_uses_preview_effective_offset_for_osv_merge(
+def test_run_job_uses_manual_offset_as_authoritative_osv_timeline(
     tmp_path,
     monkeypatch,
     test_db,
@@ -3782,6 +3782,7 @@ def test_run_job_uses_preview_effective_offset_for_osv_merge(
     render_device_path.write_bytes(b"")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_RENDER_DEVICE", str(render_device_path))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PROFILE", "nvgpu")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_SEGMENT_SECONDS", 1000)
     monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
     monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: 421.483)
     monkeypatch.setattr(
@@ -3847,7 +3848,7 @@ def test_run_job_uses_preview_effective_offset_for_osv_merge(
     assert len(merge_calls) == 1
     assert merge_calls[0][0] == [osv_path]
     assert merge_calls[0][3]["gpx_offset"] == 295.9
-    assert merge_calls[0][3]["first_gpx_at"] == pytest.approx(5.0)
+    assert merge_calls[0][3]["first_gpx_at"] is None
     assert merge_calls[0][3]["video_duration"] == 421.483
     persisted_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"])
     assert persisted_job["status"] == "completed"
