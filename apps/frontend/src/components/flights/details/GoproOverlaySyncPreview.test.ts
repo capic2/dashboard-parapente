@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { sourceTimeAtPreviewTime } from './GoproOverlaySyncPreview';
+import {
+  manualOffsetForGpxStartAtVideoTime,
+  sourceTimeAtPreviewTime,
+} from './GoproOverlaySyncPreview';
 
 const segments = [
   {
@@ -34,5 +37,11 @@ describe('sourceTimeAtPreviewTime', () => {
         },
       ])
     ).toBe(900);
+  });
+});
+
+describe('manualOffsetForGpxStartAtVideoTime', () => {
+  it('aligns the first GPX point with the current source-video time', () => {
+    expect(manualOffsetForGpxStartAtVideoTime(42.5, -156)).toBe(198.5);
   });
 });

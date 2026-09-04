@@ -6627,7 +6627,10 @@ def get_flight_gopro_overlay_preview(
     automatic_offset = (gpx_start - aligned_video_start).total_seconds()
     manual_offset = float(flight.gopro_overlay_gpx_offset or 0.0)
     effective_offset = automatic_offset + manual_offset
-    preview_target_end = min(video_duration, max(0.0, effective_offset + gpx_duration))
+    # The offset is adjusted locally in the dialog.  Do not let the value
+    # persisted from a previous render shorten the camera preview before the
+    # user can calibrate the current timeline.
+    preview_target_end = min(video_duration, max(0.0, automatic_offset + gpx_duration))
     preview_state = gopro_preview_proxy.get_preview_state(camera_path, preview_target_end)
     preview_segments = list(preview_state.segments)
     if preview_state.available_duration_seconds <= 0 or not preview_segments:

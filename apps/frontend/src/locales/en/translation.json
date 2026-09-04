@@ -1175,6 +1175,7 @@
     "goproOverlayOutsideTrack": "Outside GPX track",
     "goproOverlayEffectiveOffset": "Total offset",
     "goproOverlayAutomaticOffset": "Automatic alignment: {{offset}} s",
+    "goproOverlayAlignGpxStart": "GPX starts here",
     "goproOverlayAdjustOffset": "Adjust offset by {{offset}} second",
     "goproOverlayOffsetDialogDescription": "If the camera and watch clocks are not perfectly aligned, add a correction here before encoding.",
     "goproOverlayCanProvideGpx": "Provide a GPX in the next step or add one to the flight",

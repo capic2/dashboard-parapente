@@ -1180,6 +1180,7 @@
     "goproOverlayOutsideTrack": "Hors de la trace GPX",
     "goproOverlayEffectiveOffset": "Décalage total",
     "goproOverlayAutomaticOffset": "Alignement automatique : {{offset}} s",
+    "goproOverlayAlignGpxStart": "Le GPX commence ici",
     "goproOverlayAdjustOffset": "Ajuster le décalage de {{offset}} seconde",
     "goproOverlayOffsetDialogDescription": "Si l'horloge de la caméra et celle de la montre ne sont pas parfaitement synchronisées, ajoutez ici un décalage avant l'encodage.",
     "goproOverlayCanProvideGpx": "Fournissez un GPX dans l'étape suivante ou ajoutez-en un au vol",

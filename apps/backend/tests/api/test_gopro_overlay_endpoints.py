@@ -63,7 +63,7 @@ def test_gopro_overlay_preview_returns_shared_timeline(
 
     assert response.status_code == 200
     assert response.json()["video"]["duration_seconds"] == 120.0
-    assert response.json()["video"]["preview_target_end_seconds"] == 71.5
+    assert response.json()["video"]["preview_target_end_seconds"] == 70.0
     assert response.json()["video"]["preview_segments"] == [
         {
             "preview_start_seconds": 0.0,
