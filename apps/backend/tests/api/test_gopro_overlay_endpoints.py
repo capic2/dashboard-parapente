@@ -63,7 +63,7 @@ def test_gopro_overlay_preview_returns_shared_timeline(
 
     assert response.status_code == 200
     assert response.json()["video"]["duration_seconds"] == 120.0
-    assert response.json()["video"]["preview_target_end_seconds"] == 70.0
+    assert response.json()["video"]["preview_target_end_seconds"] == 71.5
     assert response.json()["video"]["preview_segments"] == [
         {
             "preview_start_seconds": 0.0,
@@ -110,6 +110,41 @@ def test_gopro_overlay_preview_falls_back_to_camera_mtime_when_creation_time_is_
 
     assert response.status_code == 200
     assert response.json()["alignment"]["automatic_offset_seconds"] == 10.0
+
+
+def test_gopro_overlay_preview_ignores_camera_mtime_from_a_later_file_copy(
+    client: TestClient, db_session, sample_flight, tmp_path, monkeypatch
+) -> None:
+    input_dir = tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01"
+    input_dir.mkdir(parents=True)
+    camera_path = input_dir / "camera.mp4"
+    camera_path.write_bytes(b"video")
+    gpx_path = input_dir / "Zepp-track.gpx"
+    gpx_path.write_text(
+        "<gpx><trk><trkseg>"
+        '<trkpt lat="45" lon="5"><time>2026-03-15T10:00:10Z</time></trkpt>'
+        '<trkpt lat="45.1" lon="5.1"><time>2026-03-15T10:01:10Z</time></trkpt>'
+        "</trkseg></trk></gpx>"
+    )
+    sample_flight.gopro_overlay_gpx_offset = 20.0
+    db_session.commit()
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+    copied_later = datetime.fromisoformat("2026-03-15T13:00:00+00:00").timestamp()
+    os.utime(camera_path, (copied_later, copied_later))
+
+    with (
+        patch("routes.probe_video_duration", return_value=120.0),
+        patch("routes.probe_video_start_time", return_value=None),
+    ):
+        response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay/preview")
+
+    assert response.status_code == 200
+    assert response.json()["alignment"] == {
+        "automatic_offset_seconds": 0.0,
+        "manual_offset_seconds": 20.0,
+        "effective_offset_seconds": 20.0,
+    }
+    assert response.json()["video"]["preview_target_end_seconds"] == 80.0
 
 
 def test_gopro_overlay_preview_prefers_flight_gpx_over_zepp_folder_file(
