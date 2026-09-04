@@ -6616,6 +6616,25 @@ def get_flight_gopro_overlay_preview(
     gpx_duration = gpx_duration_seconds(gpx_path)
     video_start = probe_video_start_time(camera_path)
     if video_start is None:
+        osv_paths = sorted(
+            (
+                path
+                for path in camera_path.parent.iterdir()
+                if path.is_file() and path.suffix.lower() == ".osv"
+            ),
+            key=lambda path: (path.stat().st_mtime, path.name),
+        )
+        for osv_path in osv_paths:
+            video_start = probe_video_start_time(osv_path)
+            if video_start is not None:
+                logger.info(
+                    "Using GoPro OSV timestamp for overlay preview: osv=%s start=%s",
+                    osv_path,
+                    video_start,
+                )
+                break
+
+    if video_start is None:
         try:
             file_mtime = datetime.fromtimestamp(camera_path.stat().st_mtime, tz=timezone.utc)
             if gpx_start is not None and abs((file_mtime - gpx_start).total_seconds()) <= 30 * 60:
