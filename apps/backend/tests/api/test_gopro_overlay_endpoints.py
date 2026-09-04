@@ -1274,16 +1274,29 @@ def test_worker_merge_osv_files_with_gpx_uses_effective_start_offset(
     osv_path.write_bytes(b"osv")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_ROOT", str(gopro_root))
 
-    class Result:
+    class FakeProcess:
         returncode = 0
-        stderr = ""
-        stdout = ""
 
-    def fake_run(command, **kwargs):
-        Path(command[-1]).write_text("<gpx>merged</gpx>")
-        return Result()
+        def __init__(self, command, **kwargs):
+            self.stdout = StringIO("")
+            Path(command[-1]).write_text("<gpx>merged</gpx>")
 
-    with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run) as run:
+        def poll(self):
+            return self.returncode
+
+        def wait(self, timeout=None):
+            return self.returncode
+
+        def terminate(self):
+            self.returncode = -15
+
+        def kill(self):
+            self.returncode = -9
+
+    with (
+        patch("gopro_overlay_export.subprocess.Popen", side_effect=FakeProcess) as popen,
+        patch("gopro_overlay_export.select.select", return_value=([True], [], [])),
+    ):
         result = gopro_overlay_export._merge_osv_files_with_gpx(
             [osv_path],
             source_gpx,
@@ -1294,7 +1307,8 @@ def test_worker_merge_osv_files_with_gpx_uses_effective_start_offset(
         )
 
     assert result == merged_gpx_path
-    command = run.call_args.args[0]
+    command = popen.call_args.args[0]
+    assert command[command.index("--sync") + 1] == "absolute"
     assert command[command.index("--gpx-offset") + 1] == str(gpx_offset)
     assert command[command.index("--first-gpx-at") + 1] == expected_first_gpx_at
     assert command[-3:] == [str(osv_path), str(source_gpx), str(merged_gpx_path)]
@@ -3773,7 +3787,7 @@ def test_run_job_uses_manual_offset_as_authoritative_osv_timeline(
         "</trkseg></trk></gpx>"
     )
     osv_path.write_bytes(b"osv")
-    video_mtime = datetime.fromisoformat("2026-08-08T09:35:33.900+00:00").timestamp()
+    video_mtime = datetime.fromisoformat("2026-08-08T09:30:33+00:00").timestamp()
     os.utime(video_path, (video_mtime, video_mtime))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_BIN", "gopro-dashboard.py")
@@ -3848,7 +3862,7 @@ def test_run_job_uses_manual_offset_as_authoritative_osv_timeline(
     assert len(merge_calls) == 1
     assert merge_calls[0][0] == [osv_path]
     assert merge_calls[0][3]["gpx_offset"] == 295.9
-    assert merge_calls[0][3]["first_gpx_at"] == 0.0
+    assert merge_calls[0][3]["first_gpx_at"] == 305.9
     assert merge_calls[0][3]["video_duration"] == 421.483
     persisted_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"])
     assert persisted_job["status"] == "completed"
