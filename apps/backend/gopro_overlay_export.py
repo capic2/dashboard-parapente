@@ -1596,7 +1596,9 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         # A manually supplied GPX offset is the authoritative timeline.  Do not
         # combine it with the automatic video/GPX alignment: the merger applies
         # the manual offset to the GPX before synchronising the OSV samples.
-        first_gpx_at = None
+        # The merger auto-infers a start offset when this option is omitted.
+        # Explicitly anchor manually calibrated GPX data at the video start.
+        first_gpx_at = 0.0 if gpx_offset else None
         if not gpx_offset and gpx_start is not None and aligned_video_start is not None:
             first_gpx_at = (gpx_start - aligned_video_start).total_seconds()
         if osv_paths:
