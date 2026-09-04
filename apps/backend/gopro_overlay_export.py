@@ -1593,11 +1593,12 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         gpx_start = first_gpx_timestamp(render_gpx_path)
         alignment_video_start = resolve_gopro_video_start_time(video_path, gpx_start)
         aligned_video_start = align_video_start_time_to_gpx(alignment_video_start, gpx_start)
-        first_gpx_at = (
-            (gpx_start - aligned_video_start).total_seconds() + gpx_offset
-            if gpx_offset and gpx_start is not None and aligned_video_start is not None
-            else None
-        )
+        # A manually supplied GPX offset is the authoritative timeline.  Do not
+        # combine it with the automatic video/GPX alignment: the merger applies
+        # the manual offset to the GPX before synchronising the OSV samples.
+        first_gpx_at = None
+        if not gpx_offset and gpx_start is not None and aligned_video_start is not None:
+            first_gpx_at = (gpx_start - aligned_video_start).total_seconds()
         if osv_paths:
             _update_job(job_id, progress=10, message="Merging OSV telemetry")
             video_duration = probe_video_duration(video_path)
