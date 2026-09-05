@@ -21,7 +21,7 @@ def _move_if_destination_is_empty(source: Path, destination: Path) -> bool:
 
 
 def migrate_legacy_flight_temporary_files() -> int:
-    """Move known legacy job artefacts below their owning flight's ``.tmp``.
+    """Move known legacy job artefacts below their owning flight's ``temp``.
 
     Existing destinations are never merged or overwritten. This makes startup
     retries safe and leaves ambiguous/orphaned global artefacts untouched.
@@ -33,7 +33,18 @@ def migrate_legacy_flight_temporary_files() -> int:
         with SessionLocal() as db:
             flights = db.query(Flight).all()
             for flight in flights:
-                legacy_overlay_root = flight_directory(db, flight) / ".gopro-overlay-work"
+                directory = flight_directory(db, flight)
+                temporary_root = directory / "temp"
+                hidden_temporary_root = directory / ".tmp"
+                if hidden_temporary_root.is_dir():
+                    temporary_root.mkdir(parents=True, exist_ok=True)
+                    for child in hidden_temporary_root.iterdir():
+                        if _move_if_destination_is_empty(child, temporary_root / child.name):
+                            moved += 1
+                    if not any(hidden_temporary_root.iterdir()):
+                        hidden_temporary_root.rmdir()
+
+                legacy_overlay_root = directory / ".gopro-overlay-work"
                 destination = flight_temporary_directory(db, flight, "gopro-overlay")
                 if _move_if_destination_is_empty(legacy_overlay_root, destination):
                     moved += 1

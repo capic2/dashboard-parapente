@@ -54,7 +54,7 @@ _XSI_NAMESPACE = "http://www.w3.org/2001/XMLSchema-instance"
 _VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v"}
 _GPX_EXTENSIONS = {".gpx", ".fit"}
 _UPLOAD_WORK_ROOT = Path("/tmp/dashboard-parapente/gopro-overlays")
-_PATH_WORK_DIR_NAME = ".tmp/gopro-overlay"
+_PATH_WORK_DIR_NAME = "temp/gopro-overlay"
 _PROGRESS_PERCENT_RE = re.compile(r"(?P<percent>\d{1,3})\s*%")
 _OSV_PROGRESS_RE = re.compile(r"^OSV_PROGRESS\s+(?P<percent>\d{1,3})\s*$")
 _LOG_TAIL_LINE_COUNT = 100
@@ -2803,7 +2803,7 @@ def _job_work_dir(job: dict[str, Any]) -> Path | None:
 def _can_delete_work_dir(work_dir: Path) -> bool:
     if _is_path_inside(work_dir, _UPLOAD_WORK_ROOT):
         return True
-    if work_dir.parent.name == "gopro-overlay" and work_dir.parent.parent.name == ".tmp":
+    if work_dir.parent.name == "gopro-overlay" and work_dir.parent.parent.name == "temp":
         return True
     # Jobs created before the storage migration must remain cleanable.
     return work_dir.parent.name == ".gopro-overlay-work"

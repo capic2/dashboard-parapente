@@ -102,7 +102,7 @@ def flight_temporary_directory(db: Session, flight: Flight, namespace: str) -> P
     if not namespace or Path(namespace).name != namespace:
         raise ValueError("Temporary storage namespace must be a single directory name")
 
-    directory = ensure_flight_directory(db, flight) / ".tmp" / namespace
+    directory = ensure_flight_directory(db, flight) / "temp" / namespace
     directory.mkdir(parents=True, exist_ok=True)
     return directory
 
