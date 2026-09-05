@@ -35,16 +35,27 @@ const isMediaExportInProgress = (flight: Flight) =>
     isGoproOverlayInProgress(flight.gopro_overlay_status)
   );
 
-export const flightsQueryOptions = (filters: FlightFilters = {}) => {
-  const searchParams = Object.entries(filters).reduce(
-    (acc, [key, value]) => {
-      if (value !== undefined) {
-        acc[key] = String(value);
-      }
-      return acc;
+const flightFilterSearchParams = (filters: FlightFilters) => {
+  const entries: [keyof FlightFilters, string][] = [
+    ['siteId', 'site_id'],
+    ['dateFrom', 'date_from'],
+    ['dateTo', 'date_to'],
+    ['limit', 'limit'],
+  ];
+
+  return entries.reduce(
+    (searchParams, [filterKey, apiKey]) => {
+      const value = filters[filterKey];
+      if (value !== undefined && value !== null)
+        searchParams[apiKey] = String(value);
+      return searchParams;
     },
     {} as Record<string, string>
   );
+};
+
+export const flightsQueryOptions = (filters: FlightFilters = {}) => {
+  const searchParams = flightFilterSearchParams(filters);
 
   return queryOptions<Flight[]>({
     queryKey: ['flights', filters],
@@ -64,11 +75,17 @@ export const flightsQueryOptions = (filters: FlightFilters = {}) => {
   });
 };
 
-export const flightStatsQueryOptions = () =>
+export const flightStatsQueryOptions = (filters: FlightFilters = {}) =>
   queryOptions<FlightStats>({
-    queryKey: ['flights', 'stats'],
+    queryKey: ['flights', 'stats', filters],
     queryFn: async () => {
-      const data = await api.get('flights/stats').json();
+      const analyticsFilters: FlightFilters = {
+        siteId: filters.siteId,
+        dateFrom: filters.dateFrom,
+        dateTo: filters.dateTo,
+      };
+      const searchParams = flightFilterSearchParams(analyticsFilters);
+      const data = await api.get('flights/stats', { searchParams }).json();
       const validation = FlightStatsSchema.safeParse(data);
       if (!validation.success) {
         throw new Error(`Invalid flight stats: ${validation.error.message}`);
@@ -78,11 +95,17 @@ export const flightStatsQueryOptions = () =>
     staleTime: getStaleTime(1000 * 60 * 60),
   });
 
-export const flightRecordsQueryOptions = () =>
+export const flightRecordsQueryOptions = (filters: FlightFilters = {}) =>
   queryOptions<FlightRecords>({
-    queryKey: ['flights', 'records'],
+    queryKey: ['flights', 'records', filters],
     queryFn: async () => {
-      const data = await api.get('flights/records').json();
+      const analyticsFilters: FlightFilters = {
+        siteId: filters.siteId,
+        dateFrom: filters.dateFrom,
+        dateTo: filters.dateTo,
+      };
+      const searchParams = flightFilterSearchParams(analyticsFilters);
+      const data = await api.get('flights/records', { searchParams }).json();
       const validation = FlightRecordsSchema.safeParse(data);
       if (!validation.success) {
         throw new Error(`Invalid flight records: ${validation.error.message}`);
@@ -104,15 +127,19 @@ export const useFlights = (
 /**
  * Fetch learning statistics
  */
-export const useFlightStats = (): UseQueryResult<FlightStats, Error> => {
-  return useQuery(flightStatsQueryOptions());
+export const useFlightStats = (
+  filters: FlightFilters = {}
+): UseQueryResult<FlightStats, Error> => {
+  return useQuery(flightStatsQueryOptions(filters));
 };
 
 /**
  * Fetch personal flight records
  */
-export const useFlightRecords = (): UseQueryResult<FlightRecords, Error> => {
-  return useQuery(flightRecordsQueryOptions());
+export const useFlightRecords = (
+  filters: FlightFilters = {}
+): UseQueryResult<FlightRecords, Error> => {
+  return useQuery(flightRecordsQueryOptions(filters));
 };
 
 /**
