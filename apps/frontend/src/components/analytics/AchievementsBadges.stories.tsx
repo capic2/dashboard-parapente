@@ -38,6 +38,8 @@ export const allUnlockedStats = {
   total_hours: 100,
   max_altitude_m: 3000,
   total_distance_km: 500,
+  total_elevation_gain_m: 50000,
+  avg_duration_minutes: 60,
 };
 
 export const NoBadges = meta.story({
