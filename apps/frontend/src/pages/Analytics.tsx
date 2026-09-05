@@ -38,6 +38,11 @@ export default function Analytics() {
     dateFrom: search.dateFrom ?? null,
     dateTo: search.dateTo ?? null,
   };
+  const flightFilters = {
+    siteId: filters.siteId,
+    dateFrom: filters.dateFrom ?? undefined,
+    dateTo: filters.dateTo ?? undefined,
+  };
   const { data: flights = [], isLoading: flightsLoading } = useFlights({
     limit: 500,
     siteId: search.siteId,
@@ -46,9 +51,10 @@ export default function Analytics() {
   });
   const { data: comparisonFlights = [], isLoading: comparisonLoading } =
     useFlights({ limit: 500, siteId: search.siteId });
-  const { data: stats, isLoading: statsLoading } = useFlightStats(filters);
+  const { data: stats, isLoading: statsLoading } =
+    useFlightStats(flightFilters);
   const { data: records, isLoading: recordsLoading } =
-    useFlightRecords(filters);
+    useFlightRecords(flightFilters);
 
   const isLoading =
     flightsLoading || statsLoading || recordsLoading || comparisonLoading;
