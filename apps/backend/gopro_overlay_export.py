@@ -2397,6 +2397,11 @@ def _run_job(job_id: str) -> None:
         "--use-gpx-only",
         "--gpx",
         str(render_gpx_path),
+        # Dashboard uses this separate source only for aggregate custom-calc
+        # values. Keeping it on the full render GPX makes min/max/averages and
+        # cumulative flight statistics identical across split video segments.
+        "--statistics-gpx",
+        str(render_gpx_path),
         "--layout",
         "xml",
         "--layout-xml",
