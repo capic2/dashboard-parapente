@@ -3064,6 +3064,8 @@ def test_prepare_queued_job_uses_prepared_pip_path_with_matching_gpx_offset(
     )
     queued_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"], include_command=True)
     assert queued_job is not None
+    assert queued_job["render_method"] is None
+    assert "render_method" not in queued_job["command"]
 
     prepared = gopro_overlay_export._prepare_queued_job(job["job_id"], queued_job)
 
@@ -3240,6 +3242,43 @@ def test_create_gopro_overlay_job_from_paths_defers_input_copy_to_worker_prepara
     assert Path(prepared["command"]["render_gpx_path"]).read_text() == "<gpx />"
     assert prepared["video_width"] == 1920
     assert prepared["video_height"] == 1080
+
+
+def test_create_gopro_overlay_job_without_database_keeps_render_method_shape(tmp_path, monkeypatch):
+    layout_dir = tmp_path / "layouts"
+    layout_dir.mkdir()
+    (layout_dir / "layout_parapente_1080.xml").write_text("<layout />")
+    video_path = tmp_path / "source.mp4"
+    gpx_path = tmp_path / "source.gpx"
+    video_path.write_bytes(b"video")
+    gpx_path.write_text("<gpx />")
+
+    class MissingOverlayJobsTableSession:
+        def __enter__(self) -> None:
+            raise gopro_overlay_export.OperationalError(
+                "select", {}, Exception("no such table: gopro_overlay_jobs")
+            )
+
+        def __exit__(self, *_args: object) -> bool:
+            return False
+
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", MissingOverlayJobsTableSession)
+    monkeypatch.setattr(gopro_overlay_export, "_enqueue_existing_gopro_overlay_job", lambda _: None)
+
+    job = create_gopro_overlay_job_from_paths(
+        video_path=video_path,
+        gpx_path=gpx_path,
+        pip_path=None,
+        layout_id="parapente-1080",
+        output_filename="overlay.mp4",
+    )
+
+    try:
+        assert job["render_method"] is None
+        assert gopro_overlay_export.get_gopro_overlay_job(job["job_id"])["render_method"] is None
+    finally:
+        gopro_overlay_export._JOBS.pop(job["job_id"], None)
 
 
 def test_auto_layout_selection_uses_4k_layout_for_4k_source():
