@@ -132,7 +132,7 @@ def _configured_gpx_path(value: str | None) -> Path | None:
 
 def _existing_calibrated_gpx(source_path: Path, output_dir: Path) -> Path | None:
     """Find a completed GoPro calibration for this flight, excluding this job."""
-    cache_dir = source_path.parent / ".gopro-overlay-work"
+    cache_dir = source_path.parent / ".tmp" / "gopro-overlay"
     if not cache_dir.is_dir():
         return None
     candidates = sorted(
