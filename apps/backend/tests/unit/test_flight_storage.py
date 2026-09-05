@@ -170,7 +170,7 @@ def test_flight_temporary_directory_is_isolated_in_the_flight_directory(
 
     directory = flight_temporary_directory(db_session, flight, "video-exports")
 
-    assert directory == tmp_path / "20260516" / "01" / ".tmp" / "video-exports"
+    assert directory == tmp_path / "20260516" / "01" / "temp" / "video-exports"
     assert directory.is_dir()
 
 

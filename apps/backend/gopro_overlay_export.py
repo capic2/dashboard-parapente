@@ -54,7 +54,7 @@ _XSI_NAMESPACE = "http://www.w3.org/2001/XMLSchema-instance"
 _VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v"}
 _GPX_EXTENSIONS = {".gpx", ".fit"}
 _UPLOAD_WORK_ROOT = Path("/tmp/dashboard-parapente/gopro-overlays")
-_PATH_WORK_DIR_NAME = ".tmp/gopro-overlay"
+_PATH_WORK_DIR_NAME = "temp/gopro-overlay"
 _PROGRESS_PERCENT_RE = re.compile(r"(?P<percent>\d{1,3})\s*%")
 _OSV_PROGRESS_RE = re.compile(r"^OSV_PROGRESS\s+(?P<percent>\d{1,3})\s*$")
 _LOG_TAIL_LINE_COUNT = 100
@@ -367,12 +367,12 @@ def _output_path_for_dir(output_dir: str | None, video_path: Path, output_name: 
     return Path(output_dir).expanduser().resolve() / output_name
 
 
-def _temp_output_path(output_path: Path, job_id: str) -> Path:
+def _temp_output_path(output_path: Path, work_dir: Path, job_id: str) -> Path:
     suffix = output_path.suffix or ".mp4"
     stem = (
         output_path.name[: -len(suffix)] if output_path.name.endswith(suffix) else output_path.name
     )
-    return output_path.with_name(f".{stem}.{job_id}.part{suffix}")
+    return work_dir / f"{stem}.{job_id}.part{suffix}"
 
 
 def _prepare_layout_file(
@@ -2269,7 +2269,7 @@ def _create_gopro_overlay_job_from_paths(
     layout_path = work_dir / source_layout_path.name
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    temp_output_path = _temp_output_path(output_path, job_id)
+    temp_output_path = _temp_output_path(output_path, work_dir, job_id)
     log_path = _gopro_overlay_log_path(job_id)
     preparation_metadata = _job_preparation_metadata(
         pin_inputs=pin_inputs,
@@ -2452,7 +2452,10 @@ def _run_job(job_id: str) -> None:
     if job.get("pip_path"):
         common_args.extend(["--video", f"pip={job['pip_path']}"])
     output_path = Path(job["output_path"])
-    temp_output_path = Path(job.get("temp_output_path") or _temp_output_path(output_path, job_id))
+    work_dir = Path(str(job["layout_path"])).parent
+    temp_output_path = Path(
+        job.get("temp_output_path") or _temp_output_path(output_path, work_dir, job_id)
+    )
     log_path = Path(job.get("log_path") or temp_output_path.with_suffix(".log"))
     temp_output_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2803,7 +2806,7 @@ def _job_work_dir(job: dict[str, Any]) -> Path | None:
 def _can_delete_work_dir(work_dir: Path) -> bool:
     if _is_path_inside(work_dir, _UPLOAD_WORK_ROOT):
         return True
-    if work_dir.parent.name == "gopro-overlay" and work_dir.parent.parent.name == ".tmp":
+    if work_dir.parent.name == "gopro-overlay" and work_dir.parent.parent.name == "temp":
         return True
     # Jobs created before the storage migration must remain cleanable.
     return work_dir.parent.name == ".gopro-overlay-work"

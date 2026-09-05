@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 
 from database import SessionLocal
 import config
-from flight_storage import ensure_flight_directory
+from flight_storage import flight_temporary_directory
 from flight_tracks import TrackPoint, normalize_track
 from gopro_overlay_inputs import latest_matching_file, resolve_automatic_overlay_inputs
 from highlight_video import HighlightClip
@@ -132,7 +132,7 @@ def _configured_gpx_path(value: str | None) -> Path | None:
 
 def _existing_calibrated_gpx(source_path: Path, output_dir: Path) -> Path | None:
     """Find a completed GoPro calibration for this flight, excluding this job."""
-    cache_dir = source_path.parent / ".tmp" / "gopro-overlay"
+    cache_dir = source_path.parent / "temp" / "gopro-overlay"
     if not cache_dir.is_dir():
         return None
     candidates = sorted(
@@ -1413,7 +1413,7 @@ def process_highlight_video_job(job_id: str) -> None:
             raise ValueError(f"Flight not found for highlight job: {job.flight_id}")
         source_path = Path(job.source_video_path)
         gpx_file_path = flight.gpx_file_path
-        output_dir = ensure_flight_directory(db, flight) / "highlights" / job.id
+        output_dir = flight_temporary_directory(db, flight, "highlights") / job.id
         output_path = output_dir / "highlights-original-format.mp4"
         offset = float(job.overlay_offset_seconds or 0.0)
         db.commit()
