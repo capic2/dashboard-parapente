@@ -25,6 +25,7 @@ import config
 from datetime_utils import to_api_utc
 from database import SessionLocal
 from deployment_drain import job_admission
+from flight_storage import flight_temporary_directory
 from models import Flight, GoproOverlayJob
 from sqlalchemy.exc import OperationalError
 from video_acceleration import (
@@ -53,7 +54,7 @@ _XSI_NAMESPACE = "http://www.w3.org/2001/XMLSchema-instance"
 _VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v"}
 _GPX_EXTENSIONS = {".gpx", ".fit"}
 _UPLOAD_WORK_ROOT = Path("/tmp/dashboard-parapente/gopro-overlays")
-_PATH_WORK_DIR_NAME = ".gopro-overlay-work"
+_PATH_WORK_DIR_NAME = ".tmp/gopro-overlay"
 _PROGRESS_PERCENT_RE = re.compile(r"(?P<percent>\d{1,3})\s*%")
 _OSV_PROGRESS_RE = re.compile(r"^OSV_PROGRESS\s+(?P<percent>\d{1,3})\s*$")
 _LOG_TAIL_LINE_COUNT = 100
@@ -161,7 +162,12 @@ def _layout_path(layout: GoproOverlayLayout) -> Path:
     return _layout_dir() / layout.path
 
 
-def _uploaded_job_work_dir(job_id: str) -> Path:
+def _uploaded_job_work_dir(job_id: str, flight_id: str | None = None) -> Path:
+    if flight_id:
+        with SessionLocal() as db:
+            flight = db.query(Flight).filter(Flight.id == flight_id).first()
+            if flight:
+                return flight_temporary_directory(db, flight, "gopro-overlay") / job_id
     return _UPLOAD_WORK_ROOT / job_id
 
 
@@ -2137,7 +2143,7 @@ async def create_gopro_overlay_job(
     flight_id: str | None = None,
 ) -> dict[str, Any]:
     job_id = str(uuid.uuid4())
-    job_upload_dir = _uploaded_job_work_dir(job_id)
+    job_upload_dir = _uploaded_job_work_dir(job_id, flight_id)
     try:
         video_path = await save_uploaded_file(
             video_file,
@@ -2797,7 +2803,10 @@ def _job_work_dir(job: dict[str, Any]) -> Path | None:
 def _can_delete_work_dir(work_dir: Path) -> bool:
     if _is_path_inside(work_dir, _UPLOAD_WORK_ROOT):
         return True
-    return work_dir.parent.name == _PATH_WORK_DIR_NAME
+    if work_dir.parent.name == "gopro-overlay" and work_dir.parent.parent.name == ".tmp":
+        return True
+    # Jobs created before the storage migration must remain cleanable.
+    return work_dir.parent.name == ".gopro-overlay-work"
 
 
 def _cleanup_gopro_overlay_temp_files(job: dict[str, Any]) -> None:
