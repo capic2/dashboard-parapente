@@ -95,6 +95,7 @@ def test_summaries_filter_search_sort_and_hide_paths(client, db_session, arguel_
     assert item["has_video"] is False
     assert item["has_camera"] is False
     assert item["has_youtube_video"] is False
+    assert item["youtube_video_count"] == 0
     assert item["youtube_upload_status"] is None
     assert item["youtube_upload_progress"] is None
     assert item["has_gopro_overlay"] is False
@@ -177,7 +178,10 @@ def test_summaries_only_report_completed_uploads_that_still_exist(client, db_ses
         id="youtube-uploaded",
         title="Uploaded",
         flight_date=date(2026, 1, 1),
-        youtube_urls_json='["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]',
+        youtube_urls_json=(
+            '["https://www.youtube.com/watch?v=dQw4w9WgXcQ", '
+            '"https://www.youtube.com/watch?v=9bZkp7q19f0"]'
+        ),
     )
     deleted = Flight(id="youtube-deleted", title="Deleted", flight_date=date(2026, 1, 2))
     manual = Flight(
@@ -219,16 +223,27 @@ def test_summaries_only_report_completed_uploads_that_still_exist(client, db_ses
                 description="",
                 youtube_video_id="bbbbbbbbbbb",
             ),
+            YoutubeUploadJob(
+                id="youtube-uploaded-second-job",
+                flight_id=uploaded.id,
+                user_id=1,
+                status="completed",
+                progress=100,
+                title="Uploaded second",
+                description="",
+                youtube_video_id="9bZkp7q19f0",
+            ),
         ]
     )
     db_session.commit()
 
     with patch(
         "flight_summaries.existing_youtube_video_ids",
-        return_value={"aaaaaaaaaaa", "dQw4w9WgXcQ"},
+        return_value={"aaaaaaaaaaa", "dQw4w9WgXcQ", "9bZkp7q19f0"},
     ) as verify_videos:
         response = client.get(API_URL)
     flags_by_id = {item["id"]: item["has_youtube_video"] for item in response.json()["flights"]}
+    counts_by_id = {item["id"]: item["youtube_video_count"] for item in response.json()["flights"]}
 
     assert response.status_code == 200
     assert flags_by_id == {
@@ -236,7 +251,12 @@ def test_summaries_only_report_completed_uploads_that_still_exist(client, db_ses
         "youtube-manual": False,
         "youtube-uploaded": True,
     }
-    verify_videos.assert_called_once_with({1: {"dQw4w9WgXcQ"}})
+    assert counts_by_id == {
+        "youtube-deleted": 0,
+        "youtube-manual": 0,
+        "youtube-uploaded": 2,
+    }
+    verify_videos.assert_called_once_with({1: {"dQw4w9WgXcQ", "9bZkp7q19f0"}})
 
 
 def test_summaries_require_completed_generations_and_existing_files(
