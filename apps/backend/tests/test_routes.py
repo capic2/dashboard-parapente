@@ -136,6 +136,40 @@ class TestFlightsEndpoints:
         assert "total_distance_km" in data
         assert data["total_flights"] >= 1
 
+    def test_flight_stats_follow_site_and_date_filters(self, client, db_session):
+        """Analytics aggregates only the flights selected by the page filters."""
+        site = Site(
+            id="site-analytics",
+            code="ANA",
+            name="Analytics site",
+            latitude=47.0,
+            longitude=6.0,
+        )
+        matching_flight = Flight(
+            id="flight-analytics-match",
+            site_id=site.id,
+            flight_date=datetime(2026, 6, 15).date(),
+            duration_minutes=75,
+            distance_km=12.5,
+        )
+        other_flight = Flight(
+            id="flight-analytics-other",
+            flight_date=datetime(2026, 7, 15).date(),
+            duration_minutes=180,
+            distance_km=50,
+        )
+        db_session.add_all([site, matching_flight, other_flight])
+        db_session.commit()
+
+        response = client.get(
+            "/api/flights/stats?site_id=site-analytics&date_from=2026-06-01&date_to=2026-06-30"
+        )
+
+        assert response.status_code == 200
+        assert response.json()["total_flights"] == 1
+        assert response.json()["total_duration_minutes"] == 75
+        assert response.json()["total_distance_km"] == 12.5
+
 
 class TestWeatherEndpoints:
     """Test /api/weather endpoints"""
