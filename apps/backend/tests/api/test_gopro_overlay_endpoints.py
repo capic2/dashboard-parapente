@@ -4040,6 +4040,7 @@ def test_run_job_preserves_manual_offset_on_the_osv_timeline(
     assert popen.call_args.kwargs["cwd"] == str(tmp_path / "runner-root")
     assert Path(command[command.index("--layout-xml") + 1]).parent == work_dir
     assert command[command.index("--overlay-size") + 1] == "1920x1080"
+    assert command[command.index("--statistics-gpx") + 1] == command[command.index("--gpx") + 1]
     assert "--video-time-start" not in command
     assert "--gpx-offset" not in command
     assert Path(command[-2]) == video_path
