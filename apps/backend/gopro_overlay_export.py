@@ -483,7 +483,6 @@ def _job_preparation_metadata(
     requested_layout_id: str | None,
     output_resolution: str,
     gpx_offset: float = 0.0,
-    render_method: str | None = None,
     overlay_only: bool = False,
     overlay_size: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
@@ -497,14 +496,7 @@ def _job_preparation_metadata(
     }
     if overlay_size:
         metadata["overlay_size"] = list(overlay_size)
-    if render_method:
-        metadata["render_method"] = render_method
     return metadata
-
-
-def _queued_render_method() -> str:
-    accelerator = select_video_accelerator(config.VIDEO_ACCELERATOR)
-    return "gpu" if accelerator == "nvidia" and config.GOPRO_OVERLAY_PROFILE else "cpu"
 
 
 def _gpx_offset_from_command_metadata(command: Any) -> float:
@@ -2231,13 +2223,11 @@ def _create_gopro_overlay_job_from_paths(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temp_output_path = _temp_output_path(output_path, job_id)
     log_path = _gopro_overlay_log_path(job_id)
-    render_method = _queued_render_method()
     preparation_metadata = _job_preparation_metadata(
         pin_inputs=pin_inputs,
         requested_layout_id=layout_id,
         output_resolution=output_resolution,
         gpx_offset=gpx_offset,
-        render_method=render_method,
         overlay_only=overlay_only,
         overlay_size=overlay_size,
     )
@@ -2264,7 +2254,7 @@ def _create_gopro_overlay_job_from_paths(
                 output_filename=output_path.name,
                 log_path=str(log_path),
                 command_json=json.dumps(preparation_metadata),
-                render_method=render_method,
+                render_method=None,
                 video_width=None,
                 video_height=None,
                 created_at=now,
@@ -2296,7 +2286,7 @@ def _create_gopro_overlay_job_from_paths(
             "temp_output_path": str(temp_output_path),
             "output_filename": output_path.name,
             "log_path": str(log_path),
-            "render_method": render_method,
+            "render_method": None,
             "video_width": None,
             "video_height": None,
             "gpx_offset": gpx_offset,
@@ -2322,6 +2312,7 @@ def _create_gopro_overlay_job_from_paths(
         "temp_output_path": str(temp_output_path),
         "output_filename": output_path.name,
         "log_path": str(log_path),
+        "render_method": None,
         "video_width": None,
         "video_height": None,
         "output_resolution": output_resolution,
