@@ -6696,7 +6696,7 @@ def stream_flight_gopro_camera_preview(
         raise HTTPException(status_code=404, detail="Flight not found")
     camera_path = _flight_gopro_camera_path(db, flight)
     preview_state = gopro_preview_proxy.get_preview_state(camera_path, target_end_seconds)
-    preview_path = camera_path.with_name(gopro_preview_proxy.PREVIEW_FILENAME)
+    preview_path = gopro_preview_proxy.preview_path(camera_path)
     video_path = (
         preview_path
         if (

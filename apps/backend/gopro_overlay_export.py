@@ -367,12 +367,12 @@ def _output_path_for_dir(output_dir: str | None, video_path: Path, output_name: 
     return Path(output_dir).expanduser().resolve() / output_name
 
 
-def _temp_output_path(output_path: Path, job_id: str) -> Path:
+def _temp_output_path(output_path: Path, work_dir: Path, job_id: str) -> Path:
     suffix = output_path.suffix or ".mp4"
     stem = (
         output_path.name[: -len(suffix)] if output_path.name.endswith(suffix) else output_path.name
     )
-    return output_path.with_name(f".{stem}.{job_id}.part{suffix}")
+    return work_dir / f"{stem}.{job_id}.part{suffix}"
 
 
 def _prepare_layout_file(
@@ -2269,7 +2269,7 @@ def _create_gopro_overlay_job_from_paths(
     layout_path = work_dir / source_layout_path.name
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    temp_output_path = _temp_output_path(output_path, job_id)
+    temp_output_path = _temp_output_path(output_path, work_dir, job_id)
     log_path = _gopro_overlay_log_path(job_id)
     preparation_metadata = _job_preparation_metadata(
         pin_inputs=pin_inputs,
@@ -2452,7 +2452,10 @@ def _run_job(job_id: str) -> None:
     if job.get("pip_path"):
         common_args.extend(["--video", f"pip={job['pip_path']}"])
     output_path = Path(job["output_path"])
-    temp_output_path = Path(job.get("temp_output_path") or _temp_output_path(output_path, job_id))
+    work_dir = Path(str(job["layout_path"])).parent
+    temp_output_path = Path(
+        job.get("temp_output_path") or _temp_output_path(output_path, work_dir, job_id)
+    )
     log_path = Path(job.get("log_path") or temp_output_path.with_suffix(".log"))
     temp_output_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.parent.mkdir(parents=True, exist_ok=True)

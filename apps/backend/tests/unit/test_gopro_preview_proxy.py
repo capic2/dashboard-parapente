@@ -261,9 +261,12 @@ def test_request_preview_is_cached_and_invalidated_when_camera_changes(
 def test_failed_extension_keeps_existing_preview_available(tmp_path: Path, monkeypatch) -> None:
     camera_path = tmp_path / "camera.mp4"
     camera_path.write_bytes(b"camera")
-    (tmp_path / gopro_preview_proxy.PREVIEW_FILENAME).write_bytes(b"short-preview")
+    preview_path = gopro_preview_proxy.preview_path(camera_path)
+    preview_path.parent.mkdir(parents=True, exist_ok=True)
+    preview_path.write_bytes(b"short-preview")
     fingerprint = gopro_preview_proxy._source_fingerprint(camera_path)
-    manifest_path = tmp_path / gopro_preview_proxy.MANIFEST_FILENAME
+    manifest_path = gopro_preview_proxy._manifest_path(camera_path)
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(
         json.dumps(
             {
@@ -290,7 +293,7 @@ def test_failed_extension_keeps_existing_preview_available(tmp_path: Path, monke
     state = gopro_preview_proxy.get_preview_state(camera_path)
     assert state.status == "failed"
     assert state.available_duration_seconds == 180
-    assert (tmp_path / gopro_preview_proxy.PREVIEW_FILENAME).read_bytes() == b"short-preview"
+    assert preview_path.read_bytes() == b"short-preview"
 
 
 def test_request_preview_does_not_enqueue_an_identical_running_request(
@@ -384,7 +387,7 @@ def test_stale_running_manifest_is_not_reported_as_generating(tmp_path: Path) ->
 def test_enqueue_failure_preserves_concurrent_manifest_fields(tmp_path: Path, monkeypatch) -> None:
     camera_path = tmp_path / "camera.mp4"
     camera_path.write_bytes(b"camera")
-    manifest_path = tmp_path / gopro_preview_proxy.MANIFEST_FILENAME
+    manifest_path = gopro_preview_proxy._manifest_path(camera_path)
 
     def fail_enqueue(*_args) -> None:
         manifest = json.loads(manifest_path.read_text())
@@ -406,7 +409,7 @@ def test_enqueue_failure_preserves_concurrent_manifest_fields(tmp_path: Path, mo
 def test_enqueue_failure_does_not_overwrite_newer_generation(tmp_path: Path, monkeypatch) -> None:
     camera_path = tmp_path / "camera.mp4"
     camera_path.write_bytes(b"camera")
-    manifest_path = tmp_path / gopro_preview_proxy.MANIFEST_FILENAME
+    manifest_path = gopro_preview_proxy._manifest_path(camera_path)
 
     def fail_old_enqueue(*_args) -> None:
         manifest = json.loads(manifest_path.read_text())
