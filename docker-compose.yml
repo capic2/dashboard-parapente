@@ -163,6 +163,40 @@ services:
     networks:
       - parapente-network
 
+  database-backup:
+    image: ${CI_BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
+    container_name: parapente-database-backup
+    restart: unless-stopped
+    command: ['/bin/sh', '/app/database_backup.sh']
+    labels:
+      project: dashboard-parapente
+      service: database-backup
+      env: ${ENVIRONMENT:-production}
+    environment:
+      - DATABASE_BACKUP_INTERVAL_SECONDS=${DATABASE_BACKUP_INTERVAL_SECONDS:-86400}
+      - DATABASE_BACKUP_RETRY_SECONDS=${DATABASE_BACKUP_RETRY_SECONDS:-300}
+      - DATABASE_BACKUP_RETENTION_DAYS=${DATABASE_BACKUP_RETENTION_DAYS:-30}
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - /home/capic/docker-data/dashboard-parapente/db:/app/db:ro
+      # This must be storage outside the application host (for example the NAS).
+      - ${DATABASE_BACKUP_HOST_DIR:?DATABASE_BACKUP_HOST_DIR is required}:/backups
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ['CMD-SHELL', 'find /tmp/database-backup-last-success -mmin -$${DATABASE_BACKUP_HEALTH_MAX_AGE_MINUTES:-1500} | grep -q .']
+      interval: 5m
+      timeout: 10s
+      retries: 2
+      start_period: 5m
+
   backend-worker:
     image: ${CI_BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
     container_name: parapente-backend-worker

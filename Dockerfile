@@ -123,8 +123,8 @@ RUN mkdir -p /app/db && chmod 755 /app/db && \
     mkdir -p /app/emagram-cache && chmod 755 /app/emagram-cache && \
     mkdir -p "$CODEX_HOME" && chmod 700 "$CODEX_HOME"
 
-# Rendre le script d'entrypoint exécutable
-RUN chmod +x entrypoint.sh
+# Rendre les scripts de maintenance exécutables
+RUN chmod +x entrypoint.sh database_backup.sh
 
 # This changes for every deployment, so keep it after the expensive dependency
 # layers to preserve their BuildKit cache.
