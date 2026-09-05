@@ -285,7 +285,7 @@ export function GoproOverlaySyncPreview({
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-3 text-gray-900 dark:text-gray-100">
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
             <Mountain

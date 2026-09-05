@@ -96,7 +96,6 @@ def migrate_legacy_flight_temporary_files() -> int:
                             child, _legacy_hidden_file_destination(temporary_root, child)
                         ):
                             moved += 1
-
             for job in db.query(VideoExportJob).all():
                 flight = db.query(Flight).filter(Flight.id == job.flight_id).first()
                 if not flight:
