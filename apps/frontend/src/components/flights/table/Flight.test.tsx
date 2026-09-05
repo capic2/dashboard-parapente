@@ -57,6 +57,7 @@ const flight = {
   has_video: false,
   has_camera: false,
   has_youtube_video: false,
+  youtube_video_count: 0,
   youtube_upload_status: null,
   youtube_upload_progress: null,
   has_gopro_overlay: false,
@@ -250,4 +251,23 @@ test('renders YouTube upload progress in the media badge', () => {
     'aria-live',
     'polite'
   );
+});
+
+test('shows the number of available YouTube videos when there are several', () => {
+  render(
+    <Flight
+      flight={{
+        ...flight,
+        has_youtube_video: true,
+        youtube_video_count: 2,
+      }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(screen.getByText('flights.youtubeBadge x2')).toBeInTheDocument();
 });

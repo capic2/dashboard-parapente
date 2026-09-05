@@ -20,6 +20,7 @@ const mockFlight: FlightSummary = {
   has_video: true,
   has_camera: true,
   has_youtube_video: false,
+  youtube_video_count: 0,
   youtube_upload_status: null,
   youtube_upload_progress: null,
   has_gopro_overlay: true,
@@ -141,6 +142,7 @@ export const WithYoutubeVideo = meta.story({
           ...mockFlight,
           has_video: false,
           has_youtube_video: true,
+          youtube_video_count: 2,
           has_gopro_overlay: false,
         }}
         isActive={false}

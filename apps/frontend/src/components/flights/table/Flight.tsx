@@ -110,6 +110,8 @@ export function Flight({
     t('flights.youtubeBadge'),
     isYoutubeUploadRunning ? flight.youtube_upload_progress : null
   );
+  const youtubeVideoCountLabel =
+    flight.youtube_video_count > 1 ? ` x${flight.youtube_video_count}` : '';
   const selectFlight = () => {
     if (!selectionMode) {
       onSelectFlight(flight);
@@ -240,6 +242,7 @@ export function Flight({
                 >
                   <Play className="h-3 w-3" aria-hidden="true" />
                   {youtubeLabel}
+                  {youtubeVideoCountLabel}
                 </span>
               )}
               {isVideoExportRunning && (
