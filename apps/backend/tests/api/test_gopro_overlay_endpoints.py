@@ -4,7 +4,7 @@ import os
 import re
 import shutil
 import subprocess
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from io import BytesIO, StringIO
 from pathlib import Path
 from typing import Any
@@ -35,8 +35,48 @@ from models import VideoExportJob
 API_PREFIX = "/api"
 
 
+# REGRESSION CONTRACT — manual overlay calibration must produce the same
+# camera-to-GPX timeline in the preview and in the generated video. Do not
+# weaken, remove, or change these cases without explicit user authorization.
+@pytest.mark.parametrize(
+    ("automatic_offset", "manual_offset", "expected_first_gpx_at"),
+    [
+        (10.0, 20.0, 30.0),
+        (10.0, 0.0, 10.0),
+        (10.0, -5.0, 5.0),
+        (10.0, -15.0, None),
+    ],
+)
+def test_manual_overlay_offset_keeps_the_camera_timeline(
+    automatic_offset: float,
+    manual_offset: float,
+    expected_first_gpx_at: float | None,
+) -> None:
+    video_start = datetime.fromisoformat("2026-08-08T09:30:00+00:00")
+    gpx_start = video_start + timedelta(seconds=automatic_offset)
+
+    assert (
+        gopro_overlay_export._first_gpx_at_for_camera_timeline(
+            gpx_start,
+            video_start,
+            manual_offset,
+        )
+        == expected_first_gpx_at
+    )
+
+
+@pytest.mark.parametrize(
+    ("manual_offset", "effective_offset"),
+    [(1.5, 11.5), (-2.5, 7.5)],
+)
 def test_gopro_overlay_preview_returns_shared_timeline(
-    client: TestClient, db_session, sample_flight, tmp_path, monkeypatch
+    client: TestClient,
+    db_session,
+    sample_flight,
+    tmp_path,
+    monkeypatch,
+    manual_offset,
+    effective_offset,
 ) -> None:
     input_dir = tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01"
     input_dir.mkdir(parents=True)
@@ -48,7 +88,7 @@ def test_gopro_overlay_preview_returns_shared_timeline(
         '<trkpt lat="45.1" lon="5.1"><time>2026-03-15T10:01:10Z</time><extensions><hr>126</hr></extensions></trkpt>'
         "</trkseg></trk></gpx>"
     )
-    sample_flight.gopro_overlay_gpx_offset = 1.5
+    sample_flight.gopro_overlay_gpx_offset = manual_offset
     db_session.commit()
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
 
@@ -76,8 +116,8 @@ def test_gopro_overlay_preview_returns_shared_timeline(
     assert response.json()["gpx"]["coordinates"][0]["heart_rate"] == 120
     assert response.json()["alignment"] == {
         "automatic_offset_seconds": 10.0,
-        "manual_offset_seconds": 1.5,
-        "effective_offset_seconds": 11.5,
+        "manual_offset_seconds": manual_offset,
+        "effective_offset_seconds": effective_offset,
     }
 
 
@@ -1246,6 +1286,9 @@ def test_worker_merge_osv_files_with_gpx_streams_progress(
     assert updates[-1]["message"] == "OSV telemetry merged"
 
 
+# REGRESSION CONTRACT — `absolute` is the only merger mode that preserves
+# manual GPX calibration. Do not weaken, remove, or change these cases without
+# explicit user authorization.
 @pytest.mark.parametrize(
     ("gpx_offset", "first_gpx_at", "expected_first_gpx_at"),
     [(295.9, 5.0, "5.000"), (-15.0, -20.0, "0.000")],
@@ -3808,10 +3851,113 @@ def test_cancel_queued_gopro_overlay_job_removes_rq_job(monkeypatch):
         gopro_overlay_export._PROCESSES.pop(job_id, None)
 
 
-def test_run_job_uses_manual_offset_as_authoritative_osv_timeline(
+# REGRESSION CONTRACT — every rendered segment must retain the original camera
+# timeline. Do not weaken, remove, or change this test without explicit user
+# authorization: it prevents telemetry disappearing after a segment boundary.
+def test_segmented_overlay_keeps_the_calibrated_timeline_for_every_segment(
+    tmp_path, monkeypatch
+) -> None:
+    video_path = tmp_path / "camera.mp4"
+    gpx_path = tmp_path / "render.gpx"
+    layout_path = tmp_path / "layout.xml"
+    output_path = tmp_path / "overlay.mp4"
+    temp_output_path = tmp_path / "overlay.part.mp4"
+    video_path.write_bytes(b"video")
+    gpx_path.write_text("<gpx />")
+    layout_path.write_text("<layout />")
+    timeline_start = datetime.fromisoformat("2026-08-08T09:30:00+00:00")
+    job = {
+        "video_path": str(video_path),
+        "gpx_path": str(gpx_path),
+        "layout_path": str(layout_path),
+        "command": {
+            "render_gpx_path": str(gpx_path),
+            "segment_video_start": timeline_start.isoformat(),
+        },
+    }
+    command = [
+        "gopro-dashboard.py",
+        "--use-gpx-only",
+        "--gpx",
+        str(gpx_path),
+        "--layout",
+        "xml",
+        "--layout-xml",
+        str(layout_path),
+        str(video_path),
+        str(temp_output_path),
+    ]
+    source_timestamps: list[tuple[Path, float]] = []
+    segment_commands: list[list[str]] = []
+
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_SEGMENT_SECONDS", 100)
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: 250.0)
+    monkeypatch.setattr(gopro_overlay_export, "_update_job", lambda *_args, **_kwargs: job)
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "_transition_job_to_running",
+        lambda *_args, **_kwargs: job,
+    )
+    monkeypatch.setattr(gopro_overlay_export, "_finish_job", lambda *_args, **_kwargs: job)
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "_create_overlay_segment",
+        lambda _source, destination, _start, _duration: destination.write_bytes(b"segment"),
+    )
+    monkeypatch.setattr(
+        gopro_overlay_export.os,
+        "utime",
+        lambda path, times: source_timestamps.append((Path(path), times[0])),
+    )
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "_run_overlay_process",
+        lambda _job_id, segment_command, *_args: segment_commands.append(segment_command) or 0,
+    )
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "_concat_overlay_segments",
+        lambda _segments, destination: destination.write_bytes(b"overlay"),
+    )
+    monkeypatch.setattr(gopro_overlay_export, "_verify_video_output", lambda _: (True, None))
+
+    gopro_overlay_export._run_segmented_overlay_job(
+        "segmented-job",
+        job,
+        command,
+        command.copy(),
+        False,
+        "cpu",
+        tmp_path / "overlay.log",
+        output_path,
+        temp_output_path,
+    )
+
+    assert [timestamp for _path, timestamp in source_timestamps] == [
+        timeline_start.timestamp(),
+        (timeline_start + timedelta(seconds=100)).timestamp(),
+        (timeline_start + timedelta(seconds=200)).timestamp(),
+    ]
+    assert len(segment_commands) == 3
+    assert all(
+        segment_command[segment_command.index("--video-time-start") + 1] == "file-modified"
+        for segment_command in segment_commands
+    )
+    assert output_path.read_bytes() == b"overlay"
+
+
+# REGRESSION CONTRACT — this is the worker-to-merger integration boundary. Do
+# not weaken, remove, or change these cases without explicit user authorization.
+@pytest.mark.parametrize(
+    ("gpx_offset", "expected_first_gpx_at"),
+    [(295.9, 305.9), (0.0, 10.0), (-15.0, None)],
+)
+def test_run_job_preserves_manual_offset_on_the_osv_timeline(
     tmp_path,
     monkeypatch,
     test_db,
+    gpx_offset,
+    expected_first_gpx_at,
 ):
     layout_dir = tmp_path / "layouts"
     layout_dir.mkdir()
@@ -3870,7 +4016,7 @@ def test_run_job_uses_manual_offset_as_authoritative_osv_timeline(
         pip_path=None,
         layout_id="parapente-1080",
         output_filename="overlay.mp4",
-        gpx_offset=295.9,
+        gpx_offset=gpx_offset,
     )
     work_dir = tmp_path / ".gopro-overlay-work" / job["job_id"]
 
@@ -3900,12 +4046,13 @@ def test_run_job_uses_manual_offset_as_authoritative_osv_timeline(
     assert Path(command[-1]) == Path(job["temp_output_path"])
     assert len(merge_calls) == 1
     assert merge_calls[0][0] == [osv_path]
-    assert merge_calls[0][3]["gpx_offset"] == 295.9
-    assert merge_calls[0][3]["first_gpx_at"] == 305.9
+    assert merge_calls[0][3]["gpx_offset"] == gpx_offset
+    assert merge_calls[0][3]["first_gpx_at"] == expected_first_gpx_at
     assert merge_calls[0][3]["video_duration"] == 421.483
-    persisted_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"])
+    persisted_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"], include_command=True)
     assert persisted_job["status"] == "completed"
-    assert persisted_job["gpx_offset"] == 295.9
+    assert persisted_job["gpx_offset"] == gpx_offset
+    assert persisted_job["command"]["segment_video_start"] == "2026-08-08T09:30:33+00:00"
     assert Path(job["output_path"]).read_bytes() == b"video"
     assert not Path(job["temp_output_path"]).exists()
     assert not work_dir.exists()
