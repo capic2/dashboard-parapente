@@ -31,7 +31,7 @@ from datetime_utils import to_api_utc
 from deployment_drain import DeploymentDrainActive, job_admission
 from auth import create_job_token, decode_job_token
 from database import SessionLocal
-from flight_storage import get_video_output_path
+from flight_storage import flight_temporary_directory, get_video_output_path
 from models import Flight, VideoExportJob
 from video_acceleration import (
     VideoAccelerator,
@@ -855,8 +855,38 @@ def _contiguous_frame_count(frames_dir: Path) -> int:
     return frame_index
 
 
-def _job_temp_dir_for_export(job_id: str) -> Path:
-    preferred_temp_dir = _job_temp_dir(_video_temp_images_dir(), job_id)
+def _flight_job_temp_dir(db: Session, flight_id: str, job_id: str) -> Path | None:
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        return None
+    return flight_temporary_directory(db, flight, "video-exports") / job_id
+
+
+def _job_temp_dir_for_export(job: VideoExportJob | str) -> Path:
+    if isinstance(job, str):
+        preferred_temp_dir = _job_temp_dir(_video_temp_images_dir(), job)
+        legacy_temp_dir = _job_temp_dir(_video_legacy_temp_images_dir(), job)
+        if _contiguous_frame_count(legacy_temp_dir / "frames") > _contiguous_frame_count(
+            preferred_temp_dir / "frames"
+        ):
+            return legacy_temp_dir
+        return preferred_temp_dir
+
+    flight_id = getattr(job, "flight_id", None)
+    job_id = job.id
+    if not isinstance(flight_id, str):
+        return _job_temp_dir(_video_temp_images_dir(), job_id)
+
+    preferred_temp_dir: Path | None = None
+    try:
+        with SessionLocal() as db:
+            preferred_temp_dir = _flight_job_temp_dir(db, flight_id, job_id)
+    except SQLAlchemyError:
+        return _job_temp_dir(_video_temp_images_dir(), job_id)
+
+    if preferred_temp_dir is None:
+        return _job_temp_dir(_video_temp_images_dir(), job_id)
+
     preferred_frames_dir = preferred_temp_dir / "frames"
     legacy_temp_root = _video_legacy_temp_images_dir()
     legacy_temp_dir = _job_temp_dir(legacy_temp_root, job_id)
@@ -878,7 +908,7 @@ def _write_frame_file_atomic(frame_path: Path, frame_png: bytes) -> None:
 
 
 def _job_resume_info(job: VideoExportJob) -> dict[str, Any]:
-    frames_dir = _job_temp_dir_for_export(job.id) / "frames"
+    frames_dir = _job_temp_dir_for_export(job) / "frames"
     existing_indexes = _existing_frame_indexes(frames_dir)
     total_frames = job.total_frames or 0
     resume_from_frame = _first_missing_frame_index(frames_dir, total_frames)
@@ -1004,9 +1034,21 @@ def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, 
     }
     export_root = _video_export_dir()
 
-    for job_id in known_inactive_job_ids:
+    for export in exports:
+        job_id = str(export.get("job_id") or "")
+        if not job_id or job_id not in known_inactive_job_ids:
+            continue
         for temp_root in temp_roots:
             candidates.append((_job_temp_dir(temp_root, job_id), temp_root))
+        flight_id = export.get("flight_id")
+        if isinstance(flight_id, str):
+            try:
+                with SessionLocal() as db:
+                    temp_dir = _flight_job_temp_dir(db, flight_id, job_id)
+            except SQLAlchemyError:
+                temp_dir = None
+            if temp_dir:
+                candidates.append((temp_dir, temp_dir.parent))
         candidates.append((export_root / f"frames_{job_id}", export_root))
         candidates.append((Path("/tmp") / f"playwright-debug-{job_id}.png", Path("/tmp")))
         candidates.append((Path("/tmp") / f"playwright-error-{job_id}.png", Path("/tmp")))
@@ -1075,6 +1117,18 @@ def cleanup_video_export_job_temp_files(job_id: str) -> dict[str, Any]:
         (Path("/tmp") / f"playwright-error-{job_id}.png", Path("/tmp")),
         (_job_log_path(job_id), _video_export_dir()),
     ]
+    try:
+        job = _get_job(job_id)
+    except SQLAlchemyError:
+        job = None
+    if job and isinstance(getattr(job, "flight_id", None), str):
+        try:
+            with SessionLocal() as db:
+                temp_dir = _flight_job_temp_dir(db, job.flight_id, job_id)
+        except SQLAlchemyError:
+            temp_dir = None
+        if temp_dir:
+            candidates.append((temp_dir, temp_dir.parent))
 
     deleted_paths: list[str] = []
     errors: list[dict[str, str]] = []
@@ -1152,6 +1206,18 @@ def _cleanup_job_temp_dirs(job_id: str) -> None:
     }
     for temp_root in temp_roots:
         _cleanup_temp_dir(_job_temp_dir(temp_root, job_id))
+    try:
+        job = _get_job(job_id)
+    except SQLAlchemyError:
+        job = None
+    if job and isinstance(getattr(job, "flight_id", None), str):
+        try:
+            with SessionLocal() as db:
+                temp_dir = _flight_job_temp_dir(db, job.flight_id, job_id)
+        except SQLAlchemyError:
+            temp_dir = None
+        if temp_dir:
+            _cleanup_temp_dir(temp_dir)
 
 
 def _cleanup_job_temp_dirs_unless_resumable(job_id: str) -> None:
@@ -1961,7 +2027,7 @@ async def _export_video_manual_render(job_id: str):
             )
             _set_job_runtime(job_id, phase=_STATUS_INITIALIZING)
 
-            temp_dir = _job_temp_dir_for_export(job_id)
+            temp_dir = _job_temp_dir_for_export(job)
             frames_dir = temp_dir / "frames"
             _prepare_export_dirs(export_root, temp_dir, frames_dir)
 
