@@ -1128,6 +1128,19 @@ def _pip_timeline_offsets(
     return 0.0, abs(offset)
 
 
+def _first_gpx_at_for_camera_timeline(
+    gpx_start: datetime | None,
+    video_start: datetime | None,
+    gpx_offset: float,
+) -> float | None:
+    """Return the first GPX position on the camera timeline after calibration."""
+    if gpx_start is None or video_start is None:
+        return None
+
+    first_gpx_at = (gpx_start - video_start).total_seconds() + gpx_offset
+    return first_gpx_at if first_gpx_at > 0 else None
+
+
 def align_video_start_time_to_gpx(
     video_start: datetime | None,
     gpx_start: datetime | None,
@@ -1597,11 +1610,11 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         # the GPX timestamps by the manual offset.  In its absolute mode, the
         # first GPX position therefore includes both the detected alignment and
         # the calibrated offset.
-        first_gpx_at = None
-        if gpx_start is not None and aligned_video_start is not None:
-            effective_first_gpx_at = (gpx_start - aligned_video_start).total_seconds() + gpx_offset
-            if effective_first_gpx_at > 0:
-                first_gpx_at = effective_first_gpx_at
+        first_gpx_at = _first_gpx_at_for_camera_timeline(
+            gpx_start,
+            aligned_video_start,
+            gpx_offset,
+        )
         if osv_paths:
             _update_job(job_id, progress=10, message="Merging OSV telemetry")
             video_duration = probe_video_duration(video_path)
@@ -1625,6 +1638,10 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 )
 
         command_metadata["render_gpx_path"] = str(render_gpx_path)
+        if aligned_video_start is not None:
+            command_metadata["segment_video_start"] = aligned_video_start.isoformat()
+        else:
+            command_metadata.pop("segment_video_start", None)
         if embedded_video_start is not None:
             command_metadata["video_time_start"] = "video-created"
         else:
@@ -1737,6 +1754,34 @@ def _finish_job(job_id: str, **changes: Any) -> dict[str, Any]:
 
 def _overlay_segment_path(work_dir: Path, job_id: str, index: int, kind: str) -> Path:
     return work_dir / f"{kind}-{job_id}-{index:05d}.mp4"
+
+
+def _segment_video_start(
+    metadata: dict[str, Any],
+    video_path: Path,
+    gpx_path: Path,
+) -> datetime:
+    stored_start = metadata.get("segment_video_start")
+    if isinstance(stored_start, str):
+        parsed_start = _parse_utc_datetime(stored_start)
+        if parsed_start is not None:
+            return parsed_start
+
+    gpx_start = first_gpx_timestamp(gpx_path)
+    resolved_start = align_video_start_time_to_gpx(
+        resolve_gopro_video_start_time(video_path, gpx_start),
+        gpx_start,
+    )
+    if resolved_start is not None:
+        return resolved_start
+    return datetime.fromtimestamp(video_path.stat().st_mtime, tz=timezone.utc)
+
+
+def _set_segment_video_time_start(command: list[str]) -> None:
+    if "--video-time-start" in command:
+        command[command.index("--video-time-start") + 1] = "file-modified"
+        return
+    command[4:4] = ["--video-time-start", "file-modified"]
 
 
 def _create_overlay_segment(
@@ -1853,9 +1898,8 @@ def _run_segmented_overlay_job(
     if not _transition_job_to_running(job_id, command, render_method):
         return
 
-    base_start = probe_video_start_time(video_path)
-    if base_start is None:
-        base_start = datetime.fromtimestamp(video_path.stat().st_mtime, tz=timezone.utc)
+    render_gpx_path = Path(str(metadata.get("render_gpx_path") or job["gpx_path"]))
+    base_start = _segment_video_start(metadata, video_path, render_gpx_path)
     rendered_segments: list[Path] = []
     try:
         for index in range(total_segments):
@@ -1880,9 +1924,7 @@ def _run_segmented_overlay_job(
                     str(rendered_segment),
                 ]
                 for segment_command_variant in (segment_command, segment_cpu_command):
-                    if "--video-time-start" in segment_command_variant:
-                        time_start_index = segment_command_variant.index("--video-time-start") + 1
-                        segment_command_variant[time_start_index] = "file-modified"
+                    _set_segment_video_time_start(segment_command_variant)
                 if pip_segment:
                     original_pip = f"pip={job['pip_path']}"
                     segment_pip = f"pip={pip_segment}"
