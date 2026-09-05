@@ -4163,10 +4163,44 @@ def get_flights(
     return {"flights": flights_data}
 
 
+def _apply_flight_analytics_filters(
+    query: Any,
+    site_id: str | None,
+    date_from: str | None,
+    date_to: str | None,
+) -> Any:
+    """Apply the optional Analytics page filters to a flight query."""
+    if site_id:
+        query = query.filter(Flight.site_id == site_id)
+    for value, operator, field_name in (
+        (date_from, Flight.flight_date.__ge__, "date_from"),
+        (date_to, Flight.flight_date.__le__, "date_to"),
+    ):
+        if not value:
+            continue
+        try:
+            query = query.filter(operator(datetime.strptime(value, "%Y-%m-%d").date()))
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid {field_name} format. Use YYYY-MM-DD",
+            ) from exc
+    return query
+
+
 @router.get("/flights/stats")
-def get_flight_stats(db: Session = Depends(get_db)):
+def get_flight_stats(
+    site_id: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    db: Session = Depends(get_db),
+):
     """Get aggregate flight statistics"""
-    flights = db.query(Flight).all()
+    query = _apply_flight_analytics_filters(
+        db.query(Flight).options(joinedload(Flight.site)), site_id, date_from, date_to
+    )
+
+    flights = query.all()
 
     if not flights:
         return {
@@ -4200,18 +4234,14 @@ def get_flight_stats(db: Session = Depends(get_db)):
     max_altitude = max((f.max_altitude_m or 0 for f in flights), default=0)
 
     # Find most common spot
-    spot_counts = (
-        db.query(Site.name, func.count(Flight.id).label("count"))
-        .join(Flight)
-        .group_by(Site.name)
-        .order_by(func.count(Flight.id).desc())
-        .first()
-    )
-
-    favorite_spot = spot_counts[0] if spot_counts else None
+    site_counts: dict[str, int] = {}
+    for flight in flights:
+        if flight.site and flight.site.name:
+            site_counts[flight.site.name] = site_counts.get(flight.site.name, 0) + 1
+    favorite_spot = max(site_counts, key=site_counts.get) if site_counts else None
 
     # Get last flight date
-    last_flight = db.query(Flight).order_by(Flight.flight_date.desc()).first()
+    last_flight = max(flights, key=lambda flight: flight.flight_date)
     last_flight_date = last_flight.flight_date.isoformat() if last_flight else None
 
     return {
@@ -4232,7 +4262,12 @@ def get_flight_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/flights/records", response_model=FlightRecordsResponse)
-def get_flight_records(db: Session = Depends(get_db)) -> FlightRecordsResponse:
+def get_flight_records(
+    site_id: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    db: Session = Depends(get_db),
+) -> FlightRecordsResponse:
     """
     Get personal flight records (longest duration, highest altitude, longest distance, max speed)
 
@@ -4244,7 +4279,11 @@ def get_flight_records(db: Session = Depends(get_db)) -> FlightRecordsResponse:
             "max_speed": { ... }
         }
     """
-    flights = db.query(Flight).all()
+    query = _apply_flight_analytics_filters(
+        db.query(Flight).options(joinedload(Flight.site)), site_id, date_from, date_to
+    )
+
+    flights = query.all()
 
     empty_records = {
         "longest_duration": None,
