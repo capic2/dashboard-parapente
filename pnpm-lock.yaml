@@ -250,7 +250,7 @@ catalogs:
       version: 19.2.8
     react-i18next:
       specifier: ^17.0.1
-      version: 17.0.12
+      version: 17.0.13
     react-is:
       specifier: ^19.2.4
       version: 19.2.8
@@ -333,7 +333,7 @@ importers:
         version: 19.2.8(react@19.2.8)
       react-i18next:
         specifier: 'catalog:'
-        version: 17.0.12(i18next@26.4.2(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3)
+        version: 17.0.13(i18next@26.4.2(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3)
       react-is:
         specifier: 'catalog:'
         version: 19.2.8
@@ -457,7 +457,7 @@ importers:
         version: 10.6.0(@types/react@19.2.18)(prettier@3.9.6)(react@19.2.8)
       storybook-react-i18next:
         specifier: 'catalog:'
-        version: 10.1.2(i18next-browser-languagedetector@8.2.1)(i18next-http-backend@3.0.2)(i18next@26.4.2(typescript@6.0.3))(react-i18next@17.0.12(i18next@26.4.2(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(react@19.2.8)(storybook@10.6.0(@types/react@19.2.18)(prettier@3.9.6)(react@19.2.8))
+        version: 10.1.2(i18next-browser-languagedetector@8.2.1)(i18next-http-backend@3.0.2)(i18next@26.4.2(typescript@6.0.3))(react-i18next@17.0.13(i18next@26.4.2(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(react@19.2.8)(storybook@10.6.0(@types/react@19.2.18)(prettier@3.9.6)(react@19.2.8))
       tailwindcss:
         specifier: 'catalog:'
         version: 4.3.3
@@ -4559,6 +4559,22 @@ packages:
 
   react-i18next@17.0.12:
     resolution: {integrity: sha512-lFWPEGkxQ6RhusdUkysFBD58VHfSSzvHBzqMgN0SvfVpdQGfwtNkStTqdy08/sJd7s807qqutgx93fRpD0DJ3Q==}
+    peerDependencies:
+      i18next: '>= 26.2.0'
+      react: '>= 16.8.0'
+      react-dom: '*'
+      react-native: '*'
+      typescript: ^5 || ^6 || ^7
+    peerDependenciesMeta:
+      react-dom:
+        optional: true
+      react-native:
+        optional: true
+      typescript:
+        optional: true
+
+  react-i18next@17.0.13:
+    resolution: {integrity: sha512-Cc1PscmblIHA1kljTqDwrcVMI21ydgmUzw0UAeQBe7pAOgfuRLfzXze4EUBQoeDiICzFIXXhHFoZxuetNg5D0Q==}
     peerDependencies:
       i18next: '>= 26.2.0'
       react: '>= 16.8.0'
@@ -9325,6 +9341,17 @@ snapshots:
       react-dom: 19.2.8(react@19.2.8)
       typescript: 6.0.3
 
+  react-i18next@17.0.13(i18next@26.4.2(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3):
+    dependencies:
+      '@babel/runtime': 7.29.7
+      html-parse-stringify: 4.0.1
+      i18next: 26.4.2(typescript@6.0.3)
+      react: 19.2.8
+      use-sync-external-store: 1.6.0(react@19.2.8)
+    optionalDependencies:
+      react-dom: 19.2.8(react@19.2.8)
+      typescript: 6.0.3
+
   react-is@17.0.2: {}
 
   react-is@19.2.8: {}
@@ -9574,12 +9601,12 @@ snapshots:
     transitivePeerDependencies:
       - react
 
-  storybook-react-i18next@10.1.2(i18next-browser-languagedetector@8.2.1)(i18next-http-backend@3.0.2)(i18next@26.4.2(typescript@6.0.3))(react-i18next@17.0.12(i18next@26.4.2(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(react@19.2.8)(storybook@10.6.0(@types/react@19.2.18)(prettier@3.9.6)(react@19.2.8)):
+  storybook-react-i18next@10.1.2(i18next-browser-languagedetector@8.2.1)(i18next-http-backend@3.0.2)(i18next@26.4.2(typescript@6.0.3))(react-i18next@17.0.13(i18next@26.4.2(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(react@19.2.8)(storybook@10.6.0(@types/react@19.2.18)(prettier@3.9.6)(react@19.2.8)):
     dependencies:
       i18next: 26.4.2(typescript@6.0.3)
       i18next-browser-languagedetector: 8.2.1
       i18next-http-backend: 3.0.2
-      react-i18next: 17.0.12(i18next@26.4.2(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3)
+      react-i18next: 17.0.13(i18next@26.4.2(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3)
       storybook: 10.6.0(@types/react@19.2.18)(prettier@3.9.6)(react@19.2.8)
       storybook-i18n: 10.1.1(react@19.2.8)(storybook@10.6.0(@types/react@19.2.18)(prettier@3.9.6)(react@19.2.8))
     transitivePeerDependencies:
