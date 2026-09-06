@@ -85,7 +85,7 @@ spatialmedia @ https://github.com/google/spatial-media/archive/2308497c39bb604a7
 # ============================================
 metpy==1.7.1
 matplotlib==3.11.1
-numpy==2.5.2
+numpy==2.5.3
 pillow==12.3.0
 
 # ============================================
