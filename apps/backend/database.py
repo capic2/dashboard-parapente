@@ -1,7 +1,8 @@
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from config import DATABASE_URL
@@ -23,9 +24,17 @@ else:
     # Fallback for non-sqlite databases (DB_PATH unused for non-file databases)
     DB_PATH = Path(__file__).parent / "db" / "dashboard.db"
 
+_SQLITE_BUSY_TIMEOUT_MS = 30_000
+
+connect_args = {"check_same_thread": False}
+if DATABASE_URL.startswith("sqlite"):
+    # SQLite permits concurrent readers, but only one writer.  Waiting here
+    # avoids transient failures when workers update job progress concurrently.
+    connect_args["timeout"] = _SQLITE_BUSY_TIMEOUT_MS / 1000
+
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False},
+    connect_args=connect_args,
     echo=False,
     pool_size=20,  # Increase pool size for concurrent operations
     max_overflow=30,  # Allow more overflow connections
@@ -33,6 +42,20 @@ engine = create_engine(
     pool_recycle=3600,  # Recycle connections after 1 hour
     pool_pre_ping=True,  # Verify connections before using
 )
+
+
+if DATABASE_URL.startswith("sqlite"):
+
+    @event.listens_for(engine, "connect")
+    def _configure_sqlite_connection(dbapi_connection: Any, _connection_record: Any) -> None:
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute(f"PRAGMA busy_timeout = {_SQLITE_BUSY_TIMEOUT_MS}")
+            cursor.execute("PRAGMA journal_mode = WAL")
+            cursor.execute("PRAGMA synchronous = NORMAL")
+        finally:
+            cursor.close()
+
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
