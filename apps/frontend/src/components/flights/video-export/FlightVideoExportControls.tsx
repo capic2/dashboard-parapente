@@ -172,8 +172,10 @@ export function FlightVideoExportControls({
   const canResumeVideoExport = Boolean(
     flight.video_export_job_id && exportStatus?.can_resume
   );
-  const canResumeFailedVideoExport = Boolean(
-    flight.video_export_status === 'failed' && canResumeVideoExport
+  const canResumeStoppedVideoExport = Boolean(
+    (flight.video_export_status === 'failed' ||
+      flight.video_export_status === 'cancelled') &&
+    canResumeVideoExport
   );
 
   useEffect(() => {
@@ -245,16 +247,13 @@ export function FlightVideoExportControls({
       return;
     }
 
-    if (
-      hasGeneratedVideo ||
-      isCancelledVideoExport(flight.video_export_status)
-    ) {
+    if (hasGeneratedVideo) {
       await handleRegenerateVideo();
       return;
     }
 
     try {
-      if (canResumeFailedVideoExport) {
+      if (canResumeStoppedVideoExport) {
         await resumeVideoExport();
       } else {
         await startVideoExport();
@@ -319,11 +318,13 @@ export function FlightVideoExportControls({
     }
 
     if (isCancelledVideoExport(flight.video_export_status)) {
-      return t('flights.viewer.videoRegenerateTitle');
+      return canResumeStoppedVideoExport
+        ? t('flights.viewer.videoResumeTitle')
+        : t('flights.viewer.videoRegenerateTitle');
     }
 
     if (needsVideoExportRecovery(flight.video_export_status)) {
-      return canResumeFailedVideoExport
+      return canResumeStoppedVideoExport
         ? t('flights.viewer.videoResumeTitle')
         : t('flights.viewer.videoRegenerateTitle');
     }
@@ -346,13 +347,19 @@ export function FlightVideoExportControls({
         : t('flights.viewer.cancelGeneration');
     }
     if (isCancelledVideoExport(flight.video_export_status)) {
+      if (canResumeStoppedVideoExport) {
+        return compact
+          ? t('flights.viewer.resumeVideoShort')
+          : t('flights.viewer.resumeVideo');
+      }
+
       return compact
         ? t('flights.viewer.regenerateVideoShort')
         : t('flights.viewer.regenerateVideo');
     }
 
     if (needsVideoExportRecovery(flight.video_export_status)) {
-      if (canResumeFailedVideoExport) {
+      if (canResumeStoppedVideoExport) {
         return compact
           ? t('flights.viewer.resumeVideoShort')
           : t('flights.viewer.resumeVideo');
@@ -380,7 +387,7 @@ export function FlightVideoExportControls({
     }
 
     if (needsVideoExportRecovery(flight.video_export_status)) {
-      return canResumeFailedVideoExport ? Play : RotateCcw;
+      return canResumeStoppedVideoExport ? Play : RotateCcw;
     }
 
     if (hasGeneratedVideo) {
@@ -488,7 +495,7 @@ export function FlightVideoExportControls({
         {primaryButtonLabel}
       </Button>
 
-      {canResumeFailedVideoExport && !isExportActive && (
+      {canResumeStoppedVideoExport && !isExportActive && (
         <p
           className={`mt-2 text-xs text-blue-700 dark:text-blue-300 ${
             compact ? 'basis-full text-right' : ''
