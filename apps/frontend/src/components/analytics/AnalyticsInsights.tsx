@@ -4,6 +4,7 @@ import {
   endOfMonth,
   eachDayOfInterval,
   format,
+  getDay,
   getISOWeek,
   getISOWeekYear,
   startOfMonth,
@@ -110,6 +111,73 @@ export default function AnalyticsInsights({
         count: durations.filter((value) => value >= 120).length,
       },
     ];
+    const distribution = (
+      values: number[],
+      labels: [string, number, number][]
+    ) =>
+      labels.map(([label, minimum, maximum]) => ({
+        label,
+        count: values.filter((value) => value >= minimum && value < maximum)
+          .length,
+      }));
+    const distanceBuckets = distribution(distances, [
+      ['< 5 km', 0, 5],
+      ['5–20 km', 5, 20],
+      ['20–50 km', 20, 50],
+      ['50 km +', 50, Infinity],
+    ]);
+    const gains = flights
+      .map((flight) => flight.elevation_gain_m)
+      .filter((value): value is number => value != null);
+    const gainBuckets = distribution(gains, [
+      ['< 500 m', 0, 500],
+      ['500–1 000 m', 500, 1000],
+      ['1 000–2 000 m', 1000, 2000],
+      ['2 000 m +', 2000, Infinity],
+    ]);
+
+    const groupedByYear = new Map<string, Flight[]>();
+    flights.forEach((flight) => {
+      const year = flight.flight_date.slice(0, 4);
+      groupedByYear.set(year, [...(groupedByYear.get(year) ?? []), flight]);
+    });
+    const yearlyRecords = [...groupedByYear.entries()]
+      .map(([year, yearFlights]) => ({
+        year,
+        flights: yearFlights.length,
+        hours: yearFlights.reduce(
+          (sum, flight) => sum + (flight.duration_minutes ?? 0),
+          0
+        ),
+        maxDistance: Math.max(
+          ...yearFlights.map((flight) => flight.distance_km ?? 0)
+        ),
+        maxGain: Math.max(
+          ...yearFlights.map((flight) => flight.elevation_gain_m ?? 0)
+        ),
+      }))
+      .sort((first, second) => second.year.localeCompare(first.year));
+    const weekendFlights = flights.filter((flight) => {
+      const day = getDay(parseApiLocalDate(flight.flight_date));
+      return day === 0 || day === 6;
+    });
+    const weekdayFlights = flights.filter(
+      (flight) => !weekendFlights.includes(flight)
+    );
+    const habit = (label: string, items: Flight[]) => ({
+      label,
+      count: items.length,
+      duration: median(
+        items
+          .map((flight) => flight.duration_minutes)
+          .filter((value): value is number => value != null)
+      ),
+      distance: median(
+        items
+          .map((flight) => flight.distance_km)
+          .filter((value): value is number => value != null)
+      ),
+    });
 
     const yearMonthCounts = new Map<string, number>();
     flights.forEach((flight) => {
@@ -256,6 +324,13 @@ export default function AnalyticsInsights({
         ? differenceInCalendarDays(new Date(), lastFlightDate)
         : null,
       durationBuckets,
+      distanceBuckets,
+      gainBuckets,
+      yearlyRecords,
+      habits: [
+        habit('Semaine', weekdayFlights),
+        habit('Week-end', weekendFlights),
+      ],
       yearMonthCounts,
       years,
       siteRows,
@@ -360,6 +435,96 @@ export default function AnalyticsInsights({
           </div>
         </article>
       )}
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <DistributionCard
+          title="Profil des distances"
+          description="Répartition des vols selon la distance parcourue."
+          buckets={insights.distanceBuckets}
+          total={flights.length}
+          color="bg-violet-600"
+        />
+        <DistributionCard
+          title="Profil des gains"
+          description="Répartition selon le dénivelé positif déclaré."
+          buckets={insights.gainBuckets}
+          total={flights.length}
+          color="bg-rose-600"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <article className="rounded-xl bg-white p-4 shadow-md dark:bg-gray-800">
+          <h3 className="font-semibold text-gray-900 dark:text-white">
+            Semaine ou week-end
+          </h3>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+            Compare le volume et le profil habituel des vols.
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            {insights.habits.map((habit) => (
+              <div
+                key={habit.label}
+                className="rounded-lg bg-slate-50 p-3 dark:bg-slate-700/40"
+              >
+                <p className="font-medium text-gray-900 dark:text-white">
+                  {habit.label}
+                </p>
+                <p className="mt-2 text-sm text-gray-700 dark:text-gray-200">
+                  {habit.count} vols
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  {formatMinutes(habit.duration)} méd.
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  {numberFormatter.format(habit.distance)} km méd.
+                </p>
+              </div>
+            ))}
+          </div>
+        </article>
+        <article className="overflow-hidden rounded-xl bg-white shadow-md dark:bg-gray-800">
+          <div className="p-4">
+            <h3 className="font-semibold text-gray-900 dark:text-white">
+              Records annuels
+            </h3>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+              Le meilleur de chaque année, pour replacer la progression dans son
+              contexte.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-y border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300">
+                <tr>
+                  <th className="px-4 py-2">Année</th>
+                  <th className="px-4 py-2">Vols</th>
+                  <th className="px-4 py-2">Temps</th>
+                  <th className="px-4 py-2">Dist. max</th>
+                  <th className="px-4 py-2">Gain max</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {insights.yearlyRecords.map((record) => (
+                  <tr key={record.year}>
+                    <td className="px-4 py-2 font-medium text-gray-900 dark:text-white">
+                      {record.year}
+                    </td>
+                    <td className="px-4 py-2">{record.flights}</td>
+                    <td className="px-4 py-2">{formatMinutes(record.hours)}</td>
+                    <td className="px-4 py-2">
+                      {numberFormatter.format(record.maxDistance)} km
+                    </td>
+                    <td className="px-4 py-2">
+                      +{numberFormatter.format(record.maxGain)} m
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <article className="rounded-xl bg-white p-4 shadow-md dark:bg-gray-800">
@@ -640,6 +805,50 @@ export default function AnalyticsInsights({
         </article>
       </div>
     </section>
+  );
+}
+
+function DistributionCard({
+  title,
+  description,
+  buckets,
+  total,
+  color,
+}: {
+  title: string;
+  description: string;
+  buckets: { label: string; count: number }[];
+  total: number;
+  color: string;
+}) {
+  return (
+    <article className="rounded-xl bg-white p-4 shadow-md dark:bg-gray-800">
+      <h3 className="font-semibold text-gray-900 dark:text-white">{title}</h3>
+      <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+        {description}
+      </p>
+      <div className="mt-5 space-y-3">
+        {buckets.map((bucket) => {
+          const percentage = (bucket.count / total) * 100;
+          return (
+            <div key={bucket.label}>
+              <div className="mb-1 flex justify-between text-sm text-gray-700 dark:text-gray-200">
+                <span>{bucket.label}</span>
+                <span>
+                  {bucket.count} vols ({Math.round(percentage)} %)
+                </span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+                <div
+                  className={`h-full rounded-full ${color}`}
+                  style={{ width: `${percentage}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </article>
   );
 }
 
