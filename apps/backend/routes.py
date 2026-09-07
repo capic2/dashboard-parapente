@@ -6791,7 +6791,7 @@ async def create_flight_gopro_overlay_job(
     output_dir: str | None = Form(None),
     layout_id: str | None = Form(None),
     output_filename: str | None = Form(None),
-    output_resolution: Literal["1080p", "4k"] = Form("1080p"),
+    output_resolution: Literal["1080p", "4k"] = Form("4k"),
     gpx_offset: float = Form(0.0),
     db: Session = Depends(get_db),
 ) -> GoproOverlayJob:
@@ -6959,7 +6959,7 @@ async def create_gopro_overlay_render_job(
     pip_file: UploadFile | None = File(None),
     layout_id: str | None = Form(None),
     output_filename: str | None = Form(None),
-    output_resolution: Literal["1080p", "4k"] = Form("1080p"),
+    output_resolution: Literal["1080p", "4k"] = Form("4k"),
     gpx_offset: float = Form(0.0),
 ) -> GoproOverlayJob:
     """Create a GoPro overlay render job from uploaded video, GPX, and optional PIP video."""

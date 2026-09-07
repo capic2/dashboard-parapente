@@ -978,8 +978,8 @@ def test_create_flight_gopro_overlay_job_uses_daily_departure_index(
     assert create_job.call_args.kwargs["video_path"] == camera_path
     assert create_job.call_args.kwargs["gpx_path"] == gpx_path
     assert create_job.call_args.kwargs["pip_path"] == pip_path
-    assert create_job.call_args.kwargs["output_filename"] == "Arguel 15-03 14h00-1080p.mp4"
-    assert create_job.call_args.kwargs["output_resolution"] == "1080p"
+    assert create_job.call_args.kwargs["output_filename"] == "Arguel 15-03 14h00-4k.mp4"
+    assert create_job.call_args.kwargs["output_resolution"] == "4k"
 
 
 def test_create_flight_gopro_overlay_job_uses_explicit_4k_output_resolution(

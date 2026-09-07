@@ -1038,7 +1038,7 @@ describe('FlightDetails GoPro overlay action', () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText('GPX offset (seconds)')).toHaveValue(0);
     const resolutionSelect = screen.getByLabelText('Output resolution');
-    expect(resolutionSelect).toHaveValue('1080p');
+    expect(resolutionSelect).toHaveValue('4k');
     expect(resolutionSelect).toHaveTextContent('1080p (1920 × 1080)');
     expect(resolutionSelect).toHaveTextContent('4K (3840 × 2160)');
     expect(resolutionSelect).not.toHaveTextContent('Auto');
@@ -1141,7 +1141,7 @@ describe('FlightDetails GoPro overlay action', () => {
     await waitFor(() => expect(createOverlayMock).toHaveBeenCalled());
     const formData = createOverlayMock.mock.calls[0][0] as FormData;
     expect(formData.get('gpx_offset')).toBe('-1.75');
-    expect(formData.get('output_resolution')).toBe('1080p');
+    expect(formData.get('output_resolution')).toBe('4k');
   });
 
   it('requests a longer low-resolution preview from the duration slider', async () => {
