@@ -122,7 +122,7 @@ export function FlightDetails({
   const [goproOverlayInitialGpxOffset, setGoproOverlayInitialGpxOffset] =
     useState<string | null>(null);
   const [goproOverlayOutputResolution, setGoproOverlayOutputResolution] =
-    useState<GoproOverlayOutputResolution>('1080p');
+    useState<GoproOverlayOutputResolution>('4k');
   const [downloadingMedia, setDownloadingMedia] =
     useState<DownloadableFlightMedia | null>(null);
   const [deletingGoproOverlayJobId, setDeletingGoproOverlayJobId] = useState<
@@ -416,7 +416,7 @@ export function FlightDetails({
 
   const handleOpenGoproOverlayDialog = () => {
     if (createGoproOverlayJob.isPending || isGoproOverlayRunning) return;
-    setGoproOverlayOutputResolution('1080p');
+    setGoproOverlayOutputResolution('4k');
     setIsGoproOverlayDialogOpen(true);
     if (flight.gopro_overlay_gpx_offset != null) {
       const storedOffset = String(flight.gopro_overlay_gpx_offset);
