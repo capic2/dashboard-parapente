@@ -120,7 +120,7 @@ function SiteConditionCard({
               />
               <div className="flex items-center gap-2">
                 <span className="font-bold text-slate-950 dark:text-white">
-                  {weather.wind_speed} km/h
+                  {weather.wind_speed.toFixed(1)} km/h
                 </span>
                 {weather.wind_direction_deg != null && (
                   <WindArrow

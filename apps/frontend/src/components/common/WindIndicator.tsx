@@ -83,7 +83,7 @@ export function WindIndicator({
           <span className={`font-medium ${colorClass}`}>{label}</span>
           {windDirection && windSpeed !== undefined && (
             <span className="text-sm text-gray-600 dark:text-gray-400">
-              {windDirection} {windSpeed}km/h
+              {windDirection} {windSpeed.toFixed(1)}km/h
             </span>
           )}
         </div>
@@ -113,7 +113,7 @@ export function WindIndicatorCompact({
 
   const tooltipText =
     windDirection && windSpeed != null
-      ? `${label} - ${windDirection} ${windSpeed}km/h`
+      ? `${label} - ${windDirection} ${windSpeed.toFixed(1)}km/h`
       : label;
 
   return (

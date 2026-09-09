@@ -127,7 +127,7 @@ export default function CurrentConditions({
             </span>
             <div className="mt-1 flex flex-col gap-1">
               <span className="text-lg font-black text-gray-900 dark:text-white">
-                {weather.wind_speed} km/h {weather.wind_direction}
+                {weather.wind_speed.toFixed(1)} km/h {weather.wind_direction}
               </span>
               {orientation && (
                 <WindIndicator
@@ -149,7 +149,7 @@ export default function CurrentConditions({
                 {t('common.gusts')}
               </span>
               <div className="mt-1 text-lg font-black text-gray-900 dark:text-white">
-                {weather.wind_gusts} km/h
+                {weather.wind_gusts.toFixed(1)} km/h
               </div>
             </div>
           )}
