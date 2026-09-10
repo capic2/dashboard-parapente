@@ -14,18 +14,22 @@ const mockFlights = [
   ...Array.from({ length: 5 }, (_, i) => ({
     id: `${i}`,
     flight_date: '2024-01-06',
+    tags: [],
   })), // Saturday
   ...Array.from({ length: 8 }, (_, i) => ({
     id: `${i + 5}`,
     flight_date: '2024-01-07',
+    tags: [],
   })), // Sunday
   ...Array.from({ length: 2 }, (_, i) => ({
     id: `${i + 13}`,
     flight_date: '2024-01-08',
+    tags: [],
   })), // Monday
   ...Array.from({ length: 3 }, (_, i) => ({
     id: `${i + 15}`,
     flight_date: '2024-01-10',
+    tags: [],
   })), // Wednesday
 ];
 

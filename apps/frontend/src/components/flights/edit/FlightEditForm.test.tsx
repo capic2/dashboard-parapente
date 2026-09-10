@@ -8,6 +8,7 @@ const flight: Flight = {
   id: 'flight-1',
   title: 'Test flight',
   flight_date: '2026-03-15',
+  tags: [],
   youtube_urls: [youtubeUrl],
 };
 const youtubeAssociations = [
