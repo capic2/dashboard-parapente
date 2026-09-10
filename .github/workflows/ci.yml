@@ -126,6 +126,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
+      - name: 🔨 Verify production frontend build
+        run: pnpm exec nx build frontend --configuration=production
+        env:
+          NX_NO_CLOUD: true
+          VITE_CESIUM_ION_TOKEN: ${{ secrets.VITE_CESIUM_ION_TOKEN }}
+
       - name: 🔨 Run affected (build, lint, type-check, test)
         id: nx_tasks
         run: |
