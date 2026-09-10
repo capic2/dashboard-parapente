@@ -10,6 +10,7 @@ const mockFlights: Flight[] = [
   {
     id: 'flight-1',
     flight_date: '2024-03-15',
+    tags: [],
     site_name: 'Puy de Dôme',
     site_id: 'site-1',
     title: 'Vol thermique Puy de Dôme',
@@ -30,6 +31,7 @@ const mockFlights: Flight[] = [
   {
     id: 'flight-2',
     flight_date: '2024-03-10',
+    tags: [],
     site_name: 'Col de la Forclaz',
     site_id: 'site-2',
     title: 'Plouf à la Forclaz',
@@ -45,6 +47,7 @@ const mockFlights: Flight[] = [
   {
     id: 'flight-3',
     flight_date: '2024-03-05',
+    tags: [],
     site_name: 'Planfait',
     site_id: 'site-3',
     title: 'Cross Planfait - Albertville',
@@ -62,6 +65,7 @@ const mockFlights: Flight[] = [
   {
     id: 'flight-4',
     flight_date: '2024-02-28',
+    tags: [],
     title: null,
     name: null,
     site_name: null,
@@ -76,6 +80,7 @@ const mockFlights: Flight[] = [
   {
     id: 'flight-5',
     flight_date: '2024-02-20',
+    tags: [],
     site_name: 'Sancy',
     site_id: 'site-4',
     title: 'Vol du soir Sancy',
@@ -97,6 +102,7 @@ const mockSites: Site[] = [
     latitude: 45.77,
     longitude: 2.96,
     country: 'FR',
+    practical_info: {},
     region: 'Besançon',
     camera_distance: null,
     flight_count: 1,
@@ -108,6 +114,7 @@ const mockSites: Site[] = [
     latitude: 45.86,
     longitude: 6.24,
     country: 'FR',
+    practical_info: {},
     region: 'Annecy',
     camera_distance: null,
     flight_count: 1,
@@ -119,6 +126,7 @@ const mockSites: Site[] = [
     latitude: 45.84,
     longitude: 6.21,
     country: 'FR',
+    practical_info: {},
     region: 'Annecy',
     camera_distance: null,
     flight_count: 1,
@@ -130,6 +138,7 @@ const mockSites: Site[] = [
     latitude: 45.53,
     longitude: 2.81,
     country: 'FR',
+    practical_info: {},
     region: 'Besançon',
     camera_distance: null,
     flight_count: 1,
