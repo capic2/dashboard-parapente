@@ -1,6 +1,48 @@
 interface FlightPoint {
   elevation?: number | null;
+  lat?: number | null;
+  lon?: number | null;
 }
+
+const MIN_TURN_ANGLE_RADIANS = Math.PI / 3;
+
+const getBearing = (
+  start: FlightPoint,
+  end: FlightPoint
+): number | undefined => {
+  if (
+    typeof start.lat !== 'number' ||
+    typeof start.lon !== 'number' ||
+    typeof end.lat !== 'number' ||
+    typeof end.lon !== 'number' ||
+    !Number.isFinite(start.lat) ||
+    !Number.isFinite(start.lon) ||
+    !Number.isFinite(end.lat) ||
+    !Number.isFinite(end.lon)
+  ) {
+    return undefined;
+  }
+  if (start.lat === end.lat && start.lon === end.lon) {
+    return undefined;
+  }
+
+  const startLatitude = (start.lat * Math.PI) / 180;
+  const endLatitude = (end.lat * Math.PI) / 180;
+  const longitudeDifference = ((end.lon - start.lon) * Math.PI) / 180;
+
+  return Math.atan2(
+    Math.sin(longitudeDifference) * Math.cos(endLatitude),
+    Math.cos(startLatitude) * Math.sin(endLatitude) -
+      Math.sin(startLatitude) *
+        Math.cos(endLatitude) *
+        Math.cos(longitudeDifference)
+  );
+};
+
+const getTurnAngle = (firstBearing: number, secondBearing: number) => {
+  const difference = Math.abs(secondBearing - firstBearing);
+  return difference > Math.PI ? Math.PI * 2 - difference : difference;
+};
 
 /**
  * Finds the highest valid GPS elevation when it is away from takeoff and
@@ -28,4 +70,45 @@ export const getHighestAltitudeHighlightProgress = (
 
   const progress = highestIndex / (coordinates.length - 1);
   return progress > 0.2 && progress < 0.8 ? progress : undefined;
+};
+
+/**
+ * Finds the strongest interior course change. This is deliberately a
+ * conservative visual cue: a single sharp turn is enough for a camera plan,
+ * while thermal classification remains a separate future concern.
+ */
+export const getStrongestTurnHighlightProgress = (
+  coordinates: readonly FlightPoint[]
+): number | undefined => {
+  if (coordinates.length < 3) return undefined;
+
+  let strongestTurn = MIN_TURN_ANGLE_RADIANS;
+  let strongestTurnIndex = -1;
+
+  for (let index = 1; index < coordinates.length - 1; index += 1) {
+    const progress = index / (coordinates.length - 1);
+    if (progress <= 0.2 || progress >= 0.8) continue;
+
+    const incomingBearing = getBearing(
+      coordinates[index - 1],
+      coordinates[index]
+    );
+    const outgoingBearing = getBearing(
+      coordinates[index],
+      coordinates[index + 1]
+    );
+    if (incomingBearing === undefined || outgoingBearing === undefined) {
+      continue;
+    }
+
+    const turnAngle = getTurnAngle(incomingBearing, outgoingBearing);
+    if (turnAngle > strongestTurn) {
+      strongestTurn = turnAngle;
+      strongestTurnIndex = index;
+    }
+  }
+
+  return strongestTurnIndex === -1
+    ? undefined
+    : strongestTurnIndex / (coordinates.length - 1);
 };

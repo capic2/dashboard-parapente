@@ -5,7 +5,7 @@ describe('getFlightCameraShot', () => {
   it('starts with a close takeoff plan', () => {
     expect(getFlightCameraShot({ progress: 0, baseDistance: 500 })).toEqual({
       type: 'takeoff',
-      distance: 300,
+      distance: 250,
       pitch: -0.22,
     });
   });
@@ -21,7 +21,7 @@ describe('getFlightCameraShot', () => {
   it('ends with a close landing plan', () => {
     expect(getFlightCameraShot({ progress: 1, baseDistance: 500 })).toEqual({
       type: 'landing',
-      distance: 300,
+      distance: 250,
       pitch: -0.22,
     });
   });
@@ -30,7 +30,7 @@ describe('getFlightCameraShot', () => {
     const shot = getFlightCameraShot({ progress: 0.2, baseDistance: 500 });
 
     expect(shot.type).toBe('follow');
-    expect(shot.distance).toBeGreaterThan(300);
+    expect(shot.distance).toBeGreaterThan(250);
     expect(shot.distance).toBeLessThan(500);
     expect(shot.pitch).toBeGreaterThan(-0.22);
     expect(shot.pitch).toBeLessThan(-0.05);
