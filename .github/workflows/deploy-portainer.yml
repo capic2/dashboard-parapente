@@ -260,13 +260,44 @@ jobs:
           fi
 
           payload=$(python -c 'import json, os; print(json.dumps({"deployment_id": os.environ["DEPLOYMENT_ID"], "target_version": os.environ["TARGET_VERSION"], "run_url": os.environ["RUN_URL"]}))')
-          response=$(curl --show-error --silent --fail-with-body \
-            --connect-timeout 5 --max-time 20 \
-            --request PUT \
-            --header "Authorization: Bearer $DRAIN_API_TOKEN" \
-            --header "Content-Type: application/json" \
-            --data "$payload" \
-            "$DRAIN_BASE_URL")
+          max_attempts=60
+          attempt=1
+          while [ "$attempt" -le "$max_attempts" ]; do
+            response_file=$(mktemp)
+            http_code=$(curl --show-error --silent --fail-with-body \
+              --connect-timeout 5 --max-time 20 \
+              --request PUT \
+              --header "Authorization: Bearer $DRAIN_API_TOKEN" \
+              --header "Content-Type: application/json" \
+              --data "$payload" \
+              --output "$response_file" \
+              --write-out '%{http_code}' \
+              "$DRAIN_BASE_URL" || true)
+            response=$(cat "$response_file")
+            rm -f "$response_file"
+
+            if [ "$http_code" = "409" ]; then
+              echo "Deployment drain is owned by another deployment (attempt $attempt/$max_attempts); waiting before retry"
+              if [ "$attempt" -lt "$max_attempts" ]; then
+                sleep 5
+              fi
+              attempt=$((attempt + 1))
+              continue
+            fi
+
+            if [ "$http_code" = "502" ] || [ "$http_code" = "503" ] || [ "$http_code" = "504" ] || [ "$http_code" = "000" ]; then
+              echo "::warning::Deployment drain API is unavailable (HTTP $http_code); continuing with bootstrap deployment"
+              echo "drain_bootstrap=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            break
+          done
+
+          if [ "$http_code" = "409" ]; then
+            echo "Deployment drain remained owned by another deployment after $max_attempts attempts"
+            exit 1
+          fi
 
           if ! parsed=$(python -c 'import json, sys; data=json.load(sys.stdin); phase=data["phase"]; ready=data["ready_for_deployment"]; active=data["active_jobs"]; admissions=data["admissions_in_progress"]; assert phase in ("waiting", "deploying") and type(ready) is bool and type(active) is int and active >= 0 and type(admissions) is int and admissions >= 0; print(f"{phase}\t{str(ready).lower()}\t{active}\t{admissions}")' <<< "$response" 2>/dev/null); then
             echo "Deployment drain begin returned malformed JSON"
@@ -282,7 +313,7 @@ jobs:
 
       - name: Wait for production jobs to drain
         id: wait_drain
-        if: steps.build_image.outcome == 'success' && vars.DEPLOY_DRAIN_ENABLED == 'true' && steps.begin_drain.outcome == 'success'
+        if: steps.build_image.outcome == 'success' && vars.DEPLOY_DRAIN_ENABLED == 'true' && steps.begin_drain.outcome == 'success' && steps.begin_drain.outputs.drain_bootstrap != 'true'
         continue-on-error: true
         env:
           DRAIN_BASE_URL: ${{ secrets.PRODUCTION_DEPLOY_DRAIN_URL }}
@@ -418,7 +449,7 @@ jobs:
 
       - name: Deploy on production server
         id: trigger_deploy
-        if: steps.build_image.outcome == 'success' && (vars.DEPLOY_DRAIN_ENABLED != 'true' || (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success'))
+        if: steps.build_image.outcome == 'success' && (vars.DEPLOY_DRAIN_ENABLED != 'true' || steps.begin_drain.outputs.drain_bootstrap == 'true' || (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success'))
         continue-on-error: true
         uses: appleboy/ssh-action@v1.2.5
         with:
@@ -1063,7 +1094,7 @@ jobs:
 
       - name: Release production deployment drain
         id: release_drain
-        if: always() && vars.DEPLOY_DRAIN_ENABLED == 'true' && steps.begin_drain.outcome != 'skipped'
+        if: always() && vars.DEPLOY_DRAIN_ENABLED == 'true' && steps.begin_drain.outcome != 'skipped' && steps.begin_drain.outputs.drain_bootstrap != 'true'
         continue-on-error: true
         env:
           DRAIN_BASE_URL: ${{ secrets.PRODUCTION_DEPLOY_DRAIN_URL }}
@@ -1166,7 +1197,7 @@ jobs:
 
       - name: Label merged PRs with deployed version
         id: label_deployed_prs
-        if: steps.trigger_deploy.outcome == 'success' && steps.verify_deploy.outcome == 'success' && (vars.DEPLOY_DRAIN_ENABLED != 'true' || (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success'))
+        if: steps.trigger_deploy.outcome == 'success' && steps.verify_deploy.outcome == 'success' && (vars.DEPLOY_DRAIN_ENABLED != 'true' || steps.begin_drain.outputs.drain_bootstrap == 'true' || (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success'))
         uses: actions/github-script@v9
         env:
           VERSION_LABEL: ${{ steps.version.outputs.label_name }}
@@ -1303,7 +1334,7 @@ jobs:
             );
 
       - name: Mark deployment as successful
-        if: steps.trigger_deploy.outcome == 'success' && steps.verify_deploy.outcome == 'success' && steps.label_deployed_prs.outcome == 'success' && (vars.DEPLOY_DRAIN_ENABLED != 'true' || (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success'))
+        if: steps.trigger_deploy.outcome == 'success' && steps.verify_deploy.outcome == 'success' && steps.label_deployed_prs.outcome == 'success' && (vars.DEPLOY_DRAIN_ENABLED != 'true' || steps.begin_drain.outputs.drain_bootstrap == 'true' || (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success'))
         uses: actions/github-script@v9
         env:
           TAG_NAME: ${{ steps.version.outputs.success_tag_name }}
@@ -1352,11 +1383,9 @@ jobs:
             steps.build_image.outcome != 'success' ||
             steps.trigger_deploy.outcome != 'success' ||
             steps.verify_deploy.outcome != 'success' ||
-            (vars.DEPLOY_DRAIN_ENABLED == 'true' && (
-              steps.begin_drain.outcome != 'success' ||
-              steps.wait_drain.outcome != 'success' ||
-              steps.mark_drain_deploying.outcome != 'success' ||
-              steps.release_drain.outcome != 'success'
+            (vars.DEPLOY_DRAIN_ENABLED == 'true' && !(
+              (steps.begin_drain.outputs.drain_bootstrap == 'true' && steps.release_drain.outcome == 'success') ||
+              (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success')
             ))
           )
         uses: actions/github-script@v9
@@ -1500,11 +1529,9 @@ jobs:
             steps.build_image.outcome != 'success' ||
             steps.trigger_deploy.outcome != 'success' ||
             steps.verify_deploy.outcome != 'success' ||
-            (vars.DEPLOY_DRAIN_ENABLED == 'true' && (
-              steps.begin_drain.outcome != 'success' ||
-              steps.wait_drain.outcome != 'success' ||
-              steps.mark_drain_deploying.outcome != 'success' ||
-              steps.release_drain.outcome != 'success'
+            (vars.DEPLOY_DRAIN_ENABLED == 'true' && !(
+              (steps.begin_drain.outputs.drain_bootstrap == 'true' && steps.release_drain.outcome == 'success') ||
+              (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success')
             ))
           )
         run: |
@@ -1536,11 +1563,9 @@ jobs:
             steps.build_image.outcome != 'success' ||
             steps.trigger_deploy.outcome != 'success' ||
             steps.verify_deploy.outcome != 'success' ||
-            (vars.DEPLOY_DRAIN_ENABLED == 'true' && (
-              steps.begin_drain.outcome != 'success' ||
-              steps.wait_drain.outcome != 'success' ||
-              steps.mark_drain_deploying.outcome != 'success' ||
-              steps.release_drain.outcome != 'success'
+            (vars.DEPLOY_DRAIN_ENABLED == 'true' && !(
+              (steps.begin_drain.outputs.drain_bootstrap == 'true' && steps.release_drain.outcome == 'success') ||
+              (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success')
             ))
           )
         continue-on-error: true
@@ -1627,11 +1652,9 @@ jobs:
             steps.build_image.outcome != 'success' ||
             steps.trigger_deploy.outcome != 'success' ||
             steps.verify_deploy.outcome != 'success' ||
-            (vars.DEPLOY_DRAIN_ENABLED == 'true' && (
-              steps.begin_drain.outcome != 'success' ||
-              steps.wait_drain.outcome != 'success' ||
-              steps.mark_drain_deploying.outcome != 'success' ||
-              steps.release_drain.outcome != 'success'
+            (vars.DEPLOY_DRAIN_ENABLED == 'true' && !(
+              (steps.begin_drain.outputs.drain_bootstrap == 'true' && steps.release_drain.outcome == 'success') ||
+              (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success')
             ))
           )
         run: |
