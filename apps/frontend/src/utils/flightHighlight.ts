@@ -112,3 +112,39 @@ export const getStrongestTurnHighlightProgress = (
     ? undefined
     : strongestTurnIndex / (coordinates.length - 1);
 };
+
+export interface ThermalWindow {
+  startProgress: number;
+  endProgress: number;
+  direction: 1 | -1;
+}
+
+/** Finds three consecutive interior turns in the same direction. */
+export const getThermalWindow = (
+  coordinates: readonly FlightPoint[]
+): ThermalWindow | undefined => {
+  const turns: { index: number; direction: 1 | -1 }[] = [];
+  for (let index = 1; index < coordinates.length - 1; index += 1) {
+    const incoming = getBearing(coordinates[index - 1], coordinates[index]);
+    const outgoing = getBearing(coordinates[index], coordinates[index + 1]);
+    if (incoming === undefined || outgoing === undefined) continue;
+    const signed = Math.atan2(
+      Math.sin(outgoing - incoming),
+      Math.cos(outgoing - incoming)
+    );
+    if (Math.abs(signed) >= MIN_TURN_ANGLE_RADIANS) {
+      turns.push({ index, direction: signed > 0 ? 1 : -1 });
+    }
+  }
+  for (let index = 0; index <= turns.length - 3; index += 1) {
+    const sequence = turns.slice(index, index + 3);
+    if (sequence.every((turn) => turn.direction === sequence[0].direction)) {
+      const startProgress = sequence[0].index / (coordinates.length - 1);
+      const endProgress = sequence[2].index / (coordinates.length - 1);
+      if (startProgress > 0.2 && endProgress < 0.8) {
+        return { startProgress, endProgress, direction: sequence[0].direction };
+      }
+    }
+  }
+  return undefined;
+};

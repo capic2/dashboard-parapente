@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getHighestAltitudeHighlightProgress,
   getStrongestTurnHighlightProgress,
+  getThermalWindow,
 } from './flightHighlight';
 
 describe('getHighestAltitudeHighlightProgress', () => {
@@ -24,6 +25,22 @@ describe('getHighestAltitudeHighlightProgress', () => {
         { elevation: 800 },
       ])
     ).toBeUndefined();
+  });
+});
+
+describe('getThermalWindow', () => {
+  it('requires three consecutive turns in the same direction', () => {
+    expect(
+      getThermalWindow([
+        { lat: 45, lon: 5.99 },
+        { lat: 45, lon: 6 },
+        { lat: 45, lon: 6.01 },
+        { lat: 45.01, lon: 6.01 },
+        { lat: 45.01, lon: 6 },
+        { lat: 45, lon: 6 },
+        { lat: 44.99, lon: 6.01 },
+      ])
+    ).toBeDefined();
   });
 });
 
