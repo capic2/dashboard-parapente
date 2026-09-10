@@ -6069,6 +6069,7 @@ def start_flight_video_export(
     fps: int = 15,
     speed: int = 1,
     mode: str = "manual",  # "manual", "manual_fast", or "stream"
+    director_style: str = "natural",
     db: Session = Depends(get_db),
 ):
     """
@@ -6100,8 +6101,11 @@ def start_flight_video_export(
 
     logger.info(f" Flight found: {flight.title} (date: {flight.flight_date})")
 
-    # Determine frontend URL
+    if director_style not in {"natural", "cinematic", "dynamic"}:
+        raise HTTPException(status_code=400, detail="Invalid director_style")
+
     frontend_url = resolve_frontend_url(config.FRONTEND_URL)
+    manual_frontend_url = f"{frontend_url}#director={director_style}"
 
     # Start export with selected mode
     job_id: str
@@ -6123,7 +6127,7 @@ def start_flight_video_export(
                 quality=quality,
                 fps=fps,
                 speed=speed,
-                frontend_url=frontend_url,
+                frontend_url=manual_frontend_url,
             )
         except DeploymentDrainActive:
             raise
@@ -6143,7 +6147,7 @@ def start_flight_video_export(
                         quality=quality,
                         fps=fps,
                         speed=speed,
-                        frontend_url=frontend_url,
+                        frontend_url=manual_frontend_url,
                     )
                     effective_mode = "manual"
                 else:

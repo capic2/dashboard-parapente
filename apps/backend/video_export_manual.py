@@ -1802,7 +1802,11 @@ async def _export_video_manual_render(job_id: str):
     speed = job.speed or 1
     is_fast_mode = job.mode == "manual_fast"
     flight_id = job.flight_id
-    frontend_url = resolve_frontend_url(job.frontend_url)
+    raw_frontend_url = job.frontend_url
+    frontend_url, _, director_style = raw_frontend_url.partition("#director=")
+    frontend_url = resolve_frontend_url(frontend_url)
+    if director_style not in {"natural", "cinematic", "dynamic"}:
+        director_style = "natural"
     export_root = _video_export_dir()
     temp_dir: Path | None = None
     frames_dir: Path | None = None
@@ -1811,6 +1815,7 @@ async def _export_video_manual_render(job_id: str):
     pending_frame_writes: set[asyncio.Task[None]] = set()
     auth_token = job.auth_token
     url = f"{frontend_url}/export-viewer?flightId={flight_id}&jobId={job_id}"
+    url = f"{url}&directorStyle={director_style}"
     preflight_url = url
     log_url = url
     if auth_token:
