@@ -40,6 +40,7 @@ import {
 } from '../../../utils/cameraDistanceProfile';
 import { getFlightCameraShot } from '../../../utils/cameraDirector';
 import { getExportFrameTarget } from '../../../utils/videoExportFrame';
+import { getHighestAltitudeHighlightProgress } from '../../../utils/flightHighlight';
 import { api } from '../../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../../hooks/useToast';
@@ -312,6 +313,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       speed: appUnits.speed,
     }),
     [appUnits.altitude, appUnits.speed]
+  );
+  const highestAltitudeHighlightProgress = useMemo(
+    () => getHighestAltitudeHighlightProgress(gpxData?.coordinates ?? []),
+    [gpxData?.coordinates]
   );
 
   // Terrain rendering states
@@ -1351,6 +1356,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           baseDistance: cameraDistanceRef.current,
           closeZoomPercent: cameraCloseZoomPercentRef.current,
           transitionPercent: cameraTransitionPercentRef.current,
+          highlightProgress: highestAltitudeHighlightProgress,
         });
 
         if (!smoothCamera || !cameraTargetRef.current) {
@@ -1426,7 +1432,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         tilesLoaded: Boolean(getViewerScene(viewer)?.globe.tilesLoaded),
       };
     },
-    [syncTrackEntity]
+    [highestAltitudeHighlightProgress, syncTrackEntity]
   );
 
   useEffect(() => {
