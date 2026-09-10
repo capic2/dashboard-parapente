@@ -30,7 +30,6 @@ jobs:
           PREVIEW_SEED_HOST: ${{ secrets.SSH_HOST }}
           PREVIEW_SEED_USER: ${{ secrets.SSH_USER }}
           PREVIEW_SEED_PASSWORD: ${{ secrets.SSH_PASSWORD }}
-          PREVIEW_SEED_FINGERPRINT: ${{ secrets.SSH_FINGERPRINT }}
           PREVIEW_SEED_PORT: ${{ secrets.SSH_PORT }}
           PREVIEW_SEED_DIRECTORY: /media/nas/DS211_Synology_2/parapente/database-backups
         run: |
@@ -39,12 +38,12 @@ jobs:
           sudo apt-get install --yes --no-install-recommends sshpass
           [ -n "$PREVIEW_SEED_HOST" ] && [ -n "$PREVIEW_SEED_USER" ] && [ -n "$PREVIEW_SEED_PASSWORD" ] && [ -n "$PREVIEW_SEED_DIRECTORY" ]
           case "$PREVIEW_SEED_PORT" in ''|*[!0-9]*) echo 'PREVIEW_SEED_SSH_PORT must be numeric'; exit 1 ;; esac
-          actual_fingerprint=$(ssh-keyscan -p "$PREVIEW_SEED_PORT" -t ed25519 "$PREVIEW_SEED_HOST" 2>/dev/null | ssh-keygen -lf - -E sha256 | awk '{print $2}')
-          [ "$actual_fingerprint" = "$PREVIEW_SEED_FINGERPRINT" ] || { echo 'Preview seed server fingerprint mismatch'; exit 1; }
-          seed_database=$(sshpass -p "$PREVIEW_SEED_PASSWORD" ssh -p "$PREVIEW_SEED_PORT" -o StrictHostKeyChecking=no "$PREVIEW_SEED_USER@$PREVIEW_SEED_HOST" "find '$PREVIEW_SEED_DIRECTORY' -maxdepth 1 -type f -name 'dashboard-*.sqlite3.gz' -printf '%T@ %f\\n' | sort -nr | head -n 1 | cut -d' ' -f2-")
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "$PREVIEW_SEED_PORT" -H "$PREVIEW_SEED_HOST" >> ~/.ssh/known_hosts
+          seed_database=$(sshpass -p "$PREVIEW_SEED_PASSWORD" ssh -p "$PREVIEW_SEED_PORT" -o StrictHostKeyChecking=yes "$PREVIEW_SEED_USER@$PREVIEW_SEED_HOST" "find '$PREVIEW_SEED_DIRECTORY' -maxdepth 1 -type f -name 'dashboard-*.sqlite3.gz' -printf '%T@ %f\\n' | sort -nr | head -n 1 | cut -d' ' -f2-")
           case "$seed_database" in dashboard-*.sqlite3.gz) ;; *) echo 'No valid demo backup found'; exit 1 ;; esac
           mkdir -p .preview-seed
-          sshpass -p "$PREVIEW_SEED_PASSWORD" scp -P "$PREVIEW_SEED_PORT" -o StrictHostKeyChecking=no "$PREVIEW_SEED_USER@$PREVIEW_SEED_HOST:$PREVIEW_SEED_DIRECTORY/$seed_database" .preview-seed/dashboard.sqlite3.gz
+          sshpass -p "$PREVIEW_SEED_PASSWORD" scp -P "$PREVIEW_SEED_PORT" -o StrictHostKeyChecking=yes "$PREVIEW_SEED_USER@$PREVIEW_SEED_HOST:$PREVIEW_SEED_DIRECTORY/$seed_database" .preview-seed/dashboard.sqlite3.gz
           gzip --test .preview-seed/dashboard.sqlite3.gz
 
       - name: Build and start the preview
