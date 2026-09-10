@@ -63,7 +63,7 @@ const getHighlightWeight = (
 export const getFlightCameraShot = ({
   progress,
   baseDistance,
-  closeZoomPercent = 60,
+  closeZoomPercent = 50,
   transitionPercent = 12,
   highlightProgress,
 }: {
@@ -79,7 +79,7 @@ export const getFlightCameraShot = ({
     Number.isFinite(baseDistance) ? baseDistance : 0
   );
   const safeCloseZoomPercent = clamp(
-    Number.isFinite(closeZoomPercent) ? closeZoomPercent : 60,
+    Number.isFinite(closeZoomPercent) ? closeZoomPercent : 50,
     30,
     100
   );

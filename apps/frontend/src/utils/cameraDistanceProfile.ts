@@ -1,4 +1,4 @@
-export const DEFAULT_CAMERA_CLOSE_ZOOM_PERCENT = 60;
+export const DEFAULT_CAMERA_CLOSE_ZOOM_PERCENT = 50;
 export const DEFAULT_CAMERA_TRANSITION_PERCENT = 12;
 
 const clamp = (value: number, min: number, max: number): number =>

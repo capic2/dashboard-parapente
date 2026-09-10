@@ -403,9 +403,9 @@ describe('FlightViewer3D video export mode', () => {
     window._setExportFrame?.(1, 3);
     window._setExportFrame?.(2, 3);
 
-    expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(1, 300);
+    expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(1, 250);
     expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(2, 500);
-    expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(3, 300);
+    expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(3, 250);
   });
 
   it('passes GPX longitude, latitude and rendered elevation to Cesium', async () => {
