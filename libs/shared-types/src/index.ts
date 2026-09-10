@@ -44,6 +44,7 @@ export const SiteSchema = z.object({
   usage_type: z.enum(['takeoff', 'landing', 'both']).optional(),
   // Legacy fields kept for backward compatibility
   description: z.string().optional().catch(''),
+  practical_info: z.record(z.string(), z.string()).optional().default({}),
   difficulty_level: z.string().optional().catch(''),
   is_active: z.boolean().optional().default(true),
 });
@@ -145,6 +146,9 @@ export const FlightSchema = z
     distance_km: z.number().nullish(),
     elevation_gain_m: z.number().nullish(),
     notes: z.string().nullish(),
+    tags: z.array(z.string()).optional().default([]),
+    conditions_feedback: z.string().nullish(),
+    decision_snapshot: z.string().nullish(),
     gpx_file_path: z.string().nullish(),
     gpx_max_altitude_m: z.number().nullish(),
     gpx_elevation_gain_m: z.number().nullish(),
@@ -784,6 +788,7 @@ export const SiteUpdateSchema = z
     camera_transition_percent: z.number().nullable(),
     usage_type: z.enum(['takeoff', 'landing', 'both']),
     description: z.string(),
+    practical_info: z.record(z.string(), z.string()),
   })
   .partial();
 

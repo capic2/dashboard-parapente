@@ -104,6 +104,7 @@ class Site(Base):
     latitude = Column(Float)
     longitude = Column(Float)
     description = Column(Text)
+    practical_info_json = Column("practical_info", Text, nullable=False, default="{}")
     region = Column(String)
     country = Column(String, default="FR")
     site_type = Column(String, default="user_spot")  # "user_spot", "official_spot", "custom"
@@ -139,6 +140,26 @@ class Site(Base):
         back_populates="takeoff_site",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def practical_info(self) -> dict[str, str]:
+        try:
+            value = json.loads(self.practical_info_json or "{}")
+        except (TypeError, json.JSONDecodeError):
+            return {}
+        return (
+            {
+                key: item
+                for key, item in value.items()
+                if isinstance(key, str) and isinstance(item, str)
+            }
+            if isinstance(value, dict)
+            else {}
+        )
+
+    @practical_info.setter
+    def practical_info(self, value: dict[str, str] | None) -> None:
+        self.practical_info_json = json.dumps(value or {})
 
 
 class SiteLandingAssociation(Base):
@@ -188,6 +209,9 @@ class Flight(Base):
     distance_km = Column(Float)
     elevation_gain_m = Column(Integer)
     notes = Column(Text)
+    tags_json = Column("tags", Text, nullable=False, default="[]")
+    conditions_feedback = Column(Text)
+    decision_snapshot = Column(Text)
     gpx_file_path = Column(String)
     gpx_max_altitude_m = Column(Integer)
     gpx_elevation_gain_m = Column(Integer)
@@ -246,6 +270,18 @@ class Flight(Base):
     @youtube_urls.setter
     def youtube_urls(self, value: list[str] | None) -> None:
         self.youtube_urls_json = json.dumps(value or [])
+
+    @property
+    def tags(self) -> list[str]:
+        try:
+            value = json.loads(self.tags_json or "[]")
+        except (TypeError, json.JSONDecodeError):
+            return []
+        return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
+
+    @tags.setter
+    def tags(self, value: list[str] | None) -> None:
+        self.tags_json = json.dumps(value or [])
 
 
 Index(

@@ -62,6 +62,7 @@ import { FlightGenerationLogsPanel } from './FlightGenerationLogsPanel';
 import { FlightMediaBadges } from './FlightMediaBadges';
 import { HighlightVideoJobCard } from './HighlightVideoJobCard';
 import { FlightNotesSection } from './FlightNotesSection';
+import { FlightPilotContextSection } from './FlightPilotContextSection';
 import { FlightReplayCard } from './FlightReplayCard';
 import { FlightStatsGrid } from './FlightStatsGrid';
 import { FlightYoutubeVideos } from './FlightYoutubeVideos';
@@ -821,6 +822,14 @@ export function FlightDetails({
             onCancel={() => {
               setNotesText(flight.notes ?? '');
               setEditingNotes(false);
+            }}
+          />
+          <FlightPilotContextSection
+            tags={flight.tags ?? []}
+            feedback={flight.conditions_feedback}
+            isSaving={updateFlight.isPending}
+            onSave={async (tags, conditions_feedback) => {
+              await updateFlight.mutateAsync({ tags, conditions_feedback });
             }}
           />
         </>

@@ -125,4 +125,7 @@ export interface FlightFormData {
   description?: string;
   external_url?: string;
   youtube_urls?: string[];
+  tags?: string[];
+  conditions_feedback?: string | null;
+  decision_snapshot?: string | null;
 }

@@ -250,6 +250,7 @@ class SiteBase(BaseModel):
     region: str | None = None
     country: str | None = "FR"
     description: str | None = None  # Site description
+    practical_info: dict[str, str] = Field(default_factory=dict)
     usage_type: Literal["takeoff", "landing", "both"] | None = "both"  # Site usage type
 
 
@@ -286,6 +287,7 @@ class SiteUpdate(BaseModel):
     camera_close_zoom_percent: int | None = None
     camera_transition_percent: int | None = None
     usage_type: Literal["takeoff", "landing", "both"] | None = None
+    practical_info: dict[str, str] | None = None
 
     @validator("latitude")
     def validate_latitude(cls, v):
@@ -417,6 +419,9 @@ class FlightBase(BaseModel):
     distance_km: float | None = None
     elevation_gain_m: int | None = None
     notes: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    conditions_feedback: str | None = None
+    decision_snapshot: str | None = None
 
 
 class FlightCreate(FlightBase):
@@ -459,6 +464,9 @@ class FlightUpdate(BaseModel):
     description: str | None = None
     external_url: str | None = None
     youtube_urls: list[str] | None = None
+    tags: list[str] | None = None
+    conditions_feedback: str | None = None
+    decision_snapshot: str | None = None
 
     @validator("youtube_urls")
     def valid_youtube_urls(cls, value):
