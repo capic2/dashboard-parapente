@@ -4635,6 +4635,9 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "distance_km": flight.distance_km,
         "elevation_gain_m": flight.elevation_gain_m,
         "notes": flight.notes,
+        "tags": flight.tags,
+        "conditions_feedback": flight.conditions_feedback,
+        "decision_snapshot": flight.decision_snapshot,
         "gpx_file_path": flight.gpx_file_path,
         "gpx_max_altitude_m": flight.gpx_max_altitude_m,
         "gpx_elevation_gain_m": flight.gpx_elevation_gain_m,
@@ -5211,6 +5214,9 @@ def create_flight(flight_data: FlightCreate, db: Session = Depends(get_db)):
         distance_km=flight_data.distance_km,
         elevation_gain_m=flight_data.elevation_gain_m,
         notes=flight_data.notes,
+        tags=flight_data.tags,
+        conditions_feedback=flight_data.conditions_feedback,
+        decision_snapshot=flight_data.decision_snapshot,
     )
     try:
         db.add(flight)
@@ -5238,6 +5244,9 @@ def create_flight(flight_data: FlightCreate, db: Session = Depends(get_db)):
         "distance_km": flight.distance_km,
         "elevation_gain_m": flight.elevation_gain_m,
         "notes": flight.notes,
+        "tags": flight.tags,
+        "conditions_feedback": flight.conditions_feedback,
+        "decision_snapshot": flight.decision_snapshot,
         "gpx_file_path": None,
         "external_url": None,
         "video_export_job_id": None,

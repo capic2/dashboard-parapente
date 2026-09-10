@@ -131,6 +131,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
     camera_transition_percent: 12,
     usage_type: 'both',
     description: '',
+    practical_info: {},
   });
 
   // Raw string values for numeric fields (avoids parsing on every keystroke)
@@ -209,6 +210,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         camera_transition_percent: site.camera_transition_percent || 12,
         usage_type: site.usage_type || 'both',
         description: site.description || '',
+        practical_info: site.practical_info ?? {},
       };
       setFormData(initialData);
       setOriginalData(initialData);
@@ -232,6 +234,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         camera_transition_percent: 12,
         usage_type: 'both',
         description: '',
+        practical_info: {},
       });
       setOriginalData(null);
       setLatitudeRaw('');
@@ -351,6 +354,9 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           ...(formData.country && { country: formData.country }),
           ...(formData.usage_type && { usage_type: formData.usage_type }),
           ...(formData.description && { description: formData.description }),
+          ...(Object.keys(formData.practical_info).length > 0 && {
+            practical_info: formData.practical_info,
+          }),
         });
       }
       onClose();
@@ -688,6 +694,38 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
             </label>
           </div>
         </div>
+
+        <fieldset className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/50">
+          <legend className="px-1 text-sm font-semibold text-slate-900 dark:text-white">
+            Informations pratiques privées
+          </legend>
+          <p className="text-xs text-slate-600 dark:text-slate-300">
+            Ces informations sont personnelles et ne sont jamais affichées comme
+            des données communautaires.
+          </p>
+          {[
+            ['access', 'Accès / parking'],
+            ['rules', 'Consignes locales'],
+            ['webcam', 'Webcam ou lien utile'],
+            ['contact', 'Contact club'],
+            ['hazards', 'Risques ou pièges connus'],
+          ].map(([key, label]) => (
+            <TextField
+              key={key}
+              value={formData.practical_info[key] ?? ''}
+              onChange={(value: string) =>
+                setFormData({
+                  ...formData,
+                  practical_info: { ...formData.practical_info, [key]: value },
+                })
+              }
+              className="flex flex-col gap-1"
+            >
+              <Label className={labelClass}>{label}</Label>
+              <Input className={inputClass} />
+            </TextField>
+          ))}
+        </fieldset>
 
         {/* GPS Coordinates */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
