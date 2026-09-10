@@ -58,9 +58,9 @@ catalog:
   oxfmt: ^0.67.0
   oxlint: ^1.57.0
   playwright: 1.63.0
-  react: 19.2.8
+  react: 19.3.0
   react-aria-components: ^1.5.0
-  react-dom: 19.2.8
+  react-dom: 19.3.0
   react-i18next: ^17.0.1
   react-is: ^19.2.4
   recharts: ^3.8.0
