@@ -1,4 +1,4 @@
-export type CameraShotType = 'takeoff' | 'follow' | 'landing';
+export type CameraShotType = 'takeoff' | 'follow' | 'highlight' | 'landing';
 
 export interface CameraShot {
   type: CameraShotType;
@@ -35,6 +35,26 @@ const getShotType = (progress: number): CameraShotType => {
   return 'follow';
 };
 
+const getHighlightWeight = (
+  progress: number,
+  highlightProgress: number | undefined
+) => {
+  if (
+    progress <= 0.2 ||
+    progress >= 0.8 ||
+    !Number.isFinite(highlightProgress) ||
+    highlightProgress === undefined ||
+    highlightProgress <= 0.2 ||
+    highlightProgress >= 0.8
+  ) {
+    return 0;
+  }
+
+  const distance = Math.abs(progress - highlightProgress);
+  const radius = 0.07;
+  return distance >= radius ? 0 : 1 - smoothstep(distance / radius);
+};
+
 /**
  * Returns the deterministic camera plan used by both interactive replay and
  * frame-by-frame export. Keyframes make the transitions smooth without
@@ -43,13 +63,15 @@ const getShotType = (progress: number): CameraShotType => {
 export const getFlightCameraShot = ({
   progress,
   baseDistance,
-  closeZoomPercent = 75,
+  closeZoomPercent = 60,
   transitionPercent = 12,
+  highlightProgress,
 }: {
   progress: number;
   baseDistance: number;
   closeZoomPercent?: number;
   transitionPercent?: number;
+  highlightProgress?: number;
 }): CameraShot => {
   const safeProgress = clamp(Number.isFinite(progress) ? progress : 0, 0, 1);
   const safeBaseDistance = Math.max(
@@ -57,7 +79,7 @@ export const getFlightCameraShot = ({
     Number.isFinite(baseDistance) ? baseDistance : 0
   );
   const safeCloseZoomPercent = clamp(
-    Number.isFinite(closeZoomPercent) ? closeZoomPercent : 75,
+    Number.isFinite(closeZoomPercent) ? closeZoomPercent : 60,
     30,
     100
   );
@@ -99,7 +121,7 @@ export const getFlightCameraShot = ({
       ? smoothstep((safeProgress - previousKeyframe.progress) / segmentLength)
       : 0;
 
-  return {
+  const baseShot = {
     type: getShotType(safeProgress),
     distance:
       safeBaseDistance *
@@ -110,5 +132,16 @@ export const getFlightCameraShot = ({
     pitch:
       previousKeyframe.pitch +
       (nextKeyframe.pitch - previousKeyframe.pitch) * segmentProgress,
+  };
+  const highlightWeight = getHighlightWeight(safeProgress, highlightProgress);
+
+  if (highlightWeight === 0) return baseShot;
+
+  return {
+    type: 'highlight',
+    distance:
+      baseShot.distance +
+      (safeBaseDistance * 0.5 - baseShot.distance) * highlightWeight,
+    pitch: baseShot.pitch + (-0.16 - baseShot.pitch) * highlightWeight,
   };
 };
