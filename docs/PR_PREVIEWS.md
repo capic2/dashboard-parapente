@@ -19,8 +19,8 @@ workers, le scheduler et les synchronisations externes sont désactivés.
 ## Configuration requise
 
 Le workflow réutilise les secrets SSH déjà présents pour le déploiement de
-production (`SSH_HOST`, `SSH_USER`, `SSH_PASSWORD`, `SSH_FINGERPRINT` et
-`SSH_PORT`) afin de lire la dernière sauvegarde dans
+production (`SSH_HOST`, `SSH_USER`, `SSH_PASSWORD` et `SSH_PORT`) afin de lire
+la dernière sauvegarde dans
 `/media/nas/DS211_Synology_2/parapente/database-backups`. Le jeton
 `VITE_CESIUM_ION_TOKEN` est également déjà utilisé par le build de production.
 
