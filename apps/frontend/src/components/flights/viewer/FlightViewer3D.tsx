@@ -1419,19 +1419,43 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                 0.01
               )
             : 0;
+<<<<<<< HEAD
+=======
+        const directionFrom =
+          gpxData?.coordinates?.[scenePosition.previousIndex];
+        const directionTo =
+          gpxData?.coordinates?.[
+            Math.min(scenePosition.nextIndex + 4, lastIndex)
+          ];
+        const trackHeading =
+          directionFrom && directionTo
+            ? getBearingRadians(directionFrom, directionTo)
+            : baseHeading;
+>>>>>>> origin/main
         const heading =
           thermalWindow && thermalProgress >= 0 && thermalProgress <= 1
-            ? baseHeading +
+            ? trackHeading +
               thermalWindow.direction * thermalProgress * Math.PI * 2
-            : baseHeading;
+            : trackHeading;
+        const lookAheadIndex = Math.min(
+          allPositionsRef.current.length - 1,
+          scenePosition.nextIndex + 4
+        );
+        const lookAheadPosition =
+          allPositionsRef.current[lookAheadIndex] ?? scenePosition.position;
+        const cameraFocus = interpolatePosition(
+          scenePosition.position,
+          lookAheadPosition,
+          0.35
+        );
 
         if (!smoothCamera || !cameraTargetRef.current) {
-          cameraTargetRef.current = scenePosition.position;
+          cameraTargetRef.current = cameraFocus;
         } else {
           const lerpFactor = 0.08;
           cameraTargetRef.current = interpolatePosition(
             cameraTargetRef.current,
-            scenePosition.position,
+            cameraFocus,
             lerpFactor
           );
         }
@@ -1501,6 +1525,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     [
       disabledAutoShots,
       editableHighlightProgress,
+<<<<<<< HEAD
+=======
+      gpxData?.coordinates,
+>>>>>>> origin/main
       syncTrackEntity,
       thermalWindow,
     ]
