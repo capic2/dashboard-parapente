@@ -48,6 +48,7 @@ const mockSiteArguel = {
   orientation: 'N,NE,NW',
   region: 'Besançon',
   country: 'FR',
+  practical_info: {},
   camera_distance: null,
   flight_count: 0,
   usage_type: 'both' as const,
