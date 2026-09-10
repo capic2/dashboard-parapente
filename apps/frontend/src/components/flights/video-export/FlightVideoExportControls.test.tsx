@@ -113,7 +113,7 @@ describe('FlightVideoExportControls', () => {
 
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith('flights/flight-1/export-video', {
-        searchParams: { mode: 'manual_fast' },
+        searchParams: { mode: 'manual_fast', director_style: 'natural' },
       });
     });
   });
@@ -129,7 +129,22 @@ describe('FlightVideoExportControls', () => {
 
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith('flights/flight-1/export-video', {
-        searchParams: { mode: 'manual' },
+        searchParams: { mode: 'manual', director_style: 'natural' },
+      });
+    });
+  });
+
+  it('includes the selected visual style in the export request', async () => {
+    render(<FlightVideoExportControls flight={mockFlight} />);
+
+    fireEvent.change(screen.getByLabelText(/Style visuel/u), {
+      target: { value: 'cinematic' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Generate video/u }));
+
+    await waitFor(() => {
+      expect(apiPost).toHaveBeenCalledWith('flights/flight-1/export-video', {
+        searchParams: { mode: 'manual_fast', director_style: 'cinematic' },
       });
     });
   });
