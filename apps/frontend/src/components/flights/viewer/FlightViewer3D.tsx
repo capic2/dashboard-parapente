@@ -43,6 +43,7 @@ import { getExportFrameTarget } from '../../../utils/videoExportFrame';
 import {
   getHighestAltitudeHighlightProgress,
   getStrongestTurnHighlightProgress,
+  getThermalWindow,
 } from '../../../utils/flightHighlight';
 import { api } from '../../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
@@ -321,6 +322,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     () =>
       getStrongestTurnHighlightProgress(gpxData?.coordinates ?? []) ??
       getHighestAltitudeHighlightProgress(gpxData?.coordinates ?? []),
+    [gpxData?.coordinates]
+  );
+  const thermalWindow = useMemo(
+    () => getThermalWindow(gpxData?.coordinates ?? []),
     [gpxData?.coordinates]
   );
 
@@ -1351,7 +1356,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       const viewer = viewerRef.current;
       const scene = getViewerScene(viewer);
       if (viewer && scene) {
-        const heading = cameraHeadingRef.current;
+        const baseHeading = cameraHeadingRef.current;
         const progress =
           lastIndex > 0
             ? (scenePosition.previousIndex + scenePosition.ratio) / lastIndex
@@ -1363,6 +1368,18 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           transitionPercent: cameraTransitionPercentRef.current,
           highlightProgress,
         });
+        const thermalProgress = thermalWindow
+          ? (progress - thermalWindow.startProgress) /
+            Math.max(
+              thermalWindow.endProgress - thermalWindow.startProgress,
+              0.01
+            )
+          : 0;
+        const heading =
+          thermalWindow && thermalProgress >= 0 && thermalProgress <= 1
+            ? baseHeading +
+              thermalWindow.direction * thermalProgress * Math.PI * 2
+            : baseHeading;
 
         if (!smoothCamera || !cameraTargetRef.current) {
           cameraTargetRef.current = scenePosition.position;
@@ -1437,7 +1454,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         tilesLoaded: Boolean(getViewerScene(viewer)?.globe.tilesLoaded),
       };
     },
-    [highlightProgress, syncTrackEntity]
+    [highlightProgress, syncTrackEntity, thermalWindow]
   );
 
   useEffect(() => {
