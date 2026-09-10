@@ -93,6 +93,7 @@ interface FlightViewer3DProps {
   flightTitle?: string;
   compact?: boolean;
   exportOnly?: boolean;
+  directorStyle?: VisualPreset;
   exportJobId?: string | null;
   exportToken?: string | null;
 }
@@ -104,6 +105,22 @@ interface ScenePositionState {
   ratio: number;
   timestamp: number;
 }
+
+type VisualPreset = 'natural' | 'cinematic' | 'dynamic';
+
+const VISUAL_PRESETS: Record<
+  VisualPreset,
+  {
+    shadows: boolean;
+    ambientOcclusion: boolean;
+    sunTime: number;
+    light: number;
+  }
+> = {
+  natural: { shadows: true, ambientOcclusion: false, sunTime: 10, light: 1.2 },
+  cinematic: { shadows: true, ambientOcclusion: true, sunTime: 17, light: 1.5 },
+  dynamic: { shadows: true, ambientOcclusion: true, sunTime: 14, light: 1.8 },
+};
 
 const interpolatePosition = (
   start: Cartesian3,
@@ -276,6 +293,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   flightTitle,
   compact = false,
   exportOnly = false,
+  directorStyle,
   exportJobId,
   exportToken,
 }) => {
@@ -328,12 +346,35 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     () => getThermalWindow(gpxData?.coordinates ?? []),
     [gpxData?.coordinates]
   );
+  const [editableHighlightProgress, setEditableHighlightProgress] = useState<
+    number | undefined
+  >(undefined);
+
+  useEffect(() => {
+    setEditableHighlightProgress(highlightProgress);
+  }, [highlightProgress]);
 
   // Terrain rendering states
   const [terrainShadows, setTerrainShadows] = useState(true);
   const [ambientOcclusion, setAmbientOcclusion] = useState(false);
   const [sunTime, setSunTime] = useState(10); // 10:00
   const [lightIntensity, setLightIntensity] = useState(1.2);
+  const [visualPreset, setVisualPreset] = useState<VisualPreset>('natural');
+  const [disabledAutoShots, setDisabledAutoShots] = useState<
+    ('highlight' | 'thermal')[]
+  >([]);
+  const applyVisualPreset = useCallback((preset: VisualPreset) => {
+    const settings = VISUAL_PRESETS[preset];
+    setVisualPreset(preset);
+    setTerrainShadows(settings.shadows);
+    setAmbientOcclusion(settings.ambientOcclusion);
+    setSunTime(settings.sunTime);
+    setLightIntensity(settings.light);
+  }, []);
+
+  useEffect(() => {
+    if (directorStyle) applyVisualPreset(directorStyle);
+  }, [applyVisualPreset, directorStyle]);
 
   // Orientation editing state
   const [isUpdatingOrientation, setIsUpdatingOrientation] = useState(false);
@@ -1366,28 +1407,52 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           baseDistance: cameraDistanceRef.current,
           closeZoomPercent: cameraCloseZoomPercentRef.current,
           transitionPercent: cameraTransitionPercentRef.current,
-          highlightProgress,
+          highlightProgress: disabledAutoShots.includes('highlight')
+            ? undefined
+            : editableHighlightProgress,
         });
-        const thermalProgress = thermalWindow
-          ? (progress - thermalWindow.startProgress) /
-            Math.max(
-              thermalWindow.endProgress - thermalWindow.startProgress,
-              0.01
-            )
-          : 0;
+        const thermalProgress =
+          thermalWindow && !disabledAutoShots.includes('thermal')
+            ? (progress - thermalWindow.startProgress) /
+              Math.max(
+                thermalWindow.endProgress - thermalWindow.startProgress,
+                0.01
+              )
+            : 0;
+        const directionFrom =
+          gpxData?.coordinates?.[scenePosition.previousIndex];
+        const directionTo =
+          gpxData?.coordinates?.[
+            Math.min(scenePosition.nextIndex + 4, lastIndex)
+          ];
+        const trackHeading =
+          directionFrom && directionTo
+            ? getBearingRadians(directionFrom, directionTo)
+            : baseHeading;
         const heading =
           thermalWindow && thermalProgress >= 0 && thermalProgress <= 1
-            ? baseHeading +
+            ? trackHeading +
               thermalWindow.direction * thermalProgress * Math.PI * 2
-            : baseHeading;
+            : trackHeading;
+        const lookAheadIndex = Math.min(
+          allPositionsRef.current.length - 1,
+          scenePosition.nextIndex + 4
+        );
+        const lookAheadPosition =
+          allPositionsRef.current[lookAheadIndex] ?? scenePosition.position;
+        const cameraFocus = interpolatePosition(
+          scenePosition.position,
+          lookAheadPosition,
+          0.35
+        );
 
         if (!smoothCamera || !cameraTargetRef.current) {
-          cameraTargetRef.current = scenePosition.position;
+          cameraTargetRef.current = cameraFocus;
         } else {
           const lerpFactor = 0.08;
           cameraTargetRef.current = interpolatePosition(
             cameraTargetRef.current,
-            scenePosition.position,
+            cameraFocus,
             lerpFactor
           );
         }
@@ -1454,7 +1519,13 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         tilesLoaded: Boolean(getViewerScene(viewer)?.globe.tilesLoaded),
       };
     },
-    [highlightProgress, syncTrackEntity, thermalWindow]
+    [
+      disabledAutoShots,
+      editableHighlightProgress,
+      gpxData?.coordinates,
+      syncTrackEntity,
+      thermalWindow,
+    ]
   );
 
   useEffect(() => {
@@ -2056,6 +2127,60 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                   </div>
                 </AccordionSection>
 
+                <AccordionSection
+                  title="Plans automatiques"
+                  emoji="🎬"
+                  defaultOpen={false}
+                >
+                  <p className="text-xs text-gray-600 dark:text-gray-300 mb-2">
+                    Déco, suivi et atterrissage restent actifs pendant la
+                    prévisualisation.
+                  </p>
+                  {(['highlight', 'thermal'] as const).map((shot) => (
+                    <label
+                      key={shot}
+                      className="flex items-center justify-between text-sm py-1"
+                    >
+                      <span>
+                        {shot === 'highlight'
+                          ? 'Point fort'
+                          : 'Orbite thermique'}
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={!disabledAutoShots.includes(shot)}
+                        onChange={() =>
+                          setDisabledAutoShots((current) =>
+                            current.includes(shot)
+                              ? current.filter((item) => item !== shot)
+                              : [...current, shot]
+                          )
+                        }
+                      />
+                    </label>
+                  ))}
+                  {editableHighlightProgress !== undefined && (
+                    <div className="mt-2">
+                      <label className="block text-xs text-gray-600 dark:text-gray-300 mb-1">
+                        Position du point fort :{' '}
+                        {Math.round(editableHighlightProgress * 100)}%
+                      </label>
+                      <input
+                        type="range"
+                        min="20"
+                        max="80"
+                        value={editableHighlightProgress * 100}
+                        onChange={(event) =>
+                          setEditableHighlightProgress(
+                            Number(event.target.value) / 100
+                          )
+                        }
+                        className="w-full"
+                      />
+                    </div>
+                  )}
+                </AccordionSection>
+
                 {/* ========== SECTION 2: SITE & CAMÉRA ========== */}
                 {flight?.site && (
                   <AccordionSection
@@ -2284,6 +2409,26 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
                   {/* Terrain Shadows Toggle */}
                   <div>
+                    <div className="mb-3">
+                      <label
+                        htmlFor="viewer-visual-preset"
+                        className="block text-sm font-medium mb-1"
+                      >
+                        Style vidéo
+                      </label>
+                      <select
+                        id="viewer-visual-preset"
+                        value={visualPreset}
+                        onChange={(event) =>
+                          applyVisualPreset(event.target.value as VisualPreset)
+                        }
+                        className="w-full px-2 py-1 border rounded bg-white dark:bg-gray-700"
+                      >
+                        <option value="natural">Naturel</option>
+                        <option value="cinematic">Cinématique</option>
+                        <option value="dynamic">Dynamique</option>
+                      </select>
+                    </div>
                     <label className="flex items-center text-sm mb-2 cursor-pointer">
                       <input
                         type="checkbox"

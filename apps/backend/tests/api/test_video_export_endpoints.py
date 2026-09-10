@@ -137,6 +137,40 @@ class TestVideoExportStartEndpoint:
         assert payload["message"] == "Video export started (manual fast render)"
         assert "auth_token" not in mock_start.call_args.kwargs
 
+    def test_start_video_export_passes_visual_style_to_manual_renderer(
+        self, client: TestClient, sample_flight
+    ):
+        with patch(
+            "routes.start_video_export_manual_fast", return_value="job-cinematic"
+        ) as mock_start:
+            response = client.post(
+                f"{API_PREFIX}/flights/flight-test-001/export-video?mode=manual_fast&director_style=cinematic"
+            )
+
+        assert response.status_code == 200
+        assert mock_start.call_args.kwargs["frontend_url"].endswith("#director=cinematic")
+
+    def test_start_video_export_rejects_invalid_visual_style(
+        self, client: TestClient, sample_flight
+    ):
+        response = client.post(
+            f"{API_PREFIX}/flights/flight-test-001/export-video?director_style=invalid"
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Invalid director_style"
+
+    def test_stream_export_does_not_receive_manual_renderer_style_marker(
+        self, client: TestClient, sample_flight
+    ):
+        with patch("routes._start_video_export_stream", return_value="job-stream") as mock_start:
+            response = client.post(
+                f"{API_PREFIX}/flights/flight-test-001/export-video?mode=stream&director_style=cinematic"
+            )
+
+        assert response.status_code == 200
+        assert "#director=" not in mock_start.call_args.kwargs["frontend_url"]
+
     def test_start_video_export_manual_fast_falls_back_to_manual(
         self, client: TestClient, sample_flight
     ):
@@ -693,9 +727,7 @@ class TestVideoExportJobsEndpoint:
             == "gpu"
         )
 
-    def test_video_export_jobs_youtube_filter_accepts_both_mode_values(
-        self, client: TestClient
-    ):
+    def test_video_export_jobs_youtube_filter_accepts_both_mode_values(self, client: TestClient):
         with (
             patch(
                 "routes.list_exports_manual",
