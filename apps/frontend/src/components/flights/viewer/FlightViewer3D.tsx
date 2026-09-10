@@ -37,8 +37,8 @@ import {
 import {
   DEFAULT_CAMERA_CLOSE_ZOOM_PERCENT,
   DEFAULT_CAMERA_TRANSITION_PERCENT,
-  getFlightCameraDistance,
 } from '../../../utils/cameraDistanceProfile';
+import { getFlightCameraShot } from '../../../utils/cameraDirector';
 import { getExportFrameTarget } from '../../../utils/videoExportFrame';
 import { api } from '../../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
@@ -1346,15 +1346,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           lastIndex > 0
             ? (scenePosition.previousIndex + scenePosition.ratio) / lastIndex
             : 0;
-        const distance = isExportMode
-          ? cameraDistanceRef.current
-          : getFlightCameraDistance({
-              progress,
-              baseDistance: cameraDistanceRef.current,
-              closeZoomPercent: cameraCloseZoomPercentRef.current,
-              transitionPercent: cameraTransitionPercentRef.current,
-            });
-        const pitch = -0.05;
+        const cameraShot = getFlightCameraShot({
+          progress,
+          baseDistance: cameraDistanceRef.current,
+          closeZoomPercent: cameraCloseZoomPercentRef.current,
+          transitionPercent: cameraTransitionPercentRef.current,
+        });
 
         if (!smoothCamera || !cameraTargetRef.current) {
           cameraTargetRef.current = scenePosition.position;
@@ -1371,11 +1368,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           destination: cameraTargetRef.current,
           orientation: {
             heading,
-            pitch,
+            pitch: cameraShot.pitch,
             roll: 0,
           },
         });
-        viewer.camera.moveBackward(distance);
+        viewer.camera.moveBackward(cameraShot.distance);
 
         const cameraCartographic = Cartographic.fromCartesian(
           viewer.camera.position

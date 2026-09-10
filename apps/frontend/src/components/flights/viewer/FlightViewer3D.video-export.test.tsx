@@ -388,7 +388,7 @@ describe('FlightViewer3D video export mode', () => {
     expect(viewer.render).toHaveBeenCalled();
   });
 
-  it('keeps the export camera distance constant across frames', async () => {
+  it('applies the takeoff, follow, and landing camera plans during export', async () => {
     window._exportMode = 'manual_render';
 
     render(<FlightViewer3D flightId="flight-1" exportOnly />);
@@ -403,9 +403,9 @@ describe('FlightViewer3D video export mode', () => {
     window._setExportFrame?.(1, 3);
     window._setExportFrame?.(2, 3);
 
-    expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(1, 500);
+    expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(1, 375);
     expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(2, 500);
-    expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(3, 500);
+    expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(3, 375);
   });
 
   it('passes GPX longitude, latitude and rendered elevation to Cesium', async () => {
