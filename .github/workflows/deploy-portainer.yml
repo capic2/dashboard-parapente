@@ -792,8 +792,8 @@ jobs:
 
               # Redis is not part of the backend image update. Keep it running
               # so deployments do not pull and recreate the stateful service.
-              if ! compose_cmd pull backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker ||
-                ! compose_cmd up -d --remove-orphans backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker redis; then
+              if ! compose_cmd pull backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker database-backup ||
+                ! compose_cmd up -d --remove-orphans backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker database-backup redis; then
                 print_backend_diagnostics
                 return 1
               fi
@@ -893,8 +893,8 @@ jobs:
 
                   # Redis is not part of the backend image update. Keep it running
                   # so deployments do not pull and recreate the stateful service.
-                  compose_cmd pull backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker
-                  compose_cmd up -d --remove-orphans backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker redis
+                  compose_cmd pull backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker database-backup
+                  compose_cmd up -d --remove-orphans backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker database-backup redis
                   readiness_attempt=1
                   readiness_ok=0
                   while [ "$readiness_attempt" -le "$LOCAL_VERIFY_MAX_ATTEMPTS" ]; do
