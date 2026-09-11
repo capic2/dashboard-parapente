@@ -99,6 +99,43 @@ def test_evaluate_site_azba_constraints_returns_clear_without_near_zone(monkeypa
     assert result["constraints"] == []
 
 
+def test_evaluate_site_azba_constraints_preserves_zrt_type(monkeypatch):
+    azba_airspace._CACHE.clear()
+
+    async def fake_current_range():
+        return {"rtba": "2026-06-16"}
+
+    async def fake_active_zones(start, end, latest_azba_date):
+        return {
+            "hydra:member": [
+                {
+                    "id": "zrt-near",
+                    "name": "ZRT TEST",
+                    "codeType": "ZRT",
+                    "coordinates": [{"latitude": 47.2, "longitude": 6.0}],
+                }
+            ]
+        }
+
+    monkeypatch.setattr(azba_airspace, "_get_current_range", fake_current_range)
+    monkeypatch.setattr(azba_airspace, "_get_active_zones", fake_active_zones)
+
+    result = asyncio.run(
+        azba_airspace.evaluate_site_azba_constraints(
+            site_id="site-zrt",
+            site_name="Arguel",
+            site_lat=47.2,
+            site_lon=6.0,
+            start=datetime(2026, 6, 16, 8, tzinfo=timezone.utc),
+            end=datetime(2026, 6, 16, 12, tzinfo=timezone.utc),
+            radius_km=10,
+        )
+    )
+
+    assert result["status"] == "blocking"
+    assert result["constraints"][0]["zone_type"] == "ZRT"
+
+
 def test_evaluate_site_azba_constraints_returns_unknown_on_source_error(monkeypatch):
     azba_airspace._CACHE.clear()
 

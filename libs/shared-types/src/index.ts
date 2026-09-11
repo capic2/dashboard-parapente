@@ -526,6 +526,7 @@ export const FlightDecisionResponseSchema = z.object({
 export const AzbaConstraintSchema = z.object({
   id: z.string(),
   name: z.string(),
+  zone_type: z.string().nullish(),
   valid_from: z.string().nullish(),
   valid_to: z.string().nullish(),
   floor: z.string().nullish(),

@@ -358,6 +358,7 @@ class Site(SiteBase):
 class AzbaConstraint(BaseModel):
     id: str
     name: str
+    zone_type: str | None = None
     valid_from: str | None = None
     valid_to: str | None = None
     floor: str | None = None

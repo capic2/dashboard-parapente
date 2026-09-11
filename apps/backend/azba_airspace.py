@@ -30,6 +30,7 @@ _AZBA_SHARE_SECRET_RE = re.compile(r'share_secret:"(?P<secret>[^"]+)"')
 class AzbaActiveZone:
     id: str
     name: str
+    zone_type: str | None
     valid_from: str | None
     valid_to: str | None
     floor: str | None
@@ -235,6 +236,7 @@ def _normalize_active_zone(
     payload: dict[str, Any], site_lat: float, site_lon: float
 ) -> AzbaActiveZone:
     zone_id = _first_text(payload, ("id", "mid", "uuid", "codeId", "name", "txtName")) or "unknown"
+    zone_type = _first_text(payload, ("zoneType", "codeType", "initialCodeType", "type"))
     name = (
         _first_text(payload, ("name", "txtName", "codeId", "id", "mid")) or f"Zone RTBA {zone_id}"
     )
@@ -243,6 +245,7 @@ def _normalize_active_zone(
     return AzbaActiveZone(
         id=str(zone_id),
         name=name,
+        zone_type=zone_type,
         valid_from=valid_from,
         valid_to=valid_to,
         floor=_first_text(payload, ("floor", "lower", "plancher", "lowerLimit", "valDistVerLower")),
