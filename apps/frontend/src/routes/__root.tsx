@@ -11,7 +11,8 @@ export const Route = createRootRoute({
   loader: ({ location }) => {
     if (
       location.pathname === '/login' ||
-      location.pathname === '/export-viewer'
+      location.pathname === '/export-viewer' ||
+      location.pathname === '/privacy'
     ) {
       return null;
     }
@@ -45,13 +46,14 @@ function RootComponent() {
   const matchRoute = useMatchRoute();
   const isLoginPage = matchRoute({ to: '/login' });
   const isExportViewerPage = matchRoute({ to: '/export-viewer' });
+  const isPrivacyPage = matchRoute({ to: '/privacy' });
   const appVersion = Route.useLoaderData();
   const version = appVersion?.version ?? null;
   const { latestVersion, releaseNotesUrl } = useVersionUpdates(
     isLoginPage || isExportViewerPage ? null : version
   );
 
-  if (isLoginPage || isExportViewerPage) {
+  if (isLoginPage || isExportViewerPage || isPrivacyPage) {
     return <Outlet />;
   }
 

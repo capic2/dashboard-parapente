@@ -15,6 +15,7 @@ import { Route as ExportViewerRouteImport } from './routes/export-viewer'
 import { Route as FlightsRouteImport } from './routes/flights'
 import { Route as InfrastructureRouteImport } from './routes/infrastructure'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SitesRouteImport } from './routes/sites'
 import { Route as ThermalRouteImport } from './routes/thermal'
@@ -53,6 +54,11 @@ const InfrastructureRoute = InfrastructureRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -104,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/flights': typeof FlightsRouteWithChildren
   '/infrastructure': typeof InfrastructureRouteWithChildren
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
@@ -119,6 +126,7 @@ export interface FileRoutesByTo {
   '/flights': typeof FlightsRouteWithChildren
   '/infrastructure': typeof InfrastructureRouteWithChildren
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
@@ -135,6 +143,7 @@ export interface FileRoutesById {
   '/flights': typeof FlightsRouteWithChildren
   '/infrastructure': typeof InfrastructureRouteWithChildren
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
@@ -152,6 +161,7 @@ export interface FileRouteTypes {
     | '/flights'
     | '/infrastructure'
     | '/login'
+    | '/privacy'
     | '/settings'
     | '/sites'
     | '/thermal'
@@ -167,6 +177,7 @@ export interface FileRouteTypes {
     | '/flights'
     | '/infrastructure'
     | '/login'
+    | '/privacy'
     | '/settings'
     | '/sites'
     | '/thermal'
@@ -182,6 +193,7 @@ export interface FileRouteTypes {
     | '/flights'
     | '/infrastructure'
     | '/login'
+    | '/privacy'
     | '/settings'
     | '/sites'
     | '/thermal'
@@ -198,6 +210,7 @@ export interface RootRouteChildren {
   FlightsRoute: typeof FlightsRouteWithChildren
   InfrastructureRoute: typeof InfrastructureRouteWithChildren
   LoginRoute: typeof LoginRoute
+  PrivacyRoute: typeof PrivacyRoute
   SettingsRoute: typeof SettingsRoute
   SitesRoute: typeof SitesRoute
   ThermalRoute: typeof ThermalRoute
@@ -247,6 +260,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -331,6 +351,7 @@ const rootRouteChildren: RootRouteChildren = {
   FlightsRoute: FlightsRouteWithChildren,
   InfrastructureRoute: InfrastructureRouteWithChildren,
   LoginRoute: LoginRoute,
+  PrivacyRoute: PrivacyRoute,
   SettingsRoute: SettingsRoute,
   SitesRoute: SitesRoute,
   ThermalRoute: ThermalRoute,
