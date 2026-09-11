@@ -2,8 +2,17 @@ import asyncio
 from datetime import datetime, timezone
 
 import httpx
+import pytest
 
 import azba_airspace
+
+
+@pytest.fixture(autouse=True)
+def disable_live_zrt_lookup(monkeypatch):
+    async def fake_active_zrt_zones(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr(azba_airspace, "_get_active_zrt_zones", fake_active_zrt_zones)
 
 
 def test_evaluate_site_azba_constraints_blocks_near_active_zone(monkeypatch):
@@ -119,6 +128,133 @@ def test_evaluate_site_azba_constraints_preserves_zrt_type(monkeypatch):
 
     monkeypatch.setattr(azba_airspace, "_get_current_range", fake_current_range)
     monkeypatch.setattr(azba_airspace, "_get_active_zones", fake_active_zones)
+
+    result = asyncio.run(
+        azba_airspace.evaluate_site_azba_constraints(
+            site_id="site-zrt",
+            site_name="Arguel",
+            site_lat=47.2,
+            site_lon=6.0,
+            start=datetime(2026, 6, 16, 8, tzinfo=timezone.utc),
+            end=datetime(2026, 6, 16, 12, tzinfo=timezone.utc),
+            radius_km=10,
+        )
+    )
+
+    assert result["status"] == "blocking"
+    assert result["constraints"][0]["zone_type"] == "ZRT"
+
+
+def test_normalize_zrt_notam_builds_nearby_constraint():
+    zone = azba_airspace._normalize_zrt_notam(
+        {
+            "nof": "LFFA",
+            "series": "R",
+            "number": 1234,
+            "year": 26,
+            "itemA": "ZRT TEST",
+            "itemE": "ZRT TEST ACTIVE",
+            "itemF": "SFC",
+            "itemG": "3500FT AMSL",
+            "coordinates": "4712N00600E",
+            "radius": 5,
+            "startValidity": "2026-06-16T08:00:00Z",
+            "endValidity": "2026-06-16T12:00:00Z",
+            "qLine": {"code45": "RT"},
+        },
+        47.2,
+        6.0,
+    )
+
+    assert zone is not None
+    assert zone.zone_type == "ZRT"
+    assert zone.distance_km == 0
+    assert zone.geometry["type"] == "Polygon"
+
+
+def test_normalize_zrt_notam_rejects_malformed_or_unrelated_notams():
+    assert (
+        azba_airspace._normalize_zrt_notam(
+            {"itemE": "ZRT TEST", "coordinates": "invalid", "qLine": {"code45": "RT"}},
+            47.2,
+            6.0,
+        )
+        is None
+    )
+    assert (
+        azba_airspace._normalize_zrt_notam(
+            {
+                "itemE": "RUNWAY CLOSED",
+                "coordinates": "4712N00600E",
+                "qLine": {"code45": "CA"},
+            },
+            47.2,
+            6.0,
+        )
+        is None
+    )
+
+
+def test_evaluate_site_azba_constraints_returns_unknown_when_zrt_source_fails(monkeypatch):
+    azba_airspace._CACHE.clear()
+
+    async def fake_current_range():
+        return {"rtba": "2026-06-16"}
+
+    async def fake_active_zones(start, end, latest_azba_date):
+        return {"hydra:member": []}
+
+    async def failing_zrt_zones(*args, **kwargs):
+        raise azba_airspace.AzbaClientError("SOFIA unavailable")
+
+    monkeypatch.setattr(azba_airspace, "_get_current_range", fake_current_range)
+    monkeypatch.setattr(azba_airspace, "_get_active_zones", fake_active_zones)
+    monkeypatch.setattr(azba_airspace, "_get_active_zrt_zones", failing_zrt_zones)
+
+    result = asyncio.run(
+        azba_airspace.evaluate_site_azba_constraints(
+            site_id="site-zrt-source-error",
+            site_name="Arguel",
+            site_lat=47.2,
+            site_lon=6.0,
+            start=datetime(2026, 6, 16, 8, tzinfo=timezone.utc),
+            end=datetime(2026, 6, 16, 12, tzinfo=timezone.utc),
+            radius_km=10,
+        )
+    )
+
+    assert result["status"] == "unknown"
+    assert result["message"]
+    assert azba_airspace._CACHE == {}
+
+
+def test_evaluate_site_azba_constraints_merges_sofia_zrt(monkeypatch):
+    azba_airspace._CACHE.clear()
+
+    async def fake_current_range():
+        return {"rtba": "2026-06-16"}
+
+    async def fake_active_zones(start, end, latest_azba_date):
+        return {"hydra:member": []}
+
+    async def fake_active_zrt_zones(*args, **kwargs):
+        return [
+            azba_airspace.AzbaActiveZone(
+                id="notam-zrt",
+                name="ZRT TEST",
+                zone_type="ZRT",
+                valid_from=None,
+                valid_to=None,
+                floor=None,
+                ceiling=None,
+                geometry=None,
+                distance_km=0,
+            )
+        ]
+
+    monkeypatch.setattr(azba_airspace, "_get_current_range", fake_current_range)
+    monkeypatch.setattr(azba_airspace, "_get_active_zones", fake_active_zones)
+    monkeypatch.setattr(azba_airspace, "_get_active_zrt_zones", fake_active_zrt_zones)
 
     result = asyncio.run(
         azba_airspace.evaluate_site_azba_constraints(

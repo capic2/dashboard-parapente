@@ -1,5 +1,7 @@
 import base64
 import hashlib
+import html
+import json
 import logging
 import re
 from dataclasses import dataclass
@@ -15,6 +17,10 @@ logger = logging.getLogger(__name__)
 
 AZBA_OFFICIAL_URL = "https://www.sia.aviation-civile.gouv.fr/schedules"
 AZBA_PUBLIC_APP_URL = "https://www.sia.aviation-civile.gouv.fr/azbaEx/?lang=fr"
+SOFIA_NOTAM_AREA_URL = "https://sofia-briefing.aviation-civile.gouv.fr/sofia"
+SOFIA_NOTAM_AREA_PAGE_URL = (
+    "https://sofia-briefing.aviation-civile.gouv.fr/sofia/pages/notamarea.html"
+)
 _CACHE: dict[str, tuple[datetime, dict[str, Any]]] = {}
 _AZBA_API_AUTH_SECRET_CACHE: str | None = None
 _DMS_RE = re.compile(
@@ -24,6 +30,11 @@ _AZBA_MAIN_SCRIPT_RE = re.compile(
     r'<script\s+src="(?P<src>main\.[^"]+\.js)"\s+type="module"></script>'
 )
 _AZBA_SHARE_SECRET_RE = re.compile(r'share_secret:"(?P<secret>[^"]+)"')
+_SOFIA_MESSAGE_RE = re.compile(r'<div id="Message">(?P<message>.*?)</div>', re.DOTALL)
+_NOTAM_COORDINATE_RE = re.compile(
+    r"^(?P<lat_deg>\d{2})(?P<lat_min>\d{2})(?P<lat_hem>[NS])"
+    r"(?P<lon_deg>\d{3})(?P<lon_min>\d{2})(?P<lon_hem>[EW])$"
+)
 
 
 @dataclass(frozen=True)
@@ -263,6 +274,134 @@ def _zone_matches_site(zone: AzbaActiveZone, radius_km: float) -> bool:
     return zone.distance_km <= radius_km
 
 
+def _format_notam_coordinate(value: float, *, latitude: bool) -> str:
+    absolute = abs(value)
+    degrees = int(absolute)
+    minutes = round((absolute - degrees) * 60)
+    if minutes == 60:
+        degrees += 1
+        minutes = 0
+    hemisphere = ("N" if value >= 0 else "S") if latitude else ("E" if value >= 0 else "W")
+    return f"{degrees:0{2 if latitude else 3}d}{minutes:02d}{hemisphere}"
+
+
+def _notam_coordinate_pair(value: str) -> tuple[float, float] | None:
+    match = _NOTAM_COORDINATE_RE.match(value.strip().upper())
+    if match is None:
+        return None
+    latitude = int(match.group("lat_deg")) + int(match.group("lat_min")) / 60
+    longitude = int(match.group("lon_deg")) + int(match.group("lon_min")) / 60
+    if match.group("lat_hem") == "S":
+        latitude *= -1
+    if match.group("lon_hem") == "W":
+        longitude *= -1
+    return latitude, longitude
+
+
+def _notam_geometry(latitude: float, longitude: float, radius_km: float) -> dict[str, Any]:
+    from math import cos, pi, radians, sin
+
+    points: list[list[float]] = []
+    latitude_radius = radius_km / 111.32
+    longitude_radius = radius_km / (111.32 * cos(radians(latitude)))
+    for index in range(33):
+        angle = 2 * pi * index / 32
+        points.append(
+            [longitude + longitude_radius * cos(angle), latitude + latitude_radius * sin(angle)]
+        )
+    return {"type": "Polygon", "coordinates": [points]}
+
+
+def _extract_sofia_notams(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    notams: list[dict[str, Any]] = []
+    for item in _iter_nested_dicts(payload):
+        if isinstance(item.get("qLine"), dict) and item.get("itemE"):
+            notams.append(item)
+    return notams
+
+
+def _normalize_zrt_notam(
+    payload: dict[str, Any], site_lat: float, site_lon: float
+) -> AzbaActiveZone | None:
+    q_line = payload.get("qLine")
+    if not isinstance(q_line, dict):
+        return None
+    text = str(payload.get("itemE") or "")
+    code45 = str(q_line.get("code45") or "").upper()
+    if code45 != "RT" and "ZRT" not in text.upper():
+        return None
+    coordinates = _notam_coordinate_pair(str(payload.get("coordinates") or ""))
+    if coordinates is None:
+        return None
+    latitude, longitude = coordinates
+    radius_km = float(payload.get("radius") or 0) * 1.852
+    center_distance_km = _haversine_km(site_lat, site_lon, latitude, longitude)
+    return AzbaActiveZone(
+        id=f"{payload.get('nof', 'NOTAM')}-{payload.get('series', '')}{payload.get('number', '')}/{payload.get('year', '')}",
+        name=f"ZRT {payload.get('itemA') or payload.get('number') or 'NOTAM'}",
+        zone_type="ZRT",
+        valid_from=_first_text(payload, ("startValidity",)),
+        valid_to=_first_text(payload, ("endValidity",)),
+        floor=(
+            _first_text(
+                payload.get("itemF", {}) if isinstance(payload.get("itemF"), dict) else {},
+                ("value",),
+            )
+            or str(payload.get("itemF"))
+            if payload.get("itemF")
+            else None
+        ),
+        ceiling=str(payload.get("itemG")) if payload.get("itemG") else None,
+        geometry=_notam_geometry(latitude, longitude, radius_km) if radius_km > 0 else None,
+        distance_km=max(0, center_distance_km - radius_km),
+    )
+
+
+async def _get_active_zrt_zones(
+    start: datetime,
+    end: datetime,
+    site_lat: float,
+    site_lon: float,
+    radius_km: float,
+) -> list[AzbaActiveZone]:
+    duration_minutes = max(1, min(9600, int((end - start).total_seconds() // 60)))
+    duration = f"{duration_minutes // 60:02d}{duration_minutes % 60:02d}"
+    form_data = [
+        (":operation", "postAreaPibRequest"),
+        ("valid_from", _to_iso_utc(start)),
+        ("duration", duration),
+        ("traffic[]", "V"),
+        ("traffic[]", "I"),
+        ("fl_lower", "000"),
+        ("fl_upper", "999"),
+        ("radius", str(max(1, round(radius_km / 1.852)))),
+        ("lat", _format_notam_coordinate(site_lat, latitude=True)),
+        ("long", _format_notam_coordinate(site_lon, latitude=False)),
+        ("isFromSofia", "true"),
+    ]
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            page = await client.get(SOFIA_NOTAM_AREA_PAGE_URL)
+            page.raise_for_status()
+            response = await client.post(SOFIA_NOTAM_AREA_URL, data=form_data)
+            response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise AzbaClientError("Unable to retrieve SOFIA NOTAM data") from exc
+    match = _SOFIA_MESSAGE_RE.search(response.text)
+    if match is None:
+        raise AzbaClientError("SOFIA returned an invalid NOTAM response")
+    try:
+        payload = json.loads(html.unescape(match.group("message")))
+    except json.JSONDecodeError as exc:
+        raise AzbaClientError("SOFIA returned invalid NOTAM JSON") from exc
+    return [
+        zone
+        for item in _extract_sofia_notams(payload)
+        if (zone := _normalize_zrt_notam(item, site_lat, site_lon)) is not None
+        and _zone_matches_site(zone, radius_km)
+    ]
+
+
 async def _get_json(path_with_query: str) -> dict[str, Any]:
     global _AZBA_API_AUTH_SECRET_CACHE
 
@@ -353,7 +492,13 @@ async def evaluate_site_azba_constraints(
             for item in _extract_collection(active_payload)
         ]
         constraints = [zone for zone in active_zones if _zone_matches_site(zone, radius)]
-        status = "blocking" if constraints else "clear"
+        zrt_lookup_failed = False
+        try:
+            constraints.extend(await _get_active_zrt_zones(start, end, site_lat, site_lon, radius))
+        except AzbaClientError as exc:
+            zrt_lookup_failed = True
+            logger.warning("SOFIA ZRT evaluation failed for site %s: %s", site_id, exc)
+        status = "blocking" if constraints else "unknown" if zrt_lookup_failed else "clear"
         result = {
             "site_id": site_id,
             "site_name": site_name,
@@ -366,7 +511,7 @@ async def evaluate_site_azba_constraints(
             "radius_km": radius,
             "latest_azba_date": latest_azba_date,
             "constraints": [zone.__dict__ for zone in constraints],
-            "message": None,
+            "message": "Information ZRT indisponible depuis SOFIA." if zrt_lookup_failed else None,
         }
     except AzbaClientError as exc:
         logger.warning("SIA AZBA evaluation failed for site %s: %s", site_id, exc)
