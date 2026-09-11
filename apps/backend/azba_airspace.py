@@ -334,7 +334,11 @@ def _normalize_zrt_notam(
     if coordinates is None:
         return None
     latitude, longitude = coordinates
-    radius_km = float(payload.get("radius") or 0) * 1.852
+    try:
+        radius_nm = float(payload.get("radius") or 0)
+    except (TypeError, ValueError):
+        radius_nm = 0.0
+    radius_km = radius_nm * 1.852
     center_distance_km = _haversine_km(site_lat, site_lon, latitude, longitude)
     return AzbaActiveZone(
         id=f"{payload.get('nof', 'NOTAM')}-{payload.get('series', '')}{payload.get('number', '')}/{payload.get('year', '')}",
@@ -383,7 +387,11 @@ async def _get_active_zrt_zones(
         async with httpx.AsyncClient(timeout=30.0) as client:
             page = await client.get(SOFIA_NOTAM_AREA_PAGE_URL)
             page.raise_for_status()
-            response = await client.post(SOFIA_NOTAM_AREA_URL, data=form_data)
+            response = await client.post(
+                SOFIA_NOTAM_AREA_URL,
+                content=urlencode(form_data).encode(),
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
             response.raise_for_status()
     except httpx.HTTPError as exc:
         raise AzbaClientError("Unable to retrieve SOFIA NOTAM data") from exc
@@ -478,6 +486,9 @@ async def evaluate_site_azba_constraints(
         return cached
 
     retrieved_at = _to_iso_utc(datetime.now(timezone.utc))
+    constraints: list[AzbaActiveZone] = []
+    latest_azba_date: str | None = None
+    azba_lookup_failed = False
     try:
         current_range = await _get_current_range()
         latest_azba_date = str(
@@ -491,44 +502,46 @@ async def evaluate_site_azba_constraints(
             _normalize_active_zone(item, site_lat, site_lon)
             for item in _extract_collection(active_payload)
         ]
-        constraints = [zone for zone in active_zones if _zone_matches_site(zone, radius)]
-        zrt_lookup_failed = False
-        try:
-            constraints.extend(await _get_active_zrt_zones(start, end, site_lat, site_lon, radius))
-        except AzbaClientError as exc:
-            zrt_lookup_failed = True
-            logger.warning("SOFIA ZRT evaluation failed for site %s: %s", site_id, exc)
-        status = "blocking" if constraints else "unknown" if zrt_lookup_failed else "clear"
-        result = {
-            "site_id": site_id,
-            "site_name": site_name,
-            "status": status,
-            "source": "SIA AZBA",
-            "source_url": AZBA_OFFICIAL_URL,
-            "retrieved_at": retrieved_at,
-            "valid_from": _to_iso_utc(start),
-            "valid_to": _to_iso_utc(end),
-            "radius_km": radius,
-            "latest_azba_date": latest_azba_date,
-            "constraints": [zone.__dict__ for zone in constraints],
-            "message": "Information ZRT indisponible depuis SOFIA." if zrt_lookup_failed else None,
-        }
+        constraints.extend(zone for zone in active_zones if _zone_matches_site(zone, radius))
     except AzbaClientError as exc:
+        azba_lookup_failed = True
         logger.warning("SIA AZBA evaluation failed for site %s: %s", site_id, exc)
-        result = {
-            "site_id": site_id,
-            "site_name": site_name,
-            "status": "unknown",
-            "source": "SIA AZBA",
-            "source_url": AZBA_OFFICIAL_URL,
-            "retrieved_at": retrieved_at,
-            "valid_from": _to_iso_utc(start),
-            "valid_to": _to_iso_utc(end),
-            "radius_km": radius,
-            "latest_azba_date": None,
-            "constraints": [],
-            "message": "Information AZBA indisponible depuis le SIA.",
-        }
+
+    zrt_lookup_failed = False
+    try:
+        constraints.extend(await _get_active_zrt_zones(start, end, site_lat, site_lon, radius))
+    except AzbaClientError as exc:
+        zrt_lookup_failed = True
+        logger.warning("SOFIA ZRT evaluation failed for site %s: %s", site_id, exc)
+
+    status = (
+        "blocking"
+        if constraints
+        else "unknown" if azba_lookup_failed or zrt_lookup_failed else "clear"
+    )
+    failed_sources = []
+    if azba_lookup_failed:
+        failed_sources.append("AZBA")
+    if zrt_lookup_failed:
+        failed_sources.append("ZRT")
+    result = {
+        "site_id": site_id,
+        "site_name": site_name,
+        "status": status,
+        "source": "SIA AZBA + SOFIA NOTAM",
+        "source_url": AZBA_OFFICIAL_URL,
+        "retrieved_at": retrieved_at,
+        "valid_from": _to_iso_utc(start),
+        "valid_to": _to_iso_utc(end),
+        "radius_km": radius,
+        "latest_azba_date": latest_azba_date,
+        "constraints": [zone.__dict__ for zone in constraints],
+        "message": (
+            f"Information {', '.join(failed_sources)} indisponible depuis les sources officielles."
+            if failed_sources
+            else None
+        ),
+    }
     if result["status"] != "unknown":
         _cache_set(cache_key, result)
     return result
