@@ -522,10 +522,10 @@
   "airspace": {
     "title": "Airspace constraints",
     "azba": {
-      "clearTitle": "No RTBA/AZBA activity detected",
-      "clearMessage": "No official RTBA/AZBA activity is detected around the site for the analyzed window.",
-      "blockingTitle": "RTBA/AZBA active nearby",
-      "blockingMessage": "Official RTBA/AZBA activity is detected around the site. Treat the flight as blocked until the official information has been checked.",
+      "clearTitle": "No active restricted zone detected",
+      "clearMessage": "No official RTBA, AZBA or ZRT activity is detected around the site for the analyzed window.",
+      "blockingTitle": "Active restricted zone nearby",
+      "blockingMessage": "Official RTBA, AZBA or ZRT activity is detected around the site. Treat the flight as blocked until the official information has been checked.",
       "unknownTitle": "AZBA information unavailable",
       "unknownMessage": "Official AZBA information could not be retrieved. Check the SIA directly before flying.",
       "officialLink": "Open SIA",
