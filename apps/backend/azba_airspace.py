@@ -334,7 +334,11 @@ def _normalize_zrt_notam(
     if coordinates is None:
         return None
     latitude, longitude = coordinates
-    radius_km = float(payload.get("radius") or 0) * 1.852
+    try:
+        radius_nm = float(payload.get("radius") or 0)
+    except (TypeError, ValueError):
+        radius_nm = 0.0
+    radius_km = radius_nm * 1.852
     center_distance_km = _haversine_km(site_lat, site_lon, latitude, longitude)
     return AzbaActiveZone(
         id=f"{payload.get('nof', 'NOTAM')}-{payload.get('series', '')}{payload.get('number', '')}/{payload.get('year', '')}",
@@ -383,7 +387,11 @@ async def _get_active_zrt_zones(
         async with httpx.AsyncClient(timeout=30.0) as client:
             page = await client.get(SOFIA_NOTAM_AREA_PAGE_URL)
             page.raise_for_status()
-            response = await client.post(SOFIA_NOTAM_AREA_URL, data=form_data)
+            response = await client.post(
+                SOFIA_NOTAM_AREA_URL,
+                content=urlencode(form_data).encode(),
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
             response.raise_for_status()
     except httpx.HTTPError as exc:
         raise AzbaClientError("Unable to retrieve SOFIA NOTAM data") from exc
