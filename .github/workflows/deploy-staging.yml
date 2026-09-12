@@ -2,7 +2,7 @@ name: Deploy PR staging
 
 on:
   pull_request_target:
-    types: [labeled, closed]
+    types: [labeled, unlabeled, closed]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -16,8 +16,8 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: staging-shared-${{ github.event_name }}
-  cancel-in-progress: true
+  group: staging-shared
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -301,21 +301,35 @@ jobs:
               return;
             }
 
+            const body = `${marker}\n🚀 **Shared staging updated from PR #${process.env.PR_NUMBER}**\n\n[Open staging](${stagingUrl})\n\nCommit: \`${process.env.PR_SHA.slice(0, 12)}\``;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number(process.env.PR_NUMBER),
+            });
+            const existing = comments.find((comment) => comment.user?.type === 'Bot' && comment.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: Number(process.env.PR_NUMBER), body });
+            }
+
   cleanup:
-    name: Stop staging after merge
+    name: Stop staging when PR is inactive
     if: >-
       github.event_name == 'pull_request_target' &&
-      github.event.action == 'closed' &&
-      github.event.pull_request.merged == true &&
+      (github.event.action == 'closed' ||
+      (github.event.action == 'unlabeled' && github.event.label.name == 'deploy-staging')) &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Stop staging when it serves the merged PR
+      - name: Stop staging when it serves the inactive PR
         uses: appleboy/ssh-action@v1.2.5
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           DEPLOY_PATH: ${{ secrets.STAGING_SSH_DEPLOY_PATH }}
+          VM_SHUTDOWN_COMMAND: ${{ secrets.STAGING_VM_SHUTDOWN_COMMAND }}
         with:
           host: ${{ secrets.STAGING_SSH_HOST || secrets.SSH_HOST }}
           username: ${{ secrets.STAGING_SSH_USER || secrets.SSH_USER }}
@@ -323,7 +337,7 @@ jobs:
           key: ${{ secrets.STAGING_SSH_KEY || secrets.SSH_KEY }}
           fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT || secrets.SSH_FINGERPRINT }}
           port: ${{ secrets.STAGING_SSH_PORT || secrets.SSH_PORT }}
-          envs: PR_NUMBER,DEPLOY_PATH
+          envs: PR_NUMBER,DEPLOY_PATH,VM_SHUTDOWN_COMMAND
           script: |
             set -eu
             STACK_DIR="$DEPLOY_PATH"
@@ -341,15 +355,7 @@ jobs:
               docker compose --env-file "$STACK_DIR/stack.env" -p "$PROJECT" -f docker-compose.yml down --remove-orphans
               rm -f "$STACK_DIR/current-pr"
             fi
-            const body = `${marker}\n🚀 **Shared staging updated from PR #${process.env.PR_NUMBER}**\n\n[Open staging](${stagingUrl})\n\nCommit: \`${process.env.PR_SHA.slice(0, 12)}\``;
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: Number(process.env.PR_NUMBER),
-            });
-            const existing = comments.find((comment) => comment.user?.type === 'Bot' && comment.body?.includes(marker));
-            if (existing) {
-              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
-            } else {
-              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: Number(process.env.PR_NUMBER), body });
-            }
+            if [ -n "$VM_SHUTDOWN_COMMAND" ]; then
+              echo "Scheduling configured staging VM shutdown"
+              nohup sh -c "$VM_SHUTDOWN_COMMAND" >/dev/null 2>&1 </dev/null &
+            fi
