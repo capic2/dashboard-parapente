@@ -127,8 +127,6 @@ jobs:
             BACKEND_DEPLOY_VERSION=0.0.0.${{ inputs.pr_number || github.event.pull_request.number }}
           build-contexts: |
             gopro-overlay-src=${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT || 'https://github.com/capic2/gopro-dashboard-overlay.git#main' }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
           tags: ${{ steps.pr.outputs.image }}
 
       - name: Prepare staging directory
