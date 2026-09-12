@@ -13,7 +13,7 @@ def test_enriched_gpx_is_cached_until_a_source_changes(tmp_path: Path) -> None:
     gpx_path.write_text("gpx", encoding="utf-8")
     osv_path.write_text("osv", encoding="utf-8")
 
-    def merge(*_args, **_kwargs):
+    def merge(_osv_paths: list[Path], _gpx_path: Path, output_dir: Path, **_kwargs: object) -> Path:
         merged_path.write_text("merged", encoding="utf-8")
         return merged_path
 
@@ -32,9 +32,9 @@ def test_enriched_gpx_serializes_concurrent_rebuilds(tmp_path: Path) -> None:
     gpx_path.write_text("gpx", encoding="utf-8")
     osv_path.write_text("osv", encoding="utf-8")
 
-    def merge(*args, **_kwargs):
+    def merge(_osv_paths: list[Path], _gpx_path: Path, output_dir: Path, **_kwargs: object) -> Path:
         sleep(0.02)
-        output_path = args[2] / "merged-gopro-overlay.gpx"
+        output_path = output_dir / "merged-gopro-overlay.gpx"
         output_path.write_text("merged", encoding="utf-8")
         return output_path
 
