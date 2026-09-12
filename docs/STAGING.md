@@ -14,6 +14,7 @@ Le workflow `.github/workflows/deploy-staging.yml` :
 - expose l'application publiquement via `STAGING_PUBLIC_URL` ;
 - publie l'URL dans un commentaire de la PR ;
 - remplace le contenu du staging précédent, sans créer de nouvel environnement.
+- arrête les conteneurs lorsque la PR actuellement déployée est fusionnée ; si une autre PR a été déployée entre-temps, le staging reste actif.
 
 Aucun déploiement n'est déclenché lors de la création ou de la mise à jour d'une PR. Pour tester un nouveau commit, relancer manuellement le workflow ou retirer puis remettre le label `deploy-staging`.
 

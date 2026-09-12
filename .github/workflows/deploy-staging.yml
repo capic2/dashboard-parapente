@@ -2,7 +2,7 @@ name: Deploy PR staging
 
 on:
   pull_request:
-    types: [labeled]
+    types: [labeled, closed]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -67,7 +67,7 @@ jobs:
       - name: Checkout PR
         uses: actions/checkout@v7
         with:
-          ref: refs/pull/${{ inputs.pr_number || github.event.pull_request.number }}/head
+          ref: ${{ steps.pr.outputs.sha }}
 
       - name: Checkout trusted Compose definition
         uses: actions/checkout@v7
@@ -171,6 +171,7 @@ jobs:
             docker compose --env-file "$DEPLOY_PATH/stack.env" -p "$PROJECT" -f docker-compose.yml up -d --remove-orphans
             for attempt in $(seq 1 30); do
               if curl --connect-timeout 2 --max-time 5 --fail --silent --show-error "http://127.0.0.1:$PORT/health" >/dev/null; then
+                printf '%s' "$PR_NUMBER" > "$STACK_DIR/current-pr"
                 echo "PR staging is healthy on port $PORT"
                 exit 0
               fi
@@ -194,6 +195,47 @@ jobs:
               core.setFailed('Missing STAGING_PUBLIC_URL secret');
               return;
             }
+
+  cleanup:
+    name: Stop staging after merge
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Stop staging when it serves the merged PR
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          DEPLOY_PATH: ${{ secrets.STAGING_SSH_DEPLOY_PATH }}
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          password: ${{ secrets.STAGING_SSH_PASSWORD }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT }}
+          port: ${{ secrets.STAGING_SSH_PORT }}
+          envs: PR_NUMBER,DEPLOY_PATH
+          script: |
+            set -eu
+            STACK_DIR="$DEPLOY_PATH"
+            PROJECT="dashboard-parapente-staging"
+            CURRENT_PR=""
+            if [ -f "$STACK_DIR/current-pr" ]; then
+              CURRENT_PR=$(tr -d '[:space:]' < "$STACK_DIR/current-pr")
+            fi
+            if [ "$CURRENT_PR" != "$PR_NUMBER" ]; then
+              echo "Staging currently serves PR ${CURRENT_PR:-unknown}; keeping it running"
+              exit 0
+            fi
+            if [ -f "$STACK_DIR/stack.env" ] && [ -f "$STACK_DIR/docker-compose.yml" ]; then
+              cd "$STACK_DIR"
+              docker compose --env-file "$STACK_DIR/stack.env" -p "$PROJECT" -f docker-compose.yml down --remove-orphans
+              rm -f "$STACK_DIR/current-pr"
+            fi
             const body = `${marker}\n🚀 **Shared staging updated from PR #${process.env.PR_NUMBER}**\n\n[Open staging](${stagingUrl})\n\nCommit: \`${process.env.PR_SHA.slice(0, 12)}\``;
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner: context.repo.owner,
