@@ -16,7 +16,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: staging-shared
+  group: staging-shared-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
