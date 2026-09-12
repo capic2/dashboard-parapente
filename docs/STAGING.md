@@ -7,6 +7,8 @@ Deux déclencheurs sont disponibles :
 - ajouter le label GitHub `deploy-staging` à une PR ;
 - ou ouvrir `Actions → Deploy PR staging → Run workflow`, saisir le numéro de PR, puis lancer le workflow.
 
+Le label `deploy-staging` est exclusif : lorsqu'il est ajouté à une PR, le workflow le retire automatiquement des autres PR ouvertes.
+
 Le workflow `.github/workflows/deploy-staging.yml` :
 
 - construit ou remplace l'image GHCR taguée `staging` ;

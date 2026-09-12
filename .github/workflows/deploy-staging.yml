@@ -35,6 +35,31 @@ jobs:
       PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
 
     steps:
+      - name: Keep staging label exclusive
+        if: github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'deploy-staging'
+        uses: actions/github-script@v8
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        with:
+          script: |
+            const labeledPullRequests = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'deploy-staging',
+              per_page: 100,
+            });
+            for (const pullRequest of labeledPullRequests) {
+              if (pullRequest.number === Number(process.env.PR_NUMBER)) continue;
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pullRequest.number,
+                name: 'deploy-staging',
+              });
+              core.info(`Removed deploy-staging from PR #${pullRequest.number}`);
+            }
+
       - name: Resolve PR commit
         id: pr
         uses: actions/github-script@v9
