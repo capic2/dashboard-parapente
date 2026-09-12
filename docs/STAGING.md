@@ -24,7 +24,13 @@ Aucun déploiement n'est déclenché lors de la création ou de la mise à jour 
 
 Créer un dossier par exemple `/home/capic/docker-data/dashboard-parapente-staging`. Si aucun `stack.env` staging n'existe, le workflow initialise automatiquement ce fichier depuis le `.env` ou `stack.env` de production déjà présent sur le serveur, puis surcharge les chemins persistants pour le staging. Ce dossier est réutilisé par toutes les PR et ne doit donc pas être suffixé par un numéro de PR.
 
-Le serveur doit disposer de Docker Compose, d'un accès sortant à GHCR et d'un chemin `GOPRO_OVERLAY_DATA_HOST_DIR` lisible par les conteneurs. Le port local `18001` doit être publié par un reverse proxy HTTPS ou rendu accessible par le pare-feu/NAT. La méthode recommandée est un sous-domaine tel que `https://staging.example.com` proxyfié vers `127.0.0.1:18001`.
+Le serveur doit disposer de Docker Compose, d'un accès sortant à GHCR et d'un chemin `GOPRO_OVERLAY_DATA_HOST_DIR` lisible par les conteneurs. Le port local `18001` doit être publié par un reverse proxy HTTPS ou rendu accessible par le pare-feu/NAT. Avec le domaine de production existant, créer une Custom Location `/staging` vers `192.168.1.106:18001` et ajouter cette réécriture dans sa configuration avancée Nginx :
+
+```nginx
+rewrite ^/staging(/.*)$ $1 break;
+```
+
+Elle retire le préfixe avant de transmettre la requête au backend. L'image staging est construite avec `VITE_BASE_PATH=/staging/` afin que ses assets, routes et appels API restent sous ce préfixe. Un sous-domaine dédié, par exemple `https://staging.example.com` vers `127.0.0.1:18001`, reste plus simple si cette configuration est possible.
 
 ## Secrets GitHub
 
