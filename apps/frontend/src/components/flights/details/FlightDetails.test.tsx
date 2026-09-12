@@ -691,6 +691,9 @@ describe('FlightDetails GoPro overlay action', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Video thumbnail')).toBeInTheDocument();
     expect(screen.getByText('New GoPro overlay')).toBeInTheDocument();
+    expect(
+      screen.getByText('New GoPro overlay').closest('.order-5')
+    ).toBeInTheDocument();
   });
 
   it('shows completed best moments in the available files and processing tabs', () => {
@@ -972,6 +975,9 @@ describe('FlightDetails GoPro overlay action', () => {
 
     expect(screen.getByText('overlay-1080p.mp4')).toBeInTheDocument();
     expect(screen.getByText('overlay-4k.mp4')).toBeInTheDocument();
+    expect(
+      document.getElementById('gopro-overlay-job-stack-panel')
+    ).toHaveClass('border-cyan-300');
     expect(
       screen.getByRole('button', { name: 'Hide overlay versions' })
     ).toHaveAttribute('aria-expanded', 'true');
