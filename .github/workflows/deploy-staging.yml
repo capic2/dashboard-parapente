@@ -99,7 +99,19 @@ jobs:
         with:
           ref: ${{ steps.pr.outputs.main_sha }}
           path: trusted-compose
-          sparse-checkout: docker-compose.yml
+          sparse-checkout: |
+            docker-compose.yml
+            Dockerfile
+            apps/frontend/vite.config.ts
+            apps/frontend/src/App.tsx
+            apps/frontend/src/lib/api.ts
+
+      - name: Apply trusted staging path support
+        run: |
+          cp trusted-compose/Dockerfile Dockerfile
+          cp trusted-compose/apps/frontend/vite.config.ts apps/frontend/vite.config.ts
+          cp trusted-compose/apps/frontend/src/App.tsx apps/frontend/src/App.tsx
+          cp trusted-compose/apps/frontend/src/lib/api.ts apps/frontend/src/lib/api.ts
 
       - name: Verify GoPro overlay build context
         env:
