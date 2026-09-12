@@ -1,4 +1,5 @@
 import asyncio
+import fcntl
 import fnmatch
 import json
 import logging
@@ -391,29 +392,42 @@ def ensure_enriched_gpx(
         "video_duration": video_duration,
         "first_gpx_at": first_gpx_at,
     }
-    if merged_gpx_path.is_file() and metadata_path.is_file():
+    lock_path = input_dir / "merged-gopro-overlay.lock"
+    with lock_path.open("a+") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
         try:
-            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            metadata = None
-        if metadata == signature:
-            return merged_gpx_path
+            if merged_gpx_path.is_file() and metadata_path.is_file():
+                try:
+                    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    metadata = None
+                if metadata == signature:
+                    return merged_gpx_path
 
-    merged_gpx_path = _merge_osv_files_with_gpx(
-        osv_paths,
-        gpx_path,
-        input_dir,
-        gpx_offset=0.0,
-        video_duration=video_duration,
-        first_gpx_at=first_gpx_at,
-    )
-    temporary_metadata_path = metadata_path.with_suffix(".tmp")
-    temporary_metadata_path.write_text(
-        json.dumps(signature, separators=(",", ":")),
-        encoding="utf-8",
-    )
-    temporary_metadata_path.replace(metadata_path)
-    return merged_gpx_path
+            staging_dir = input_dir / f".merged-gopro-overlay-{uuid.uuid4().hex}"
+            staging_dir.mkdir()
+            try:
+                staged_gpx_path = _merge_osv_files_with_gpx(
+                    osv_paths,
+                    gpx_path,
+                    staging_dir,
+                    gpx_offset=0.0,
+                    video_duration=video_duration,
+                    first_gpx_at=first_gpx_at,
+                )
+                staged_gpx_path.replace(merged_gpx_path)
+            finally:
+                shutil.rmtree(staging_dir, ignore_errors=True)
+
+            temporary_metadata_path = input_dir / f".{metadata_path.name}.{uuid.uuid4().hex}.tmp"
+            temporary_metadata_path.write_text(
+                json.dumps(signature, separators=(",", ":")),
+                encoding="utf-8",
+            )
+            temporary_metadata_path.replace(metadata_path)
+            return merged_gpx_path
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
 def _output_path_for_video(video_path: Path, output_name: str) -> Path:
