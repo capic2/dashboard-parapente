@@ -6,6 +6,9 @@ import App from './App';
 // oxlint-disable-next-line import/no-unassigned-import
 import './App.css';
 import { initTheme } from './stores/themeStore';
+import { appTitle } from './lib/appEnvironment';
+
+document.title = appTitle;
 
 // Initialiser MSW en mode développement (peut être désactivé via VITE_ENABLE_MSW=false)
 async function enableMocking() {
