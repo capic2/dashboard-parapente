@@ -873,9 +873,6 @@ export function FlightDetails({
             <h2 className="text-lg font-bold text-slate-950 dark:text-white">
               {t('flights.mediaPageTitle')}
             </h2>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-              {t('flights.mediaPageDescription')}
-            </p>
           </div>
         </div>
       </header>
@@ -1048,7 +1045,7 @@ export function FlightDetails({
             />
           )}
           {visibleGoproOverlays.length === 0 && (
-            <div className="flex min-h-48 flex-col justify-between rounded-xl border border-dashed border-cyan-300 bg-cyan-50/60 p-3 dark:border-cyan-800 dark:bg-cyan-950/20">
+            <div className="order-5 flex min-h-48 flex-col justify-between rounded-xl border border-dashed border-cyan-300 bg-cyan-50/60 p-3 dark:border-cyan-800 dark:bg-cyan-950/20">
               <div>
                 <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
                   <Wand2 className="h-5 w-5" aria-hidden="true" />

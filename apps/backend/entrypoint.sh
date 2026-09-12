@@ -11,7 +11,7 @@ fi
 echo "Initializing database..."
 if [ "${ENVIRONMENT:-production}" = "staging" ]; then
     python init_database.py
-    python -c "from seed_flights import seed_flights; print(f'✅ Sample flights created: {seed_flights()}')"
+    python -c "from seed_flights import seed_flights; print(f'✅ Sample flights created: {seed_flights(include_media=True)}')"
 else
     python -c "from database import Base, engine; Base.metadata.create_all(bind=engine); print('✅ Database tables created')"
 fi
