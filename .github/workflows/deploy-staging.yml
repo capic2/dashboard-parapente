@@ -246,6 +246,7 @@ jobs:
             printf '%s' "$GHCR_READ_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
             cd "$STACK_DIR"
             ENV_FILE="$STACK_DIR/stack.env"
+            docker compose --env-file "$ENV_FILE" -p "$PROJECT" -f docker-compose.yml config --quiet
             docker compose --env-file "$ENV_FILE" -p "$PROJECT" -f docker-compose.yml pull
             docker compose --env-file "$ENV_FILE" -p "$PROJECT" -f docker-compose.yml up -d --remove-orphans
             for attempt in $(seq 1 30); do
