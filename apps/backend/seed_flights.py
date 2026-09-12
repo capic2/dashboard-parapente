@@ -63,14 +63,17 @@ def ensure_sample_media(db: Session, flights: list[Flight]) -> int:
 
     for index, flight in enumerate(flights):
         directory = flight_directory(db, flight)
-        for filename in ("camera.mp4", "pano.mp4", "final.mp4"):
+        for filename in ("flight.mp4", "camera.mp4", "pano.mp4", "final.mp4"):
             path = directory / filename
             if not path.is_file():
                 create_sample_video(path, colors[index % len(colors)])
                 created_count += 1
 
+        video_path = (directory / "flight.mp4").resolve()
         pano_path = (directory / "pano.mp4").resolve()
         overlay_path = (directory / "final.mp4").resolve()
+        flight.video_file_path = str(video_path)
+        flight.video_export_status = "completed"
         flight.pano_video_file_path = str(pano_path)
         flight.gopro_overlay_file_path = str(overlay_path)
         flight.gopro_overlay_status = "completed"
