@@ -6,7 +6,7 @@ import { queryClient } from './lib/queryClient';
 import { routeTree } from './routeTree.gen';
 import { JobNotifications } from './components/common/JobNotifications';
 
-const router = createRouter({ routeTree });
+const router = createRouter({ routeTree, basepath: import.meta.env.BASE_URL });
 
 declare module '@tanstack/react-router' {
   interface Register {

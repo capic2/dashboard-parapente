@@ -1,0 +1,355 @@
+name: Deploy PR staging
+
+on:
+  pull_request_target:
+    types: [labeled, closed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR number to deploy
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  packages: write
+  pull-requests: write
+
+concurrency:
+  group: staging-shared-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy shared staging
+    if: >-
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request_target' && github.event.action == 'labeled' &&
+      github.event.label.name == 'deploy-staging')) &&
+      (github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 120
+    env:
+      PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
+
+    steps:
+      - name: Keep staging label exclusive
+        if: github.event_name == 'pull_request_target' && github.event.action == 'labeled' && github.event.label.name == 'deploy-staging'
+        uses: actions/github-script@v9
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        with:
+          script: |
+            const labeledPullRequests = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'deploy-staging',
+              per_page: 100,
+            });
+            for (const pullRequest of labeledPullRequests) {
+              if (pullRequest.number === Number(process.env.PR_NUMBER)) continue;
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pullRequest.number,
+                name: 'deploy-staging',
+              });
+              core.info(`Removed deploy-staging from PR #${pullRequest.number}`);
+            }
+
+      - name: Resolve PR commit
+        id: pr
+        uses: actions/github-script@v9
+        env:
+          PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: Number(process.env.PR_NUMBER),
+            });
+            if (pr.state !== 'open') {
+              core.setFailed(`PR #${process.env.PR_NUMBER} is not open`);
+              return;
+            }
+            if (pr.head.repo?.full_name !== context.payload.repository.full_name) {
+              core.setFailed('Fork PRs cannot be deployed with staging secrets');
+              return;
+            }
+            const { data: defaultBranch } = await github.rest.repos.getBranch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: context.payload.repository.default_branch,
+            });
+            core.setOutput('sha', pr.head.sha);
+            core.setOutput('main_sha', defaultBranch.commit.sha);
+            core.setOutput('image', `ghcr.io/${context.repo.owner}/${context.repo.repo}/backend:staging`);
+
+      - name: Checkout PR
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.pr.outputs.sha }}
+
+      - name: Checkout trusted Compose definition
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.pr.outputs.main_sha }}
+          path: trusted-compose
+          sparse-checkout: |
+            docker-compose.yml
+            Dockerfile
+            apps/frontend/vite.config.ts
+            apps/frontend/src/App.tsx
+            apps/frontend/src/lib/api.ts
+
+      - name: Apply trusted staging path support
+        run: |
+          cp trusted-compose/Dockerfile Dockerfile
+          cp trusted-compose/apps/frontend/vite.config.ts apps/frontend/vite.config.ts
+          cp trusted-compose/apps/frontend/src/App.tsx apps/frontend/src/App.tsx
+          cp trusted-compose/apps/frontend/src/lib/api.ts apps/frontend/src/lib/api.ts
+
+      - name: Verify GoPro overlay build context
+        env:
+          GOPRO_OVERLAY_BUILD_CONTEXT: ${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT || 'https://github.com/capic2/gopro-dashboard-overlay.git#main' }}
+        run: test -n "$GOPRO_OVERLAY_BUILD_CONTEXT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and push PR image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          build-args: |
+            VITE_CESIUM_ION_TOKEN=${{ secrets.VITE_CESIUM_ION_TOKEN }}
+            VITE_BASE_PATH=/staging/
+            BACKEND_DEPLOY_VERSION=0.0.0.${{ inputs.pr_number || github.event.pull_request.number }}
+          build-contexts: |
+            gopro-overlay-src=${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT || 'https://github.com/capic2/gopro-dashboard-overlay.git#main' }}
+          tags: ${{ steps.pr.outputs.image }}
+
+      - name: Prepare staging directory
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST || secrets.SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER || secrets.SSH_USER }}
+          password: ${{ secrets.STAGING_SSH_PASSWORD || secrets.SSH_PASSWORD }}
+          key: ${{ secrets.STAGING_SSH_KEY || secrets.SSH_KEY }}
+          fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT || secrets.SSH_FINGERPRINT }}
+          port: ${{ secrets.STAGING_SSH_PORT || secrets.SSH_PORT }}
+          script: |
+            set -eu
+            mkdir -p "${{ secrets.STAGING_SSH_DEPLOY_PATH }}"
+
+      - name: Upload Compose definition
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST || secrets.SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER || secrets.SSH_USER }}
+          password: ${{ secrets.STAGING_SSH_PASSWORD || secrets.SSH_PASSWORD }}
+          key: ${{ secrets.STAGING_SSH_KEY || secrets.SSH_KEY }}
+          fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT || secrets.SSH_FINGERPRINT }}
+          port: ${{ secrets.STAGING_SSH_PORT || secrets.SSH_PORT }}
+          source: trusted-compose/docker-compose.yml
+          target: ${{ secrets.STAGING_SSH_DEPLOY_PATH }}
+          strip_components: 1
+
+      - name: Start PR staging stack
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          PR_NUMBER: ${{ env.PR_NUMBER }}
+          GHCR_IMAGE: ${{ steps.pr.outputs.image }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+          DEPLOY_PATH: ${{ secrets.STAGING_SSH_DEPLOY_PATH }}
+          PROD_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST || secrets.SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER || secrets.SSH_USER }}
+          password: ${{ secrets.STAGING_SSH_PASSWORD || secrets.SSH_PASSWORD }}
+          key: ${{ secrets.STAGING_SSH_KEY || secrets.SSH_KEY }}
+          fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT || secrets.SSH_FINGERPRINT }}
+          port: ${{ secrets.STAGING_SSH_PORT || secrets.SSH_PORT }}
+          envs: PR_NUMBER,GHCR_IMAGE,GHCR_USERNAME,GHCR_READ_TOKEN,DEPLOY_PATH,PROD_DEPLOY_PATH
+          script: |
+            set -eu
+            STACK_DIR="$DEPLOY_PATH"
+            PROJECT="dashboard-parapente-staging"
+            PORT=18001
+            export CI_BACKEND_IMAGE="$GHCR_IMAGE"
+            export CONTAINER_PREFIX="parapente-staging"
+            export ENVIRONMENT=staging
+            export BACKEND_HOST_PORT="$PORT"
+            export REDIS_HOST_PORT=0
+            export DATABASE_HOST_DIR="$STACK_DIR/data/db"
+            export REDIS_HOST_DIR="$STACK_DIR/data/redis"
+            export VIDEO_EXPORT_HOST_DIR="$STACK_DIR/data/videos"
+            export VIDEO_TEMP_IMAGES_HOST_DIR="$STACK_DIR/data/video-temp-images"
+            export EMAGRAM_CACHE_HOST_DIR="$STACK_DIR/data/emagram-cache"
+            export CODEX_HOME_HOST_DIR="$STACK_DIR/data/codex"
+            export DATABASE_BACKUP_HOST_DIR="$STACK_DIR/data/backups"
+            mkdir -p "$DATABASE_HOST_DIR" "$REDIS_HOST_DIR" "$VIDEO_EXPORT_HOST_DIR" "$VIDEO_TEMP_IMAGES_HOST_DIR" "$EMAGRAM_CACHE_HOST_DIR" "$CODEX_HOME_HOST_DIR" "$DATABASE_BACKUP_HOST_DIR"
+
+            bootstrap_from_portainer() {
+              for volume_name in portainer_data portainer; do
+                if ! docker volume inspect "$volume_name" >/dev/null 2>&1; then
+                  continue
+                fi
+
+                temp_env_file="$STACK_DIR/.stack.env.tmp.$$"
+                if docker run --rm \
+                  -v "$volume_name:/data:ro" \
+                  docker:27-cli sh -ceu '
+                    for compose_file in /data/compose/*/docker-compose.yml /data/compose/*/compose.yml; do
+                      [ -f "$compose_file" ] || continue
+                      if ! grep -q "dashboard-parapente" "$compose_file" && ! grep -q "parapente-backend" "$compose_file"; then
+                        continue
+                      fi
+                      compose_dir=$(dirname "$compose_file")
+                      for env_file in stack.env .env; do
+                        if [ -f "$compose_dir/$env_file" ]; then
+                          cat "$compose_dir/$env_file"
+                          exit 0
+                        fi
+                      done
+                    done
+                    exit 1
+                  ' > "$temp_env_file"; then
+                  mv "$temp_env_file" "$STACK_DIR/stack.env"
+                  chmod 600 "$STACK_DIR/stack.env"
+                  echo "Bootstrapped staging stack.env from the Portainer volume"
+                  return 0
+                fi
+                rm -f "$temp_env_file"
+              done
+              return 1
+            }
+
+            if [ ! -f "$STACK_DIR/stack.env" ]; then
+              for candidate in "$PROD_DEPLOY_PATH/stack.env" "$PROD_DEPLOY_PATH/.env"; do
+                if [ -f "$candidate" ]; then
+                  cp "$candidate" "$STACK_DIR/stack.env"
+                  chmod 600 "$STACK_DIR/stack.env"
+                  echo "Bootstrapped staging stack.env from the existing server configuration"
+                  break
+                fi
+              done
+            fi
+            if [ ! -f "$STACK_DIR/stack.env" ]; then
+              bootstrap_from_portainer || true
+            fi
+            if [ -f "$STACK_DIR/stack.env" ] && [ ! -r "$STACK_DIR/stack.env" ]; then
+              temp_env_file="$STACK_DIR/.stack.env.recover.$$"
+              if docker run --rm \
+                -v "$STACK_DIR:/staging:ro" \
+                docker:27-cli sh -ceu 'cat /staging/stack.env' > "$temp_env_file"; then
+                mv "$temp_env_file" "$STACK_DIR/stack.env"
+                chmod 600 "$STACK_DIR/stack.env"
+                echo "Recovered unreadable staging stack.env ownership"
+              else
+                rm -f "$temp_env_file"
+              fi
+            fi
+            if [ ! -f "$STACK_DIR/stack.env" ]; then
+              echo "Missing staging stack.env and no production environment file was found"
+              exit 1
+            fi
+            printf '%s' "$GHCR_READ_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+            cd "$STACK_DIR"
+            ENV_FILE="$STACK_DIR/stack.env"
+            docker compose --env-file "$ENV_FILE" -p "$PROJECT" -f docker-compose.yml config --quiet
+            docker compose --env-file "$ENV_FILE" -p "$PROJECT" -f docker-compose.yml pull
+            docker compose --env-file "$ENV_FILE" -p "$PROJECT" -f docker-compose.yml up -d --remove-orphans
+            for attempt in $(seq 1 30); do
+              if curl --connect-timeout 2 --max-time 5 --fail --silent --show-error "http://127.0.0.1:$PORT/health" >/dev/null; then
+                printf '%s' "$PR_NUMBER" > "$STACK_DIR/current-pr"
+                echo "PR staging is healthy on port $PORT"
+                exit 0
+              fi
+              sleep 5
+            done
+            docker compose --env-file "$ENV_FILE" -p "$PROJECT" -f docker-compose.yml ps
+            docker compose --env-file "$ENV_FILE" -p "$PROJECT" -f docker-compose.yml logs --tail 100 backend
+            exit 1
+
+      - name: Comment staging URL on PR
+        uses: actions/github-script@v9
+        env:
+          STAGING_PUBLIC_URL: ${{ secrets.STAGING_PUBLIC_URL }}
+          PR_NUMBER: ${{ env.PR_NUMBER }}
+          PR_SHA: ${{ steps.pr.outputs.sha }}
+        with:
+          script: |
+            const marker = '<!-- pr-staging-url -->';
+            const stagingUrl = process.env.STAGING_PUBLIC_URL?.replace(/\/$/, '');
+            if (!stagingUrl) {
+              core.setFailed('Missing STAGING_PUBLIC_URL secret');
+              return;
+            }
+
+  cleanup:
+    name: Stop staging after merge
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Stop staging when it serves the merged PR
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          DEPLOY_PATH: ${{ secrets.STAGING_SSH_DEPLOY_PATH }}
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST || secrets.SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER || secrets.SSH_USER }}
+          password: ${{ secrets.STAGING_SSH_PASSWORD || secrets.SSH_PASSWORD }}
+          key: ${{ secrets.STAGING_SSH_KEY || secrets.SSH_KEY }}
+          fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT || secrets.SSH_FINGERPRINT }}
+          port: ${{ secrets.STAGING_SSH_PORT || secrets.SSH_PORT }}
+          envs: PR_NUMBER,DEPLOY_PATH
+          script: |
+            set -eu
+            STACK_DIR="$DEPLOY_PATH"
+            PROJECT="dashboard-parapente-staging"
+            CURRENT_PR=""
+            if [ -f "$STACK_DIR/current-pr" ]; then
+              CURRENT_PR=$(tr -d '[:space:]' < "$STACK_DIR/current-pr")
+            fi
+            if [ "$CURRENT_PR" != "$PR_NUMBER" ]; then
+              echo "Staging currently serves PR ${CURRENT_PR:-unknown}; keeping it running"
+              exit 0
+            fi
+            if [ -f "$STACK_DIR/stack.env" ] && [ -f "$STACK_DIR/docker-compose.yml" ]; then
+              cd "$STACK_DIR"
+              docker compose --env-file "$STACK_DIR/stack.env" -p "$PROJECT" -f docker-compose.yml down --remove-orphans
+              rm -f "$STACK_DIR/current-pr"
+            fi
+            const body = `${marker}\n🚀 **Shared staging updated from PR #${process.env.PR_NUMBER}**\n\n[Open staging](${stagingUrl})\n\nCommit: \`${process.env.PR_SHA.slice(0, 12)}\``;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number(process.env.PR_NUMBER),
+            });
+            const existing = comments.find((comment) => comment.user?.type === 'Bot' && comment.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: Number(process.env.PR_NUMBER), body });
+            }

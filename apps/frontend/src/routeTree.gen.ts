@@ -19,6 +19,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SitesRouteImport } from './routes/sites'
 import { Route as ThermalRouteImport } from './routes/thermal'
+import { Route as ThermalAnalysisRouteImport } from './routes/thermal-analysis'
 import { Route as WeatherRouteImport } from './routes/weather'
 import { Route as FlightsFlightIdRouteImport } from './routes/flights.$flightId'
 import { Route as InfrastructureTabRouteImport } from './routes/infrastructure.$tab'
@@ -76,6 +77,11 @@ const ThermalRoute = ThermalRouteImport.update({
   path: '/thermal',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/thermal.lazy').then((d) => d.Route))
+const ThermalAnalysisRoute = ThermalAnalysisRouteImport.update({
+  id: '/thermal-analysis',
+  path: '/thermal-analysis',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WeatherRoute = WeatherRouteImport.update({
   id: '/weather',
   path: '/weather',
@@ -114,6 +120,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
+  '/thermal-analysis': typeof ThermalAnalysisRoute
   '/weather': typeof WeatherRoute
   '/flights/$flightId': typeof FlightsFlightIdRoute
   '/infrastructure/$tab': typeof InfrastructureTabRoute
@@ -130,6 +137,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
+  '/thermal-analysis': typeof ThermalAnalysisRoute
   '/weather': typeof WeatherRoute
   '/flights/$flightId': typeof FlightsFlightIdRoute
   '/infrastructure/$tab': typeof InfrastructureTabRoute
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
+  '/thermal-analysis': typeof ThermalAnalysisRoute
   '/weather': typeof WeatherRoute
   '/flights/$flightId': typeof FlightsFlightIdRoute
   '/infrastructure/$tab': typeof InfrastructureTabRoute
@@ -165,6 +174,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/sites'
     | '/thermal'
+    | '/thermal-analysis'
     | '/weather'
     | '/flights/$flightId'
     | '/infrastructure/$tab'
@@ -181,6 +191,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/sites'
     | '/thermal'
+    | '/thermal-analysis'
     | '/weather'
     | '/flights/$flightId'
     | '/infrastructure/$tab'
@@ -197,6 +208,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/sites'
     | '/thermal'
+    | '/thermal-analysis'
     | '/weather'
     | '/flights/$flightId'
     | '/infrastructure/$tab'
@@ -214,6 +226,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SitesRoute: typeof SitesRoute
   ThermalRoute: typeof ThermalRoute
+  ThermalAnalysisRoute: typeof ThermalAnalysisRoute
   WeatherRoute: typeof WeatherRoute
   ViewerFlightIdRoute: typeof ViewerFlightIdRoute
 }
@@ -290,6 +303,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ThermalRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/thermal-analysis': {
+      id: '/thermal-analysis'
+      path: '/thermal-analysis'
+      fullPath: '/thermal-analysis'
+      preLoaderRoute: typeof ThermalAnalysisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/weather': {
       id: '/weather'
       path: '/weather'
@@ -355,6 +375,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SitesRoute: SitesRoute,
   ThermalRoute: ThermalRoute,
+  ThermalAnalysisRoute: ThermalAnalysisRoute,
   WeatherRoute: WeatherRoute,
   ViewerFlightIdRoute: ViewerFlightIdRoute,
 }

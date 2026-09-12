@@ -57,6 +57,23 @@ def test_normalizes_gzipped_gpx_and_calculates_stats():
     assert stats["duration_minutes"] == 1
 
 
+def test_prefers_gpx_speed_extension_in_meters_per_second() -> None:
+    gpx = b"""<gpx xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
+    <trk><trkseg>
+    <trkpt lat="47.2" lon="6.0"><time>2026-07-01T10:00:00Z</time>
+      <extensions><gpxtpx:TrackPointExtension><gpxtpx:speed>10</gpxtpx:speed></gpxtpx:TrackPointExtension></extensions>
+    </trkpt>
+    <trkpt lat="47.2001" lon="6.0001"><time>2026-07-01T10:00:01Z</time>
+      <extensions><gpxtpx:TrackPointExtension><gpxtpx:speed>13.333333</gpxtpx:speed></gpxtpx:TrackPointExtension></extensions>
+    </trkpt>
+    </trkseg></trk></gpx>"""
+
+    _, points = normalize_track(gpx, "gpx")
+
+    assert calculate_track_stats(points)["max_speed_kmh"] == 48.0
+    assert b"<gpxtpx:speed>13.333333" in normalize_track(gpx, "gpx")[0]
+
+
 def test_normalizes_tcx():
     tcx = b"""<TrainingCenterDatabase><Activities><Activity><Lap><Track><Trackpoint>
     <Time>2026-07-01T10:00:00Z</Time><Position><LatitudeDegrees>47.2</LatitudeDegrees>

@@ -9,10 +9,12 @@ import path from 'path';
 const cesiumBuildRootPath = path.resolve(__dirname, '../../node_modules/cesium/Build');
 const cesiumBuildPath = path.join(cesiumBuildRootPath, 'Cesium');
 const workspaceRoot = path.resolve(__dirname, '../..');
+const appBasePath = process.env.VITE_BASE_PATH || '/';
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
   root: __dirname,
+  base: appBasePath,
   resolve: {
     dedupe: ['react', 'react-dom'],
     alias: {
