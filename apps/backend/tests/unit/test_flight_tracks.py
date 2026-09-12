@@ -74,6 +74,54 @@ def test_prefers_gpx_speed_extension_in_meters_per_second() -> None:
     assert b"<gpxtpx:speed>13.333333" in normalize_track(gpx, "gpx")[0]
 
 
+def test_prefers_tcx_speed_in_meters_per_second() -> None:
+    tcx = b"""<TrainingCenterDatabase><Activities><Activity><Lap><Track>
+    <Trackpoint><Time>2026-07-01T10:00:00Z</Time><Position>
+      <LatitudeDegrees>47.2</LatitudeDegrees><LongitudeDegrees>6.0</LongitudeDegrees>
+    </Position><Extensions><TPX><Speed>13.333333</Speed></TPX></Extensions></Trackpoint>
+    </Track></Lap></Activity></Activities></TrainingCenterDatabase>"""
+
+    _, points = normalize_track(tcx, "tcx")
+
+    assert points[0]["speed_kmh"] == pytest.approx(48.0)
+
+
+def test_prefers_fit_speed_over_point_to_point_speed(monkeypatch: pytest.MonkeyPatch) -> None:
+    frames = [
+        FakeFitDataMessage(
+            {
+                "position_lat": 47.2,
+                "position_long": 6.0,
+                "timestamp": datetime(2026, 7, 1, 10, tzinfo=timezone.utc),
+                "speed": 13.333333,
+            }
+        ),
+        FakeFitDataMessage(
+            {
+                "position_lat": 47.2001,
+                "position_long": 6.0001,
+                "timestamp": datetime(2026, 7, 1, 10, 0, 1, tzinfo=timezone.utc),
+                "speed": 8.0,
+            }
+        ),
+    ]
+    install_fitdecode_mock(monkeypatch, frames)
+
+    _, points = normalize_track(b"fit-data", "fit")
+
+    assert calculate_track_stats(points)["max_speed_kmh"] == pytest.approx(48.0, abs=0.01)
+
+
+def test_normalizes_igc_and_calculates_point_to_point_speed() -> None:
+    igc = b"""AXXX\nHFDTEDATE:010726,01\nB1000004700000N00600000EA000000040000\nB1000014700001N00600001EA000000040000\n"""
+
+    _, points = normalize_track(igc, "igc")
+
+    assert len(points) == 2
+    assert points[0]["timestamp"] > 0
+    assert calculate_track_stats(points)["max_speed_kmh"] > 0
+
+
 def test_normalizes_tcx():
     tcx = b"""<TrainingCenterDatabase><Activities><Activity><Lap><Track><Trackpoint>
     <Time>2026-07-01T10:00:00Z</Time><Position><LatitudeDegrees>47.2</LatitudeDegrees>
