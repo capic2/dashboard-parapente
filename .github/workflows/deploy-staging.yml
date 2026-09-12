@@ -2,7 +2,7 @@ name: Deploy PR staging
 
 on:
   pull_request_target:
-    types: [labeled, unlabeled, closed]
+    types: [labeled, synchronize, unlabeled, closed]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -25,7 +25,9 @@ jobs:
     if: >-
       (github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'pull_request_target' && github.event.action == 'labeled' &&
-      github.event.label.name == 'deploy-staging')) &&
+      github.event.label.name == 'deploy-staging') ||
+      (github.event_name == 'pull_request_target' && github.event.action == 'synchronize' &&
+      contains(github.event.pull_request.labels.*.name, 'deploy-staging'))) &&
       (github.event_name == 'workflow_dispatch' ||
       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
@@ -128,6 +130,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
+      - name: Verify staging deployment is still current before build
+        uses: actions/github-script@v9
+        env:
+          PR_NUMBER: ${{ env.PR_NUMBER }}
+          EXPECTED_SHA: ${{ steps.pr.outputs.sha }}
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: Number(process.env.PR_NUMBER),
+            });
+            const hasStagingLabel = pr.labels.some((label) => label.name === 'deploy-staging');
+            if (pr.state !== 'open' || pr.head.sha !== process.env.EXPECTED_SHA || !hasStagingLabel) {
+              core.setFailed(`Refusing stale staging build for PR #${process.env.PR_NUMBER}`);
+            }
+
       - name: Build and push PR image
         uses: docker/build-push-action@v7
         with:
@@ -167,6 +186,23 @@ jobs:
           source: trusted-compose/docker-compose.yml
           target: ${{ secrets.STAGING_SSH_DEPLOY_PATH }}
           strip_components: 1
+
+      - name: Verify staging deployment is still current before update
+        uses: actions/github-script@v9
+        env:
+          PR_NUMBER: ${{ env.PR_NUMBER }}
+          EXPECTED_SHA: ${{ steps.pr.outputs.sha }}
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: Number(process.env.PR_NUMBER),
+            });
+            const hasStagingLabel = pr.labels.some((label) => label.name === 'deploy-staging');
+            if (pr.state !== 'open' || pr.head.sha !== process.env.EXPECTED_SHA || !hasStagingLabel) {
+              core.setFailed(`Refusing stale staging update for PR #${process.env.PR_NUMBER}`);
+            }
 
       - name: Start PR staging stack
         uses: appleboy/ssh-action@v1.2.5
