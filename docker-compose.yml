@@ -1,12 +1,12 @@
 services:
   redis:
     image: redis:8.10-alpine
-    container_name: parapente-redis
+    container_name: ${CONTAINER_PREFIX:-parapente}-redis
     restart: unless-stopped
     ports:
-      - '6379:6379'
+      - '${REDIS_HOST_PORT:-6379}:6379'
     volumes:
-      - /home/capic/docker-data/dashboard-parapente/redis:/data
+      - ${REDIS_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/redis}:/data
     command: redis-server --save 60 1 --loglevel warning --maxmemory 256mb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
@@ -19,10 +19,10 @@ services:
 
   backend:
     image: ${CI_BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
-    container_name: parapente-backend
+    container_name: ${CONTAINER_PREFIX:-parapente}-backend
     restart: unless-stopped
     ports:
-      - '8001:8001'
+      - '${BACKEND_HOST_PORT:-8001}:8001'
     labels:
       project: dashboard-parapente
       service: backend
@@ -148,7 +148,7 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - /home/capic/docker-data/dashboard-parapente/db:/app/db
+      - ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}:/app/db
       - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
       - ${VIDEO_TEMP_IMAGES_HOST_DIR:-/media/nas/DS211_Synology_2/parapente/video-temp-images}:${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
       - ${EMAGRAM_CACHE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/emagram-cache}:${BACKEND_EMAGRAM_CACHE_DIR:-/app/emagram-cache}
@@ -165,7 +165,7 @@ services:
 
   database-backup:
     image: ${CI_BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
-    container_name: parapente-database-backup
+    container_name: ${CONTAINER_PREFIX:-parapente}-database-backup
     restart: unless-stopped
     command: ['/bin/sh', '/app/database_backup.sh']
     labels:
@@ -180,7 +180,7 @@ services:
       backend:
         condition: service_healthy
     volumes:
-      - /home/capic/docker-data/dashboard-parapente/db:/app/db:ro
+      - ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}:/app/db:ro
       # This must be storage outside the application host (for example the NAS).
       - ${DATABASE_BACKUP_HOST_DIR:?DATABASE_BACKUP_HOST_DIR is required}:/backups
     read_only: true
@@ -199,7 +199,7 @@ services:
 
   backend-worker:
     image: ${CI_BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
-    container_name: parapente-backend-worker
+    container_name: ${CONTAINER_PREFIX:-parapente}-backend-worker
     restart: unless-stopped
     command: ['python', 'job_worker.py']
     labels:
@@ -256,7 +256,7 @@ services:
       backend:
         condition: service_healthy
     volumes:
-      - /home/capic/docker-data/dashboard-parapente/db:/app/db
+      - ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}:/app/db
       - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
       - ${VIDEO_TEMP_IMAGES_HOST_DIR:-/media/nas/DS211_Synology_2/parapente/video-temp-images}:${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
       - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
@@ -275,7 +275,7 @@ services:
 
   highlight-video-worker:
     image: ${CI_BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
-    container_name: parapente-highlight-video-worker
+    container_name: ${CONTAINER_PREFIX:-parapente}-highlight-video-worker
     restart: unless-stopped
     command: ['python', 'highlight_video_rq_worker.py']
     labels:
@@ -308,7 +308,7 @@ services:
       backend:
         condition: service_healthy
     volumes:
-      - /home/capic/docker-data/dashboard-parapente/db:/app/db
+      - ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}:/app/db
       - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
       - ${VIDEO_TEMP_IMAGES_HOST_DIR:-/media/nas/DS211_Synology_2/parapente/video-temp-images}:${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
       - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
@@ -327,7 +327,7 @@ services:
 
   youtube-upload-worker:
     image: ${CI_BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
-    container_name: parapente-youtube-upload-worker
+    container_name: ${CONTAINER_PREFIX:-parapente}-youtube-upload-worker
     restart: unless-stopped
     command: ['python', 'youtube_upload_worker.py']
     labels:
@@ -361,7 +361,7 @@ services:
       backend:
         condition: service_healthy
     volumes:
-      - /home/capic/docker-data/dashboard-parapente/db:/app/db
+      - ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}:/app/db
       - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
       - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
     healthcheck:
@@ -379,7 +379,7 @@ services:
 
   gopro-overlay-worker:
     image: ${CI_BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
-    container_name: parapente-gopro-overlay-worker
+    container_name: ${CONTAINER_PREFIX:-parapente}-gopro-overlay-worker
     # This worker may be stopped during a deployment while an ffmpeg child is
     # still running. Always restart it so queued jobs cannot remain orphaned.
     restart: always
@@ -436,7 +436,7 @@ services:
       backend:
         condition: service_healthy
     volumes:
-      - /home/capic/docker-data/dashboard-parapente/db:/app/db
+      - ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}:/app/db
       - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
       - ${VIDEO_TEMP_IMAGES_HOST_DIR:-/media/nas/DS211_Synology_2/parapente/video-temp-images}:${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
       - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
