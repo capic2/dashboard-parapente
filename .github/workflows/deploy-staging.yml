@@ -239,6 +239,18 @@ jobs:
             if [ ! -f "$STACK_DIR/stack.env" ]; then
               bootstrap_from_portainer || true
             fi
+            if [ -f "$STACK_DIR/stack.env" ] && [ ! -r "$STACK_DIR/stack.env" ]; then
+              temp_env_file="$STACK_DIR/.stack.env.recover.$$"
+              if docker run --rm \
+                -v "$STACK_DIR:/staging:ro" \
+                docker:27-cli sh -ceu 'cat /staging/stack.env' > "$temp_env_file"; then
+                mv "$temp_env_file" "$STACK_DIR/stack.env"
+                chmod 600 "$STACK_DIR/stack.env"
+                echo "Recovered unreadable staging stack.env ownership"
+              else
+                rm -f "$temp_env_file"
+              fi
+            fi
             if [ ! -f "$STACK_DIR/stack.env" ]; then
               echo "Missing staging stack.env and no production environment file was found"
               exit 1
