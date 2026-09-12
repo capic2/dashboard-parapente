@@ -197,9 +197,9 @@ jobs:
                   continue
                 fi
 
+                temp_env_file="$STACK_DIR/.stack.env.tmp.$$"
                 if docker run --rm \
                   -v "$volume_name:/data:ro" \
-                  -v "$STACK_DIR:/staging" \
                   docker:27-cli sh -ceu '
                     for compose_file in /data/compose/*/docker-compose.yml /data/compose/*/compose.yml; do
                       [ -f "$compose_file" ] || continue
@@ -209,17 +209,19 @@ jobs:
                       compose_dir=$(dirname "$compose_file")
                       for env_file in stack.env .env; do
                         if [ -f "$compose_dir/$env_file" ]; then
-                          cp "$compose_dir/$env_file" /staging/stack.env
+                          cat "$compose_dir/$env_file"
                           exit 0
                         fi
                       done
                     done
                     exit 1
-                  '; then
+                  ' > "$temp_env_file"; then
+                  mv "$temp_env_file" "$STACK_DIR/stack.env"
                   chmod 600 "$STACK_DIR/stack.env"
                   echo "Bootstrapped staging stack.env from the Portainer volume"
                   return 0
                 fi
+                rm -f "$temp_env_file"
               done
               return 1
             }
