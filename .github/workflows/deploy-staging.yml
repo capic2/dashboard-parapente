@@ -1,7 +1,7 @@
 name: Deploy PR staging
 
 on:
-  pull_request:
+  pull_request_target:
     types: [labeled, closed]
   workflow_dispatch:
     inputs:
@@ -24,7 +24,7 @@ jobs:
     name: Deploy shared staging
     if: >-
       (github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request' && github.event.action == 'labeled' &&
+      (github.event_name == 'pull_request_target' && github.event.action == 'labeled' &&
       github.event.label.name == 'deploy-staging')) &&
       (github.event_name == 'workflow_dispatch' ||
       github.event.pull_request.head.repo.full_name == github.repository)
@@ -36,7 +36,7 @@ jobs:
 
     steps:
       - name: Keep staging label exclusive
-        if: github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'deploy-staging'
+        if: github.event_name == 'pull_request_target' && github.event.action == 'labeled' && github.event.label.name == 'deploy-staging'
         uses: actions/github-script@v9
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -224,7 +224,7 @@ jobs:
   cleanup:
     name: Stop staging after merge
     if: >-
-      github.event_name == 'pull_request' &&
+      github.event_name == 'pull_request_target' &&
       github.event.action == 'closed' &&
       github.event.pull_request.merged == true &&
       github.event.pull_request.head.repo.full_name == github.repository
