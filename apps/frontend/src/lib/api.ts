@@ -9,7 +9,8 @@ type ApiErrorPayload = {
 let _apiLogsEnabled = import.meta.env.DEV;
 
 const apiBaseUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
-const apiPrefix = apiBaseUrl ? `${apiBaseUrl}/api` : '/api';
+const appBasePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+const apiPrefix = apiBaseUrl ? `${apiBaseUrl}/api` : `${appBasePath}/api`;
 
 export function getApiUrl(path: string) {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
@@ -68,7 +69,7 @@ export let api = ky.create({
           const { isAuthenticated, logout } = useAuthStore.getState();
           if (isAuthenticated) {
             logout();
-            window.location.href = '/login';
+            window.location.href = `${appBasePath}/login`;
           }
         }
 
