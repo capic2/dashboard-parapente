@@ -190,6 +190,40 @@ jobs:
             export CODEX_HOME_HOST_DIR="$STACK_DIR/data/codex"
             export DATABASE_BACKUP_HOST_DIR="$STACK_DIR/data/backups"
             mkdir -p "$DATABASE_HOST_DIR" "$REDIS_HOST_DIR" "$VIDEO_EXPORT_HOST_DIR" "$VIDEO_TEMP_IMAGES_HOST_DIR" "$EMAGRAM_CACHE_HOST_DIR" "$CODEX_HOME_HOST_DIR" "$DATABASE_BACKUP_HOST_DIR"
+
+            bootstrap_from_portainer() {
+              for volume_name in portainer_data portainer; do
+                if ! docker volume inspect "$volume_name" >/dev/null 2>&1; then
+                  continue
+                fi
+
+                if docker run --rm \
+                  -v "$volume_name:/data:ro" \
+                  -v "$STACK_DIR:/staging" \
+                  docker:27-cli sh -ceu '
+                    for compose_file in /data/compose/*/docker-compose.yml /data/compose/*/compose.yml; do
+                      [ -f "$compose_file" ] || continue
+                      if ! grep -q "dashboard-parapente" "$compose_file" && ! grep -q "parapente-backend" "$compose_file"; then
+                        continue
+                      fi
+                      compose_dir=$(dirname "$compose_file")
+                      for env_file in stack.env .env; do
+                        if [ -f "$compose_dir/$env_file" ]; then
+                          cp "$compose_dir/$env_file" /staging/stack.env
+                          exit 0
+                        fi
+                      done
+                    done
+                    exit 1
+                  '; then
+                  chmod 600 "$STACK_DIR/stack.env"
+                  echo "Bootstrapped staging stack.env from the Portainer volume"
+                  return 0
+                fi
+              done
+              return 1
+            }
+
             if [ ! -f "$STACK_DIR/stack.env" ]; then
               for candidate in "$PROD_DEPLOY_PATH/stack.env" "$PROD_DEPLOY_PATH/.env"; do
                 if [ -f "$candidate" ]; then
@@ -201,13 +235,17 @@ jobs:
               done
             fi
             if [ ! -f "$STACK_DIR/stack.env" ]; then
+              bootstrap_from_portainer || true
+            fi
+            if [ ! -f "$STACK_DIR/stack.env" ]; then
               echo "Missing staging stack.env and no production environment file was found"
               exit 1
             fi
             printf '%s' "$GHCR_READ_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
             cd "$STACK_DIR"
-            docker compose --env-file "$DEPLOY_PATH/stack.env" -p "$PROJECT" -f docker-compose.yml pull
-            docker compose --env-file "$DEPLOY_PATH/stack.env" -p "$PROJECT" -f docker-compose.yml up -d --remove-orphans
+            ENV_FILE="$STACK_DIR/stack.env"
+            docker compose --env-file "$ENV_FILE" -p "$PROJECT" -f docker-compose.yml pull
+            docker compose --env-file "$ENV_FILE" -p "$PROJECT" -f docker-compose.yml up -d --remove-orphans
             for attempt in $(seq 1 30); do
               if curl --connect-timeout 2 --max-time 5 --fail --silent --show-error "http://127.0.0.1:$PORT/health" >/dev/null; then
                 printf '%s' "$PR_NUMBER" > "$STACK_DIR/current-pr"
@@ -216,8 +254,8 @@ jobs:
               fi
               sleep 5
             done
-            docker compose --env-file "$DEPLOY_PATH/stack.env" -p "$PROJECT" -f docker-compose.yml ps
-            docker compose --env-file "$DEPLOY_PATH/stack.env" -p "$PROJECT" -f docker-compose.yml logs --tail 100 backend
+            docker compose --env-file "$ENV_FILE" -p "$PROJECT" -f docker-compose.yml ps
+            docker compose --env-file "$ENV_FILE" -p "$PROJECT" -f docker-compose.yml logs --tail 100 backend
             exit 1
 
       - name: Comment staging URL on PR
