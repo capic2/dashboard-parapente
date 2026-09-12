@@ -134,12 +134,12 @@ jobs:
       - name: Prepare staging directory
         uses: appleboy/ssh-action@v1.2.5
         with:
-          host: ${{ secrets.STAGING_SSH_HOST }}
-          username: ${{ secrets.STAGING_SSH_USER }}
-          password: ${{ secrets.STAGING_SSH_PASSWORD }}
-          key: ${{ secrets.STAGING_SSH_KEY }}
-          fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT }}
-          port: ${{ secrets.STAGING_SSH_PORT }}
+          host: ${{ secrets.STAGING_SSH_HOST || secrets.SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER || secrets.SSH_USER }}
+          password: ${{ secrets.STAGING_SSH_PASSWORD || secrets.SSH_PASSWORD }}
+          key: ${{ secrets.STAGING_SSH_KEY || secrets.SSH_KEY }}
+          fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT || secrets.SSH_FINGERPRINT }}
+          port: ${{ secrets.STAGING_SSH_PORT || secrets.SSH_PORT }}
           script: |
             set -eu
             mkdir -p "${{ secrets.STAGING_SSH_DEPLOY_PATH }}"
@@ -147,12 +147,12 @@ jobs:
       - name: Upload Compose definition
         uses: appleboy/scp-action@v1.0.0
         with:
-          host: ${{ secrets.STAGING_SSH_HOST }}
-          username: ${{ secrets.STAGING_SSH_USER }}
-          password: ${{ secrets.STAGING_SSH_PASSWORD }}
-          key: ${{ secrets.STAGING_SSH_KEY }}
-          fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT }}
-          port: ${{ secrets.STAGING_SSH_PORT }}
+          host: ${{ secrets.STAGING_SSH_HOST || secrets.SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER || secrets.SSH_USER }}
+          password: ${{ secrets.STAGING_SSH_PASSWORD || secrets.SSH_PASSWORD }}
+          key: ${{ secrets.STAGING_SSH_KEY || secrets.SSH_KEY }}
+          fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT || secrets.SSH_FINGERPRINT }}
+          port: ${{ secrets.STAGING_SSH_PORT || secrets.SSH_PORT }}
           source: trusted-compose/docker-compose.yml
           target: ${{ secrets.STAGING_SSH_DEPLOY_PATH }}
 
@@ -165,12 +165,12 @@ jobs:
           GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
           DEPLOY_PATH: ${{ secrets.STAGING_SSH_DEPLOY_PATH }}
         with:
-          host: ${{ secrets.STAGING_SSH_HOST }}
-          username: ${{ secrets.STAGING_SSH_USER }}
-          password: ${{ secrets.STAGING_SSH_PASSWORD }}
-          key: ${{ secrets.STAGING_SSH_KEY }}
-          fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT }}
-          port: ${{ secrets.STAGING_SSH_PORT }}
+          host: ${{ secrets.STAGING_SSH_HOST || secrets.SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER || secrets.SSH_USER }}
+          password: ${{ secrets.STAGING_SSH_PASSWORD || secrets.SSH_PASSWORD }}
+          key: ${{ secrets.STAGING_SSH_KEY || secrets.SSH_KEY }}
+          fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT || secrets.SSH_FINGERPRINT }}
+          port: ${{ secrets.STAGING_SSH_PORT || secrets.SSH_PORT }}
           envs: PR_NUMBER,GHCR_IMAGE,GHCR_USERNAME,GHCR_READ_TOKEN,DEPLOY_PATH
           script: |
             set -eu
@@ -237,12 +237,12 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           DEPLOY_PATH: ${{ secrets.STAGING_SSH_DEPLOY_PATH }}
         with:
-          host: ${{ secrets.STAGING_SSH_HOST }}
-          username: ${{ secrets.STAGING_SSH_USER }}
-          password: ${{ secrets.STAGING_SSH_PASSWORD }}
-          key: ${{ secrets.STAGING_SSH_KEY }}
-          fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT }}
-          port: ${{ secrets.STAGING_SSH_PORT }}
+          host: ${{ secrets.STAGING_SSH_HOST || secrets.SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER || secrets.SSH_USER }}
+          password: ${{ secrets.STAGING_SSH_PASSWORD || secrets.SSH_PASSWORD }}
+          key: ${{ secrets.STAGING_SSH_KEY || secrets.SSH_KEY }}
+          fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT || secrets.SSH_FINGERPRINT }}
+          port: ${{ secrets.STAGING_SSH_PORT || secrets.SSH_PORT }}
           envs: PR_NUMBER,DEPLOY_PATH
           script: |
             set -eu

@@ -28,6 +28,6 @@ Le serveur doit disposer de Docker Compose, d'un accès sortant à GHCR et d'un 
 
 ## Secrets GitHub
 
-Configurer les secrets suivants : `STAGING_SSH_HOST`, `STAGING_SSH_USER`, `STAGING_SSH_PORT`, `STAGING_SSH_DEPLOY_PATH`, `STAGING_PUBLIC_URL`, `GHCR_READ_TOKEN`, ainsi qu'un mot de passe ou une clé SSH (`STAGING_SSH_PASSWORD` ou `STAGING_SSH_KEY`). `STAGING_SSH_FINGERPRINT` est recommandé.
+Configurer `STAGING_SSH_DEPLOY_PATH`, `STAGING_PUBLIC_URL` et `GHCR_READ_TOKEN`. Pour SSH, le workflow réutilise les secrets `SSH_HOST`, `SSH_USER`, `SSH_PORT`, `SSH_PASSWORD` ou `SSH_KEY` et `SSH_FINGERPRINT` déjà utilisés par la production ; des secrets `STAGING_SSH_*` peuvent les remplacer si nécessaire.
 
 Le workflow est volontairement limité aux PR dont la branche source appartient au même dépôt : cela évite d'exécuter du code d'une fork avec les secrets de déploiement.
