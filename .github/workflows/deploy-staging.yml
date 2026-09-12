@@ -16,7 +16,8 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: staging-shared
+  # Keep legacy pull_request runs from cancelling the trusted deployment run.
+  group: staging-shared-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
