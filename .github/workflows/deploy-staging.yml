@@ -202,7 +202,8 @@ jobs:
             export EMAGRAM_CACHE_HOST_DIR="$STACK_DIR/data/emagram-cache"
             export CODEX_HOME_HOST_DIR="$STACK_DIR/data/codex"
             export DATABASE_BACKUP_HOST_DIR="$STACK_DIR/data/backups"
-            mkdir -p "$DATABASE_HOST_DIR" "$REDIS_HOST_DIR" "$VIDEO_EXPORT_HOST_DIR" "$VIDEO_TEMP_IMAGES_HOST_DIR" "$EMAGRAM_CACHE_HOST_DIR" "$CODEX_HOME_HOST_DIR" "$DATABASE_BACKUP_HOST_DIR"
+            export GOPRO_OVERLAY_DATA_HOST_DIR="$STACK_DIR/data/parapente"
+            mkdir -p "$DATABASE_HOST_DIR" "$REDIS_HOST_DIR" "$VIDEO_EXPORT_HOST_DIR" "$VIDEO_TEMP_IMAGES_HOST_DIR" "$EMAGRAM_CACHE_HOST_DIR" "$CODEX_HOME_HOST_DIR" "$DATABASE_BACKUP_HOST_DIR" "$GOPRO_OVERLAY_DATA_HOST_DIR"
 
             bootstrap_from_portainer() {
               for volume_name in portainer_data portainer; do
