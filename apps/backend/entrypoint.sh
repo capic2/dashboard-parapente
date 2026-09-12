@@ -9,7 +9,12 @@ if [ -f "$CODEX_HOME/auth.json" ]; then
 fi
 
 echo "Initializing database..."
-python -c "from database import Base, engine; Base.metadata.create_all(bind=engine); print('✅ Database tables created')"
+if [ "${ENVIRONMENT:-production}" = "staging" ]; then
+    python init_database.py
+    python -c "from seed_flights import seed_flights; print(f'✅ Sample flights created: {seed_flights()}')"
+else
+    python -c "from database import Base, engine; Base.metadata.create_all(bind=engine); print('✅ Database tables created')"
+fi
 
 # SQL migrations are run automatically by run_migrations() in main.py at import time.
 # No need to run them manually here.

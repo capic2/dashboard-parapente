@@ -17,6 +17,7 @@ import { Button } from '@dashboard-parapente/design-system';
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore, type ThemePreference } from '../../stores/themeStore';
 import { requestJobNotificationPermission } from '../../hooks/useJobNotifications';
+import { appTitle } from '../../lib/appEnvironment';
 
 const linkClass =
   'px-3.5 py-2 rounded-md text-gray-600 dark:text-gray-300 text-sm transition-all hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-sky-600 [&.active]:bg-sky-600 [&.active]:text-white';
@@ -108,7 +109,7 @@ export default function Header() {
   return (
     <header className="mb-4 flex items-center justify-between gap-2.5 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg shadow-slate-200/60 dark:border-slate-700 dark:bg-slate-900/95 dark:shadow-black/25">
       <h1 className="text-2xl sm:text-xl text-sky-600 dark:text-sky-400 font-semibold min-w-0 sm:min-w-[200px] m-0 truncate">
-        {t('header.title')}
+        {appTitle}
       </h1>
 
       {/* Desktop navigation */}
