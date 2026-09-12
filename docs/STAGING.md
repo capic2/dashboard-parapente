@@ -16,7 +16,8 @@ Le workflow `.github/workflows/deploy-staging.yml` :
 - expose l'application publiquement via `STAGING_PUBLIC_URL` ;
 - publie l'URL dans un commentaire de la PR ;
 - remplace le contenu du staging précédent, sans créer de nouvel environnement.
-- arrête les conteneurs lorsque la PR actuellement déployée est fusionnée ; si une autre PR a été déployée entre-temps, le staging reste actif.
+- arrête les conteneurs lorsque le label est retiré ou lorsque la PR actuellement déployée est fermée ; si une autre PR a été déployée entre-temps, le staging reste actif.
+- conserve le dossier, `stack.env` et les données persistantes ; la VM peut aussi être arrêtée avec `STAGING_VM_SHUTDOWN_COMMAND`.
 
 Aucun déploiement n'est déclenché lors de la création ou de la mise à jour d'une PR. Pour tester un nouveau commit, relancer manuellement le workflow ou retirer puis remettre le label `deploy-staging`.
 
@@ -35,5 +36,7 @@ Elle retire le préfixe avant de transmettre la requête au backend. L'image sta
 ## Secrets GitHub
 
 Configurer `STAGING_SSH_DEPLOY_PATH`, `STAGING_PUBLIC_URL` et `GHCR_READ_TOKEN`. Pour SSH, le workflow réutilise les secrets `SSH_HOST`, `SSH_USER`, `SSH_PORT`, `SSH_PASSWORD` ou `SSH_KEY` et `SSH_FINGERPRINT` déjà utilisés par la production ; des secrets `STAGING_SSH_*` peuvent les remplacer si nécessaire.
+
+`STAGING_VM_SHUTDOWN_COMMAND` est optionnel. S'il est défini, il est exécuté en tâche détachée après l'arrêt du stack, par exemple `sudo shutdown -h now`. Ne le configurer que si l'hôte SSH est une VM dédiée au staging : les valeurs SSH retombent sinon sur celles de production. La VM doit être rallumée par un mécanisme externe avant un nouveau déploiement, car GitHub Actions ne peut pas se connecter à une VM arrêtée.
 
 Le workflow est volontairement limité aux PR dont la branche source appartient au même dépôt : cela évite d'exécuter du code d'une fork avec les secrets de déploiement.
