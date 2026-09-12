@@ -37,7 +37,7 @@ jobs:
     steps:
       - name: Resolve PR commit
         id: pr
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
         with:
@@ -182,7 +182,7 @@ jobs:
             exit 1
 
       - name: Comment staging URL on PR
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           STAGING_PUBLIC_URL: ${{ secrets.STAGING_PUBLIC_URL }}
           PR_NUMBER: ${{ env.PR_NUMBER }}
