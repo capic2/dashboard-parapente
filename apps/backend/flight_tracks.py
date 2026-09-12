@@ -2,7 +2,7 @@ import gzip
 import io
 import math
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, TypedDict
 
 from spots.distance import haversine_distance
@@ -196,7 +196,64 @@ def _parse_tcx(content: bytes) -> list[TrackPoint]:
                 point["heart_rate"] = int(float(heart_rate))
             if power:
                 point["power"] = int(float(power))
+            speed = _child_text(element, "Speed")
+            if speed:
+                speed_mps = float(speed)
+                if math.isfinite(speed_mps) and speed_mps >= 0:
+                    # TCX Speed values are meters per second.
+                    point["speed_kmh"] = speed_mps * 3.6
             _append_point(points, point)
+    return points
+
+
+def _parse_igc(content: bytes) -> list[TrackPoint]:
+    flight_date: date | None = None
+    points: list[TrackPoint] = []
+    for raw_line in content.decode("ascii", errors="ignore").splitlines():
+        line = raw_line.strip()
+        if line.startswith(("HFDTE", "HFDTEDATE")):
+            date_text = line.split(":", 1)[-1][0:6]
+            if len(date_text) == 6 and date_text.isdigit():
+                day, month, year = int(date_text[0:2]), int(date_text[2:4]), int(date_text[4:6])
+                flight_date = date(2000 + year if year < 50 else 1900 + year, month, day)
+            continue
+        if not line.startswith("B") or len(line) < 35:
+            continue
+        try:
+            hours, minutes, seconds = int(line[1:3]), int(line[3:5]), int(line[5:7])
+            latitude = int(line[7:9]) + (int(line[9:11]) + int(line[11:14]) / 1000) / 60
+            if line[14] == "S":
+                latitude = -latitude
+            longitude = int(line[15:18]) + (int(line[18:20]) + int(line[20:23]) / 1000) / 60
+            if line[23] == "W":
+                longitude = -longitude
+            elevation = float(int(line[30:35]))
+            timestamp = 0
+            if flight_date is not None:
+                timestamp = int(
+                    datetime(
+                        flight_date.year,
+                        flight_date.month,
+                        flight_date.day,
+                        hours,
+                        minutes,
+                        seconds,
+                        tzinfo=timezone.utc,
+                    ).timestamp()
+                    * 1000
+                )
+            _append_point(
+                points,
+                {
+                    "lat": latitude,
+                    "lon": longitude,
+                    "elevation": elevation,
+                    "timestamp": timestamp,
+                    "segment": 0,
+                },
+            )
+        except (ValueError, IndexError):
+            continue
     return points
 
 
@@ -233,6 +290,14 @@ def _parse_fit(content: bytes) -> list[TrackPoint]:
                 point["heart_rate"] = int(heart_rate)
             if power is not None:
                 point["power"] = int(power)
+            speed = frame.get_value("enhanced_speed", fallback=None)
+            if speed is None:
+                speed = frame.get_value("speed", fallback=None)
+            if speed is not None:
+                speed_mps = float(speed)
+                if math.isfinite(speed_mps) and speed_mps >= 0:
+                    # FIT speed values are meters per second.
+                    point["speed_kmh"] = speed_mps * 3.6
             _append_point(points, point)
     return points
 
@@ -248,6 +313,8 @@ def normalize_track(content: bytes, file_type: str) -> tuple[bytes, list[TrackPo
         points = _parse_gpx(decoded)
     elif normalized_type == "tcx":
         points = _parse_tcx(decoded)
+    elif normalized_type == "igc":
+        points = _parse_igc(decoded)
     else:
         raise ValueError(f"Unsupported original activity file type: {file_type or 'unknown'}")
     if not points:
@@ -303,6 +370,19 @@ def track_to_gpx(points: list[TrackPoint]) -> bytes:
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
+def _precise_haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Return segment distance in km without the display-oriented rounding."""
+    radius_km = 6371.0
+    lat1_rad, lat2_rad = math.radians(lat1), math.radians(lat2)
+    delta_lat = math.radians(lat2 - lat1)
+    delta_lon = math.radians(lon2 - lon1)
+    haversine = (
+        math.sin(delta_lat / 2) ** 2
+        + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon / 2) ** 2
+    )
+    return radius_km * 2 * math.atan2(math.sqrt(haversine), math.sqrt(1 - haversine))
+
+
 def calculate_track_stats(points: list[TrackPoint]) -> dict[str, Any]:
     elevations = [point.get("elevation", 0.0) for point in points]
     distance = sum(
@@ -336,7 +416,7 @@ def calculate_track_stats(points: list[TrackPoint]) -> dict[str, Any]:
             elapsed = current.get("timestamp", 0) - previous.get("timestamp", 0)
             if elapsed <= 0:
                 continue
-            segment_distance = haversine_distance(
+            segment_distance = _precise_haversine_distance(
                 previous["lat"], previous["lon"], current["lat"], current["lon"]
             )
             speed = segment_distance / (elapsed / 3_600_000)
