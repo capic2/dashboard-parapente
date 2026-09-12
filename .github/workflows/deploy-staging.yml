@@ -37,7 +37,7 @@ jobs:
     steps:
       - name: Keep staging label exclusive
         if: github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'deploy-staging'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         with:
