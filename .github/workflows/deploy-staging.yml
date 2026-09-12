@@ -162,6 +162,7 @@ jobs:
           GHCR_USERNAME: ${{ github.actor }}
           GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
           DEPLOY_PATH: ${{ secrets.STAGING_SSH_DEPLOY_PATH }}
+          PROD_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
         with:
           host: ${{ secrets.STAGING_SSH_HOST || secrets.SSH_HOST }}
           username: ${{ secrets.STAGING_SSH_USER || secrets.SSH_USER }}
@@ -169,7 +170,7 @@ jobs:
           key: ${{ secrets.STAGING_SSH_KEY || secrets.SSH_KEY }}
           fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT || secrets.SSH_FINGERPRINT }}
           port: ${{ secrets.STAGING_SSH_PORT || secrets.SSH_PORT }}
-          envs: PR_NUMBER,GHCR_IMAGE,GHCR_USERNAME,GHCR_READ_TOKEN,DEPLOY_PATH
+          envs: PR_NUMBER,GHCR_IMAGE,GHCR_USERNAME,GHCR_READ_TOKEN,DEPLOY_PATH,PROD_DEPLOY_PATH
           script: |
             set -eu
             STACK_DIR="$DEPLOY_PATH"
@@ -188,6 +189,20 @@ jobs:
             export CODEX_HOME_HOST_DIR="$STACK_DIR/data/codex"
             export DATABASE_BACKUP_HOST_DIR="$STACK_DIR/data/backups"
             mkdir -p "$DATABASE_HOST_DIR" "$REDIS_HOST_DIR" "$VIDEO_EXPORT_HOST_DIR" "$VIDEO_TEMP_IMAGES_HOST_DIR" "$EMAGRAM_CACHE_HOST_DIR" "$CODEX_HOME_HOST_DIR" "$DATABASE_BACKUP_HOST_DIR"
+            if [ ! -f "$STACK_DIR/stack.env" ]; then
+              for candidate in "$PROD_DEPLOY_PATH/stack.env" "$PROD_DEPLOY_PATH/.env"; do
+                if [ -f "$candidate" ]; then
+                  cp "$candidate" "$STACK_DIR/stack.env"
+                  chmod 600 "$STACK_DIR/stack.env"
+                  echo "Bootstrapped staging stack.env from the existing server configuration"
+                  break
+                fi
+              done
+            fi
+            if [ ! -f "$STACK_DIR/stack.env" ]; then
+              echo "Missing staging stack.env and no production environment file was found"
+              exit 1
+            fi
             printf '%s' "$GHCR_READ_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
             cd "$STACK_DIR"
             docker compose --env-file "$DEPLOY_PATH/stack.env" -p "$PROJECT" -f docker-compose.yml pull

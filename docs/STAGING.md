@@ -22,7 +22,7 @@ Aucun déploiement n'est déclenché lors de la création ou de la mise à jour 
 
 ## Préparation du serveur
 
-Créer un dossier par exemple `/home/capic/docker-data/dashboard-parapente-staging`, puis un fichier `/home/capic/docker-data/dashboard-parapente-staging/stack.env` (le workflow ne crée pas de secrets). Ce dossier est réutilisé par toutes les PR et ne doit donc pas être suffixé par un numéro de PR. Le fichier doit contenir les variables requises par `docker-compose.yml`, notamment la base SQLite, les tokens backend, `GOPRO_OVERLAY_DATA_HOST_DIR` et `BACKEND_VERSION_STATE_FILE=/app/db/version_state.json`.
+Créer un dossier par exemple `/home/capic/docker-data/dashboard-parapente-staging`. Si aucun `stack.env` staging n'existe, le workflow initialise automatiquement ce fichier depuis le `.env` ou `stack.env` de production déjà présent sur le serveur, puis surcharge les chemins persistants pour le staging. Ce dossier est réutilisé par toutes les PR et ne doit donc pas être suffixé par un numéro de PR.
 
 Le serveur doit disposer de Docker Compose, d'un accès sortant à GHCR et d'un chemin `GOPRO_OVERLAY_DATA_HOST_DIR` lisible par les conteneurs. Le port local `18001` doit être publié par un reverse proxy HTTPS ou rendu accessible par le pare-feu/NAT. La méthode recommandée est un sous-domaine tel que `https://staging.example.com` proxyfié vers `127.0.0.1:18001`.
 
