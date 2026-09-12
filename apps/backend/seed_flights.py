@@ -5,16 +5,84 @@ Creates realistic flight data with GPX files
 """
 
 import random
+import subprocess
 import sys
 import uuid
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from sqlalchemy.orm import Session
+
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from database import SessionLocal
+from flight_storage import flight_directory
 from models import Flight, Site
+
+SAMPLE_FLIGHT_TITLES = {
+    "Vol d'initiation Arguel",
+    "Cross-country Mont Poupet",
+    "Vol thermique La Côte",
+    "Soaring Arguel",
+    "Vol du soir Mont Poupet",
+}
+
+
+def create_sample_video(video_path: Path, color: str) -> None:
+    """Create a tiny valid MP4 that is suitable for staging smoke tests."""
+    video_path.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            f"color=c={color}:s=640x360:r=30",
+            "-t",
+            "1",
+            "-an",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
+            "-y",
+            str(video_path),
+        ],
+        check=True,
+    )
+
+
+def ensure_sample_media(db: Session, flights: list[Flight]) -> int:
+    """Create the camera, pano, and overlay files used by staging fixtures."""
+    created_count = 0
+    colors = ("0x24527a", "0x6b4f8a", "0x39734a", "0x8a633b", "0x7a3f54")
+
+    for index, flight in enumerate(flights):
+        directory = flight_directory(db, flight)
+        for filename in ("camera.mp4", "pano.mp4", "final.mp4"):
+            path = directory / filename
+            if not path.is_file():
+                create_sample_video(path, colors[index % len(colors)])
+                created_count += 1
+
+        pano_path = (directory / "pano.mp4").resolve()
+        overlay_path = (directory / "final.mp4").resolve()
+        flight.pano_video_file_path = str(pano_path)
+        flight.gopro_overlay_file_path = str(overlay_path)
+        flight.gopro_overlay_status = "completed"
+
+    return created_count
+
+
+def is_sample_flight(flight: Flight) -> bool:
+    """Identify flights created by this seed without touching imported flights."""
+    return flight.title in SAMPLE_FLIGHT_TITLES and (flight.notes or "").startswith(
+        "Sample flight created for testing."
+    )
 
 
 def create_sample_gpx(
@@ -82,7 +150,7 @@ def create_sample_gpx(
     return gpx_path
 
 
-def seed_flights(force: bool = False) -> int:
+def seed_flights(force: bool = False, include_media: bool = False) -> int:
     """Seed an empty database with sample flights and return the count created."""
     db = SessionLocal()
 
@@ -95,6 +163,12 @@ def seed_flights(force: bool = False) -> int:
         # Check if flights already exist
         existing_flights = db.query(Flight).count()
         if existing_flights > 0 and not force:
+            if include_media:
+                sample_flights = [
+                    flight for flight in db.query(Flight).all() if is_sample_flight(flight)
+                ]
+                ensure_sample_media(db, sample_flights)
+                db.commit()
             return 0
         if existing_flights > 0:
             response = input("Delete and recreate? (y/N): ")
@@ -185,6 +259,9 @@ def seed_flights(force: bool = False) -> int:
             db.add(flight)
             created_count += 1
 
+        db.flush()
+        if include_media:
+            ensure_sample_media(db, list(db.query(Flight).all()))
         db.commit()
         return created_count
 
