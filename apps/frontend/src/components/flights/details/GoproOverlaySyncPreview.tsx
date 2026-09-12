@@ -207,6 +207,17 @@ export function GoproOverlaySyncPreview({
             manualOffset
           }
           onTimeChange={setVideoTime}
+          overlayContent={
+            <div className="flex gap-2 rounded-lg bg-slate-950/75 px-3 py-2 font-mono text-xs text-white shadow-lg backdrop-blur-sm">
+              <span>
+                {telemetry ? `${Math.round(telemetry.elevation)} m` : '--'}
+              </span>
+              <span>
+                {telemetry ? `${telemetry.speedKmh.toFixed(1)} km/h` : '--'}
+              </span>
+              <span>{heartRate === null ? '--' : `${heartRate} bpm`}</span>
+            </div>
+          }
         />
         <div className="flex items-center justify-between px-3 py-2 font-mono text-xs text-gray-200">
           <span>{t('flights.goproOverlayVideoTime')}</span>

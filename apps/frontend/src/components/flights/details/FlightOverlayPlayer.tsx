@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DefaultVideoLayout,
@@ -28,6 +34,7 @@ interface FlightOverlayPlayerProps {
   syncOffsetSeconds?: number;
   getFlightTime?: (cameraTime: number) => number;
   onTimeChange?: (time: number) => void;
+  overlayContent?: ReactNode;
 }
 
 function clamp(value: number, minimum: number, maximum: number) {
@@ -42,6 +49,7 @@ export function FlightOverlayPlayer({
   syncOffsetSeconds = 0,
   getFlightTime,
   onTimeChange,
+  overlayContent,
 }: FlightOverlayPlayerProps) {
   const { t } = useTranslation();
   const playerRef = useRef<MediaPlayerInstance>(null);
@@ -153,6 +161,11 @@ export function FlightOverlayPlayer({
             <Repeat2 className="h-3.5 w-3.5" aria-hidden="true" />
             {cameraIsMain ? flightLabel : cameraLabel}
           </button>
+        )}
+        {overlayContent && (
+          <div className="pointer-events-none absolute left-3 top-3 z-30">
+            {overlayContent}
+          </div>
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2 border-t border-gray-800 bg-gray-950 px-3 py-2">
