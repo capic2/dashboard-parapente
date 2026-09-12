@@ -666,12 +666,6 @@ export function FlightDetails({
           </div>
         )}
 
-        <GoproOverlaySyncPreview
-          flightId={flight.id}
-          offset={goproOverlayGpxOffset}
-          onOffsetChange={handleGoproOverlayOffsetChange}
-        />
-
         <div className="flex flex-col gap-1">
           <label
             htmlFor="gopro-overlay-output-resolution"
@@ -715,7 +709,7 @@ export function FlightDetails({
                 variant="ghost"
                 className="min-h-8 px-2 py-1 text-xs"
                 onPress={() =>
-                  setGoproOverlayGpxOffset(goproOverlayInitialGpxOffset)
+                  handleGoproOverlayOffsetChange(goproOverlayInitialGpxOffset)
                 }
                 isDisabled={
                   goproOverlayGpxOffset === goproOverlayInitialGpxOffset
@@ -730,7 +724,7 @@ export function FlightDetails({
             step="0.1"
             value={goproOverlayGpxOffset}
             onChange={(event) =>
-              setGoproOverlayGpxOffset(event.currentTarget.value)
+              handleGoproOverlayOffsetChange(event.currentTarget.value)
             }
             className="min-h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
             aria-label={t('flights.goproOverlayGpxOffsetLabel')}
@@ -1085,6 +1079,35 @@ export function FlightDetails({
             </div>
           )}
         </FlightMediaBadges>
+
+        {hasGpx && hasVideo && hasGoproCameraVideo && (
+          <section
+            aria-labelledby="flight-interactive-overlay-title"
+            className="rounded-2xl border border-cyan-200 bg-cyan-50/50 p-4 shadow-sm dark:border-cyan-900 dark:bg-cyan-950/20 sm:p-5"
+          >
+            <div className="mb-4 flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
+                <Wand2 className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <div>
+                <h2
+                  id="flight-interactive-overlay-title"
+                  className="text-base font-semibold text-slate-950 dark:text-white"
+                >
+                  {t('flights.goproOverlayInteractiveTitle')}
+                </h2>
+                <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
+                  {t('flights.goproOverlayInteractiveDescription')}
+                </p>
+              </div>
+            </div>
+            <GoproOverlaySyncPreview
+              flightId={flight.id}
+              offset={goproOverlayGpxOffset}
+              onOffsetChange={handleGoproOverlayOffsetChange}
+            />
+          </section>
+        )}
 
         {(flight.youtube_urls?.length ?? 0) > 0 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800 sm:p-5">

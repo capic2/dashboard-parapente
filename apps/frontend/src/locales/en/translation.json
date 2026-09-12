@@ -1183,6 +1183,8 @@
     "goproOverlayPreviewLoading": "Loading synchronized preview…",
     "goproOverlayPreviewError": "Preview is unavailable. Check the video and GPX timestamps.",
     "goproOverlayCameraPreview": "GoPro video preview",
+    "goproOverlayInteractiveTitle": "Interactive overlay",
+    "goproOverlayInteractiveDescription": "Calibrate and watch the camera and flight video with an interactive layout.",
     "goproOverlayFlightVideo": "Flight video",
     "goproOverlayLayoutLabel": "Layout",
     "goproOverlaySwapVideos": "Show {{name}} large",
