@@ -15,6 +15,7 @@ class TrackPoint(TypedDict, total=False):
     timestamp: int
     heart_rate: int
     power: int
+    speed_kmh: float
     segment: int
 
 
@@ -158,6 +159,12 @@ def _parse_gpx(content: bytes) -> list[TrackPoint]:
                 point["heart_rate"] = int(float(heart_rate))
             if power:
                 point["power"] = int(float(power))
+            speed = _child_text(element, "speed")
+            if speed:
+                speed_mps = float(speed)
+                if math.isfinite(speed_mps) and speed_mps >= 0:
+                    # GPX TrackPointExtension speed values are meters per second.
+                    point["speed_kmh"] = speed_mps * 3.6
             _append_point(points, point)
     return points
 
@@ -276,7 +283,7 @@ def track_to_gpx(points: list[TrackPoint]) -> bytes:
             ET.SubElement(element, "{http://www.topografix.com/GPX/1/1}time").text = (
                 timestamp.isoformat().replace("+00:00", "Z")
             )
-        if "heart_rate" in point or "power" in point:
+        if "heart_rate" in point or "power" in point or "speed_kmh" in point:
             extensions = ET.SubElement(element, "{http://www.topografix.com/GPX/1/1}extensions")
             extension = ET.SubElement(
                 extensions,
@@ -288,6 +295,11 @@ def track_to_gpx(points: list[TrackPoint]) -> bytes:
                 ).text = str(point["heart_rate"])
             if "power" in point:
                 ET.SubElement(extension, "power").text = str(point["power"])
+            if "speed_kmh" in point:
+                ET.SubElement(
+                    extension,
+                    "{http://www.garmin.com/xmlschemas/TrackPointExtension/v1}speed",
+                ).text = str(point["speed_kmh"] / 3.6)
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
@@ -305,19 +317,31 @@ def calculate_track_stats(points: list[TrackPoint]) -> dict[str, Any]:
     )
     valid_times = [point["timestamp"] for point in points if point.get("timestamp", 0) > 0]
     duration_seconds = (valid_times[-1] - valid_times[0]) / 1000 if len(valid_times) > 1 else 0
-    max_speed = 0.0
-    for previous, current in zip(points, points[1:], strict=False):
-        if previous.get("segment", 0) != current.get("segment", 0):
-            continue
-        elapsed = current.get("timestamp", 0) - previous.get("timestamp", 0)
-        if elapsed <= 0:
-            continue
-        segment_distance = haversine_distance(
-            previous["lat"], previous["lon"], current["lat"], current["lon"]
+    explicit_speeds = [
+        point["speed_kmh"]
+        for point in points
+        if (
+            "speed_kmh" in point
+            and math.isfinite(point["speed_kmh"])
+            and 0 <= point["speed_kmh"] < 150
         )
-        speed = segment_distance / (elapsed / 3_600_000)
-        if math.isfinite(speed) and speed < 150:
-            max_speed = max(max_speed, speed)
+    ]
+    if explicit_speeds:
+        max_speed = max(explicit_speeds)
+    else:
+        max_speed = 0.0
+        for previous, current in zip(points, points[1:], strict=False):
+            if previous.get("segment", 0) != current.get("segment", 0):
+                continue
+            elapsed = current.get("timestamp", 0) - previous.get("timestamp", 0)
+            if elapsed <= 0:
+                continue
+            segment_distance = haversine_distance(
+                previous["lat"], previous["lon"], current["lat"], current["lon"]
+            )
+            speed = segment_distance / (elapsed / 3_600_000)
+            if math.isfinite(speed) and speed < 150:
+                max_speed = max(max_speed, speed)
     return {
         "max_altitude_m": round(max(elevations)),
         "elevation_gain_m": round(gain),
