@@ -102,7 +102,7 @@ export function GoproOverlayJobStack({
       {isExpanded && (
         <div
           id={panelId}
-          className="mt-3 grid gap-3 sm:grid-cols-2 2xl:grid-cols-3"
+          className="mt-3 grid gap-3 rounded-2xl border border-cyan-300 bg-cyan-50/40 p-3 shadow-sm dark:border-cyan-800 dark:bg-cyan-950/20 sm:grid-cols-2 sm:p-4 2xl:grid-cols-3"
         >
           {jobs.map((job) => (
             <GoproOverlayJobCard

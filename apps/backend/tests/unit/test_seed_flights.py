@@ -1,12 +1,17 @@
 from pathlib import Path
 
+import pytest
 import config
 import seed_flights
-from models import Flight
+from models import Flight, Site
+from sqlalchemy.orm import sessionmaker
 
 
 def test_seed_flights_can_create_staging_media(
-    test_db, arguel_site, tmp_path: Path, monkeypatch
+    test_db: sessionmaker,
+    arguel_site: Site,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(seed_flights, "SessionLocal", test_db)
     monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
@@ -25,6 +30,8 @@ def test_seed_flights_can_create_staging_media(
         for flight in flights:
             directory = tmp_path / flight.flight_date.strftime("%Y%m%d")
             assert list(directory.rglob("camera.mp4"))
+            assert Path(flight.video_file_path).is_file()
+            assert flight.video_export_status == "completed"
             assert Path(flight.pano_video_file_path).is_file()
             assert Path(flight.gopro_overlay_file_path).is_file()
             assert flight.gopro_overlay_status == "completed"
