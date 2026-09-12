@@ -154,6 +154,7 @@ jobs:
           port: ${{ secrets.STAGING_SSH_PORT || secrets.SSH_PORT }}
           source: trusted-compose/docker-compose.yml
           target: ${{ secrets.STAGING_SSH_DEPLOY_PATH }}
+          strip_components: 1
 
       - name: Start PR staging stack
         uses: appleboy/ssh-action@v1.2.5
