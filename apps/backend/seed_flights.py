@@ -82,22 +82,24 @@ def create_sample_gpx(
     return gpx_path
 
 
-def seed_flights():
-    """Seed the database with sample flights"""
+def seed_flights(force: bool = False) -> int:
+    """Seed an empty database with sample flights and return the count created."""
     db = SessionLocal()
 
     try:
         # Get existing sites
         sites = db.query(Site).all()
         if not sites:
-            return
+            return 0
 
         # Check if flights already exist
         existing_flights = db.query(Flight).count()
+        if existing_flights > 0 and not force:
+            return 0
         if existing_flights > 0:
             response = input("Delete and recreate? (y/N): ")
             if response.lower() != "y":
-                return
+                return 0
             # Delete existing flights
             db.query(Flight).delete()
             db.commit()
@@ -184,9 +186,11 @@ def seed_flights():
             created_count += 1
 
         db.commit()
+        return created_count
 
     except Exception:
         db.rollback()
+        raise
     finally:
         db.close()
 
