@@ -1,3 +1,4 @@
+import math
 import re
 from datetime import date, datetime, time
 from typing import Any, Literal
@@ -468,6 +469,7 @@ class FlightUpdate(BaseModel):
     tags: list[str] | None = None
     conditions_feedback: str | None = None
     decision_snapshot: str | None = None
+    gopro_overlay_gpx_offset: float | None = None
 
     @validator("youtube_urls")
     def valid_youtube_urls(cls, value):
@@ -479,6 +481,12 @@ class FlightUpdate(BaseModel):
         if v is not None and v < 0:
             raise ValueError("Value must be positive or zero")
         return v
+
+    @validator("gopro_overlay_gpx_offset")
+    def finite_gopro_overlay_offset(cls, value):
+        if value is not None and not math.isfinite(value):
+            raise ValueError("gopro_overlay_gpx_offset must be finite")
+        return value
 
     @validator("distance_km", "max_speed_kmh")
     def positive_floats(cls, v):

@@ -429,6 +429,14 @@ export function FlightDetails({
     setGoproOverlayGpxOffset('0');
   };
 
+  const handleGoproOverlayOffsetChange = (nextOffset: string) => {
+    setGoproOverlayGpxOffset(nextOffset);
+    const parsedOffset = Number(nextOffset);
+    if (Number.isFinite(parsedOffset)) {
+      updateFlight.mutate({ gopro_overlay_gpx_offset: parsedOffset });
+    }
+  };
+
   const downloadBlob = async (
     path: string,
     filename: string,
@@ -661,7 +669,7 @@ export function FlightDetails({
         <GoproOverlaySyncPreview
           flightId={flight.id}
           offset={goproOverlayGpxOffset}
-          onOffsetChange={setGoproOverlayGpxOffset}
+          onOffsetChange={handleGoproOverlayOffsetChange}
         />
 
         <div className="flex flex-col gap-1">
