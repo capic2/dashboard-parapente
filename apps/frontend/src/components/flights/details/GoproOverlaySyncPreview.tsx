@@ -11,6 +11,7 @@ import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
 import { telemetryAtTimestamp } from './goproSyncTelemetry';
 import type { GoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
+import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 
 interface GoproOverlaySyncPreviewProps {
   flightId: string;
@@ -95,6 +96,12 @@ export function GoproOverlaySyncPreview({
         preview.data?.video.preview_target_end_seconds ?? ''
       ),
       version: `${preview.data?.video.preview_target_end_seconds}-${preview.data?.video.preview_available_duration_seconds}`,
+    }
+  );
+  const flightVideoUrl = getApiUrlWithSearchParams(
+    `flights/${flightId}/video`,
+    {
+      access_token: token,
     }
   );
 
@@ -188,25 +195,30 @@ export function GoproOverlaySyncPreview({
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(17rem,1fr)]">
       <div className="overflow-hidden rounded-xl bg-black shadow-sm">
-        <video
-          className="aspect-video w-full"
-          src={videoUrl}
-          controls
-          preload="metadata"
-          onTimeUpdate={(event) =>
-            setVideoTime(event.currentTarget.currentTime)
+        <FlightOverlayPlayer
+          cameraUrl={videoUrl}
+          flightUrl={flightVideoUrl}
+          cameraLabel={t('flights.goproOverlayCameraPreview')}
+          flightLabel={t('flights.goproOverlayFlightVideo')}
+          syncOffsetSeconds={automaticOffset + manualOffset}
+          getFlightTime={(previewTime) =>
+            sourceTimeAtPreviewTime(previewTime, previewSegments) -
+            automaticOffset -
+            manualOffset
           }
-          onSeeked={(event) => setVideoTime(event.currentTarget.currentTime)}
-          onLoadedMetadata={(event) => {
-            event.currentTarget.currentTime = Math.min(
-              videoTime,
-              event.currentTarget.duration || videoTime
-            );
-          }}
-          aria-label={t('flights.goproOverlayCameraPreview')}
-        >
-          <track kind="captions" />
-        </video>
+          onTimeChange={setVideoTime}
+          overlayContent={
+            <div className="flex gap-2 rounded-lg bg-slate-950/75 px-3 py-2 font-mono text-xs text-white shadow-lg backdrop-blur-sm">
+              <span>
+                {telemetry ? `${Math.round(telemetry.elevation)} m` : '--'}
+              </span>
+              <span>
+                {telemetry ? `${telemetry.speedKmh.toFixed(1)} km/h` : '--'}
+              </span>
+              <span>{heartRate === null ? '--' : `${heartRate} bpm`}</span>
+            </div>
+          }
+        />
         <div className="flex items-center justify-between px-3 py-2 font-mono text-xs text-gray-200">
           <span>{t('flights.goproOverlayVideoTime')}</span>
           <span>{formatSeconds(sourceVideoTime)}</span>

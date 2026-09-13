@@ -81,7 +81,9 @@ from gopro_overlay_export import (
     create_gopro_overlay_job_from_paths,
     delete_gopro_overlay_job,
     delete_gopro_overlay_output,
+    ensure_enriched_gpx,
     first_gpx_timestamp,
+    _first_gpx_at_for_camera_timeline,
     get_gopro_overlay_job,
     gpx_duration_seconds,
     gopro_overlay_output_path,
@@ -6663,11 +6665,11 @@ def get_flight_gopro_overlay_preview(
         raise HTTPException(status_code=404, detail="Flight not found")
 
     camera_path, gpx_path = _flight_gopro_preview_inputs(db, flight)
+    osv_paths = _matching_files_by_mtime(camera_path.parent, "*.osv")
     video_duration = probe_video_duration(camera_path)
     gpx_start = first_gpx_timestamp(gpx_path)
     gpx_duration = gpx_duration_seconds(gpx_path)
     video_start = resolve_gopro_video_start_time(camera_path, gpx_start)
-    coordinates = parse_gpx_file(gpx_path)
     if video_duration is None or video_start is None:
         raise HTTPException(status_code=422, detail="Camera video has no usable time metadata")
     if gpx_start is None or gpx_duration is None:
@@ -6677,6 +6679,20 @@ def get_flight_gopro_overlay_preview(
     if aligned_video_start is None:
         raise HTTPException(status_code=422, detail="Unable to align camera video and GPX track")
     automatic_offset = (gpx_start - aligned_video_start).total_seconds()
+    if osv_paths:
+        try:
+            gpx_path = ensure_enriched_gpx(
+                osv_paths,
+                gpx_path,
+                camera_path.parent,
+                video_duration=video_duration,
+                first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
+            )
+        except (OSError, ValueError) as exc:
+            # Keep the GPX-only preview usable when the optional OSV toolchain
+            # is unavailable. The export job will report the merge failure.
+            logger.warning("Unable to prepare enriched GPX for flight %s: %s", flight_id, exc)
+    coordinates = parse_gpx_file(gpx_path)
     manual_offset = float(flight.gopro_overlay_gpx_offset or 0.0)
     effective_offset = automatic_offset + manual_offset
     # The offset is adjusted locally in the dialog.  Do not let the value
