@@ -6794,7 +6794,7 @@ def get_flight_gopro_overlay_preview(
     manual_offset = float(flight.gopro_overlay_gpx_offset or 0.0)
     effective_offset = automatic_offset + manual_offset
     overlay_state = _interactive_overlay_state(camera_path)
-    if overlay_state["status"] == "missing":
+    if overlay_state["status"] in {"missing", "failed"}:
         background_tasks.add_task(
             _generate_interactive_overlay_in_background,
             camera_path,
