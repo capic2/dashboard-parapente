@@ -81,6 +81,7 @@ from gopro_overlay_export import (
     create_gopro_overlay_job_from_paths,
     delete_gopro_overlay_job,
     delete_gopro_overlay_output,
+    enriched_gpx_path,
     ensure_enriched_gpx,
     first_gpx_timestamp,
     _first_gpx_at_for_camera_timeline,
@@ -6651,12 +6652,35 @@ def get_gopro_overlay_dependencies() -> GoproOverlayDependencies:
     return check_gopro_overlay_dependencies()
 
 
+def _prepare_enriched_gpx_in_background(
+    osv_paths: list[Path],
+    gpx_path: Path,
+    input_dir: Path,
+    *,
+    video_duration: float,
+    first_gpx_at: float | None,
+) -> None:
+    try:
+        ensure_enriched_gpx(
+            osv_paths,
+            gpx_path,
+            input_dir,
+            video_duration=video_duration,
+            first_gpx_at=first_gpx_at,
+        )
+    except (OSError, ValueError) as exc:
+        logger.warning("Unable to prepare enriched GPX in background: %s", exc)
+
+
 @router.get(
     "/flights/{flight_id}/gopro-overlay/preview",
     response_model=GoproOverlayPreview,
 )
 def get_flight_gopro_overlay_preview(
-    flight_id: str, response: Response, db: Session = Depends(get_db)
+    flight_id: str,
+    response: Response,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
 ) -> GoproOverlayPreview:
     response.headers["Cache-Control"] = "no-store"
 
@@ -6680,18 +6704,18 @@ def get_flight_gopro_overlay_preview(
         raise HTTPException(status_code=422, detail="Unable to align camera video and GPX track")
     automatic_offset = (gpx_start - aligned_video_start).total_seconds()
     if osv_paths:
-        try:
-            gpx_path = ensure_enriched_gpx(
-                osv_paths,
-                gpx_path,
-                camera_path.parent,
-                video_duration=video_duration,
-                first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
-            )
-        except (OSError, ValueError) as exc:
-            # Keep the GPX-only preview usable when the optional OSV toolchain
-            # is unavailable. The export job will report the merge failure.
-            logger.warning("Unable to prepare enriched GPX for flight %s: %s", flight_id, exc)
+        source_gpx_path = gpx_path
+        cached_gpx_path = enriched_gpx_path(camera_path.parent)
+        if cached_gpx_path.is_file():
+            gpx_path = cached_gpx_path
+        background_tasks.add_task(
+            _prepare_enriched_gpx_in_background,
+            osv_paths,
+            source_gpx_path,
+            camera_path.parent,
+            video_duration=video_duration,
+            first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
+        )
     coordinates = parse_gpx_file(gpx_path)
     manual_offset = float(flight.gopro_overlay_gpx_offset or 0.0)
     effective_offset = automatic_offset + manual_offset
