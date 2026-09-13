@@ -6,6 +6,7 @@
   "dependencies": {
     "@dashboard-parapente/design-system": "workspace:*",
     "@dashboard-parapente/shared-types": "workspace:*",
+    "@vidstack/react": "1.15.6",
     "lucide-react": "catalog:"
   },
   "scripts": {

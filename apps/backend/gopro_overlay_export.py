@@ -1,4 +1,5 @@
 import asyncio
+import fcntl
 import fnmatch
 import json
 import logging
@@ -57,6 +58,8 @@ _UPLOAD_WORK_ROOT = Path("/tmp/dashboard-parapente/gopro-overlays")
 _PATH_WORK_DIR_NAME = "temp/gopro-overlay"
 _PROGRESS_PERCENT_RE = re.compile(r"(?P<percent>\d{1,3})\s*%")
 _OSV_PROGRESS_RE = re.compile(r"^OSV_PROGRESS\s+(?P<percent>\d{1,3})\s*$")
+_ENRICHED_GPX_FILENAME = "merged-gopro-overlay.gpx"
+_ENRICHED_GPX_METADATA_FILENAME = "merged-gopro-overlay.json"
 _LOG_TAIL_LINE_COUNT = 100
 _PIP_FRAME_RATE = 10
 _OUTPUT_RESOLUTIONS: dict[str, tuple[int, int] | None] = {
@@ -355,6 +358,76 @@ def _merge_osv_files_with_gpx(
     if log_path:
         _append_job_log(log_path, f"Created merged GPX: {merged_gpx_path.name}")
     return merged_gpx_path
+
+
+def ensure_enriched_gpx(
+    osv_paths: list[Path],
+    gpx_path: Path,
+    input_dir: Path,
+    *,
+    video_duration: float | None = None,
+    first_gpx_at: float | None = None,
+) -> Path:
+    """Return a cached GPX containing the GPX track enriched with OSV data.
+
+    The cached file deliberately does not include the user-controlled manual
+    offset. That offset belongs to the flight timeline and can therefore be
+    changed without rebuilding the OSV merge.
+    """
+    if not osv_paths:
+        return gpx_path
+
+    input_dir.mkdir(parents=True, exist_ok=True)
+    merged_gpx_path = input_dir / _ENRICHED_GPX_FILENAME
+    metadata_path = input_dir / _ENRICHED_GPX_METADATA_FILENAME
+    signature = {
+        "sources": [
+            {
+                "path": str(path.resolve()),
+                "size": path.stat().st_size,
+                "mtime_ns": path.stat().st_mtime_ns,
+            }
+            for path in [gpx_path, *osv_paths]
+        ],
+        "video_duration": video_duration,
+        "first_gpx_at": first_gpx_at,
+    }
+    lock_path = input_dir / "merged-gopro-overlay.lock"
+    with lock_path.open("a+") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            if merged_gpx_path.is_file() and metadata_path.is_file():
+                try:
+                    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    metadata = None
+                if metadata == signature:
+                    return merged_gpx_path
+
+            staging_dir = input_dir / f".merged-gopro-overlay-{uuid.uuid4().hex}"
+            staging_dir.mkdir()
+            try:
+                staged_gpx_path = _merge_osv_files_with_gpx(
+                    osv_paths,
+                    gpx_path,
+                    staging_dir,
+                    gpx_offset=0.0,
+                    video_duration=video_duration,
+                    first_gpx_at=first_gpx_at,
+                )
+                staged_gpx_path.replace(merged_gpx_path)
+            finally:
+                shutil.rmtree(staging_dir, ignore_errors=True)
+
+            temporary_metadata_path = input_dir / f".{metadata_path.name}.{uuid.uuid4().hex}.tmp"
+            temporary_metadata_path.write_text(
+                json.dumps(signature, separators=(",", ":")),
+                encoding="utf-8",
+            )
+            temporary_metadata_path.replace(metadata_path)
+            return merged_gpx_path
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
 def _output_path_for_video(video_path: Path, output_name: str) -> Path:
@@ -1584,6 +1657,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         work_dir = Path(str(job["layout_path"])).parent
         video_path = Path(str(job["video_path"]))
         gpx_path = Path(str(job["gpx_path"]))
+        source_gpx_path = gpx_path
         pip_path = Path(str(job["pip_path"])) if job.get("pip_path") else None
         command_metadata = dict(metadata)
         render_gpx_path = gpx_path
@@ -1597,35 +1671,29 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 _GPX_EXTENSIONS,
             )
 
-        source_input_dir = Path(str(job["output_path"])).parent
-        osv_paths = _matching_files_by_mtime(source_input_dir, "*.osv")
+        osv_paths = _matching_files_by_mtime(video_path.parent, "*.osv")
         gpx_offset = _gpx_offset_from_command_metadata(command_metadata)
         embedded_video_start = probe_video_start_time(video_path)
         gpx_start = first_gpx_timestamp(render_gpx_path)
         alignment_video_start = resolve_gopro_video_start_time(video_path, gpx_start)
         aligned_video_start = align_video_start_time_to_gpx(alignment_video_start, gpx_start)
-        # Keep the camera start as the timeline anchor while the merger shifts
-        # the GPX timestamps by the manual offset.  In its absolute mode, the
-        # first GPX position therefore includes both the detected alignment and
-        # the calibrated offset.
-        first_gpx_at = _first_gpx_at_for_camera_timeline(
-            gpx_start,
-            aligned_video_start,
-            gpx_offset,
-        )
         if osv_paths:
             _update_job(job_id, progress=10, message="Merging OSV telemetry")
             video_duration = probe_video_duration(video_path)
-            render_gpx_path = _merge_osv_files_with_gpx(
+            enriched_gpx_path = ensure_enriched_gpx(
                 osv_paths,
-                render_gpx_path,
-                work_dir,
-                job_id=job_id,
-                log_path=log_path,
-                gpx_offset=gpx_offset,
+                source_gpx_path,
+                video_path.parent,
                 video_duration=video_duration,
-                first_gpx_at=first_gpx_at,
+                first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
             )
+            render_gpx_path = enriched_gpx_path
+            if gpx_offset:
+                render_gpx_path = _shift_gpx_timestamps(
+                    enriched_gpx_path,
+                    work_dir / f"gpx-offset-{job_id}.gpx",
+                    gpx_offset,
+                )
         else:
             _append_job_log(log_path, "No OSV files found; using GPX directly")
             if gpx_offset:
