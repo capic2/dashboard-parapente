@@ -41,6 +41,7 @@ interface FlightOverlayPlayerProps {
   overlayUrl?: string;
   syncOffsetSeconds?: number;
   getFlightTime?: (cameraTime: number) => number;
+  getCameraTime?: (flightTime: number) => number;
   getOverlayTime?: (cameraTime: number) => number;
   onTimeChange?: (time: number) => void;
   overlayContent?: ReactNode;
@@ -58,6 +59,7 @@ export function FlightOverlayPlayer({
   overlayUrl,
   syncOffsetSeconds = 0,
   getFlightTime,
+  getCameraTime,
   getOverlayTime,
   onTimeChange,
   overlayContent,
@@ -142,6 +144,30 @@ export function FlightOverlayPlayer({
   const handlePause = () => {
     flightRef.current?.pause();
     overlayRef.current?.pause();
+  };
+
+  const handleFlightPlay = () => {
+    syncFlight(playerRef.current?.state.currentTime ?? 0);
+    void playerRef.current?.play();
+    void overlayRef.current?.play();
+  };
+
+  const handleFlightPause = () => {
+    void playerRef.current?.pause();
+    overlayRef.current?.pause();
+  };
+
+  const handleFlightTimeUpdate = () => {
+    if (!flightIsMain || !getCameraTime || !playerRef.current) return;
+    const cameraTime = clamp(
+      getCameraTime(flightRef.current?.currentTime ?? 0),
+      0,
+      playerRef.current.state.duration
+    );
+    if (Math.abs(playerRef.current.state.currentTime - cameraTime) > 0.12) {
+      playerRef.current.currentTime = cameraTime;
+    }
+    syncOverlay(cameraTime);
   };
 
   const handleSeek = () => {
@@ -252,6 +278,10 @@ export function FlightOverlayPlayer({
             muted
             onLoadStart={() => setFlightReady(false)}
             onLoadedMetadata={() => setFlightReady(true)}
+            controls={flightIsMain}
+            onPlay={handleFlightPlay}
+            onPause={handleFlightPause}
+            onTimeUpdate={handleFlightTimeUpdate}
             className="h-full w-full rounded-md object-contain"
             aria-label={flightLabel}
           />

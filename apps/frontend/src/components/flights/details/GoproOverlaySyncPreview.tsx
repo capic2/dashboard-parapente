@@ -38,6 +38,25 @@ export function sourceTimeAtPreviewTime(
   return segment.source_start_seconds + elapsed;
 }
 
+export function previewTimeAtSourceTime(
+  sourceTime: number,
+  segments: GoproOverlayPreview['video']['preview_segments']
+) {
+  const segment = segments.find(
+    (candidate) =>
+      sourceTime >= candidate.source_start_seconds &&
+      sourceTime <= candidate.source_start_seconds + candidate.duration_seconds
+  );
+  if (!segment) return sourceTime;
+  return (
+    segment.preview_start_seconds +
+    Math.min(
+      Math.max(0, sourceTime - segment.source_start_seconds),
+      segment.duration_seconds
+    )
+  );
+}
+
 export function manualOffsetForGpxStartAtVideoTime(
   sourceVideoTime: number,
   automaticOffset: number
@@ -204,6 +223,12 @@ export function GoproOverlaySyncPreview({
             sourceTimeAtPreviewTime(previewTime, previewSegments) -
             automaticOffset -
             manualOffset
+          }
+          getCameraTime={(flightTime) =>
+            previewTimeAtSourceTime(
+              flightTime + automaticOffset + manualOffset,
+              previewSegments
+            )
           }
           getOverlayTime={(previewTime) =>
             sourceTimeAtPreviewTime(previewTime, previewSegments) -
