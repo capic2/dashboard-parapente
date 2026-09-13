@@ -175,7 +175,10 @@ services:
     environment:
       - DATABASE_BACKUP_INTERVAL_SECONDS=${DATABASE_BACKUP_INTERVAL_SECONDS:-86400}
       - DATABASE_BACKUP_RETRY_SECONDS=${DATABASE_BACKUP_RETRY_SECONDS:-300}
-      - DATABASE_BACKUP_RETENTION_DAYS=${DATABASE_BACKUP_RETENTION_DAYS:-30}
+      - DATABASE_BACKUP_RETENTION_COUNT=${DATABASE_BACKUP_RETENTION_COUNT:-3}
+      - DATABASE_BACKUP_GOOGLE_DRIVE_REMOTE=${DATABASE_BACKUP_GOOGLE_DRIVE_REMOTE:-}
+      - DATABASE_BACKUP_GOOGLE_DRIVE_PATH=${DATABASE_BACKUP_GOOGLE_DRIVE_PATH:-dashboard-parapente/database-backups}
+      - RCLONE_CONFIG=/etc/rclone/rclone.conf
     depends_on:
       backend:
         condition: service_healthy
@@ -183,6 +186,7 @@ services:
       - ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}:/app/db:ro
       # This must be storage outside the application host (for example the NAS).
       - ${DATABASE_BACKUP_HOST_DIR:?DATABASE_BACKUP_HOST_DIR is required}:/backups
+      - ${RCLONE_CONFIG_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/rclone}:/etc/rclone:ro
     read_only: true
     tmpfs:
       - /tmp
