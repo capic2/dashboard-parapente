@@ -3,6 +3,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type KeyboardEvent,
   type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -98,6 +99,22 @@ export function FlightOverlayPlayer({
 
   const cameraIsMain = layout === 'camera-main';
   const flightIsMain = layout === 'flight-main';
+  const pipClassName =
+    'absolute bottom-3 right-3 z-30 aspect-video w-1/3 cursor-pointer rounded-lg border-2 border-white/80 bg-black shadow-xl transition-[width] duration-200 hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400';
+
+  const switchTo = (nextLayout: FlightOverlayLayout) => {
+    setLayout(nextLayout);
+  };
+
+  const handlePipKeyDown = (
+    event: KeyboardEvent<HTMLDivElement>,
+    nextLayout: FlightOverlayLayout
+  ) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      switchTo(nextLayout);
+    }
+  };
 
   return (
     <div className="overflow-hidden rounded-xl bg-black shadow-sm">
@@ -106,47 +123,91 @@ export function FlightOverlayPlayer({
           layout === 'side-by-side' ? 'grid-cols-1 md:grid-cols-2' : ''
         }`}
       >
-        <MediaPlayer
-          ref={playerRef}
-          src={cameraUrl}
-          playsInline
-          preload="metadata"
-          onTimeUpdate={handleTimeUpdate}
-          onPlay={handlePlay}
-          onPause={handlePause}
-          onSeeked={handleSeek}
+        {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions */}
+        <div
+          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
+          role={
+            !cameraIsMain && !layout.includes('side') ? 'button' : undefined
+          }
+          tabIndex={!cameraIsMain && !layout.includes('side') ? 0 : undefined}
+          aria-label={
+            !cameraIsMain && !layout.includes('side')
+              ? t('flights.goproOverlaySwapVideos', { name: cameraLabel })
+              : undefined
+          }
           className={
             cameraIsMain || layout === 'side-by-side'
               ? 'aspect-video w-full'
-              : 'absolute bottom-3 right-3 z-20 aspect-video w-1/3 cursor-pointer rounded-lg border-2 border-white/80 shadow-xl transition-[width] duration-200 hover:border-sky-300 [&_[data-media-provider]]:rounded-md'
+              : pipClassName
           }
-          aria-label={cameraLabel}
           onClick={() => {
-            if (layout === 'flight-main') setLayout('camera-main');
+            if (flightIsMain) switchTo('camera-main');
+          }}
+          onKeyDown={(event) => {
+            if (flightIsMain) handlePipKeyDown(event, 'camera-main');
           }}
         >
-          <MediaProvider />
-          <DefaultVideoLayout icons={defaultLayoutIcons} />
-        </MediaPlayer>
+          <MediaPlayer
+            ref={playerRef}
+            src={cameraUrl}
+            playsInline
+            preload="metadata"
+            onTimeUpdate={handleTimeUpdate}
+            onPlay={handlePlay}
+            onPause={handlePause}
+            onSeeked={handleSeek}
+            className="h-full w-full [&_[data-media-provider]]:rounded-md"
+            aria-label={cameraLabel}
+          >
+            <MediaProvider />
+            <DefaultVideoLayout icons={defaultLayoutIcons} />
+          </MediaPlayer>
+          {!cameraIsMain && flightIsMain && (
+            <span className="pointer-events-none absolute bottom-2 left-2 rounded bg-slate-950/85 px-2 py-1 text-[10px] font-semibold text-white">
+              {cameraLabel}
+            </span>
+          )}
+        </div>
 
-        <video
-          ref={flightRef}
-          src={flightUrl}
-          playsInline
-          preload="metadata"
-          muted
-          onLoadStart={() => setFlightReady(false)}
-          onLoadedMetadata={() => setFlightReady(true)}
+        {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions */}
+        <div
+          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
+          role={cameraIsMain ? 'button' : undefined}
+          tabIndex={cameraIsMain ? 0 : undefined}
+          aria-label={
+            cameraIsMain
+              ? t('flights.goproOverlaySwapVideos', { name: flightLabel })
+              : undefined
+          }
           className={
             flightIsMain || layout === 'side-by-side'
-              ? 'aspect-video w-full object-contain'
-              : 'absolute bottom-3 right-3 z-20 aspect-video w-1/3 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
+              ? 'aspect-video w-full'
+              : pipClassName
           }
           onClick={() => {
-            if (layout === 'camera-main') setLayout('flight-main');
+            if (cameraIsMain) switchTo('flight-main');
           }}
-          aria-label={flightLabel}
-        />
+          onKeyDown={(event) => {
+            if (cameraIsMain) handlePipKeyDown(event, 'flight-main');
+          }}
+        >
+          <video
+            ref={flightRef}
+            src={flightUrl}
+            playsInline
+            preload="metadata"
+            muted
+            onLoadStart={() => setFlightReady(false)}
+            onLoadedMetadata={() => setFlightReady(true)}
+            className="h-full w-full rounded-md object-contain"
+            aria-label={flightLabel}
+          />
+          {cameraIsMain && (
+            <span className="pointer-events-none absolute bottom-2 left-2 rounded bg-slate-950/85 px-2 py-1 text-[10px] font-semibold text-white">
+              {flightLabel}
+            </span>
+          )}
+        </div>
 
         {layout !== 'side-by-side' && (
           <button
