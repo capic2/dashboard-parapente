@@ -44,6 +44,8 @@ def test_seed_flights_can_create_staging_media(
         assert len(flights) == 5
         for flight in flights:
             directory = tmp_path / flight.flight_date.strftime("%Y%m%d")
+            assert Path(flight.gpx_file_path).is_file()
+            assert Path(flight.gpx_file_path).parent.parent == directory
             assert list(directory.rglob("camera.mp4"))
             assert Path(flight.video_file_path).is_file()
             assert flight.video_export_status == "completed"

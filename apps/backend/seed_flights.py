@@ -85,6 +85,25 @@ def ensure_sample_media(db: Session, flights: list[Flight]) -> int:
     return created_count
 
 
+def ensure_sample_gpx(db: Session, flights: list[Flight]) -> int:
+    """Persist GPX fixtures next to staging media so they survive redeploys."""
+    created_count = 0
+    for flight in flights:
+        if not flight.site or not flight.duration_minutes:
+            continue
+        gpx_path = flight_directory(db, flight) / "track.gpx"
+        create_sample_gpx(
+            flight.id,
+            flight.site.latitude,
+            flight.site.longitude,
+            flight.duration_minutes,
+            output_path=gpx_path,
+        )
+        flight.gpx_file_path = str(gpx_path.resolve())
+        created_count += 1
+    return created_count
+
+
 def is_sample_flight(flight: Flight) -> bool:
     """Identify flights created by this seed without touching imported flights."""
     return flight.title in SAMPLE_FLIGHT_TITLES and (flight.notes or "").startswith(
@@ -93,16 +112,18 @@ def is_sample_flight(flight: Flight) -> bool:
 
 
 def create_sample_gpx(
-    flight_id: str, start_lat: float, start_lon: float, duration_min: int
+    flight_id: str,
+    start_lat: float,
+    start_lon: float,
+    duration_min: int,
+    output_path: Path | None = None,
 ) -> Path:
     """
     Create a sample GPX file for testing
     Generates a realistic flight track with elevation changes
     """
-    gpx_dir = Path(__file__).parent / "gpx_files"
-    gpx_dir.mkdir(exist_ok=True)
-
-    gpx_path = gpx_dir / f"flight_{flight_id}.gpx"
+    gpx_path = output_path or Path(__file__).parent / "gpx_files" / f"flight_{flight_id}.gpx"
+    gpx_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Generate track points (one every 10 seconds)
     num_points = (duration_min * 60) // 10
@@ -174,6 +195,7 @@ def seed_flights(force: bool = False, include_media: bool = False) -> int:
                 sample_flights = [
                     flight for flight in db.query(Flight).all() if is_sample_flight(flight)
                 ]
+                ensure_sample_gpx(db, sample_flights)
                 ensure_sample_media(db, sample_flights)
                 db.commit()
             return 0
@@ -267,8 +289,10 @@ def seed_flights(force: bool = False, include_media: bool = False) -> int:
             created_count += 1
 
         db.flush()
+        sample_flights = list(db.query(Flight).all())
         if include_media:
-            ensure_sample_media(db, list(db.query(Flight).all()))
+            ensure_sample_gpx(db, sample_flights)
+            ensure_sample_media(db, sample_flights)
         db.commit()
         return created_count
 
