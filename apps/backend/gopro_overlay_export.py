@@ -401,7 +401,7 @@ def ensure_enriched_gpx(
                     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
                 except (OSError, json.JSONDecodeError):
                     metadata = None
-                if metadata == signature:
+                if metadata == signature and _has_usable_gpx_timestamps(merged_gpx_path):
                     return merged_gpx_path
 
             staging_dir = input_dir / f".merged-gopro-overlay-{uuid.uuid4().hex}"
@@ -415,6 +415,12 @@ def ensure_enriched_gpx(
                     video_duration=video_duration,
                     first_gpx_at=first_gpx_at,
                 )
+                if not _has_usable_gpx_timestamps(staged_gpx_path):
+                    logger.warning(
+                        "OSV merge produced an unusable GPX; falling back to source GPX %s",
+                        gpx_path,
+                    )
+                    return gpx_path
                 staged_gpx_path.replace(merged_gpx_path)
             finally:
                 shutil.rmtree(staging_dir, ignore_errors=True)
@@ -428,6 +434,10 @@ def ensure_enriched_gpx(
             return merged_gpx_path
         finally:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
+def _has_usable_gpx_timestamps(gpx_path: Path) -> bool:
+    return first_gpx_timestamp(gpx_path) is not None and gpx_duration_seconds(gpx_path) is not None
 
 
 def enriched_gpx_path(input_dir: Path) -> Path:
