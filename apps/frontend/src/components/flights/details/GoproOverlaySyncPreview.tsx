@@ -193,7 +193,7 @@ export function GoproOverlaySyncPreview({
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(17rem,1fr)]">
+    <div className="grid gap-4">
       <div className="overflow-hidden rounded-xl bg-black shadow-sm">
         <FlightOverlayPlayer
           cameraUrl={videoUrl}
@@ -208,14 +208,34 @@ export function GoproOverlaySyncPreview({
           }
           onTimeChange={setVideoTime}
           overlayContent={
-            <div className="flex gap-2 rounded-lg bg-slate-950/75 px-3 py-2 font-mono text-xs text-white shadow-lg backdrop-blur-sm">
-              <span>
+            <div className="grid min-w-56 grid-cols-2 gap-x-4 gap-y-1 rounded-lg bg-slate-950/80 px-3 py-2.5 font-mono text-xs text-white shadow-lg backdrop-blur-sm">
+              <span className="text-sky-200">
+                <Mountain
+                  className="mr-1 inline h-3.5 w-3.5"
+                  aria-hidden="true"
+                />
                 {telemetry ? `${Math.round(telemetry.elevation)} m` : '--'}
               </span>
-              <span>
+              <span className="text-rose-200">
+                <Gauge className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />
                 {telemetry ? `${telemetry.speedKmh.toFixed(1)} km/h` : '--'}
               </span>
-              <span>{heartRate === null ? '--' : `${heartRate} bpm`}</span>
+              <span className="text-emerald-200">
+                <HeartPulse
+                  className="mr-1 inline h-3.5 w-3.5"
+                  aria-hidden="true"
+                />
+                {heartRate === null ? '--' : `${heartRate} bpm`}
+              </span>
+              <span className="text-violet-200">
+                <MapPin
+                  className="mr-1 inline h-3.5 w-3.5"
+                  aria-hidden="true"
+                />
+                {telemetry
+                  ? `${telemetry.lat.toFixed(3)}, ${telemetry.lon.toFixed(3)}`
+                  : '--'}
+              </span>
             </div>
           }
         />
@@ -298,54 +318,6 @@ export function GoproOverlaySyncPreview({
       </div>
 
       <div className="space-y-3 text-gray-900 dark:text-gray-100">
-        <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
-            <Mountain
-              className="mb-2 h-4 w-4 text-sky-600"
-              aria-hidden="true"
-            />
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              {t('flights.altitude')}
-            </div>
-            <div className="font-mono text-lg font-semibold">
-              {telemetry ? `${Math.round(telemetry.elevation)} m` : '--'}
-            </div>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
-            <Gauge className="mb-2 h-4 w-4 text-rose-600" aria-hidden="true" />
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              {t('flights.speed')}
-            </div>
-            <div className="font-mono text-lg font-semibold">
-              {telemetry ? `${telemetry.speedKmh.toFixed(1)} km/h` : '--'}
-            </div>
-          </div>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
-          <HeartPulse
-            className="mb-2 h-4 w-4 text-emerald-600"
-            aria-hidden="true"
-          />
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            {t('flights.goproOverlayHeartRate')}
-          </div>
-          <div className="font-mono text-lg font-semibold">
-            {heartRate === null
-              ? t('flights.goproOverlayHeartRateUnavailable')
-              : `${heartRate} bpm`}
-          </div>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
-          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-            <MapPin className="h-4 w-4" aria-hidden="true" />
-            {t('flights.goproOverlayGpxPosition')}
-          </div>
-          <div className="mt-1 font-mono text-sm">
-            {telemetry
-              ? `${telemetry.lat.toFixed(5)}, ${telemetry.lon.toFixed(5)}`
-              : t('flights.goproOverlayOutsideTrack')}
-          </div>
-        </div>
         <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 dark:border-sky-900 dark:bg-sky-950/30">
           <div className="flex items-center justify-between gap-3 text-sm">
             <span className="flex items-center gap-2 font-medium">
