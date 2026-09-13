@@ -33,6 +33,11 @@ export type GoproOverlayPreview = {
     manual_offset_seconds: number;
     effective_offset_seconds: number;
   };
+  overlay: {
+    status: 'missing' | 'generating' | 'ready' | 'failed';
+    job_id?: string | null;
+    error?: string | null;
+  };
 };
 
 export function goproPreviewRefetchInterval(
@@ -51,8 +56,11 @@ export function useGoproOverlayPreview(flightId: string, enabled: boolean) {
         .get(`flights/${flightId}/gopro-overlay/preview`)
         .json<GoproOverlayPreview>(),
     enabled,
-    refetchInterval: (query) =>
-      goproPreviewRefetchInterval(query.state.data?.video.preview_status),
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (data?.overlay.status === 'generating') return 2000;
+      return goproPreviewRefetchInterval(data?.video.preview_status);
+    },
   });
 }
 

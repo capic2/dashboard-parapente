@@ -38,8 +38,10 @@ interface FlightOverlayPlayerProps {
   flightUrl: string;
   cameraLabel: string;
   flightLabel: string;
+  overlayUrl?: string;
   syncOffsetSeconds?: number;
   getFlightTime?: (cameraTime: number) => number;
+  getOverlayTime?: (cameraTime: number) => number;
   onTimeChange?: (time: number) => void;
   overlayContent?: ReactNode;
 }
@@ -53,17 +55,21 @@ export function FlightOverlayPlayer({
   flightUrl,
   cameraLabel,
   flightLabel,
+  overlayUrl,
   syncOffsetSeconds = 0,
   getFlightTime,
+  getOverlayTime,
   onTimeChange,
   overlayContent,
 }: FlightOverlayPlayerProps) {
   const { t } = useTranslation();
   const playerRef = useRef<MediaPlayerInstance>(null);
   const flightRef = useRef<HTMLVideoElement>(null);
+  const overlayRef = useRef<HTMLVideoElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState<FlightOverlayLayout>('camera-main');
   const [flightReady, setFlightReady] = useState(false);
+  const [overlayReady, setOverlayReady] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const syncFlight = useCallback(
@@ -82,9 +88,26 @@ export function FlightOverlayPlayer({
     [flightReady, getFlightTime, syncOffsetSeconds]
   );
 
+  const syncOverlay = useCallback(
+    (cameraTime: number) => {
+      const overlay = overlayRef.current;
+      if (!overlay || !overlayReady) return;
+      const target = clamp(
+        getOverlayTime?.(cameraTime) ?? cameraTime,
+        0,
+        Number.isFinite(overlay.duration) ? overlay.duration : cameraTime
+      );
+      if (Math.abs(overlay.currentTime - target) > 0.08) {
+        overlay.currentTime = target;
+      }
+    },
+    [getOverlayTime, overlayReady]
+  );
+
   useEffect(() => {
     syncFlight(playerRef.current?.state.currentTime ?? 0);
-  }, [syncFlight]);
+    syncOverlay(playerRef.current?.state.currentTime ?? 0);
+  }, [syncFlight, syncOverlay]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -106,20 +129,24 @@ export function FlightOverlayPlayer({
   const handleTimeUpdate = () => {
     const time = playerRef.current?.state.currentTime ?? 0;
     syncFlight(time);
+    syncOverlay(time);
     onTimeChange?.(time);
   };
 
   const handlePlay = () => {
     syncFlight(playerRef.current?.state.currentTime ?? 0);
     void flightRef.current?.play();
+    void overlayRef.current?.play();
   };
 
   const handlePause = () => {
     flightRef.current?.pause();
+    overlayRef.current?.pause();
   };
 
   const handleSeek = () => {
     syncFlight(playerRef.current?.state.currentTime ?? 0);
+    syncOverlay(playerRef.current?.state.currentTime ?? 0);
   };
 
   const cameraIsMain = layout === 'camera-main';
@@ -256,6 +283,19 @@ export function FlightOverlayPlayer({
           <div className="pointer-events-none absolute inset-0 z-30">
             {overlayContent}
           </div>
+        )}
+        {overlayUrl && (
+          <video
+            ref={overlayRef}
+            src={overlayUrl}
+            playsInline
+            muted
+            preload="metadata"
+            onLoadStart={() => setOverlayReady(false)}
+            onLoadedMetadata={() => setOverlayReady(true)}
+            className="pointer-events-none absolute inset-0 z-10 h-full w-full object-fill"
+            aria-hidden="true"
+          />
         )}
         <button
           type="button"
