@@ -22,6 +22,7 @@ import '@vidstack/react/player/styles/default/theme.css';
 import '@vidstack/react/player/styles/default/layouts/video.css';
 import {
   Columns2,
+  LoaderCircle,
   Maximize,
   Minimize,
   Pause,
@@ -41,6 +42,8 @@ interface FlightOverlayPlayerProps {
   cameraLabel: string;
   flightLabel: string;
   overlayUrl?: string;
+  overlayStatus?: 'missing' | 'generating' | 'ready' | 'failed';
+  overlayError?: string | null;
   syncOffsetSeconds?: number;
   getFlightTime?: (cameraTime: number) => number;
   getCameraTime?: (flightTime: number) => number;
@@ -59,6 +62,8 @@ export function FlightOverlayPlayer({
   cameraLabel,
   flightLabel,
   overlayUrl,
+  overlayStatus,
+  overlayError,
   syncOffsetSeconds = 0,
   getFlightTime,
   getCameraTime,
@@ -343,6 +348,27 @@ export function FlightOverlayPlayer({
             className="pointer-events-none absolute inset-0 z-10 h-full w-full object-fill"
             aria-hidden="true"
           />
+        )}
+        {overlayStatus === 'generating' && (
+          <div className="pointer-events-none absolute inset-0 z-35 flex items-center justify-center bg-slate-950/45 p-4">
+            <div className="flex items-center gap-3 rounded-lg border border-sky-300/40 bg-slate-950/90 px-4 py-3 text-sm font-semibold text-white shadow-xl">
+              <LoaderCircle
+                className="h-5 w-5 animate-spin text-sky-300"
+                aria-hidden="true"
+              />
+              <span>{t('flights.goproOverlayGeneratingInteractive')}</span>
+            </div>
+          </div>
+        )}
+        {overlayStatus === 'failed' && (
+          <div className="pointer-events-none absolute inset-x-4 bottom-4 z-35 rounded-lg border border-red-400/50 bg-red-950/90 px-4 py-3 text-sm text-red-100 shadow-xl">
+            <p className="font-semibold">
+              {t('flights.goproOverlayInteractiveUnavailable')}
+            </p>
+            {overlayError && (
+              <p className="mt-1 text-xs text-red-200/80">{overlayError}</p>
+            )}
+          </div>
         )}
         <button
           type="button"

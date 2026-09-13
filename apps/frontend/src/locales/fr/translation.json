@@ -1186,6 +1186,8 @@
     "goproOverlayGpxOffsetHint": "Une valeur positive retarde le GPX ; une valeur négative l'avance.",
     "goproOverlayPreviewLoading": "Chargement de la prévisualisation synchronisée…",
     "goproOverlayPreviewError": "La prévisualisation n’est pas disponible. Vérifiez les horodatages de la vidéo et du GPX.",
+    "goproOverlayGeneratingInteractive": "Génération de l’overlay en cours…",
+    "goproOverlayInteractiveUnavailable": "L’overlay interactif n’est pas disponible.",
     "goproOverlayCameraPreview": "Prévisualisation de la vidéo GoPro",
     "goproOverlayInteractiveTitle": "Overlay interactif",
     "goproOverlayInteractiveDescription": "Calibrez et regardez la caméra et la vidéo du vol avec une disposition interactive.",
