@@ -1703,7 +1703,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
             )
             render_gpx_path = enriched_gpx_path
-            if gpx_offset:
+            if gpx_offset and not command_metadata.get("overlay_only"):
                 render_gpx_path = _shift_gpx_timestamps(
                     enriched_gpx_path,
                     work_dir / f"gpx-offset-{job_id}.gpx",
@@ -1711,7 +1711,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 )
         else:
             _append_job_log(log_path, "No OSV files found; using GPX directly")
-            if gpx_offset:
+            if gpx_offset and not command_metadata.get("overlay_only"):
                 render_gpx_path = _shift_gpx_timestamps(
                     render_gpx_path,
                     work_dir / f"gpx-offset-{job_id}.gpx",
@@ -1723,7 +1723,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
             command_metadata["segment_video_start"] = aligned_video_start.isoformat()
         else:
             command_metadata.pop("segment_video_start", None)
-        if embedded_video_start is not None:
+        if embedded_video_start is not None and not command_metadata.get("overlay_only"):
             command_metadata["video_time_start"] = "video-created"
         else:
             command_metadata.pop("video_time_start", None)
