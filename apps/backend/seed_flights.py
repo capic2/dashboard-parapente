@@ -29,7 +29,7 @@ SAMPLE_FLIGHT_TITLES = {
 }
 
 
-def create_sample_video(video_path: Path, color: str) -> None:
+def create_sample_video(video_path: Path, color: str, start_time: datetime) -> None:
     """Create a tiny valid MP4 that is suitable for staging smoke tests."""
     video_path.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
@@ -49,6 +49,8 @@ def create_sample_video(video_path: Path, color: str) -> None:
             "yuv420p",
             "-movflags",
             "+faststart",
+            "-metadata",
+            f"creation_time={start_time.isoformat(timespec='seconds')}Z",
             "-y",
             str(video_path),
         ],
@@ -66,7 +68,8 @@ def ensure_sample_media(db: Session, flights: list[Flight]) -> int:
         for filename in ("flight.mp4", "camera.mp4", "pano.mp4", "final.mp4"):
             path = directory / filename
             if not path.is_file():
-                create_sample_video(path, colors[index % len(colors)])
+                video_start = flight.created_at - timedelta(minutes=flight.duration_minutes)
+                create_sample_video(path, colors[index % len(colors)], video_start)
                 created_count += 1
 
         video_path = (directory / "flight.mp4").resolve()
