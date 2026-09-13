@@ -6672,7 +6672,7 @@ def _prepare_enriched_gpx_in_background(
         logger.warning("Unable to prepare enriched GPX in background: %s", exc)
 
 
-_INTERACTIVE_OVERLAY_FILENAME = "interactive-gopro-overlay.mov"
+_INTERACTIVE_OVERLAY_FILENAME = "interactive-gopro-overlay.webm"
 _INTERACTIVE_OVERLAY_JOB_FILENAME = "interactive-gopro-overlay.json"
 
 
@@ -6692,8 +6692,10 @@ def _interactive_overlay_state(camera_path: Path) -> dict[str, Any]:
     if not job:
         return {"status": "missing", "job_id": None, "error": None}
     status = str(job.get("status") or "missing")
-    if status == "completed" and not gopro_overlay_output_path(str(job_id)):
-        status = "generating"
+    if job.get("output_filename") != _INTERACTIVE_OVERLAY_FILENAME:
+        return {"status": "missing", "job_id": None, "error": None}
+    if status == "completed":
+        status = "ready" if gopro_overlay_output_path(str(job_id)) else "generating"
     return {
         "status": status if status in {"generating", "ready", "failed"} else "generating",
         "job_id": str(job_id),
@@ -7177,7 +7179,7 @@ def download_gopro_overlay_render_job(job_id: str) -> FileResponse:
 
     return FileResponse(
         path=output_path,
-        media_type="video/mp4",
+        media_type="video/webm" if output_path.suffix.lower() == ".webm" else "video/mp4",
         filename=output_path.name,
         content_disposition_type="inline",
     )

@@ -2514,11 +2514,11 @@ def _run_job(job_id: str) -> None:
             profile or "<none>",
         )
         if overlay_only:
-            # ``mov`` is GoPro Dashboard's built-in PNG-in-MOV profile.  It
-            # preserves the alpha channel needed when compositing each scene.
-            # There is no built-in ``overlay`` profile in Dashboard 0.133.
-            command.extend(["--profile", "mov"])
-            cpu_command.extend(["--profile", "mov"])
+            # VP9/WebM preserves alpha and is playable as a transparent HTML5
+            # video in Chromium. The PNG-in-MOV profile is useful for server
+            # compositing but is not reliably decodable by browsers.
+            command.extend(["--profile", "vp9"])
+            cpu_command.extend(["--profile", "vp9"])
     common_args: list[str] = []
     if job.get("video_width") and job.get("video_height"):
         common_args.extend(["--overlay-size", f"{job['video_width']}x{job['video_height']}"])
