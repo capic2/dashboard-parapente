@@ -19,6 +19,31 @@ En cas d'échec réseau, la copie locale est conservée et le service réessaie.
 
 La rétention de 3 sauvegardes est alors appliquée sur Google Drive.
 
+### Première configuration
+
+L'autorisation Google est distincte de l'autorisation YouTube, même si le
+même compte Google est utilisé.
+
+1. Installer `rclone` sur un ordinateur qui peut ouvrir un navigateur.
+2. Lancer `rclone config`.
+3. Créer un nouveau remote nommé `gdrive`, de type `drive`.
+4. Laisser `client_id`, `client_secret` et `service_account_file` vides.
+5. Choisir l'accès complet à Google Drive et autoriser le même compte Google
+   que celui utilisé pour YouTube.
+6. Vérifier le remote avec `rclone lsd gdrive:` et créer le dossier distant :
+   `rclone mkdir gdrive:dashboard-parapente/database-backups`.
+7. Afficher le fichier de configuration avec `rclone config file`, puis
+   copier `rclone.conf` sur le serveur dans
+   `RCLONE_CONFIG_HOST_DIR/rclone.conf`.
+8. Dans Portainer, renseigner `DATABASE_BACKUP_GOOGLE_DRIVE_REMOTE=gdrive` et
+   `DATABASE_BACKUP_GOOGLE_DRIVE_PATH=dashboard-parapente/database-backups`,
+   puis redéployer la stack.
+
+Le fichier `rclone.conf` contient un jeton d'accès Google et ne doit jamais
+être commité ni partagé. Tant que le remote Google Drive n'est pas renseigné,
+le service conserve les 3 dernières sauvegardes localement. En cas d'échec de
+l'upload, la sauvegarde locale est conservée et le service réessaie.
+
 ## Destination requise
 
 `DATABASE_BACKUP_HOST_DIR` doit désigner un stockage distinct du serveur
