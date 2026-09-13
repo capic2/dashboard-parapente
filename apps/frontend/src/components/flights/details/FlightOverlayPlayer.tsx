@@ -24,7 +24,9 @@ import {
   Columns2,
   Maximize,
   Minimize,
+  Pause,
   PictureInPicture2,
+  Play,
   Repeat2,
 } from 'lucide-react';
 
@@ -72,6 +74,7 @@ export function FlightOverlayPlayer({
   const [layout, setLayout] = useState<FlightOverlayLayout>('camera-main');
   const [flightReady, setFlightReady] = useState(false);
   const [overlayReady, setOverlayReady] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const syncFlight = useCallback(
@@ -128,6 +131,16 @@ export function FlightOverlayPlayer({
     void frameRef.current?.requestFullscreen();
   };
 
+  const togglePlayback = () => {
+    if (flightIsMain) {
+      if (flightRef.current?.paused) void flightRef.current.play();
+      else flightRef.current?.pause();
+      return;
+    }
+    if (playerRef.current?.state.paused) void playerRef.current.play();
+    else void playerRef.current?.pause();
+  };
+
   const handleTimeUpdate = () => {
     const time = playerRef.current?.state.currentTime ?? 0;
     syncFlight(time);
@@ -136,23 +149,27 @@ export function FlightOverlayPlayer({
   };
 
   const handlePlay = () => {
+    setIsPlaying(true);
     syncFlight(playerRef.current?.state.currentTime ?? 0);
     void flightRef.current?.play();
     void overlayRef.current?.play();
   };
 
   const handlePause = () => {
+    setIsPlaying(false);
     flightRef.current?.pause();
     overlayRef.current?.pause();
   };
 
   const handleFlightPlay = () => {
+    setIsPlaying(true);
     syncFlight(playerRef.current?.state.currentTime ?? 0);
     void playerRef.current?.play();
     void overlayRef.current?.play();
   };
 
   const handleFlightPause = () => {
+    setIsPlaying(false);
     void playerRef.current?.pause();
     overlayRef.current?.pause();
   };
@@ -327,6 +344,20 @@ export function FlightOverlayPlayer({
             aria-hidden="true"
           />
         )}
+        <button
+          type="button"
+          onClick={togglePlayback}
+          className="absolute left-1/2 top-1/2 z-40 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-slate-950/80 text-white shadow-lg transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+          aria-label={t(
+            isPlaying ? 'flights.viewer.pause' : 'flights.viewer.play'
+          )}
+        >
+          {isPlaying ? (
+            <Pause className="h-6 w-6" aria-hidden="true" />
+          ) : (
+            <Play className="ml-0.5 h-6 w-6" aria-hidden="true" />
+          )}
+        </button>
         <button
           type="button"
           onClick={toggleFullscreen}
