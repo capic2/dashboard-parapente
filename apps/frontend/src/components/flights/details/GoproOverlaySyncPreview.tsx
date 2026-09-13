@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Gauge, HeartPulse, MapPin, Mountain, TimerReset } from 'lucide-react';
+import {
+  Activity,
+  Gauge,
+  HeartPulse,
+  Mountain,
+  TimerReset,
+} from 'lucide-react';
 import {
   useGenerateGoproPreview,
   useGoproOverlayPreview,
@@ -25,6 +31,162 @@ function formatSeconds(seconds: number) {
   const minutes = Math.floor(absolute / 60);
   const remainingSeconds = absolute - minutes * 60;
   return `${sign}${minutes}:${remainingSeconds.toFixed(1).padStart(4, '0')}`;
+}
+
+function flightTotals(coordinates: GoproOverlayPreview['gpx']['coordinates']) {
+  let gain = 0;
+  let loss = 0;
+  let distance = 0;
+  for (let index = 1; index < coordinates.length; index += 1) {
+    const previous = coordinates[index - 1];
+    const current = coordinates[index];
+    const elevationDelta = current.elevation - previous.elevation;
+    if (elevationDelta > 0) gain += elevationDelta;
+    else loss -= elevationDelta;
+    const latitude = ((previous.lat + current.lat) / 2) * (Math.PI / 180);
+    const latitudeDelta = (current.lat - previous.lat) * (Math.PI / 180);
+    const longitudeDelta = (current.lon - previous.lon) * (Math.PI / 180);
+    const a =
+      Math.sin(latitudeDelta / 2) ** 2 +
+      Math.cos(latitude) ** 2 * Math.sin(longitudeDelta / 2) ** 2;
+    distance += 2 * 6_371_000 * Math.asin(Math.sqrt(a));
+  }
+  return {
+    gain,
+    loss,
+    distance: distance / 1000,
+    startAltitude: coordinates[0]?.elevation ?? 0,
+    minAltitude: Math.min(...coordinates.map((point) => point.elevation)),
+    maxAltitude: Math.max(...coordinates.map((point) => point.elevation)),
+  };
+}
+
+function varioAtTimestamp(
+  coordinates: GoproOverlayPreview['gpx']['coordinates'],
+  timestamp: number
+) {
+  if (coordinates.length < 2) return 0;
+  let index = 1;
+  while (
+    index < coordinates.length &&
+    coordinates[index].timestamp < timestamp
+  ) {
+    index += 1;
+  }
+  const previous = coordinates[index - 1];
+  const next = coordinates[Math.min(index, coordinates.length - 1)];
+  const duration = (next.timestamp - previous.timestamp) / 1000;
+  return duration > 0 ? (next.elevation - previous.elevation) / duration : 0;
+}
+
+function formatOverlayDate(timestamp: number) {
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(new Date(timestamp));
+}
+
+function InteractiveGoproOverlay({
+  telemetry,
+  coordinates,
+}: {
+  telemetry: ReturnType<typeof telemetryAtTimestamp>;
+  coordinates: GoproOverlayPreview['gpx']['coordinates'];
+}) {
+  const totals = flightTotals(coordinates);
+  const vario = telemetry
+    ? varioAtTimestamp(coordinates, telemetry.timestamp)
+    : 0;
+  const heartRates = coordinates.flatMap((point) =>
+    point.heart_rate === undefined ? [] : [point.heart_rate]
+  );
+  const value = (current: number | null | undefined, suffix = '') =>
+    current === null || current === undefined
+      ? '--'
+      : `${Math.round(current)}${suffix}`;
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden font-mono text-[clamp(7px,1.25vw,16px)] font-semibold text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.95)]">
+      <span className="absolute left-[0.52%] top-[0.93%] whitespace-nowrap text-[clamp(8px,1.4vw,18px)]">
+        {telemetry
+          ? formatOverlayDate(telemetry.timestamp)
+          : '--/--/---- --:--:--'}
+      </span>
+
+      <div className="absolute right-[1%] top-[0.93%] w-[15%] text-right">
+        <div className="flex items-center justify-end gap-1 text-[clamp(8px,1vw,14px)]">
+          <HeartPulse className="h-[1.8em] w-[1.8em]" aria-hidden="true" />
+          {telemetry?.heart_rate ? `${telemetry.heart_rate} bpm` : '-- bpm'}
+        </div>
+        <div className="mt-1 text-[clamp(12px,2.2vw,28px)]">
+          {telemetry?.heart_rate ?? '--'}
+        </div>
+        <div className="mt-1 flex justify-end gap-3 text-[0.8em]">
+          <span>
+            min {value(heartRates.length ? Math.min(...heartRates) : null)}
+          </span>
+          <span>
+            max {value(heartRates.length ? Math.max(...heartRates) : null)}
+          </span>
+        </div>
+      </div>
+
+      <div className="absolute right-[1%] top-[10.2%] w-[15%] text-right">
+        <div className="flex items-center justify-end gap-1 text-[clamp(8px,1vw,14px)]">
+          <Mountain className="h-[1.8em] w-[1.8em]" aria-hidden="true" /> m
+        </div>
+        <div className="mt-1 text-[clamp(12px,2.2vw,28px)]">
+          {value(telemetry?.elevation)}
+        </div>
+        <div className="mt-1 flex justify-end gap-3 text-[0.8em]">
+          <span>min {Math.round(totals.minAltitude)}</span>
+          <span>max {Math.round(totals.maxAltitude)}</span>
+        </div>
+      </div>
+
+      <div className="absolute right-[1%] top-[19.4%] w-[15%] text-right">
+        <div className="flex items-center justify-end gap-1">
+          ↗ D+ {Math.round(totals.gain)} m
+        </div>
+        <div>↘ D- {Math.round(totals.loss)} m</div>
+      </div>
+
+      <div className="absolute right-[1%] top-[28.7%] w-[15%] text-right">
+        <div className="flex items-center justify-end gap-1">
+          <Activity className="h-[1.8em] w-[1.8em]" aria-hidden="true" />
+          {vario.toFixed(2)} m/s
+        </div>
+      </div>
+
+      <div className="absolute bottom-[1%] left-[12.5%] text-left">
+        <div>Déco (m)</div>
+        <div className="text-[clamp(12px,2.2vw,28px)]">
+          {Math.round(totals.startAltitude)}
+        </div>
+        <div className="mt-1">Attero (m)</div>
+        <div className="text-[clamp(12px,2.2vw,28px)]">
+          {Math.round(totals.minAltitude)}
+        </div>
+        <div className="mt-1">Distance {totals.distance.toFixed(1)} km</div>
+      </div>
+
+      <div className="absolute bottom-[1%] right-[1%] flex flex-col items-center text-center">
+        <Gauge
+          className="h-[clamp(24px,6vw,76px)] w-[clamp(24px,6vw,76px)]"
+          aria-hidden="true"
+        />
+        <span className="-mt-2 text-[clamp(14px,2.8vw,36px)]">
+          {telemetry ? Math.round(telemetry.speedKmh) : '--'}
+        </span>
+        <span>km/h</span>
+      </div>
+    </div>
+  );
 }
 
 export function sourceTimeAtPreviewTime(
@@ -87,7 +249,6 @@ export function GoproOverlaySyncPreview({
         gpxStart + (sourceVideoTime - automaticOffset - manualOffset) * 1000
       )
     : null;
-  const heartRate = telemetry?.heart_rate ?? null;
   const videoUrl = getApiUrlWithSearchParams(
     `flights/${flightId}/gopro-camera/preview`,
     {
@@ -208,35 +369,10 @@ export function GoproOverlaySyncPreview({
           }
           onTimeChange={setVideoTime}
           overlayContent={
-            <div className="grid min-w-56 grid-cols-2 gap-x-4 gap-y-1 rounded-lg bg-slate-950/80 px-3 py-2.5 font-mono text-xs text-white shadow-lg backdrop-blur-sm">
-              <span className="text-sky-200">
-                <Mountain
-                  className="mr-1 inline h-3.5 w-3.5"
-                  aria-hidden="true"
-                />
-                {telemetry ? `${Math.round(telemetry.elevation)} m` : '--'}
-              </span>
-              <span className="text-rose-200">
-                <Gauge className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />
-                {telemetry ? `${telemetry.speedKmh.toFixed(1)} km/h` : '--'}
-              </span>
-              <span className="text-emerald-200">
-                <HeartPulse
-                  className="mr-1 inline h-3.5 w-3.5"
-                  aria-hidden="true"
-                />
-                {heartRate === null ? '--' : `${heartRate} bpm`}
-              </span>
-              <span className="text-violet-200">
-                <MapPin
-                  className="mr-1 inline h-3.5 w-3.5"
-                  aria-hidden="true"
-                />
-                {telemetry
-                  ? `${telemetry.lat.toFixed(3)}, ${telemetry.lon.toFixed(3)}`
-                  : '--'}
-              </span>
-            </div>
+            <InteractiveGoproOverlay
+              telemetry={telemetry}
+              coordinates={preview.data?.gpx.coordinates ?? []}
+            />
           }
         />
         <div className="flex items-center justify-between px-3 py-2 font-mono text-xs text-gray-200">

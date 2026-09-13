@@ -100,7 +100,7 @@ export function FlightOverlayPlayer({
   const cameraIsMain = layout === 'camera-main';
   const flightIsMain = layout === 'flight-main';
   const pipClassName =
-    'absolute bottom-3 right-3 z-30 aspect-video w-1/3 cursor-pointer rounded-lg border-2 border-white/80 bg-black shadow-xl transition-[width] duration-200 hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400';
+    'absolute bottom-3 left-3 z-30 aspect-video w-1/3 cursor-pointer rounded-lg border-2 border-white/80 bg-black shadow-xl transition-[width] duration-200 hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400';
 
   const switchTo = (nextLayout: FlightOverlayLayout) => {
     setLayout(nextLayout);
@@ -217,7 +217,7 @@ export function FlightOverlayPlayer({
                 current === 'camera-main' ? 'flight-main' : 'camera-main'
               )
             }
-            className="absolute bottom-3 left-3 z-20 flex cursor-pointer items-center gap-1.5 rounded-md bg-slate-950/80 px-2.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+            className="absolute bottom-3 right-3 z-20 flex cursor-pointer items-center gap-1.5 rounded-md bg-slate-950/80 px-2.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
             aria-label={t('flights.goproOverlaySwapVideos', {
               name: cameraIsMain ? flightLabel : cameraLabel,
             })}
@@ -227,7 +227,7 @@ export function FlightOverlayPlayer({
           </button>
         )}
         {overlayContent && (
-          <div className="pointer-events-none absolute left-3 top-3 z-30">
+          <div className="pointer-events-none absolute inset-0 z-30">
             {overlayContent}
           </div>
         )}
