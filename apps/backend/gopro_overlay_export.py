@@ -430,6 +430,11 @@ def ensure_enriched_gpx(
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
+def enriched_gpx_path(input_dir: Path) -> Path:
+    """Return the stable location used for the persisted enriched GPX."""
+    return input_dir / _ENRICHED_GPX_FILENAME
+
+
 def _output_path_for_video(video_path: Path, output_name: str) -> Path:
     return video_path.expanduser().resolve().parent / output_name
 
