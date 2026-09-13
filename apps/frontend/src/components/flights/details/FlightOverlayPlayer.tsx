@@ -20,7 +20,13 @@ import {
 import '@vidstack/react/player/styles/default/theme.css';
 // oxlint-disable-next-line import/no-unassigned-import
 import '@vidstack/react/player/styles/default/layouts/video.css';
-import { Columns2, PictureInPicture2, Repeat2 } from 'lucide-react';
+import {
+  Columns2,
+  Maximize,
+  Minimize,
+  PictureInPicture2,
+  Repeat2,
+} from 'lucide-react';
 
 export type FlightOverlayLayout =
   | 'camera-main'
@@ -55,8 +61,10 @@ export function FlightOverlayPlayer({
   const { t } = useTranslation();
   const playerRef = useRef<MediaPlayerInstance>(null);
   const flightRef = useRef<HTMLVideoElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState<FlightOverlayLayout>('camera-main');
   const [flightReady, setFlightReady] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const syncFlight = useCallback(
     (cameraTime: number) => {
@@ -77,6 +85,23 @@ export function FlightOverlayPlayer({
   useEffect(() => {
     syncFlight(playerRef.current?.state.currentTime ?? 0);
   }, [syncFlight]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === frameRef.current);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () =>
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement === frameRef.current) {
+      void document.exitFullscreen();
+      return;
+    }
+    void frameRef.current?.requestFullscreen();
+  };
 
   const handleTimeUpdate = () => {
     const time = playerRef.current?.state.currentTime ?? 0;
@@ -119,9 +144,10 @@ export function FlightOverlayPlayer({
   return (
     <div className="overflow-hidden rounded-xl bg-black shadow-sm">
       <div
+        ref={frameRef}
         className={`relative grid min-h-0 bg-black ${
           layout === 'side-by-side' ? 'grid-cols-1 md:grid-cols-2' : ''
-        }`}
+        } [&:fullscreen]:h-screen [&:fullscreen]:w-screen [&:fullscreen]:content-center [&:fullscreen]:items-center [&:fullscreen]:p-4`}
       >
         {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions */}
         <div
@@ -231,6 +257,19 @@ export function FlightOverlayPlayer({
             {overlayContent}
           </div>
         )}
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          className="absolute right-3 top-3 z-40 flex h-9 w-9 cursor-pointer items-center justify-center rounded-md bg-slate-950/80 text-white transition-colors hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+          aria-label={t('flights.viewer.fullscreen')}
+          title={t('flights.viewer.fullscreen')}
+        >
+          {isFullscreen ? (
+            <Minimize className="h-4 w-4" aria-hidden="true" />
+          ) : (
+            <Maximize className="h-4 w-4" aria-hidden="true" />
+          )}
+        </button>
       </div>
       <div className="flex flex-wrap items-center gap-2 border-t border-gray-800 bg-gray-950 px-3 py-2">
         <span className="mr-auto text-xs font-medium text-gray-300">
