@@ -67,10 +67,11 @@ def ensure_sample_media(db: Session, flights: list[Flight]) -> int:
         directory = flight_directory(db, flight)
         for filename in ("flight.mp4", "camera.mp4", "pano.mp4", "final.mp4"):
             path = directory / filename
-            if not path.is_file():
-                video_start = flight.created_at - timedelta(minutes=flight.duration_minutes)
-                create_sample_video(path, colors[index % len(colors)], video_start)
-                created_count += 1
+            # These are disposable staging fixtures. Recreate them on every
+            # startup so persistent volumes pick up metadata changes too.
+            video_start = flight.created_at - timedelta(minutes=flight.duration_minutes)
+            create_sample_video(path, colors[index % len(colors)], video_start)
+            created_count += 1
 
         video_path = (directory / "flight.mp4").resolve()
         pano_path = (directory / "pano.mp4").resolve()
