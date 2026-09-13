@@ -46,6 +46,7 @@ _LOG_TAIL_LINE_COUNT = 100
 _PANORAMA_PREPARATION_PROGRESS_MAX = 10
 _PANORAMA_PREPARATION_POLL_SECONDS = 10
 _PANORAMA_PREPARATION_HEARTBEAT_SECONDS = 60
+_ORPHANED_UPLOAD_ARTIFACT_MAX_AGE = timedelta(hours=24)
 
 
 class YoutubeConfigurationError(RuntimeError):
@@ -679,6 +680,57 @@ def _panorama_upload_path(job_id: str) -> Path:
     return Path(config.VIDEO_EXPORT_DIR) / ".youtube-uploads" / f"{job_id}.spherical.mp4"
 
 
+def _upload_artifact_job_id(path: Path) -> str | None:
+    """Return the upload job id encoded in a generated panorama filename."""
+    for suffix in (".spherical.part.mp4", ".spherical.mp4"):
+        if path.name.endswith(suffix):
+            job_id = path.name[: -len(suffix)]
+            return job_id or None
+    return None
+
+
+def cleanup_orphaned_upload_artifacts(
+    *, now: datetime | None = None, max_age: timedelta = _ORPHANED_UPLOAD_ARTIFACT_MAX_AGE
+) -> int:
+    """Remove stale temporary YouTube panorama files not owned by active jobs.
+
+    A grace period protects artifacts from a job that is being recovered while
+    the API or RQ worker is starting. Unknown filenames are left untouched.
+    """
+    artifact_dir = Path(config.VIDEO_EXPORT_DIR) / ".youtube-uploads"
+    if not artifact_dir.is_dir():
+        return 0
+
+    with SessionLocal() as db:
+        active_job_ids = {
+            job_id
+            for (job_id,) in db.query(YoutubeUploadJob.id)
+            .filter(YoutubeUploadJob.status.in_(_ACTIVE_STATUSES))
+            .all()
+        }
+
+    current_time = now or datetime.now(timezone.utc)
+    removed_count = 0
+    for artifact_path in artifact_dir.iterdir():
+        if not artifact_path.is_file():
+            continue
+        job_id = _upload_artifact_job_id(artifact_path)
+        if job_id is None or job_id in active_job_ids:
+            continue
+        try:
+            modified_at = datetime.fromtimestamp(artifact_path.stat().st_mtime, tz=timezone.utc)
+            if current_time - modified_at < max_age:
+                continue
+            artifact_path.unlink()
+            removed_count += 1
+        except OSError:
+            logger.warning("Unable to remove orphaned YouTube artifact %s", artifact_path)
+
+    if removed_count:
+        logger.info("Removed %s orphaned YouTube upload artifact(s)", removed_count)
+    return removed_count
+
+
 def _has_spherical_panorama_metadata(video_path: Path) -> bool:
     def debug_metadata(message: object, *extra: object) -> None:
         logger.debug("Spatial metadata inspector: %s", " ".join(map(str, (message, *extra))))
@@ -987,6 +1039,7 @@ def enqueue_youtube_upload(job_id: str) -> None:
 def enqueue_pending_youtube_uploads(
     *, recover_active: bool = False, migrate_legacy_queue: bool = False
 ) -> int:
+    cleanup_orphaned_upload_artifacts()
     with SessionLocal() as db:
         jobs = (
             db.query(YoutubeUploadJob)

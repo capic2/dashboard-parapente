@@ -1,3 +1,5 @@
+import os
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -478,6 +480,49 @@ def test_worker_keeps_standard_youtube_upload_source_unchanged(tmp_path) -> None
         youtube_upload._prepare_upload_video("youtube-overlay", "gopro_overlay", source_path)
         == source_path
     )
+
+
+def test_cleanup_orphaned_upload_artifacts_removes_only_old_inactive_files(
+    tmp_path, db_session, test_db, sample_flight, monkeypatch
+) -> None:
+    monkeypatch.setattr(config, "VIDEO_EXPORT_DIR", str(tmp_path))
+    monkeypatch.setattr(youtube_upload, "SessionLocal", test_db)
+    active_job = YoutubeUploadJob(
+        id="youtube-active",
+        flight_id=sample_flight.id,
+        user_id=1,
+        status="uploading",
+        progress=50,
+        title="Active upload",
+        description="",
+        privacy_status="private",
+    )
+    db_session.add(active_job)
+    db_session.commit()
+
+    artifact_dir = tmp_path / ".youtube-uploads"
+    artifact_dir.mkdir()
+    active_artifact = artifact_dir / "youtube-active.spherical.mp4"
+    stale_artifact = artifact_dir / "youtube-stale.spherical.mp4"
+    stale_partial = artifact_dir / "youtube-partial.spherical.part.mp4"
+    recent_artifact = artifact_dir / "youtube-recent.spherical.mp4"
+    unknown_artifact = artifact_dir / "manual.spherical.mov"
+    artifacts = (active_artifact, stale_artifact, stale_partial, recent_artifact, unknown_artifact)
+    for path in artifacts:
+        path.write_bytes(b"artifact")
+
+    now = datetime.now(timezone.utc)
+    old_timestamp = (now - timedelta(days=2)).timestamp()
+    for path in (active_artifact, stale_artifact, stale_partial, unknown_artifact):
+        path.touch()
+        os.utime(path, (old_timestamp, old_timestamp))
+
+    assert youtube_upload.cleanup_orphaned_upload_artifacts(now=now) == 2
+    assert active_artifact.exists()
+    assert not stale_artifact.exists()
+    assert not stale_partial.exists()
+    assert recent_artifact.exists()
+    assert unknown_artifact.exists()
 
 
 def test_start_youtube_upload_allows_an_overlay_with_an_existing_youtube_video(
