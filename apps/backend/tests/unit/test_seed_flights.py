@@ -28,10 +28,12 @@ def test_seed_flights_can_create_staging_media(
 ) -> None:
     monkeypatch.setattr(seed_flights, "SessionLocal", test_db)
     monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    created_videos: list[Path] = []
 
     def write_sample_video(path: Path, color: str, start_time) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(f"sample-{color}".encode())
+        created_videos.append(path)
 
     monkeypatch.setattr(seed_flights, "create_sample_video", write_sample_video)
 
@@ -59,6 +61,7 @@ def test_seed_flights_can_create_staging_media(
         db.commit()
 
     assert seed_flights.seed_flights(include_media=True) == 0
+    assert len(created_videos) == 40
 
     with test_db() as db:
         imported_flight = db.get(Flight, "imported-flight")
