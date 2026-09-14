@@ -12,7 +12,6 @@ import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
 import { telemetryAtTimestamp } from './goproSyncTelemetry';
 import type { GoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
-import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 
 interface GoproOverlaySyncPreviewProps {
   flightId: string;
@@ -73,6 +72,8 @@ export function GoproOverlaySyncPreview({
   const generatePreview = useGenerateGoproPreview(flightId);
   const automaticallyRequestedTarget = useRef<string | null>(null);
   const [videoTime, setVideoTime] = useState(0);
+  const cameraRef = useRef<HTMLVideoElement>(null);
+  const overlayRef = useRef<HTMLVideoElement>(null);
   const [requestedMinutes, setRequestedMinutes] = useState(3);
   const parsedOffset = Number(offset);
   const manualOffset = Number.isFinite(parsedOffset) ? parsedOffset : 0;
@@ -110,12 +111,6 @@ export function GoproOverlaySyncPreview({
         }
       )
     : undefined;
-  const flightVideoUrl = getApiUrlWithSearchParams(
-    `flights/${flightId}/video`,
-    {
-      access_token: token,
-    }
-  );
 
   const availableMinutes = Math.max(
     0,
@@ -185,6 +180,25 @@ export function GoproOverlaySyncPreview({
     );
   };
 
+  const syncOverlay = () => {
+    const camera = cameraRef.current;
+    const overlay = overlayRef.current;
+    if (!camera || !overlay) return;
+    const target = sourceTimeAtPreviewTime(camera.currentTime, previewSegments);
+    if (Math.abs(overlay.currentTime - target) > 0.08) {
+      overlay.currentTime = target;
+    }
+  };
+
+  const handleCameraPlay = () => {
+    syncOverlay();
+    void overlayRef.current?.play();
+  };
+
+  const handleCameraPause = () => {
+    overlayRef.current?.pause();
+  };
+
   if (preview.isPending) {
     return (
       <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
@@ -207,23 +221,39 @@ export function GoproOverlaySyncPreview({
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(17rem,1fr)]">
       <div className="overflow-hidden rounded-xl bg-black shadow-sm">
-        <FlightOverlayPlayer
-          cameraUrl={videoUrl}
-          flightUrl={flightVideoUrl}
-          overlayUrl={overlayUrl}
-          getOverlayTime={(previewTime) =>
-            sourceTimeAtPreviewTime(previewTime, previewSegments)
-          }
-          cameraLabel={t('flights.goproOverlayCameraPreview')}
-          flightLabel={t('flights.goproOverlayFlightVideo')}
-          syncOffsetSeconds={automaticOffset + manualOffset}
-          getFlightTime={(previewTime) =>
-            sourceTimeAtPreviewTime(previewTime, previewSegments) -
-            automaticOffset -
-            manualOffset
-          }
-          onTimeChange={setVideoTime}
-          overlayContent={
+        <div className="relative aspect-video bg-black">
+          <video
+            ref={cameraRef}
+            src={videoUrl}
+            controls
+            playsInline
+            preload="metadata"
+            className="absolute inset-0 h-full w-full object-contain"
+            aria-label={t('flights.goproOverlayCameraPreview')}
+            onPlay={handleCameraPlay}
+            onPause={handleCameraPause}
+            onSeeked={syncOverlay}
+            onTimeUpdate={() => {
+              syncOverlay();
+              setVideoTime(cameraRef.current?.currentTime ?? 0);
+            }}
+          >
+            <track kind="captions" />
+          </video>
+          {overlayUrl && (
+            <video
+              ref={overlayRef}
+              src={overlayUrl}
+              muted
+              playsInline
+              preload="metadata"
+              className="pointer-events-none absolute inset-0 z-10 h-full w-full object-contain"
+              aria-label={t('flights.overlayLayerReady')}
+            >
+              <track kind="captions" />
+            </video>
+          )}
+          <div className="pointer-events-none absolute left-3 top-3 z-20">
             <div className="flex gap-2 rounded-lg bg-slate-950/75 px-3 py-2 font-mono text-xs text-white shadow-lg backdrop-blur-sm">
               <span>
                 {telemetry ? `${Math.round(telemetry.elevation)} m` : '--'}
@@ -233,8 +263,8 @@ export function GoproOverlaySyncPreview({
               </span>
               <span>{heartRate === null ? '--' : `${heartRate} bpm`}</span>
             </div>
-          }
-        />
+          </div>
+        </div>
         <div className="flex items-center justify-between px-3 py-2 font-mono text-xs text-gray-200">
           <span>{t('flights.goproOverlayVideoTime')}</span>
           <span>{formatSeconds(sourceVideoTime)}</span>
