@@ -150,6 +150,20 @@ const mockGPXData = {
     elevation: 800 + Math.sin(i / 10) * 400,
     timestamp: 1773842400000 + i * 60000,
   })),
+  max_altitude_m: 1850,
+  min_altitude_m: 700,
+  altitude_range_m: 1150,
+  takeoff_altitude_m: 800,
+  landing_altitude_m: 760,
+  elevation_gain_m: 1200,
+  elevation_loss_m: 1240,
+  total_distance_km: 18.5,
+  max_distance_from_takeoff_km: 8.4,
+  flight_duration_seconds: 5700,
+  average_speed_kmh: 11.7,
+  max_speed_kmh: 52.3,
+  max_climb_rate_ms: 4.6,
+  max_sink_rate_ms: 3.2,
 };
 
 const defaultHandlers = [

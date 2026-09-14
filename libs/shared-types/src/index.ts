@@ -762,10 +762,18 @@ export const GPXDataSchema = z.object({
   coordinates: z.array(GeoPointSchema),
   max_altitude_m: z.number(),
   min_altitude_m: z.number(),
+  altitude_range_m: z.number().optional(),
+  takeoff_altitude_m: z.number().optional(),
+  landing_altitude_m: z.number().optional(),
   elevation_gain_m: z.number(),
   elevation_loss_m: z.number(),
   total_distance_km: z.number(),
+  max_distance_from_takeoff_km: z.number().optional(),
   flight_duration_seconds: z.number(),
+  average_speed_kmh: z.number().optional(),
+  max_speed_kmh: z.number().optional(),
+  max_climb_rate_ms: z.number().optional(),
+  max_sink_rate_ms: z.number().optional(),
 });
 
 // ============================================================================
