@@ -1207,6 +1207,8 @@
     "overlayLayerMissing": "Layer to generate",
     "overlayLayerOutdated": "Layer needs regeneration",
     "overlayLayerGenerating": "Generating layer",
+    "overlayLayerProgress": "Overlay layer generation progress",
+    "overlayLayerJobId": "Job {{jobId}} · updated automatically",
     "overlayLayerReady": "Layer ready",
     "overlaySaveCalibration": "Save calibration",
     "overlayGenerateLayer": "Generate layer",
@@ -1280,6 +1282,7 @@
       "videoTitle": "Flight video",
       "highlightVideoTitle": "Best moments",
       "goproOverlayTitle": "GoPro overlay",
+      "overlayLayerTitle": "Overlay layer",
       "youtubeUploadTitle": "YouTube upload",
       "method": {
         "cpu": "CPU",

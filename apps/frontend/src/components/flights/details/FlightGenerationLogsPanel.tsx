@@ -18,6 +18,7 @@ type FlightGenerationLogsPanelProps = {
   videoFallbackStatus?: string | null;
   videoFallbackProgress?: number | null;
   goproOverlayJob: GoproOverlayJob | null;
+  overlayLayerJob?: GoproOverlayJob | null;
   goproOverlayJobId?: string | null;
   goproOverlayFallbackStatus?: string | null;
   goproOverlayFallbackProgress?: number | null;
@@ -227,6 +228,7 @@ export function FlightGenerationLogsPanel({
   videoFallbackStatus,
   videoFallbackProgress,
   goproOverlayJob,
+  overlayLayerJob,
   goproOverlayJobId,
   goproOverlayFallbackStatus,
   goproOverlayFallbackProgress,
@@ -247,12 +249,14 @@ export function FlightGenerationLogsPanel({
   const hasGoproOverlayLogSource = Boolean(
     goproOverlayStatusValue || goproOverlayJob?.job_id || goproOverlayJobId
   );
+  const hasOverlayLayerLogSource = Boolean(overlayLayerJob?.job_id);
   const hasYoutubeUploadLogSource = Boolean(youtubeUploadJob?.job_id);
   const hasHighlightLogSource = Boolean(highlightVideo?.job_id);
 
   if (
     !hasVideoLogSource &&
     !hasGoproOverlayLogSource &&
+    !hasOverlayLayerLogSource &&
     !hasYoutubeUploadLogSource &&
     !hasHighlightLogSource
   ) {
@@ -270,6 +274,25 @@ export function FlightGenerationLogsPanel({
         </p>
       </div>
       <div className="space-y-3">
+        {hasOverlayLayerLogSource && overlayLayerJob && (
+          <LogSourceCard
+            key={`overlay-layer-${overlayLayerJob.job_id}`}
+            title={t(
+              'flights.generationLogs.overlayLayerTitle',
+              'Couche overlay'
+            )}
+            status={overlayLayerJob.status}
+            isInProgress={isGoproOverlayInProgress(overlayLayerJob.status)}
+            statusLabel={t(
+              `flights.generationLogs.status.${overlayLayerJob.status}`
+            )}
+            progress={overlayLayerJob.progress}
+            message={overlayLayerJob.message}
+            error={overlayLayerJob.error}
+            updatedAt={overlayLayerJob.updated_at}
+            logs={overlayLayerJob.log_tail}
+          />
+        )}
         {hasVideoLogSource && (
           <LogSourceCard
             key={`video-${videoStatus?.job_id ?? videoJobId ?? 'fallback'}`}

@@ -99,6 +99,7 @@ type FilterOption<T extends string> = {
 
 const activeStatusLabels = new Set([
   'running',
+  'preparing',
   'initializing',
   'capturing',
   'encoding',
