@@ -129,6 +129,7 @@ export function FlightEditForm({
       elevation_gain_m: flight.elevation_gain_m ?? 0,
       max_speed_kmh: flight.max_speed_kmh ?? 0,
       notes: flight.notes ?? '',
+      gpx_metrics_excluded: flight.gpx_metrics_excluded ?? false,
     },
     onSubmit: async ({ value }) => {
       const removedUrls = new Set(
@@ -147,6 +148,7 @@ export function FlightEditForm({
           elevation_gain_m: value.elevation_gain_m,
           max_speed_kmh: value.max_speed_kmh,
           notes: value.notes,
+          gpx_metrics_excluded: value.gpx_metrics_excluded,
           youtube_urls: youtubeRows
             .map((row) => row.value.trim())
             .filter((url) => Boolean(url) && !removedUrls.has(url)),
@@ -516,6 +518,19 @@ export function FlightEditForm({
           )}
         </form.Field>
       </div>
+
+      <form.Field name="gpx_metrics_excluded">
+        {(field) => (
+          <label className="mt-4 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+            <input
+              type="checkbox"
+              checked={field.state.value}
+              onChange={(event) => field.handleChange(event.target.checked)}
+            />
+            {t('flights.excludeGpxMetrics')}
+          </label>
+        )}
+      </form.Field>
 
       <YoutubeAssociationRemovalModal
         association={removalAssociation}

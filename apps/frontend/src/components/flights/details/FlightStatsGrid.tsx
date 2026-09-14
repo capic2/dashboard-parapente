@@ -101,17 +101,21 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
       },
       {
         label: t('flights.maxClimbRateLabel'),
-        value: formatVerticalSpeed(
-          trackAnalysis.max_climb_rate_ms ?? 0,
-          units.altitude
-        ),
+        value: flight.gpx_metrics_excluded
+          ? 'N/A'
+          : formatVerticalSpeed(
+              trackAnalysis.max_climb_rate_ms ?? 0,
+              units.altitude
+            ),
       },
       {
         label: t('flights.maxSinkRateLabel'),
-        value: formatVerticalSpeed(
-          trackAnalysis.max_sink_rate_ms ?? 0,
-          units.altitude
-        ),
+        value: flight.gpx_metrics_excluded
+          ? 'N/A'
+          : formatVerticalSpeed(
+              trackAnalysis.max_sink_rate_ms ?? 0,
+              units.altitude
+            ),
       },
       {
         label: t('flights.averageSpeedLabel'),

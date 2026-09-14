@@ -106,9 +106,9 @@ def test_skips_aberrant_vertical_point_and_uses_next_valid_timestamp() -> None:
 @pytest.mark.parametrize(
     ("elevations", "timestamps", "expected_climb", "expected_sink"),
     [
-        ([0.0, 10.0], [1_000, 2_000], 10, 0),
-        ([0.0, 10.1], [1_000, 2_000], 0, 0),
-        ([0.0, 5.0, 10.0], [1_000, 1_000, 2_000], 10, 0),
+        ([0.0, 5.0], [1_000, 2_000], 5, 0),
+        ([0.0, 5.1], [1_000, 2_000], 0, 0),
+        ([0.0, 2.5, 5.0], [1_000, 1_000, 2_000], 5, 0),
     ],
 )
 def test_vertical_rate_filter_handles_limit_and_invalid_intervals(

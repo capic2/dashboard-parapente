@@ -129,4 +129,5 @@ export interface FlightFormData {
   conditions_feedback?: string | null;
   decision_snapshot?: string | null;
   gopro_overlay_gpx_offset?: number | null;
+  gpx_metrics_excluded?: boolean;
 }

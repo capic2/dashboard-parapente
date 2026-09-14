@@ -1047,6 +1047,7 @@
     "maxSpeedLabel": "Vitesse max (km/h)",
     "trackAnalysisLoading": "Analyse de la trace en cours de chargement",
     "trackAnalysisUnavailable": "L’analyse détaillée de la trace est indisponible.",
+    "excludeGpxMetrics": "Exclure les métriques de ce GPX",
     "minAltitudeLabel": "Altitude mini",
     "altitudeRangeLabel": "Amplitude d’altitude",
     "maxClimbRateLabel": "Ascension max",
