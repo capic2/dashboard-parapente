@@ -147,6 +147,28 @@ jobs:
               core.setFailed(`Refusing stale staging build for PR #${process.env.PR_NUMBER}`);
             }
 
+      - name: Mark staging deployment in progress
+        id: mark_staging_deployment
+        if: ${{ secrets.STAGING_PUBLIC_URL != '' && secrets.STAGING_DEPLOY_DRAIN_API_TOKEN != '' }}
+        env:
+          STAGING_PUBLIC_URL: ${{ secrets.STAGING_PUBLIC_URL }}
+          DEPLOY_DRAIN_API_TOKEN: ${{ secrets.STAGING_DEPLOY_DRAIN_API_TOKEN }}
+          DEPLOYMENT_ID: staging-${{ github.run_id }}-${{ github.run_attempt }}
+          TARGET_VERSION: 0.0.0.${{ env.PR_NUMBER }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -eu
+          curl --fail --silent --show-error \
+            -X PUT \
+            -H "Authorization: Bearer $DEPLOY_DRAIN_API_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data "{\"deployment_id\":\"$DEPLOYMENT_ID\",\"target_version\":\"$TARGET_VERSION\",\"run_url\":\"$RUN_URL\"}" \
+            "${STAGING_PUBLIC_URL%/}/api/deployment-drain"
+          curl --fail --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $DEPLOY_DRAIN_API_TOKEN" \
+            "${STAGING_PUBLIC_URL%/}/api/deployment-drain/$DEPLOYMENT_ID/deploying"
+
       - name: Build and push PR image
         uses: docker/build-push-action@v7
         with:
@@ -350,6 +372,18 @@ jobs:
             } else {
               await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: Number(process.env.PR_NUMBER), body });
             }
+
+      - name: Clear staging deployment status
+        if: ${{ always() && steps.mark_staging_deployment.outcome != 'skipped' }}
+        env:
+          STAGING_PUBLIC_URL: ${{ secrets.STAGING_PUBLIC_URL }}
+          DEPLOY_DRAIN_API_TOKEN: ${{ secrets.STAGING_DEPLOY_DRAIN_API_TOKEN }}
+          DEPLOYMENT_ID: staging-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          curl --fail --silent --show-error \
+            -X DELETE \
+            -H "Authorization: Bearer $DEPLOY_DRAIN_API_TOKEN" \
+            "${STAGING_PUBLIC_URL%/}/api/deployment-drain/$DEPLOYMENT_ID" || true
 
   cleanup:
     name: Stop staging when PR is inactive
