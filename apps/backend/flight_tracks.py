@@ -22,7 +22,7 @@ class TrackPoint(TypedDict, total=False):
 MAX_TRACK_BYTES = 100 * 1024 * 1024
 MAX_XML_TRACK_BYTES = 25 * 1024 * 1024
 MAX_TRACK_POINTS = 500_000
-MAX_VERTICAL_RATE_ABS_MS = 5.0
+MAX_VERTICAL_RATE_ABS_MS = 8.0
 
 
 def _append_point(points: list[TrackPoint], point: TrackPoint) -> None:
