@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { TimerReset } from 'lucide-react';
+import { Gauge, HeartPulse, MapPin, Mountain, TimerReset } from 'lucide-react';
 import {
   useFlightOverlayLayer,
   useGenerateGoproPreview,
   useGoproOverlayPreview,
 } from '../../../hooks/gopro/useGoproOverlay';
 import { getApiUrlWithSearchParams } from '../../../lib/api';
+import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
+import { telemetryAtTimestamp } from './goproSyncTelemetry';
 import type { GoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
-import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 
 interface GoproOverlaySyncPreviewProps {
   flightId: string;
@@ -37,25 +38,6 @@ export function sourceTimeAtPreviewTime(
     segment.duration_seconds
   );
   return segment.source_start_seconds + elapsed;
-}
-
-export function previewTimeAtSourceTime(
-  sourceTime: number,
-  segments: GoproOverlayPreview['video']['preview_segments']
-) {
-  const segment = segments.find(
-    (candidate) =>
-      sourceTime >= candidate.source_start_seconds &&
-      sourceTime <= candidate.source_start_seconds + candidate.duration_seconds
-  );
-  if (!segment) return sourceTime;
-  return (
-    segment.preview_start_seconds +
-    Math.min(
-      Math.max(0, sourceTime - segment.source_start_seconds),
-      segment.duration_seconds
-    )
-  );
 }
 
 export function manualOffsetForGpxStartAtVideoTime(
@@ -90,6 +72,8 @@ export function GoproOverlaySyncPreview({
   const generatePreview = useGenerateGoproPreview(flightId);
   const automaticallyRequestedTarget = useRef<string | null>(null);
   const [videoTime, setVideoTime] = useState(0);
+  const cameraRef = useRef<HTMLVideoElement>(null);
+  const overlayRef = useRef<HTMLVideoElement>(null);
   const [requestedMinutes, setRequestedMinutes] = useState(3);
   const parsedOffset = Number(offset);
   const manualOffset = Number.isFinite(parsedOffset) ? parsedOffset : 0;
@@ -97,6 +81,16 @@ export function GoproOverlaySyncPreview({
   const previewSegments = preview.data?.video.preview_segments ?? [];
   const sourceVideoTime = sourceTimeAtPreviewTime(videoTime, previewSegments);
   const activeSegmentIndex = previewSegmentIndex(videoTime, previewSegments);
+  const gpxStart = preview.data
+    ? parseApiUtcDate(preview.data.gpx.start_time).getTime()
+    : 0;
+  const telemetry = preview.data
+    ? telemetryAtTimestamp(
+        preview.data.gpx.coordinates,
+        gpxStart + (sourceVideoTime - automaticOffset - manualOffset) * 1000
+      )
+    : null;
+  const heartRate = telemetry?.heart_rate ?? null;
   const videoUrl = getApiUrlWithSearchParams(
     `flights/${flightId}/gopro-camera/preview`,
     {
@@ -107,34 +101,16 @@ export function GoproOverlaySyncPreview({
       version: `${preview.data?.video.preview_target_end_seconds}-${preview.data?.video.preview_available_duration_seconds}`,
     }
   );
-  const flightVideoUrl = getApiUrlWithSearchParams(
-    `flights/${flightId}/video`,
-    {
-      access_token: token,
-    }
-  );
   const overlayJob = layer.data?.status === 'completed' ? layer.data.job : null;
-  let overlayUrl: string | undefined;
-  if (overlayJob) {
-    overlayUrl = getApiUrlWithSearchParams(
-      `gopro-overlays/jobs/${overlayJob.job_id}/download`,
-      {
-        access_token: token,
-        version: overlayJob.updated_at,
-      }
-    );
-  } else if (
-    preview.data?.overlay.status === 'ready' &&
-    preview.data.overlay.job_id
-  ) {
-    overlayUrl = getApiUrlWithSearchParams(
-      `gopro-overlays/jobs/${preview.data.overlay.job_id}/download`,
-      {
-        access_token: token,
-        version: preview.data.overlay.job_id,
-      }
-    );
-  }
+  const overlayUrl = overlayJob
+    ? getApiUrlWithSearchParams(
+        `gopro-overlays/jobs/${overlayJob.job_id}/download`,
+        {
+          access_token: token,
+          version: overlayJob.updated_at,
+        }
+      )
+    : undefined;
 
   const availableMinutes = Math.max(
     0,
@@ -204,6 +180,25 @@ export function GoproOverlaySyncPreview({
     );
   };
 
+  const syncOverlay = () => {
+    const camera = cameraRef.current;
+    const overlay = overlayRef.current;
+    if (!camera || !overlay) return;
+    const target = sourceTimeAtPreviewTime(camera.currentTime, previewSegments);
+    if (Math.abs(overlay.currentTime - target) > 0.08) {
+      overlay.currentTime = target;
+    }
+  };
+
+  const handleCameraPlay = () => {
+    syncOverlay();
+    void overlayRef.current?.play();
+  };
+
+  const handleCameraPause = () => {
+    overlayRef.current?.pause();
+  };
+
   if (preview.isPending) {
     return (
       <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
@@ -224,35 +219,41 @@ export function GoproOverlaySyncPreview({
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(17rem,1fr)]">
       <div className="overflow-hidden rounded-xl bg-black shadow-sm">
-        <FlightOverlayPlayer
-          cameraUrl={videoUrl}
-          flightUrl={flightVideoUrl}
-          cameraLabel={t('flights.goproOverlayCameraPreview')}
-          flightLabel={t('flights.goproOverlayFlightVideo')}
-          overlayUrl={overlayUrl}
-          overlayStatus={preview.data?.overlay.status}
-          overlayError={preview.data?.overlay.error}
-          syncOffsetSeconds={automaticOffset + manualOffset}
-          getFlightTime={(previewTime) =>
-            sourceTimeAtPreviewTime(previewTime, previewSegments) -
-            automaticOffset -
-            manualOffset
-          }
-          getCameraTime={(flightTime) =>
-            previewTimeAtSourceTime(
-              flightTime + automaticOffset + manualOffset,
-              previewSegments
-            )
-          }
-          getOverlayTime={(previewTime) =>
-            sourceTimeAtPreviewTime(previewTime, previewSegments) -
-            automaticOffset -
-            manualOffset
-          }
-          onTimeChange={setVideoTime}
-        />
+        <div className="relative aspect-video bg-black">
+          <video
+            ref={cameraRef}
+            src={videoUrl}
+            controls
+            playsInline
+            preload="metadata"
+            className="absolute inset-0 h-full w-full object-contain"
+            aria-label={t('flights.goproOverlayCameraPreview')}
+            onPlay={handleCameraPlay}
+            onPause={handleCameraPause}
+            onSeeked={syncOverlay}
+            onTimeUpdate={() => {
+              syncOverlay();
+              setVideoTime(cameraRef.current?.currentTime ?? 0);
+            }}
+          >
+            <track kind="captions" />
+          </video>
+          {overlayUrl && (
+            <video
+              ref={overlayRef}
+              src={overlayUrl}
+              muted
+              playsInline
+              preload="metadata"
+              className="pointer-events-none absolute inset-0 z-10 h-full w-full object-contain"
+              aria-label={t('flights.overlayLayerReady')}
+            >
+              <track kind="captions" />
+            </video>
+          )}
+        </div>
         <div className="flex items-center justify-between px-3 py-2 font-mono text-xs text-gray-200">
           <span>{t('flights.goproOverlayVideoTime')}</span>
           <span>{formatSeconds(sourceVideoTime)}</span>
@@ -332,6 +333,54 @@ export function GoproOverlaySyncPreview({
       </div>
 
       <div className="space-y-3 text-gray-900 dark:text-gray-100">
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+            <Mountain
+              className="mb-2 h-4 w-4 text-sky-600"
+              aria-hidden="true"
+            />
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              {t('flights.altitude')}
+            </div>
+            <div className="font-mono text-lg font-semibold">
+              {telemetry ? `${Math.round(telemetry.elevation)} m` : '--'}
+            </div>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+            <Gauge className="mb-2 h-4 w-4 text-rose-600" aria-hidden="true" />
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              {t('flights.speed')}
+            </div>
+            <div className="font-mono text-lg font-semibold">
+              {telemetry ? `${telemetry.speedKmh.toFixed(1)} km/h` : '--'}
+            </div>
+          </div>
+        </div>
+        <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+          <HeartPulse
+            className="mb-2 h-4 w-4 text-emerald-600"
+            aria-hidden="true"
+          />
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            {t('flights.goproOverlayHeartRate')}
+          </div>
+          <div className="font-mono text-lg font-semibold">
+            {heartRate === null
+              ? t('flights.goproOverlayHeartRateUnavailable')
+              : `${heartRate} bpm`}
+          </div>
+        </div>
+        <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+            <MapPin className="h-4 w-4" aria-hidden="true" />
+            {t('flights.goproOverlayGpxPosition')}
+          </div>
+          <div className="mt-1 font-mono text-sm">
+            {telemetry
+              ? `${telemetry.lat.toFixed(5)}, ${telemetry.lon.toFixed(5)}`
+              : t('flights.goproOverlayOutsideTrack')}
+          </div>
+        </div>
         <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 dark:border-sky-900 dark:bg-sky-950/30">
           <div className="flex items-center justify-between gap-3 text-sm">
             <span className="flex items-center gap-2 font-medium">
