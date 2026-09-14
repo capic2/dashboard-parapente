@@ -211,6 +211,9 @@ export function GoproOverlaySyncPreview({
           cameraUrl={videoUrl}
           flightUrl={flightVideoUrl}
           overlayUrl={overlayUrl}
+          getOverlayTime={(previewTime) =>
+            sourceTimeAtPreviewTime(previewTime, previewSegments)
+          }
           cameraLabel={t('flights.goproOverlayCameraPreview')}
           flightLabel={t('flights.goproOverlayFlightVideo')}
           syncOffsetSeconds={automaticOffset + manualOffset}

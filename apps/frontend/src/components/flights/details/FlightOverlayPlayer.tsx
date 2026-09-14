@@ -34,6 +34,7 @@ interface FlightOverlayPlayerProps {
   flightLabel: string;
   syncOffsetSeconds?: number;
   getFlightTime?: (cameraTime: number) => number;
+  getOverlayTime?: (cameraTime: number) => number;
   onTimeChange?: (time: number) => void;
   overlayContent?: ReactNode;
 }
@@ -50,6 +51,7 @@ export function FlightOverlayPlayer({
   flightLabel,
   syncOffsetSeconds = 0,
   getFlightTime,
+  getOverlayTime,
   onTimeChange,
   overlayContent,
 }: FlightOverlayPlayerProps) {
@@ -76,17 +78,20 @@ export function FlightOverlayPlayer({
     [flightReady, getFlightTime, syncOffsetSeconds]
   );
 
-  const syncOverlay = useCallback((cameraTime: number) => {
-    const overlay = overlayRef.current;
-    if (!overlay) return;
-    const target = clamp(
-      cameraTime,
-      0,
-      Number.isFinite(overlay.duration) ? overlay.duration : cameraTime
-    );
-    if (Math.abs(overlay.currentTime - target) > 0.08)
-      overlay.currentTime = target;
-  }, []);
+  const syncOverlay = useCallback(
+    (cameraTime: number) => {
+      const overlay = overlayRef.current;
+      if (!overlay) return;
+      const target = clamp(
+        getOverlayTime?.(cameraTime) ?? cameraTime,
+        0,
+        Number.isFinite(overlay.duration) ? overlay.duration : cameraTime
+      );
+      if (Math.abs(overlay.currentTime - target) > 0.08)
+        overlay.currentTime = target;
+    },
+    [getOverlayTime]
+  );
 
   useEffect(() => {
     syncFlight(playerRef.current?.state.currentTime ?? 0);
