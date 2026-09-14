@@ -192,6 +192,13 @@ class GoproOverlayPreview(BaseModel):
     overlay: GoproOverlayPreviewLayer
 
 
+class FlightOverlayLayer(BaseModel):
+    """The reusable transparent telemetry overlay for a recorded flight."""
+
+    status: Literal["missing", "queued", "preparing", "running", "completed", "failed", "cancelled"]
+    job: GoproOverlayJob | None = None
+
+
 class GoproOverlayCancelResponse(BaseModel):
     job_id: str
     message: str

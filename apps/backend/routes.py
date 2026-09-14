@@ -67,6 +67,7 @@ from flight_summaries import (
     list_flight_summaries,
 )
 from flight_storage import (
+    ensure_flight_directory,
     flight_sequence_number,
     pano_video_path,
     pano_video_paths,
@@ -132,6 +133,7 @@ from schemas import (
     GoproOverlayDependencies,
     GoproOverlayJob,
     GoproOverlayPreview,
+    FlightOverlayLayer,
     GoproPreviewRequest,
     GoproPreviewState,
     GoproOverlayLayoutsResponse,
@@ -487,7 +489,8 @@ def _flight_gopro_overlay_progress(flight: Flight, job: dict[str, Any] | None = 
 
 
 def _flight_gopro_overlay_file_exists(db: Session, flight: Flight) -> bool:
-    overlay_path = _flight_gopro_overlay_file_path(db, flight)
+    overlay_path = ensure_flight_directory(db, flight) / "overlays" / "pano-telemetry-overlay.mov"
+    overlay_path.parent.mkdir(parents=True, exist_ok=True)
     return bool(overlay_path)
 
 
@@ -5086,6 +5089,8 @@ def create_flight_highlight_video(
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
+    overlay_offset = _require_gopro_overlay_offset(flight)
+    _require_ready_gopro_overlay_layer(flight)
 
     pano_path = pano_video_path(db, flight)
     if not pano_path.is_file():
@@ -5113,7 +5118,7 @@ def create_flight_highlight_video(
         source_video_path=str(pano_path),
         overlay_video_path=overlay_path,
         output_format="original",
-        overlay_offset_seconds=float(flight.gopro_overlay_gpx_offset or 0.0),
+        overlay_offset_seconds=overlay_offset,
     )
     db.add(job)
     try:
@@ -6689,11 +6694,9 @@ def _interactive_overlay_state(camera_path: Path) -> dict[str, Any]:
     except (OSError, ValueError, AttributeError):
         return {"status": "missing", "job_id": None, "error": None}
     job = get_gopro_overlay_job(str(job_id)) if job_id else None
-    if not job:
+    if not job or job.get("output_filename") != _INTERACTIVE_OVERLAY_FILENAME:
         return {"status": "missing", "job_id": None, "error": None}
     status = str(job.get("status") or "missing")
-    if job.get("output_filename") != _INTERACTIVE_OVERLAY_FILENAME:
-        return {"status": "missing", "job_id": None, "error": None}
     if status == "completed":
         status = "ready" if gopro_overlay_output_path(str(job_id)) else "generating"
     return {
@@ -6712,10 +6715,11 @@ def _generate_interactive_overlay_in_background(
     gpx_offset: float,
 ) -> None:
     job_path = _interactive_overlay_job_path(camera_path)
-    if job_path.is_file():
-        state = _interactive_overlay_state(camera_path)
-        if state["status"] in {"generating", "ready"}:
-            return
+    if job_path.is_file() and _interactive_overlay_state(camera_path)["status"] in {
+        "generating",
+        "ready",
+    }:
+        return
     try:
         render_gpx_path = gpx_path
         if osv_paths:
@@ -6726,13 +6730,12 @@ def _generate_interactive_overlay_in_background(
                 video_duration=video_duration,
                 first_gpx_at=first_gpx_at,
             )
-        output_name = _INTERACTIVE_OVERLAY_FILENAME
         job = create_gopro_overlay_job_from_paths(
             video_path=camera_path,
             gpx_path=render_gpx_path,
             pip_path=None,
             layout_id=None,
-            output_filename=output_name,
+            output_filename=_INTERACTIVE_OVERLAY_FILENAME,
             output_resolution="source",
             output_dir=str(camera_path.parent),
             flight_id=None,
@@ -6744,6 +6747,104 @@ def _generate_interactive_overlay_in_background(
         temp_path.replace(job_path)
     except (OSError, ValueError) as exc:
         logger.warning("Unable to generate interactive GoPro overlay: %s", exc)
+
+
+def _flight_overlay_layer_job(flight: Flight) -> GoproOverlayJobModel | None:
+    """Return the newest job that rendered the reusable transparent layer."""
+    for job in reversed(flight.gopro_overlay_jobs):
+        try:
+            metadata = json.loads(job.command_json or "{}")
+        except json.JSONDecodeError:
+            continue
+        if metadata.get("overlay_only"):
+            return job
+    return None
+
+
+def _require_gopro_overlay_offset(flight: Flight) -> float:
+    """Require an explicit persisted synchronization offset before rendering."""
+    if flight.gopro_overlay_gpx_offset is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Set the GoPro overlay synchronization offset before generating media",
+        )
+    return float(flight.gopro_overlay_gpx_offset)
+
+
+def _require_ready_gopro_overlay_layer(flight: Flight) -> GoproOverlayJobModel:
+    """Require a completed reusable transparent layer before composing media."""
+    job = _flight_overlay_layer_job(flight)
+    if job is None or job.status != "completed":
+        raise HTTPException(
+            status_code=409,
+            detail="Generate the synchronized overlay layer before generating media",
+        )
+    return job
+
+
+@router.get(
+    "/flights/{flight_id}/overlay-layer",
+    response_model=FlightOverlayLayer,
+)
+def get_flight_overlay_layer(flight_id: str, db: Session = Depends(get_db)) -> FlightOverlayLayer:
+    """Expose the durable transparent telemetry layer independently of video exports."""
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    job = _flight_overlay_layer_job(flight)
+    if job is None:
+        return FlightOverlayLayer(status="missing")
+    return FlightOverlayLayer(
+        status=job.status,
+        job=GoproOverlayJob.model_validate(gopro_overlay_job_to_payload(job)),
+    )
+
+
+@router.post(
+    "/flights/{flight_id}/overlay-layer",
+    response_model=GoproOverlayJob,
+)
+@_map_async_deployment_drain_rejection
+async def create_flight_overlay_layer(
+    flight_id: str, db: Session = Depends(get_db)
+) -> GoproOverlayJob:
+    """Queue one alpha overlay timeline that exports and highlights can reuse."""
+    dependencies = check_gopro_overlay_dependencies()
+    missing = [
+        name for name, available in dependencies.items() if not available and name != "ffmpeg_vaapi"
+    ]
+    if missing:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Missing GoPro overlay dependencies: {', '.join(missing)}",
+        )
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    video_path, gpx_path = _flight_gopro_preview_inputs(db, flight)
+    output_size = probe_video_resolution(video_path)
+    if output_size[0] is None or output_size[1] is None:
+        raise HTTPException(status_code=422, detail="Camera video has no usable dimensions")
+    output_dir = ensure_flight_directory(db, flight) / "overlays"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        job = await asyncio.to_thread(
+            create_gopro_overlay_job_from_paths,
+            video_path=video_path,
+            gpx_path=gpx_path,
+            pip_path=None,
+            layout_id=None,
+            output_filename="telemetry-overlay.mov",
+            output_resolution="source",
+            output_dir=str(output_dir),
+            gpx_offset=float(flight.gopro_overlay_gpx_offset or 0.0),
+            flight_id=flight.id,
+            overlay_only=True,
+            overlay_size=(output_size[0], output_size[1]),
+        )
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return GoproOverlayJob.model_validate(job)
 
 
 @router.get(
@@ -6949,6 +7050,8 @@ async def create_flight_gopro_overlay_job(
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
+    _require_gopro_overlay_offset(flight)
+    _require_ready_gopro_overlay_layer(flight)
 
     title = flight.title or flight.name or flight.id
     input_dir = _gopro_overlay_flight_directory(db, flight)
@@ -7179,7 +7282,7 @@ def download_gopro_overlay_render_job(job_id: str) -> FileResponse:
 
     return FileResponse(
         path=output_path,
-        media_type="video/webm" if output_path.suffix.lower() == ".webm" else "video/mp4",
+        media_type="video/mp4",
         filename=output_path.name,
         content_disposition_type="inline",
     )

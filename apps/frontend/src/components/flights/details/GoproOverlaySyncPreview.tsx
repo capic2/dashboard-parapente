@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { TimerReset } from 'lucide-react';
 import {
+  useFlightOverlayLayer,
   useGenerateGoproPreview,
   useGoproOverlayPreview,
 } from '../../../hooks/gopro/useGoproOverlay';
@@ -85,6 +86,7 @@ export function GoproOverlaySyncPreview({
   const token = useAuthStore((state) => state.token);
   const queryClient = useQueryClient();
   const preview = useGoproOverlayPreview(flightId, true);
+  const layer = useFlightOverlayLayer(flightId);
   const generatePreview = useGenerateGoproPreview(flightId);
   const automaticallyRequestedTarget = useRef<string | null>(null);
   const [videoTime, setVideoTime] = useState(0);
@@ -111,16 +113,25 @@ export function GoproOverlaySyncPreview({
       access_token: token,
     }
   );
-  const overlayUrl =
-    preview.data?.overlay.status === 'ready' && preview.data.overlay.job_id
-      ? getApiUrlWithSearchParams(
-          `gopro-overlays/jobs/${preview.data.overlay.job_id}/download`,
-          {
-            access_token: token,
-            version: preview.data.overlay.job_id,
-          }
-        )
-      : undefined;
+  const overlayJob = layer.data?.status === 'completed' ? layer.data.job : null;
+  let overlayUrl: string | undefined;
+  if (overlayJob) {
+    overlayUrl = getApiUrlWithSearchParams(
+      `gopro-overlays/jobs/${overlayJob.job_id}/download`,
+      {
+        access_token: token,
+        version: overlayJob.updated_at,
+      }
+    );
+  } else if (preview.data?.overlay.status === 'ready' && preview.data.overlay.job_id) {
+    overlayUrl = getApiUrlWithSearchParams(
+      `gopro-overlays/jobs/${preview.data.overlay.job_id}/download`,
+      {
+        access_token: token,
+        version: preview.data.overlay.job_id,
+      }
+    );
+  }
 
   const availableMinutes = Math.max(
     0,

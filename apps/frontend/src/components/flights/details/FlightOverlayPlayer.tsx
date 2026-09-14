@@ -1,35 +1,6 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-} from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  DefaultVideoLayout,
-  defaultLayoutIcons,
-} from '@vidstack/react/player/layouts/default';
-import {
-  MediaPlayer,
-  MediaProvider,
-  type MediaPlayerInstance,
-} from '@vidstack/react';
-// oxlint-disable-next-line import/no-unassigned-import
-import '@vidstack/react/player/styles/default/theme.css';
-// oxlint-disable-next-line import/no-unassigned-import
-import '@vidstack/react/player/styles/default/layouts/video.css';
-import {
-  Columns2,
-  LoaderCircle,
-  Maximize,
-  Minimize,
-  Pause,
-  PictureInPicture2,
-  Play,
-  Repeat2,
-} from 'lucide-react';
+import { Columns2, PictureInPicture2, Repeat2 } from 'lucide-react';
 
 export type FlightOverlayLayout =
   | 'camera-main'
@@ -39,9 +10,9 @@ export type FlightOverlayLayout =
 interface FlightOverlayPlayerProps {
   cameraUrl: string;
   flightUrl: string;
+  overlayUrl?: string;
   cameraLabel: string;
   flightLabel: string;
-  overlayUrl?: string;
   overlayStatus?: 'missing' | 'generating' | 'ready' | 'failed';
   overlayError?: string | null;
   syncOffsetSeconds?: number;
@@ -52,16 +23,19 @@ interface FlightOverlayPlayerProps {
   overlayContent?: ReactNode;
 }
 
-function clamp(value: number, minimum: number, maximum: number) {
-  return Math.max(minimum, Math.min(maximum, value));
+function clamp(value: number, maximum: number) {
+  return Math.max(
+    0,
+    Math.min(value, Number.isFinite(maximum) ? maximum : value)
+  );
 }
 
 export function FlightOverlayPlayer({
   cameraUrl,
   flightUrl,
+  overlayUrl,
   cameraLabel,
   flightLabel,
-  overlayUrl,
   overlayStatus,
   overlayError,
   syncOffsetSeconds = 0,
@@ -72,248 +46,104 @@ export function FlightOverlayPlayer({
   overlayContent,
 }: FlightOverlayPlayerProps) {
   const { t } = useTranslation();
-  const playerRef = useRef<MediaPlayerInstance>(null);
+  const cameraRef = useRef<HTMLVideoElement>(null);
   const flightRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLVideoElement>(null);
-  const frameRef = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState<FlightOverlayLayout>('camera-main');
-  const [flightReady, setFlightReady] = useState(false);
-  const [overlayReady, setOverlayReady] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const syncFlight = useCallback(
-    (cameraTime: number) => {
-      const flight = flightRef.current;
-      if (!flight || !flightReady) return;
-      const target = clamp(
-        getFlightTime?.(cameraTime) ?? cameraTime - syncOffsetSeconds,
-        0,
-        Number.isFinite(flight.duration) ? flight.duration : cameraTime
-      );
-      if (Math.abs(flight.currentTime - target) > 0.12) {
-        flight.currentTime = target;
-      }
-    },
-    [flightReady, getFlightTime, syncOffsetSeconds]
-  );
-
-  const syncOverlay = useCallback(
-    (cameraTime: number) => {
-      const overlay = overlayRef.current;
-      if (!overlay || !overlayReady) return;
-      const target = clamp(
-        getOverlayTime?.(cameraTime) ?? cameraTime,
-        0,
-        Number.isFinite(overlay.duration) ? overlay.duration : cameraTime
-      );
-      if (Math.abs(overlay.currentTime - target) > 0.08) {
-        overlay.currentTime = target;
-      }
-    },
-    [getOverlayTime, overlayReady]
-  );
-
-  useEffect(() => {
-    syncFlight(playerRef.current?.state.currentTime ?? 0);
-    syncOverlay(playerRef.current?.state.currentTime ?? 0);
-  }, [syncFlight, syncOverlay]);
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(document.fullscreenElement === frameRef.current);
-    };
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () =>
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
-
-  const toggleFullscreen = () => {
-    if (document.fullscreenElement === frameRef.current) {
-      void document.exitFullscreen();
-      return;
+  const syncMedia = () => {
+    const camera = cameraRef.current;
+    if (!camera) return;
+    const currentTime = camera.currentTime;
+    const flight = flightRef.current;
+    const flightTime = getFlightTime?.(currentTime) ?? currentTime - syncOffsetSeconds;
+    if (flight && Math.abs(flight.currentTime - flightTime) > 0.12) {
+      flight.currentTime = clamp(flightTime, flight.duration);
     }
-    void frameRef.current?.requestFullscreen();
-  };
-
-  const togglePlayback = () => {
-    if (flightIsMain) {
-      if (flightRef.current?.paused) void flightRef.current.play();
-      else flightRef.current?.pause();
-      return;
+    const overlay = overlayRef.current;
+    const overlayTime = getOverlayTime?.(currentTime) ?? currentTime;
+    if (overlay && Math.abs(overlay.currentTime - overlayTime) > 0.08) {
+      overlay.currentTime = clamp(overlayTime, overlay.duration);
     }
-    if (playerRef.current?.state.paused) void playerRef.current.play();
-    else void playerRef.current?.pause();
-  };
-
-  const handleTimeUpdate = () => {
-    const time = playerRef.current?.state.currentTime ?? 0;
-    syncFlight(time);
-    syncOverlay(time);
-    onTimeChange?.(time);
+    onTimeChange?.(currentTime);
   };
 
   const handlePlay = () => {
-    setIsPlaying(true);
-    syncFlight(playerRef.current?.state.currentTime ?? 0);
+    syncMedia();
     void flightRef.current?.play();
     void overlayRef.current?.play();
   };
 
   const handlePause = () => {
-    setIsPlaying(false);
     flightRef.current?.pause();
     overlayRef.current?.pause();
   };
 
-  const handleFlightPlay = () => {
-    setIsPlaying(true);
-    syncFlight(playerRef.current?.state.currentTime ?? 0);
-    void playerRef.current?.play();
-    void overlayRef.current?.play();
-  };
-
-  const handleFlightPause = () => {
-    setIsPlaying(false);
-    void playerRef.current?.pause();
-    overlayRef.current?.pause();
-  };
-
-  const handleFlightTimeUpdate = () => {
-    if (!flightIsMain || !getCameraTime || !playerRef.current) return;
-    const cameraTime = clamp(
-      getCameraTime(flightRef.current?.currentTime ?? 0),
-      0,
-      playerRef.current.state.duration
-    );
-    if (Math.abs(playerRef.current.state.currentTime - cameraTime) > 0.12) {
-      playerRef.current.currentTime = cameraTime;
-    }
-    syncOverlay(cameraTime);
-  };
-
-  const handleSeek = () => {
-    syncFlight(playerRef.current?.state.currentTime ?? 0);
-    syncOverlay(playerRef.current?.state.currentTime ?? 0);
-  };
-
   const cameraIsMain = layout === 'camera-main';
   const flightIsMain = layout === 'flight-main';
-  const pipClassName =
-    'absolute bottom-3 left-3 z-30 aspect-video w-1/3 cursor-pointer rounded-lg border-2 border-white/80 bg-black shadow-xl transition-[width] duration-200 hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400';
-
-  const switchTo = (nextLayout: FlightOverlayLayout) => {
-    setLayout(nextLayout);
-  };
-
-  const handlePipKeyDown = (
-    event: KeyboardEvent<HTMLDivElement>,
-    nextLayout: FlightOverlayLayout
-  ) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      switchTo(nextLayout);
-    }
-  };
 
   return (
     <div className="overflow-hidden rounded-xl bg-black shadow-sm">
       <div
-        ref={frameRef}
-        className={`relative grid min-h-0 bg-black ${
-          layout === 'side-by-side' ? 'grid-cols-1 md:grid-cols-2' : ''
-        } [&:fullscreen]:h-screen [&:fullscreen]:w-screen [&:fullscreen]:content-center [&:fullscreen]:items-center [&:fullscreen]:p-4`}
+        className={`relative grid min-h-0 bg-black ${layout === 'side-by-side' ? 'grid-cols-1 md:grid-cols-2' : ''}`}
       >
-        {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions */}
-        <div
-          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
-          role={
-            !cameraIsMain && !layout.includes('side') ? 'button' : undefined
-          }
-          tabIndex={!cameraIsMain && !layout.includes('side') ? 0 : undefined}
-          aria-label={
-            !cameraIsMain && !layout.includes('side')
-              ? t('flights.goproOverlaySwapVideos', { name: cameraLabel })
-              : undefined
-          }
+        <video
+          ref={cameraRef}
+          src={cameraUrl}
+          controls
+          playsInline
+          preload="metadata"
+          onPlay={handlePlay}
+          onPause={handlePause}
+          onTimeUpdate={syncMedia}
+          onSeeked={syncMedia}
           className={
             cameraIsMain || layout === 'side-by-side'
-              ? 'aspect-video w-full'
-              : pipClassName
+              ? 'aspect-video w-full object-contain'
+              : 'pointer-events-none absolute inset-0 z-20 h-full w-full opacity-0'
           }
-          onClick={() => {
-            if (flightIsMain) switchTo('camera-main');
-          }}
-          onKeyDown={(event) => {
-            if (flightIsMain) handlePipKeyDown(event, 'camera-main');
-          }}
+          aria-label={cameraLabel}
         >
-          <MediaPlayer
-            ref={playerRef}
-            src={cameraUrl}
-            playsInline
-            preload="metadata"
-            onTimeUpdate={handleTimeUpdate}
-            onPlay={handlePlay}
-            onPause={handlePause}
-            onSeeked={handleSeek}
-            className="h-full w-full [&_[data-media-provider]]:rounded-md"
-            aria-label={cameraLabel}
-          >
-            <MediaProvider />
-            <DefaultVideoLayout icons={defaultLayoutIcons} />
-          </MediaPlayer>
-          {!cameraIsMain && flightIsMain && (
-            <span className="pointer-events-none absolute bottom-2 left-2 rounded bg-slate-950/85 px-2 py-1 text-[10px] font-semibold text-white">
-              {cameraLabel}
+          <track kind="captions" />
+        </video>
+        {flightIsMain && getCameraTime && (
+          <div className="pointer-events-none absolute inset-0">
+            <span className="sr-only">
+              {getCameraTime(flightRef.current?.currentTime ?? 0)}
             </span>
-          )}
-        </div>
-
-        {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions */}
-        <div
-          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
-          role={cameraIsMain ? 'button' : undefined}
-          tabIndex={cameraIsMain ? 0 : undefined}
-          aria-label={
-            cameraIsMain
-              ? t('flights.goproOverlaySwapVideos', { name: flightLabel })
-              : undefined
-          }
+          </div>
+        )}
+        <video
+          ref={flightRef}
+          src={flightUrl}
+          playsInline
+          preload="metadata"
+          muted
+          onClick={() => {
+            if (layout === 'camera-main') setLayout('flight-main');
+          }}
           className={
             flightIsMain || layout === 'side-by-side'
-              ? 'aspect-video w-full'
-              : pipClassName
+              ? 'aspect-video w-full object-contain'
+              : 'absolute bottom-3 right-3 z-10 aspect-video w-1/3 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
           }
-          onClick={() => {
-            if (cameraIsMain) switchTo('flight-main');
-          }}
-          onKeyDown={(event) => {
-            if (cameraIsMain) handlePipKeyDown(event, 'flight-main');
-          }}
+          aria-label={flightLabel}
         >
+          <track kind="captions" />
+        </video>
+        {overlayUrl && (
           <video
-            ref={flightRef}
-            src={flightUrl}
+            ref={overlayRef}
+            src={overlayUrl}
             playsInline
             preload="metadata"
             muted
-            onLoadStart={() => setFlightReady(false)}
-            onLoadedMetadata={() => setFlightReady(true)}
-            controls={flightIsMain}
-            onPlay={handleFlightPlay}
-            onPause={handleFlightPause}
-            onTimeUpdate={handleFlightTimeUpdate}
-            className="h-full w-full rounded-md object-contain"
-            aria-label={flightLabel}
-          />
-          {cameraIsMain && (
-            <span className="pointer-events-none absolute bottom-2 left-2 rounded bg-slate-950/85 px-2 py-1 text-[10px] font-semibold text-white">
-              {flightLabel}
-            </span>
-          )}
-        </div>
-
+            className="pointer-events-none absolute inset-0 z-[15] h-full w-full object-contain"
+            aria-label={t('flights.overlayLayerReady')}
+          >
+            <track kind="captions" />
+          </video>
+        )}
         {layout !== 'side-by-side' && (
           <button
             type="button"
@@ -322,7 +152,7 @@ export function FlightOverlayPlayer({
                 current === 'camera-main' ? 'flight-main' : 'camera-main'
               )
             }
-            className="absolute bottom-3 right-3 z-20 flex cursor-pointer items-center gap-1.5 rounded-md bg-slate-950/80 px-2.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+            className="absolute bottom-3 left-3 z-20 flex cursor-pointer items-center gap-1.5 rounded-md bg-slate-950/80 px-2.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
             aria-label={t('flights.goproOverlaySwapVideos', {
               name: cameraIsMain ? flightLabel : cameraLabel,
             })}
@@ -332,71 +162,25 @@ export function FlightOverlayPlayer({
           </button>
         )}
         {overlayContent && (
-          <div className="pointer-events-none absolute inset-0 z-30">
+          <div className="pointer-events-none absolute left-3 top-3 z-30">
             {overlayContent}
           </div>
         )}
-        {overlayUrl && (
-          <video
-            ref={overlayRef}
-            src={overlayUrl}
-            playsInline
-            muted
-            preload="metadata"
-            onLoadStart={() => setOverlayReady(false)}
-            onLoadedMetadata={() => setOverlayReady(true)}
-            className="pointer-events-none absolute inset-0 z-10 h-full w-full object-fill"
-            aria-hidden="true"
-          />
-        )}
         {overlayStatus === 'generating' && (
-          <div className="pointer-events-none absolute inset-0 z-35 flex items-center justify-center bg-slate-950/45 p-4">
-            <div className="flex items-center gap-3 rounded-lg border border-sky-300/40 bg-slate-950/90 px-4 py-3 text-sm font-semibold text-white shadow-xl">
-              <LoaderCircle
-                className="h-5 w-5 animate-spin text-sky-300"
-                aria-hidden="true"
-              />
-              <span>{t('flights.goproOverlayGeneratingInteractive')}</span>
-            </div>
+          <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-slate-950/45">
+            <span className="rounded-lg bg-slate-950/90 px-4 py-3 text-sm font-semibold text-white">
+              {t('flights.goproOverlayGeneratingInteractive')}
+            </span>
           </div>
         )}
         {overlayStatus === 'failed' && (
-          <div className="pointer-events-none absolute inset-x-4 bottom-4 z-35 rounded-lg border border-red-400/50 bg-red-950/90 px-4 py-3 text-sm text-red-100 shadow-xl">
+          <div className="pointer-events-none absolute inset-x-4 bottom-4 z-30 rounded-lg bg-red-950/90 px-4 py-3 text-sm text-red-100">
             <p className="font-semibold">
               {t('flights.goproOverlayInteractiveUnavailable')}
             </p>
-            {overlayError && (
-              <p className="mt-1 text-xs text-red-200/80">{overlayError}</p>
-            )}
+            {overlayError && <p className="mt-1 text-xs">{overlayError}</p>}
           </div>
         )}
-        <button
-          type="button"
-          onClick={togglePlayback}
-          className="absolute left-1/2 top-1/2 z-40 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-slate-950/80 text-white shadow-lg transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
-          aria-label={t(
-            isPlaying ? 'flights.viewer.pause' : 'flights.viewer.play'
-          )}
-        >
-          {isPlaying ? (
-            <Pause className="h-6 w-6" aria-hidden="true" />
-          ) : (
-            <Play className="ml-0.5 h-6 w-6" aria-hidden="true" />
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={toggleFullscreen}
-          className="absolute right-3 top-3 z-40 flex h-9 w-9 cursor-pointer items-center justify-center rounded-md bg-slate-950/80 text-white transition-colors hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
-          aria-label={t('flights.viewer.fullscreen')}
-          title={t('flights.viewer.fullscreen')}
-        >
-          {isFullscreen ? (
-            <Minimize className="h-4 w-4" aria-hidden="true" />
-          ) : (
-            <Maximize className="h-4 w-4" aria-hidden="true" />
-          )}
-        </button>
       </div>
       <div className="flex flex-wrap items-center gap-2 border-t border-gray-800 bg-gray-950 px-3 py-2">
         <span className="mr-auto text-xs font-medium text-gray-300">
@@ -405,7 +189,7 @@ export function FlightOverlayPlayer({
         <button
           type="button"
           onClick={() => setLayout('camera-main')}
-          className={`flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${cameraIsMain ? 'bg-sky-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+          className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800"
         >
           <PictureInPicture2 className="h-3.5 w-3.5" aria-hidden="true" />
           {cameraLabel}
@@ -413,7 +197,7 @@ export function FlightOverlayPlayer({
         <button
           type="button"
           onClick={() => setLayout('flight-main')}
-          className={`flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${flightIsMain ? 'bg-sky-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+          className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800"
         >
           <PictureInPicture2 className="h-3.5 w-3.5" aria-hidden="true" />
           {flightLabel}
@@ -421,7 +205,7 @@ export function FlightOverlayPlayer({
         <button
           type="button"
           onClick={() => setLayout('side-by-side')}
-          className={`flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${layout === 'side-by-side' ? 'bg-sky-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+          className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800"
         >
           <Columns2 className="h-3.5 w-3.5" aria-hidden="true" />
           {t('flights.goproOverlaySideBySide')}

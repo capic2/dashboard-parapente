@@ -16,6 +16,7 @@ interface HighlightVideoJobCardProps {
   job: HighlightVideoJob | null;
   flight: Flight;
   hasPanoVideo: boolean;
+  hasOverlayOffset: boolean;
   isDownloadingAnyMedia: boolean;
   isGenerationPending: boolean;
   isCancellationPending: boolean;
@@ -30,6 +31,7 @@ export function HighlightVideoJobCard({
   job,
   flight,
   hasPanoVideo,
+  hasOverlayOffset,
   isDownloadingAnyMedia,
   isGenerationPending,
   isCancellationPending,
@@ -42,11 +44,17 @@ export function HighlightVideoJobCard({
   const { t } = useTranslation();
   const status = job?.status ?? null;
   const isProcessing = status === 'queued' || status === 'running';
-  const isGenerationLocked = !hasPanoVideo;
+  const isGenerationLocked = !hasPanoVideo || !hasOverlayOffset;
   const progress = Math.max(0, Math.min(100, Math.round(job?.progress ?? 0)));
   const statusLabel = status
     ? t(`flights.generationLogs.status.${status}`)
     : t('flights.videoNotGenerated');
+  const generationLockLabel = hasPanoVideo
+    ? t('flights.highlightVideoSyncRequired')
+    : t('flights.highlightVideoLocked');
+  const generationLockMessage = hasPanoVideo
+    ? t('flights.highlightVideoRequiresOverlayOffset')
+    : t('flights.highlightVideoRequiresPano');
 
   return (
     <div
@@ -76,14 +84,12 @@ export function HighlightVideoJobCard({
             {isGenerationLocked && (
               <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
             )}
-            {isGenerationLocked
-              ? t('flights.highlightVideoLocked')
-              : statusLabel}
+            {isGenerationLocked ? generationLockLabel : statusLabel}
           </span>
         </div>
         {isGenerationLocked && (
           <p className="mt-3 rounded-lg bg-amber-50 p-2 text-xs font-medium text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-            {t('flights.highlightVideoRequiresPano')}
+            {generationLockMessage}
           </p>
         )}
         {isProcessing && (

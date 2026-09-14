@@ -1591,7 +1591,12 @@ def process_highlight_video_job(job_id: str) -> None:
         logger.info("Highlight viewpoints classified: job_id=%s clips=%d", job_id, len(clips))
         output_width, output_height = _output_dimensions(source_path)
         timeline_path = output_dir / "overlay-timeline.mp4"
-        full_overlay_path = output_dir / "full-flight-overlay.mov"
+        full_overlay_path = (
+            Path(str(job.overlay_video_path))
+            if job.overlay_video_path
+            else output_dir / "full-flight-overlay.mov"
+        )
+        full_overlay_path.parent.mkdir(parents=True, exist_ok=True)
         _create_overlay_timeline(timeline_path, duration_seconds, source_timeline_start)
         _set_job_stage(
             job_id,
