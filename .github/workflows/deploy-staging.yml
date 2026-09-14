@@ -35,6 +35,8 @@ jobs:
     timeout-minutes: 120
     env:
       PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
+      STAGING_PUBLIC_URL: ${{ secrets.STAGING_PUBLIC_URL }}
+      STAGING_DEPLOY_DRAIN_API_TOKEN: ${{ secrets.STAGING_DEPLOY_DRAIN_API_TOKEN }}
 
     steps:
       - name: Keep staging label exclusive
@@ -149,10 +151,9 @@ jobs:
 
       - name: Mark staging deployment in progress
         id: mark_staging_deployment
-        if: ${{ secrets.STAGING_PUBLIC_URL != '' && secrets.STAGING_DEPLOY_DRAIN_API_TOKEN != '' }}
+        if: ${{ env.STAGING_PUBLIC_URL != '' && env.STAGING_DEPLOY_DRAIN_API_TOKEN != '' }}
         env:
-          STAGING_PUBLIC_URL: ${{ secrets.STAGING_PUBLIC_URL }}
-          DEPLOY_DRAIN_API_TOKEN: ${{ secrets.STAGING_DEPLOY_DRAIN_API_TOKEN }}
+          DEPLOY_DRAIN_API_TOKEN: ${{ env.STAGING_DEPLOY_DRAIN_API_TOKEN }}
           DEPLOYMENT_ID: staging-${{ github.run_id }}-${{ github.run_attempt }}
           TARGET_VERSION: 0.0.0.${{ env.PR_NUMBER }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -376,8 +377,7 @@ jobs:
       - name: Clear staging deployment status
         if: ${{ always() && steps.mark_staging_deployment.outcome != 'skipped' }}
         env:
-          STAGING_PUBLIC_URL: ${{ secrets.STAGING_PUBLIC_URL }}
-          DEPLOY_DRAIN_API_TOKEN: ${{ secrets.STAGING_DEPLOY_DRAIN_API_TOKEN }}
+          DEPLOY_DRAIN_API_TOKEN: ${{ env.STAGING_DEPLOY_DRAIN_API_TOKEN }}
           DEPLOYMENT_ID: staging-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           curl --fail --silent --show-error \
