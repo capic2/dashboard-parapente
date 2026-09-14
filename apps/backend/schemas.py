@@ -764,6 +764,8 @@ class FlightRecordsResponse(BaseModel):
     highest_altitude: FlightRecord | None = None
     longest_distance: FlightRecord | None = None
     max_speed: FlightRecord | None = None
+    max_climb_rate: FlightRecord | None = None
+    max_sink_rate: FlightRecord | None = None
     takeoff_elevation_gain: FlightRecord | None = None
     earliest_takeoff: FlightRecord | None = None
     latest_takeoff: FlightRecord | None = None

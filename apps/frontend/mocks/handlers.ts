@@ -188,6 +188,20 @@ export const handlers = [
         flight_date: '2024-09-05',
         site_name: 'Grenoble',
       },
+      max_climb_rate: {
+        value: 4.2,
+        flight_id: 'flight2',
+        flight_name: 'Vol record - Ascension',
+        flight_date: '2024-07-20',
+        site_name: 'Chamonix',
+      },
+      max_sink_rate: {
+        value: 3.4,
+        flight_id: 'flight4',
+        flight_name: 'Vol record - Descente',
+        flight_date: '2024-09-05',
+        site_name: 'Grenoble',
+      },
     });
   }),
 

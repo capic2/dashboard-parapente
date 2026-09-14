@@ -64,6 +64,8 @@ async def test_import_normalizes_intervals_name_and_repairs_it_on_resync(
     assert flight.title == "Vol du 01/07/2026 à 12:00"
     assert "intervals_unsafe_id_" in flight.gpx_file_path
     assert flight.site_id == arguel_site.id
+    assert flight.max_climb_rate_ms == 0.83
+    assert flight.max_sink_rate_ms == 0
 
 
 @pytest.mark.asyncio

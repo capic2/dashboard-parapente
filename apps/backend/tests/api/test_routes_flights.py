@@ -960,6 +960,8 @@ class TestFlightRecordsEndpoint:
         assert data["highest_altitude"] is None
         assert data["longest_distance"] is None
         assert data["max_speed"] is None
+        assert data["max_climb_rate"] is None
+        assert data["max_sink_rate"] is None
         assert data["takeoff_elevation_gain"] is None
         assert data["earliest_takeoff"] is None
         assert data["latest_takeoff"] is None
@@ -1014,6 +1016,49 @@ class TestFlightRecordsEndpoint:
 
         assert data["max_speed"]["flight_id"] == "flight-3"
         assert data["max_speed"]["value"] == 55.0
+
+    def test_get_flight_records_finds_vertical_speed_records(self, client, db_session, arguel_site):
+        """GET /flights/records reads persisted rates and excludes opted-out tracks."""
+        flights = [
+            Flight(
+                id="flight-climb",
+                name="Best climb",
+                flight_date=date(2026, 3, 15),
+                site_id=arguel_site.id,
+                max_climb_rate_ms=4.2,
+                max_sink_rate_ms=1.5,
+            ),
+            Flight(
+                id="flight-sink",
+                name="Best sink",
+                flight_date=date(2026, 3, 16),
+                site_id=arguel_site.id,
+                max_climb_rate_ms=2.1,
+                max_sink_rate_ms=3.4,
+            ),
+            Flight(
+                id="flight-excluded",
+                name="Excluded track",
+                flight_date=date(2026, 3, 17),
+                site_id=arguel_site.id,
+                max_climb_rate_ms=5.0,
+                max_sink_rate_ms=5.0,
+                gpx_metrics_excluded=True,
+            ),
+        ]
+        db_session.add_all(flights)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/records")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["max_climb_rate"]["flight_id"] == "flight-climb"
+        assert data["max_climb_rate"]["value"] == 4.2
+        assert data["max_climb_rate"]["partial"] is True
+        assert data["max_sink_rate"]["flight_id"] == "flight-sink"
+        assert data["max_sink_rate"]["value"] == 3.4
+        assert data["max_sink_rate"]["partial"] is True
 
     def test_get_flight_records_finds_takeoff_elevation_gain(self, client, db_session, arguel_site):
         """GET /flights/records finds max altitude above takeoff elevation"""
@@ -1426,12 +1471,16 @@ class TestFlightGPXEndpoints:
         assert sample_flight.elevation_gain_m == expected["elevation_gain_m"]
         assert sample_flight.gpx_max_altitude_m == expected["max_altitude_m"]
         assert sample_flight.gpx_elevation_gain_m == expected["elevation_gain_m"]
+        assert sample_flight.max_climb_rate_ms == expected["max_climb_rate_ms"]
+        assert sample_flight.max_sink_rate_ms == expected["max_sink_rate_ms"]
         assert sample_flight.departure_time == expected["departure_time"].replace(tzinfo=None)
 
     def test_upload_gpx_succeeds_when_stat_calculation_fails(
         self, client, db_session, sample_flight, sample_gpx
     ):
         sample_flight.max_speed_kmh = None
+        sample_flight.max_climb_rate_ms = 4.2
+        sample_flight.max_sink_rate_ms = 3.4
         db_session.commit()
         files = {"gpx_file": ("test.gpx", sample_gpx.encode(), "application/gpx+xml")}
         with (
@@ -1448,6 +1497,8 @@ class TestFlightGPXEndpoints:
         db_session.refresh(sample_flight)
         assert sample_flight.gpx_file_path == "private/track.gpx"
         assert sample_flight.max_speed_kmh is None
+        assert sample_flight.max_climb_rate_ms is None
+        assert sample_flight.max_sink_rate_ms is None
 
 
 class TestCreateFlightFromGPX:
@@ -1455,11 +1506,19 @@ class TestCreateFlightFromGPX:
 
     def test_create_flight_from_gpx_valid(self, client, db_session, arguel_site, sample_gpx):
         """POST /flights/create-from-gpx creates flight from GPX"""
-        files = {"file": ("arguel.gpx", sample_gpx.encode(), "application/gpx+xml")}
+        files = {"gpx_file": ("arguel.gpx", sample_gpx.encode(), "application/gpx+xml")}
         data = {"site_id": "site-arguel"}
-        response = client.post(f"{API_PREFIX}/flights/create-from-gpx", files=files, data=data)
-        # Should succeed or fail gracefully
-        assert response.status_code in [200, 201, 400, 422, 500]
+        with (
+            patch("routes.write_flight_text_file", return_value=Path("private/track.gpx")),
+            patch("video_export_manual.trigger_auto_export"),
+        ):
+            response = client.post(f"{API_PREFIX}/flights/create-from-gpx", files=files, data=data)
+
+        assert response.status_code == 200
+        flight = db_session.get(Flight, response.json()["flight_id"])
+        assert flight is not None
+        assert flight.max_climb_rate_ms == 1.0
+        assert flight.max_sink_rate_ms == 0.77
 
     def test_create_flight_from_gpx_no_file(self, client, db_session, arguel_site):
         """POST /flights/create-from-gpx fails without file"""

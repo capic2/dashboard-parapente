@@ -741,6 +741,8 @@ export const FlightRecordsSchema = z.object({
   highest_altitude: FlightRecordSchema.nullish(),
   longest_distance: FlightRecordSchema.nullish(),
   max_speed: FlightRecordSchema.nullish(),
+  max_climb_rate: FlightRecordSchema.nullish(),
+  max_sink_rate: FlightRecordSchema.nullish(),
   takeoff_elevation_gain: FlightRecordSchema.nullish(),
   earliest_takeoff: FlightRecordSchema.nullish(),
   latest_takeoff: FlightRecordSchema.nullish(),

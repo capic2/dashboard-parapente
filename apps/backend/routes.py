@@ -4276,14 +4276,16 @@ def get_flight_records(
     db: Session = Depends(get_db),
 ) -> FlightRecordsResponse:
     """
-    Get personal flight records (longest duration, highest altitude, longest distance, max speed)
+    Get personal flight records, including maximum horizontal and vertical speeds.
 
     Returns:
         {
             "longest_duration": { "value": 120, "flight_id": "...", "date": "2025-11-15", "site_name": "Annecy" },
             "highest_altitude": { ... },
             "longest_distance": { ... },
-            "max_speed": { ... }
+            "max_speed": { ... },
+            "max_climb_rate": { ... },
+            "max_sink_rate": { ... }
         }
     """
     query = _apply_flight_analytics_filters(
@@ -4297,6 +4299,8 @@ def get_flight_records(
         "highest_altitude": None,
         "longest_distance": None,
         "max_speed": None,
+        "max_climb_rate": None,
+        "max_sink_rate": None,
         "takeoff_elevation_gain": None,
         "earliest_takeoff": None,
         "latest_takeoff": None,
@@ -4312,6 +4316,30 @@ def get_flight_records(
     flights_with_altitude = [f for f in flights if f.max_altitude_m is not None]
     flights_with_distance = [f for f in flights if f.distance_km is not None]
     flights_with_speed = [f for f in flights if f.max_speed_kmh is not None and f.max_speed_kmh > 0]
+    flights_with_climb_rate = [
+        flight
+        for flight in flights
+        if not flight.gpx_metrics_excluded
+        and flight.max_climb_rate_ms is not None
+        and flight.max_climb_rate_ms > 0
+    ]
+    flights_with_sink_rate = [
+        flight
+        for flight in flights
+        if not flight.gpx_metrics_excluded
+        and flight.max_sink_rate_ms is not None
+        and flight.max_sink_rate_ms > 0
+    ]
+    flights_with_climb_data = [
+        flight
+        for flight in flights
+        if not flight.gpx_metrics_excluded and flight.max_climb_rate_ms is not None
+    ]
+    flights_with_sink_data = [
+        flight
+        for flight in flights
+        if not flight.gpx_metrics_excluded and flight.max_sink_rate_ms is not None
+    ]
     flights_with_takeoff_elevation_gain = [
         f
         for f in flights
@@ -4335,6 +4363,16 @@ def get_flight_records(
         max(flights_with_distance, key=lambda f: f.distance_km) if flights_with_distance else None
     )
     fastest = max(flights_with_speed, key=lambda f: f.max_speed_kmh) if flights_with_speed else None
+    fastest_climb = (
+        max(flights_with_climb_rate, key=lambda flight: flight.max_climb_rate_ms)
+        if flights_with_climb_rate
+        else None
+    )
+    fastest_sink = (
+        max(flights_with_sink_rate, key=lambda flight: flight.max_sink_rate_ms)
+        if flights_with_sink_rate
+        else None
+    )
     greatest_takeoff_gain = (
         max(
             flights_with_takeoff_elevation_gain,
@@ -4450,6 +4488,8 @@ def get_flight_records(
         highest_altitude=format_record(highest, "max_altitude_m", flights_with_altitude),
         longest_distance=format_record(farthest, "distance_km", flights_with_distance),
         max_speed=format_record(fastest, "max_speed_kmh", flights_with_speed),
+        max_climb_rate=format_record(fastest_climb, "max_climb_rate_ms", flights_with_climb_data),
+        max_sink_rate=format_record(fastest_sink, "max_sink_rate_ms", flights_with_sink_data),
         takeoff_elevation_gain=format_computed_flight_record(
             greatest_takeoff_gain,
             (
@@ -5305,6 +5345,8 @@ async def upload_gpx_to_flight(
 
         # Keep the upload successful even if historical/statistical data is malformed.
         flight.gpx_file_path = str(file_path)
+        flight.max_climb_rate_ms = None
+        flight.max_sink_rate_ms = None
         flight.updated_at = datetime.utcnow()
         try:
             _, points = normalize_track(gpx_content, "gpx")
@@ -5316,6 +5358,8 @@ async def upload_gpx_to_flight(
             flight.elevation_gain_m = stats["elevation_gain_m"]
             flight.gpx_max_altitude_m = stats["max_altitude_m"]
             flight.gpx_elevation_gain_m = stats["elevation_gain_m"]
+            flight.max_climb_rate_ms = stats["max_climb_rate_ms"]
+            flight.max_sink_rate_ms = stats["max_sink_rate_ms"]
             flight.departure_time = stats["departure_time"]
         except Exception as exc:
             logger.warning(
@@ -5396,6 +5440,7 @@ async def create_flight_from_gpx(
 
         # 3. Calculer les statistiques
         stats = calculate_gpx_stats(coordinates)
+        vertical_stats = calculate_track_stats(coordinates)
 
         # 4. Déterminer le site si pas fourni
         if not site_id and coordinates:
@@ -5448,6 +5493,8 @@ async def create_flight_from_gpx(
             distance_km=stats.get("total_distance_km"),
             elevation_gain_m=stats.get("elevation_gain_m"),
             max_speed_kmh=stats.get("max_speed_kmh", 0),
+            max_climb_rate_ms=vertical_stats["max_climb_rate_ms"],
+            max_sink_rate_ms=vertical_stats["max_sink_rate_ms"],
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
         )

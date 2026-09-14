@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, labeled]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -19,6 +20,7 @@ permissions:
 jobs:
   main:
     name: main
+    if: github.event.action != 'labeled' || github.event.label.name == 'automerge'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -109,18 +111,26 @@ jobs:
       - name: 🎛️ Configure NX Cloud execution
         run: |
           if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "IS_AUTOMERGE=false" >> $GITHUB_ENV
             echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
             echo "Push to main: using local cache"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name' 2>/dev/null || echo "")
-            if echo "$LABELS" | grep -q "skip-nx-cloud"; then
+            if echo "$LABELS" | grep -qx "automerge"; then
+              echo "IS_AUTOMERGE=true" >> $GITHUB_ENV
+              echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
+              echo "Automerge: NX Cloud disabled for a full uncached validation"
+            elif echo "$LABELS" | grep -qx "skip-nx-cloud"; then
+              echo "IS_AUTOMERGE=false" >> $GITHUB_ENV
               echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
               echo "NX Cloud DISABLED (skip-nx-cloud label)"
             else
+              echo "IS_AUTOMERGE=false" >> $GITHUB_ENV
               echo "NX_NO_CLOUD=false" >> $GITHUB_ENV
               echo "NX Cloud ENABLED"
             fi
           else
+            echo "IS_AUTOMERGE=false" >> $GITHUB_ENV
             echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
           fi
         env:
@@ -148,7 +158,11 @@ jobs:
             echo "$output"
           }
 
-          run_nx nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e
+          if [[ "$IS_AUTOMERGE" == "true" ]]; then
+            run_nx nx run-many -t build,lint,type-check,test --all --parallel=5 --exclude=e2e --skip-nx-cache
+          else
+            run_nx nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e
+          fi
         continue-on-error: true
         env:
           NODE_OPTIONS: --preserve-symlinks
@@ -209,7 +223,7 @@ jobs:
     name: E2E Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && (github.event.action != 'labeled' || github.event.label.name == 'automerge')
     env:
       NODE_OPTIONS: --preserve-symlinks
 
@@ -271,10 +285,16 @@ jobs:
       - name: 🎛️ Configure NX Cloud execution
         run: |
           LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name' 2>/dev/null || echo "")
-          if echo "$LABELS" | grep -q "skip-nx-cloud"; then
+          if echo "$LABELS" | grep -qx "automerge"; then
+            echo "IS_AUTOMERGE=true" >> $GITHUB_ENV
+            echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
+            echo "Automerge: NX Cloud disabled for an uncached E2E validation"
+          elif echo "$LABELS" | grep -qx "skip-nx-cloud"; then
+            echo "IS_AUTOMERGE=false" >> $GITHUB_ENV
             echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
             echo "NX Cloud DISABLED (skip-nx-cloud label)"
           else
+            echo "IS_AUTOMERGE=false" >> $GITHUB_ENV
             echo "NX_NO_CLOUD=false" >> $GITHUB_ENV
             echo "NX Cloud ENABLED"
           fi
@@ -286,7 +306,11 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 pnpm exec nx e2e e2e --configuration=ci --skipInstall 2>&1 | tee /tmp/e2e.log
+          NX_ARGS=()
+          if [[ "$IS_AUTOMERGE" == "true" ]]; then
+            NX_ARGS+=(--skip-nx-cache)
+          fi
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 pnpm exec nx e2e e2e --configuration=ci --skipInstall "${NX_ARGS[@]}" 2>&1 | tee /tmp/e2e.log
         env:
           DEBUG: pw:webserver
           ENVIRONMENT: test

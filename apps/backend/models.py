@@ -216,6 +216,8 @@ class Flight(Base):
     gpx_metrics_excluded = Column(Boolean, nullable=False, default=False)
     gpx_max_altitude_m = Column(Integer)
     gpx_elevation_gain_m = Column(Integer)
+    max_climb_rate_ms = Column(Float)
+    max_sink_rate_ms = Column(Float)
     external_url = Column(String)
     youtube_urls_json = Column("youtube_urls", Text, nullable=False, default="[]")
     # Video export fields
