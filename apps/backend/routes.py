@@ -489,7 +489,8 @@ def _flight_gopro_overlay_progress(flight: Flight, job: dict[str, Any] | None = 
 
 
 def _flight_gopro_overlay_file_exists(db: Session, flight: Flight) -> bool:
-    overlay_path = _flight_gopro_overlay_file_path(db, flight)
+    overlay_path = ensure_flight_directory(db, flight) / "overlays" / "pano-telemetry-overlay.mov"
+    overlay_path.parent.mkdir(parents=True, exist_ok=True)
     return bool(overlay_path)
 
 
