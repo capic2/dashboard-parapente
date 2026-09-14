@@ -7,6 +7,7 @@ import {
   useAppSettingsStore,
 } from '../../../stores/appSettingsStore';
 import { formatFlightSiteLabel } from '../siteDisplay';
+import { useFlightGPX } from '../../../hooks/flights/useFlightGPX';
 
 interface FlightStatsGridProps {
   flight: Flight;
@@ -20,9 +21,19 @@ const valueClass =
 const statClass =
   'rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-900/50';
 
+const formatVerticalSpeed = (value: number, altitudeUnit: string) =>
+  altitudeUnit === 'ft'
+    ? `${Math.round(value * 196.85)} ft/min`
+    : `${value.toFixed(1)} m/s`;
+
 export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
   const { t, i18n } = useTranslation();
   const units = useAppSettingsStore((state) => state.settings.units);
+  const { data: trackAnalysis, isPending: isAnalysisPending } = useFlightGPX(
+    flight.id,
+    {},
+    Boolean(flight.gpx_file_path)
+  );
   const [year, month, day] = flight.flight_date.split('-');
   const localDate = new Date(Number(year), Number(month) - 1, Number(day));
   const siteLabel = formatFlightSiteLabel({
@@ -52,6 +63,102 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
       ? 'N/A'
       : formatSpeedKmh(flight.max_speed_kmh, units.speed);
   const trackFileName = flight.gpx_file_path?.split(/[\\/]/u).pop();
+  let trackAnalysisContent = (
+    <p className="col-span-full text-sm text-gray-500 dark:text-gray-400">
+      {t('flights.trackAnalysisUnavailable')}
+    </p>
+  );
+
+  if (isAnalysisPending) {
+    trackAnalysisContent = (
+      <>
+        <span className="sr-only">{t('flights.trackAnalysisLoading')}</span>
+        {Array.from({ length: 8 }, (_, index) => (
+          <div
+            // The order is stable and the placeholders have no identity of their own.
+            key={index}
+            className="h-[67px] animate-pulse rounded-xl border border-gray-200 bg-gray-100 motion-reduce:animate-none dark:border-gray-700 dark:bg-gray-900/50"
+          />
+        ))}
+      </>
+    );
+  } else if (trackAnalysis?.coordinates.length) {
+    const stats = [
+      {
+        label: t('flights.minAltitudeLabel'),
+        value: formatAltitudeMeters(
+          trackAnalysis.min_altitude_m,
+          units.altitude
+        ),
+      },
+      {
+        label: t('flights.altitudeRangeLabel'),
+        value: formatAltitudeMeters(
+          trackAnalysis.altitude_range_m ??
+            trackAnalysis.max_altitude_m - trackAnalysis.min_altitude_m,
+          units.altitude
+        ),
+      },
+      {
+        label: t('flights.maxClimbRateLabel'),
+        value: formatVerticalSpeed(
+          trackAnalysis.max_climb_rate_ms ?? 0,
+          units.altitude
+        ),
+      },
+      {
+        label: t('flights.maxSinkRateLabel'),
+        value: formatVerticalSpeed(
+          trackAnalysis.max_sink_rate_ms ?? 0,
+          units.altitude
+        ),
+      },
+      {
+        label: t('flights.averageSpeedLabel'),
+        value: formatSpeedKmh(
+          trackAnalysis.average_speed_kmh ?? 0,
+          units.speed
+        ),
+      },
+      {
+        label: t('flights.maxDistanceFromTakeoffLabel'),
+        value: formatDistanceKm(
+          trackAnalysis.max_distance_from_takeoff_km ?? 0,
+          units.distance
+        ),
+      },
+      {
+        label: t('flights.takeoffAltitudeLabel'),
+        value: formatAltitudeMeters(
+          trackAnalysis.takeoff_altitude_m ??
+            trackAnalysis.coordinates[0]?.elevation ??
+            0,
+          units.altitude
+        ),
+      },
+      {
+        label: t('flights.landingAltitudeLabel'),
+        value: formatAltitudeMeters(
+          trackAnalysis.landing_altitude_m ??
+            trackAnalysis.coordinates[trackAnalysis.coordinates.length - 1]
+              ?.elevation ??
+            0,
+          units.altitude
+        ),
+      },
+    ];
+
+    trackAnalysisContent = (
+      <>
+        {stats.map((stat) => (
+          <div className={statClass} key={stat.label}>
+            <span className={labelClass}>{stat.label}</span>
+            <span className={valueClass}>{stat.value}</span>
+          </div>
+        ))}
+      </>
+    );
+  }
 
   return (
     <div className="mb-4">
@@ -100,6 +207,7 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
           <span className={labelClass}>{t('flights.maxSpeedLabel')}</span>
           <span className={valueClass}>{maxSpeedLabel}</span>
         </div>
+        {flight.gpx_file_path && trackAnalysisContent}
       </div>
       {trackFileName && (
         <div className="mt-3 min-w-0">
