@@ -29,6 +29,7 @@ export type FlightOverlayLayout =
 interface FlightOverlayPlayerProps {
   cameraUrl: string;
   flightUrl: string;
+  overlayUrl?: string;
   cameraLabel: string;
   flightLabel: string;
   syncOffsetSeconds?: number;
@@ -44,6 +45,7 @@ function clamp(value: number, minimum: number, maximum: number) {
 export function FlightOverlayPlayer({
   cameraUrl,
   flightUrl,
+  overlayUrl,
   cameraLabel,
   flightLabel,
   syncOffsetSeconds = 0,
@@ -54,6 +56,7 @@ export function FlightOverlayPlayer({
   const { t } = useTranslation();
   const playerRef = useRef<MediaPlayerInstance>(null);
   const flightRef = useRef<HTMLVideoElement>(null);
+  const overlayRef = useRef<HTMLVideoElement>(null);
   const [layout, setLayout] = useState<FlightOverlayLayout>('camera-main');
   const [flightReady, setFlightReady] = useState(false);
 
@@ -73,27 +76,44 @@ export function FlightOverlayPlayer({
     [flightReady, getFlightTime, syncOffsetSeconds]
   );
 
+  const syncOverlay = useCallback((cameraTime: number) => {
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+    const target = clamp(
+      cameraTime,
+      0,
+      Number.isFinite(overlay.duration) ? overlay.duration : cameraTime
+    );
+    if (Math.abs(overlay.currentTime - target) > 0.08)
+      overlay.currentTime = target;
+  }, []);
+
   useEffect(() => {
     syncFlight(playerRef.current?.state.currentTime ?? 0);
-  }, [syncFlight]);
+    syncOverlay(playerRef.current?.state.currentTime ?? 0);
+  }, [syncFlight, syncOverlay]);
 
   const handleTimeUpdate = () => {
     const time = playerRef.current?.state.currentTime ?? 0;
     syncFlight(time);
+    syncOverlay(time);
     onTimeChange?.(time);
   };
 
   const handlePlay = () => {
     syncFlight(playerRef.current?.state.currentTime ?? 0);
     void flightRef.current?.play();
+    void overlayRef.current?.play();
   };
 
   const handlePause = () => {
     flightRef.current?.pause();
+    overlayRef.current?.pause();
   };
 
   const handleSeek = () => {
     syncFlight(playerRef.current?.state.currentTime ?? 0);
+    syncOverlay(playerRef.current?.state.currentTime ?? 0);
   };
 
   const cameraIsMain = layout === 'camera-main';
@@ -144,6 +164,18 @@ export function FlightOverlayPlayer({
           }}
           aria-label={flightLabel}
         />
+
+        {overlayUrl && (
+          <video
+            ref={overlayRef}
+            src={overlayUrl}
+            playsInline
+            preload="metadata"
+            muted
+            className="pointer-events-none absolute inset-0 z-[15] h-full w-full object-contain"
+            aria-label="Telemetry overlay"
+          />
+        )}
 
         {layout !== 'side-by-side' && (
           <button

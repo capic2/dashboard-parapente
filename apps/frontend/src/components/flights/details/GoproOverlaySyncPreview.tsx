@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Gauge, HeartPulse, MapPin, Mountain, TimerReset } from 'lucide-react';
 import {
+  useFlightOverlayLayer,
   useGenerateGoproPreview,
   useGoproOverlayPreview,
 } from '../../../hooks/gopro/useGoproOverlay';
@@ -68,6 +69,7 @@ export function GoproOverlaySyncPreview({
   const token = useAuthStore((state) => state.token);
   const queryClient = useQueryClient();
   const preview = useGoproOverlayPreview(flightId, true);
+  const layer = useFlightOverlayLayer(flightId);
   const generatePreview = useGenerateGoproPreview(flightId);
   const automaticallyRequestedTarget = useRef<string | null>(null);
   const [videoTime, setVideoTime] = useState(0);
@@ -98,6 +100,16 @@ export function GoproOverlaySyncPreview({
       version: `${preview.data?.video.preview_target_end_seconds}-${preview.data?.video.preview_available_duration_seconds}`,
     }
   );
+  const overlayJob = layer.data?.status === 'completed' ? layer.data.job : null;
+  const overlayUrl = overlayJob
+    ? getApiUrlWithSearchParams(
+        `gopro-overlays/jobs/${overlayJob.job_id}/download`,
+        {
+          access_token: token,
+          version: overlayJob.updated_at,
+        }
+      )
+    : undefined;
   const flightVideoUrl = getApiUrlWithSearchParams(
     `flights/${flightId}/video`,
     {
@@ -198,6 +210,7 @@ export function GoproOverlaySyncPreview({
         <FlightOverlayPlayer
           cameraUrl={videoUrl}
           flightUrl={flightVideoUrl}
+          overlayUrl={overlayUrl}
           cameraLabel={t('flights.goproOverlayCameraPreview')}
           flightLabel={t('flights.goproOverlayFlightVideo')}
           syncOffsetSeconds={automaticOffset + manualOffset}
