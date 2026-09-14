@@ -35,13 +35,15 @@ export function FlightOverlayWorkspace({
   useEffect(() => setOffset(initialOffset), [initialOffset]);
 
   const isDirty = offset !== initialOffset;
+  const hasValidOffset =
+    offset.trim() !== '' && Number.isFinite(Number(offset));
   const isGenerating = ACTIVE_LAYER_STATUSES.has(
     layer.data?.status ?? 'missing'
   );
   const isReady = layer.data?.status === 'completed' && !isDirty;
 
   const saveOffset = async () => {
-    if (!isDirty) return;
+    if (!isDirty || !hasValidOffset) return;
     setIsSaving(true);
     try {
       await onSaveOffset(offset);
@@ -117,6 +119,7 @@ export function FlightOverlayWorkspace({
       <GoproOverlaySyncPreview
         flightId={flightId}
         offset={offset}
+        resetOffset={initialOffset}
         onOffsetChange={setOffset}
       />
 
@@ -125,14 +128,19 @@ export function FlightOverlayWorkspace({
           <Button
             variant="outline"
             onPress={() => void saveOffset()}
-            isDisabled={isSaving || generateLayer.isPending}
+            isDisabled={isSaving || generateLayer.isPending || !hasValidOffset}
           >
             {t('flights.overlaySaveCalibration')}
           </Button>
         )}
         <Button
           onPress={() => void saveAndGenerate()}
-          isDisabled={isSaving || generateLayer.isPending || isGenerating}
+          isDisabled={
+            isSaving ||
+            generateLayer.isPending ||
+            isGenerating ||
+            !hasValidOffset
+          }
         >
           {isSaving || generateLayer.isPending || isGenerating ? (
             <LoaderCircle

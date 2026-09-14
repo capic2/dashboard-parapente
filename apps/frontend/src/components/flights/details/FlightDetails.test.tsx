@@ -180,6 +180,12 @@ vi.mock('react-i18next', () => ({
           'flights.goproOverlayOutputResolutionHint': 'Resolution hint',
           'flights.goproOverlayGpxOffsetLabel': 'GPX offset (seconds)',
           'flights.goproOverlayGpxOffsetHint': 'Offset hint',
+          'flights.overlayWorkspaceTitle': 'Synchronization and overlay layer',
+          'flights.overlayWorkspaceDescription': 'Calibrate telemetry',
+          'flights.overlaySaveCalibration': 'Save calibration',
+          'flights.goproPreviewStart': 'Start of flight',
+          'flights.goproPreviewEnd': 'End of flight',
+          'flights.goproOverlayCameraPreview': 'GoPro video preview',
           'common.reset': 'Reset',
           'flights.goproOverlayStarted': 'Overlay started',
           'flights.goproOverlayCancelled': 'Overlay cancelled',
@@ -376,6 +382,46 @@ const sites: Site[] = [];
 
 const openTab = (name: 'Media' | 'Processing') => {
   fireEvent.click(screen.getByRole('tab', { name }));
+};
+
+const setSegmentedPreview = () => {
+  previewMock.current = {
+    isPending: false,
+    data: {
+      video: {
+        duration_seconds: 1200,
+        start_time: '2026-03-15T14:00:00Z',
+        preview_target_end_seconds: 1200,
+        preview_segments: [
+          {
+            preview_start_seconds: 0,
+            source_start_seconds: 0,
+            duration_seconds: 180,
+          },
+          {
+            preview_start_seconds: 180,
+            source_start_seconds: 1020,
+            duration_seconds: 180,
+          },
+        ],
+        preview_status: 'ready',
+        preview_available_duration_seconds: 180,
+        preview_requested_duration_seconds: 180,
+        preview_max_duration_seconds: 601,
+      },
+      gpx: {
+        start_time: '2026-03-15T14:00:00Z',
+        end_time: '2026-03-15T14:20:00Z',
+        duration_seconds: 1200,
+        coordinates: [],
+      },
+      alignment: {
+        automatic_offset_seconds: 0,
+        manual_offset_seconds: 0,
+        effective_offset_seconds: 0,
+      },
+    },
+  };
 };
 
 describe('FlightDetails GoPro overlay action', () => {
@@ -1157,6 +1203,61 @@ describe('FlightDetails GoPro overlay action', () => {
     const formData = createOverlayMock.mock.calls[0][0] as FormData;
     expect(formData.get('gpx_offset')).toBe('-1.75');
     expect(formData.get('output_resolution')).toBe('4k');
+  });
+
+  it('allows a precise manual offset in the synchronization workspace', async () => {
+    setSegmentedPreview();
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    openTab('Media');
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /Synchronization and overlay layer/u,
+      })
+    );
+
+    const offsetInput = screen.getByLabelText('GPX offset (seconds)');
+    fireEvent.change(offsetInput, { target: { value: '2.5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save calibration' }));
+
+    await waitFor(() =>
+      expect(updateFlightMock).toHaveBeenCalledWith({
+        gopro_overlay_gpx_offset: 2.5,
+      })
+    );
+  });
+
+  it('seeks to the start and end preview segments from their buttons', () => {
+    setSegmentedPreview();
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    openTab('Media');
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /Synchronization and overlay layer/u,
+      })
+    );
+
+    const camera = screen.getByLabelText('GoPro video preview');
+    fireEvent.click(screen.getByRole('button', { name: 'End of flight' }));
+    expect(camera).toHaveProperty('currentTime', 180);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start of flight' }));
+    expect(camera).toHaveProperty('currentTime', 0);
   });
 
   it('requests a longer low-resolution preview from the duration slider', async () => {
