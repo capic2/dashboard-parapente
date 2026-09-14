@@ -35,6 +35,36 @@ export type GoproOverlayPreview = {
   };
 };
 
+export type FlightOverlayLayer = {
+  status: 'missing' | GoproOverlayJob['status'];
+  job: GoproOverlayJob | null;
+};
+
+export function useFlightOverlayLayer(flightId: string) {
+  return useQuery({
+    queryKey: ['flights', flightId, 'overlay-layer'],
+    queryFn: () =>
+      api.get(`flights/${flightId}/overlay-layer`).json<FlightOverlayLayer>(),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === 'queued' ||
+        status === 'preparing' ||
+        status === 'running'
+        ? STATUS_POLL_INTERVAL_MS
+        : false;
+    },
+  });
+}
+
+export function useGenerateFlightOverlayLayer(flightId: string) {
+  return useMutation({
+    mutationFn: () =>
+      api
+        .post(`flights/${flightId}/overlay-layer`, { timeout: false })
+        .json<GoproOverlayJob>(),
+  });
+}
+
 export function goproPreviewRefetchInterval(
   status?: GoproOverlayPreview['video']['preview_status']
 ) {

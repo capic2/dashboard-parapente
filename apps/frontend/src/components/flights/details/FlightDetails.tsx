@@ -67,7 +67,7 @@ import { FlightReplayCard } from './FlightReplayCard';
 import { FlightStatsGrid } from './FlightStatsGrid';
 import { FlightYoutubeVideos } from './FlightYoutubeVideos';
 import { GoproOverlayJobStack } from './GoproOverlayJobStack';
-import { GoproOverlaySyncPreview } from './GoproOverlaySyncPreview';
+import { FlightOverlayWorkspace } from './FlightOverlayWorkspace';
 
 interface FlightDetailsProps {
   flight: Flight;
@@ -429,11 +429,13 @@ export function FlightDetails({
     setGoproOverlayGpxOffset('0');
   };
 
-  const handleGoproOverlayOffsetChange = (nextOffset: string) => {
+  const handleGoproOverlayOffsetChange = async (nextOffset: string) => {
     setGoproOverlayGpxOffset(nextOffset);
     const parsedOffset = Number(nextOffset);
     if (Number.isFinite(parsedOffset)) {
-      updateFlight.mutate({ gopro_overlay_gpx_offset: parsedOffset });
+      await updateFlight.mutateAsync({
+        gopro_overlay_gpx_offset: parsedOffset,
+      });
     }
   };
 
@@ -1078,32 +1080,11 @@ export function FlightDetails({
         </FlightMediaBadges>
 
         {hasGpx && hasVideo && hasGoproCameraVideo && (
-          <section
-            aria-labelledby="flight-interactive-overlay-title"
-            className="rounded-2xl border border-cyan-200 bg-cyan-50/50 p-4 shadow-sm dark:border-cyan-900 dark:bg-cyan-950/20 sm:p-5"
-          >
-            <div className="mb-4 flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
-                <Wand2 className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <div>
-                <h2
-                  id="flight-interactive-overlay-title"
-                  className="text-base font-semibold text-slate-950 dark:text-white"
-                >
-                  {t('flights.goproOverlayInteractiveTitle')}
-                </h2>
-                <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
-                  {t('flights.goproOverlayInteractiveDescription')}
-                </p>
-              </div>
-            </div>
-            <GoproOverlaySyncPreview
-              flightId={flight.id}
-              offset={goproOverlayGpxOffset}
-              onOffsetChange={handleGoproOverlayOffsetChange}
-            />
-          </section>
+          <FlightOverlayWorkspace
+            flightId={flight.id}
+            initialOffset={goproOverlayGpxOffset}
+            onSaveOffset={handleGoproOverlayOffsetChange}
+          />
         )}
 
         {(flight.youtube_urls?.length ?? 0) > 0 && (
