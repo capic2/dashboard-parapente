@@ -75,6 +75,20 @@ def test_calculates_instantaneous_vertical_rate_extrema() -> None:
     assert stats["elevation_loss_m"] == 3
 
 
+def test_clamps_unrealistic_instantaneous_vertical_rate() -> None:
+    gpx = b"""<gpx xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>
+    <trkpt lat="47.2" lon="6.0"><ele>500</ele><time>2026-07-01T10:00:00Z</time></trkpt>
+    <trkpt lat="47.2" lon="6.0"><ele>700</ele><time>2026-07-01T10:00:01Z</time></trkpt>
+    <trkpt lat="47.2" lon="6.0"><ele>500</ele><time>2026-07-01T10:00:02Z</time></trkpt>
+    </trkseg></trk></gpx>"""
+
+    _, points = normalize_track(gpx, "gpx")
+
+    stats = calculate_track_stats(points)
+    assert stats["max_climb_rate_ms"] == pytest.approx(15)
+    assert stats["max_sink_rate_ms"] == pytest.approx(15)
+
+
 def test_prefers_gpx_speed_extension_in_meters_per_second() -> None:
     gpx = b"""<gpx xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
     <trk><trkseg>
