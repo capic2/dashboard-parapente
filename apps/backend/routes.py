@@ -5090,6 +5090,7 @@ def create_flight_highlight_video(
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
     overlay_offset = _require_gopro_overlay_offset(flight)
+    _require_ready_gopro_overlay_layer(flight)
 
     pano_path = pano_video_path(db, flight)
     if not pano_path.is_file():
@@ -6698,6 +6699,17 @@ def _require_gopro_overlay_offset(flight: Flight) -> float:
     return float(flight.gopro_overlay_gpx_offset)
 
 
+def _require_ready_gopro_overlay_layer(flight: Flight) -> GoproOverlayJobModel:
+    """Require a completed reusable transparent layer before composing media."""
+    job = _flight_overlay_layer_job(flight)
+    if job is None or job.status != "completed":
+        raise HTTPException(
+            status_code=409,
+            detail="Generate the synchronized overlay layer before generating media",
+        )
+    return job
+
+
 @router.get(
     "/flights/{flight_id}/overlay-layer",
     response_model=FlightOverlayLayer,
@@ -6955,6 +6967,7 @@ async def create_flight_gopro_overlay_job(
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
     _require_gopro_overlay_offset(flight)
+    _require_ready_gopro_overlay_layer(flight)
 
     title = flight.title or flight.name or flight.id
     input_dir = _gopro_overlay_flight_directory(db, flight)

@@ -8,9 +8,6 @@ import {
   useFlightOverlayLayer,
   useGenerateFlightOverlayLayer,
 } from '../../../hooks/gopro/useGoproOverlay';
-import { getApiUrlWithSearchParams } from '../../../lib/api';
-import { useAuthStore } from '../../../stores/authStore';
-import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 import { GoproOverlaySyncPreview } from './GoproOverlaySyncPreview';
 
 interface FlightOverlayWorkspaceProps {
@@ -29,7 +26,6 @@ export function FlightOverlayWorkspace({
   showHeader = true,
 }: FlightOverlayWorkspaceProps) {
   const { t } = useTranslation();
-  const token = useAuthStore((state) => state.token);
   const queryClient = useQueryClient();
   const layer = useFlightOverlayLayer(flightId);
   const generateLayer = useGenerateFlightOverlayLayer(flightId);
@@ -43,20 +39,6 @@ export function FlightOverlayWorkspace({
     layer.data?.status ?? 'missing'
   );
   const isReady = layer.data?.status === 'completed' && !isDirty;
-  const overlayJob = isReady ? layer.data?.job : null;
-  const overlayUrl = overlayJob
-    ? getApiUrlWithSearchParams(
-        `gopro-overlays/jobs/${overlayJob.job_id}/download`,
-        { access_token: token, version: overlayJob.updated_at }
-      )
-    : undefined;
-  const cameraUrl = getApiUrlWithSearchParams(
-    `flights/${flightId}/gopro-camera/preview`,
-    { access_token: token }
-  );
-  const flightUrl = getApiUrlWithSearchParams(`flights/${flightId}/video`, {
-    access_token: token,
-  });
 
   const saveOffset = async () => {
     if (!isDirty) return;
@@ -137,21 +119,6 @@ export function FlightOverlayWorkspace({
         offset={offset}
         onOffsetChange={setOffset}
       />
-
-      {overlayUrl && (
-        <div className="mt-4 border-t border-cyan-200 pt-4 dark:border-cyan-900">
-          <p className="mb-2 text-sm font-semibold text-slate-900 dark:text-white">
-            {t('flights.overlayInteractivePreview')}
-          </p>
-          <FlightOverlayPlayer
-            cameraUrl={cameraUrl}
-            flightUrl={flightUrl}
-            overlayUrl={overlayUrl}
-            cameraLabel={t('flights.goproOverlayCameraPreview')}
-            flightLabel={t('flights.goproOverlayFlightVideo')}
-          />
-        </div>
-      )}
 
       <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-cyan-200 pt-4 dark:border-cyan-900">
         {isDirty && (
