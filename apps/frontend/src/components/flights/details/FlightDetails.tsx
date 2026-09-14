@@ -139,6 +139,7 @@ export function FlightDetails({
   const hasVideo = hasFlightVideo(flight);
   const hasPanoVideo = flight.pano_video_file_exists === true;
   const hasGoproCameraVideo = flight.gopro_camera_file_exists === true;
+  const hasGoproOverlayOffset = flight.gopro_overlay_gpx_offset != null;
   const hasPersistedGoproOverlay = hasFlightGoproOverlay(flight);
   const persistedGoproOverlays = flight.gopro_overlays ?? [];
   const activePersistedGoproOverlay = persistedGoproOverlays.find((overlay) =>
@@ -375,6 +376,10 @@ export function FlightDetails({
 
   const handleStartGoproOverlay = async () => {
     if (isGoproOverlayRunning) return;
+    if (!hasGoproOverlayOffset) {
+      toast.error(t('flights.goproOverlayNeedsOffset'));
+      return;
+    }
     if (!hasGoproCameraVideo) {
       toast.error(t('flights.goproOverlayNeedsCameraVideo'));
       return;
@@ -616,16 +621,23 @@ export function FlightDetails({
     goproOverlayTitle = t('flights.goproOverlayNeedsCameraVideo');
   } else if (!hasVideo) {
     goproOverlayTitle = t('flights.goproOverlayNeedsVideo');
+  } else if (!hasGoproOverlayOffset) {
+    goproOverlayTitle = t('flights.goproOverlayNeedsOffset');
   }
   let goproOverlayUnavailableReason: string | null = null;
   if (!isGoproOverlayRunning && !hasGoproCameraVideo) {
     goproOverlayUnavailableReason = t('flights.goproOverlayNeedsCameraVideo');
   } else if (!isGoproOverlayRunning && !hasVideo) {
     goproOverlayUnavailableReason = t('flights.goproOverlayNeedsVideo');
+  } else if (!isGoproOverlayRunning && !hasGoproOverlayOffset) {
+    goproOverlayUnavailableReason = t('flights.goproOverlayNeedsOffset');
   }
   const canUseGoproOverlayAction =
     (isGoproOverlayRunning && Boolean(effectiveGoproOverlayJobId)) ||
-    (hasGoproCameraVideo && hasVideo && !isGoproOverlayRunning);
+    (hasGoproCameraVideo &&
+      hasVideo &&
+      hasGoproOverlayOffset &&
+      !isGoproOverlayRunning);
   const hasGenerationLogs = Boolean(
     flight.video_export_job_id ||
     videoExportStatus?.internal_status ||
@@ -943,6 +955,7 @@ export function FlightDetails({
             job={latestHighlightVideo}
             flight={flight}
             hasPanoVideo={hasPanoVideo}
+            hasOverlayOffset={hasGoproOverlayOffset}
             isDownloadingAnyMedia={isDownloadingAnyMedia}
             isGenerationPending={createHighlightVideo.isPending}
             isCancellationPending={cancelHighlightVideo.isPending}

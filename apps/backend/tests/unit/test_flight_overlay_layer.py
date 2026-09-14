@@ -1,7 +1,10 @@
 import json
 from types import SimpleNamespace
 
-from routes import _flight_overlay_layer_job
+from fastapi import HTTPException
+import pytest
+
+from routes import _flight_overlay_layer_job, _require_gopro_overlay_offset
 
 
 def test_flight_overlay_layer_job_returns_newest_transparent_overlay() -> None:
@@ -19,3 +22,14 @@ def test_flight_overlay_layer_job_ignores_invalid_or_regular_jobs() -> None:
     flight = SimpleNamespace(gopro_overlay_jobs=[invalid, regular_export])
 
     assert _flight_overlay_layer_job(flight) is None
+
+
+def test_gopro_overlay_offset_requires_explicit_persistence() -> None:
+    with pytest.raises(HTTPException) as error:
+        _require_gopro_overlay_offset(SimpleNamespace(gopro_overlay_gpx_offset=None))
+
+    assert error.value.status_code == 409
+
+
+def test_gopro_overlay_offset_accepts_zero_as_a_valid_offset() -> None:
+    assert _require_gopro_overlay_offset(SimpleNamespace(gopro_overlay_gpx_offset=0.0)) == 0.0

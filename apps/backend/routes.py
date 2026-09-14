@@ -5089,6 +5089,7 @@ def create_flight_highlight_video(
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
+    overlay_offset = _require_gopro_overlay_offset(flight)
 
     pano_path = pano_video_path(db, flight)
     if not pano_path.is_file():
@@ -5116,7 +5117,7 @@ def create_flight_highlight_video(
         source_video_path=str(pano_path),
         overlay_video_path=overlay_path,
         output_format="original",
-        overlay_offset_seconds=float(flight.gopro_overlay_gpx_offset or 0.0),
+        overlay_offset_seconds=overlay_offset,
     )
     db.add(job)
     try:
@@ -6687,6 +6688,16 @@ def _flight_overlay_layer_job(flight: Flight) -> GoproOverlayJobModel | None:
     return None
 
 
+def _require_gopro_overlay_offset(flight: Flight) -> float:
+    """Require an explicit persisted synchronization offset before rendering."""
+    if flight.gopro_overlay_gpx_offset is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Set the GoPro overlay synchronization offset before generating media",
+        )
+    return float(flight.gopro_overlay_gpx_offset)
+
+
 @router.get(
     "/flights/{flight_id}/overlay-layer",
     response_model=FlightOverlayLayer,
@@ -6943,6 +6954,7 @@ async def create_flight_gopro_overlay_job(
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
+    _require_gopro_overlay_offset(flight)
 
     title = flight.title or flight.name or flight.id
     input_dir = _gopro_overlay_flight_directory(db, flight)

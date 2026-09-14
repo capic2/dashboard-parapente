@@ -46,6 +46,7 @@ const {
     gopro_overlay_status: null,
     gopro_overlay_file_path: null,
     gopro_overlay_file_exists: undefined,
+    gopro_overlay_gpx_offset: 0,
     duration_minutes: 12,
     max_altitude_m: 1000,
     max_speed_kmh: 42,
@@ -303,6 +304,14 @@ vi.mock('../../../hooks/gopro/useGoproOverlay', () => ({
     reset: resetOverlayMock,
   }),
   useGoproOverlayJobStream: () => ({ job: overlayJobStreamMock.current }),
+  useFlightOverlayLayer: () => ({
+    data: { status: 'missing', job: null },
+    isPending: false,
+  }),
+  useGenerateFlightOverlayLayer: () => ({
+    isPending: false,
+    mutateAsync: vi.fn(),
+  }),
   useGoproOverlayPreview: () => previewMock.current ?? { isPending: true },
   useGenerateGoproPreview: () => ({
     isPending: false,
@@ -389,7 +398,7 @@ describe('FlightDetails GoPro overlay action', () => {
     mockFlight.gopro_overlay_file_path = null;
     mockFlight.gopro_overlay_file_exists = undefined;
     mockFlight.gopro_overlay_progress = null;
-    mockFlight.gopro_overlay_gpx_offset = null;
+    mockFlight.gopro_overlay_gpx_offset = 0;
     mockFlight.gopro_overlays = undefined;
     mockFlight.video_export_job_id = null;
     mockFlight.video_export_status = null;
