@@ -22,8 +22,6 @@ class TrackPoint(TypedDict, total=False):
 MAX_TRACK_BYTES = 100 * 1024 * 1024
 MAX_XML_TRACK_BYTES = 25 * 1024 * 1024
 MAX_TRACK_POINTS = 500_000
-VARIO_WINDOW_SECONDS = 10
-MAX_VARIO_WINDOW_SECONDS = 120
 
 
 def _append_point(points: list[TrackPoint], point: TrackPoint) -> None:
@@ -452,35 +450,19 @@ def calculate_track_stats(points: list[TrackPoint]) -> dict[str, Any]:
 
     max_climb_rate = 0.0
     max_sink_rate = 0.0
-    window_start = 0
-    for index, current in enumerate(points):
-        if index == 0:
+    for previous, current in zip(points, points[1:], strict=False):
+        if previous.get("segment", 0) != current.get("segment", 0):
             continue
-        if current.get("segment", 0) != points[index - 1].get("segment", 0):
-            window_start = index
+        previous_timestamp = previous.get("timestamp", 0)
+        current_timestamp = current.get("timestamp", 0)
+        if previous_timestamp <= 0 or current_timestamp <= 0:
             continue
-        if current.get("timestamp", 0) <= 0:
+        elapsed = current_timestamp - previous_timestamp
+        if elapsed <= 0:
             continue
-        while window_start < index and points[window_start].get("timestamp", 0) <= 0:
-            window_start += 1
-        if window_start == index:
-            continue
-        while window_start < index - 1:
-            next_point = points[window_start + 1]
-            next_elapsed = (current.get("timestamp", 0) - next_point.get("timestamp", 0)) / 1000
-            if (
-                next_point.get("segment", 0) != current.get("segment", 0)
-                or next_elapsed < VARIO_WINDOW_SECONDS
-            ):
-                break
-            window_start += 1
-        previous = points[window_start]
-        elapsed_seconds = (current.get("timestamp", 0) - previous.get("timestamp", 0)) / 1000
-        if not VARIO_WINDOW_SECONDS <= elapsed_seconds <= MAX_VARIO_WINDOW_SECONDS:
-            continue
-        vertical_rate = (
-            current.get("elevation", 0.0) - previous.get("elevation", 0.0)
-        ) / elapsed_seconds
+        vertical_rate = (current.get("elevation", 0.0) - previous.get("elevation", 0.0)) / (
+            elapsed / 1000
+        )
         if math.isfinite(vertical_rate):
             max_climb_rate = max(max_climb_rate, vertical_rate)
             max_sink_rate = max(max_sink_rate, -vertical_rate)

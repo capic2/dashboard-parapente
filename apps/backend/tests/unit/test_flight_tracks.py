@@ -54,7 +54,25 @@ def test_normalizes_gzipped_gpx_and_calculates_stats():
     assert len(points) == 2
     assert stats["max_altitude_m"] == 450
     assert stats["elevation_gain_m"] == 50
+    assert stats["elevation_loss_m"] == 0
+    assert stats["max_climb_rate_ms"] == pytest.approx(50 / 60, abs=0.01)
+    assert stats["max_sink_rate_ms"] == 0
     assert stats["duration_minutes"] == 1
+
+
+def test_calculates_instantaneous_vertical_rate_extrema() -> None:
+    gpx = b"""<gpx xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>
+    <trkpt lat="47.2" lon="6.0"><ele>500</ele><time>2026-07-01T10:00:00Z</time></trkpt>
+    <trkpt lat="47.2" lon="6.0"><ele>501.21</ele><time>2026-07-01T10:00:01Z</time></trkpt>
+    <trkpt lat="47.2" lon="6.0"><ele>498.65</ele><time>2026-07-01T10:00:02Z</time></trkpt>
+    </trkseg></trk></gpx>"""
+
+    _, points = normalize_track(gpx, "gpx")
+
+    stats = calculate_track_stats(points)
+    assert stats["max_climb_rate_ms"] == pytest.approx(1.21)
+    assert stats["max_sink_rate_ms"] == pytest.approx(2.56)
+    assert stats["elevation_loss_m"] == 3
 
 
 def test_prefers_gpx_speed_extension_in_meters_per_second() -> None:
