@@ -5302,12 +5302,18 @@ async def upload_gpx_to_flight(
         flight.updated_at = datetime.utcnow()
         try:
             _, points = normalize_track(gpx_content, "gpx")
-            max_speed_kmh = float(calculate_track_stats(points)["max_speed_kmh"])
-            if max_speed_kmh > 0:
-                flight.max_speed_kmh = max_speed_kmh
+            stats = calculate_track_stats(points)
+            flight.duration_minutes = stats["duration_minutes"]
+            flight.max_altitude_m = stats["max_altitude_m"]
+            flight.max_speed_kmh = stats["max_speed_kmh"]
+            flight.distance_km = stats["distance_km"]
+            flight.elevation_gain_m = stats["elevation_gain_m"]
+            flight.gpx_max_altitude_m = stats["max_altitude_m"]
+            flight.gpx_elevation_gain_m = stats["elevation_gain_m"]
+            flight.departure_time = stats["departure_time"]
         except Exception as exc:
             logger.warning(
-                "Could not calculate max speed for uploaded GPX on %s: %s", flight_id, exc
+                "Could not calculate GPX stats for uploaded track on %s: %s", flight_id, exc
             )
 
         db.commit()

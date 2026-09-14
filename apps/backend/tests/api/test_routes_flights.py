@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 import config
 from fastapi.testclient import TestClient
+from flight_tracks import calculate_track_stats, normalize_track
 from models import Flight, GoproOverlayJob, HighlightVideoJob
 from sqlalchemy.orm import Session
 from video_thumbnail import VideoThumbnailError
@@ -1416,8 +1417,16 @@ class TestFlightGPXEndpoints:
 
         assert response.status_code == 200
         db_session.refresh(sample_flight)
-        assert sample_flight.max_speed_kmh is not None
-        assert sample_flight.max_speed_kmh > 0
+        _, points = normalize_track(sample_gpx.encode(), "gpx")
+        expected = calculate_track_stats(points)
+        assert sample_flight.duration_minutes == expected["duration_minutes"]
+        assert sample_flight.max_altitude_m == expected["max_altitude_m"]
+        assert sample_flight.max_speed_kmh == expected["max_speed_kmh"]
+        assert sample_flight.distance_km == expected["distance_km"]
+        assert sample_flight.elevation_gain_m == expected["elevation_gain_m"]
+        assert sample_flight.gpx_max_altitude_m == expected["max_altitude_m"]
+        assert sample_flight.gpx_elevation_gain_m == expected["elevation_gain_m"]
+        assert sample_flight.departure_time == expected["departure_time"].replace(tzinfo=None)
 
     def test_upload_gpx_succeeds_when_stat_calculation_fails(
         self, client, db_session, sample_flight, sample_gpx
