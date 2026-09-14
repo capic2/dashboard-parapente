@@ -123,7 +123,10 @@ export function GoproOverlaySyncPreview({
         version: overlayJob.updated_at,
       }
     );
-  } else if (preview.data?.overlay.status === 'ready' && preview.data.overlay.job_id) {
+  } else if (
+    preview.data?.overlay.status === 'ready' &&
+    preview.data.overlay.job_id
+  ) {
     overlayUrl = getApiUrlWithSearchParams(
       `gopro-overlays/jobs/${preview.data.overlay.job_id}/download`,
       {

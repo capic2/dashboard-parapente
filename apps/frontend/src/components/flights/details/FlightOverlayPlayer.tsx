@@ -56,7 +56,8 @@ export function FlightOverlayPlayer({
     if (!camera) return;
     const currentTime = camera.currentTime;
     const flight = flightRef.current;
-    const flightTime = getFlightTime?.(currentTime) ?? currentTime - syncOffsetSeconds;
+    const flightTime =
+      getFlightTime?.(currentTime) ?? currentTime - syncOffsetSeconds;
     if (flight && Math.abs(flight.currentTime - flightTime) > 0.12) {
       flight.currentTime = clamp(flightTime, flight.duration);
     }
