@@ -484,6 +484,7 @@ class FlightUpdate(BaseModel):
     conditions_feedback: str | None = None
     decision_snapshot: str | None = None
     gopro_overlay_gpx_offset: float | None = None
+    gpx_metrics_excluded: bool | None = None
 
     @validator("youtube_urls")
     def valid_youtube_urls(cls, value):
@@ -614,6 +615,7 @@ class Flight(FlightBase):
     external_provider: str | None = None
     external_activity_id: str | None = None
     gpx_file_path: str | None = None
+    gpx_metrics_excluded: bool = False
     external_url: str | None = None
     youtube_urls: list[str] = Field(default_factory=list)
     video_export_job_id: str | None = None

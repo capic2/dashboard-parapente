@@ -1043,6 +1043,7 @@
     "maxSpeedLabel": "Max speed (km/h)",
     "trackAnalysisLoading": "Track analysis loading",
     "trackAnalysisUnavailable": "Detailed track analysis is unavailable.",
+    "excludeGpxMetrics": "Exclude metrics from this GPX",
     "minAltitudeLabel": "Minimum altitude",
     "altitudeRangeLabel": "Altitude range",
     "maxClimbRateLabel": "Max climb rate",

@@ -213,6 +213,7 @@ class Flight(Base):
     conditions_feedback = Column(Text)
     decision_snapshot = Column(Text)
     gpx_file_path = Column(String)
+    gpx_metrics_excluded = Column(Boolean, nullable=False, default=False)
     gpx_max_altitude_m = Column(Integer)
     gpx_elevation_gain_m = Column(Integer)
     external_url = Column(String)

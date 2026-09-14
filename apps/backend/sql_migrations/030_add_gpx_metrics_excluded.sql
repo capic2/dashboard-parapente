@@ -1,0 +1,1 @@
+ALTER TABLE flights ADD COLUMN gpx_metrics_excluded BOOLEAN NOT NULL DEFAULT 0;

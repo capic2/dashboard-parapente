@@ -4139,6 +4139,7 @@ def get_flights(
             "elevation_gain_m": flight.elevation_gain_m,
             "notes": flight.notes,
             "gpx_file_path": flight.gpx_file_path,
+            "gpx_metrics_excluded": flight.gpx_metrics_excluded,
             "video_export_job_id": flight.video_export_job_id,
             "video_export_status": video_export["status"],
             "video_export_progress": video_export["progress"],
@@ -4645,6 +4646,7 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "conditions_feedback": flight.conditions_feedback,
         "decision_snapshot": flight.decision_snapshot,
         "gpx_file_path": flight.gpx_file_path,
+        "gpx_metrics_excluded": flight.gpx_metrics_excluded,
         "gpx_max_altitude_m": flight.gpx_max_altitude_m,
         "gpx_elevation_gain_m": flight.gpx_elevation_gain_m,
         "external_url": flight.external_url,
@@ -4789,8 +4791,12 @@ def get_flight_gpx_data(flight_id: str, db: Session = Depends(get_db)):
                 "flight_duration_seconds": stats["flight_duration_seconds"],
                 "average_speed_kmh": stats["average_speed_kmh"],
                 "max_speed_kmh": stats["max_speed_kmh"],
-                "max_climb_rate_ms": stats["max_climb_rate_ms"],
-                "max_sink_rate_ms": stats["max_sink_rate_ms"],
+                "max_climb_rate_ms": (
+                    None if flight.gpx_metrics_excluded else stats["max_climb_rate_ms"]
+                ),
+                "max_sink_rate_ms": (
+                    None if flight.gpx_metrics_excluded else stats["max_sink_rate_ms"]
+                ),
             }
         }
     except Exception as e:
