@@ -1193,6 +1193,7 @@
     "goproOverlayInteractiveDescription": "Calibrez et regardez la caméra et la vidéo du vol avec une disposition interactive.",
     "overlayWorkspaceTitle": "Synchronisation et couche overlay",
     "overlayWorkspaceDescription": "Calibrez la télémétrie puis générez une couche transparente réutilisable par les exports.",
+    "overlayInteractivePreview": "Overlay dynamique interactif",
     "overlayLayerMissing": "Couche à générer",
     "overlayLayerOutdated": "Couche à régénérer",
     "overlayLayerGenerating": "Génération en cours",

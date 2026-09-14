@@ -1188,6 +1188,7 @@
     "goproOverlayInteractiveDescription": "Calibrate and watch the camera and flight video with an interactive layout.",
     "overlayWorkspaceTitle": "Synchronization and overlay layer",
     "overlayWorkspaceDescription": "Calibrate telemetry, then generate a transparent layer reusable by exports.",
+    "overlayInteractivePreview": "Interactive dynamic overlay",
     "overlayLayerMissing": "Layer to generate",
     "overlayLayerOutdated": "Layer needs regeneration",
     "overlayLayerGenerating": "Generating layer",

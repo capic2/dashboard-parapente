@@ -22,7 +22,6 @@ import {
   Play,
   Wand2,
 } from 'lucide-react';
-import { Input, Label, TextField } from 'react-aria-components';
 import {
   useUpdateFlight,
   useUploadGPXToFlight,
@@ -123,8 +122,6 @@ export function FlightDetails({
   const [goproOverlayGpxOffset, setGoproOverlayGpxOffset] = useState(
     String(flight.gopro_overlay_gpx_offset ?? 0)
   );
-  const [goproOverlayInitialGpxOffset, setGoproOverlayInitialGpxOffset] =
-    useState<string | null>(null);
   const [goproOverlayOutputResolution, setGoproOverlayOutputResolution] =
     useState<GoproOverlayOutputResolution>('4k');
   const [downloadingMedia, setDownloadingMedia] =
@@ -394,19 +391,7 @@ export function FlightDetails({
 
     const requestedFlightId = flight.id;
     const formData = new FormData();
-    const normalizedGpxOffset = goproOverlayGpxOffset.trim();
-    if (normalizedGpxOffset) {
-      const parsedOffset = Number(normalizedGpxOffset);
-      if (!Number.isFinite(parsedOffset)) {
-        toast.error(t('flights.goproOverlayInvalidOffset'));
-        return;
-      }
-    }
-
     setIsGoproOverlayDialogOpen(false);
-    if (normalizedGpxOffset) {
-      formData.append('gpx_offset', normalizedGpxOffset);
-    }
     formData.append('output_resolution', goproOverlayOutputResolution);
 
     try {
@@ -427,14 +412,6 @@ export function FlightDetails({
     if (createGoproOverlayJob.isPending || isGoproOverlayRunning) return;
     setGoproOverlayOutputResolution('4k');
     setIsGoproOverlayDialogOpen(true);
-    if (flight.gopro_overlay_gpx_offset != null) {
-      const storedOffset = String(flight.gopro_overlay_gpx_offset);
-      setGoproOverlayInitialGpxOffset(storedOffset);
-      setGoproOverlayGpxOffset(storedOffset);
-      return;
-    }
-    setGoproOverlayInitialGpxOffset('0');
-    setGoproOverlayGpxOffset('0');
   };
 
   const handleGoproOverlayOffsetChange = async (nextOffset: string) => {
@@ -715,45 +692,6 @@ export function FlightDetails({
             {t('flights.goproOverlayOutputResolutionHint')}
           </span>
         </div>
-
-        <TextField className="flex flex-col gap-1">
-          <div className="flex items-center justify-between gap-2">
-            <Label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-              {t('flights.goproOverlayGpxOffsetLabel')}
-            </Label>
-            {goproOverlayInitialGpxOffset !== null && (
-              <Button
-                variant="ghost"
-                className="min-h-8 px-2 py-1 text-xs"
-                onPress={() =>
-                  handleGoproOverlayOffsetChange(goproOverlayInitialGpxOffset)
-                }
-                isDisabled={
-                  goproOverlayGpxOffset === goproOverlayInitialGpxOffset
-                }
-              >
-                {t('common.reset')}
-              </Button>
-            )}
-          </div>
-          <Input
-            type="number"
-            step="0.1"
-            value={goproOverlayGpxOffset}
-            onChange={(event) =>
-              handleGoproOverlayOffsetChange(event.currentTarget.value)
-            }
-            className="min-h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            aria-label={t('flights.goproOverlayGpxOffsetLabel')}
-            aria-describedby="gopro-overlay-gpx-offset-hint"
-          />
-          <span
-            id="gopro-overlay-gpx-offset-hint"
-            className="text-xs text-gray-500 dark:text-gray-400"
-          >
-            {t('flights.goproOverlayGpxOffsetHint')}
-          </span>
-        </TextField>
 
         <div className="flex flex-wrap justify-end gap-2 pt-2">
           <Button
