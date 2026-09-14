@@ -27,9 +27,16 @@ SAMPLE_FLIGHT_TITLES = {
     "Soaring Arguel",
     "Vol du soir Mont Poupet",
 }
+SAMPLE_MEDIA_DURATION_SECONDS = 180
+SAMPLE_MEDIA_DURATION_MINUTES = SAMPLE_MEDIA_DURATION_SECONDS // 60
 
 
-def create_sample_video(video_path: Path, color: str, start_time: datetime) -> None:
+def create_sample_video(
+    video_path: Path,
+    color: str,
+    start_time: datetime,
+    duration_seconds: int = SAMPLE_MEDIA_DURATION_SECONDS,
+) -> None:
     """Create a tiny valid MP4 that is suitable for staging smoke tests."""
     video_path.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
@@ -43,7 +50,7 @@ def create_sample_video(video_path: Path, color: str, start_time: datetime) -> N
             "-i",
             f"color=c={color}:s=640x360:r=30",
             "-t",
-            "1",
+            str(duration_seconds),
             "-an",
             "-pix_fmt",
             "yuv420p",
@@ -69,7 +76,7 @@ def ensure_sample_media(db: Session, flights: list[Flight]) -> int:
             path = directory / filename
             # These are disposable staging fixtures. Recreate them on every
             # startup so persistent volumes pick up metadata changes too.
-            video_start = flight.created_at - timedelta(minutes=flight.duration_minutes)
+            video_start = flight.created_at - timedelta(seconds=SAMPLE_MEDIA_DURATION_SECONDS)
             create_sample_video(path, colors[index % len(colors)], video_start)
             created_count += 1
 
@@ -96,7 +103,8 @@ def ensure_sample_gpx(db: Session, flights: list[Flight]) -> int:
             flight.id,
             flight.site.latitude,
             flight.site.longitude,
-            flight.duration_minutes,
+            SAMPLE_MEDIA_DURATION_MINUTES,
+            start_time=flight.created_at - timedelta(seconds=SAMPLE_MEDIA_DURATION_SECONDS),
             output_path=gpx_path,
         )
         flight.gpx_file_path = str(gpx_path.resolve())
@@ -116,6 +124,7 @@ def create_sample_gpx(
     start_lat: float,
     start_lon: float,
     duration_min: int,
+    start_time: datetime | None = None,
     output_path: Path | None = None,
 ) -> Path:
     """
@@ -128,6 +137,7 @@ def create_sample_gpx(
     # Generate track points (one every 10 seconds)
     num_points = (duration_min * 60) // 10
 
+    base_time = start_time or datetime.utcnow() - timedelta(minutes=duration_min)
     gpx_content = """<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Dashboard Parapente" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata>
@@ -137,9 +147,8 @@ def create_sample_gpx(
   <trk>
     <name>Flight Track</name>
     <trkseg>
-""".format(timestamp=datetime.utcnow().isoformat() + "Z")
+""".format(timestamp=base_time.isoformat() + "Z")
 
-    base_time = datetime.utcnow() - timedelta(minutes=duration_min)
     lat, lon = start_lat, start_lon
     elevation = 800  # Start at 800m
     max_elevation = 800
@@ -257,13 +266,18 @@ def seed_flights(force: bool = False, include_media: bool = False) -> int:
             flight_id = str(uuid.uuid4())
             flight_date = date.today() - timedelta(days=flight_data["days_ago"])
             site = flight_data["site"]
+            created_at = datetime.utcnow()
 
             if not site:
                 continue
 
             # Create GPX file
             gpx_path = create_sample_gpx(
-                flight_id, site.latitude, site.longitude, flight_data["duration"]
+                flight_id,
+                site.latitude,
+                site.longitude,
+                SAMPLE_MEDIA_DURATION_MINUTES,
+                start_time=created_at - timedelta(seconds=SAMPLE_MEDIA_DURATION_SECONDS),
             )
 
             # Calculate elevation gain (rough estimate)
@@ -281,8 +295,8 @@ def seed_flights(force: bool = False, include_media: bool = False) -> int:
                 max_speed_kmh=random.uniform(25, 45),
                 gpx_file_path=str(gpx_path),
                 notes=f"Sample flight created for testing. Site: {site.name}",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=created_at,
+                updated_at=created_at,
             )
 
             db.add(flight)

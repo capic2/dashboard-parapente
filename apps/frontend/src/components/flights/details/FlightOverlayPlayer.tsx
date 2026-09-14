@@ -13,6 +13,13 @@ interface FlightOverlayPlayerProps {
   overlayUrl?: string;
   cameraLabel: string;
   flightLabel: string;
+  overlayStatus?: 'missing' | 'generating' | 'ready' | 'failed';
+  overlayError?: string | null;
+  syncOffsetSeconds?: number;
+  getFlightTime?: (cameraTime: number) => number;
+  getCameraTime?: (flightTime: number) => number;
+  getOverlayTime?: (cameraTime: number) => number;
+  onTimeChange?: (time: number) => void;
   overlayContent?: ReactNode;
 }
 
@@ -29,6 +36,13 @@ export function FlightOverlayPlayer({
   overlayUrl,
   cameraLabel,
   flightLabel,
+  overlayStatus,
+  overlayError,
+  syncOffsetSeconds = 0,
+  getFlightTime,
+  getCameraTime,
+  getOverlayTime,
+  onTimeChange,
   overlayContent,
 }: FlightOverlayPlayerProps) {
   const { t } = useTranslation();
@@ -42,13 +56,17 @@ export function FlightOverlayPlayer({
     if (!camera) return;
     const currentTime = camera.currentTime;
     const flight = flightRef.current;
-    if (flight && Math.abs(flight.currentTime - currentTime) > 0.12) {
-      flight.currentTime = clamp(currentTime, flight.duration);
+    const flightTime =
+      getFlightTime?.(currentTime) ?? currentTime - syncOffsetSeconds;
+    if (flight && Math.abs(flight.currentTime - flightTime) > 0.12) {
+      flight.currentTime = clamp(flightTime, flight.duration);
     }
     const overlay = overlayRef.current;
-    if (overlay && Math.abs(overlay.currentTime - currentTime) > 0.08) {
-      overlay.currentTime = clamp(currentTime, overlay.duration);
+    const overlayTime = getOverlayTime?.(currentTime) ?? currentTime;
+    if (overlay && Math.abs(overlay.currentTime - overlayTime) > 0.08) {
+      overlay.currentTime = clamp(overlayTime, overlay.duration);
     }
+    onTimeChange?.(currentTime);
   };
 
   const handlePlay = () => {
@@ -89,6 +107,13 @@ export function FlightOverlayPlayer({
         >
           <track kind="captions" />
         </video>
+        {flightIsMain && getCameraTime && (
+          <div className="pointer-events-none absolute inset-0">
+            <span className="sr-only">
+              {getCameraTime(flightRef.current?.currentTime ?? 0)}
+            </span>
+          </div>
+        )}
         <video
           ref={flightRef}
           src={flightUrl}
@@ -140,6 +165,21 @@ export function FlightOverlayPlayer({
         {overlayContent && (
           <div className="pointer-events-none absolute left-3 top-3 z-30">
             {overlayContent}
+          </div>
+        )}
+        {overlayStatus === 'generating' && (
+          <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-slate-950/45">
+            <span className="rounded-lg bg-slate-950/90 px-4 py-3 text-sm font-semibold text-white">
+              {t('flights.goproOverlayGeneratingInteractive')}
+            </span>
+          </div>
+        )}
+        {overlayStatus === 'failed' && (
+          <div className="pointer-events-none absolute inset-x-4 bottom-4 z-30 rounded-lg bg-red-950/90 px-4 py-3 text-sm text-red-100">
+            <p className="font-semibold">
+              {t('flights.goproOverlayInteractiveUnavailable')}
+            </p>
+            {overlayError && <p className="mt-1 text-xs">{overlayError}</p>}
           </div>
         )}
       </div>

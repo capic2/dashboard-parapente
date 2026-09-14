@@ -1193,6 +1193,8 @@
     "goproOverlayGpxOffsetHint": "Positive values delay the GPX track; negative values advance it.",
     "goproOverlayPreviewLoading": "Loading synchronized preview…",
     "goproOverlayPreviewError": "Preview is unavailable. Check the video and GPX timestamps.",
+    "goproOverlayGeneratingInteractive": "Generating the overlay…",
+    "goproOverlayInteractiveUnavailable": "The interactive overlay is unavailable.",
     "goproOverlayCameraPreview": "GoPro video preview",
     "goproOverlayInteractiveTitle": "Interactive overlay",
     "goproOverlayInteractiveDescription": "Calibrate and watch the camera and flight video with an interactive layout.",

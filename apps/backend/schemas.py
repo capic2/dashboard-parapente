@@ -179,10 +179,17 @@ class GoproOverlayPreviewAlignment(BaseModel):
     effective_offset_seconds: float
 
 
+class GoproOverlayPreviewLayer(BaseModel):
+    status: Literal["missing", "generating", "ready", "failed"]
+    job_id: str | None = None
+    error: str | None = None
+
+
 class GoproOverlayPreview(BaseModel):
     video: GoproOverlayPreviewVideo
     gpx: GoproOverlayPreviewGpx
     alignment: GoproOverlayPreviewAlignment
+    overlay: GoproOverlayPreviewLayer
 
 
 class FlightOverlayLayer(BaseModel):

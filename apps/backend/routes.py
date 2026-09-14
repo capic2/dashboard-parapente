@@ -6679,6 +6679,78 @@ def _prepare_enriched_gpx_in_background(
         logger.warning("Unable to prepare enriched GPX in background: %s", exc)
 
 
+_INTERACTIVE_OVERLAY_FILENAME = "interactive-gopro-overlay.webm"
+_INTERACTIVE_OVERLAY_JOB_FILENAME = "interactive-gopro-overlay.json"
+
+
+def _interactive_overlay_job_path(camera_path: Path) -> Path:
+    return camera_path.parent / _INTERACTIVE_OVERLAY_JOB_FILENAME
+
+
+def _interactive_overlay_state(camera_path: Path) -> dict[str, Any]:
+    job_path = _interactive_overlay_job_path(camera_path)
+    if not job_path.is_file():
+        return {"status": "missing", "job_id": None, "error": None}
+    try:
+        job_id = json.loads(job_path.read_text()).get("job_id")
+    except (OSError, ValueError, AttributeError):
+        return {"status": "missing", "job_id": None, "error": None}
+    job = get_gopro_overlay_job(str(job_id)) if job_id else None
+    if not job or job.get("output_filename") != _INTERACTIVE_OVERLAY_FILENAME:
+        return {"status": "missing", "job_id": None, "error": None}
+    status = str(job.get("status") or "missing")
+    if status == "completed":
+        status = "ready" if gopro_overlay_output_path(str(job_id)) else "generating"
+    return {
+        "status": status if status in {"generating", "ready", "failed"} else "generating",
+        "job_id": str(job_id),
+        "error": job.get("error"),
+    }
+
+
+def _generate_interactive_overlay_in_background(
+    camera_path: Path,
+    gpx_path: Path,
+    osv_paths: list[Path],
+    video_duration: float,
+    first_gpx_at: float | None,
+    gpx_offset: float,
+) -> None:
+    job_path = _interactive_overlay_job_path(camera_path)
+    if job_path.is_file() and _interactive_overlay_state(camera_path)["status"] in {
+        "generating",
+        "ready",
+    }:
+        return
+    try:
+        render_gpx_path = gpx_path
+        if osv_paths:
+            render_gpx_path = ensure_enriched_gpx(
+                osv_paths,
+                gpx_path,
+                camera_path.parent,
+                video_duration=video_duration,
+                first_gpx_at=first_gpx_at,
+            )
+        job = create_gopro_overlay_job_from_paths(
+            video_path=camera_path,
+            gpx_path=render_gpx_path,
+            pip_path=None,
+            layout_id=None,
+            output_filename=_INTERACTIVE_OVERLAY_FILENAME,
+            output_resolution="source",
+            output_dir=str(camera_path.parent),
+            flight_id=None,
+            overlay_only=True,
+            gpx_offset=gpx_offset,
+        )
+        temp_path = job_path.with_suffix(".tmp")
+        temp_path.write_text(json.dumps({"job_id": job["job_id"]}))
+        temp_path.replace(job_path)
+    except (OSError, ValueError) as exc:
+        logger.warning("Unable to generate interactive GoPro overlay: %s", exc)
+
+
 def _flight_overlay_layer_job(flight: Flight) -> GoproOverlayJobModel | None:
     """Return the newest job that rendered the reusable transparent layer."""
     for job in reversed(flight.gopro_overlay_jobs):
@@ -6824,6 +6896,17 @@ def get_flight_gopro_overlay_preview(
     coordinates = parse_gpx_file(gpx_path)
     manual_offset = float(flight.gopro_overlay_gpx_offset or 0.0)
     effective_offset = automatic_offset + manual_offset
+    overlay_state = _interactive_overlay_state(camera_path)
+    if overlay_state["status"] in {"missing", "failed"}:
+        background_tasks.add_task(
+            _generate_interactive_overlay_in_background,
+            camera_path,
+            gpx_path,
+            osv_paths,
+            video_duration,
+            _first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
+            manual_offset,
+        )
     # The offset is adjusted locally in the dialog.  Do not let the value
     # persisted from a previous render shorten the camera preview before the
     # user can calibrate the current timeline.
@@ -6858,6 +6941,7 @@ def get_flight_gopro_overlay_preview(
             "manual_offset_seconds": manual_offset,
             "effective_offset_seconds": effective_offset,
         },
+        overlay=overlay_state,
     )
 
 

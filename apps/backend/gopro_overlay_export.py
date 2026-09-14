@@ -401,7 +401,7 @@ def ensure_enriched_gpx(
                     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
                 except (OSError, json.JSONDecodeError):
                     metadata = None
-                if metadata == signature:
+                if metadata == signature and _has_usable_gpx_timestamps(merged_gpx_path):
                     return merged_gpx_path
 
             staging_dir = input_dir / f".merged-gopro-overlay-{uuid.uuid4().hex}"
@@ -415,6 +415,12 @@ def ensure_enriched_gpx(
                     video_duration=video_duration,
                     first_gpx_at=first_gpx_at,
                 )
+                if not _has_usable_gpx_timestamps(staged_gpx_path):
+                    logger.warning(
+                        "OSV merge produced an unusable GPX; falling back to source GPX %s",
+                        gpx_path,
+                    )
+                    return gpx_path
                 staged_gpx_path.replace(merged_gpx_path)
             finally:
                 shutil.rmtree(staging_dir, ignore_errors=True)
@@ -428,6 +434,10 @@ def ensure_enriched_gpx(
             return merged_gpx_path
         finally:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
+def _has_usable_gpx_timestamps(gpx_path: Path) -> bool:
+    return first_gpx_timestamp(gpx_path) is not None and gpx_duration_seconds(gpx_path) is not None
 
 
 def enriched_gpx_path(input_dir: Path) -> Path:
@@ -1693,7 +1703,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
             )
             render_gpx_path = enriched_gpx_path
-            if gpx_offset:
+            if gpx_offset and not command_metadata.get("overlay_only"):
                 render_gpx_path = _shift_gpx_timestamps(
                     enriched_gpx_path,
                     work_dir / f"gpx-offset-{job_id}.gpx",
@@ -1701,7 +1711,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 )
         else:
             _append_job_log(log_path, "No OSV files found; using GPX directly")
-            if gpx_offset:
+            if gpx_offset and not command_metadata.get("overlay_only"):
                 render_gpx_path = _shift_gpx_timestamps(
                     render_gpx_path,
                     work_dir / f"gpx-offset-{job_id}.gpx",
@@ -1713,7 +1723,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
             command_metadata["segment_video_start"] = aligned_video_start.isoformat()
         else:
             command_metadata.pop("segment_video_start", None)
-        if embedded_video_start is not None:
+        if embedded_video_start is not None and not command_metadata.get("overlay_only"):
             command_metadata["video_time_start"] = "video-created"
         else:
             command_metadata.pop("video_time_start", None)
@@ -2514,11 +2524,11 @@ def _run_job(job_id: str) -> None:
             profile or "<none>",
         )
         if overlay_only:
-            # ``mov`` is GoPro Dashboard's built-in PNG-in-MOV profile.  It
-            # preserves the alpha channel needed when compositing each scene.
-            # There is no built-in ``overlay`` profile in Dashboard 0.133.
-            command.extend(["--profile", "mov"])
-            cpu_command.extend(["--profile", "mov"])
+            # VP9/WebM preserves alpha and is playable as a transparent HTML5
+            # video in Chromium. The PNG-in-MOV profile is useful for server
+            # compositing but is not reliably decodable by browsers.
+            command.extend(["--profile", "vp9"])
+            cpu_command.extend(["--profile", "vp9"])
     common_args: list[str] = []
     if job.get("video_width") and job.get("video_height"):
         common_args.extend(["--overlay-size", f"{job['video_width']}x{job['video_height']}"])
