@@ -132,14 +132,15 @@ def test_rejects_a_14_8_ms_spike_and_uses_the_next_point() -> None:
     points = [
         {"lat": 47.2, "lon": 6.0, "elevation": 500.0, "timestamp": 1_000},
         {"lat": 47.2, "lon": 6.0, "elevation": 514.8, "timestamp": 2_000},
-        {"lat": 47.2, "lon": 6.0, "elevation": 499.9, "timestamp": 3_000},
-        {"lat": 47.2, "lon": 6.0, "elevation": 500.3, "timestamp": 5_000},
+        {"lat": 47.2, "lon": 6.0, "elevation": 529.7, "timestamp": 3_000},
+        {"lat": 47.2, "lon": 6.0, "elevation": 510.0, "timestamp": 5_000},
+        {"lat": 47.2, "lon": 6.0, "elevation": 510.2, "timestamp": 7_000},
     ]
 
     stats = calculate_track_stats(points)
 
-    assert stats["max_climb_rate_ms"] == pytest.approx(0.2)
-    assert stats["max_sink_rate_ms"] == pytest.approx(0.05)
+    assert stats["max_climb_rate_ms"] == pytest.approx(2.5)
+    assert stats["max_sink_rate_ms"] == 0
 
 
 def test_prefers_gpx_speed_extension_in_meters_per_second() -> None:
