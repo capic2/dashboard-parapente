@@ -22,6 +22,8 @@ class TrackPoint(TypedDict, total=False):
 MAX_TRACK_BYTES = 100 * 1024 * 1024
 MAX_XML_TRACK_BYTES = 25 * 1024 * 1024
 MAX_TRACK_POINTS = 500_000
+VARIO_WINDOW_SECONDS = 10
+MAX_VARIO_WINDOW_SECONDS = 120
 
 
 def _append_point(points: list[TrackPoint], point: TrackPoint) -> None:
@@ -384,6 +386,26 @@ def _precise_haversine_distance(lat1: float, lon1: float, lat2: float, lon2: flo
 
 
 def calculate_track_stats(points: list[TrackPoint]) -> dict[str, Any]:
+    if not points:
+        return {
+            "max_altitude_m": 0,
+            "min_altitude_m": 0,
+            "altitude_range_m": 0,
+            "takeoff_altitude_m": 0,
+            "landing_altitude_m": 0,
+            "elevation_gain_m": 0,
+            "elevation_loss_m": 0,
+            "distance_km": 0,
+            "max_distance_from_takeoff_km": 0,
+            "flight_duration_seconds": 0,
+            "duration_minutes": 0,
+            "average_speed_kmh": 0,
+            "max_speed_kmh": 0,
+            "max_climb_rate_ms": 0,
+            "max_sink_rate_ms": 0,
+            "departure_time": None,
+        }
+
     elevations = [point.get("elevation", 0.0) for point in points]
     distance = sum(
         haversine_distance(previous["lat"], previous["lon"], current["lat"], current["lon"])
@@ -392,6 +414,11 @@ def calculate_track_stats(points: list[TrackPoint]) -> dict[str, Any]:
     )
     gain = sum(
         max(0.0, current.get("elevation", 0.0) - previous.get("elevation", 0.0))
+        for previous, current in zip(points, points[1:], strict=False)
+        if previous.get("segment", 0) == current.get("segment", 0)
+    )
+    loss = sum(
+        max(0.0, previous.get("elevation", 0.0) - current.get("elevation", 0.0))
         for previous, current in zip(points, points[1:], strict=False)
         if previous.get("segment", 0) == current.get("segment", 0)
     )
@@ -422,12 +449,66 @@ def calculate_track_stats(points: list[TrackPoint]) -> dict[str, Any]:
             speed = segment_distance / (elapsed / 3_600_000)
             if math.isfinite(speed) and speed < 150:
                 max_speed = max(max_speed, speed)
+
+    max_climb_rate = 0.0
+    max_sink_rate = 0.0
+    window_start = 0
+    for index, current in enumerate(points):
+        if index == 0:
+            continue
+        if current.get("segment", 0) != points[index - 1].get("segment", 0):
+            window_start = index
+            continue
+        if current.get("timestamp", 0) <= 0:
+            continue
+        while window_start < index and points[window_start].get("timestamp", 0) <= 0:
+            window_start += 1
+        if window_start == index:
+            continue
+        while window_start < index - 1:
+            next_point = points[window_start + 1]
+            next_elapsed = (current.get("timestamp", 0) - next_point.get("timestamp", 0)) / 1000
+            if (
+                next_point.get("segment", 0) != current.get("segment", 0)
+                or next_elapsed < VARIO_WINDOW_SECONDS
+            ):
+                break
+            window_start += 1
+        previous = points[window_start]
+        elapsed_seconds = (current.get("timestamp", 0) - previous.get("timestamp", 0)) / 1000
+        if not VARIO_WINDOW_SECONDS <= elapsed_seconds <= MAX_VARIO_WINDOW_SECONDS:
+            continue
+        vertical_rate = (
+            current.get("elevation", 0.0) - previous.get("elevation", 0.0)
+        ) / elapsed_seconds
+        if math.isfinite(vertical_rate):
+            max_climb_rate = max(max_climb_rate, vertical_rate)
+            max_sink_rate = max(max_sink_rate, -vertical_rate)
+
+    takeoff = points[0]
+    max_distance_from_takeoff = max(
+        _precise_haversine_distance(takeoff["lat"], takeoff["lon"], point["lat"], point["lon"])
+        for point in points
+    )
+    min_altitude = min(elevations)
+    max_altitude = max(elevations)
+    average_speed = distance / (duration_seconds / 3600) if duration_seconds > 0 else 0
     return {
-        "max_altitude_m": round(max(elevations)),
+        "max_altitude_m": round(max_altitude),
+        "min_altitude_m": round(min_altitude),
+        "altitude_range_m": round(max_altitude - min_altitude),
+        "takeoff_altitude_m": round(elevations[0]),
+        "landing_altitude_m": round(elevations[-1]),
         "elevation_gain_m": round(gain),
+        "elevation_loss_m": round(loss),
         "distance_km": round(distance, 2),
+        "max_distance_from_takeoff_km": round(max_distance_from_takeoff, 2),
+        "flight_duration_seconds": round(duration_seconds),
         "duration_minutes": round(duration_seconds / 60),
+        "average_speed_kmh": round(average_speed, 2),
         "max_speed_kmh": round(max_speed, 2),
+        "max_climb_rate_ms": round(max_climb_rate, 2),
+        "max_sink_rate_ms": round(max_sink_rate, 2),
         "departure_time": (
             datetime.fromtimestamp(valid_times[0] / 1000, tz=timezone.utc) if valid_times else None
         ),
