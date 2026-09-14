@@ -75,7 +75,7 @@ def test_calculates_instantaneous_vertical_rate_extrema() -> None:
     assert stats["elevation_loss_m"] == 3
 
 
-def test_clamps_unrealistic_instantaneous_vertical_rate() -> None:
+def test_ignores_unrealistic_instantaneous_vertical_rate() -> None:
     gpx = b"""<gpx xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>
     <trkpt lat="47.2" lon="6.0"><ele>500</ele><time>2026-07-01T10:00:00Z</time></trkpt>
     <trkpt lat="47.2" lon="6.0"><ele>700</ele><time>2026-07-01T10:00:01Z</time></trkpt>
@@ -85,8 +85,47 @@ def test_clamps_unrealistic_instantaneous_vertical_rate() -> None:
     _, points = normalize_track(gpx, "gpx")
 
     stats = calculate_track_stats(points)
-    assert stats["max_climb_rate_ms"] == pytest.approx(15)
-    assert stats["max_sink_rate_ms"] == pytest.approx(15)
+    assert stats["max_climb_rate_ms"] == 0
+    assert stats["max_sink_rate_ms"] == 0
+
+
+def test_skips_aberrant_vertical_point_and_uses_next_valid_timestamp() -> None:
+    points = [
+        {"lat": 47.2, "lon": 6.0, "elevation": 500.0, "timestamp": 1_000},
+        {"lat": 47.2, "lon": 6.0, "elevation": 550.0, "timestamp": 2_000},
+        {"lat": 47.2, "lon": 6.0, "elevation": 502.0, "timestamp": 3_000},
+        {"lat": 47.2, "lon": 6.0, "elevation": 504.0, "timestamp": 5_000},
+    ]
+
+    stats = calculate_track_stats(points)
+
+    assert stats["max_climb_rate_ms"] == 1
+    assert stats["max_sink_rate_ms"] == 0
+
+
+@pytest.mark.parametrize(
+    ("elevations", "timestamps", "expected_climb", "expected_sink"),
+    [
+        ([0.0, 15.0], [1_000, 2_000], 15, 0),
+        ([0.0, 15.1], [1_000, 2_000], 0, 0),
+        ([0.0, 5.0, 10.0], [1_000, 1_000, 2_000], 10, 0),
+    ],
+)
+def test_vertical_rate_filter_handles_limit_and_invalid_intervals(
+    elevations: list[float],
+    timestamps: list[int],
+    expected_climb: float,
+    expected_sink: float,
+) -> None:
+    points = [
+        {"lat": 47.2, "lon": 6.0, "elevation": elevation, "timestamp": timestamp}
+        for elevation, timestamp in zip(elevations, timestamps, strict=True)
+    ]
+
+    stats = calculate_track_stats(points)
+
+    assert stats["max_climb_rate_ms"] == expected_climb
+    assert stats["max_sink_rate_ms"] == expected_sink
 
 
 def test_prefers_gpx_speed_extension_in_meters_per_second() -> None:
