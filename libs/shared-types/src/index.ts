@@ -150,7 +150,7 @@ export const FlightSchema = z
     conditions_feedback: z.string().nullish(),
     decision_snapshot: z.string().nullish(),
     gpx_file_path: z.string().nullish(),
-    gpx_metrics_excluded: z.boolean().optional().default(false),
+    gpx_metrics_excluded: z.boolean().optional(),
     gpx_max_altitude_m: z.number().nullish(),
     gpx_elevation_gain_m: z.number().nullish(),
     external_url: z.string().nullish(),
