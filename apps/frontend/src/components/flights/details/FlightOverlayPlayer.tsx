@@ -1,24 +1,5 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  DefaultVideoLayout,
-  defaultLayoutIcons,
-} from '@vidstack/react/player/layouts/default';
-import {
-  MediaPlayer,
-  MediaProvider,
-  type MediaPlayerInstance,
-} from '@vidstack/react';
-// oxlint-disable-next-line import/no-unassigned-import
-import '@vidstack/react/player/styles/default/theme.css';
-// oxlint-disable-next-line import/no-unassigned-import
-import '@vidstack/react/player/styles/default/layouts/video.css';
 import { Columns2, PictureInPicture2, Repeat2 } from 'lucide-react';
 
 export type FlightOverlayLayout =
@@ -29,71 +10,56 @@ export type FlightOverlayLayout =
 interface FlightOverlayPlayerProps {
   cameraUrl: string;
   flightUrl: string;
+  overlayUrl?: string;
   cameraLabel: string;
   flightLabel: string;
-  syncOffsetSeconds?: number;
-  getFlightTime?: (cameraTime: number) => number;
-  onTimeChange?: (time: number) => void;
   overlayContent?: ReactNode;
 }
 
-function clamp(value: number, minimum: number, maximum: number) {
-  return Math.max(minimum, Math.min(maximum, value));
+function clamp(value: number, maximum: number) {
+  return Math.max(
+    0,
+    Math.min(value, Number.isFinite(maximum) ? maximum : value)
+  );
 }
 
 export function FlightOverlayPlayer({
   cameraUrl,
   flightUrl,
+  overlayUrl,
   cameraLabel,
   flightLabel,
-  syncOffsetSeconds = 0,
-  getFlightTime,
-  onTimeChange,
   overlayContent,
 }: FlightOverlayPlayerProps) {
   const { t } = useTranslation();
-  const playerRef = useRef<MediaPlayerInstance>(null);
+  const cameraRef = useRef<HTMLVideoElement>(null);
   const flightRef = useRef<HTMLVideoElement>(null);
+  const overlayRef = useRef<HTMLVideoElement>(null);
   const [layout, setLayout] = useState<FlightOverlayLayout>('camera-main');
-  const [flightReady, setFlightReady] = useState(false);
 
-  const syncFlight = useCallback(
-    (cameraTime: number) => {
-      const flight = flightRef.current;
-      if (!flight || !flightReady) return;
-      const target = clamp(
-        getFlightTime?.(cameraTime) ?? cameraTime - syncOffsetSeconds,
-        0,
-        Number.isFinite(flight.duration) ? flight.duration : cameraTime
-      );
-      if (Math.abs(flight.currentTime - target) > 0.12) {
-        flight.currentTime = target;
-      }
-    },
-    [flightReady, getFlightTime, syncOffsetSeconds]
-  );
-
-  useEffect(() => {
-    syncFlight(playerRef.current?.state.currentTime ?? 0);
-  }, [syncFlight]);
-
-  const handleTimeUpdate = () => {
-    const time = playerRef.current?.state.currentTime ?? 0;
-    syncFlight(time);
-    onTimeChange?.(time);
+  const syncMedia = () => {
+    const camera = cameraRef.current;
+    if (!camera) return;
+    const currentTime = camera.currentTime;
+    const flight = flightRef.current;
+    if (flight && Math.abs(flight.currentTime - currentTime) > 0.12) {
+      flight.currentTime = clamp(currentTime, flight.duration);
+    }
+    const overlay = overlayRef.current;
+    if (overlay && Math.abs(overlay.currentTime - currentTime) > 0.08) {
+      overlay.currentTime = clamp(currentTime, overlay.duration);
+    }
   };
 
   const handlePlay = () => {
-    syncFlight(playerRef.current?.state.currentTime ?? 0);
+    syncMedia();
     void flightRef.current?.play();
+    void overlayRef.current?.play();
   };
 
   const handlePause = () => {
     flightRef.current?.pause();
-  };
-
-  const handleSeek = () => {
-    syncFlight(playerRef.current?.state.currentTime ?? 0);
+    overlayRef.current?.pause();
   };
 
   const cameraIsMain = layout === 'camera-main';
@@ -102,49 +68,58 @@ export function FlightOverlayPlayer({
   return (
     <div className="overflow-hidden rounded-xl bg-black shadow-sm">
       <div
-        className={`relative grid min-h-0 bg-black ${
-          layout === 'side-by-side' ? 'grid-cols-1 md:grid-cols-2' : ''
-        }`}
+        className={`relative grid min-h-0 bg-black ${layout === 'side-by-side' ? 'grid-cols-1 md:grid-cols-2' : ''}`}
       >
-        <MediaPlayer
-          ref={playerRef}
+        <video
+          ref={cameraRef}
           src={cameraUrl}
+          controls
           playsInline
           preload="metadata"
-          onTimeUpdate={handleTimeUpdate}
           onPlay={handlePlay}
           onPause={handlePause}
-          onSeeked={handleSeek}
+          onTimeUpdate={syncMedia}
+          onSeeked={syncMedia}
           className={
             cameraIsMain || layout === 'side-by-side'
-              ? 'aspect-video w-full'
-              : 'pointer-events-none absolute inset-0 z-20 h-full w-full [&_[data-media-provider]]:opacity-0'
+              ? 'aspect-video w-full object-contain'
+              : 'pointer-events-none absolute inset-0 z-20 h-full w-full opacity-0'
           }
           aria-label={cameraLabel}
         >
-          <MediaProvider />
-          <DefaultVideoLayout icons={defaultLayoutIcons} />
-        </MediaPlayer>
-
+          <track kind="captions" />
+        </video>
         <video
           ref={flightRef}
           src={flightUrl}
           playsInline
           preload="metadata"
           muted
-          onLoadStart={() => setFlightReady(false)}
-          onLoadedMetadata={() => setFlightReady(true)}
+          onClick={() => {
+            if (layout === 'camera-main') setLayout('flight-main');
+          }}
           className={
             flightIsMain || layout === 'side-by-side'
               ? 'aspect-video w-full object-contain'
               : 'absolute bottom-3 right-3 z-10 aspect-video w-1/3 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
           }
-          onClick={() => {
-            if (layout === 'camera-main') setLayout('flight-main');
-          }}
           aria-label={flightLabel}
-        />
-
+        >
+          <track kind="captions" />
+        </video>
+        {overlayUrl && (
+          <video
+            ref={overlayRef}
+            src={overlayUrl}
+            playsInline
+            preload="metadata"
+            muted
+            className="pointer-events-none absolute inset-0 z-[15] h-full w-full object-contain"
+            aria-label={t('flights.overlayLayerReady')}
+          >
+            <track kind="captions" />
+          </video>
+        )}
         {layout !== 'side-by-side' && (
           <button
             type="button"
@@ -175,7 +150,7 @@ export function FlightOverlayPlayer({
         <button
           type="button"
           onClick={() => setLayout('camera-main')}
-          className={`flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${cameraIsMain ? 'bg-sky-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+          className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800"
         >
           <PictureInPicture2 className="h-3.5 w-3.5" aria-hidden="true" />
           {cameraLabel}
@@ -183,7 +158,7 @@ export function FlightOverlayPlayer({
         <button
           type="button"
           onClick={() => setLayout('flight-main')}
-          className={`flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${flightIsMain ? 'bg-sky-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+          className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800"
         >
           <PictureInPicture2 className="h-3.5 w-3.5" aria-hidden="true" />
           {flightLabel}
@@ -191,7 +166,7 @@ export function FlightOverlayPlayer({
         <button
           type="button"
           onClick={() => setLayout('side-by-side')}
-          className={`flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${layout === 'side-by-side' ? 'bg-sky-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+          className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800"
         >
           <Columns2 className="h-3.5 w-3.5" aria-hidden="true" />
           {t('flights.goproOverlaySideBySide')}
