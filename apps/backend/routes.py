@@ -6882,6 +6882,12 @@ async def create_flight_overlay_layer(
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
+    current_layer_job = _flight_overlay_layer_job(flight)
+    if current_layer_job and current_layer_job.status in _GOPRO_OVERLAY_IN_PROGRESS_STATUSES:
+        raise HTTPException(
+            status_code=409,
+            detail="An overlay layer is already being generated for this flight",
+        )
     video_path, gpx_path = _flight_gopro_preview_inputs(db, flight)
     output_size = probe_video_resolution(video_path)
     if output_size[0] is None or output_size[1] is None:

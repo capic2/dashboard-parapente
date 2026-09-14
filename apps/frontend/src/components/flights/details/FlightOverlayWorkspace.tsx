@@ -40,6 +40,11 @@ export function FlightOverlayWorkspace({
   const isGenerating = ACTIVE_LAYER_STATUSES.has(
     layer.data?.status ?? 'missing'
   );
+  const layerJob = layer.data?.job;
+  const progress = Math.max(
+    0,
+    Math.min(100, Math.round(layerJob?.progress ?? 0))
+  );
   const isReady = layer.data?.status === 'completed' && !isDirty;
 
   const saveOffset = async () => {
@@ -56,6 +61,7 @@ export function FlightOverlayWorkspace({
   };
 
   const saveAndGenerate = async () => {
+    if (isGenerating || generateLayer.isPending) return;
     await saveOffset();
     await generateLayer.mutateAsync();
     await queryClient.invalidateQueries({
@@ -122,6 +128,32 @@ export function FlightOverlayWorkspace({
         resetOffset={initialOffset}
         onOffsetChange={setOffset}
       />
+
+      {isGenerating && layerJob && (
+        <div
+          className="mt-4 rounded-xl border border-cyan-200 bg-white/80 p-3 dark:border-cyan-800 dark:bg-slate-900/50"
+          aria-live="polite"
+        >
+          <div className="flex items-center justify-between gap-3 text-sm font-semibold text-cyan-950 dark:text-cyan-100">
+            <span>
+              {layerJob.message || t('flights.overlayLayerGenerating')}
+            </span>
+            <span>{progress}%</span>
+          </div>
+          <progress
+            className="mt-2 h-2 w-full overflow-hidden rounded-full bg-cyan-100 accent-cyan-600 dark:bg-cyan-950 dark:accent-cyan-400"
+            aria-label={t('flights.overlayLayerProgress')}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progress}
+            value={progress}
+            max={100}
+          />
+          <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+            {t('flights.overlayLayerJobId', { jobId: layerJob.job_id })}
+          </p>
+        </div>
+      )}
 
       <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-cyan-200 pt-4 dark:border-cyan-900">
         {isDirty && (

@@ -6,13 +6,14 @@ Coverage: GET, POST, PATCH, DELETE for flights.
 """
 
 from datetime import date, datetime, timedelta
+import json
 from pathlib import Path
 from unittest.mock import patch
 
 import config
 from fastapi.testclient import TestClient
 from flight_tracks import calculate_track_stats, normalize_track
-from models import Flight, GoproOverlayJob, HighlightVideoJob
+from models import Flight, GoproOverlayJob, HighlightVideoJob, Site
 from sqlalchemy.orm import Session
 from video_thumbnail import VideoThumbnailError
 
@@ -1783,6 +1784,55 @@ class TestHighlightVideoEndpoints:
         )
 
         assert response.status_code == 409
+
+
+class TestFlightOverlayLayerEndpoint:
+    def test_rejects_duplicate_overlay_layer_generation(
+        self, client: TestClient, db_session: Session, arguel_site: Site
+    ) -> None:
+        flight = Flight(
+            id="flight-overlay-layer-active",
+            name="Flight with active overlay layer",
+            flight_date=date(2026, 3, 15),
+            site_id=arguel_site.id,
+            gopro_overlay_gpx_offset=0.0,
+        )
+        db_session.add(flight)
+        db_session.add(
+            GoproOverlayJob(
+                id="overlay-layer-active",
+                flight_id=flight.id,
+                status="running",
+                progress=42,
+                message="Rendering overlay",
+                video_path="camera.mp4",
+                gpx_path="track.gpx",
+                layout_id="parapente",
+                layout_label="Parapente",
+                layout_path="layout.xml",
+                output_path="overlay.mov",
+                temp_output_path="overlay.tmp.mov",
+                output_filename="telemetry-overlay.mov",
+                command_json=json.dumps({"overlay_only": True}),
+            )
+        )
+        db_session.commit()
+
+        with patch(
+            "routes.check_gopro_overlay_dependencies",
+            return_value={
+                "gopro_dashboard": True,
+                "ffmpeg": True,
+                "ffprobe": True,
+                "ffmpeg_vaapi": False,
+            },
+        ):
+            response = client.post(f"{API_PREFIX}/flights/{flight.id}/overlay-layer")
+
+        assert response.status_code == 409
+        assert response.json()["detail"] == (
+            "An overlay layer is already being generated for this flight"
+        )
 
 
 class TestHealthCheck:

@@ -1216,6 +1216,8 @@
     "overlayLayerMissing": "Couche à générer",
     "overlayLayerOutdated": "Couche à régénérer",
     "overlayLayerGenerating": "Génération en cours",
+    "overlayLayerProgress": "Progression de la génération de la couche",
+    "overlayLayerJobId": "Traitement {{jobId}} · actualisé automatiquement",
     "overlayLayerReady": "Couche prête",
     "overlaySaveCalibration": "Enregistrer le calage",
     "overlayGenerateLayer": "Générer la couche",
@@ -1289,6 +1291,7 @@
       "videoTitle": "Vidéo du vol",
       "highlightVideoTitle": "Meilleurs moments",
       "goproOverlayTitle": "Overlay GoPro",
+      "overlayLayerTitle": "Couche overlay",
       "youtubeUploadTitle": "Upload YouTube",
       "method": {
         "cpu": "CPU",
