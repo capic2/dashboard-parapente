@@ -3,6 +3,7 @@ import { createRootRoute, Outlet, useMatchRoute } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import Header from '../components/common/Header';
 import AppUpdateBanner from '../components/common/AppUpdateBanner';
+import DeploymentStatusBanner from '../components/common/DeploymentStatusBanner';
 import { queryClient } from '../lib/queryClient';
 import { appVersionQueryOptions } from '../hooks/common/useAppVersion';
 import { useVersionUpdates } from '../hooks/common/useVersionUpdates';
@@ -48,6 +49,10 @@ function RootComponent() {
   const isLoginPage = matchRoute({ to: '/login' });
   const isExportViewerPage = matchRoute({ to: '/export-viewer' });
   const isPrivacyPage = matchRoute({ to: '/privacy' });
+  const isInfrastructurePage = matchRoute({
+    to: '/infrastructure',
+    fuzzy: true,
+  });
   const appVersion = Route.useLoaderData();
   const version = appVersion?.version ?? null;
   const stagingPrNumber = getStagingPrNumber(version);
@@ -74,6 +79,7 @@ function RootComponent() {
             onRefresh={() => window.location.reload()}
           />
         )}
+        {!isInfrastructurePage && <DeploymentStatusBanner />}
         <Header />
         <main>
           <Suspense>
