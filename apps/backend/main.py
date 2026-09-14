@@ -428,6 +428,9 @@ def run_migrations():
 if not config.TESTING:
     initialize_database()
     run_migrations()
+    from flight_vertical_rate_migration import backfill_missing_vertical_rates
+
+    backfill_missing_vertical_rates()
     from flight_temp_migration import migrate_legacy_flight_temporary_files
 
     migrate_legacy_flight_temporary_files()

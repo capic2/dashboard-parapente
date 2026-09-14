@@ -210,6 +210,8 @@ async def import_external_activities(
                         flight.elevation_gain_m = int(stats["elevation_gain_m"])
                         flight.gpx_max_altitude_m = flight.max_altitude_m
                         flight.gpx_elevation_gain_m = flight.elevation_gain_m
+                        flight.max_climb_rate_ms = float(stats["max_climb_rate_ms"])
+                        flight.max_sink_rate_ms = float(stats["max_sink_rate_ms"])
                         db.flush()
 
                         filename = f"intervals_{_safe_activity_id(activity.id)}.gpx"

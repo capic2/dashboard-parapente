@@ -12,11 +12,11 @@ Work only in the worktree path given by the parent agent.
 
 Responsibilities:
 
-- Verify workspace-local dependencies are usable before Nx commands run.
-- Check for `node_modules/.bin/nx` and representative packages such as `typescript`.
-- Run `CI=true /home/capic/.local/share/pnpm/pnpm install --frozen-lockfile` only when dependencies are missing or unusable.
+- Run `/home/capic/.local/share/pnpm/pnpm setup:local` before Nx commands.
+- Verify the branch-local Node dependencies under `node_modules` and Python dependencies under `.venv` are usable.
+- Let the bootstrap script install dependencies only when their lock or requirements file changed, or when the environment is missing or unusable.
 - Do not rely on pnpm's global virtual store; each worktree must have a workspace-local dependency layout usable by Nx and Knip.
+- Do not reuse a Python virtual environment from the main checkout or another worktree.
 - Do not edit source code.
 - Do not commit.
-- Run `NX_NO_CLOUD=true /home/capic/.local/share/pnpm/pnpm nx --version` after the check or install.
 - Return a concise report with status, commands run, failures, and whether any files changed.

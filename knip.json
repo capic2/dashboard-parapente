@@ -7,7 +7,7 @@
     "libs/design-system/.storybook/main.ts",
     ".agents/skills/**/scripts/**"
   ],
-  "ignoreBinaries": ["eslint", "apps/backend/.venv/bin/ruff", "apps/backend/.venv/bin/black"],
+  "ignoreBinaries": ["eslint", ".venv/bin/ruff", ".venv/bin/black"],
   "ignoreDependencies": [
     "@chromatic-com/storybook",
     "@storybook/addon-a11y",
@@ -15,7 +15,8 @@
     "@storybook/addon-vitest",
     "@storybook/react-vite",
     "chromatic",
-    "storybook-react-i18next"
+    "storybook-react-i18next",
+    "lint-staged"
   ],
   "ignoreExportsUsedInFile": true
 }
