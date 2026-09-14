@@ -451,26 +451,27 @@ def calculate_track_stats(points: list[TrackPoint]) -> dict[str, Any]:
 
     max_climb_rate = 0.0
     max_sink_rate = 0.0
-    for previous, current in zip(points, points[1:], strict=False):
-        if previous.get("segment", 0) != current.get("segment", 0):
+    previous = points[0]
+    for current in points[1:]:
+        if current.get("segment", 0) != previous.get("segment", 0):
+            previous = current
             continue
+
         previous_timestamp = previous.get("timestamp", 0)
         current_timestamp = current.get("timestamp", 0)
-        if previous_timestamp <= 0 or current_timestamp <= 0:
-            continue
         elapsed = current_timestamp - previous_timestamp
-        if elapsed <= 0:
+        if previous_timestamp <= 0 or current_timestamp <= 0 or elapsed <= 0:
             continue
+
         vertical_rate = (current.get("elevation", 0.0) - previous.get("elevation", 0.0)) / (
             elapsed / 1000
         )
-        if math.isfinite(vertical_rate):
-            vertical_rate = max(
-                -MAX_VERTICAL_RATE_ABS_MS,
-                min(MAX_VERTICAL_RATE_ABS_MS, vertical_rate),
-            )
-            max_climb_rate = max(max_climb_rate, vertical_rate)
-            max_sink_rate = max(max_sink_rate, -vertical_rate)
+        if not math.isfinite(vertical_rate) or abs(vertical_rate) > MAX_VERTICAL_RATE_ABS_MS:
+            continue
+
+        max_climb_rate = max(max_climb_rate, vertical_rate)
+        max_sink_rate = max(max_sink_rate, -vertical_rate)
+        previous = current
 
     takeoff = points[0]
     max_distance_from_takeoff = max(
