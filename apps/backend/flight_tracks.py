@@ -22,6 +22,7 @@ class TrackPoint(TypedDict, total=False):
 MAX_TRACK_BYTES = 100 * 1024 * 1024
 MAX_XML_TRACK_BYTES = 25 * 1024 * 1024
 MAX_TRACK_POINTS = 500_000
+MAX_VERTICAL_RATE_ABS_MS = 15.0
 
 
 def _append_point(points: list[TrackPoint], point: TrackPoint) -> None:
@@ -464,6 +465,10 @@ def calculate_track_stats(points: list[TrackPoint]) -> dict[str, Any]:
             elapsed / 1000
         )
         if math.isfinite(vertical_rate):
+            vertical_rate = max(
+                -MAX_VERTICAL_RATE_ABS_MS,
+                min(MAX_VERTICAL_RATE_ABS_MS, vertical_rate),
+            )
             max_climb_rate = max(max_climb_rate, vertical_rate)
             max_sink_rate = max(max_sink_rate, -vertical_rate)
 
