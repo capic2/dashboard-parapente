@@ -16,6 +16,7 @@ import type { GoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 interface GoproOverlaySyncPreviewProps {
   flightId: string;
   offset: string;
+  resetOffset: string;
   onOffsetChange: (offset: string) => void;
 }
 
@@ -62,6 +63,7 @@ function previewSegmentIndex(
 export function GoproOverlaySyncPreview({
   flightId,
   offset,
+  resetOffset,
   onOffsetChange,
 }: GoproOverlaySyncPreviewProps) {
   const { t } = useTranslation();
@@ -171,6 +173,15 @@ export function GoproOverlaySyncPreview({
     onOffsetChange((manualOffset + delta).toFixed(1));
   };
 
+  const seekToPreviewSegment = (segmentIndex: number) => {
+    const segment = previewSegments[segmentIndex];
+    const camera = cameraRef.current;
+    if (!segment || !camera) return;
+    camera.currentTime = segment.preview_start_seconds;
+    setVideoTime(segment.preview_start_seconds);
+    syncOverlay();
+  };
+
   const alignGpxStartAtCurrentVideoTime = () => {
     onOffsetChange(
       manualOffsetForGpxStartAtVideoTime(
@@ -260,16 +271,22 @@ export function GoproOverlaySyncPreview({
         </div>
         {previewSegments.length > 1 && (
           <div className="grid grid-cols-2 border-t border-gray-800 text-center text-xs font-medium text-gray-400">
-            <span
-              className={`px-3 py-2 ${activeSegmentIndex === 0 ? 'bg-sky-950 text-sky-200' : ''}`}
+            <button
+              type="button"
+              onClick={() => seekToPreviewSegment(0)}
+              aria-pressed={activeSegmentIndex === 0}
+              className={`cursor-pointer px-3 py-2 transition-colors hover:bg-gray-900 hover:text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 ${activeSegmentIndex === 0 ? 'bg-sky-950 text-sky-200' : ''}`}
             >
               {t('flights.goproPreviewStart')}
-            </span>
-            <span
-              className={`border-l border-gray-800 px-3 py-2 ${activeSegmentIndex === 1 ? 'bg-sky-950 text-sky-200' : ''}`}
+            </button>
+            <button
+              type="button"
+              onClick={() => seekToPreviewSegment(1)}
+              aria-pressed={activeSegmentIndex === 1}
+              className={`cursor-pointer border-l border-gray-800 px-3 py-2 transition-colors hover:bg-gray-900 hover:text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 ${activeSegmentIndex === 1 ? 'bg-sky-950 text-sky-200' : ''}`}
             >
               {t('flights.goproPreviewEnd')}
-            </span>
+            </button>
           </div>
         )}
         <div className="space-y-2 border-t border-gray-800 px-3 py-3 text-gray-100">
@@ -396,6 +413,39 @@ export function GoproOverlaySyncPreview({
               offset: automaticOffset.toFixed(1),
             })}
           </div>
+        </div>
+        <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+          <div className="flex items-center justify-between gap-2">
+            <label
+              htmlFor="gopro-overlay-manual-offset"
+              className="text-sm font-medium text-gray-700 dark:text-gray-200"
+            >
+              {t('flights.goproOverlayGpxOffsetLabel')}
+            </label>
+            <button
+              type="button"
+              onClick={() => onOffsetChange(resetOffset)}
+              disabled={offset === resetOffset}
+              className="min-h-8 cursor-pointer rounded-md px-2 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 dark:text-sky-300 dark:hover:bg-sky-950/40"
+            >
+              {t('common.reset')}
+            </button>
+          </div>
+          <input
+            id="gopro-overlay-manual-offset"
+            type="number"
+            step="0.1"
+            value={offset}
+            onChange={(event) => onOffsetChange(event.currentTarget.value)}
+            aria-describedby="gopro-overlay-manual-offset-hint"
+            className="mt-2 min-h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 font-mono text-sm text-gray-900 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100 dark:focus:ring-sky-900"
+          />
+          <p
+            id="gopro-overlay-manual-offset-hint"
+            className="mt-1 text-xs text-gray-500 dark:text-gray-400"
+          >
+            {t('flights.goproOverlayGpxOffsetHint')}
+          </p>
         </div>
         <div className="grid grid-cols-4 gap-2">
           {[-1, -0.1, 0.1, 1].map((delta) => (
