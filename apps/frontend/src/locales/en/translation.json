@@ -1041,7 +1041,6 @@
     "maxAltitudeLabel": "Max altitude (m)",
     "elevationGainLabel": "Elevation gain (m)",
     "maxSpeedLabel": "Max speed (km/h)",
-    "trackAnalysisTitle": "Track analysis",
     "trackAnalysisLoading": "Track analysis loading",
     "trackAnalysisUnavailable": "Detailed track analysis is unavailable.",
     "minAltitudeLabel": "Minimum altitude",

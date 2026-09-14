@@ -66,7 +66,6 @@ describe('FlightStatsGrid', () => {
   it('shows the detailed metrics calculated from the track', () => {
     render(<FlightStatsGrid flight={flight} sites={[]} />);
 
-    expect(screen.getByText('flights.trackAnalysisTitle')).toBeInTheDocument();
     expect(screen.getByText('4.6 m/s')).toBeInTheDocument();
     expect(screen.getByText('3.2 m/s')).toBeInTheDocument();
     expect(screen.getByText('11.7 km/h')).toBeInTheDocument();

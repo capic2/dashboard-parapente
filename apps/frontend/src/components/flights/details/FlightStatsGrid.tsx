@@ -64,17 +64,15 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
       : formatSpeedKmh(flight.max_speed_kmh, units.speed);
   const trackFileName = flight.gpx_file_path?.split(/[\\/]/u).pop();
   let trackAnalysisContent = (
-    <p className="text-sm text-gray-500 dark:text-gray-400">
+    <p className="col-span-full text-sm text-gray-500 dark:text-gray-400">
       {t('flights.trackAnalysisUnavailable')}
     </p>
   );
 
   if (isAnalysisPending) {
     trackAnalysisContent = (
-      <div
-        className="grid grid-cols-2 gap-2 sm:grid-cols-4"
-        aria-label={t('flights.trackAnalysisLoading')}
-      >
+      <>
+        <span className="sr-only">{t('flights.trackAnalysisLoading')}</span>
         {Array.from({ length: 8 }, (_, index) => (
           <div
             // The order is stable and the placeholders have no identity of their own.
@@ -82,7 +80,7 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
             className="h-[67px] animate-pulse rounded-xl border border-gray-200 bg-gray-100 motion-reduce:animate-none dark:border-gray-700 dark:bg-gray-900/50"
           />
         ))}
-      </div>
+      </>
     );
   } else if (trackAnalysis?.coordinates.length) {
     const stats = [
@@ -151,14 +149,14 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
     ];
 
     trackAnalysisContent = (
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <>
         {stats.map((stat) => (
           <div className={statClass} key={stat.label}>
             <span className={labelClass}>{stat.label}</span>
             <span className={valueClass}>{stat.value}</span>
           </div>
         ))}
-      </div>
+      </>
     );
   }
 
@@ -209,15 +207,8 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
           <span className={labelClass}>{t('flights.maxSpeedLabel')}</span>
           <span className={valueClass}>{maxSpeedLabel}</span>
         </div>
+        {flight.gpx_file_path && trackAnalysisContent}
       </div>
-      {flight.gpx_file_path && (
-        <section className="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
-          <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">
-            {t('flights.trackAnalysisTitle')}
-          </h3>
-          {trackAnalysisContent}
-        </section>
-      )}
       {trackFileName && (
         <div className="mt-3 min-w-0">
           <span className={labelClass}>{t('flights.trackFileLabel')}</span>
