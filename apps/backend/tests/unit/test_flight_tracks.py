@@ -267,6 +267,76 @@ def test_statistics_do_not_bridge_separate_track_segments():
     assert stats["elevation_gain_m"] == 20
 
 
+def test_calculates_detailed_flight_analysis_with_smoothed_vario() -> None:
+    points = [
+        {
+            "lat": 47.2,
+            "lon": 6.0,
+            "elevation": 400.0,
+            "timestamp": 1_000,
+            "segment": 0,
+        },
+        {
+            "lat": 47.21,
+            "lon": 6.01,
+            "elevation": 430.0,
+            "timestamp": 11_000,
+            "segment": 0,
+        },
+        {
+            "lat": 47.22,
+            "lon": 6.02,
+            "elevation": 410.0,
+            "timestamp": 21_000,
+            "segment": 0,
+        },
+    ]
+
+    stats = calculate_track_stats(points)
+
+    assert stats["min_altitude_m"] == 400
+    assert stats["altitude_range_m"] == 30
+    assert stats["takeoff_altitude_m"] == 400
+    assert stats["landing_altitude_m"] == 410
+    assert stats["elevation_loss_m"] == 20
+    assert stats["max_climb_rate_ms"] == 3
+    assert stats["max_sink_rate_ms"] == 2
+    assert stats["average_speed_kmh"] > 0
+    assert stats["max_distance_from_takeoff_km"] > 0
+    assert stats["flight_duration_seconds"] == 20
+
+
+def test_vario_ignores_untimed_point_at_segment_boundary() -> None:
+    points = [
+        {
+            "lat": 47.2,
+            "lon": 6.0,
+            "elevation": 400.0,
+            "timestamp": 1_000,
+            "segment": 0,
+        },
+        {
+            "lat": 47.21,
+            "lon": 6.01,
+            "elevation": 1_000.0,
+            "timestamp": 0,
+            "segment": 1,
+        },
+        {
+            "lat": 47.22,
+            "lon": 6.02,
+            "elevation": 1_100.0,
+            "timestamp": 20_000,
+            "segment": 1,
+        },
+    ]
+
+    stats = calculate_track_stats(points)
+
+    assert stats["max_climb_rate_ms"] == 0
+    assert stats["max_sink_rate_ms"] == 0
+
+
 @pytest.mark.parametrize(
     "latitude,longitude",
     [("nan", "6.0"), ("91", "6.0"), ("47.2", "181")],

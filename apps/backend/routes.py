@@ -4771,24 +4771,26 @@ def get_flight_gpx_data(flight_id: str, db: Session = Depends(get_db)):
 
     # Parse GPX file
     try:
-        print(f"🔍 DEBUG API - Parsing GPX for flight {flight_id}: {gpx_path}")
         coordinates = parse_gpx_file(gpx_path)
-        print(f"🔍 DEBUG API - Parsed {len(coordinates)} coordinates")
-        if coordinates:
-            print(f"🔍 DEBUG API - First timestamp: {coordinates[0]['timestamp']}")
-            print(f"🔍 DEBUG API - Last timestamp: {coordinates[-1]['timestamp']}")
-
-        stats = calculate_gpx_stats(coordinates)
+        stats = calculate_track_stats(coordinates)
 
         return {
             "data": {
                 "coordinates": coordinates,
                 "max_altitude_m": stats["max_altitude_m"],
                 "min_altitude_m": stats["min_altitude_m"],
+                "altitude_range_m": stats["altitude_range_m"],
+                "takeoff_altitude_m": stats["takeoff_altitude_m"],
+                "landing_altitude_m": stats["landing_altitude_m"],
                 "elevation_gain_m": stats["elevation_gain_m"],
                 "elevation_loss_m": stats["elevation_loss_m"],
-                "total_distance_km": stats["total_distance_km"],
+                "total_distance_km": stats["distance_km"],
+                "max_distance_from_takeoff_km": stats["max_distance_from_takeoff_km"],
                 "flight_duration_seconds": stats["flight_duration_seconds"],
+                "average_speed_kmh": stats["average_speed_kmh"],
+                "max_speed_kmh": stats["max_speed_kmh"],
+                "max_climb_rate_ms": stats["max_climb_rate_ms"],
+                "max_sink_rate_ms": stats["max_sink_rate_ms"],
             }
         }
     except Exception as e:
