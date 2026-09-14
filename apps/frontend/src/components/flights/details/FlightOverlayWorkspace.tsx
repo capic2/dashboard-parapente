@@ -14,6 +14,7 @@ interface FlightOverlayWorkspaceProps {
   flightId: string;
   initialOffset: string;
   onSaveOffset: (offset: string) => Promise<void>;
+  showHeader?: boolean;
 }
 
 const ACTIVE_LAYER_STATUSES = new Set(['queued', 'preparing', 'running']);
@@ -22,6 +23,7 @@ export function FlightOverlayWorkspace({
   flightId,
   initialOffset,
   onSaveOffset,
+  showHeader = true,
 }: FlightOverlayWorkspaceProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -81,30 +83,36 @@ export function FlightOverlayWorkspace({
   return (
     <section
       aria-labelledby="flight-overlay-workspace-title"
-      className="rounded-2xl border border-cyan-200 bg-cyan-50/50 p-4 shadow-sm dark:border-cyan-900 dark:bg-cyan-950/20 sm:p-5"
+      className={
+        showHeader
+          ? 'rounded-2xl border border-cyan-200 bg-cyan-50/50 p-4 shadow-sm dark:border-cyan-900 dark:bg-cyan-950/20 sm:p-5'
+          : 'rounded-b-2xl bg-cyan-50/50 p-4 dark:bg-cyan-950/20 sm:p-5'
+      }
     >
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
-            <Wand2 className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <div>
-            <h2
-              id="flight-overlay-workspace-title"
-              className="text-base font-semibold text-slate-950 dark:text-white"
-            >
-              {t('flights.overlayWorkspaceTitle')}
-            </h2>
-            <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
-              {t('flights.overlayWorkspaceDescription')}
-            </p>
+      {showHeader && (
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
+              <Wand2 className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div>
+              <h2
+                id="flight-overlay-workspace-title"
+                className="text-base font-semibold text-slate-950 dark:text-white"
+              >
+                {t('flights.overlayWorkspaceTitle')}
+              </h2>
+              <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
+                {t('flights.overlayWorkspaceDescription')}
+              </p>
+            </div>
           </div>
+          <span className="flex items-center gap-1.5 rounded-full border border-cyan-200 bg-white px-3 py-1.5 text-xs font-semibold text-cyan-900 dark:border-cyan-800 dark:bg-slate-900 dark:text-cyan-100">
+            {statusIcon}
+            {status}
+          </span>
         </div>
-        <span className="flex items-center gap-1.5 rounded-full border border-cyan-200 bg-white px-3 py-1.5 text-xs font-semibold text-cyan-900 dark:border-cyan-800 dark:bg-slate-900 dark:text-cyan-100">
-          {statusIcon}
-          {status}
-        </span>
-      </div>
+      )}
 
       <GoproOverlaySyncPreview
         flightId={flightId}

@@ -107,6 +107,9 @@ export function FlightDetails({
   const [notesText, setNotesText] = useState(flight.notes ?? '');
   const [activeTab, setActiveTab] = useState<FlightDetailsTab>('infos');
   const [isReplayExpanded, setIsReplayExpanded] = useState(false);
+  const [isOverlayWorkspaceExpanded, setIsOverlayWorkspaceExpanded] = useState(
+    flight.gopro_overlay_gpx_offset == null
+  );
   const [isGoproOverlayDialogOpen, setIsGoproOverlayDialogOpen] =
     useState(false);
   const [goproOverlayJobId, setGoproOverlayJobId] = useState<string | null>(
@@ -861,6 +864,57 @@ export function FlightDetails({
       compact={mobileMode}
     />
   );
+  useEffect(() => {
+    setIsOverlayWorkspaceExpanded(flight.gopro_overlay_gpx_offset == null);
+  }, [flight.gopro_overlay_gpx_offset]);
+
+  const overlayWorkspacePanel = (
+    <section className="overflow-hidden rounded-2xl border border-cyan-200 bg-cyan-50/50 shadow-sm dark:border-cyan-900 dark:bg-cyan-950/20">
+      <button
+        type="button"
+        className="flex w-full cursor-pointer items-center justify-between gap-3 p-4 text-left transition-colors hover:bg-cyan-100/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-inset dark:hover:bg-cyan-950/40 sm:p-5"
+        aria-expanded={isOverlayWorkspaceExpanded}
+        aria-controls="flight-overlay-workspace-panel"
+        onClick={() =>
+          setIsOverlayWorkspaceExpanded((isExpanded) => !isExpanded)
+        }
+      >
+        <span className="flex min-w-0 items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
+            <Wand2 className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <span>
+            <span className="block font-semibold text-slate-950 dark:text-white">
+              {t('flights.overlayWorkspaceTitle')}
+            </span>
+            <span className="block text-sm text-slate-600 dark:text-slate-300">
+              {t('flights.overlayWorkspaceDescription')}
+            </span>
+          </span>
+        </span>
+        <ChevronDown
+          aria-hidden="true"
+          className={`size-5 shrink-0 text-cyan-700 transition-transform duration-200 dark:text-cyan-300 ${isOverlayWorkspaceExpanded ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {isOverlayWorkspaceExpanded && (
+        <div
+          id="flight-overlay-workspace-panel"
+          className="border-t border-cyan-200 dark:border-cyan-900"
+        >
+          {hasGpx && hasVideo && hasGoproCameraVideo && (
+            <FlightOverlayWorkspace
+              flightId={flight.id}
+              initialOffset={goproOverlayGpxOffset}
+              onSaveOffset={handleGoproOverlayOffsetChange}
+              showHeader={false}
+            />
+          )}
+        </div>
+      )}
+    </section>
+  );
+
   const logsPanel = (
     <FlightGenerationLogsPanel
       videoJobId={flight.video_export_job_id}
@@ -892,6 +946,7 @@ export function FlightDetails({
       </header>
 
       <div className="min-w-0 space-y-4">
+        {hasGpx && hasVideo && hasGoproCameraVideo && overlayWorkspacePanel}
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
           <button
             type="button"
@@ -1091,14 +1146,6 @@ export function FlightDetails({
             </div>
           )}
         </FlightMediaBadges>
-
-        {hasGpx && hasVideo && hasGoproCameraVideo && (
-          <FlightOverlayWorkspace
-            flightId={flight.id}
-            initialOffset={goproOverlayGpxOffset}
-            onSaveOffset={handleGoproOverlayOffsetChange}
-          />
-        )}
 
         {(flight.youtube_urls?.length ?? 0) > 0 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800 sm:p-5">
