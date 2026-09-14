@@ -873,6 +873,7 @@ export function FlightDetails({
       videoFallbackStatus={flight.video_export_status}
       videoFallbackProgress={flight.video_export_progress}
       goproOverlayJob={goproOverlayJob}
+      overlayLayerJob={overlayLayer.data?.job}
       goproOverlayJobId={effectiveGoproOverlayJobId}
       goproOverlayFallbackStatus={flight.gopro_overlay_status}
       goproOverlayFallbackProgress={flight.gopro_overlay_progress}
