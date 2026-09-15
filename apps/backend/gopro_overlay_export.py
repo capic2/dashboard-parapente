@@ -3267,7 +3267,9 @@ def gopro_overlay_browser_preview_path(output_path: Path) -> Path:
     if output_path.suffix.lower() != ".mov":
         return output_path
 
-    preview_path = output_path.with_suffix(".webm")
+    # Version the cache filename so previews produced by an older encoder
+    # cannot hide a newly fixed transparent layer.
+    preview_path = output_path.with_suffix(".browser-alpha.webm")
     if preview_path.exists() and preview_path.stat().st_mtime >= output_path.stat().st_mtime:
         return preview_path
 
