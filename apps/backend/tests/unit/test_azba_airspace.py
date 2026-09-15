@@ -182,6 +182,27 @@ def test_normalize_zrt_notam_rejects_malformed_or_unrelated_notams() -> None:
         )
         is None
     )
+
+
+def test_normalize_zrt_notam_rejects_trigger_notam_announcements() -> None:
+    assert (
+        azba_airspace._normalize_zrt_notam(
+            {
+                "nof": "LFFA",
+                "series": "R",
+                "number": 2450,
+                "year": 26,
+                "itemA": "LFEE",
+                "itemE": "TRIGGER NOTAM - AIP SUP 184/26. CREATION OF 4 TEMPORARY RESTRICTED AREAS (ZRT) IN BESANCON",
+                "coordinates": "4712N00600E",
+                "radius": 5,
+                "qLine": {"code45": "RT"},
+            },
+            47.2,
+            6.0,
+        )
+        is None
+    )
     assert (
         azba_airspace._normalize_zrt_notam(
             {

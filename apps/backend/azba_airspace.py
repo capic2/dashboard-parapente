@@ -328,6 +328,8 @@ def _normalize_zrt_notam(
         return None
     text = str(payload.get("itemE") or "")
     code45 = str(q_line.get("code45") or "").upper()
+    if "TRIGGER NOTAM" in text.upper():
+        return None
     if code45 != "RT" and "ZRT" not in text.upper():
         return None
     coordinates = _notam_coordinate_pair(str(payload.get("coordinates") or ""))
