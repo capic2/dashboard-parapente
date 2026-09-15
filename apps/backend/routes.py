@@ -6793,7 +6793,7 @@ def _prepare_enriched_gpx_in_background(
         logger.warning("Unable to prepare enriched GPX in background: %s", exc)
 
 
-_INTERACTIVE_OVERLAY_FILENAME = "interactive-gopro-overlay.webm"
+_INTERACTIVE_OVERLAY_FILENAME = "interactive-gopro-overlay.mov"
 _INTERACTIVE_OVERLAY_JOB_FILENAME = "interactive-gopro-overlay.json"
 
 
