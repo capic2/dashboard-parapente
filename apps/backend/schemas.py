@@ -241,12 +241,25 @@ class DeploymentDrainRequest(BaseModel):
     run_url: str = Field(min_length=1)
 
 
+class DeploymentDrainJob(BaseModel):
+    job_id: str
+    mode: str | None = None
+    status: str
+    internal_status: str | None = None
+    flight_name: str | None = None
+    progress: int | float | None = None
+    message: str | None = None
+    created_at: datetime | None = None
+    started_at: datetime | None = None
+
+
 class DeploymentDrainStatus(BaseModel):
     phase: Literal["idle", "waiting", "deploying"]
     accepting_jobs: bool
     ready_for_deployment: bool
     active_jobs: int
     admissions_in_progress: int
+    blocking_jobs: list[DeploymentDrainJob] = Field(default_factory=list)
     deployment_id: str | None = None
     target_version: str | None = None
     run_url: str | None = None

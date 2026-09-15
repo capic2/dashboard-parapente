@@ -122,6 +122,7 @@ from schemas import (
     EmagramAnalysisListItem,
     EmagramTriggerRequest,
     DeploymentDrainRequest,
+    DeploymentDrainJob,
     DeploymentDrainStatus,
     ExternalImportResult,
     FlightCreate,
@@ -906,14 +907,14 @@ def _get_video_export_jobs_payload(
     return payload
 
 
-def _active_deployment_job_count(db: Session) -> int:
+def _active_deployment_jobs(db: Session) -> list[dict[str, Any]]:
     jobs = _get_video_export_jobs_payload(db)["jobs"]
-    return sum(
-        1
+    return [
+        job
         for job in jobs
         if job.get("status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
         or job.get("internal_status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
-    )
+    ]
 
 
 def _deployment_drain_status(db: Session) -> DeploymentDrainStatus:
@@ -921,7 +922,26 @@ def _deployment_drain_status(db: Session) -> DeploymentDrainStatus:
     # Admissions are registered before jobs become visible in storage. Reading
     # this counter first prevents a handoff from looking idle between the two.
     admissions = deployment_drain.admissions_in_progress()
-    active_jobs = _active_deployment_job_count(db)
+    blocking_jobs = [
+        DeploymentDrainJob.model_validate(
+            {
+                key: job.get(key)
+                for key in (
+                    "job_id",
+                    "mode",
+                    "status",
+                    "internal_status",
+                    "flight_name",
+                    "progress",
+                    "message",
+                    "created_at",
+                    "started_at",
+                )
+            }
+        )
+        for job in _active_deployment_jobs(db)
+    ]
+    active_jobs = len(blocking_jobs)
     if state is None:
         return DeploymentDrainStatus(
             phase="idle",
@@ -929,6 +949,7 @@ def _deployment_drain_status(db: Session) -> DeploymentDrainStatus:
             ready_for_deployment=False,
             active_jobs=active_jobs,
             admissions_in_progress=admissions,
+            blocking_jobs=blocking_jobs,
         )
     return DeploymentDrainStatus(
         **state,
@@ -936,6 +957,7 @@ def _deployment_drain_status(db: Session) -> DeploymentDrainStatus:
         ready_for_deployment=active_jobs == 0 and admissions == 0,
         active_jobs=active_jobs,
         admissions_in_progress=admissions,
+        blocking_jobs=blocking_jobs,
     )
 
 
