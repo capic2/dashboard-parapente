@@ -1340,6 +1340,39 @@ class TestUpdateFlightEndpoint:
         assert sample_flight.notes == "New notes"
         assert sample_flight.distance_km == 20.5
 
+    def test_update_gpx_metrics_exclusion_recalculates_vertical_rates(
+        self, client, db_session, sample_flight
+    ):
+        sample_flight.gpx_file_path = "private/track.gpx"
+        sample_flight.max_climb_rate_ms = 1.0
+        sample_flight.max_sink_rate_ms = 0.5
+        db_session.commit()
+
+        with (
+            patch("routes.parse_gpx_file", return_value=[{"timestamp": 1}]),
+            patch(
+                "routes.calculate_track_stats",
+                return_value={"max_climb_rate_ms": 4.2, "max_sink_rate_ms": 3.4},
+            ) as calculate_stats,
+        ):
+            response = client.patch(
+                f"{API_PREFIX}/flights/{sample_flight.id}",
+                json={"gpx_metrics_excluded": True},
+            )
+            assert response.status_code == 200
+
+            response = client.patch(
+                f"{API_PREFIX}/flights/{sample_flight.id}",
+                json={"gpx_metrics_excluded": False},
+            )
+
+        assert response.status_code == 200
+        assert calculate_stats.call_count == 2
+        db_session.refresh(sample_flight)
+        assert sample_flight.gpx_metrics_excluded is False
+        assert sample_flight.max_climb_rate_ms == 4.2
+        assert sample_flight.max_sink_rate_ms == 3.4
+
 
 class TestDeleteFlightEndpoint:
     """Tests for DELETE /flights/{flight_id}"""

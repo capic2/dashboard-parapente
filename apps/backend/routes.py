@@ -4776,6 +4776,24 @@ async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session =
     # 3. Update only provided fields (exclude_unset skips None values)
     update_data = flight_data.dict(exclude_unset=True)
 
+    gpx_metrics_excluded = update_data.get("gpx_metrics_excluded")
+    if (
+        gpx_metrics_excluded is not None
+        and gpx_metrics_excluded != flight.gpx_metrics_excluded
+        and flight.gpx_file_path
+    ):
+        try:
+            coordinates = parse_gpx_file(Path(flight.gpx_file_path))
+            stats = calculate_track_stats(coordinates)
+            flight.max_climb_rate_ms = stats["max_climb_rate_ms"]
+            flight.max_sink_rate_ms = stats["max_sink_rate_ms"]
+        except Exception as exc:
+            logger.warning(
+                "Could not recalculate vertical rates after changing GPX exclusion " "for %s: %s",
+                flight_id,
+                exc,
+            )
+
     for field, value in update_data.items():
         setattr(flight, field, value)
 
