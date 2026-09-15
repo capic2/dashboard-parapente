@@ -25,7 +25,14 @@ def test_browser_preview_converts_mov_to_webm(
 
     assert preview_path == tmp_path / "overlay.webm"
     assert preview_path.read_bytes() == b"webm"
-    assert ["-f", "webm"] == commands[0][-3:-1]
+    assert commands[0][commands[0].index("-f") : commands[0].index("-f") + 2] == ["-f", "webm"]
+    assert commands[0][
+        commands[0].index("-auto-alt-ref") : commands[0].index("-auto-alt-ref") + 2
+    ] == [
+        "-auto-alt-ref",
+        "0",
+    ]
+    assert "alpha_mode=1" in commands[0]
 
 
 def test_browser_preview_falls_back_to_mov_when_ffmpeg_fails(
