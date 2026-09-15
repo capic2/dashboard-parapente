@@ -7424,6 +7424,7 @@ def download_gopro_overlay_render_job(
         media_type=media_type,
         filename=preview_path.name,
         content_disposition_type="inline",
+        headers={"Cache-Control": "no-store"} if browser_preview else None,
     )
 
 
@@ -7502,10 +7503,14 @@ async def stream_gopro_overlay_status_with_job_token(
 
 
 @public_router.get("/job-access/gopro-overlays/jobs/{job_id}/download")
-def download_gopro_overlay_with_job_token(job_id: str, request: Request) -> FileResponse:
+def download_gopro_overlay_with_job_token(
+    job_id: str,
+    request: Request,
+    browser_preview: bool = Query(False),
+) -> FileResponse:
     """Download a completed GoPro overlay with a scoped job token."""
     _require_job_token(request, purpose="gopro_overlay", job_id=job_id)
-    return download_gopro_overlay_render_job(job_id)
+    return download_gopro_overlay_render_job(job_id, browser_preview=browser_preview)
 
 
 @public_router.delete(
