@@ -12,6 +12,7 @@ import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
 import { telemetryAtTimestamp } from './goproSyncTelemetry';
 import type { GoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
+import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 
 interface GoproOverlaySyncPreviewProps {
   flightId: string;
@@ -39,6 +40,52 @@ export function sourceTimeAtPreviewTime(
     segment.duration_seconds
   );
   return segment.source_start_seconds + elapsed;
+}
+
+export function previewTimeAtSourceTime(
+  sourceTime: number,
+  segments: GoproOverlayPreview['video']['preview_segments']
+) {
+  const segmentIndex = segments.findIndex(
+    (candidate) =>
+      sourceTime >= candidate.source_start_seconds &&
+      sourceTime <= candidate.source_start_seconds + candidate.duration_seconds
+  );
+  if (segmentIndex >= 0) {
+    const segment = segments[segmentIndex];
+    return (
+      segment.preview_start_seconds +
+      Math.min(
+        Math.max(0, sourceTime - segment.source_start_seconds),
+        segment.duration_seconds
+      )
+    );
+  }
+  if (segments.length === 0) return sourceTime;
+
+  const nearestSegment = segments.reduce((nearest, candidate) => {
+    const candidateBoundary =
+      sourceTime < candidate.source_start_seconds
+        ? candidate.source_start_seconds
+        : candidate.source_start_seconds + candidate.duration_seconds;
+    const nearestBoundary =
+      sourceTime < nearest.source_start_seconds
+        ? nearest.source_start_seconds
+        : nearest.source_start_seconds + nearest.duration_seconds;
+    return Math.abs(sourceTime - candidateBoundary) <
+      Math.abs(sourceTime - nearestBoundary)
+      ? candidate
+      : nearest;
+  });
+  const boundarySourceTime =
+    sourceTime < nearestSegment.source_start_seconds
+      ? nearestSegment.source_start_seconds
+      : nearestSegment.source_start_seconds + nearestSegment.duration_seconds;
+  return (
+    nearestSegment.preview_start_seconds +
+    boundarySourceTime -
+    nearestSegment.source_start_seconds
+  );
 }
 
 export function manualOffsetForGpxStartAtVideoTime(
@@ -74,8 +121,10 @@ export function GoproOverlaySyncPreview({
   const generatePreview = useGenerateGoproPreview(flightId);
   const automaticallyRequestedTarget = useRef<string | null>(null);
   const [videoTime, setVideoTime] = useState(0);
-  const cameraRef = useRef<HTMLVideoElement>(null);
-  const overlayRef = useRef<HTMLVideoElement>(null);
+  const [seekRequest, setSeekRequest] = useState<{
+    id: number;
+    time: number;
+  } | null>(null);
   const [requestedMinutes, setRequestedMinutes] = useState(3);
   const parsedOffset = Number(offset);
   const manualOffset = Number.isFinite(parsedOffset) ? parsedOffset : 0;
@@ -103,14 +152,23 @@ export function GoproOverlaySyncPreview({
       version: `${preview.data?.video.preview_target_end_seconds}-${preview.data?.video.preview_available_duration_seconds}`,
     }
   );
+  const flightVideoUrl = getApiUrlWithSearchParams(
+    `flights/${flightId}/video`,
+    { access_token: token }
+  );
   const overlayJob = layer.data?.status === 'completed' ? layer.data.job : null;
-  const overlayUrl = overlayJob
-    ? getApiUrlWithSearchParams(
-        `gopro-overlays/jobs/${overlayJob.job_id}/download`,
-        {
-          access_token: token,
-          version: overlayJob.updated_at,
+  const overlaySource =
+    overlayJob ??
+    (preview.data?.overlay?.status === 'ready' && preview.data.overlay.job_id
+      ? {
+          job_id: preview.data.overlay.job_id,
+          updated_at: preview.data.overlay.job_id,
         }
+      : null);
+  const overlayUrl = overlaySource
+    ? getApiUrlWithSearchParams(
+        `gopro-overlays/jobs/${overlaySource.job_id}/download`,
+        { access_token: token, version: overlaySource.updated_at }
       )
     : undefined;
 
@@ -175,11 +233,12 @@ export function GoproOverlaySyncPreview({
 
   const seekToPreviewSegment = (segmentIndex: number) => {
     const segment = previewSegments[segmentIndex];
-    const camera = cameraRef.current;
-    if (!segment || !camera) return;
-    camera.currentTime = segment.preview_start_seconds;
+    if (!segment) return;
+    setSeekRequest((current) => ({
+      id: (current?.id ?? 0) + 1,
+      time: segment.preview_start_seconds,
+    }));
     setVideoTime(segment.preview_start_seconds);
-    syncOverlay();
   };
 
   const alignGpxStartAtCurrentVideoTime = () => {
@@ -189,25 +248,6 @@ export function GoproOverlaySyncPreview({
         automaticOffset
       ).toFixed(1)
     );
-  };
-
-  const syncOverlay = () => {
-    const camera = cameraRef.current;
-    const overlay = overlayRef.current;
-    if (!camera || !overlay) return;
-    const target = sourceTimeAtPreviewTime(camera.currentTime, previewSegments);
-    if (Math.abs(overlay.currentTime - target) > 0.08) {
-      overlay.currentTime = target;
-    }
-  };
-
-  const handleCameraPlay = () => {
-    syncOverlay();
-    void overlayRef.current?.play();
-  };
-
-  const handleCameraPause = () => {
-    overlayRef.current?.pause();
   };
 
   if (preview.isPending) {
@@ -231,40 +271,35 @@ export function GoproOverlaySyncPreview({
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(17rem,1fr)]">
-      <div className="overflow-hidden rounded-xl bg-black shadow-sm">
-        <div className="relative aspect-video bg-black">
-          <video
-            ref={cameraRef}
-            src={videoUrl}
-            controls
-            playsInline
-            preload="metadata"
-            className="absolute inset-0 h-full w-full object-contain"
-            aria-label={t('flights.goproOverlayCameraPreview')}
-            onPlay={handleCameraPlay}
-            onPause={handleCameraPause}
-            onSeeked={syncOverlay}
-            onTimeUpdate={() => {
-              syncOverlay();
-              setVideoTime(cameraRef.current?.currentTime ?? 0);
-            }}
-          >
-            <track kind="captions" />
-          </video>
-          {overlayUrl && (
-            <video
-              ref={overlayRef}
-              src={overlayUrl}
-              muted
-              playsInline
-              preload="metadata"
-              className="pointer-events-none absolute inset-0 z-10 h-full w-full object-contain"
-              aria-label={t('flights.overlayLayerReady')}
-            >
-              <track kind="captions" />
-            </video>
-          )}
-        </div>
+      <div>
+        <FlightOverlayPlayer
+          cameraUrl={videoUrl}
+          flightUrl={flightVideoUrl}
+          cameraLabel={t('flights.goproOverlayCameraPreview')}
+          flightLabel={t('flights.goproOverlayFlightVideo')}
+          overlayUrl={overlayUrl}
+          overlayStatus={preview.data?.overlay?.status}
+          overlayError={preview.data?.overlay?.error}
+          syncOffsetSeconds={automaticOffset + manualOffset}
+          getFlightTime={(previewTime) =>
+            sourceTimeAtPreviewTime(previewTime, previewSegments) -
+            automaticOffset -
+            manualOffset
+          }
+          getCameraTime={(flightTime) =>
+            previewTimeAtSourceTime(
+              flightTime + automaticOffset + manualOffset,
+              previewSegments
+            )
+          }
+          getOverlayTime={(previewTime) =>
+            sourceTimeAtPreviewTime(previewTime, previewSegments) -
+            automaticOffset -
+            manualOffset
+          }
+          onTimeChange={setVideoTime}
+          seekRequest={seekRequest}
+        />
         <div className="flex items-center justify-between px-3 py-2 font-mono text-xs text-gray-200">
           <span>{t('flights.goproOverlayVideoTime')}</span>
           <span>{formatSeconds(sourceVideoTime)}</span>
