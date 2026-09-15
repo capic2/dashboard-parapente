@@ -253,6 +253,11 @@ class DeploymentDrainJob(BaseModel):
     started_at: datetime | None = None
 
 
+class DeploymentDrainAdmission(BaseModel):
+    operation: str
+    started_at: datetime
+
+
 class DeploymentDrainStatus(BaseModel):
     phase: Literal["idle", "waiting", "deploying"]
     accepting_jobs: bool
@@ -260,6 +265,7 @@ class DeploymentDrainStatus(BaseModel):
     active_jobs: int
     admissions_in_progress: int
     blocking_jobs: list[DeploymentDrainJob] = Field(default_factory=list)
+    active_admissions: list[DeploymentDrainAdmission] = Field(default_factory=list)
     deployment_id: str | None = None
     target_version: str | None = None
     run_url: str | None = None

@@ -92,7 +92,7 @@ async def run_scheduled_emagram_analysis():
 
             try:
                 with get_db_context() as db_session:
-                    with job_admission():
+                    with job_admission("emagram_scheduler"):
                         result = await generate_multi_source_emagram_for_spot(
                             site_id=site.id,
                             db=db_session,

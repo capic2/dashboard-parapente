@@ -1700,7 +1700,7 @@ def _enqueue_video_export_job(
     if not _dependencies_ok:
         raise RuntimeError("Missing dependencies for video export")
 
-    with job_admission():
+    with job_admission("video_export_create"):
         job_id = str(uuid.uuid4())
         now = datetime.utcnow()
 
@@ -2467,7 +2467,7 @@ def resume_video_export(job_id: str, auth_token: str | None = None) -> bool:
     if not resume_info["can_resume"]:
         return False
 
-    with job_admission():
+    with job_admission("video_export_resume"):
         resumed_job = _update_job(
             job_id,
             status=_STATUS_QUEUED,

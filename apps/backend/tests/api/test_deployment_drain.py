@@ -1,3 +1,4 @@
+import time
 from datetime import date
 from unittest.mock import patch
 
@@ -51,6 +52,7 @@ def test_begin_status_mark_and_release_enforce_ownership(client):
         "active_jobs": 0,
         "admissions_in_progress": 0,
         "blocking_jobs": [],
+        "active_admissions": [],
         "deployment_id": "deploy-123",
         "target_version": "sha-abc",
         "run_url": "https://github.example/runs/123",
@@ -138,11 +140,29 @@ def test_status_counts_youtube_uploading_jobs(client, db_session):
 
 
 def test_status_reports_admission_in_progress(client):
-    with job_admission():
+    with job_admission("test_operation"):
         response = client.put("/api/deployment-drain", json=BEGIN_PAYLOAD, headers=AUTH)
         assert response.status_code == 200
         assert response.json()["admissions_in_progress"] == 1
-        assert response.json()["ready_for_deployment"] is False
+    assert response.json()["active_admissions"][0]["operation"] == "test_operation"
+    assert response.json()["ready_for_deployment"] is False
+
+
+def test_admission_metadata_is_released_after_context_exits() -> None:
+    with job_admission("test_operation"):
+        assert deployment_drain.admissions_details()[0]["operation"] == "test_operation"
+
+    assert deployment_drain.admissions_details() == []
+
+
+def test_expired_admission_metadata_is_removed_when_reading_details() -> None:
+    deployment_drain._memory_admissions["expired-token"] = {
+        "operation": "expired_operation",
+        "started_at": "2026-09-15T08:00:00+00:00",
+        "expires_at": time.time() - 1,
+    }
+
+    assert deployment_drain.admissions_details() == []
 
 
 def test_start_rejection_maps_to_retryable_503(client, db_session):

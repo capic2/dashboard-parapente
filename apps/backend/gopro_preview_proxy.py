@@ -527,7 +527,7 @@ def process_preview_job(
         if available >= requested and _preview_path(camera_path).is_file():
             return
         try:
-            with job_admission():
+            with job_admission("gopro_preview"):
                 source_duration = _probe_duration(camera_path)
                 effective_duration = min(requested, max(1, math.ceil(source_duration or requested)))
                 effective_target = min(
