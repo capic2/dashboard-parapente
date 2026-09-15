@@ -1,3 +1,4 @@
+import time
 from datetime import date
 from unittest.mock import patch
 
@@ -50,6 +51,8 @@ def test_begin_status_mark_and_release_enforce_ownership(client):
         "ready_for_deployment": True,
         "active_jobs": 0,
         "admissions_in_progress": 0,
+        "blocking_jobs": [],
+        "active_admissions": [],
         "deployment_id": "deploy-123",
         "target_version": "sha-abc",
         "run_url": "https://github.example/runs/123",
@@ -86,6 +89,7 @@ def test_begin_status_mark_and_release_enforce_ownership(client):
     assert idle.json()["phase"] == "idle"
     assert idle.json()["accepting_jobs"] is True
     assert idle.json()["ready_for_deployment"] is False
+    assert idle.json()["blocking_jobs"] == []
 
 
 def test_status_counts_manual_stream_and_gopro_preparing_jobs(client):
@@ -103,6 +107,9 @@ def test_status_counts_manual_stream_and_gopro_preparing_jobs(client):
     assert response.status_code == 200
     assert response.json()["active_jobs"] == 3
     assert response.json()["ready_for_deployment"] is False
+    blocking_jobs = response.json()["blocking_jobs"]
+    assert {job["job_id"] for job in blocking_jobs} == {"manual", "stream", "gopro"}
+    assert {job["mode"] for job in blocking_jobs} == {"manual", "stream", "gopro_overlay"}
 
 
 def test_status_counts_youtube_uploading_jobs(client, db_session):
@@ -128,14 +135,34 @@ def test_status_counts_youtube_uploading_jobs(client, db_session):
     assert response.status_code == 200
     assert response.json()["active_jobs"] == 1
     assert response.json()["ready_for_deployment"] is False
+    assert response.json()["blocking_jobs"][0]["job_id"] == "youtube-drain-job"
+    assert response.json()["blocking_jobs"][0]["mode"] == "youtube_upload"
 
 
 def test_status_reports_admission_in_progress(client):
-    with job_admission():
+    with job_admission("test_operation"):
         response = client.put("/api/deployment-drain", json=BEGIN_PAYLOAD, headers=AUTH)
         assert response.status_code == 200
         assert response.json()["admissions_in_progress"] == 1
-        assert response.json()["ready_for_deployment"] is False
+    assert response.json()["active_admissions"][0]["operation"] == "test_operation"
+    assert response.json()["ready_for_deployment"] is False
+
+
+def test_admission_metadata_is_released_after_context_exits() -> None:
+    with job_admission("test_operation"):
+        assert deployment_drain.admissions_details()[0]["operation"] == "test_operation"
+
+    assert deployment_drain.admissions_details() == []
+
+
+def test_expired_admission_metadata_is_removed_when_reading_details() -> None:
+    deployment_drain._memory_admissions["expired-token"] = {
+        "operation": "expired_operation",
+        "started_at": "2026-09-15T08:00:00+00:00",
+        "expires_at": time.time() - 1,
+    }
+
+    assert deployment_drain.admissions_details() == []
 
 
 def test_start_rejection_maps_to_retryable_503(client, db_session):

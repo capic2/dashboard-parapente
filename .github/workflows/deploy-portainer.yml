@@ -299,17 +299,19 @@ jobs:
             exit 1
           fi
 
-          if ! parsed=$(python -c 'import json, sys; data=json.load(sys.stdin); phase=data["phase"]; ready=data["ready_for_deployment"]; active=data["active_jobs"]; admissions=data["admissions_in_progress"]; assert phase in ("waiting", "deploying") and type(ready) is bool and type(active) is int and active >= 0 and type(admissions) is int and admissions >= 0; print(f"{phase}\t{str(ready).lower()}\t{active}\t{admissions}")' <<< "$response" 2>/dev/null); then
+          if ! parsed=$(python -c 'import json, sys; data=json.load(sys.stdin); phase=data["phase"]; ready=data["ready_for_deployment"]; active=data["active_jobs"]; admissions=data["admissions_in_progress"]; jobs=json.dumps(data.get("blocking_jobs", []), separators=(",", ":")); active_admissions=json.dumps(data.get("active_admissions", []), separators=(",", ":")); assert phase in ("waiting", "deploying") and type(ready) is bool and type(active) is int and active >= 0 and type(admissions) is int and admissions >= 0; print(f"{phase}\t{str(ready).lower()}\t{active}\t{admissions}\t{jobs}\t{active_admissions}")' <<< "$response" 2>/dev/null); then
             echo "Deployment drain begin returned malformed JSON"
             exit 1
           fi
 
-          IFS=$'\t' read -r phase ready active_jobs admissions_in_progress <<< "$parsed"
+          IFS=$'\t' read -r phase ready active_jobs admissions_in_progress blocking_jobs active_admissions <<< "$parsed"
           echo "phase=$phase" >> "$GITHUB_OUTPUT"
           echo "ready_for_deployment=$ready" >> "$GITHUB_OUTPUT"
           echo "active_jobs=$active_jobs" >> "$GITHUB_OUTPUT"
           echo "admissions_in_progress=$admissions_in_progress" >> "$GITHUB_OUTPUT"
           echo "Deployment drain acquired: phase=$phase active_jobs=$active_jobs admissions_in_progress=$admissions_in_progress"
+          python -c 'import json, sys; jobs=json.load(sys.stdin); print("Blocking jobs: " + ("; ".join("{}/{} status={} progress={}% flight={} started={}".format(j.get("mode", "unknown"), j.get("job_id", "unknown"), j.get("status"), j.get("progress", "n/a"), j.get("flight_name") or "n/a", j.get("started_at") or "n/a") for j in jobs) or "none"))' <<< "$blocking_jobs"
+          python -c 'import json, sys; admissions=json.load(sys.stdin); print("Active admissions: " + ("; ".join("{} started={}".format(a.get("operation", "unknown"), a.get("started_at", "n/a")) for a in admissions) or "none"))' <<< "$active_admissions"
 
       - name: Wait for production jobs to drain
         id: wait_drain
@@ -383,7 +385,7 @@ jobs:
               continue
             fi
 
-            if ! parsed=$(python -c 'import json, sys; data=json.load(sys.stdin); phase=data["phase"]; ready=data["ready_for_deployment"]; active=data["active_jobs"]; admissions=data["admissions_in_progress"]; assert phase in ("waiting", "deploying") and type(ready) is bool and type(active) is int and active >= 0 and type(admissions) is int and admissions >= 0; print(f"{phase}\t{str(ready).lower()}\t{active}\t{admissions}")' <<< "$response" 2>/dev/null); then
+            if ! parsed=$(python -c 'import json, sys; data=json.load(sys.stdin); phase=data["phase"]; ready=data["ready_for_deployment"]; active=data["active_jobs"]; admissions=data["admissions_in_progress"]; jobs=json.dumps(data.get("blocking_jobs", []), separators=(",", ":")); active_admissions=json.dumps(data.get("active_admissions", []), separators=(",", ":")); assert phase in ("waiting", "deploying") and type(ready) is bool and type(active) is int and active >= 0 and type(admissions) is int and admissions >= 0; print(f"{phase}\t{str(ready).lower()}\t{active}\t{admissions}\t{jobs}\t{active_admissions}")' <<< "$response" 2>/dev/null); then
               waited_seconds=$(( $(date +%s) - started_at ))
               echo "waited_seconds=$waited_seconds" >> "$GITHUB_OUTPUT"
               echo "::warning::$(date -u +'%Y-%m-%dT%H:%M:%SZ') attempt $attempt/$MAX_ATTEMPTS: drain status returned malformed JSON active_jobs=$last_active_jobs admissions_in_progress=$last_admissions_in_progress waited_seconds=$waited_seconds; treating it as not ready and retrying when attempts remain"
@@ -392,7 +394,7 @@ jobs:
               continue
             fi
 
-            IFS=$'\t' read -r phase ready active_jobs admissions_in_progress <<< "$parsed"
+            IFS=$'\t' read -r phase ready active_jobs admissions_in_progress blocking_jobs active_admissions <<< "$parsed"
             last_active_jobs=$active_jobs
             last_admissions_in_progress=$admissions_in_progress
             waited_seconds=$(( $(date +%s) - started_at ))
@@ -400,6 +402,8 @@ jobs:
             echo "last_admissions_in_progress=$admissions_in_progress" >> "$GITHUB_OUTPUT"
             echo "waited_seconds=$waited_seconds" >> "$GITHUB_OUTPUT"
             echo "$(date -u +'%Y-%m-%dT%H:%M:%SZ') attempt $attempt/$MAX_ATTEMPTS: phase=$phase active_jobs=$active_jobs admissions_in_progress=$admissions_in_progress waited_seconds=$waited_seconds"
+            python -c 'import json, sys; jobs=json.load(sys.stdin); print("Blocking jobs: " + ("; ".join("{}/{} status={} progress={}% flight={} started={}".format(j.get("mode", "unknown"), j.get("job_id", "unknown"), j.get("status"), j.get("progress", "n/a"), j.get("flight_name") or "n/a", j.get("started_at") or "n/a") for j in jobs) or "none"))' <<< "$blocking_jobs"
+            python -c 'import json, sys; admissions=json.load(sys.stdin); print("Active admissions: " + ("; ".join("{} started={}".format(a.get("operation", "unknown"), a.get("started_at", "n/a")) for a in admissions) or "none"))' <<< "$active_admissions"
 
             if [ "$ready" = "true" ]; then
               echo "Production is ready for deployment"

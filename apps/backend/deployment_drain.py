@@ -19,19 +19,27 @@ from job_queue import get_redis_connection
 
 _STATE_KEY = "{deployment-drain}:state"
 _ADMISSIONS_KEY = "{deployment-drain}:admissions"
+_ADMISSION_METADATA_KEY = "{deployment-drain}:admission-metadata"
 logger = logging.getLogger(__name__)
 
 _ADMIT_SCRIPT = """
+local expired = redis.call('zrangebyscore', KEYS[2], '-inf', ARGV[2])
+if #expired > 0 then
+  redis.call('hdel', KEYS[3], unpack(expired))
+end
 redis.call('zremrangebyscore', KEYS[2], '-inf', ARGV[2])
 if redis.call('exists', KEYS[1]) == 1 then
   return -1
 end
 redis.call('zadd', KEYS[2], ARGV[3], ARGV[1])
+redis.call('hset', KEYS[3], ARGV[1], ARGV[4])
 return redis.call('zcard', KEYS[2])
 """
 
 _RELEASE_ADMISSION_SCRIPT = """
-return redis.call('zrem', KEYS[1], ARGV[1])
+local removed = redis.call('zrem', KEYS[1], ARGV[1])
+redis.call('hdel', KEYS[2], ARGV[1])
+return removed
 """
 
 _RENEW_ADMISSION_SCRIPT = """
@@ -42,9 +50,21 @@ end
 return 0
 """
 
-_COUNT_ADMISSIONS_SCRIPT = """
+_LIST_ADMISSIONS_SCRIPT = """
+local expired = redis.call('zrangebyscore', KEYS[1], '-inf', ARGV[1])
+if #expired > 0 then
+  redis.call('hdel', KEYS[2], unpack(expired))
+end
 redis.call('zremrangebyscore', KEYS[1], '-inf', ARGV[1])
-return redis.call('zcard', KEYS[1])
+local active = redis.call('zrangebyscore', KEYS[1], ARGV[1], '+inf')
+local details = {}
+for _, token in ipairs(active) do
+  local metadata = redis.call('hget', KEYS[2], token)
+  if metadata then
+    table.insert(details, metadata)
+  end
+end
+return details
 """
 
 _BEGIN_SCRIPT = """
@@ -134,7 +154,7 @@ class DeploymentDrainService:
         self._lock = threading.Lock()
         self._admission_depth: ContextVar[int] = ContextVar("deployment_admission_depth", default=0)
         self._memory_state: dict[str, Any] | None = None
-        self._memory_admissions = 0
+        self._memory_admissions: dict[str, dict[str, Any]] = {}
 
     @property
     def _use_memory(self) -> bool:
@@ -159,17 +179,36 @@ class DeploymentDrainService:
         return json.loads(raw)
 
     def admissions_in_progress(self) -> int:
+        return len(self.admissions_details())
+
+    def admissions_details(self) -> list[dict[str, Any]]:
         if self._use_memory:
             with self._lock:
-                return self._memory_admissions
-        return int(
-            get_redis_connection().eval(
-                _COUNT_ADMISSIONS_SCRIPT,
-                1,
-                _ADMISSIONS_KEY,
-                time.time(),
-            )
+                now = time.time()
+                expired = [
+                    token
+                    for token, details in self._memory_admissions.items()
+                    if details["expires_at"] <= now
+                ]
+                for token in expired:
+                    self._memory_admissions.pop(token, None)
+                return list(self._memory_admissions.values())
+
+        raw_details = get_redis_connection().eval(
+            _LIST_ADMISSIONS_SCRIPT,
+            2,
+            _ADMISSIONS_KEY,
+            _ADMISSION_METADATA_KEY,
+            time.time(),
         )
+        details: list[dict[str, Any]] = []
+        for raw in raw_details:
+            if raw is None:
+                continue
+            if isinstance(raw, bytes):
+                raw = raw.decode("utf-8")
+            details.append(json.loads(raw))
+        return details
 
     def begin(self, deployment_id: str, target_version: str, run_url: str) -> dict[str, Any]:
         now = datetime.now(timezone.utc)
@@ -278,7 +317,7 @@ class DeploymentDrainService:
             raise DeploymentDrainConflict("Deployment drain is owned by another deployment")
 
     @contextmanager
-    def admission(self) -> Iterator[None]:
+    def admission(self, operation: str = "unknown") -> Iterator[None]:
         depth = self._admission_depth.get()
         if depth:
             token = self._admission_depth.set(depth + 1)
@@ -289,32 +328,49 @@ class DeploymentDrainService:
             return
 
         if self._use_memory:
+            admission_token = str(uuid.uuid4())
+            started_at = datetime.now(timezone.utc).isoformat()
+            expires_at = time.time() + config.DEPLOY_DRAIN_LEASE_SECONDS
             with self._lock:
                 self._clear_expired_memory_state()
                 if self._memory_state is not None:
                     raise DeploymentDrainActive(_active_drain_message())
-                self._memory_admissions += 1
+                self._memory_admissions[admission_token] = {
+                    "operation": operation,
+                    "started_at": started_at,
+                    "expires_at": expires_at,
+                }
             token = self._admission_depth.set(1)
             try:
                 yield
             finally:
                 self._admission_depth.reset(token)
                 with self._lock:
-                    self._memory_admissions = max(0, self._memory_admissions - 1)
+                    self._memory_admissions.pop(admission_token, None)
             return
 
         redis = get_redis_connection()
         admission_token = str(uuid.uuid4())
+        started_at = datetime.now(timezone.utc).isoformat()
         admission_expires_at = time.time() + config.DEPLOY_DRAIN_LEASE_SECONDS
+        admission_metadata = json.dumps(
+            {
+                "operation": operation,
+                "started_at": started_at,
+                "expires_at": admission_expires_at,
+            }
+        )
         admitted = int(
             redis.eval(
                 _ADMIT_SCRIPT,
-                2,
+                3,
                 _STATE_KEY,
                 _ADMISSIONS_KEY,
+                _ADMISSION_METADATA_KEY,
                 admission_token,
                 time.time(),
                 admission_expires_at,
+                admission_metadata,
             )
         )
         if admitted == -1:
@@ -350,8 +406,9 @@ class DeploymentDrainService:
             renewal_thread.join(timeout=1)
             redis.eval(
                 _RELEASE_ADMISSION_SCRIPT,
-                1,
+                2,
                 _ADMISSIONS_KEY,
+                _ADMISSION_METADATA_KEY,
                 admission_token,
             )
 
@@ -359,12 +416,12 @@ class DeploymentDrainService:
         """Reset process-local state between tests."""
         with self._lock:
             self._memory_state = None
-            self._memory_admissions = 0
+            self._memory_admissions.clear()
 
 
 deployment_drain = DeploymentDrainService()
 
 
-def job_admission() -> Iterator[None]:
+def job_admission(operation: str = "unknown") -> Iterator[None]:
     """Return the shared synchronous admission context manager."""
-    return deployment_drain.admission()
+    return deployment_drain.admission(operation)

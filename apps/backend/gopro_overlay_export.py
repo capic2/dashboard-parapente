@@ -2255,7 +2255,7 @@ async def create_gopro_overlay_job(
             _validate_file_extension(fallback_pip_path, _VIDEO_EXTENSIONS)
             pip_path = fallback_pip_path
 
-        with job_admission():
+        with job_admission("gopro_overlay_create"):
             return await asyncio.to_thread(
                 _create_gopro_overlay_job_from_paths,
                 job_id=job_id,
@@ -2298,7 +2298,7 @@ def create_gopro_overlay_job_from_paths(
     work_dir = _path_job_work_dir(video_path, job_id)
     work_dir.mkdir(parents=True, exist_ok=True)
     try:
-        with job_admission():
+        with job_admission("gopro_overlay_create"):
             return _create_gopro_overlay_job_from_paths(
                 job_id=job_id,
                 video_path=video_path,

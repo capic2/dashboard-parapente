@@ -121,7 +121,9 @@ from schemas import EmagramAnalysis as EmagramAnalysisSchema
 from schemas import (
     EmagramAnalysisListItem,
     EmagramTriggerRequest,
+    DeploymentDrainAdmission,
     DeploymentDrainRequest,
+    DeploymentDrainJob,
     DeploymentDrainStatus,
     ExternalImportResult,
     FlightCreate,
@@ -906,22 +908,45 @@ def _get_video_export_jobs_payload(
     return payload
 
 
-def _active_deployment_job_count(db: Session) -> int:
+def _active_deployment_jobs(db: Session) -> list[dict[str, Any]]:
     jobs = _get_video_export_jobs_payload(db)["jobs"]
-    return sum(
-        1
+    return [
+        job
         for job in jobs
         if job.get("status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
         or job.get("internal_status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
-    )
+    ]
 
 
 def _deployment_drain_status(db: Session) -> DeploymentDrainStatus:
     state = deployment_drain.get_state()
     # Admissions are registered before jobs become visible in storage. Reading
     # this counter first prevents a handoff from looking idle between the two.
-    admissions = deployment_drain.admissions_in_progress()
-    active_jobs = _active_deployment_job_count(db)
+    admission_details = [
+        DeploymentDrainAdmission.model_validate(details)
+        for details in deployment_drain.admissions_details()
+    ]
+    admissions = len(admission_details)
+    blocking_jobs = [
+        DeploymentDrainJob.model_validate(
+            {
+                key: job.get(key)
+                for key in (
+                    "job_id",
+                    "mode",
+                    "status",
+                    "internal_status",
+                    "flight_name",
+                    "progress",
+                    "message",
+                    "created_at",
+                    "started_at",
+                )
+            }
+        )
+        for job in _active_deployment_jobs(db)
+    ]
+    active_jobs = len(blocking_jobs)
     if state is None:
         return DeploymentDrainStatus(
             phase="idle",
@@ -929,6 +954,8 @@ def _deployment_drain_status(db: Session) -> DeploymentDrainStatus:
             ready_for_deployment=False,
             active_jobs=active_jobs,
             admissions_in_progress=admissions,
+            blocking_jobs=blocking_jobs,
+            active_admissions=admission_details,
         )
     return DeploymentDrainStatus(
         **state,
@@ -936,6 +963,8 @@ def _deployment_drain_status(db: Session) -> DeploymentDrainStatus:
         ready_for_deployment=active_jobs == 0 and admissions == 0,
         active_jobs=active_jobs,
         admissions_in_progress=admissions,
+        blocking_jobs=blocking_jobs,
+        active_admissions=admission_details,
     )
 
 
@@ -5402,7 +5431,7 @@ async def upload_gpx_to_flight(
             from video_export_manual import trigger_auto_export
 
             frontend_url = resolve_frontend_url()
-            with job_admission():
+            with job_admission("auto_video_export"):
                 trigger_auto_export(flight_id, db, frontend_url)
         except Exception as e:
             logger.warning(f"Failed to trigger auto video export: {e}")
@@ -5546,7 +5575,7 @@ async def create_flight_from_gpx(
             from video_export_manual import trigger_auto_export
 
             frontend_url = resolve_frontend_url()
-            with job_admission():
+            with job_admission("auto_video_export"):
                 trigger_auto_export(flight_id, db, frontend_url)
         except Exception as e:
             logger.warning(f"Failed to trigger auto video export: {e}")
@@ -7810,7 +7839,7 @@ _pending_emagram_analyses: set[str] = set()
 async def _run_emagram_analysis_with_admission(**kwargs: Any) -> dict[str, Any]:
     from emagram_multi_source import generate_multi_source_emagram_for_spot
 
-    with job_admission():
+    with job_admission("emagram_analysis"):
         return await generate_multi_source_emagram_for_spot(**kwargs)
 
 
@@ -8582,7 +8611,7 @@ async def refresh_emagram_for_spot(
         raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
 
     # Add background task
-    with job_admission():
+    with job_admission("emagram_refresh_enqueue"):
         background_tasks.add_task(
             _run_emagram_analysis_with_admission,
             site_id=site_id,
