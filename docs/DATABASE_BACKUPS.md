@@ -9,6 +9,11 @@ accompagnées d'un fichier SHA-256, et seules les 3 plus récentes sont conserv�
 produite avec l'API de sauvegarde en ligne de SQLite : elle reste cohérente
 même si la base utilise un fichier WAL.
 
+Les snapshots SQLite temporaires sont supprimés après chaque sauvegarde. Les
+fichiers temporaires plus anciens que 24 heures sont également supprimés au
+démarrage d'une tentative, afin de récupérer les restes d'une sauvegarde
+interrompue sans toucher à une sauvegarde potentiellement en cours.
+
 ## Google Drive
 
 Pour stocker les sauvegardes hors du NAS, configurer un remote `rclone` Google
