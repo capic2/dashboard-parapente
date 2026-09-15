@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Columns2, PictureInPicture2, Repeat2 } from 'lucide-react';
+import {
+  Columns2,
+  Pause,
+  PictureInPicture2,
+  Play,
+  Repeat2,
+} from 'lucide-react';
 
 export type FlightOverlayLayout =
   | 'camera-main'
@@ -8,6 +14,7 @@ export type FlightOverlayLayout =
   | 'side-by-side';
 
 interface FlightOverlayPlayerProps {
+  mode: 'calibration' | 'interactive';
   cameraUrl: string;
   flightUrl: string;
   overlayUrl?: string;
@@ -32,6 +39,7 @@ function clamp(value: number, maximum: number) {
 }
 
 export function FlightOverlayPlayer({
+  mode,
   cameraUrl,
   flightUrl,
   overlayUrl,
@@ -52,6 +60,9 @@ export function FlightOverlayPlayer({
   const flightRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLVideoElement>(null);
   const [layout, setLayout] = useState<FlightOverlayLayout>('camera-main');
+  const [cameraCurrentTime, setCameraCurrentTime] = useState(0);
+  const [cameraDuration, setCameraDuration] = useState(0);
+  const [cameraIsPlaying, setCameraIsPlaying] = useState(false);
 
   useEffect(() => {
     if (!seekRequest || !cameraRef.current) {
@@ -79,18 +90,47 @@ export function FlightOverlayPlayer({
   };
 
   const handlePlay = () => {
+    setCameraIsPlaying(true);
     syncMedia();
     void flightRef.current?.play();
     void overlayRef.current?.play();
   };
 
   const handlePause = () => {
+    setCameraIsPlaying(false);
     flightRef.current?.pause();
     overlayRef.current?.pause();
   };
 
+  const handleOverlayReady = () => {
+    syncMedia();
+    // The browser preview may finish converting after the camera started.
+    // Retry playback at that point so the transparent layer cannot remain
+    // silently paused after its source becomes playable.
+    if (cameraRef.current && !cameraRef.current.paused) {
+      void overlayRef.current?.play();
+    }
+  };
+
+  const handleTimelineChange = (time: number) => {
+    if (!cameraRef.current) return;
+    cameraRef.current.currentTime = time;
+    setCameraCurrentTime(time);
+    syncMedia();
+  };
+
+  const handleTogglePlay = () => {
+    if (!cameraRef.current) return;
+    if (cameraRef.current.paused) {
+      void cameraRef.current.play();
+    } else {
+      cameraRef.current.pause();
+    }
+  };
+
   const cameraIsMain = layout === 'camera-main';
   const flightIsMain = layout === 'flight-main';
+  const isInteractive = mode === 'interactive';
 
   return (
     <div className="overflow-hidden rounded-xl bg-black shadow-sm">
@@ -100,12 +140,18 @@ export function FlightOverlayPlayer({
         <video
           ref={cameraRef}
           src={cameraUrl}
-          controls
+          controls={!isInteractive}
           playsInline
           preload="metadata"
           onPlay={handlePlay}
           onPause={handlePause}
-          onTimeUpdate={syncMedia}
+          onLoadedMetadata={() => {
+            setCameraDuration(cameraRef.current?.duration ?? 0);
+          }}
+          onTimeUpdate={() => {
+            syncMedia();
+            setCameraCurrentTime(cameraRef.current?.currentTime ?? 0);
+          }}
           onSeeked={syncMedia}
           className={
             cameraIsMain || layout === 'side-by-side'
@@ -126,30 +172,34 @@ export function FlightOverlayPlayer({
             </span>
           </div>
         )}
-        <video
-          ref={flightRef}
-          src={flightUrl}
-          playsInline
-          preload="metadata"
-          muted
-          onClick={() => {
-            if (layout === 'camera-main') setLayout('flight-main');
-          }}
-          className={
-            flightIsMain || layout === 'side-by-side'
-              ? 'aspect-video w-full object-contain'
-              : 'absolute bottom-3 right-3 z-10 aspect-video w-1/3 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
-          }
-          aria-label={flightLabel}
-        >
-          <track kind="captions" />
-        </video>
+        {isInteractive && (
+          <video
+            ref={flightRef}
+            src={flightUrl}
+            playsInline
+            preload="metadata"
+            muted
+            onClick={() => {
+              if (layout === 'camera-main') setLayout('flight-main');
+            }}
+            className={
+              flightIsMain || layout === 'side-by-side'
+                ? 'aspect-video w-full object-contain'
+                : 'absolute bottom-3 right-3 z-10 aspect-video w-1/3 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
+            }
+            aria-label={flightLabel}
+          >
+            <track kind="captions" />
+          </video>
+        )}
         {overlayUrl && (
           <video
             ref={overlayRef}
             src={overlayUrl}
             playsInline
-            preload="metadata"
+            preload="auto"
+            onLoadedMetadata={handleOverlayReady}
+            onCanPlay={handleOverlayReady}
             muted
             className="pointer-events-none absolute inset-0 z-[15] h-full w-full object-contain"
             aria-label={t('flights.overlayLayerReady')}
@@ -157,7 +207,7 @@ export function FlightOverlayPlayer({
             <track kind="captions" />
           </video>
         )}
-        {layout !== 'side-by-side' && (
+        {isInteractive && layout !== 'side-by-side' && (
           <button
             type="button"
             onClick={() =>
@@ -195,35 +245,80 @@ export function FlightOverlayPlayer({
           </div>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-2 border-t border-gray-800 bg-gray-950 px-3 py-2">
-        <span className="mr-auto text-xs font-medium text-gray-300">
-          {t('flights.goproOverlayLayoutLabel')}
-        </span>
-        <button
-          type="button"
-          onClick={() => setLayout('camera-main')}
-          className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800"
-        >
-          <PictureInPicture2 className="h-3.5 w-3.5" aria-hidden="true" />
-          {cameraLabel}
-        </button>
-        <button
-          type="button"
-          onClick={() => setLayout('flight-main')}
-          className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800"
-        >
-          <PictureInPicture2 className="h-3.5 w-3.5" aria-hidden="true" />
-          {flightLabel}
-        </button>
-        <button
-          type="button"
-          onClick={() => setLayout('side-by-side')}
-          className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800"
-        >
-          <Columns2 className="h-3.5 w-3.5" aria-hidden="true" />
-          {t('flights.goproOverlaySideBySide')}
-        </button>
-      </div>
+      {isInteractive && (
+        <div className="flex items-center gap-3 border-t border-gray-800 bg-gray-950 px-3 py-2">
+          <button
+            type="button"
+            onClick={handleTogglePlay}
+            className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-gray-200 hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+            aria-label={
+              cameraIsPlaying
+                ? t('flights.goproOverlayPause')
+                : t('flights.goproOverlayPlay')
+            }
+          >
+            {cameraIsPlaying ? (
+              <Pause className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <Play className="h-4 w-4" aria-hidden="true" />
+            )}
+          </button>
+          <input
+            type="range"
+            min={0}
+            max={cameraDuration || 0}
+            step={0.01}
+            value={Math.min(cameraCurrentTime, cameraDuration || 0)}
+            onChange={(event) =>
+              handleTimelineChange(Number(event.target.value))
+            }
+            disabled={!cameraDuration}
+            className="min-w-0 flex-1 cursor-pointer accent-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label={t('flights.goproOverlayTimeline')}
+          />
+          <span className="shrink-0 font-mono text-xs text-gray-300">
+            {Math.floor(cameraCurrentTime / 60)}:
+            {Math.floor(cameraCurrentTime % 60)
+              .toString()
+              .padStart(2, '0')}{' '}
+            / {Math.floor(cameraDuration / 60)}:
+            {Math.floor(cameraDuration % 60)
+              .toString()
+              .padStart(2, '0')}
+          </span>
+        </div>
+      )}
+      {isInteractive && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-gray-800 bg-gray-950 px-3 py-2">
+          <span className="mr-auto text-xs font-medium text-gray-300">
+            {t('flights.goproOverlayLayoutLabel')}
+          </span>
+          <button
+            type="button"
+            onClick={() => setLayout('camera-main')}
+            className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800"
+          >
+            <PictureInPicture2 className="h-3.5 w-3.5" aria-hidden="true" />
+            {cameraLabel}
+          </button>
+          <button
+            type="button"
+            onClick={() => setLayout('flight-main')}
+            className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800"
+          >
+            <PictureInPicture2 className="h-3.5 w-3.5" aria-hidden="true" />
+            {flightLabel}
+          </button>
+          <button
+            type="button"
+            onClick={() => setLayout('side-by-side')}
+            className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800"
+          >
+            <Columns2 className="h-3.5 w-3.5" aria-hidden="true" />
+            {t('flights.goproOverlaySideBySide')}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

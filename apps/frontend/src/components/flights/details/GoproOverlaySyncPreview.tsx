@@ -14,6 +14,8 @@ import { telemetryAtTimestamp } from './goproSyncTelemetry';
 import type { GoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 
+// This player is only for calibration and synchronization; the final dynamic
+// overlay playback belongs to FlightOverlayInteractivePreview.
 interface GoproOverlaySyncPreviewProps {
   flightId: string;
   offset: string;
@@ -269,6 +271,7 @@ export function GoproOverlaySyncPreview({
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(17rem,1fr)]">
       <div>
         <FlightOverlayPlayer
+          mode="calibration"
           cameraUrl={videoUrl}
           flightUrl={getApiUrlWithSearchParams(`flights/${flightId}/video`, {
             access_token: token,

@@ -5,6 +5,8 @@ import { getApiUrlWithSearchParams } from '../../../lib/api';
 import { useAuthStore } from '../../../stores/authStore';
 import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 
+// This is the final dynamic overlay player. Calibration and GPX alignment
+// belong to GoproOverlaySyncPreview and must not be changed here by mistake.
 interface FlightOverlayInteractivePreviewProps {
   flightId: string;
   overlayLayer?: FlightOverlayLayer;
@@ -22,7 +24,11 @@ export function FlightOverlayInteractivePreview({
   const overlayUrl = overlayJob
     ? getApiUrlWithSearchParams(
         `gopro-overlays/jobs/${overlayJob.job_id}/download`,
-        { access_token: token, version: overlayJob.updated_at }
+        {
+          access_token: token,
+          browser_preview: 'true',
+          version: overlayJob.updated_at,
+        }
       )
     : undefined;
 
@@ -48,6 +54,7 @@ export function FlightOverlayInteractivePreview({
       <div className="border-t border-slate-200 p-4 dark:border-slate-700 sm:p-5">
         {overlayUrl ? (
           <FlightOverlayPlayer
+            mode="interactive"
             cameraUrl={getApiUrlWithSearchParams(
               `flights/${flightId}/gopro-camera/preview`,
               { access_token: token }
