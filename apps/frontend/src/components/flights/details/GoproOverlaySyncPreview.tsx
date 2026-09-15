@@ -271,6 +271,7 @@ export function GoproOverlaySyncPreview({
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(17rem,1fr)]">
       <div>
         <FlightOverlayPlayer
+          mode="calibration"
           cameraUrl={videoUrl}
           flightUrl={getApiUrlWithSearchParams(`flights/${flightId}/video`, {
             access_token: token,

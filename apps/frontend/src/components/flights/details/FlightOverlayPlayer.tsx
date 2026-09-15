@@ -8,6 +8,7 @@ export type FlightOverlayLayout =
   | 'side-by-side';
 
 interface FlightOverlayPlayerProps {
+  mode: 'calibration' | 'interactive';
   cameraUrl: string;
   flightUrl: string;
   overlayUrl?: string;
@@ -32,6 +33,7 @@ function clamp(value: number, maximum: number) {
 }
 
 export function FlightOverlayPlayer({
+  mode,
   cameraUrl,
   flightUrl,
   overlayUrl,
@@ -91,6 +93,7 @@ export function FlightOverlayPlayer({
 
   const cameraIsMain = layout === 'camera-main';
   const flightIsMain = layout === 'flight-main';
+  const isInteractive = mode === 'interactive';
 
   return (
     <div className="overflow-hidden rounded-xl bg-black shadow-sm">
@@ -126,30 +129,34 @@ export function FlightOverlayPlayer({
             </span>
           </div>
         )}
-        <video
-          ref={flightRef}
-          src={flightUrl}
-          playsInline
-          preload="metadata"
-          muted
-          onClick={() => {
-            if (layout === 'camera-main') setLayout('flight-main');
-          }}
-          className={
-            flightIsMain || layout === 'side-by-side'
-              ? 'aspect-video w-full object-contain'
-              : 'absolute bottom-3 right-3 z-10 aspect-video w-1/3 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
-          }
-          aria-label={flightLabel}
-        >
-          <track kind="captions" />
-        </video>
+        {isInteractive && (
+          <video
+            ref={flightRef}
+            src={flightUrl}
+            playsInline
+            preload="metadata"
+            muted
+            onClick={() => {
+              if (layout === 'camera-main') setLayout('flight-main');
+            }}
+            className={
+              flightIsMain || layout === 'side-by-side'
+                ? 'aspect-video w-full object-contain'
+                : 'absolute bottom-3 right-3 z-10 aspect-video w-1/3 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
+            }
+            aria-label={flightLabel}
+          >
+            <track kind="captions" />
+          </video>
+        )}
         {overlayUrl && (
           <video
             ref={overlayRef}
             src={overlayUrl}
             playsInline
-            preload="metadata"
+            preload="auto"
+            onLoadedMetadata={syncMedia}
+            onCanPlay={syncMedia}
             muted
             className="pointer-events-none absolute inset-0 z-[15] h-full w-full object-contain"
             aria-label={t('flights.overlayLayerReady')}
@@ -157,7 +164,7 @@ export function FlightOverlayPlayer({
             <track kind="captions" />
           </video>
         )}
-        {layout !== 'side-by-side' && (
+        {isInteractive && layout !== 'side-by-side' && (
           <button
             type="button"
             onClick={() =>
@@ -195,35 +202,37 @@ export function FlightOverlayPlayer({
           </div>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-2 border-t border-gray-800 bg-gray-950 px-3 py-2">
-        <span className="mr-auto text-xs font-medium text-gray-300">
-          {t('flights.goproOverlayLayoutLabel')}
-        </span>
-        <button
-          type="button"
-          onClick={() => setLayout('camera-main')}
-          className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800"
-        >
-          <PictureInPicture2 className="h-3.5 w-3.5" aria-hidden="true" />
-          {cameraLabel}
-        </button>
-        <button
-          type="button"
-          onClick={() => setLayout('flight-main')}
-          className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800"
-        >
-          <PictureInPicture2 className="h-3.5 w-3.5" aria-hidden="true" />
-          {flightLabel}
-        </button>
-        <button
-          type="button"
-          onClick={() => setLayout('side-by-side')}
-          className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800"
-        >
-          <Columns2 className="h-3.5 w-3.5" aria-hidden="true" />
-          {t('flights.goproOverlaySideBySide')}
-        </button>
-      </div>
+      {isInteractive && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-gray-800 bg-gray-950 px-3 py-2">
+          <span className="mr-auto text-xs font-medium text-gray-300">
+            {t('flights.goproOverlayLayoutLabel')}
+          </span>
+          <button
+            type="button"
+            onClick={() => setLayout('camera-main')}
+            className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800"
+          >
+            <PictureInPicture2 className="h-3.5 w-3.5" aria-hidden="true" />
+            {cameraLabel}
+          </button>
+          <button
+            type="button"
+            onClick={() => setLayout('flight-main')}
+            className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800"
+          >
+            <PictureInPicture2 className="h-3.5 w-3.5" aria-hidden="true" />
+            {flightLabel}
+          </button>
+          <button
+            type="button"
+            onClick={() => setLayout('side-by-side')}
+            className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800"
+          >
+            <Columns2 className="h-3.5 w-3.5" aria-hidden="true" />
+            {t('flights.goproOverlaySideBySide')}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

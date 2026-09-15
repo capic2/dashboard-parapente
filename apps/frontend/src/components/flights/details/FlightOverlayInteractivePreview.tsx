@@ -54,6 +54,7 @@ export function FlightOverlayInteractivePreview({
       <div className="border-t border-slate-200 p-4 dark:border-slate-700 sm:p-5">
         {overlayUrl ? (
           <FlightOverlayPlayer
+            mode="interactive"
             cameraUrl={getApiUrlWithSearchParams(
               `flights/${flightId}/gopro-camera/preview`,
               { access_token: token }
