@@ -384,6 +384,56 @@ def test_stale_running_manifest_is_not_reported_as_generating(tmp_path: Path) ->
     assert state.status == "missing"
 
 
+def test_list_active_preview_jobs_reports_only_live_generations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+    active_camera = tmp_path / "20260315" / "01" / "camera.mp4"
+    stale_camera = tmp_path / "20260315" / "02" / "camera.mp4"
+    ready_camera = tmp_path / "20260315" / "03" / "camera.mp4"
+
+    for camera_path in (active_camera, stale_camera, ready_camera):
+        camera_path.parent.mkdir(parents=True, exist_ok=True)
+        camera_path.write_bytes(b"camera")
+        fingerprint = gopro_preview_proxy._source_fingerprint(camera_path)
+        manifest_path = gopro_preview_proxy._manifest_path(camera_path)
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "profile_version": gopro_preview_proxy.PROFILE_VERSION,
+                    "source": {
+                        "size": fingerprint.size,
+                        "mtime_ns": fingerprint.mtime_ns,
+                    },
+                    "status": "generating",
+                    "generation_started_at": 900,
+                    "available_duration_seconds": 0,
+                    "requested_duration_seconds": 180,
+                }
+            )
+        )
+
+    stale_manifest = gopro_preview_proxy._manifest_path(stale_camera)
+    stale_manifest.write_text(
+        stale_manifest.read_text().replace(
+            '"generation_started_at": 900', '"generation_started_at": 1'
+        )
+    )
+    ready_manifest = gopro_preview_proxy._manifest_path(ready_camera)
+    ready_manifest.write_text(
+        ready_manifest.read_text().replace('"status": "generating"', '"status": "ready"')
+    )
+
+    with patch("gopro_preview_proxy.time.time", return_value=1000):
+        jobs = gopro_preview_proxy.list_active_preview_jobs()
+
+    assert len(jobs) == 1
+    assert jobs[0]["mode"] == "gopro_preview"
+    assert jobs[0]["status"] == "processing"
+    assert jobs[0]["flight_name"] == "20260315/01/camera.mp4"
+
+
 def test_enqueue_failure_preserves_concurrent_manifest_fields(tmp_path: Path, monkeypatch) -> None:
     camera_path = tmp_path / "camera.mp4"
     camera_path.write_bytes(b"camera")

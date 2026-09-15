@@ -15,6 +15,7 @@ import uuid
 from collections.abc import Iterator
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
@@ -607,6 +608,41 @@ def process_preview_job(
                         _write_manifest(camera_path, manifest)
     if follow_up_duration:
         request_preview(camera_path, follow_up_duration, effective_target)
+
+
+def list_active_preview_jobs() -> list[dict[str, Any]]:
+    """Return GoPro preview generations so they appear in active job views."""
+    root = Path(config.GOPRO_OVERLAY_PARAGLIDING_ROOT)
+    if not root.is_dir():
+        return []
+
+    jobs: list[dict[str, Any]] = []
+    for camera_path in root.glob("[0-9]" * 8 + "/[0-9][0-9]/camera.mp4"):
+        manifest = _load_manifest(camera_path)
+        if manifest.get("status") != "generating":
+            continue
+        if not _generation_is_active(manifest):
+            continue
+        started_at = float(manifest.get("generation_started_at") or 0)
+        relative_path = camera_path.relative_to(root).as_posix()
+        started_datetime = datetime.fromtimestamp(started_at, tz=timezone.utc)
+        jobs.append(
+            {
+                "job_id": f"gopro-preview-{hashlib.sha256(relative_path.encode()).hexdigest()[:16]}",
+                "status": "processing",
+                "internal_status": "processing",
+                "progress": None,
+                "message": f"Generating GoPro preview: {relative_path}",
+                "mode": "gopro_preview",
+                "flight_title": relative_path,
+                "flight_name": relative_path,
+                "created_at": started_datetime,
+                "updated_at": started_datetime,
+                "started_at": started_datetime,
+                "has_output_file": False,
+            }
+        )
+    return jobs
 
 
 _STABILITY_OBSERVATIONS: dict[Path, tuple[SourceFingerprint, float]] = {}

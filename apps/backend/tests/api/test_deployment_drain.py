@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import config
 import pytest
+from fastapi.testclient import TestClient
 import routes
 from deployment_drain import DeploymentDrainActive, deployment_drain, job_admission
 
@@ -21,6 +22,7 @@ def empty_existing_jobs(monkeypatch):
     monkeypatch.setattr(routes, "list_exports_manual", lambda: [])
     monkeypatch.setattr(routes, "list_exports_stream", lambda: [])
     monkeypatch.setattr(routes, "list_gopro_overlay_jobs", lambda: [])
+    monkeypatch.setattr(routes.gopro_preview_proxy, "list_active_preview_jobs", lambda: [])
 
 
 def test_machine_endpoints_require_configured_valid_bearer_token(client, monkeypatch):
@@ -110,6 +112,50 @@ def test_status_counts_manual_stream_and_gopro_preparing_jobs(client):
     blocking_jobs = response.json()["blocking_jobs"]
     assert {job["job_id"] for job in blocking_jobs} == {"manual", "stream", "gopro"}
     assert {job["mode"] for job in blocking_jobs} == {"manual", "stream", "gopro_overlay"}
+
+
+def test_status_counts_active_gopro_preview_jobs(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        routes.gopro_preview_proxy,
+        "list_active_preview_jobs",
+        lambda: [
+            {
+                "job_id": "gopro-preview-123",
+                "mode": "gopro_preview",
+                "status": "processing",
+                "internal_status": "processing",
+                "flight_name": "20260915/01/camera.mp4",
+                "started_at": "2026-09-15T11:24:33+00:00",
+            }
+        ],
+    )
+
+    response = client.put("/api/deployment-drain", json=BEGIN_PAYLOAD, headers=AUTH)
+
+    assert response.status_code == 200
+    assert response.json()["active_jobs"] == 1
+    assert response.json()["blocking_jobs"][0]["mode"] == "gopro_preview"
+    assert response.json()["ready_for_deployment"] is False
+
+
+def test_status_contract_reports_job_and_admission_blockers(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        routes,
+        "list_exports_manual",
+        lambda: [{"job_id": "manual", "status": "processing"}],
+    )
+
+    with job_admission("contract_test"):
+        response = client.put("/api/deployment-drain", json=BEGIN_PAYLOAD, headers=AUTH)
+
+    payload = response.json()
+    assert payload["ready_for_deployment"] is False
+    assert payload["blocking_jobs"][0]["job_id"] == "manual"
+    assert payload["active_admissions"][0]["operation"] == "contract_test"
 
 
 def test_status_counts_youtube_uploading_jobs(client, db_session):
