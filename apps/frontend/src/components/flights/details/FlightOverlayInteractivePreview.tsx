@@ -1,24 +1,26 @@
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CircleAlert, Wand2 } from 'lucide-react';
-import { useFlightOverlayLayer } from '../../../hooks/gopro/useGoproOverlay';
+import type { FlightOverlayLayer } from '../../../hooks/gopro/useGoproOverlay';
 import { getApiUrlWithSearchParams } from '../../../lib/api';
 import { useAuthStore } from '../../../stores/authStore';
 
 interface FlightOverlayInteractivePreviewProps {
   flightId: string;
+  overlayLayer?: FlightOverlayLayer;
 }
 
 export function FlightOverlayInteractivePreview({
   flightId,
+  overlayLayer,
 }: FlightOverlayInteractivePreviewProps) {
   const { t } = useTranslation();
   const token = useAuthStore((state) => state.token);
-  const layer = useFlightOverlayLayer(flightId);
   const cameraRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLVideoElement>(null);
-  const isReady = layer.data?.status === 'completed' && Boolean(layer.data.job);
-  const overlayJob = isReady ? layer.data?.job : null;
+  const isReady =
+    overlayLayer?.status === 'completed' && Boolean(overlayLayer.job);
+  const overlayJob = isReady ? overlayLayer.job : null;
   const overlayUrl = overlayJob
     ? getApiUrlWithSearchParams(
         `gopro-overlays/jobs/${overlayJob.job_id}/download`,
