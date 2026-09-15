@@ -52,7 +52,9 @@ class TestFlightsListEndpoint:
         assert "flights" in data
         assert len(data["flights"]) == 3
 
-    def test_get_flights_returns_all_gopro_overlays(self, client, db_session, arguel_site):
+    def test_get_flights_returns_video_overlays_but_excludes_overlay_layer(
+        self, client, db_session, arguel_site
+    ):
         flight = Flight(
             id="flight-multi-overlay",
             name="Flight with multiple overlays",
@@ -60,9 +62,10 @@ class TestFlightsListEndpoint:
             site_id=arguel_site.id,
         )
         db_session.add(flight)
-        for job_id, width, height, created_at in (
-            ("overlay-1080p", 1920, 1080, datetime(2026, 3, 15, 12)),
-            ("overlay-4k", 3840, 2160, datetime(2026, 3, 15, 13)),
+        for job_id, width, height, created_at, overlay_only in (
+            ("overlay-1080p", 1920, 1080, datetime(2026, 3, 15, 12), False),
+            ("overlay-4k", 3840, 2160, datetime(2026, 3, 15, 13), False),
+            ("overlay-layer", 3840, 2160, datetime(2026, 3, 15, 14), True),
         ):
             db_session.add(
                 GoproOverlayJob(
@@ -84,6 +87,7 @@ class TestFlightsListEndpoint:
                     created_at=created_at,
                     updated_at=created_at,
                     completed_at=created_at,
+                    command_json=json.dumps({"overlay_only": overlay_only}),
                 )
             )
         db_session.commit()
