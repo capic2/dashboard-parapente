@@ -7,6 +7,7 @@ readonly backup_directory="${DATABASE_BACKUP_DIRECTORY:-/backups}"
 readonly interval_seconds="${DATABASE_BACKUP_INTERVAL_SECONDS:-86400}"
 readonly retry_seconds="${DATABASE_BACKUP_RETRY_SECONDS:-300}"
 readonly retention_count="${DATABASE_BACKUP_RETENTION_COUNT:-3}"
+readonly temporary_retention_minutes="${DATABASE_BACKUP_TEMPORARY_RETENTION_MINUTES:-1440}"
 readonly google_drive_remote="${DATABASE_BACKUP_GOOGLE_DRIVE_REMOTE:-}"
 readonly google_drive_path="${DATABASE_BACKUP_GOOGLE_DRIVE_PATH:-dashboard-parapente/database-backups}"
 readonly success_marker="/tmp/database-backup-last-success"
@@ -43,13 +44,25 @@ prune_local_backups() {
         done
 }
 
+prune_stale_temporary_files() {
+    find "$backup_directory" -maxdepth 1 -type f \( \
+        -name '.dashboard-*.sqlite3' \
+        -o -name '.dashboard-*.sqlite3-*' \
+        -o -name 'dashboard-*.sqlite3.gz.tmp' \
+    \) -mmin "+$temporary_retention_minutes" -print |
+        while IFS= read -r stale_file; do
+            rm -f "$stale_file"
+        done
+}
+
 backup_once() {
+    mkdir -p "$backup_directory"
+    prune_stale_temporary_files
+
     if [ ! -f "$source_database" ]; then
         echo "Database backup failed: source database does not exist: $source_database" >&2
         return 1
     fi
-
-    mkdir -p "$backup_directory"
 
     timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
     archive="$backup_directory/dashboard-$timestamp.sqlite3.gz"
@@ -72,6 +85,10 @@ backup_once() {
         cd "$backup_directory"
         sha256sum "$(basename "$archive")"
     ) > "$archive.sha256"
+
+    # The process stays alive between backups, so EXIT traps alone would keep
+    # every SQLite snapshot on the NAS until the container is restarted.
+    cleanup
 
     # Keep the local fallback bounded even when Google Drive is unavailable.
     prune_local_backups
