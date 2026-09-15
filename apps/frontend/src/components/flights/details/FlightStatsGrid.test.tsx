@@ -32,9 +32,27 @@ useFlightGPXMock.mockReturnValue({
   isPending: false,
   data: {
     coordinates: [
-      { lat: 47.2, lon: 6, elevation: 420, timestamp: 1_742_048_400_000 },
-      { lat: 47.3, lon: 6.1, elevation: 880, timestamp: 1_742_049_000_000 },
-      { lat: 47.4, lon: 6.2, elevation: 500, timestamp: 1_742_049_600_000 },
+      {
+        lat: 47.2,
+        lon: 6,
+        elevation: 420,
+        timestamp: 1_742_048_400_000,
+        speed_kmh: 20,
+      },
+      {
+        lat: 47.3,
+        lon: 6.1,
+        elevation: 880,
+        timestamp: 1_742_049_000_000,
+        speed_kmh: 52.3,
+      },
+      {
+        lat: 47.4,
+        lon: 6.2,
+        elevation: 500,
+        timestamp: 1_742_049_600_000,
+        speed_kmh: 10,
+      },
     ],
     max_altitude_m: 1_850,
     min_altitude_m: 380,
@@ -70,7 +88,7 @@ describe('FlightStatsGrid', () => {
 
     expect(screen.getByText('4.6 m/s')).toBeInTheDocument();
     expect(screen.getByText('3.2 m/s')).toBeInTheDocument();
-    expect(screen.getAllByText(/flights\.metricAtTime/u)).toHaveLength(3);
+    expect(screen.getAllByText(/flights\.metricAtTime/u)).toHaveLength(8);
     expect(screen.getByText('11.7 km/h')).toBeInTheDocument();
     expect(screen.getByText('8.4 km')).toBeInTheDocument();
     expect(screen.getByText('1470 m')).toBeInTheDocument();
@@ -102,7 +120,7 @@ describe('FlightStatsGrid', () => {
       />
     );
 
-    expect(screen.queryAllByText(/flights\.metricAtTime/u)).toHaveLength(1);
+    expect(screen.queryAllByText(/flights\.metricAtTime/u)).toHaveLength(5);
   });
 
   it('shows the unavailable state for an empty track', () => {

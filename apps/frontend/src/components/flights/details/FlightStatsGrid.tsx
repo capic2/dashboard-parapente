@@ -59,21 +59,58 @@ const getVerticalRateTimestamp = (
   return bestTimestamp;
 };
 
-const getMaximumTimestamp = (
-  coordinates: { elevation: number; timestamp: number }[]
+const getExtremeTimestamp = (
+  coordinates: GeoPoint[],
+  getValue: (point: GeoPoint) => number,
+  direction: 'min' | 'max'
 ) => {
-  const point = coordinates.reduce<
-    { elevation: number; timestamp: number } | undefined
-  >((maximum, current) => {
+  const point = coordinates.reduce<GeoPoint | undefined>((maximum, current) => {
     if (
       current.timestamp <= 0 ||
-      (maximum && maximum.elevation >= current.elevation)
+      (maximum &&
+        (direction === 'max'
+          ? getValue(maximum) >= getValue(current)
+          : getValue(maximum) <= getValue(current)))
     ) {
       return maximum;
     }
     return current;
   }, undefined);
   return point?.timestamp;
+};
+
+const getDistanceFromTakeoff = (takeoff: GeoPoint, point: GeoPoint) => {
+  const radiusKm = 6371;
+  const lat1 = (takeoff.lat * Math.PI) / 180;
+  const lat2 = (point.lat * Math.PI) / 180;
+  const deltaLat = ((point.lat - takeoff.lat) * Math.PI) / 180;
+  const deltaLon = ((point.lon - takeoff.lon) * Math.PI) / 180;
+  const haversine =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) ** 2;
+  return (
+    radiusKm * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
+  );
+};
+
+const getMaxDistanceTimestamp = (coordinates: GeoPoint[]) => {
+  const takeoff = coordinates[0];
+  if (!takeoff) return undefined;
+  return getExtremeTimestamp(
+    coordinates,
+    (point) => getDistanceFromTakeoff(takeoff, point),
+    'max'
+  );
+};
+
+const getMaxSpeedTimestamp = (coordinates: GeoPoint[]) => {
+  return getExtremeTimestamp(
+    coordinates.filter(
+      (point) => point.speed_kmh != null && Number.isFinite(point.speed_kmh)
+    ),
+    (point) => point.speed_kmh ?? 0,
+    'max'
+  );
 };
 
 export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
@@ -117,7 +154,13 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
     trackAnalysis?.coordinates.length &&
     flight.max_altitude_m != null &&
     Math.abs(flight.max_altitude_m - trackAnalysis.max_altitude_m) <= 1
-      ? metricTime(getMaximumTimestamp(trackAnalysis.coordinates))
+      ? metricTime(
+          getExtremeTimestamp(
+            trackAnalysis.coordinates,
+            (point) => point.elevation,
+            'max'
+          )
+        )
       : null;
   const elevationGainLabel =
     flight.elevation_gain_m == null
@@ -127,6 +170,13 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
     flight.max_speed_kmh == null
       ? 'N/A'
       : formatSpeedKmh(flight.max_speed_kmh, units.speed);
+  const maxSpeedTime =
+    trackAnalysis?.coordinates.length &&
+    flight.max_speed_kmh != null &&
+    trackAnalysis.max_speed_kmh != null &&
+    Math.abs(flight.max_speed_kmh - trackAnalysis.max_speed_kmh) <= 0.1
+      ? metricTime(getMaxSpeedTimestamp(trackAnalysis.coordinates))
+      : null;
   const trackFileName = flight.gpx_file_path?.split(/[\\/]/u).pop();
   let trackAnalysisContent = (
     <p className="col-span-full text-sm text-gray-500 dark:text-gray-400">
@@ -154,6 +204,13 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
         value: formatAltitudeMeters(
           trackAnalysis.min_altitude_m,
           units.altitude
+        ),
+        time: metricTime(
+          getExtremeTimestamp(
+            trackAnalysis.coordinates,
+            (point) => point.elevation,
+            'min'
+          )
         ),
       },
       {
@@ -205,6 +262,7 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
           trackAnalysis.max_distance_from_takeoff_km ?? 0,
           units.distance
         ),
+        time: metricTime(getMaxDistanceTimestamp(trackAnalysis.coordinates)),
       },
       {
         label: t('flights.takeoffAltitudeLabel'),
@@ -214,6 +272,7 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
             0,
           units.altitude
         ),
+        time: metricTime(trackAnalysis.coordinates[0]?.timestamp),
       },
       {
         label: t('flights.landingAltitudeLabel'),
@@ -223,6 +282,10 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
               ?.elevation ??
             0,
           units.altitude
+        ),
+        time: metricTime(
+          trackAnalysis.coordinates[trackAnalysis.coordinates.length - 1]
+            ?.timestamp
         ),
       },
     ];
@@ -295,6 +358,11 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
         <div className={statClass}>
           <span className={labelClass}>{t('flights.maxSpeedLabel')}</span>
           <span className={valueClass}>{maxSpeedLabel}</span>
+          {maxSpeedTime ? (
+            <span className="mt-1 block text-xs font-normal text-gray-500 dark:text-gray-400">
+              {maxSpeedTime}
+            </span>
+          ) : null}
         </div>
         {flight.gpx_file_path && trackAnalysisContent}
       </div>

@@ -8,5 +8,6 @@ export interface GeoPoint {
   elevation: number;
   timestamp: number;
   segment?: number;
+  speed_kmh?: number;
   heart_rate?: number;
 }
