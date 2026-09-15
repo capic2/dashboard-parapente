@@ -15,6 +15,7 @@ from highlight_video_worker import (
     _clip_is_covered_by_gpx,
     _frame_scores,
     _prepare_calibrated_highlight_gpx,
+    _compose_clip_with_full_overlay,
     _render_clip,
     _render_method_for_accelerator,
     _set_job_stage,
@@ -101,6 +102,20 @@ def test_full_flight_overlay_uses_one_transparent_full_timeline_job(tmp_path: Pa
     assert create_job.call_args.kwargs["overlay_only"] is True
     assert create_job.call_args.kwargs["overlay_size"] == (1920, 1080)
     assert create_job.call_args.kwargs["video_path"] == timeline
+
+
+def test_highlight_composition_scales_the_pre_generated_overlay_layer(tmp_path: Path) -> None:
+    raw_video = tmp_path / "clip-pano.mp4"
+    overlay = tmp_path / "telemetry-overlay.mov"
+    output = tmp_path / "clip.mp4"
+    clip = HighlightClip(start_seconds=12.5, duration_seconds=8, yaw_degrees=0)
+
+    with patch("highlight_video_worker.subprocess.run") as run:
+        _compose_clip_with_full_overlay(raw_video, overlay, clip, output)
+
+    command = run.call_args.args[0]
+    assert command[command.index("-filter_complex") + 1].startswith("[1:v][0:v]scale2ref")
+    assert command[command.index("-ss") + 1] == "12.500"
 
 
 def test_best_yaw_allows_a_face_view_when_no_clearer_view_exists(tmp_path: Path) -> None:
