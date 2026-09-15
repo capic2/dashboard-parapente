@@ -3293,6 +3293,8 @@ def gopro_overlay_browser_preview_path(output_path: Path) -> Path:
                     "-crf",
                     "30",
                     "-an",
+                    "-f",
+                    "webm",
                     str(temporary_path),
                 ],
                 check=False,
@@ -3308,6 +3310,8 @@ def gopro_overlay_browser_preview_path(output_path: Path) -> Path:
                 output_path,
                 result.stderr[-1000:],
             )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            logger.warning("Unable to create browser preview for %s: %s", output_path, error)
         finally:
             _unlink_if_exists(temporary_path)
     return output_path
