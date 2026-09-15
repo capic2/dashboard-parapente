@@ -23,7 +23,7 @@ def test_browser_preview_converts_mov_to_webm(
 
     preview_path = gopro_overlay_browser_preview_path(source_path)
 
-    assert preview_path == tmp_path / "overlay.webm"
+    assert preview_path == tmp_path / "overlay.browser-alpha.webm"
     assert preview_path.read_bytes() == b"webm"
     assert commands[0][commands[0].index("-f") : commands[0].index("-f") + 2] == ["-f", "webm"]
     assert commands[0][
