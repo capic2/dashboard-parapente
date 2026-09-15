@@ -14,6 +14,8 @@ import { telemetryAtTimestamp } from './goproSyncTelemetry';
 import type { GoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 
+// This player is only for calibration and synchronization; the final dynamic
+// overlay playback belongs to FlightOverlayInteractivePreview.
 interface GoproOverlaySyncPreviewProps {
   flightId: string;
   offset: string;

@@ -5,6 +5,8 @@ import { getApiUrlWithSearchParams } from '../../../lib/api';
 import { useAuthStore } from '../../../stores/authStore';
 import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 
+// This is the final dynamic overlay player. Calibration and GPX alignment
+// belong to GoproOverlaySyncPreview and must not be changed here by mistake.
 interface FlightOverlayInteractivePreviewProps {
   flightId: string;
   overlayLayer?: FlightOverlayLayer;
