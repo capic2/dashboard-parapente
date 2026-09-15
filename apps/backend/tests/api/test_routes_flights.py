@@ -1583,8 +1583,30 @@ class TestHighlightVideoEndpoints:
         self, client, db_session, monkeypatch, tmp_path
     ):
         pano_path = tmp_path / "pano.mp4"
+        overlay_path = tmp_path / "telemetry-overlay.mov"
         pano_path.write_bytes(b"pano")
+        overlay_path.write_bytes(b"transparent overlay layer")
         flight = self._flight(db_session, "highlight-queue", pano_path)
+        db_session.add(
+            GoproOverlayJob(
+                id="overlay-layer-queue",
+                flight_id=flight.id,
+                status="completed",
+                progress=100,
+                message="Overlay ready",
+                video_path="camera.mp4",
+                gpx_path="track.gpx",
+                layout_id="parapente-3840",
+                layout_label="Parapente",
+                layout_path="layout.xml",
+                output_path=str(overlay_path),
+                temp_output_path=str(tmp_path / "overlay.tmp.mov"),
+                output_filename=overlay_path.name,
+                command_json=json.dumps({"overlay_only": True}),
+                completed_at=datetime(2026, 3, 15, 12),
+            )
+        )
+        db_session.commit()
         enqueue = patch("job_queue.enqueue_once")
         monkeypatch.setattr("job_queue.is_rq_enabled", lambda: True)
         with enqueue as enqueue_mock:
@@ -1598,6 +1620,43 @@ class TestHighlightVideoEndpoints:
         assert "source_video_path" not in payload
         assert "output_path" not in payload
         enqueue_mock.assert_called_once()
+
+    def test_create_uses_the_pre_generated_transparent_overlay_layer(
+        self, client, db_session, monkeypatch, tmp_path
+    ):
+        pano_path = tmp_path / "pano.mp4"
+        overlay_path = tmp_path / "telemetry-overlay.mov"
+        pano_path.write_bytes(b"pano")
+        overlay_path.write_bytes(b"transparent overlay layer")
+        flight = self._flight(db_session, "highlight-overlay-layer", pano_path)
+        db_session.add(
+            GoproOverlayJob(
+                id="overlay-layer-ready",
+                flight_id=flight.id,
+                status="completed",
+                progress=100,
+                message="Overlay ready",
+                video_path="camera.mp4",
+                gpx_path="track.gpx",
+                layout_id="parapente-3840",
+                layout_label="Parapente",
+                layout_path="layout.xml",
+                output_path=str(overlay_path),
+                temp_output_path=str(tmp_path / "overlay.tmp.mov"),
+                output_filename=overlay_path.name,
+                command_json=json.dumps({"overlay_only": True}),
+                completed_at=datetime(2026, 3, 15, 12),
+            )
+        )
+        db_session.commit()
+
+        monkeypatch.setattr("job_queue.is_rq_enabled", lambda: True)
+        with patch("job_queue.enqueue_once"):
+            response = client.post(f"{API_PREFIX}/flights/{flight.id}/highlight-videos")
+
+        assert response.status_code == 202
+        highlight = db_session.query(HighlightVideoJob).filter_by(flight_id=flight.id).one()
+        assert highlight.overlay_video_path == str(overlay_path)
 
     def test_create_reuses_active_job(self, client, db_session, tmp_path):
         pano_path = tmp_path / "pano.mp4"

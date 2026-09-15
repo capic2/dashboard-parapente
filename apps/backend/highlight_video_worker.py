@@ -399,7 +399,10 @@ def _compose_clip_with_full_overlay(
             "-i",
             str(overlay_path),
             "-filter_complex",
-            "[0:v][1:v]overlay=0:0:format=auto[v]",
+            # The reusable layer is rendered at the camera resolution while the
+            # highlight projection is exported at 1920x1080. Scale the layer to
+            # the clip instead of silently falling back to the source video.
+            "[1:v][0:v]scale2ref[overlay][video];[video][overlay]overlay=0:0:format=auto[v]",
             "-map",
             "[v]",
             "-map",
@@ -1589,38 +1592,17 @@ def process_highlight_video_job(job_id: str) -> None:
             )
         clips = classified_clips
         logger.info("Highlight viewpoints classified: job_id=%s clips=%d", job_id, len(clips))
-        output_width, output_height = _output_dimensions(source_path)
-        timeline_path = output_dir / "overlay-timeline.mp4"
-        full_overlay_path = (
-            Path(str(job.overlay_video_path))
-            if job.overlay_video_path
-            else output_dir / "full-flight-overlay.mov"
-        )
-        full_overlay_path.parent.mkdir(parents=True, exist_ok=True)
-        _create_overlay_timeline(timeline_path, duration_seconds, source_timeline_start)
+        full_overlay_path = Path(str(job.overlay_video_path)) if job.overlay_video_path else None
+        if full_overlay_path is None or not full_overlay_path.is_file():
+            raise ValueError(
+                "La couche GoPro Overlay synchronisée doit être générée avant la vidéo highlight"
+            )
         _set_job_stage(
             job_id,
             progress=45,
-            stage="full_flight_overlay",
-            message="Calcul du GoPro Overlay sur l'intégralité du vol",
+            stage="overlay_layer_ready",
+            message="Utilisation de la couche GoPro Overlay synchronisée",
         )
-
-        def full_overlay_progress(progress: int, message: str) -> None:
-            _update_job(
-                job_id,
-                progress=45 + round(progress * 10 / 100),
-                message=f"GoPro Overlay complet : {message}",
-            )
-
-        if not _render_full_flight_overlay(
-            timeline_path,
-            gpx_path,
-            full_overlay_path,
-            (output_width, output_height),
-            full_overlay_progress,
-            lambda: _is_cancelled(job_id),
-        ):
-            return
         rendered: list[Path] = []
         for index, clip in enumerate(clips, start=1):
             if _is_cancelled(job_id):
