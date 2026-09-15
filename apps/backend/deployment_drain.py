@@ -330,7 +330,7 @@ class DeploymentDrainService:
         if self._use_memory:
             admission_token = str(uuid.uuid4())
             started_at = datetime.now(timezone.utc).isoformat()
-            expires_at = time.time() + config.DEPLOY_DRAIN_LEASE_SECONDS
+            expires_at = time.time() + config.DEPLOY_DRAIN_ADMISSION_LEASE_SECONDS
             with self._lock:
                 self._clear_expired_memory_state()
                 if self._memory_state is not None:
@@ -352,7 +352,7 @@ class DeploymentDrainService:
         redis = get_redis_connection()
         admission_token = str(uuid.uuid4())
         started_at = datetime.now(timezone.utc).isoformat()
-        admission_expires_at = time.time() + config.DEPLOY_DRAIN_LEASE_SECONDS
+        admission_expires_at = time.time() + config.DEPLOY_DRAIN_ADMISSION_LEASE_SECONDS
         admission_metadata = json.dumps(
             {
                 "operation": operation,
@@ -379,7 +379,7 @@ class DeploymentDrainService:
         stop_renewal = threading.Event()
 
         def renew_admission() -> None:
-            interval = max(1, config.DEPLOY_DRAIN_LEASE_SECONDS / 3)
+            interval = max(1, config.DEPLOY_DRAIN_ADMISSION_LEASE_SECONDS / 3)
             while not stop_renewal.wait(interval):
                 try:
                     renewed = redis.eval(
@@ -387,7 +387,7 @@ class DeploymentDrainService:
                         1,
                         _ADMISSIONS_KEY,
                         admission_token,
-                        time.time() + config.DEPLOY_DRAIN_LEASE_SECONDS,
+                        time.time() + config.DEPLOY_DRAIN_ADMISSION_LEASE_SECONDS,
                     )
                     if not renewed:
                         return

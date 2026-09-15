@@ -139,6 +139,10 @@ GOPRO_OVERLAY_SEGMENT_SECONDS = int(os.getenv("BACKEND_GOPRO_OVERLAY_SEGMENT_SEC
 # Deployment drain coordination
 DEPLOY_DRAIN_TOKEN = os.getenv("BACKEND_DEPLOY_DRAIN_TOKEN")
 DEPLOY_DRAIN_LEASE_SECONDS = _int_env_at_least("BACKEND_DEPLOY_DRAIN_LEASE_SECONDS", 4500, 1)
+# Keep orphaned admissions bounded independently from the longer drain lease.
+DEPLOY_DRAIN_ADMISSION_LEASE_SECONDS = _int_env_at_least(
+    "BACKEND_DEPLOY_DRAIN_ADMISSION_LEASE_SECONDS", 300, 1
+)
 
 # ============================================================================
 # API

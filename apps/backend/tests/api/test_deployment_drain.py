@@ -165,6 +165,17 @@ def test_expired_admission_metadata_is_removed_when_reading_details() -> None:
     assert deployment_drain.admissions_details() == []
 
 
+def test_admission_uses_shorter_orphan_cleanup_lease(monkeypatch) -> None:
+    monkeypatch.setattr(config, "DEPLOY_DRAIN_ADMISSION_LEASE_SECONDS", 5)
+    now = 1_000.0
+    monkeypatch.setattr("deployment_drain.time.time", lambda: now)
+
+    with job_admission("test_operation"):
+        assert deployment_drain.admissions_details()[0]["expires_at"] == now + 5
+
+    assert deployment_drain.admissions_details() == []
+
+
 def test_start_rejection_maps_to_retryable_503(client, db_session):
     from models import Flight
 
