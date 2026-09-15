@@ -1043,6 +1043,7 @@
     "durationLabel": "Duration (min)",
     "distanceLabel": "Distance (km)",
     "maxAltitudeLabel": "Max altitude (m)",
+    "metricAtTime": "at {{time}}",
     "elevationGainLabel": "Elevation gain (m)",
     "maxSpeedLabel": "Max speed (km/h)",
     "trackAnalysisLoading": "Track analysis loading",

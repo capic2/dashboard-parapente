@@ -8,6 +8,7 @@ import {
 } from '../../../stores/appSettingsStore';
 import { formatFlightSiteLabel } from '../siteDisplay';
 import { useFlightGPX } from '../../../hooks/flights/useFlightGPX';
+import type { GeoPoint } from '../../../types/flight';
 
 interface FlightStatsGridProps {
   flight: Flight;
@@ -25,6 +26,55 @@ const formatVerticalSpeed = (value: number, altitudeUnit: string) =>
   altitudeUnit === 'ft'
     ? `${Math.round(value * 196.85)} ft/min`
     : `${value.toFixed(1)} m/s`;
+
+const getVerticalRateTimestamp = (
+  coordinates: GeoPoint[],
+  direction: 'climb' | 'sink'
+) => {
+  let bestRate = 0;
+  let bestTimestamp: number | undefined;
+
+  for (let index = 1; index < coordinates.length; index += 1) {
+    const previous = coordinates[index - 1];
+    const current = coordinates[index];
+    if (
+      previous.segment !== undefined &&
+      current.segment !== undefined &&
+      previous.segment !== current.segment
+    ) {
+      continue;
+    }
+    const elapsed = current.timestamp - previous.timestamp;
+    if (previous.timestamp <= 0 || current.timestamp <= 0 || elapsed <= 0) {
+      continue;
+    }
+    const rate = (current.elevation - previous.elevation) / (elapsed / 1000);
+    const candidate = direction === 'climb' ? rate : -rate;
+    if (Number.isFinite(candidate) && candidate > bestRate) {
+      bestRate = candidate;
+      bestTimestamp = current.timestamp;
+    }
+  }
+
+  return bestTimestamp;
+};
+
+const getMaximumTimestamp = (
+  coordinates: { elevation: number; timestamp: number }[]
+) => {
+  const point = coordinates.reduce<
+    { elevation: number; timestamp: number } | undefined
+  >((maximum, current) => {
+    if (
+      current.timestamp <= 0 ||
+      (maximum && maximum.elevation >= current.elevation)
+    ) {
+      return maximum;
+    }
+    return current;
+  }, undefined);
+  return point?.timestamp;
+};
 
 export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
   const { t, i18n } = useTranslation();
@@ -54,6 +104,21 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
     flight.max_altitude_m == null
       ? 'N/A'
       : formatAltitudeMeters(flight.max_altitude_m, units.altitude);
+  const metricTime = (timestamp: number | undefined) =>
+    timestamp
+      ? t('flights.metricAtTime', {
+          time: new Date(timestamp).toLocaleTimeString(i18n.language, {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+        })
+      : null;
+  const maxAltitudeTime =
+    trackAnalysis?.coordinates.length &&
+    flight.max_altitude_m != null &&
+    Math.abs(flight.max_altitude_m - trackAnalysis.max_altitude_m) <= 1
+      ? metricTime(getMaximumTimestamp(trackAnalysis.coordinates))
+      : null;
   const elevationGainLabel =
     flight.elevation_gain_m == null
       ? 'N/A'
@@ -107,6 +172,11 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
               trackAnalysis.max_climb_rate_ms ?? 0,
               units.altitude
             ),
+        time: flight.gpx_metrics_excluded
+          ? undefined
+          : metricTime(
+              getVerticalRateTimestamp(trackAnalysis.coordinates, 'climb')
+            ),
       },
       {
         label: t('flights.maxSinkRateLabel'),
@@ -115,6 +185,11 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
           : formatVerticalSpeed(
               trackAnalysis.max_sink_rate_ms ?? 0,
               units.altitude
+            ),
+        time: flight.gpx_metrics_excluded
+          ? undefined
+          : metricTime(
+              getVerticalRateTimestamp(trackAnalysis.coordinates, 'sink')
             ),
       },
       {
@@ -158,6 +233,11 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
           <div className={statClass} key={stat.label}>
             <span className={labelClass}>{stat.label}</span>
             <span className={valueClass}>{stat.value}</span>
+            {'time' in stat && stat.time && (
+              <span className="mt-1 block text-xs font-normal text-gray-500 dark:text-gray-400">
+                {stat.time}
+              </span>
+            )}
           </div>
         ))}
       </>
@@ -202,6 +282,11 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
         <div className={statClass}>
           <span className={labelClass}>{t('flights.maxAltitudeLabel')}</span>
           <span className={valueClass}>{maxAltitudeLabel}</span>
+          {maxAltitudeTime ? (
+            <span className="mt-1 block text-xs font-normal text-gray-500 dark:text-gray-400">
+              {maxAltitudeTime}
+            </span>
+          ) : null}
         </div>
         <div className={statClass}>
           <span className={labelClass}>{t('flights.elevationGainLabel')}</span>

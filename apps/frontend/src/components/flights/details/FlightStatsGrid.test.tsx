@@ -8,7 +8,8 @@ const useFlightGPXMock = vi.hoisted(() => vi.fn());
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     i18n: { language: 'fr' },
-    t: (key: string) => key,
+    t: (key: string, options?: { time?: string }) =>
+      options?.time ? `${key} ${options.time}` : key,
   }),
 }));
 
@@ -31,8 +32,9 @@ useFlightGPXMock.mockReturnValue({
   isPending: false,
   data: {
     coordinates: [
-      { lat: 47.2, lon: 6, elevation: 420, timestamp: 0 },
-      { lat: 47.3, lon: 6.1, elevation: 380, timestamp: 60_000 },
+      { lat: 47.2, lon: 6, elevation: 420, timestamp: 1_742_048_400_000 },
+      { lat: 47.3, lon: 6.1, elevation: 880, timestamp: 1_742_049_000_000 },
+      { lat: 47.4, lon: 6.2, elevation: 500, timestamp: 1_742_049_600_000 },
     ],
     max_altitude_m: 1_850,
     min_altitude_m: 380,
@@ -68,11 +70,39 @@ describe('FlightStatsGrid', () => {
 
     expect(screen.getByText('4.6 m/s')).toBeInTheDocument();
     expect(screen.getByText('3.2 m/s')).toBeInTheDocument();
+    expect(screen.getAllByText(/flights\.metricAtTime/u)).toHaveLength(3);
     expect(screen.getByText('11.7 km/h')).toBeInTheDocument();
     expect(screen.getByText('8.4 km')).toBeInTheDocument();
     expect(screen.getByText('1470 m')).toBeInTheDocument();
     expect(screen.getByText('420 m')).toBeInTheDocument();
     expect(screen.getAllByText('380 m')).toHaveLength(2);
+  });
+
+  it('does not attach a track time to a manually different altitude', () => {
+    useFlightGPXMock.mockReturnValueOnce({
+      isPending: false,
+      data: {
+        coordinates: [
+          { lat: 47.2, lon: 6, elevation: 420, timestamp: 1_742_048_400_000 },
+          { lat: 47.3, lon: 6.1, elevation: 880, timestamp: 1_742_049_000_000 },
+        ],
+        max_altitude_m: 880,
+        min_altitude_m: 420,
+        elevation_gain_m: 460,
+        elevation_loss_m: 0,
+        total_distance_km: 1,
+        flight_duration_seconds: 600,
+      },
+    });
+
+    render(
+      <FlightStatsGrid
+        flight={{ ...flight, max_altitude_m: 1_000 } as Flight}
+        sites={[]}
+      />
+    );
+
+    expect(screen.queryAllByText(/flights\.metricAtTime/u)).toHaveLength(1);
   });
 
   it('shows the unavailable state for an empty track', () => {

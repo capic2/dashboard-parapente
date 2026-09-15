@@ -1047,6 +1047,7 @@
     "durationLabel": "Durée (min)",
     "distanceLabel": "Distance (km)",
     "maxAltitudeLabel": "Altitude max (m)",
+    "metricAtTime": "à {{time}}",
     "elevationGainLabel": "Dénivelé (m)",
     "maxSpeedLabel": "Vitesse max (km/h)",
     "trackAnalysisLoading": "Analyse de la trace en cours de chargement",
