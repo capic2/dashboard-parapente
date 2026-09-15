@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import sqlite3
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -22,6 +21,7 @@ from gopro_overlay_export import start_gopro_overlay_worker, stop_gopro_overlay_
 from gopro_preview_proxy import start_preview_scanner, stop_preview_scanner
 from job_queue import is_rq_enabled
 from metrics import setup_metrics
+from database_migrations import run_migrations
 from models import Site  # Needed for database initialization
 from routes import public_router, router
 from scheduler import start_scheduler, stop_scheduler
@@ -342,85 +342,6 @@ def seed_weather_sources():
             db.rollback()
             db.close()
         return False
-
-
-def run_migrations():
-    """
-    Run SQL migrations from db/migrations directory.
-    Each SQL statement is executed individually to handle idempotent migrations
-    gracefully (e.g., ALTER TABLE ADD COLUMN that already exists).
-    """
-    from database import DB_PATH
-
-    migrations_dir = Path(__file__).parent / "sql_migrations"
-
-    if not migrations_dir.exists():
-        logger.warning(f"Migrations directory not found: {migrations_dir}")
-        return
-
-    # Get all .sql migration files
-    migration_files = sorted(migrations_dir.glob("*.sql"))
-
-    if not migration_files:
-        logger.info("No migration files found")
-        return
-
-    logger.info(f"Running {len(migration_files)} migration(s)...")
-
-    conn = sqlite3.connect(str(DB_PATH))
-    cursor = conn.cursor()
-
-    for migration_file in migration_files:
-        logger.info(f"Applying migration: {migration_file.name}")
-
-        with open(migration_file) as f:
-            sql = f.read()
-
-        # Execute each statement individually so that one "already exists" error
-        # doesn't prevent subsequent statements in the same migration from running.
-        # Split by semicolons, strip comments, and skip empty statements.
-        applied = 0
-        skipped = 0
-
-        for raw_statement in sql.split(";"):
-            # Strip comment lines and whitespace
-            lines = [
-                line for line in raw_statement.splitlines() if not line.strip().startswith("--")
-            ]
-            clean = "\n".join(lines).strip()
-            if not clean:
-                continue
-
-            try:
-                cursor.execute(clean)
-                conn.commit()
-                applied += 1
-            except sqlite3.IntegrityError:
-                # Row already exists (UNIQUE constraint) — idempotent, skip
-                conn.rollback()
-                skipped += 1
-            except sqlite3.OperationalError as e:
-                err_msg = str(e).lower()
-                if "already exists" in err_msg or "duplicate column name" in err_msg:
-                    skipped += 1
-                else:
-                    logger.error(
-                        f"✗ Migration {migration_file.name} failed on statement: {clean[:100]}"
-                    )
-                    logger.error(f"  Error: {e}")
-                    raise
-
-        if skipped > 0 and applied == 0:
-            logger.info(f"⊙ Migration {migration_file.name} already applied (skipping)")
-        elif skipped > 0:
-            logger.info(
-                f"✓ Migration {migration_file.name}: {applied} applied, {skipped} already existed"
-            )
-        else:
-            logger.info(f"✓ Migration {migration_file.name} applied successfully")
-
-    conn.close()
-    logger.info("✓ All migrations completed")
 
 
 # Initialize database (create schema + seed sites)
