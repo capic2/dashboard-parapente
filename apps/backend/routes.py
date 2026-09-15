@@ -521,10 +521,19 @@ def _flight_gopro_overlay_state(db: Session, flight: Flight) -> dict[str, Any]:
     }
 
 
+def _is_overlay_layer_job(job: GoproOverlayJobModel) -> bool:
+    try:
+        metadata = json.loads(job.command_json or "{}")
+    except json.JSONDecodeError:
+        return False
+    return isinstance(metadata, dict) and metadata.get("overlay_only") is True
+
+
 def _flight_gopro_overlay_jobs(flight: Flight) -> list[dict[str, Any]]:
     return [
         GoproOverlayJob.model_validate(gopro_overlay_job_to_payload(job)).model_dump(mode="json")
         for job in reversed(flight.gopro_overlay_jobs)
+        if not _is_overlay_layer_job(job)
     ]
 
 
@@ -6868,11 +6877,7 @@ def _generate_interactive_overlay_in_background(
 def _flight_overlay_layer_job(flight: Flight) -> GoproOverlayJobModel | None:
     """Return the newest job that rendered the reusable transparent layer."""
     for job in reversed(flight.gopro_overlay_jobs):
-        try:
-            metadata = json.loads(job.command_json or "{}")
-        except json.JSONDecodeError:
-            continue
-        if metadata.get("overlay_only"):
+        if _is_overlay_layer_job(job):
             return job
     return None
 
