@@ -79,7 +79,7 @@ def create_sample_overlay(
             "-f",
             "lavfi",
             "-i",
-            "color=c=black@0.0:s=640x360:r=30",
+            f"color=c=black@0.0:s=640x360:r=1/{duration_seconds}",
             "-vf",
             (
                 "format=rgba,"

@@ -20,6 +20,20 @@ def test_create_sample_video_embeds_gpx_start_time(tmp_path: Path) -> None:
     assert "creation_time=2026-09-13T10:30:00Z" in command
 
 
+def test_create_sample_overlay_uses_a_single_frame_for_fast_staging_startup(
+    tmp_path: Path,
+) -> None:
+    overlay_path = tmp_path / "telemetry-overlay.mov"
+
+    with patch("seed_flights.subprocess.run") as run:
+        seed_flights.create_sample_overlay(overlay_path, duration_seconds=180)
+
+    command = run.call_args.args[0]
+    assert "color=c=black@0.0:s=640x360:r=1/180" in command
+    assert command[command.index("-t") + 1] == "180"
+    assert command[command.index("-pix_fmt") + 1] == "argb"
+
+
 def test_seed_flights_can_create_staging_media(
     test_db: sessionmaker,
     arguel_site: Site,
