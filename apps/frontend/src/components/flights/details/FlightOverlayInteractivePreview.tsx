@@ -22,7 +22,11 @@ export function FlightOverlayInteractivePreview({
   const overlayUrl = overlayJob
     ? getApiUrlWithSearchParams(
         `gopro-overlays/jobs/${overlayJob.job_id}/download`,
-        { access_token: token, version: overlayJob.updated_at }
+        {
+          access_token: token,
+          browser_preview: 'true',
+          version: overlayJob.updated_at,
+        }
       )
     : undefined;
 

@@ -89,6 +89,7 @@ from gopro_overlay_export import (
     get_gopro_overlay_job,
     gpx_duration_seconds,
     gopro_overlay_output_path,
+    gopro_overlay_browser_preview_path,
     gopro_overlay_job_to_payload,
     list_gopro_overlay_jobs,
     list_gopro_overlay_layouts,
@@ -4827,7 +4828,7 @@ async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session =
             flight.max_sink_rate_ms = stats["max_sink_rate_ms"]
         except Exception as exc:
             logger.warning(
-                "Could not recalculate vertical rates after changing GPX exclusion " "for %s: %s",
+                "Could not recalculate vertical rates after changing GPX exclusion for %s: %s",
                 flight_id,
                 exc,
             )
@@ -7397,7 +7398,10 @@ def cancel_gopro_overlay_render_job(job_id: str) -> GoproOverlayCancelResponse:
 
 
 @router.get("/gopro-overlays/jobs/{job_id}/download")
-def download_gopro_overlay_render_job(job_id: str) -> FileResponse:
+def download_gopro_overlay_render_job(
+    job_id: str,
+    browser_preview: bool = Query(False),
+) -> FileResponse:
     """Download the completed GoPro overlay video."""
     job = get_gopro_overlay_job(job_id)
     if not job:
@@ -7407,10 +7411,18 @@ def download_gopro_overlay_render_job(job_id: str) -> FileResponse:
     if not output_path:
         raise HTTPException(status_code=400, detail="GoPro overlay video is not ready")
 
+    preview_path = (
+        gopro_overlay_browser_preview_path(output_path) if browser_preview else output_path
+    )
+    media_type = {
+        ".mov": "video/quicktime",
+        ".webm": "video/webm",
+        ".mp4": "video/mp4",
+    }.get(preview_path.suffix.lower(), "application/octet-stream")
     return FileResponse(
-        path=output_path,
-        media_type="video/mp4",
-        filename=output_path.name,
+        path=preview_path,
+        media_type=media_type,
+        filename=preview_path.name,
         content_disposition_type="inline",
     )
 

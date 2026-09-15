@@ -67,6 +67,7 @@ _OUTPUT_RESOLUTIONS: dict[str, tuple[int, int] | None] = {
     "1080p": (1920, 1080),
     "4k": (3840, 2160),
 }
+_BROWSER_PREVIEW_LOCK = threading.Lock()
 
 
 def _gopro_overlay_log_dir() -> Path:
@@ -3254,6 +3255,62 @@ def gopro_overlay_output_path(job_id: str) -> Path | None:
         return None
     path = Path(job["output_path"])
     return path if path.exists() else None
+
+
+def gopro_overlay_browser_preview_path(output_path: Path) -> Path:
+    """Return a browser-compatible WebM preview for a transparent overlay.
+
+    The reusable layer is kept as PNG-in-MOV for GoPro Dashboard and export
+    compatibility. Chromium cannot play that transparent MOV profile, so the
+    interactive player consumes a cached VP9/WebM conversion instead.
+    """
+    if output_path.suffix.lower() != ".mov":
+        return output_path
+
+    preview_path = output_path.with_suffix(".webm")
+    if preview_path.exists() and preview_path.stat().st_mtime >= output_path.stat().st_mtime:
+        return preview_path
+
+    with _BROWSER_PREVIEW_LOCK:
+        if preview_path.exists() and preview_path.stat().st_mtime >= output_path.stat().st_mtime:
+            return preview_path
+        temporary_path = preview_path.with_suffix(".webm.part")
+        try:
+            result = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(output_path),
+                    "-map",
+                    "0:v:0",
+                    "-c:v",
+                    "libvpx-vp9",
+                    "-pix_fmt",
+                    "yuva420p",
+                    "-b:v",
+                    "0",
+                    "-crf",
+                    "30",
+                    "-an",
+                    str(temporary_path),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=600,
+            )
+            if result.returncode == 0 and temporary_path.exists():
+                temporary_path.replace(preview_path)
+                return preview_path
+            logger.warning(
+                "Unable to create browser preview for %s: %s",
+                output_path,
+                result.stderr[-1000:],
+            )
+        finally:
+            _unlink_if_exists(temporary_path)
+    return output_path
 
 
 def delete_gopro_overlay_output(job_id: str) -> dict[str, Any] | None:
