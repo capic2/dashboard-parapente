@@ -1372,6 +1372,7 @@
       "pause": "Pause",
       "play": "Play",
       "position": "Position",
+      "flightTime": "Time",
       "speed": "Speed",
       "videoSection": "Video",
       "videoStartError": "Unable to start generation",
