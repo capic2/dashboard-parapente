@@ -34,7 +34,7 @@ def test_migration_adds_vertical_rate_columns_idempotently() -> None:
     assert {"max_climb_rate_ms", "max_sink_rate_ms"} <= columns
 
 
-def test_backfill_persists_only_missing_vertical_rates(
+def test_backfill_refreshes_all_persisted_vertical_rates(
     test_db: sessionmaker[Session],
     db_session: Session,
     tmp_path: Path,
@@ -78,12 +78,12 @@ def test_backfill_persists_only_missing_vertical_rates(
     first = backfill_missing_vertical_rates(test_db, batch_size=1, base_dir=tmp_path)
     second = backfill_missing_vertical_rates(test_db, batch_size=1, base_dir=tmp_path)
 
-    assert first.scanned == 3
-    assert first.updated == 2
+    assert first.scanned == 4
+    assert first.updated == 3
     assert first.failed == 1
-    assert first.batches == 3
-    assert second.scanned == 1
-    assert second.updated == 0
+    assert first.batches == 4
+    assert second.scanned == 4
+    assert second.updated == 3
     assert second.failed == 1
 
     with test_db() as verification:
@@ -94,10 +94,10 @@ def test_backfill_persists_only_missing_vertical_rates(
         assert missing.max_climb_rate_ms == 1.0
         assert missing.max_sink_rate_ms == 0.77
         assert stored is not None
-        assert stored.max_climb_rate_ms == 4.2
-        assert stored.max_sink_rate_ms == 3.4
+        assert stored.max_climb_rate_ms == 1.0
+        assert stored.max_sink_rate_ms == 0.77
         assert partial is not None
-        assert partial.max_climb_rate_ms == 4.8
+        assert partial.max_climb_rate_ms == 1.0
         assert partial.max_sink_rate_ms == 0.77
 
 

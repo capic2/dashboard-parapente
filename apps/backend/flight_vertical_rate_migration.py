@@ -1,11 +1,10 @@
-"""Backfill persisted vertical-rate metrics for existing flight tracks."""
+"""Refresh persisted vertical-rate metrics for existing flight tracks."""
 
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from database import SessionLocal
@@ -34,7 +33,7 @@ def backfill_missing_vertical_rates(
     batch_size: int = 100,
     base_dir: Path = Path(__file__).parent,
 ) -> VerticalRateBackfillReport:
-    """Persist missing climb and sink rates once, outside API request handling."""
+    """Recalculate climb and sink rates outside API request handling."""
     if batch_size < 1:
         raise ValueError("batch_size must be positive")
 
@@ -46,10 +45,6 @@ def backfill_missing_vertical_rates(
                 query = db.query(Flight).filter(
                     Flight.gpx_file_path.isnot(None),
                     Flight.gpx_file_path != "",
-                    or_(
-                        Flight.max_climb_rate_ms.is_(None),
-                        Flight.max_sink_rate_ms.is_(None),
-                    ),
                 )
                 if last_id is not None:
                     query = query.filter(Flight.id > last_id)
@@ -68,10 +63,8 @@ def backfill_missing_vertical_rates(
                         )
                         _, points = normalize_track(path.read_bytes(), file_type)
                         stats = calculate_track_stats(points)
-                        if flight.max_climb_rate_ms is None:
-                            flight.max_climb_rate_ms = float(stats["max_climb_rate_ms"])
-                        if flight.max_sink_rate_ms is None:
-                            flight.max_sink_rate_ms = float(stats["max_sink_rate_ms"])
+                        flight.max_climb_rate_ms = float(stats["max_climb_rate_ms"])
+                        flight.max_sink_rate_ms = float(stats["max_sink_rate_ms"])
                         report.updated += 1
                     except Exception as exc:
                         report.failed += 1

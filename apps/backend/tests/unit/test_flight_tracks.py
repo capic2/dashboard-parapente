@@ -60,18 +60,20 @@ def test_normalizes_gzipped_gpx_and_calculates_stats():
     assert stats["duration_minutes"] == 1
 
 
-def test_calculates_instantaneous_vertical_rate_extrema() -> None:
+def test_smooths_short_vertical_rate_spikes() -> None:
     gpx = b"""<gpx xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>
     <trkpt lat="47.2" lon="6.0"><ele>500</ele><time>2026-07-01T10:00:00Z</time></trkpt>
     <trkpt lat="47.2" lon="6.0"><ele>501.21</ele><time>2026-07-01T10:00:01Z</time></trkpt>
     <trkpt lat="47.2" lon="6.0"><ele>498.65</ele><time>2026-07-01T10:00:02Z</time></trkpt>
+    <trkpt lat="47.2" lon="6.0"><ele>501.5</ele><time>2026-07-01T10:00:03Z</time></trkpt>
+    <trkpt lat="47.2" lon="6.0"><ele>504.5</ele><time>2026-07-01T10:00:04Z</time></trkpt>
     </trkseg></trk></gpx>"""
 
     _, points = normalize_track(gpx, "gpx")
 
     stats = calculate_track_stats(points)
-    assert stats["max_climb_rate_ms"] == pytest.approx(1.21)
-    assert stats["max_sink_rate_ms"] == pytest.approx(2.56)
+    assert stats["max_climb_rate_ms"] == pytest.approx(1.1)
+    assert stats["max_sink_rate_ms"] == 0
     assert stats["elevation_loss_m"] == 3
 
 
@@ -106,9 +108,9 @@ def test_skips_aberrant_vertical_point_and_uses_next_valid_timestamp() -> None:
 @pytest.mark.parametrize(
     ("elevations", "timestamps", "expected_climb", "expected_sink"),
     [
-        ([0.0, 8.0], [1_000, 2_000], 8, 0),
+        ([0.0, 8.0], [1_000, 2_000], 0, 0),
         ([0.0, 8.1], [1_000, 2_000], 0, 0),
-        ([0.0, 4.0, 8.0], [1_000, 1_000, 2_000], 8, 0),
+        ([0.0, 4.0, 8.0], [1_000, 1_000, 2_000], 0, 0),
     ],
 )
 def test_vertical_rate_filter_handles_limit_and_invalid_intervals(
@@ -139,8 +141,8 @@ def test_rejects_a_14_8_ms_spike_and_uses_the_next_point() -> None:
 
     stats = calculate_track_stats(points)
 
-    assert stats["max_climb_rate_ms"] == pytest.approx(2.5)
-    assert stats["max_sink_rate_ms"] == 0
+    assert stats["max_climb_rate_ms"] == 0
+    assert stats["max_sink_rate_ms"] == pytest.approx(4.88)
 
 
 def test_prefers_gpx_speed_extension_in_meters_per_second() -> None:

@@ -23,6 +23,7 @@ MAX_TRACK_BYTES = 100 * 1024 * 1024
 MAX_XML_TRACK_BYTES = 25 * 1024 * 1024
 MAX_TRACK_POINTS = 500_000
 MAX_VERTICAL_RATE_ABS_MS = 8.0
+VERTICAL_RATE_WINDOW_SECONDS = 3.0
 
 
 def _append_point(points: list[TrackPoint], point: TrackPoint) -> None:
@@ -451,27 +452,31 @@ def calculate_track_stats(points: list[TrackPoint]) -> dict[str, Any]:
 
     max_climb_rate = 0.0
     max_sink_rate = 0.0
-    previous = points[0]
-    for current in points[1:]:
-        if current.get("segment", 0) != previous.get("segment", 0):
-            previous = current
-            continue
-
-        previous_timestamp = previous.get("timestamp", 0)
+    for current_index, current in enumerate(points[1:], start=1):
         current_timestamp = current.get("timestamp", 0)
-        elapsed = current_timestamp - previous_timestamp
-        if previous_timestamp <= 0 or current_timestamp <= 0 or elapsed <= 0:
+        if current_timestamp <= 0:
             continue
 
-        vertical_rate = (current.get("elevation", 0.0) - previous.get("elevation", 0.0)) / (
-            elapsed / 1000
-        )
-        if not math.isfinite(vertical_rate) or abs(vertical_rate) > MAX_VERTICAL_RATE_ABS_MS:
-            continue
+        for previous_index in range(current_index - 1, -1, -1):
+            candidate = points[previous_index]
+            if candidate.get("segment", 0) != current.get("segment", 0):
+                break
+            previous_timestamp = candidate.get("timestamp", 0)
+            elapsed = current_timestamp - previous_timestamp
+            if previous_timestamp <= 0 or elapsed <= 0:
+                continue
+            if elapsed < VERTICAL_RATE_WINDOW_SECONDS * 1000:
+                continue
 
-        max_climb_rate = max(max_climb_rate, vertical_rate)
-        max_sink_rate = max(max_sink_rate, -vertical_rate)
-        previous = current
+            vertical_rate = (
+                current.get("elevation", 0.0) - candidate.get("elevation", 0.0)
+            ) / (elapsed / 1000)
+            if not math.isfinite(vertical_rate) or abs(vertical_rate) > MAX_VERTICAL_RATE_ABS_MS:
+                continue
+
+            max_climb_rate = max(max_climb_rate, vertical_rate)
+            max_sink_rate = max(max_sink_rate, -vertical_rate)
+            break
 
     takeoff = points[0]
     max_distance_from_takeoff = max(
