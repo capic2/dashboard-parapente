@@ -10,6 +10,7 @@ const {
   generatePreviewMutateMock,
   generatePreviewMock,
   mockFlight,
+  overlayLayerMock,
   highlightVideoMock,
   overlayJobStreamMock,
   previewMock,
@@ -54,6 +55,7 @@ const {
     elevation_gain_m: 250,
     notes: null,
   } as Flight,
+  overlayLayerMock: { current: { status: 'missing', job: null } as unknown },
 }));
 
 vi.mock('@dashboard-parapente/design-system', async () => {
@@ -311,7 +313,7 @@ vi.mock('../../../hooks/gopro/useGoproOverlay', () => ({
   }),
   useGoproOverlayJobStream: () => ({ job: overlayJobStreamMock.current }),
   useFlightOverlayLayer: () => ({
-    data: { status: 'missing', job: null },
+    data: overlayLayerMock.current,
     isPending: false,
   }),
   useGenerateFlightOverlayLayer: () => ({
@@ -455,6 +457,7 @@ describe('FlightDetails GoPro overlay action', () => {
     mockFlight.pano_video_file_exists = false;
     mockFlight.gpx_file_path = 'sample.gpx';
     mockFlight.youtube_urls = [];
+    overlayLayerMock.current = { status: 'missing', job: null };
     videoStatusMock.current = null;
     youtubeUploadMock.current = null;
     youtubeAssociationsMock.current = [];
@@ -1231,6 +1234,39 @@ describe('FlightDetails GoPro overlay action', () => {
       expect(updateFlightMock).toHaveBeenCalledWith({
         gopro_overlay_gpx_offset: 2.5,
       })
+    );
+  });
+
+  it('collapses the synchronization workspace when the overlay layer is ready', async () => {
+    const { rerender } = render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    openTab('Media');
+    const workspaceToggle = screen.getByRole('button', {
+      name: /Synchronization and overlay layer/u,
+    });
+    expect(workspaceToggle).toHaveAttribute('aria-expanded', 'true');
+
+    overlayLayerMock.current = { status: 'completed', job: null };
+    rerender(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', {
+          name: /Synchronization and overlay layer/u,
+        })
+      ).toHaveAttribute('aria-expanded', 'false')
     );
   });
 

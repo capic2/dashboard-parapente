@@ -95,6 +95,7 @@ export function FlightDetails({
   const uploadGPXMutation = useUploadGPXToFlight(flight.id);
   const createGoproOverlayJob = useCreateFlightGoproOverlayJob(flight.id);
   const overlayLayer = useFlightOverlayLayer(flight.id);
+  const hasReadyOverlayLayer = overlayLayer.data?.status === 'completed';
   const highlightVideosQuery = useFlightHighlightVideos(flight.id);
   const createHighlightVideo = useCreateFlightHighlightVideo(flight.id);
   const cancelHighlightVideo = useCancelFlightHighlightVideo(flight.id);
@@ -109,9 +110,8 @@ export function FlightDetails({
   const [notesText, setNotesText] = useState(flight.notes ?? '');
   const [activeTab, setActiveTab] = useState<FlightDetailsTab>('infos');
   const [isReplayExpanded, setIsReplayExpanded] = useState(false);
-  const [isOverlayWorkspaceExpanded, setIsOverlayWorkspaceExpanded] = useState(
-    flight.gopro_overlay_gpx_offset == null
-  );
+  const [isOverlayWorkspaceExpanded, setIsOverlayWorkspaceExpanded] =
+    useState(!hasReadyOverlayLayer);
   const [isGoproOverlayDialogOpen, setIsGoproOverlayDialogOpen] =
     useState(false);
   const [goproOverlayJobId, setGoproOverlayJobId] = useState<string | null>(
@@ -143,7 +143,6 @@ export function FlightDetails({
   const hasPanoVideo = flight.pano_video_file_exists === true;
   const hasGoproCameraVideo = flight.gopro_camera_file_exists === true;
   const hasGoproOverlayOffset = flight.gopro_overlay_gpx_offset != null;
-  const hasReadyOverlayLayer = overlayLayer.data?.status === 'completed';
   const hasPersistedGoproOverlay = hasFlightGoproOverlay(flight);
   const persistedGoproOverlays = flight.gopro_overlays ?? [];
   const activePersistedGoproOverlay = persistedGoproOverlays.find((overlay) =>
@@ -816,8 +815,8 @@ export function FlightDetails({
     />
   );
   useEffect(() => {
-    setIsOverlayWorkspaceExpanded(flight.gopro_overlay_gpx_offset == null);
-  }, [flight.gopro_overlay_gpx_offset]);
+    setIsOverlayWorkspaceExpanded(!hasReadyOverlayLayer);
+  }, [hasReadyOverlayLayer]);
 
   const overlayWorkspacePanel = (
     <section className="overflow-hidden rounded-2xl border border-cyan-200 bg-cyan-50/50 shadow-sm dark:border-cyan-900 dark:bg-cyan-950/20">
@@ -900,7 +899,10 @@ export function FlightDetails({
       <div className="min-w-0 space-y-4">
         {hasGpx && hasVideo && hasGoproCameraVideo && overlayWorkspacePanel}
         {hasGpx && hasVideo && hasGoproCameraVideo && (
-          <FlightOverlayInteractivePreview flightId={flight.id} />
+          <FlightOverlayInteractivePreview
+            flightId={flight.id}
+            overlayLayer={overlayLayer.data}
+          />
         )}
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
           <button
@@ -1028,79 +1030,80 @@ export function FlightDetails({
               );
             }}
           />
-          {visibleGoproOverlays.length > 0 && (
-            <GoproOverlayJobStack
-              jobs={visibleGoproOverlays}
-              youtubeUploadFlight={flight}
-              isDownloadingAnyMedia={isDownloadingAnyMedia}
-              deletingJobId={deletingGoproOverlayJobId}
-              onDownload={(overlay) => void handleDownloadGoproOverlay(overlay)}
-              onDelete={(overlay) => void handleDeleteGoproOverlay(overlay)}
-              generationCard={
-                <div className="flex min-h-48 flex-col justify-between rounded-xl border border-dashed border-cyan-300 bg-cyan-50/60 p-3 dark:border-cyan-800 dark:bg-cyan-950/20">
-                  <div>
-                    <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
-                      <Wand2 className="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <p className="mt-3 font-semibold text-slate-950 dark:text-white">
-                      {t('flights.goproOverlayAddCardTitle')}
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">
-                      {goproOverlayUnavailableReason ??
-                        t('flights.goproOverlayAddCardDescription')}
-                    </p>
-                  </div>
-                  <Button
-                    variant={isGoproOverlayRunning ? 'danger' : 'outline'}
-                    className="mt-4 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
-                    onPress={goproOverlayAction}
-                    isDisabled={
-                      !canUseGoproOverlayAction ||
-                      createGoproOverlayJob.isPending ||
-                      isCancellingGoproOverlay
-                    }
-                    title={goproOverlayTitle}
-                    aria-label={goproOverlayLabel}
-                  >
-                    <Wand2 className="h-4 w-4" aria-hidden="true" />
-                    {goproOverlayCompactLabel}
-                  </Button>
-                </div>
-              }
-            />
-          )}
-          {visibleGoproOverlays.length === 0 && (
-            <div className="order-5 flex min-h-48 flex-col justify-between rounded-xl border border-dashed border-cyan-300 bg-cyan-50/60 p-3 dark:border-cyan-800 dark:bg-cyan-950/20">
-              <div>
-                <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
-                  <Wand2 className="h-5 w-5" aria-hidden="true" />
-                </span>
-                <p className="mt-3 font-semibold text-slate-950 dark:text-white">
-                  {t('flights.goproOverlayAddCardTitle')}
-                </p>
-                <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">
-                  {goproOverlayUnavailableReason ??
-                    t('flights.goproOverlayAddCardDescription')}
-                </p>
-              </div>
-              <Button
-                variant={isGoproOverlayRunning ? 'danger' : 'outline'}
-                className="mt-4 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
-                onPress={goproOverlayAction}
-                isDisabled={
-                  !canUseGoproOverlayAction ||
-                  createGoproOverlayJob.isPending ||
-                  isCancellingGoproOverlay
-                }
-                title={goproOverlayTitle}
-                aria-label={goproOverlayLabel}
-              >
-                <Wand2 className="h-4 w-4" aria-hidden="true" />
-                {goproOverlayCompactLabel}
-              </Button>
-            </div>
-          )}
         </FlightMediaBadges>
+
+        {visibleGoproOverlays.length > 0 && (
+          <GoproOverlayJobStack
+            jobs={visibleGoproOverlays}
+            youtubeUploadFlight={flight}
+            isDownloadingAnyMedia={isDownloadingAnyMedia}
+            deletingJobId={deletingGoproOverlayJobId}
+            onDownload={(overlay) => void handleDownloadGoproOverlay(overlay)}
+            onDelete={(overlay) => void handleDeleteGoproOverlay(overlay)}
+            generationCard={
+              <div className="flex min-h-48 flex-col justify-between rounded-xl border border-dashed border-cyan-300 bg-cyan-50/60 p-3 dark:border-cyan-800 dark:bg-cyan-950/20">
+                <div>
+                  <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
+                    <Wand2 className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <p className="mt-3 font-semibold text-slate-950 dark:text-white">
+                    {t('flights.goproOverlayAddCardTitle')}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">
+                    {goproOverlayUnavailableReason ??
+                      t('flights.goproOverlayAddCardDescription')}
+                  </p>
+                </div>
+                <Button
+                  variant={isGoproOverlayRunning ? 'danger' : 'outline'}
+                  className="mt-4 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
+                  onPress={goproOverlayAction}
+                  isDisabled={
+                    !canUseGoproOverlayAction ||
+                    createGoproOverlayJob.isPending ||
+                    isCancellingGoproOverlay
+                  }
+                  title={goproOverlayTitle}
+                  aria-label={goproOverlayLabel}
+                >
+                  <Wand2 className="h-4 w-4" aria-hidden="true" />
+                  {goproOverlayCompactLabel}
+                </Button>
+              </div>
+            }
+          />
+        )}
+        {visibleGoproOverlays.length === 0 && (
+          <div className="order-5 flex min-h-48 flex-col justify-between rounded-xl border border-dashed border-cyan-300 bg-cyan-50/60 p-3 dark:border-cyan-800 dark:bg-cyan-950/20">
+            <div>
+              <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
+                <Wand2 className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <p className="mt-3 font-semibold text-slate-950 dark:text-white">
+                {t('flights.goproOverlayAddCardTitle')}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">
+                {goproOverlayUnavailableReason ??
+                  t('flights.goproOverlayAddCardDescription')}
+              </p>
+            </div>
+            <Button
+              variant={isGoproOverlayRunning ? 'danger' : 'outline'}
+              className="mt-4 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
+              onPress={goproOverlayAction}
+              isDisabled={
+                !canUseGoproOverlayAction ||
+                createGoproOverlayJob.isPending ||
+                isCancellingGoproOverlay
+              }
+              title={goproOverlayTitle}
+              aria-label={goproOverlayLabel}
+            >
+              <Wand2 className="h-4 w-4" aria-hidden="true" />
+              {goproOverlayCompactLabel}
+            </Button>
+          </div>
+        )}
 
         {(flight.youtube_urls?.length ?? 0) > 0 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800 sm:p-5">
