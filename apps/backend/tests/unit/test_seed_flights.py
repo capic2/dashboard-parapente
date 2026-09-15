@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 import config
 import seed_flights
-from models import Flight, Site
+from models import Flight, GoproOverlayJob, Site
 from sqlalchemy.orm import sessionmaker
 
 
@@ -18,6 +18,20 @@ def test_create_sample_video_embeds_gpx_start_time(tmp_path: Path) -> None:
 
     command = run.call_args.args[0]
     assert "creation_time=2026-09-13T10:30:00Z" in command
+
+
+def test_create_sample_overlay_uses_a_single_frame_for_fast_staging_startup(
+    tmp_path: Path,
+) -> None:
+    overlay_path = tmp_path / "telemetry-overlay.mov"
+
+    with patch("seed_flights.subprocess.run") as run:
+        seed_flights.create_sample_overlay(overlay_path, duration_seconds=180)
+
+    command = run.call_args.args[0]
+    assert "color=c=black@0.0:s=640x360:r=1/180" in command
+    assert command[command.index("-t") + 1] == "180"
+    assert command[command.index("-pix_fmt") + 1] == "argb"
 
 
 def test_seed_flights_can_create_staging_media(
@@ -36,6 +50,11 @@ def test_seed_flights_can_create_staging_media(
         created_videos.append(path)
 
     monkeypatch.setattr(seed_flights, "create_sample_video", write_sample_video)
+    monkeypatch.setattr(
+        seed_flights,
+        "create_sample_overlay",
+        lambda path: (path.parent.mkdir(parents=True, exist_ok=True), path.write_bytes(b"overlay")),
+    )
 
     assert seed_flights.seed_flights(include_media=True) == 5
 
@@ -52,6 +71,11 @@ def test_seed_flights_can_create_staging_media(
             assert Path(flight.pano_video_file_path).is_file()
             assert Path(flight.gopro_overlay_file_path).is_file()
             assert flight.gopro_overlay_status == "completed"
+            overlay_layer = db.get(GoproOverlayJob, f"staging-overlay-layer-{flight.id}")
+            assert overlay_layer is not None
+            assert overlay_layer.status == "completed"
+            assert Path(overlay_layer.output_path).is_file()
+            assert overlay_layer.command_json == '{"overlay_only": true, "staging_fixture": true}'
 
         imported_flight = Flight(
             id="imported-flight",
