@@ -297,7 +297,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   exportJobId,
   exportToken,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const resolvedFlightTitle = flightTitle || t('flights.viewer.defaultTitle');
   const {
     data: gpxData,
@@ -328,6 +328,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(compact);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentElapsedTime, setCurrentElapsedTime] = useState(0);
+  const [currentFlightTimestamp, setCurrentFlightTimestamp] = useState<
+    number | null
+  >(null);
   const appUnits = useAppSettingsStore((state) => state.settings.units);
   const viewerUnits: ViewerUnits = useMemo(
     () => ({
@@ -772,6 +775,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       timestampsRef.current = timestamps;
       currentIndexRef.current = 0;
       currentTimestampRef.current = null;
+      setCurrentFlightTimestamp(timestamps[0] > 0 ? timestamps[0] : null);
       cameraTargetRef.current = null;
       visiblePositionsRef.current = [];
 
@@ -943,6 +947,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       setIsPlaying(false);
       currentIndexRef.current = 0;
       setCurrentProgress(0);
+      setCurrentFlightTimestamp(null);
 
       if (typeof window !== 'undefined' && window._cesiumViewer === viewer) {
         window._cesiumViewer = undefined;
@@ -1384,6 +1389,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         typeof window !== 'undefined' && Boolean(window._exportMode);
 
       if (timestampsRef.current.length > 0 && !isExportMode) {
+        if (scenePosition.timestamp > 0) {
+          setCurrentFlightTimestamp(scenePosition.timestamp);
+        }
         const startTimestamp = timestampsRef.current[0];
         setCurrentElapsedTime(
           (scenePosition.timestamp - startTimestamp) / 1000
@@ -1630,6 +1638,9 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     cameraTargetRef.current = null;
     setCurrentProgress(0);
     setCurrentElapsedTime(0);
+    setCurrentFlightTimestamp(
+      timestampsRef.current[0] > 0 ? timestampsRef.current[0] : null
+    );
 
     if (allPositionsRef.current.length > 0) {
       visiblePositionsRef.current = [];
@@ -1877,6 +1888,16 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     return `${mins}min ${secs.toString().padStart(2, '0')}s`;
   };
 
+  const formatFlightClock = (timestamp: number | null): string => {
+    if (!timestamp) return '--:--:--';
+
+    return new Intl.DateTimeFormat(i18n.language, {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).format(new Date(timestamp));
+  };
+
   const renderOverlay = () => {
     if (isLoading) {
       return (
@@ -2085,6 +2106,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                   <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">
                     ⏱️ {formatFlightTime(currentElapsedTime)} /{' '}
                     {formatFlightTime(gpxData?.flight_duration_seconds || 0)}
+                  </div>
+
+                  <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">
+                    🕒 {t('flights.viewer.flightTime')}:{' '}
+                    {formatFlightClock(currentFlightTimestamp)}
                   </div>
 
                   {/* Speed Slider */}

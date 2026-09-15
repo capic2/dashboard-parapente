@@ -1377,6 +1377,7 @@
       "pause": "Pause",
       "play": "Lecture",
       "position": "Position",
+      "flightTime": "Heure",
       "speed": "Vitesse",
       "videoSection": "Vidéo",
       "videoStartError": "Impossible de lancer la génération",
