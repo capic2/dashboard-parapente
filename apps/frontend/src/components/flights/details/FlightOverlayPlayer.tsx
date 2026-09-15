@@ -110,8 +110,11 @@ export function FlightOverlayPlayer({
           className={
             cameraIsMain || layout === 'side-by-side'
               ? 'aspect-video w-full object-contain'
-              : 'pointer-events-none absolute inset-0 z-20 h-full w-full opacity-0'
+              : 'absolute bottom-3 right-3 z-20 aspect-video w-1/3 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
           }
+          onClick={() => {
+            if (layout === 'flight-main') setLayout('camera-main');
+          }}
           aria-label={cameraLabel}
         >
           <track kind="captions" />
