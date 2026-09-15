@@ -4217,6 +4217,51 @@ def test_create_gopro_overlay_job_from_paths_sanitizes_output_filename_in_source
     assert Path(job["output_path"]) == tmp_path / "Arguel_test-1080p.mp4"
 
 
+def test_create_overlay_only_job_uses_mov_output_for_transparent_layer(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    test_db: Any,
+) -> None:
+    layout_dir = tmp_path / "layouts"
+    layout_dir.mkdir()
+    (layout_dir / "layout_parapente_1080.xml").write_text("<layout />")
+    video_path = tmp_path / "source.mp4"
+    gpx_path = tmp_path / "source.gpx"
+    video_path.write_bytes(b"video")
+    gpx_path.write_text("<gpx />")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+
+    job = create_gopro_overlay_job_from_paths(
+        video_path=video_path,
+        gpx_path=gpx_path,
+        pip_path=None,
+        layout_id="parapente-1080",
+        output_filename="interactive-gopro-overlay.webm",
+        overlay_only=True,
+    )
+
+    assert Path(job["output_path"]) == tmp_path / "interactive-gopro-overlay.mov"
+
+
+def test_rq_overlay_job_raises_when_render_is_marked_failed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    job_id = "failed-rq-job"
+    monkeypatch.setattr(gopro_overlay_export, "_run_job", lambda _job_id: None)
+    gopro_overlay_export._JOBS[job_id] = {
+        "job_id": job_id,
+        "status": "failed",
+        "error": "ffmpeg failed",
+    }
+    try:
+        with pytest.raises(RuntimeError, match="ffmpeg failed"):
+            gopro_overlay_export.process_gopro_overlay_job(job_id)
+    finally:
+        gopro_overlay_export._JOBS.pop(job_id, None)
+
+
 def test_cancelled_queued_job_does_not_start_process():
     job_id = "queued-job"
     gopro_overlay_export._JOBS[job_id] = {

@@ -2339,8 +2339,9 @@ def _create_gopro_overlay_job_from_paths(
     if output_resolution not in _OUTPUT_RESOLUTIONS:
         raise ValueError("Unknown output resolution")
     output_name = _safe_filename(output_filename, f"gopro-overlay-{job_id}.mp4")
-    if not overlay_only and Path(output_name).suffix.lower() != ".mp4":
-        output_name = f"{Path(output_name).stem}.mp4"
+    expected_suffix = ".mov" if overlay_only else ".mp4"
+    if Path(output_name).suffix.lower() != expected_suffix:
+        output_name = f"{Path(output_name).stem}{expected_suffix}"
     output_path = _output_path_for_dir(output_dir, video_path, output_name)
 
     selected_layout = _find_layout(layout_id) if layout_id else _LAYOUTS[0]
@@ -2988,6 +2989,11 @@ def enqueue_pending_gopro_overlay_jobs(*, recover_active: bool = False) -> int:
 def process_gopro_overlay_job(job_id: str) -> None:
     """RQ job target for one GoPro overlay render."""
     _run_job(job_id)
+    job = get_gopro_overlay_job(job_id)
+    if job and job.get("status") == _STATUS_FAILED:
+        raise RuntimeError(
+            str(job.get("error") or job.get("message") or "Overlay rendering failed")
+        )
 
 
 def _mark_interrupted_jobs_failed() -> None:
