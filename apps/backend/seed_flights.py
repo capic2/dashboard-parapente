@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from database import SessionLocal
 from flight_storage import flight_directory
-from models import Flight, Site
+from models import Flight, GoproOverlayJob, Site
 
 SAMPLE_FLIGHT_TITLES = {
     "Vol d'initiation Arguel",
@@ -65,6 +65,43 @@ def create_sample_video(
     )
 
 
+def create_sample_overlay(
+    overlay_path: Path, duration_seconds: int = SAMPLE_MEDIA_DURATION_SECONDS
+) -> None:
+    """Create a visible transparent layer for the staging dynamic-player fixture."""
+    overlay_path.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=black@0.0:s=640x360:r=30",
+            "-vf",
+            (
+                "format=rgba,"
+                "drawbox=x=24:y=24:w=230:h=62:color=black@0.72:t=fill,"
+                "drawtext=fontfile=/usr/share/fonts/truetype/liberation/"
+                "LiberationSans-Regular.ttf:text='STAGING OVERLAY':"
+                "fontcolor=white:fontsize=22:x=40:y=44"
+            ),
+            "-t",
+            str(duration_seconds),
+            "-an",
+            "-c:v",
+            "qtrle",
+            "-pix_fmt",
+            "argb",
+            "-y",
+            str(overlay_path),
+        ],
+        check=True,
+    )
+
+
 def ensure_sample_media(db: Session, flights: list[Flight]) -> int:
     """Create the camera, pano, and overlay files used by staging fixtures."""
     created_count = 0
@@ -90,6 +127,40 @@ def ensure_sample_media(db: Session, flights: list[Flight]) -> int:
         flight.gopro_overlay_status = "completed"
 
     return created_count
+
+
+def ensure_sample_overlay_layers(db: Session, flights: list[Flight]) -> None:
+    """Give each staging fixture the durable alpha layer used by the dynamic player."""
+    for flight in flights:
+        directory = flight_directory(db, flight)
+        overlay_path = directory / "overlays" / "telemetry-overlay.mov"
+        create_sample_overlay(overlay_path)
+
+        job_id = f"staging-overlay-layer-{flight.id}"
+        job = db.get(GoproOverlayJob, job_id)
+        if job is None:
+            job = GoproOverlayJob(id=job_id)
+            db.add(job)
+
+        completed_at = flight.updated_at or datetime.utcnow()
+        job.flight_id = flight.id
+        job.status = "completed"
+        job.progress = 100
+        job.message = "Staging overlay layer ready"
+        job.video_path = str(directory / "camera.mp4")
+        job.gpx_path = str(directory / "track.gpx")
+        job.pip_path = None
+        job.layout_id = "staging-overlay"
+        job.layout_label = "Staging transparent overlay"
+        job.layout_path = "staging-fixture"
+        job.output_path = str(overlay_path)
+        job.temp_output_path = str(overlay_path.with_suffix(".part.mov"))
+        job.output_filename = overlay_path.name
+        job.video_width = 640
+        job.video_height = 360
+        job.render_method = "fixture"
+        job.command_json = '{"overlay_only": true, "staging_fixture": true}'
+        job.completed_at = completed_at
 
 
 def ensure_sample_gpx(db: Session, flights: list[Flight]) -> int:
@@ -206,6 +277,7 @@ def seed_flights(force: bool = False, include_media: bool = False) -> int:
                 ]
                 ensure_sample_gpx(db, sample_flights)
                 ensure_sample_media(db, sample_flights)
+                ensure_sample_overlay_layers(db, sample_flights)
                 db.commit()
             return 0
         if existing_flights > 0:
@@ -307,6 +379,7 @@ def seed_flights(force: bool = False, include_media: bool = False) -> int:
         if include_media:
             ensure_sample_gpx(db, sample_flights)
             ensure_sample_media(db, sample_flights)
+            ensure_sample_overlay_layers(db, sample_flights)
         db.commit()
         return created_count
 

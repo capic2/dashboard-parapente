@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 import config
 import seed_flights
-from models import Flight, Site
+from models import Flight, GoproOverlayJob, Site
 from sqlalchemy.orm import sessionmaker
 
 
@@ -36,6 +36,11 @@ def test_seed_flights_can_create_staging_media(
         created_videos.append(path)
 
     monkeypatch.setattr(seed_flights, "create_sample_video", write_sample_video)
+    monkeypatch.setattr(
+        seed_flights,
+        "create_sample_overlay",
+        lambda path: (path.parent.mkdir(parents=True, exist_ok=True), path.write_bytes(b"overlay")),
+    )
 
     assert seed_flights.seed_flights(include_media=True) == 5
 
@@ -52,6 +57,11 @@ def test_seed_flights_can_create_staging_media(
             assert Path(flight.pano_video_file_path).is_file()
             assert Path(flight.gopro_overlay_file_path).is_file()
             assert flight.gopro_overlay_status == "completed"
+            overlay_layer = db.get(GoproOverlayJob, f"staging-overlay-layer-{flight.id}")
+            assert overlay_layer is not None
+            assert overlay_layer.status == "completed"
+            assert Path(overlay_layer.output_path).is_file()
+            assert overlay_layer.command_json == '{"overlay_only": true, "staging_fixture": true}'
 
         imported_flight = Flight(
             id="imported-flight",
