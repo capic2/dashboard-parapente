@@ -91,6 +91,16 @@ export function FlightOverlayPlayer({
     overlayRef.current?.pause();
   };
 
+  const handleOverlayReady = () => {
+    syncMedia();
+    // The browser preview may finish converting after the camera started.
+    // Retry playback at that point so the transparent layer cannot remain
+    // silently paused after its source becomes playable.
+    if (cameraRef.current && !cameraRef.current.paused) {
+      void overlayRef.current?.play();
+    }
+  };
+
   const cameraIsMain = layout === 'camera-main';
   const flightIsMain = layout === 'flight-main';
   const isInteractive = mode === 'interactive';
@@ -155,8 +165,8 @@ export function FlightOverlayPlayer({
             src={overlayUrl}
             playsInline
             preload="auto"
-            onLoadedMetadata={syncMedia}
-            onCanPlay={syncMedia}
+            onLoadedMetadata={handleOverlayReady}
+            onCanPlay={handleOverlayReady}
             muted
             className="pointer-events-none absolute inset-0 z-[15] h-full w-full object-contain"
             aria-label={t('flights.overlayLayerReady')}
