@@ -1,9 +1,9 @@
-import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CircleAlert, Wand2 } from 'lucide-react';
 import type { FlightOverlayLayer } from '../../../hooks/gopro/useGoproOverlay';
 import { getApiUrlWithSearchParams } from '../../../lib/api';
 import { useAuthStore } from '../../../stores/authStore';
+import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 
 interface FlightOverlayInteractivePreviewProps {
   flightId: string;
@@ -16,8 +16,6 @@ export function FlightOverlayInteractivePreview({
 }: FlightOverlayInteractivePreviewProps) {
   const { t } = useTranslation();
   const token = useAuthStore((state) => state.token);
-  const cameraRef = useRef<HTMLVideoElement>(null);
-  const overlayRef = useRef<HTMLVideoElement>(null);
   const isReady =
     overlayLayer?.status === 'completed' && Boolean(overlayLayer.job);
   const overlayJob = isReady ? overlayLayer.job : null;
@@ -27,15 +25,6 @@ export function FlightOverlayInteractivePreview({
         { access_token: token, version: overlayJob.updated_at }
       )
     : undefined;
-
-  const syncOverlay = () => {
-    const camera = cameraRef.current;
-    const overlay = overlayRef.current;
-    if (!camera || !overlay) return;
-    if (Math.abs(overlay.currentTime - camera.currentTime) > 0.08) {
-      overlay.currentTime = camera.currentTime;
-    }
-  };
 
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
@@ -58,42 +47,18 @@ export function FlightOverlayInteractivePreview({
       </div>
       <div className="border-t border-slate-200 p-4 dark:border-slate-700 sm:p-5">
         {overlayUrl ? (
-          <div className="overflow-hidden rounded-xl bg-black">
-            <div className="relative aspect-video">
-              <video
-                ref={cameraRef}
-                src={getApiUrlWithSearchParams(
-                  `flights/${flightId}/gopro-camera/preview`,
-                  { access_token: token }
-                )}
-                controls
-                playsInline
-                preload="metadata"
-                className="absolute inset-0 h-full w-full object-contain"
-                aria-label={t('flights.goproOverlayCameraPreview')}
-                onPlay={() => {
-                  syncOverlay();
-                  void overlayRef.current?.play();
-                }}
-                onPause={() => overlayRef.current?.pause()}
-                onSeeked={syncOverlay}
-                onTimeUpdate={syncOverlay}
-              >
-                <track kind="captions" />
-              </video>
-              <video
-                ref={overlayRef}
-                src={overlayUrl}
-                muted
-                playsInline
-                preload="metadata"
-                className="pointer-events-none absolute inset-0 z-10 h-full w-full object-contain"
-                aria-label={t('flights.overlayLayerReady')}
-              >
-                <track kind="captions" />
-              </video>
-            </div>
-          </div>
+          <FlightOverlayPlayer
+            cameraUrl={getApiUrlWithSearchParams(
+              `flights/${flightId}/gopro-camera/preview`,
+              { access_token: token }
+            )}
+            flightUrl={getApiUrlWithSearchParams(`flights/${flightId}/video`, {
+              access_token: token,
+            })}
+            cameraLabel={t('flights.goproOverlayCameraPreview')}
+            flightLabel={t('flights.goproOverlayFlightVideo')}
+            overlayUrl={overlayUrl}
+          />
         ) : (
           <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
             <CircleAlert
