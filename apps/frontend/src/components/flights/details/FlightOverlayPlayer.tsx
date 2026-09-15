@@ -199,6 +199,7 @@ export function FlightOverlayPlayer({
             playsInline
             preload="auto"
             onLoadedMetadata={handleOverlayReady}
+            onLoadedData={handleOverlayReady}
             onCanPlay={handleOverlayReady}
             muted
             className="pointer-events-none absolute inset-0 z-[15] h-full w-full object-contain"
