@@ -1,18 +1,15 @@
 <layout width="1920" height="1080">
-  <frame x="1320" y="56" width="540" height="700" cr="32" bg="7,18,36,190" outline="210,235,255,220">
-    <component type="text" x="52" y="55" size="54">TÉLÉMÉTRIE DE VOL</component>
-
-    <component type="text" x="52" y="145" size="42">ALTITUDE</component>
-    <component type="metric" x="52" y="205" metric="alt" dp="0" size="112" />
-    <component type="metric_unit" x="315" y="245" metric="alt" units="m" size="48">m</component>
-
-    <component type="text" x="52" y="365" size="42">DISTANCE</component>
-    <component type="metric" x="52" y="425" metric="odo" units="km" dp="1" size="92" />
-    <component type="text" x="305" y="455" size="42">km</component>
-
-    <component type="text" x="52" y="550" size="42">DÉNIVELÉ +</component>
-    <component type="custom_calc" x="52" y="610" expression="precalc.get('total_gain', 0)" dp="0" size="92" />
-    <component type="text" x="305" y="640" size="42">m</component>
+  <frame x="40" y="760" width="1840" height="280" cr="32" bg="7,18,36,190" outline="210,235,255,220">
+    <component type="text" x="52" y="58" size="42">TÉLÉMÉTRIE DE VOL</component>
+    <component type="text" x="520" y="58" size="36">ALTITUDE</component>
+    <component type="metric" x="520" y="145" metric="alt" dp="0" size="82" />
+    <component type="metric_unit" x="700" y="145" metric="alt" units="m" size="34">m</component>
+    <component type="text" x="900" y="58" size="36">DISTANCE</component>
+    <component type="metric" x="900" y="145" metric="odo" units="km" dp="1" size="82" />
+    <component type="text" x="1080" y="145" size="34">km</component>
+    <component type="text" x="1280" y="58" size="36">DÉNIVELÉ +</component>
+    <component type="custom_calc" x="1280" y="145" expression="precalc.get('total_gain', 0)" dp="0" size="82" />
+    <component type="text" x="1460" y="145" size="34">m</component>
   </frame>
 
   <component type="datetime" format="%H:%M:%S" x="70" y="72" size="64" />
