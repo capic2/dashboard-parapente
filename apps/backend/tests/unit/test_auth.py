@@ -16,7 +16,6 @@ def test_internal_staging_auto_login_only_applies_to_the_configured_origin(monke
     db = Mock()
     db.query.return_value.filter.return_value.first.return_value = user
     monkeypatch.setattr(auth.config, "ENVIRONMENT", "staging")
-    monkeypatch.setattr(auth.config, "INTERNAL_STAGING_AUTO_LOGIN", True)
     monkeypatch.setattr(auth.config, "INTERNAL_STAGING_AUTO_LOGIN_HOST", "192.168.1.106:18001")
     monkeypatch.setattr(auth.config, "ADMIN_EMAIL", "admin@example.test")
 

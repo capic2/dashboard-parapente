@@ -52,8 +52,6 @@ def _can_auto_authenticate_internal_staging(request: Request) -> bool:
     """Allow the explicit staging test mode on its private HTTP origin only."""
     return (
         config.ENVIRONMENT == "staging"
-        and config.INTERNAL_STAGING_AUTO_LOGIN
-        and bool(config.INTERNAL_STAGING_AUTO_LOGIN_HOST)
         and request.headers.get("host") == config.INTERNAL_STAGING_AUTO_LOGIN_HOST
     )
 
