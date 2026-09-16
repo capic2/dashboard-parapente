@@ -1,6 +1,8 @@
 <layout width="1920" height="1080">
-  <frame x="1320" y="56" width="540" height="700" cr="32" bg="7,18,36,190" outline="210,235,255,220">
-    <component type="text" x="52" y="55" size="54">TÉLÉMÉTRIE DE VOL</component>
+  <!-- Keep a safe right margin so the title and metric units are not clipped
+       when GoPro's 3840x2160-authored layout is rendered at 1080p. -->
+  <frame x="1240" y="56" width="620" height="700" cr="32" bg="7,18,36,190" outline="210,235,255,220">
+    <component type="text" x="52" y="55" size="46">TÉLÉMÉTRIE DE VOL</component>
     <component type="text" x="52" y="145" size="42">ALTITUDE</component>
     <component type="metric" x="52" y="205" metric="alt" dp="0" size="112" />
     <component type="metric_unit" x="315" y="245" metric="alt" units="m" size="48">m</component>
