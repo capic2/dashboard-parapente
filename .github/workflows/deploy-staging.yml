@@ -253,6 +253,8 @@ jobs:
             export CONTAINER_PREFIX="parapente-staging"
             export ENVIRONMENT=staging
             export BACKEND_HOST_PORT="$PORT"
+            export BACKEND_INTERNAL_STAGING_AUTO_LOGIN=true
+            export BACKEND_INTERNAL_STAGING_AUTO_LOGIN_HOST="192.168.1.106:$PORT"
             export REDIS_HOST_PORT=0
             export DATABASE_HOST_DIR="$STACK_DIR/data/db"
             export REDIS_HOST_DIR="$STACK_DIR/data/redis"

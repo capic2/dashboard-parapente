@@ -241,6 +241,10 @@ JWT_SECRET = os.getenv("BACKEND_JWT_SECRET")
 JWT_EXPIRE_HOURS = int(os.getenv("BACKEND_JWT_EXPIRE_HOURS", "168"))  # 7 days
 ADMIN_EMAIL = os.getenv("BACKEND_ADMIN_EMAIL")
 ADMIN_PASSWORD = os.getenv("BACKEND_ADMIN_PASSWORD")
+INTERNAL_STAGING_AUTO_LOGIN = (
+    os.getenv("BACKEND_INTERNAL_STAGING_AUTO_LOGIN", "false").lower() == "true"
+)
+INTERNAL_STAGING_AUTO_LOGIN_HOST = os.getenv("BACKEND_INTERNAL_STAGING_AUTO_LOGIN_HOST", "")
 
 # ============================================================================
 # YOUTUBE UPLOAD (Optional)
