@@ -534,6 +534,11 @@ def read_root():
 # ============================================
 
 STATIC_DIR = Path(__file__).parent / "static"
+STAGING_CESIUM_DIR = STATIC_DIR / "staging" / "cesium"
+if not STAGING_CESIUM_DIR.exists():
+    # Local builds keep Cesium at the static root, while Vite's /staging/
+    # build nests it under static/staging.
+    STAGING_CESIUM_DIR = STATIC_DIR / "cesium"
 
 if STATIC_DIR.exists():
     logger.info(f"✓ Static directory found: {STATIC_DIR}")
@@ -547,9 +552,10 @@ if STATIC_DIR.exists():
     )
     app.mount(
         "/staging/cesium",
-        StaticFiles(directory=STATIC_DIR / "cesium"),
+        StaticFiles(directory=STAGING_CESIUM_DIR),
         name="staging-cesium",
     )
+    app.mount("/cesium", StaticFiles(directory=STAGING_CESIUM_DIR), name="cesium")
 
     # Catch-all route for SPA (MUST be LAST route)
     @app.get("/{full_path:path}")

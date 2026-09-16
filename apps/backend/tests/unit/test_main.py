@@ -22,6 +22,13 @@ def test_staging_api_routes_are_available_without_a_reverse_proxy(client):
     assert response.headers["content-type"].startswith("application/json")
 
 
+def test_staging_cesium_assets_are_available_without_a_reverse_proxy(client):
+    response = client.get("/staging/cesium/Cesium.js")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/javascript")
+
+
 def test_root_route_returns_api_status_when_frontend_is_missing(client, tmp_path, monkeypatch):
     import main
 
