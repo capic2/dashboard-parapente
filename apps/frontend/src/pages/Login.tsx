@@ -1,9 +1,12 @@
 import { useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LoginForm } from '../components/auth/LoginForm';
 import { useLogin } from '../hooks/auth/useLogin';
+import { api } from '../lib/api';
 import { useAuthStore } from '../stores/authStore';
+
+const INTERNAL_STAGING_HOST = '192.168.1.106:18001';
 
 export default function Login() {
   const { t } = useTranslation();
@@ -11,6 +14,25 @@ export default function Login() {
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState<string>();
   const loginMutation = useLogin();
+
+  useEffect(() => {
+    if (window.location.host !== INTERNAL_STAGING_HOST) return;
+
+    let cancelled = false;
+    void api
+      .post('auth/internal-staging-login')
+      .json<{ access_token: string }>()
+      .then(async ({ access_token }) => {
+        if (cancelled) return;
+        login(access_token);
+        await navigate({ to: '/' });
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [login, navigate]);
 
   const handleSubmit = async (value: { email: string; password: string }) => {
     setErrorMessage(undefined);

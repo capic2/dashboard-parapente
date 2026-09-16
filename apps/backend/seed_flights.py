@@ -18,7 +18,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from database import SessionLocal
 from flight_storage import flight_directory
-from models import Flight, Site
+from gopro_overlay_export import create_gopro_overlay_job_from_paths, probe_video_resolution
+from models import Flight, GoproOverlayJob, Site
 
 SAMPLE_FLIGHT_TITLES = {
     "Vol d'initiation Arguel",
@@ -72,7 +73,7 @@ def ensure_sample_media(db: Session, flights: list[Flight]) -> int:
 
     for index, flight in enumerate(flights):
         directory = flight_directory(db, flight)
-        for filename in ("flight.mp4", "camera.mp4", "pano.mp4", "final.mp4"):
+        for filename in ("flight.mp4", "camera.mp4", "pano.mp4"):
             path = directory / filename
             # These are disposable staging fixtures. Recreate them on every
             # startup so persistent volumes pick up metadata changes too.
@@ -82,14 +83,53 @@ def ensure_sample_media(db: Session, flights: list[Flight]) -> int:
 
         video_path = (directory / "flight.mp4").resolve()
         pano_path = (directory / "pano.mp4").resolve()
-        overlay_path = (directory / "final.mp4").resolve()
+        legacy_overlay_path = directory / "final.mp4"
+        if legacy_overlay_path.exists():
+            legacy_overlay_path.unlink()
         flight.video_file_path = str(video_path)
         flight.video_export_status = "completed"
         flight.pano_video_file_path = str(pano_path)
-        flight.gopro_overlay_file_path = str(overlay_path)
-        flight.gopro_overlay_status = "completed"
+        flight.gopro_overlay_file_path = None
+        flight.gopro_overlay_status = None
 
     return created_count
+
+
+def ensure_sample_overlay_layers(db: Session, flights: list[Flight]) -> None:
+    """Queue the real GoPro telemetry layer used by the dynamic player."""
+    for flight in flights:
+        existing = (
+            db.query(GoproOverlayJob)
+            .filter(
+                GoproOverlayJob.flight_id == flight.id,
+                GoproOverlayJob.command_json.contains('"overlay_only": true'),
+            )
+            .first()
+        )
+        if existing:
+            db.delete(existing)
+
+    # The job creator uses its own database session.  Commit sample flights and
+    # removals first so that the second transaction neither violates the flight
+    # foreign key nor blocks on a row lock held by this seed transaction.
+    db.commit()
+
+    for flight in flights:
+        directory = flight_directory(db, flight)
+        camera_path = directory / "camera.mp4"
+        gpx_path = directory / "track.gpx"
+        width, height = probe_video_resolution(camera_path)
+        create_gopro_overlay_job_from_paths(
+            video_path=camera_path,
+            gpx_path=gpx_path,
+            pip_path=None,
+            layout_id=None,
+            output_filename="telemetry-overlay.mov",
+            output_dir=str(directory / "overlays"),
+            flight_id=flight.id,
+            overlay_only=True,
+            overlay_size=(width, height),
+        )
 
 
 def ensure_sample_gpx(db: Session, flights: list[Flight]) -> int:
@@ -105,6 +145,8 @@ def ensure_sample_gpx(db: Session, flights: list[Flight]) -> int:
             flight.site.longitude,
             SAMPLE_MEDIA_DURATION_MINUTES,
             start_time=flight.created_at - timedelta(seconds=SAMPLE_MEDIA_DURATION_SECONDS),
+            target_distance_km=flight.distance_km,
+            target_max_altitude_m=flight.max_altitude_m,
             output_path=gpx_path,
         )
         flight.gpx_file_path = str(gpx_path.resolve())
@@ -125,6 +167,8 @@ def create_sample_gpx(
     start_lon: float,
     duration_min: int,
     start_time: datetime | None = None,
+    target_distance_km: float | None = None,
+    target_max_altitude_m: float | None = None,
     output_path: Path | None = None,
 ) -> Path:
     """
@@ -152,15 +196,34 @@ def create_sample_gpx(
     lat, lon = start_lat, start_lon
     elevation = 800  # Start at 800m
     max_elevation = 800
+    total_latitude_degrees = (
+        target_distance_km / 111.32 if target_distance_km and target_distance_km > 0 else None
+    )
+    target_peak = (
+        max(800.0, target_max_altitude_m)
+        if target_max_altitude_m and target_max_altitude_m > 0
+        else None
+    )
 
     for i in range(num_points):
-        # Simulate circular flight pattern with some drift
-        (i / num_points) * 2 * 3.14159 * 2  # 2 circles
-        lat = start_lat + 0.01 * (i / num_points) + 0.005 * random.uniform(-1, 1)
-        lon = start_lon + 0.01 * (i / num_points) + 0.005 * random.uniform(-1, 1)
+        progress = i / max(1, num_points - 1)
+        if total_latitude_degrees is not None:
+            # Keep seeded telemetry consistent with the distance shown in the
+            # flight summary instead of adding random lateral detours.
+            lat = start_lat + total_latitude_degrees * progress
+            lon = start_lon
+        else:
+            # Simulate circular flight pattern with some drift.
+            lat = start_lat + 0.01 * progress + 0.005 * random.uniform(-1, 1)
+            lon = start_lon + 0.01 * progress + 0.005 * random.uniform(-1, 1)
 
         # Elevation changes - climb first, then descend
-        if i < num_points * 0.3:
+        if target_peak is not None:
+            if progress <= 0.3:
+                elevation = 800 + (target_peak - 800) * (progress / 0.3)
+            else:
+                elevation = target_peak - (target_peak - 820) * ((progress - 0.3) / 0.7)
+        elif i < num_points * 0.3:
             elevation += random.uniform(5, 15)  # Climbing
         elif i < num_points * 0.8:
             elevation += random.uniform(-3, 3)  # Maintaining
@@ -206,6 +269,7 @@ def seed_flights(force: bool = False, include_media: bool = False) -> int:
                 ]
                 ensure_sample_gpx(db, sample_flights)
                 ensure_sample_media(db, sample_flights)
+                ensure_sample_overlay_layers(db, sample_flights)
                 db.commit()
             return 0
         if existing_flights > 0:
@@ -278,6 +342,8 @@ def seed_flights(force: bool = False, include_media: bool = False) -> int:
                 site.longitude,
                 SAMPLE_MEDIA_DURATION_MINUTES,
                 start_time=created_at - timedelta(seconds=SAMPLE_MEDIA_DURATION_SECONDS),
+                target_distance_km=flight_data["distance"],
+                target_max_altitude_m=flight_data["max_alt"],
             )
 
             # Calculate elevation gain (rough estimate)
@@ -307,6 +373,7 @@ def seed_flights(force: bool = False, include_media: bool = False) -> int:
         if include_media:
             ensure_sample_gpx(db, sample_flights)
             ensure_sample_media(db, sample_flights)
+            ensure_sample_overlay_layers(db, sample_flights)
         db.commit()
         return created_count
 

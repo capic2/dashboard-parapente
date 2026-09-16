@@ -409,6 +409,12 @@ _GOPRO_OVERLAY_MERGED_GPX_FILENAME = "merged-gopro-overlay.gpx"
 def _flight_gopro_overlay_file_path(
     db: Session, flight: Flight, job: dict[str, Any] | None = None
 ) -> str | None:
+    layer_job = _flight_overlay_layer_job(flight)
+    if layer_job and layer_job.status == "completed":
+        layer_path = _resolve_flight_file_path(layer_job.output_path)
+        if layer_path and layer_path.is_file():
+            return str(layer_path)
+
     stored_path = _resolve_flight_file_path(flight.gopro_overlay_file_path)
     if stored_path and stored_path.exists():
         return str(stored_path)
@@ -493,8 +499,7 @@ def _flight_gopro_overlay_progress(flight: Flight, job: dict[str, Any] | None = 
 
 def _flight_gopro_overlay_file_exists(db: Session, flight: Flight) -> bool:
     overlay_path = ensure_flight_directory(db, flight) / "overlays" / "pano-telemetry-overlay.mov"
-    overlay_path.parent.mkdir(parents=True, exist_ok=True)
-    return bool(overlay_path)
+    return overlay_path.is_file()
 
 
 def _flight_gopro_overlay_state(db: Session, flight: Flight) -> dict[str, Any]:
@@ -1406,6 +1411,28 @@ def login(
         httponly=True,
         samesite="lax",
         secure=config.ENVIRONMENT == "production",
+    )
+    return {"access_token": token, "token_type": "bearer"}
+
+
+@public_router.post("/auth/internal-staging-login")
+def internal_staging_login(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Bootstrap the frontend token on the private staging HTTP origin only."""
+    if request.headers.get("host") != config.INTERNAL_STAGING_AUTO_LOGIN_HOST:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    user = db.query(User).filter(User.email == config.ADMIN_EMAIL).first()
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=401, detail="Internal staging user unavailable")
+
+    token = create_access_token(user.email)
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        max_age=config.JWT_EXPIRE_HOURS * 60 * 60,
+        httponly=True,
+        samesite="lax",
+        secure=False,
     )
     return {"access_token": token, "token_type": "bearer"}
 
@@ -7113,7 +7140,12 @@ def stream_flight_gopro_camera_preview(
         )
         else camera_path
     )
-    return FileResponse(path=video_path, media_type="video/mp4", content_disposition_type="inline")
+    return FileResponse(
+        path=video_path,
+        media_type="video/mp4",
+        content_disposition_type="inline",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.post(

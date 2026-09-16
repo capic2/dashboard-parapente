@@ -36,6 +36,13 @@ def test_seed_flights_can_create_staging_media(
         created_videos.append(path)
 
     monkeypatch.setattr(seed_flights, "create_sample_video", write_sample_video)
+    created_layers: list[dict] = []
+    monkeypatch.setattr(seed_flights, "probe_video_resolution", lambda _path: (640, 360))
+    monkeypatch.setattr(
+        seed_flights,
+        "create_gopro_overlay_job_from_paths",
+        lambda **kwargs: created_layers.append(kwargs),
+    )
 
     assert seed_flights.seed_flights(include_media=True) == 5
 
@@ -50,8 +57,8 @@ def test_seed_flights_can_create_staging_media(
             assert Path(flight.video_file_path).is_file()
             assert flight.video_export_status == "completed"
             assert Path(flight.pano_video_file_path).is_file()
-            assert Path(flight.gopro_overlay_file_path).is_file()
-            assert flight.gopro_overlay_status == "completed"
+            assert flight.gopro_overlay_file_path is None
+            assert flight.gopro_overlay_status is None
 
         imported_flight = Flight(
             id="imported-flight",
@@ -63,7 +70,11 @@ def test_seed_flights_can_create_staging_media(
         db.commit()
 
     assert seed_flights.seed_flights(include_media=True) == 0
-    assert len(created_videos) == 40
+    assert len(created_videos) == 30
+    assert len(created_layers) == 10
+    assert all(layer["overlay_only"] is True for layer in created_layers)
+    assert all(layer["pip_path"] is None for layer in created_layers)
+    assert all(layer["overlay_size"] == (640, 360) for layer in created_layers)
 
     with test_db() as db:
         imported_flight = db.get(Flight, "imported-flight")

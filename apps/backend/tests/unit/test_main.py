@@ -14,6 +14,21 @@ def test_health_check_route_is_not_intercepted_by_spa_catch_all(client):
     assert response.json() == {"status": "ok"}
 
 
+def test_staging_api_routes_are_available_without_a_reverse_proxy(client):
+    """A VITE_BASE_PATH=/staging/ build must work on the published HTTP port."""
+    response = client.get("/staging/api/flights")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")
+
+
+def test_staging_cesium_assets_are_available_without_a_reverse_proxy(client):
+    response = client.get("/staging/cesium/Cesium.js")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/javascript")
+
+
 def test_root_route_returns_api_status_when_frontend_is_missing(client, tmp_path, monkeypatch):
     import main
 
