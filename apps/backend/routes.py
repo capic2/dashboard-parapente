@@ -1410,6 +1410,28 @@ def login(
     return {"access_token": token, "token_type": "bearer"}
 
 
+@public_router.post("/auth/internal-staging-login")
+def internal_staging_login(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Bootstrap the frontend token on the private staging HTTP origin only."""
+    if request.headers.get("host") != config.INTERNAL_STAGING_AUTO_LOGIN_HOST:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    user = db.query(User).filter(User.email == config.ADMIN_EMAIL).first()
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=401, detail="Internal staging user unavailable")
+
+    token = create_access_token(user.email)
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        max_age=config.JWT_EXPIRE_HOURS * 60 * 60,
+        httponly=True,
+        samesite="lax",
+        secure=False,
+    )
+    return {"access_token": token, "token_type": "bearer"}
+
+
 @public_router.get("/auth/me")
 def get_me(user: User = Depends(get_current_user)):
     """Get current authenticated user info."""
