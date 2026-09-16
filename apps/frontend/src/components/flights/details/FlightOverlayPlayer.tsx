@@ -156,7 +156,7 @@ export function FlightOverlayPlayer({
           className={
             cameraIsMain || layout === 'side-by-side'
               ? 'aspect-video w-full object-contain'
-              : 'absolute bottom-3 right-3 z-20 aspect-video w-1/3 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
+              : 'absolute bottom-3 left-3 z-20 aspect-video w-1/3 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
           }
           onClick={() => {
             if (layout === 'flight-main') setLayout('camera-main');
@@ -185,7 +185,7 @@ export function FlightOverlayPlayer({
             className={
               flightIsMain || layout === 'side-by-side'
                 ? 'aspect-video w-full object-contain'
-                : 'absolute bottom-3 right-3 z-10 aspect-video w-1/3 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
+                : 'absolute bottom-3 left-3 z-10 aspect-video w-1/3 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
             }
             aria-label={flightLabel}
           >
