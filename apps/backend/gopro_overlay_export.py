@@ -2550,8 +2550,7 @@ def _run_job(job_id: str) -> None:
     # opaque video render, while adding ``--generate overlay`` is rejected in
     # combination with ``--use-gpx-only``.  The timeline is only retained by
     # the queued job preparation to establish the calibrated GPX range.
-    if not overlay_only:
-        common_args.append(job["video_path"])
+    common_args.append(job["video_path"])
     common_args.append(str(temp_output_path))
     command.extend(common_args)
     cpu_command.extend(common_args)
