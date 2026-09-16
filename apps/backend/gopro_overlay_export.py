@@ -170,9 +170,11 @@ def _layout_dir() -> Path:
 
 
 def _layout_path(layout: GoproOverlayLayout) -> Path:
-    # Always use the layout shipped with GoPro Overlay.  The backend only
-    # selects the layout id; it must not replace GoPro's generated layer with
-    # a dashboard-specific imitation.
+    # Keep staging's generated layer backed by the interactive layout shipped
+    # with the backend; the mounted stock file is an empty placeholder.
+    bundled_layout = Path(__file__).parent / "gopro_layouts" / layout.path
+    if bundled_layout.is_file():
+        return bundled_layout
     return _layout_dir() / layout.path
 
 
