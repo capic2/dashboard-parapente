@@ -102,7 +102,7 @@ def ensure_sample_overlay_layers(db: Session, flights: list[Flight]) -> None:
             db.query(GoproOverlayJob)
             .filter(
                 GoproOverlayJob.flight_id == flight.id,
-                GoproOverlayJob.command_json.contains('"staging_fixture": true'),
+                GoproOverlayJob.command_json.contains('"overlay_only": true'),
             )
             .first()
         )
@@ -116,16 +116,6 @@ def ensure_sample_overlay_layers(db: Session, flights: list[Flight]) -> None:
 
     for flight in flights:
         directory = flight_directory(db, flight)
-        existing = (
-            db.query(GoproOverlayJob)
-            .filter(
-                GoproOverlayJob.flight_id == flight.id,
-                GoproOverlayJob.command_json.contains('"overlay_only": true'),
-            )
-            .first()
-        )
-        if existing and existing.status in {"queued", "preparing", "running", "completed"}:
-            continue
         camera_path = directory / "camera.mp4"
         gpx_path = directory / "track.gpx"
         width, height = probe_video_resolution(camera_path)
