@@ -85,6 +85,8 @@ class GoproOverlayLayout:
     path: str
     width: int | None
     height: int | None
+    coordinate_width: int | None = None
+    coordinate_height: int | None = None
 
 
 @dataclass(frozen=True)
@@ -102,6 +104,11 @@ _LAYOUTS = [
         path="layout_parapente_1080.xml",
         width=1920,
         height=1080,
+        # The upstream XML has no root dimensions, but its components are
+        # authored on a 3840x2160 canvas. Keep its advertised output at 1080p
+        # while scaling positions from the actual source coordinate system.
+        coordinate_width=3840,
+        coordinate_height=2160,
     ),
     GoproOverlayLayout(
         id="parapente-3840",
@@ -472,6 +479,8 @@ def _prepare_layout_file(
     target_height: int | None = None,
     layout_width: int | None = None,
     layout_height: int | None = None,
+    layout_coordinate_width: int | None = None,
+    layout_coordinate_height: int | None = None,
 ) -> Path:
     tree = ET.parse(layout_path)
     root = tree.getroot()
@@ -480,12 +489,12 @@ def _prepare_layout_file(
     source_width = (
         parsed_width
         if parsed_width is not None and math.isfinite(parsed_width) and parsed_width > 0
-        else layout_width
+        else layout_coordinate_width or layout_width
     )
     source_height = (
         parsed_height
         if parsed_height is not None and math.isfinite(parsed_height) and parsed_height > 0
-        else layout_height
+        else layout_coordinate_height or layout_height
     )
     scale_x = target_width / source_width if target_width and source_width else None
     scale_y = target_height / source_height if target_height and source_height else None
@@ -501,6 +510,7 @@ def _prepare_layout_file(
         for child in list(parent):
             if child.tag == "component" and child.attrib.get("type") == "video":
                 if has_pip:
+                    child.set("id", "pip")
                     continue
                 # The stock parapente layouts may declare the PIP explicitly
                 # as ``id="pip"``. Remove that component too when highlights
@@ -1784,6 +1794,8 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
             target_height=render_height,
             layout_width=selected_layout.width,
             layout_height=selected_layout.height,
+            layout_coordinate_width=selected_layout.coordinate_width,
+            layout_coordinate_height=selected_layout.coordinate_height,
         )
 
         prepared_job = _update_job(

@@ -2566,6 +2566,33 @@ def test_prepare_layout_file_scales_layout_without_root_dimensions(tmp_path: Pat
     assert 'size="30"' in prepared
 
 
+def test_prepare_layout_file_uses_layout_coordinate_canvas_when_declared(tmp_path: Path) -> None:
+    source = tmp_path / "layout.xml"
+    destination = tmp_path / "prepared.xml"
+    source.write_text(
+        '<layout><composite x="3800" y="1780">'
+        '<component type="text" size="64" />'
+        "</composite></layout>"
+    )
+
+    _prepare_layout_file(
+        source,
+        destination,
+        has_pip=False,
+        target_width=1920,
+        target_height=1080,
+        layout_width=1920,
+        layout_height=1080,
+        layout_coordinate_width=3840,
+        layout_coordinate_height=2160,
+    )
+
+    prepared = destination.read_text()
+    assert 'x="1900"' in prepared
+    assert 'y="890"' in prepared
+    assert 'size="32"' in prepared
+
+
 @pytest.mark.parametrize("invalid_dimension", ["0", "-1", "nan", "inf"])
 def test_prepare_layout_file_rejects_invalid_root_dimensions(
     tmp_path: Path, invalid_dimension: str
