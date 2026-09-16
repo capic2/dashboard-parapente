@@ -7140,7 +7140,12 @@ def stream_flight_gopro_camera_preview(
         )
         else camera_path
     )
-    return FileResponse(path=video_path, media_type="video/mp4", content_disposition_type="inline")
+    return FileResponse(
+        path=video_path,
+        media_type="video/mp4",
+        content_disposition_type="inline",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.post(
