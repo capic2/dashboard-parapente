@@ -176,7 +176,11 @@ def _layout_path(layout: GoproOverlayLayout) -> Path:
     # browser-sized overlay.
     layout_dir = _layout_dir()
     bundled_layout = Path(__file__).parent / "gopro_layouts" / layout.path
-    if layout_dir == Path("/app/gopro-overlay") and bundled_layout.is_file():
+    # Production mounts the upstream layout directory at ``/app/gopro-overlay``
+    # (the absolute path can differ in staging), while tests point the setting
+    # at a temporary directory.  Prefer the backend-bundled interactive layout
+    # for that production mount without affecting test fixtures.
+    if layout_dir.name == "gopro-overlay" and bundled_layout.is_file():
         return bundled_layout
     return layout_dir / layout.path
 
