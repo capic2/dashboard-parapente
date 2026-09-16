@@ -475,6 +475,13 @@ app.add_middleware(
 app.include_router(public_router)
 app.include_router(router)
 
+# PR staging can be reached directly on its published HTTP port, without the
+# reverse proxy that normally strips the /staging prefix. Keep the same API
+# available under that prefix so a frontend built with VITE_BASE_PATH=/staging/
+# remains usable in both access modes.
+app.include_router(public_router, prefix="/staging")
+app.include_router(router, prefix="/staging")
+
 # Database
 DB_PATH = Path(__file__).parent / "db" / "dashboard.db"
 
@@ -533,6 +540,16 @@ if STATIC_DIR.exists():
 
     # Mount static assets (CSS, JS, images, etc.)
     app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+    app.mount(
+        "/staging/assets",
+        StaticFiles(directory=STATIC_DIR / "assets"),
+        name="staging-assets",
+    )
+    app.mount(
+        "/staging/cesium",
+        StaticFiles(directory=STATIC_DIR / "cesium"),
+        name="staging-cesium",
+    )
 
     # Catch-all route for SPA (MUST be LAST route)
     @app.get("/{full_path:path}")
