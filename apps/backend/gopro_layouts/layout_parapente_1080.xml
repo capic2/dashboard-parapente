@@ -9,9 +9,9 @@
     <component type="text" x="104" y="730" size="84">DISTANCE</component>
     <component type="metric" x="104" y="850" metric="odo" units="km" dp="1" size="184" />
     <component type="text" x="610" y="910" size="84">km</component>
-    <component type="text" x="104" y="1010" size="84">DÉNIVELÉ +</component>
-    <component type="custom_calc" x="104" y="1130" expression="precalc.get('total_gain', 0)" dp="0" size="184" />
-    <component type="text" x="610" y="1190" size="84">m</component>
+    <component type="text" x="104" y="1120" size="84">DÉNIVELÉ +</component>
+    <component type="custom_calc" x="104" y="1240" expression="precalc.get('total_gain', 0)" dp="0" size="184" />
+    <component type="text" x="610" y="1300" size="84">m</component>
   </frame>
   <component type="datetime" format="%H:%M:%S" x="140" y="144" size="128" />
 </layout>
