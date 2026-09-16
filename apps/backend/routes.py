@@ -409,6 +409,12 @@ _GOPRO_OVERLAY_MERGED_GPX_FILENAME = "merged-gopro-overlay.gpx"
 def _flight_gopro_overlay_file_path(
     db: Session, flight: Flight, job: dict[str, Any] | None = None
 ) -> str | None:
+    layer_job = _flight_overlay_layer_job(flight)
+    if layer_job and layer_job.status == "completed":
+        layer_path = _resolve_flight_file_path(layer_job.output_path)
+        if layer_path and layer_path.is_file():
+            return str(layer_path)
+
     stored_path = _resolve_flight_file_path(flight.gopro_overlay_file_path)
     if stored_path and stored_path.exists():
         return str(stored_path)
@@ -493,8 +499,7 @@ def _flight_gopro_overlay_progress(flight: Flight, job: dict[str, Any] | None = 
 
 def _flight_gopro_overlay_file_exists(db: Session, flight: Flight) -> bool:
     overlay_path = ensure_flight_directory(db, flight) / "overlays" / "pano-telemetry-overlay.mov"
-    overlay_path.parent.mkdir(parents=True, exist_ok=True)
-    return bool(overlay_path)
+    return overlay_path.is_file()
 
 
 def _flight_gopro_overlay_state(db: Session, flight: Flight) -> dict[str, Any]:

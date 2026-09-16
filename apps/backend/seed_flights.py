@@ -73,7 +73,7 @@ def ensure_sample_media(db: Session, flights: list[Flight]) -> int:
 
     for index, flight in enumerate(flights):
         directory = flight_directory(db, flight)
-        for filename in ("flight.mp4", "camera.mp4", "pano.mp4", "final.mp4"):
+        for filename in ("flight.mp4", "camera.mp4", "pano.mp4"):
             path = directory / filename
             # These are disposable staging fixtures. Recreate them on every
             # startup so persistent volumes pick up metadata changes too.
@@ -83,12 +83,14 @@ def ensure_sample_media(db: Session, flights: list[Flight]) -> int:
 
         video_path = (directory / "flight.mp4").resolve()
         pano_path = (directory / "pano.mp4").resolve()
-        overlay_path = (directory / "final.mp4").resolve()
+        legacy_overlay_path = directory / "final.mp4"
+        if legacy_overlay_path.exists():
+            legacy_overlay_path.unlink()
         flight.video_file_path = str(video_path)
         flight.video_export_status = "completed"
         flight.pano_video_file_path = str(pano_path)
-        flight.gopro_overlay_file_path = str(overlay_path)
-        flight.gopro_overlay_status = "completed"
+        flight.gopro_overlay_file_path = None
+        flight.gopro_overlay_status = None
 
     return created_count
 
