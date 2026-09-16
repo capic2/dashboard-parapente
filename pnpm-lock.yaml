@@ -250,7 +250,7 @@ catalogs:
       version: 1.145.0
     chromatic:
       specifier: ^18.0.0
-      version: 18.9.0
+      version: 18.9.1
     date-fns:
       specifier: ^4.0.0
       version: 4.4.0
@@ -478,7 +478,7 @@ importers:
         version: 5.0.1(vitest@5.0.1)
       chromatic:
         specifier: 'catalog:'
-        version: 18.9.0
+        version: 18.9.1
       happy-dom:
         specifier: 'catalog:'
         version: 20.14.5
@@ -3388,8 +3388,8 @@ packages:
     resolution: {integrity: sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw==}
     engines: {node: '>= 20.19.0'}
 
-  chromatic@18.9.0:
-    resolution: {integrity: sha512-BFkxiSrelIX0S+Di31YiEEVPCDaN1kR20vDakzn+7vp56NwEgwHLBatOMV6CAhUjW+/5zqwbikQZN+LDX61iQg==}
+  chromatic@18.9.1:
+    resolution: {integrity: sha512-2XNnsqMU8xb5NN3MMO7E2/uclu8jNspJI42F3q+zgA0HCuvhj3CXqNHlyup5WkExVF5L8BkJS96TVmN5Q6igKw==}
     engines: {node: '>=22.0.0'}
     hasBin: true
     peerDependencies:
@@ -6213,7 +6213,7 @@ snapshots:
   '@chromatic-com/storybook@5.3.1(storybook@10.6.0(@types/react@19.3.0)(prettier@3.9.6)(react@19.3.0))':
     dependencies:
       '@neoconfetti/react': 1.0.0
-      chromatic: 18.9.0
+      chromatic: 18.9.1
       jsonfile: 6.2.1
       storybook: 10.6.0(@types/react@19.3.0)(prettier@3.9.6)(react@19.3.0)
       strip-ansi: 7.2.0
@@ -8089,7 +8089,7 @@ snapshots:
     dependencies:
       readdirp: 5.1.1
 
-  chromatic@18.9.0:
+  chromatic@18.9.1:
     dependencies:
       semver: 7.8.5
 
