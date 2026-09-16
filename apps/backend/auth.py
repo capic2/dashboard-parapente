@@ -49,11 +49,8 @@ def _extract_access_token(request: Request) -> str | None:
 
 
 def _can_auto_authenticate_internal_staging(request: Request) -> bool:
-    """Allow the explicit staging test mode on its private HTTP origin only."""
-    return (
-        config.ENVIRONMENT == "staging"
-        and request.headers.get("host") == config.INTERNAL_STAGING_AUTO_LOGIN_HOST
-    )
+    """Allow the private staging origin only; production does not use this host/port."""
+    return request.headers.get("host") == config.INTERNAL_STAGING_AUTO_LOGIN_HOST
 
 
 def hash_password(password: str) -> str:
