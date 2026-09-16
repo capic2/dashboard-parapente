@@ -105,6 +105,12 @@ def ensure_sample_overlay_layers(db: Session, flights: list[Flight]) -> None:
             ),
             None,
         )
+        # Replace the short-lived staging placeholder introduced by a previous
+        # deployment.  It has no telemetry and must never mask the real layer.
+        if existing and '"staging_fixture": true' in (existing.command_json or ""):
+            db.delete(existing)
+            db.flush()
+            existing = None
         if existing and existing.status in {"queued", "preparing", "running", "completed"}:
             continue
         camera_path = directory / "camera.mp4"
