@@ -1,4 +1,4 @@
-<layout>
+<layout width="1920" height="1080">
   <frame x="1320" y="56" width="540" height="700" cr="32" bg="7,18,36,190" outline="210,235,255,220">
     <component type="text" x="52" y="55" size="54">TÉLÉMÉTRIE DE VOL</component>
 
