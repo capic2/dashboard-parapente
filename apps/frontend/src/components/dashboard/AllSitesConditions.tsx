@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
-import { Cloud, Thermometer, Wind } from 'lucide-react';
+import { Cloud, RefreshCw, Thermometer, Wind } from 'lucide-react';
+import { Button } from '@dashboard-parapente/design-system';
 import { WindIndicator } from '../common/WindIndicator';
 import CacheTimestamp from '../common/CacheTimestamp';
 import WindArrow from '../weather/WindArrow';
@@ -36,6 +37,7 @@ export interface SiteWeatherEntry {
 
 interface AllSitesConditionsProps {
   entries: SiteWeatherEntry[];
+  onRefresh?: () => void;
 }
 
 function SiteConditionCard({
@@ -165,23 +167,38 @@ function SiteConditionCard({
 
 export default function AllSitesConditions({
   entries,
+  onRefresh,
 }: AllSitesConditionsProps) {
   const { t } = useTranslation();
+  const hasError = entries.some((entry) => entry.isError);
 
   if (entries.length === 0) return null;
 
   return (
     <div>
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
-        <Cloud
-          className="h-4 w-4 text-sky-600 dark:text-sky-400"
-          aria-hidden="true"
-        />
-        {t(
-          'dashboard.allSitesConditions',
-          'Conditions actuelles — tous les sites'
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+          <Cloud
+            className="h-4 w-4 text-sky-600 dark:text-sky-400"
+            aria-hidden="true"
+          />
+          {t(
+            'dashboard.allSitesConditions',
+            'Conditions actuelles — tous les sites'
+          )}
+        </h2>
+        {hasError && onRefresh && (
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={onRefresh}
+            aria-label={t('common.refresh')}
+          >
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            {t('common.refresh')}
+          </Button>
         )}
-      </h2>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {entries.map((entry) => (
           <SiteConditionCard key={entry.site.id} {...entry} />

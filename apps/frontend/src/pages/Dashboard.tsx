@@ -55,6 +55,14 @@ export default function Dashboard() {
     isError: weatherQueries[index]?.isError ?? false,
   }));
 
+  const refreshFailedWeather = () => {
+    void Promise.all(
+      weatherQueries
+        .filter((query) => query.isError)
+        .map((query) => query.refetch())
+    );
+  };
+
   if (areSitesLoading) {
     return <DashboardLoadingState label={t('common.loading')} />;
   }
@@ -151,7 +159,10 @@ export default function Dashboard() {
           selectedDayIndex={0}
         />
 
-        <AllSitesConditions entries={siteWeatherEntries} />
+        <AllSitesConditions
+          entries={siteWeatherEntries}
+          onRefresh={refreshFailedWeather}
+        />
       </div>
     </div>
   );

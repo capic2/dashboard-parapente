@@ -8,7 +8,7 @@ import { createWeatherQueryFn } from '../../hooks/weather/useWeather';
 import type { Site } from '../../types';
 import { Button } from '@dashboard-parapente/design-system';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
-import { Check, MapPin, Mountain, Search } from 'lucide-react';
+import { Check, MapPin, Mountain, RefreshCw, Search } from 'lucide-react';
 import { getSiteDisplayName } from '../../lib/siteDisplay';
 
 interface SiteSelectorProps {
@@ -120,7 +120,7 @@ export default function SiteSelector({
   weatherData,
 }: SiteSelectorProps) {
   const { t } = useTranslation();
-  const { data: sites, isLoading, error } = useSites();
+  const { data: sites, isLoading, error, refetch, isRefetching } = useSites();
   const favoriteSiteIds = useAppSettingsStore(
     (state) => state.settings.favoriteSites
   );
@@ -167,7 +167,20 @@ export default function SiteSelector({
   if (error || !sites) {
     return (
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
-        {t('common.loadingError')}
+        <p>{t('common.loadingError')}</p>
+        <Button
+          variant="outline"
+          size="sm"
+          onPress={() => void refetch()}
+          isDisabled={isRefetching}
+          className="mt-3"
+        >
+          <RefreshCw
+            className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`}
+            aria-hidden="true"
+          />
+          {t('common.refresh')}
+        </Button>
       </div>
     );
   }
