@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from database import SessionLocal
 from flight_storage import flight_directory
 from gopro_overlay_export import create_gopro_overlay_job_from_paths, probe_video_resolution
-from models import Flight, Site
+from models import Flight, GoproOverlayJob, Site
 
 SAMPLE_FLIGHT_TITLES = {
     "Vol d'initiation Arguel",
@@ -96,21 +96,32 @@ def ensure_sample_media(db: Session, flights: list[Flight]) -> int:
 def ensure_sample_overlay_layers(db: Session, flights: list[Flight]) -> None:
     """Queue the real GoPro telemetry layer used by the dynamic player."""
     for flight in flights:
-        directory = flight_directory(db, flight)
-        existing = next(
-            (
-                job
-                for job in flight.gopro_overlay_jobs
-                if '"overlay_only": true' in (job.command_json or "")
-            ),
-            None,
+        existing = (
+            db.query(GoproOverlayJob)
+            .filter(
+                GoproOverlayJob.flight_id == flight.id,
+                GoproOverlayJob.command_json.contains('"staging_fixture": true'),
+            )
+            .first()
         )
-        # Replace the short-lived staging placeholder introduced by a previous
-        # deployment.  It has no telemetry and must never mask the real layer.
-        if existing and '"staging_fixture": true' in (existing.command_json or ""):
+        if existing:
             db.delete(existing)
-            db.flush()
-            existing = None
+
+    # The job creator uses its own database session.  Commit sample flights and
+    # removals first so that the second transaction neither violates the flight
+    # foreign key nor blocks on a row lock held by this seed transaction.
+    db.commit()
+
+    for flight in flights:
+        directory = flight_directory(db, flight)
+        existing = (
+            db.query(GoproOverlayJob)
+            .filter(
+                GoproOverlayJob.flight_id == flight.id,
+                GoproOverlayJob.command_json.contains('"overlay_only": true'),
+            )
+            .first()
+        )
         if existing and existing.status in {"queued", "preparing", "running", "completed"}:
             continue
         camera_path = directory / "camera.mp4"
