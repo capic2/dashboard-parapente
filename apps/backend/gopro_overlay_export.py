@@ -170,7 +170,15 @@ def _layout_dir() -> Path:
 
 
 def _layout_path(layout: GoproOverlayLayout) -> Path:
-    return _layout_dir() / layout.path
+    # Keep the dashboard's stock layouts as the fallback, but ship the
+    # interactive 1080p layout with the backend.  The upstream file carries
+    # 4K coordinates under a 1080p name and puts the telemetry outside a
+    # browser-sized overlay.
+    layout_dir = _layout_dir()
+    bundled_layout = Path(__file__).parent / "gopro_layouts" / layout.path
+    if layout_dir == Path("/app/gopro-overlay") and bundled_layout.is_file():
+        return bundled_layout
+    return layout_dir / layout.path
 
 
 def _uploaded_job_work_dir(job_id: str, flight_id: str | None = None) -> Path:
