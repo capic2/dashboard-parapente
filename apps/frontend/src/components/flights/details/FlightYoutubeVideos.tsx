@@ -1,7 +1,94 @@
 import { Button } from '@dashboard-parapente/design-system';
 import { Trash2 } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getYoutubeEmbedUrl } from '../../../lib/youtube';
+
+interface YoutubeSphericalProperties {
+  enableOrientationSensor: boolean;
+}
+
+interface YoutubePlayer {
+  setSphericalProperties: (properties: YoutubeSphericalProperties) => void;
+  destroy: () => void;
+}
+
+interface YoutubeApi {
+  Player: new (
+    iframe: HTMLIFrameElement,
+    options: { events: { onReady: (event: { target: YoutubePlayer }) => void } }
+  ) => YoutubePlayer;
+}
+
+declare global {
+  interface Window {
+    YT?: YoutubeApi;
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
+let youtubeApiPromise: Promise<YoutubeApi> | null = null;
+
+function loadYoutubeApi(): Promise<YoutubeApi> {
+  if (window.YT?.Player) return Promise.resolve(window.YT);
+  if (youtubeApiPromise) return youtubeApiPromise;
+
+  youtubeApiPromise = new Promise((resolve) => {
+    const previousReady = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      previousReady?.();
+      if (window.YT) resolve(window.YT);
+    };
+    const script = document.createElement('script');
+    script.src = 'https://www.youtube.com/iframe_api';
+    script.async = true;
+    document.head.appendChild(script);
+  });
+  return youtubeApiPromise;
+}
+
+function YoutubeIframe({
+  embedUrl,
+  title,
+}: {
+  embedUrl: string;
+  title: string;
+}) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    let disposed = false;
+    let player: YoutubePlayer | undefined;
+    void loadYoutubeApi().then((youtube) => {
+      if (disposed || !iframeRef.current) return;
+      player = new youtube.Player(iframeRef.current, {
+        events: {
+          onReady: ({ target }) => {
+            target.setSphericalProperties({ enableOrientationSensor: false });
+          },
+        },
+      });
+    });
+    return () => {
+      disposed = true;
+      player?.destroy();
+    };
+  }, []);
+
+  return (
+    // oxlint-disable-next-line react/iframe-missing-sandbox -- YouTube playback does not work inside a restrictive sandbox.
+    <iframe
+      ref={iframeRef}
+      src={embedUrl}
+      title={title}
+      className="aspect-video w-full"
+      loading="lazy"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; xr-spatial-tracking"
+      referrerPolicy="origin"
+      allowFullScreen
+    />
+  );
+}
 
 interface FlightYoutubeVideosProps {
   urls?: string[];
@@ -41,25 +128,10 @@ export function FlightYoutubeVideos({
             key={embedUrl}
             className="overflow-hidden rounded-lg bg-black shadow-sm"
           >
-            {/* oxlint-disable-next-line react/iframe-missing-sandbox -- The source is restricted to validated YouTube video IDs; YouTube playback does not work inside the restrictive sandbox. */}
-            <iframe
-              src={embedUrl}
+            {/* oxlint-disable-next-line react/iframe-missing-sandbox -- YouTube playback does not work inside a restrictive sandbox. */}
+            <YoutubeIframe
+              embedUrl={embedUrl}
               title={t('flights.youtubeVideoTitle', { count: index + 1 })}
-              className="aspect-video w-full"
-              loading="lazy"
-              onLoad={(event) => {
-                event.currentTarget.contentWindow?.postMessage(
-                  JSON.stringify({
-                    event: 'command',
-                    func: 'setSphericalProperties',
-                    args: [{ enableOrientationSensor: false }],
-                  }),
-                  'https://www.youtube.com'
-                );
-              }}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; xr-spatial-tracking"
-              referrerPolicy="origin"
-              allowFullScreen
             />
             <div className="flex items-center justify-between gap-2 bg-gray-900 px-3 py-2">
               <a
