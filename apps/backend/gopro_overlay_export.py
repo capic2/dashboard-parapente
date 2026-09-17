@@ -2802,6 +2802,10 @@ def _run_job(job_id: str) -> None:
 
         temp_output_path.replace(output_path)
 
+        if overlay_only:
+            preview_path = ensure_gopro_overlay_browser_preview(output_path)
+            _append_job_log(log_path, f"Browser overlay preview ready: {preview_path.name}")
+
         _finish_job(
             job_id,
             status=_STATUS_COMPLETED,
@@ -3337,6 +3341,20 @@ def gopro_overlay_browser_preview_path(output_path: Path) -> Path:
         finally:
             _unlink_if_exists(temporary_path)
     return output_path
+
+
+def ensure_gopro_overlay_browser_preview(output_path: Path) -> Path:
+    """Create a browser-decodable alpha preview or fail the overlay job.
+
+    A transparent PNG-in-MOV is valid for exports but Chromium cannot render
+    it as an HTML video. Do this work in the render worker, rather than in
+    the request that mounts the interactive player: otherwise the player can
+    receive no playable bytes while the conversion is running.
+    """
+    preview_path = gopro_overlay_browser_preview_path(output_path)
+    if output_path.suffix.lower() == ".mov" and preview_path == output_path:
+        raise ValueError("Unable to create a browser-compatible WebM overlay preview")
+    return preview_path
 
 
 def delete_gopro_overlay_output(job_id: str) -> dict[str, Any] | None:
