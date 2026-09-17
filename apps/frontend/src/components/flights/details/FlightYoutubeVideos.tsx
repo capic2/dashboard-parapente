@@ -41,7 +41,7 @@ export function FlightYoutubeVideos({
             key={embedUrl}
             className="overflow-hidden rounded-lg bg-black shadow-sm"
           >
-            {/* oxlint-disable-next-line react/iframe-missing-sandbox -- The source is restricted to validated youtube-nocookie.com video IDs; YouTube playback does not work inside the restrictive sandbox. */}
+            {/* oxlint-disable-next-line react/iframe-missing-sandbox -- The source is restricted to validated YouTube video IDs; YouTube playback does not work inside the restrictive sandbox. */}
             <iframe
               src={embedUrl}
               title={t('flights.youtubeVideoTitle', { count: index + 1 })}

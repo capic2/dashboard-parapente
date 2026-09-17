@@ -36,7 +36,9 @@ export function getYoutubeEmbedUrl(rawUrl: string): string | null {
   const videoId = getYoutubeVideoId(rawUrl);
   if (!videoId) return null;
 
-  const embedUrl = new URL(`https://www.youtube-nocookie.com/embed/${videoId}`);
+  // Use the standard YouTube player: the privacy-enhanced host can render a
+  // 360° video without exposing its interactive viewpoint controls.
+  const embedUrl = new URL(`https://www.youtube.com/embed/${videoId}`);
   embedUrl.searchParams.set('enablejsapi', '1');
   if (typeof window !== 'undefined' && window.location.origin !== 'null') {
     embedUrl.searchParams.set('origin', window.location.origin);
