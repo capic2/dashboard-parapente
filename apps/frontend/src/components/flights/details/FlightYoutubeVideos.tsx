@@ -47,6 +47,16 @@ export function FlightYoutubeVideos({
               title={t('flights.youtubeVideoTitle', { count: index + 1 })}
               className="aspect-video w-full"
               loading="lazy"
+              onLoad={(event) => {
+                event.currentTarget.contentWindow?.postMessage(
+                  JSON.stringify({
+                    event: 'command',
+                    func: 'setSphericalProperties',
+                    args: [{ enableOrientationSensor: false }],
+                  }),
+                  'https://www.youtube.com'
+                );
+              }}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; xr-spatial-tracking"
               referrerPolicy="origin"
               allowFullScreen

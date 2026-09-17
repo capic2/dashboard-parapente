@@ -29,6 +29,7 @@ describe('YouTube URL parsing', () => {
     expect(embedUrl.origin).toBe('https://www.youtube.com');
     expect(embedUrl.pathname).toBe('/embed/dQw4w9WgXcQ');
     expect(embedUrl.searchParams.get('enablejsapi')).toBe('1');
+    expect(embedUrl.searchParams.get('playsinline')).toBe('1');
     expect(embedUrl.searchParams.get('origin')).toBe(window.location.origin);
   });
 });
