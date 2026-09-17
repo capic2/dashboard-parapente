@@ -14,3 +14,6 @@ services:
 
   gopro-overlay-worker:
     image: parapente-backend:nx-latest
+
+  gopro-preview-worker:
+    image: parapente-backend:nx-latest
