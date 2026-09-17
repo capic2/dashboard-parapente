@@ -3,7 +3,10 @@ import subprocess
 
 import pytest
 
-from gopro_overlay_export import gopro_overlay_browser_preview_path
+from gopro_overlay_export import (
+    ensure_gopro_overlay_browser_preview,
+    gopro_overlay_browser_preview_path,
+)
 
 
 def test_browser_preview_converts_mov_to_webm(
@@ -48,3 +51,19 @@ def test_browser_preview_falls_back_to_mov_when_ffmpeg_fails(
     monkeypatch.setattr("gopro_overlay_export.subprocess.run", failing_run)
 
     assert gopro_overlay_browser_preview_path(source_path) == source_path
+
+
+def test_required_browser_preview_rejects_a_mov_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_path = tmp_path / "overlay.mov"
+    source_path.write_bytes(b"mov")
+
+    def failing_run(*_: object, **__: object) -> subprocess.CompletedProcess[str]:
+        raise subprocess.TimeoutExpired("ffmpeg", 600)
+
+    monkeypatch.setattr("gopro_overlay_export.subprocess.run", failing_run)
+
+    with pytest.raises(ValueError, match="browser-compatible WebM"):
+        ensure_gopro_overlay_browser_preview(source_path)
