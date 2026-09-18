@@ -2502,8 +2502,8 @@ def test_prepare_layout_file_removes_explicit_pip_without_video(tmp_path):
 
 
 def test_prepare_layout_file_removes_video_component_with_default_file_without_video(
-    tmp_path,
-):
+    tmp_path: Path,
+) -> None:
     source = tmp_path / "layout.xml"
     destination = tmp_path / "prepared.xml"
     source.write_text(
@@ -3160,6 +3160,62 @@ def test_prepare_queued_job_uses_prepared_pip_path_with_matching_gpx_offset(
     assert render_gpx_path.name.startswith("gpx-offset-")
     assert "2026-08-08T09:30:45.500000Z" in render_gpx_path.read_text()
     assert prepared["command"]["video_time_start"] == "video-created"
+
+
+@pytest.mark.parametrize("with_osv", [False, True])
+def test_prepare_overlay_only_job_applies_gpx_offset(
+    tmp_path: Path,
+    monkeypatch,
+    test_db,
+    with_osv: bool,
+) -> None:
+    layout_dir = tmp_path / "layouts"
+    layout_dir.mkdir()
+    (layout_dir / "layout_parapente_1080.xml").write_text("<layout />")
+    video_path = tmp_path / "source.mp4"
+    gpx_path = tmp_path / "source.gpx"
+    video_path.write_bytes(b"video")
+    gpx_contents = (
+        '<gpx xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>'
+        '<trkpt lat="45" lon="5"><time>2026-08-08T09:30:43Z</time></trkpt>'
+        "</trkseg></trk></gpx>"
+    )
+    gpx_path.write_text(gpx_contents)
+    if with_osv:
+        (tmp_path / "source.osv").write_bytes(b"osv")
+
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
+    monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: (1920, 1080))
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_start_time", lambda _: None)
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: 120.0)
+    if with_osv:
+        enriched_path = tmp_path / "enriched.gpx"
+        enriched_path.write_text(gpx_contents)
+        monkeypatch.setattr(
+            gopro_overlay_export,
+            "ensure_enriched_gpx",
+            lambda *_args, **_kwargs: enriched_path,
+        )
+
+    job = create_gopro_overlay_job_from_paths(
+        video_path=video_path,
+        gpx_path=gpx_path,
+        pip_path=None,
+        layout_id="parapente-1080",
+        output_filename="overlay.webm",
+        gpx_offset=2.5,
+        overlay_only=True,
+    )
+    queued_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"], include_command=True)
+    assert queued_job is not None
+
+    prepared = gopro_overlay_export._prepare_queued_job(job["job_id"], queued_job)
+
+    assert prepared is not None
+    render_gpx_path = Path(prepared["command"]["render_gpx_path"])
+    assert render_gpx_path.name.startswith("gpx-offset-")
+    assert "2026-08-08T09:30:45.500000Z" in render_gpx_path.read_text()
 
 
 def test_prepare_queued_job_omits_unreliable_file_time_for_render_timeline(
