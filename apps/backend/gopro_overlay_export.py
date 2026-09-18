@@ -10,6 +10,7 @@ import shlex
 import select
 import shutil
 import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -76,6 +77,15 @@ def _gopro_overlay_log_dir() -> Path:
 
 def _gopro_overlay_log_path(job_id: str) -> Path:
     return _gopro_overlay_log_dir() / f"{job_id}.log"
+
+
+def _gopro_overlay_double_buffer_supported() -> bool:
+    """Return whether Dashboard's shared-memory buffer works on this Python."""
+
+    # gopro-dashboard's buffering worker pickles Frame.memory, which is a
+    # memoryview. Python 3.14's forkserver rejects that object during process
+    # startup, leaving a leaked shared-memory segment behind.
+    return sys.version_info < (3, 14)
 
 
 @dataclass(frozen=True)
@@ -2556,7 +2566,14 @@ def _run_job(job_id: str) -> None:
             # frame while FFmpeg encodes the previous one. Keep any operator
             # supplied arguments and avoid adding the flag twice.
             extra_args = shlex.split(config.GOPRO_OVERLAY_EXTRA_ARGS or "")
-            if "--double-buffer" not in extra_args:
+            if not _gopro_overlay_double_buffer_supported():
+                if "--double-buffer" in extra_args:
+                    logger.warning(
+                        "Disabling GoPro overlay double buffering on Python %s",
+                        sys.version.split()[0],
+                    )
+                extra_args = [arg for arg in extra_args if arg != "--double-buffer"]
+            elif "--double-buffer" not in extra_args:
                 extra_args.append("--double-buffer")
             command.extend(extra_args)
             cpu_command.extend(extra_args)
