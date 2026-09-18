@@ -2357,7 +2357,10 @@ def _create_gopro_overlay_job_from_paths(
     if output_resolution not in _OUTPUT_RESOLUTIONS:
         raise ValueError("Unknown output resolution")
     output_name = _safe_filename(output_filename, f"gopro-overlay-{job_id}.mp4")
-    expected_suffix = ".mov" if overlay_only else ".mp4"
+    # Transparent layers are rendered directly as VP9/WebM.  PNG-in-MOV is
+    # lossless but expands a 4K timeline to hundreds of gigabytes before it
+    # can be converted for browser playback.
+    expected_suffix = ".webm" if overlay_only else ".mp4"
     if Path(output_name).suffix.lower() != expected_suffix:
         output_name = f"{Path(output_name).stem}{expected_suffix}"
     output_path = _output_path_for_dir(output_dir, video_path, output_name)
@@ -2543,12 +2546,10 @@ def _run_job(job_id: str) -> None:
             profile or "<none>",
         )
         if overlay_only:
-            # ``mov`` is GoPro Dashboard's built-in PNG-in-MOV profile. It
-            # matches the .mov temporary output used for transparent overlays.
-            # VP9 cannot be written to a MOV container by the FFmpeg version
-            # shipped in the production image.
-            command.extend(["--profile", "mov"])
-            cpu_command.extend(["--profile", "mov"])
+            # GoPro Dashboard's built-in VP9 profile writes WebM with alpha
+            # directly, avoiding the enormous PNG-in-MOV intermediate.
+            command.extend(["--profile", "vp9"])
+            cpu_command.extend(["--profile", "vp9"])
     common_args: list[str] = []
     if job.get("video_width") and job.get("video_height"):
         common_args.extend(["--overlay-size", f"{job['video_width']}x{job['video_height']}"])
@@ -2563,11 +2564,12 @@ def _run_job(job_id: str) -> None:
     temp_output_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     # GoPro Dashboard renders a transparent movie for a GPX-only command with
-    # no input video.  Passing the synthetic timeline would instead create an
-    # opaque video render, while adding ``--generate overlay`` is rejected in
-    # combination with ``--use-gpx-only``.  The timeline is only retained by
-    # the queued job preparation to establish the calibrated GPX range.
-    common_args.append(job["video_path"])
+    # no input video. Passing the camera here makes FFmpeg composite the
+    # overlay onto that camera, which is not the reusable layer we want. The
+    # camera path is retained by job preparation only to establish the
+    # calibrated GPX range.
+    if not overlay_only:
+        common_args.append(job["video_path"])
     common_args.append(str(temp_output_path))
     command.extend(common_args)
     cpu_command.extend(common_args)
@@ -2803,8 +2805,7 @@ def _run_job(job_id: str) -> None:
         temp_output_path.replace(output_path)
 
         if overlay_only:
-            preview_path = ensure_gopro_overlay_browser_preview(output_path)
-            _append_job_log(log_path, f"Browser overlay preview ready: {preview_path.name}")
+            _append_job_log(log_path, f"Browser overlay ready: {output_path.name}")
 
         _finish_job(
             job_id,

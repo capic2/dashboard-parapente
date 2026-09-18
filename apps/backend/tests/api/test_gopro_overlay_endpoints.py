@@ -4244,7 +4244,7 @@ def test_create_gopro_overlay_job_from_paths_sanitizes_output_filename_in_source
     assert Path(job["output_path"]) == tmp_path / "Arguel_test-1080p.mp4"
 
 
-def test_create_overlay_only_job_uses_mov_output_for_transparent_layer(
+def test_create_overlay_only_job_uses_webm_output_for_transparent_layer(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     test_db: Any,
@@ -4269,7 +4269,7 @@ def test_create_overlay_only_job_uses_mov_output_for_transparent_layer(
         overlay_only=True,
     )
 
-    assert Path(job["output_path"]) == tmp_path / "interactive-gopro-overlay.mov"
+    assert Path(job["output_path"]) == tmp_path / "interactive-gopro-overlay.webm"
 
 
 def test_rq_overlay_job_raises_when_render_is_marked_failed(
@@ -4374,7 +4374,7 @@ def test_run_job_generates_full_flight_overlay_from_gpx_only(
 ) -> None:
     job_id = "full-flight-overlay-job"
     timeline_path = tmp_path / "timeline.mp4"
-    output_path = tmp_path / "full-flight-overlay.mov"
+    output_path = tmp_path / "full-flight-overlay.webm"
     gopro_overlay_export._JOBS[job_id] = {
         "job_id": job_id,
         "status": "queued",
@@ -4411,9 +4411,9 @@ def test_run_job_generates_full_flight_overlay_from_gpx_only(
         command = popen.call_args.args[0]
         assert "--use-gpx-only" in command
         assert "--generate" not in command
-        assert command[command.index("--profile") + 1] == "mov"
+        assert command[command.index("--profile") + 1] == "vp9"
         assert str(timeline_path) not in command
-        assert command[-1] == str(output_path.with_name(f".full-flight-overlay.{job_id}.part.mov"))
+        assert command[-1] == str(output_path.with_name(f"full-flight-overlay.{job_id}.part.webm"))
     finally:
         gopro_overlay_export._JOBS.pop(job_id, None)
         gopro_overlay_export._PROCESSES.pop(job_id, None)

@@ -252,6 +252,8 @@ jobs:
             export CI_BACKEND_IMAGE="$GHCR_IMAGE"
             export CONTAINER_PREFIX="parapente-staging"
             export ENVIRONMENT=staging
+            export BACKEND_SEED_SAMPLE_DATA=false
+            export BACKEND_BACKGROUND_JOB_RECOVERY_ENABLED=false
             export BACKEND_HOST_PORT="$PORT"
             export BACKEND_INTERNAL_STAGING_AUTO_LOGIN=true
             export BACKEND_INTERNAL_STAGING_AUTO_LOGIN_HOST="192.168.1.106:$PORT"
@@ -336,6 +338,23 @@ jobs:
                 environment:
                   BACKEND_INTERNAL_STAGING_AUTO_LOGIN: "true"
                   BACKEND_INTERNAL_STAGING_AUTO_LOGIN_HOST: "192.168.1.106:$PORT"
+                  BACKEND_SEED_SAMPLE_DATA: "false"
+                  BACKEND_BACKGROUND_JOB_RECOVERY_ENABLED: "false"
+              backend-worker:
+                environment:
+                  BACKEND_BACKGROUND_JOB_RECOVERY_ENABLED: "false"
+              highlight-video-worker:
+                environment:
+                  BACKEND_BACKGROUND_JOB_RECOVERY_ENABLED: "false"
+              youtube-upload-worker:
+                environment:
+                  BACKEND_BACKGROUND_JOB_RECOVERY_ENABLED: "false"
+              gopro-overlay-worker:
+                environment:
+                  BACKEND_BACKGROUND_JOB_RECOVERY_ENABLED: "false"
+              gopro-preview-worker:
+                environment:
+                  BACKEND_BACKGROUND_JOB_RECOVERY_ENABLED: "false"
             EOF
             compose() {
               docker compose --env-file "$ENV_FILE" -p "$PROJECT" \
@@ -347,7 +366,7 @@ jobs:
             compose config --quiet
             compose pull
             compose up -d --remove-orphans
-            for attempt in $(seq 1 30); do
+            for attempt in $(seq 1 120); do
               if curl --connect-timeout 2 --max-time 5 --fail --silent --show-error "http://127.0.0.1:$PORT/health" >/dev/null; then
                 printf '%s' "$PR_NUMBER" > "$STACK_DIR/current-pr"
                 echo "PR staging is healthy on port $PORT"

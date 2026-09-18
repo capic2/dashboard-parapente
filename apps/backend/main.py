@@ -435,7 +435,9 @@ async def lifespan(app: FastAPI):
         start_gopro_overlay_worker()
         start_preview_scanner()
         if not is_rq_enabled():
-            enqueue_pending_youtube_uploads(recover_active=True)
+            enqueue_pending_youtube_uploads(
+                recover_active=config.BACKGROUND_JOB_RECOVERY_ENABLED
+            )
 
     yield
 

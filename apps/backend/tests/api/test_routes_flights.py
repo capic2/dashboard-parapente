@@ -1587,7 +1587,7 @@ class TestHighlightVideoEndpoints:
         self, client, db_session, monkeypatch, tmp_path
     ):
         pano_path = tmp_path / "pano.mp4"
-        overlay_path = tmp_path / "telemetry-overlay.mov"
+        overlay_path = tmp_path / "telemetry-overlay.webm"
         pano_path.write_bytes(b"pano")
         overlay_path.write_bytes(b"transparent overlay layer")
         flight = self._flight(db_session, "highlight-queue", pano_path)
@@ -1629,7 +1629,7 @@ class TestHighlightVideoEndpoints:
         self, client, db_session, monkeypatch, tmp_path
     ):
         pano_path = tmp_path / "pano.mp4"
-        overlay_path = tmp_path / "telemetry-overlay.mov"
+        overlay_path = tmp_path / "telemetry-overlay.webm"
         pano_path.write_bytes(b"pano")
         overlay_path.write_bytes(b"transparent overlay layer")
         flight = self._flight(db_session, "highlight-overlay-layer", pano_path)
@@ -1908,7 +1908,7 @@ class TestFlightOverlayLayerEndpoint:
                 layout_path="layout.xml",
                 output_path="overlay.mov",
                 temp_output_path="overlay.tmp.mov",
-                output_filename="telemetry-overlay.mov",
+                output_filename="telemetry-overlay.webm",
                 command_json=json.dumps({"overlay_only": True}),
             )
         )
