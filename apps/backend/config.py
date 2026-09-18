@@ -53,6 +53,9 @@ PROJECT_ROOT = _resolve_project_root(BACKEND_ROOT)
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 TESTING = os.getenv("TESTING", "false").lower() == "true"
 IS_TEST_ENV = TESTING or ENVIRONMENT == "test"
+BACKGROUND_JOB_RECOVERY_ENABLED = os.getenv(
+    "BACKEND_BACKGROUND_JOB_RECOVERY_ENABLED", "true"
+).lower() == "true"
 
 if ENVIRONMENT != "production":
     # En développement : chercher .env.development puis .env

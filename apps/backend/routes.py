@@ -6830,7 +6830,7 @@ def _prepare_enriched_gpx_in_background(
         logger.warning("Unable to prepare enriched GPX in background: %s", exc)
 
 
-_INTERACTIVE_OVERLAY_FILENAME = "interactive-gopro-overlay.mov"
+_INTERACTIVE_OVERLAY_FILENAME = "interactive-gopro-overlay.webm"
 _INTERACTIVE_OVERLAY_JOB_FILENAME = "interactive-gopro-overlay.json"
 
 
@@ -6989,7 +6989,7 @@ async def create_flight_overlay_layer(
             gpx_path=gpx_path,
             pip_path=None,
             layout_id=None,
-            output_filename="telemetry-overlay.mov",
+            output_filename="telemetry-overlay.webm",
             output_resolution="source",
             output_dir=str(output_dir),
             gpx_offset=float(flight.gopro_overlay_gpx_offset or 0.0),

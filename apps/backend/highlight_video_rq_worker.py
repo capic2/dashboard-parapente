@@ -22,7 +22,9 @@ def _reconciliation_loop(stop_event: threading.Event) -> None:
     """Continuously restore queued database jobs missing from Redis."""
     while not stop_event.wait(config.JOB_QUEUE_RECONCILIATION_INTERVAL_SECONDS):
         try:
-            queued_count = enqueue_pending_highlight_video_jobs(recover_active=True)
+            queued_count = enqueue_pending_highlight_video_jobs(
+                recover_active=config.BACKGROUND_JOB_RECOVERY_ENABLED
+            )
             if queued_count:
                 logger.info("Reconciled %s pending highlight video job(s)", queued_count)
         except Exception:
@@ -33,7 +35,9 @@ def main() -> None:
     if not is_rq_enabled():
         raise RuntimeError("Highlight video RQ worker requires BACKEND_JOB_QUEUE_BACKEND=rq")
 
-    queued_count = enqueue_pending_highlight_video_jobs(recover_active=True)
+    queued_count = enqueue_pending_highlight_video_jobs(
+        recover_active=config.BACKGROUND_JOB_RECOVERY_ENABLED
+    )
     if queued_count:
         logger.info("Enqueued %s pending highlight video job(s)", queued_count)
 

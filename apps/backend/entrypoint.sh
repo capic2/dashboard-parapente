@@ -12,7 +12,11 @@ echo "Initializing database..."
 if [ "${ENVIRONMENT:-production}" = "staging" ]; then
     python init_database.py
     python -c "from database_migrations import run_migrations; run_migrations()"
-    python -c "from seed_flights import seed_flights; print(f'✅ Sample flights created: {seed_flights(include_media=True)}')"
+    if [ "${BACKEND_SEED_SAMPLE_DATA:-true}" = "true" ]; then
+        python -c "from seed_flights import seed_flights; print(f'✅ Sample flights created: {seed_flights(include_media=True)}')"
+    else
+        echo "⏭️ Sample flight seeding disabled"
+    fi
 else
     python -c "from database import Base, engine; Base.metadata.create_all(bind=engine); print('✅ Database tables created')"
 fi

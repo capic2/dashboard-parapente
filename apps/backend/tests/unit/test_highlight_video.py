@@ -83,7 +83,7 @@ def test_render_method_matches_selected_accelerator() -> None:
 def test_full_flight_overlay_uses_one_transparent_full_timeline_job(tmp_path: Path) -> None:
     timeline = tmp_path / "timeline.mp4"
     gpx = tmp_path / "flight.gpx"
-    output = tmp_path / "full-overlay.mov"
+    output = tmp_path / "full-overlay.webm"
     timeline.touch()
     gpx.touch()
     output.touch()
@@ -106,7 +106,7 @@ def test_full_flight_overlay_uses_one_transparent_full_timeline_job(tmp_path: Pa
 
 def test_highlight_composition_scales_the_pre_generated_overlay_layer(tmp_path: Path) -> None:
     raw_video = tmp_path / "clip-pano.mp4"
-    overlay = tmp_path / "telemetry-overlay.mov"
+    overlay = tmp_path / "telemetry-overlay.webm"
     output = tmp_path / "clip.mp4"
     clip = HighlightClip(start_seconds=12.5, duration_seconds=8, yaw_degrees=0)
 
