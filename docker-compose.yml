@@ -30,6 +30,7 @@ services:
     environment:
       # Global
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - BACKEND_SEED_SAMPLE_DATA=${BACKEND_SEED_SAMPLE_DATA:-true}
       - BACKEND_BACKGROUND_JOB_RECOVERY_ENABLED=${BACKEND_BACKGROUND_JOB_RECOVERY_ENABLED:-true}
 
       # Backend - Database

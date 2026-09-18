@@ -252,6 +252,7 @@ jobs:
             export CI_BACKEND_IMAGE="$GHCR_IMAGE"
             export CONTAINER_PREFIX="parapente-staging"
             export ENVIRONMENT=staging
+            export BACKEND_SEED_SAMPLE_DATA=false
             export BACKEND_BACKGROUND_JOB_RECOVERY_ENABLED=false
             export BACKEND_HOST_PORT="$PORT"
             export BACKEND_INTERNAL_STAGING_AUTO_LOGIN=true
@@ -337,6 +338,7 @@ jobs:
                 environment:
                   BACKEND_INTERNAL_STAGING_AUTO_LOGIN: "true"
                   BACKEND_INTERNAL_STAGING_AUTO_LOGIN_HOST: "192.168.1.106:$PORT"
+                  BACKEND_SEED_SAMPLE_DATA: "false"
                   BACKEND_BACKGROUND_JOB_RECOVERY_ENABLED: "false"
               backend-worker:
                 environment:
