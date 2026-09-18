@@ -185,9 +185,9 @@ export function FlightOverlayPlayer({
   const handleToggleFullscreen = () => {
     if (!playerRef.current) return;
     if (document.fullscreenElement === playerRef.current) {
-      void document.exitFullscreen();
+      void document.exitFullscreen().catch(() => undefined);
     } else {
-      void playerRef.current.requestFullscreen();
+      void playerRef.current.requestFullscreen().catch(() => undefined);
     }
   };
 
