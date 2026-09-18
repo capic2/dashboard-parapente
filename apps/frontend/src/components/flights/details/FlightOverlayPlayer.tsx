@@ -15,6 +15,17 @@ export type FlightOverlayLayout =
   | 'flight-main'
   | 'side-by-side';
 
+// The GoPro layout is authored on a 3840x2160 canvas. Keep the interactive
+// PiP in that same coordinate system instead of tying it to arbitrary Tailwind
+// fractions of the responsive player container.
+const GOPRO_TEMPLATE_CANVAS = { width: 3840, height: 2160 };
+const GOPRO_TEMPLATE_PIP = {
+  left: 20,
+  bottom: 20,
+  width: 440,
+  height: 440,
+};
+
 interface FlightOverlayPlayerProps {
   mode: 'calibration' | 'interactive';
   cameraUrl: string;
@@ -28,6 +39,7 @@ interface FlightOverlayPlayerProps {
   getFlightTime?: (cameraTime: number) => number;
   getCameraTime?: (flightTime: number) => number;
   getOverlayTime?: (cameraTime: number) => number;
+  overlayOffsetSeconds?: number;
   onTimeChange?: (time: number) => void;
   seekRequest?: { id: number; time: number } | null;
   overlayContent?: ReactNode;
@@ -53,6 +65,7 @@ export function FlightOverlayPlayer({
   getFlightTime,
   getCameraTime,
   getOverlayTime,
+  overlayOffsetSeconds = 0,
   onTimeChange,
   seekRequest,
   overlayContent,
@@ -87,7 +100,8 @@ export function FlightOverlayPlayer({
       flight.currentTime = clamp(flightTime, flight.duration);
     }
     const overlay = overlayRef.current;
-    const overlayTime = getOverlayTime?.(currentTime) ?? currentTime;
+    const overlayTime =
+      getOverlayTime?.(currentTime) ?? currentTime - overlayOffsetSeconds;
     if (overlay && Math.abs(overlay.currentTime - overlayTime) > 0.08) {
       overlay.currentTime = clamp(overlayTime, overlay.duration);
     }
@@ -180,6 +194,12 @@ export function FlightOverlayPlayer({
   const cameraIsMain = layout === 'camera-main';
   const flightIsMain = layout === 'flight-main';
   const isInteractive = mode === 'interactive';
+  const pipStyle = {
+    left: `${(GOPRO_TEMPLATE_PIP.left / GOPRO_TEMPLATE_CANVAS.width) * 100}%`,
+    bottom: `${(GOPRO_TEMPLATE_PIP.bottom / GOPRO_TEMPLATE_CANVAS.height) * 100}%`,
+    width: `${(GOPRO_TEMPLATE_PIP.width / GOPRO_TEMPLATE_CANVAS.width) * 100}%`,
+    aspectRatio: `${GOPRO_TEMPLATE_PIP.width} / ${GOPRO_TEMPLATE_PIP.height}`,
+  };
 
   return (
     <div
@@ -208,7 +228,10 @@ export function FlightOverlayPlayer({
           className={
             cameraIsMain || layout === 'side-by-side'
               ? 'aspect-video w-full object-contain'
-              : 'absolute bottom-[0.93%] left-[0.52%] z-20 aspect-square w-[11.46%] cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
+              : 'absolute z-20 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
+          }
+          style={
+            !cameraIsMain && layout !== 'side-by-side' ? pipStyle : undefined
           }
           onClick={() => {
             if (layout === 'flight-main') setLayout('camera-main');
@@ -237,7 +260,10 @@ export function FlightOverlayPlayer({
             className={
               flightIsMain || layout === 'side-by-side'
                 ? 'aspect-video w-full object-contain'
-                : 'absolute bottom-[0.93%] left-[0.52%] z-10 aspect-square w-[11.46%] cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
+                : 'absolute z-10 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
+            }
+            style={
+              !flightIsMain && layout !== 'side-by-side' ? pipStyle : undefined
             }
             aria-label={flightLabel}
           >
