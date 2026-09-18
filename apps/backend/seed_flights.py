@@ -124,7 +124,7 @@ def ensure_sample_overlay_layers(db: Session, flights: list[Flight]) -> None:
             gpx_path=gpx_path,
             pip_path=None,
             layout_id=None,
-            output_filename="telemetry-overlay.mov",
+            output_filename="telemetry-overlay.webm",
             output_dir=str(directory / "overlays"),
             flight_id=flight.id,
             overlay_only=True,
