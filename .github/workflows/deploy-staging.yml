@@ -252,6 +252,7 @@ jobs:
             export CI_BACKEND_IMAGE="$GHCR_IMAGE"
             export CONTAINER_PREFIX="parapente-staging"
             export ENVIRONMENT=staging
+            export BACKEND_BACKGROUND_WORKERS_ENABLED=false
             export BACKEND_HOST_PORT="$PORT"
             export BACKEND_INTERNAL_STAGING_AUTO_LOGIN=true
             export BACKEND_INTERNAL_STAGING_AUTO_LOGIN_HOST="192.168.1.106:$PORT"
@@ -345,8 +346,9 @@ jobs:
             cd "$STACK_DIR"
             ENV_FILE="$STACK_DIR/stack.env"
             compose config --quiet
-            compose pull
-            compose up -d --remove-orphans
+            compose pull redis backend
+            compose rm -sf backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker gopro-preview-worker database-backup || true
+            compose up -d --remove-orphans redis backend
             for attempt in $(seq 1 30); do
               if curl --connect-timeout 2 --max-time 5 --fail --silent --show-error "http://127.0.0.1:$PORT/health" >/dev/null; then
                 printf '%s' "$PR_NUMBER" > "$STACK_DIR/current-pr"
