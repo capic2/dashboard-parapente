@@ -4392,6 +4392,10 @@ def test_run_job_generates_full_flight_overlay_from_gpx_only(
     }
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PROFILE", "nnvgpu")
     monkeypatch.setattr(config, "VIDEO_ACCELERATOR", "cpu")
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_EXTRA_ARGS", None)
+    monkeypatch.setattr(
+        gopro_overlay_export, "_gopro_overlay_double_buffer_supported", lambda: True
+    )
     monkeypatch.setattr(
         gopro_overlay_export,
         "check_gopro_overlay_dependencies",
@@ -4412,11 +4416,18 @@ def test_run_job_generates_full_flight_overlay_from_gpx_only(
         assert "--use-gpx-only" in command
         assert "--generate" not in command
         assert command[command.index("--profile") + 1] == "vp9"
+        assert "--double-buffer" in command
         assert str(timeline_path) not in command
         assert command[-1] == str(output_path.with_name(f"full-flight-overlay.{job_id}.part.webm"))
     finally:
         gopro_overlay_export._JOBS.pop(job_id, None)
         gopro_overlay_export._PROCESSES.pop(job_id, None)
+
+
+def test_double_buffer_is_disabled_on_python_314(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(gopro_overlay_export.sys, "version_info", (3, 14, 0))
+
+    assert not gopro_overlay_export._gopro_overlay_double_buffer_supported()
 
 
 def test_run_job_passes_configured_overlay_gpu_args(monkeypatch, tmp_path):
