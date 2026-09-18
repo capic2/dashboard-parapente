@@ -30,7 +30,6 @@ services:
     environment:
       # Global
       - ENVIRONMENT=${ENVIRONMENT:-production}
-      - BACKEND_BACKGROUND_WORKERS_ENABLED=${BACKEND_BACKGROUND_WORKERS_ENABLED:-true}
 
       # Backend - Database
       - BACKEND_DATABASE_URL=${BACKEND_DATABASE_URL:?BACKEND_DATABASE_URL is required}

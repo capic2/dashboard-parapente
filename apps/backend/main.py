@@ -430,14 +430,14 @@ async def lifespan(app: FastAPI):
         logger.info("📅 Scheduler disabled, skipping cache warmup")
 
     # Start manual video export worker (skip in tests)
-    if not config.TESTING and config.BACKGROUND_WORKERS_ENABLED:
+    if not config.TESTING:
         start_video_export_worker()
         start_gopro_overlay_worker()
         start_preview_scanner()
         if not is_rq_enabled():
-            enqueue_pending_youtube_uploads(recover_active=True)
-    elif not config.TESTING:
-        logger.info("⏸️ Background workers disabled by BACKEND_BACKGROUND_WORKERS_ENABLED")
+            enqueue_pending_youtube_uploads(
+                recover_active=config.BACKGROUND_JOB_RECOVERY_ENABLED
+            )
 
     yield
 
