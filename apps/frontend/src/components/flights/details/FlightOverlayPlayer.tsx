@@ -39,7 +39,6 @@ interface FlightOverlayPlayerProps {
   getFlightTime?: (cameraTime: number) => number;
   getCameraTime?: (flightTime: number) => number;
   getOverlayTime?: (cameraTime: number) => number;
-  overlayOffsetSeconds?: number;
   onTimeChange?: (time: number) => void;
   seekRequest?: { id: number; time: number } | null;
   overlayContent?: ReactNode;
@@ -65,7 +64,6 @@ export function FlightOverlayPlayer({
   getFlightTime,
   getCameraTime,
   getOverlayTime,
-  overlayOffsetSeconds = 0,
   onTimeChange,
   seekRequest,
   overlayContent,
@@ -100,8 +98,7 @@ export function FlightOverlayPlayer({
       flight.currentTime = clamp(flightTime, flight.duration);
     }
     const overlay = overlayRef.current;
-    const overlayTime =
-      getOverlayTime?.(currentTime) ?? currentTime - overlayOffsetSeconds;
+    const overlayTime = getOverlayTime?.(currentTime) ?? currentTime;
     if (overlay && Math.abs(overlay.currentTime - overlayTime) > 0.08) {
       overlay.currentTime = clamp(overlayTime, overlay.duration);
     }

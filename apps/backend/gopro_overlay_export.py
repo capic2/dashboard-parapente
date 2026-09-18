@@ -527,11 +527,11 @@ def _prepare_layout_file(
                 if has_pip:
                     child.set("id", "pip")
                     continue
-                # The stock parapente layouts may declare the PIP explicitly
-                # as ``id="pip"``. Remove that component too when highlights
-                # intentionally run without a PIP input.
-                if child.attrib.get("id") == "pip" or not child.attrib.get("file"):
-                    parent.remove(child)
+                # A GPX-only render has no video input. Remove every video
+                # component, including templates that carry a default file
+                # attribute, so GoPro Dashboard cannot try to open a missing
+                # PIP source.
+                parent.remove(child)
                 continue
             normalize_video_components(child)
 
@@ -1729,7 +1729,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
             )
             render_gpx_path = enriched_gpx_path
-            if gpx_offset and not command_metadata.get("overlay_only"):
+            if gpx_offset:
                 render_gpx_path = _shift_gpx_timestamps(
                     enriched_gpx_path,
                     work_dir / f"gpx-offset-{job_id}.gpx",
@@ -1737,7 +1737,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 )
         else:
             _append_job_log(log_path, "No OSV files found; using GPX directly")
-            if gpx_offset and not command_metadata.get("overlay_only"):
+            if gpx_offset:
                 render_gpx_path = _shift_gpx_timestamps(
                     render_gpx_path,
                     work_dir / f"gpx-offset-{job_id}.gpx",

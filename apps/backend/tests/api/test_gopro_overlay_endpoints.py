@@ -2501,6 +2501,20 @@ def test_prepare_layout_file_removes_explicit_pip_without_video(tmp_path):
     assert 'id="pip"' not in destination.read_text()
 
 
+def test_prepare_layout_file_removes_video_component_with_default_file_without_video(
+    tmp_path,
+):
+    source = tmp_path / "layout.xml"
+    destination = tmp_path / "prepared.xml"
+    source.write_text(
+        '<layout><component type="video" file="default-pip.mp4" id="camera" /></layout>'
+    )
+
+    _prepare_layout_file(source, destination, has_pip=False)
+
+    assert 'type="video"' not in destination.read_text()
+
+
 def test_read_process_updates_drains_output_after_process_exit():
     class ExitedProcess:
         stdout = StringIO("last status line\nTraceback details\n")
