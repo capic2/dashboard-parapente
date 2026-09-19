@@ -1,5 +1,5 @@
 import { definePreview } from '@storybook/react-vite';
-import { initialize, mswLoader } from 'msw-storybook-addon';
+import addonMsw from 'msw-storybook-addon';
 import addonA11y from '@storybook/addon-a11y';
 import { http, HttpResponse } from 'msw';
 import { I18nextProvider } from 'react-i18next';
@@ -9,12 +9,6 @@ import { Suspense, useEffect, useState } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TanstackRouterDecorator } from './decorators';
-
-declare global {
-  interface Window {
-    __mswInitialized?: boolean;
-  }
-}
 
 // Default MSW handlers — fallback responses for common API endpoints.
 // Individual stories override these with their own parameters.msw.handlers.
@@ -64,24 +58,17 @@ const defaultMswHandlers = [
   http.put('*/api/settings', () =>
     HttpResponse.json({ success: true, updated: {} })
   ),
+  http.get(/approximateTerrainHeights\.json(?:\?.*)?$/, () =>
+    HttpResponse.json({})
+  ),
 ];
 
-const initializeMsw = (
-  options?: Parameters<typeof initialize>[0],
-  handlers?: Parameters<typeof initialize>[1]
-) => {
-  if (typeof window !== 'undefined' && window.__mswInitialized) {
-    return;
-  }
-
-  initialize(options, handlers);
-
-  if (typeof window !== 'undefined') {
-    window.__mswInitialized = true;
-  }
+const setupMsw = async () => {
+  const { setupWorker } = await import('msw/browser');
+  const worker = setupWorker(...defaultMswHandlers);
+  await worker.start({ onUnhandledRequest: 'error', quiet: true });
+  return worker;
 };
-// Initialize MSW with default fallback handlers
-initializeMsw({ onUnhandledRequest: 'error', quiet: true }, defaultMswHandlers);
 
 // i18n decorator — syncs the toolbar locale global with the i18n instance
 function I18nDecorator({
@@ -136,7 +123,7 @@ function ThemeDecorator({
 }
 
 const preview = definePreview({
-  addons: [addonA11y()],
+  addons: [addonA11y(), addonMsw(setupMsw)],
 
   parameters: {
     router: {
@@ -213,9 +200,6 @@ const preview = definePreview({
     },
     TanstackRouterDecorator,
   ],
-
-  // MSW loader
-  loaders: [mswLoader],
 
   // Tags
   tags: ['autodocs'],
