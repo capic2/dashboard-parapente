@@ -23,6 +23,7 @@ import {
   createDailySummaryQueryFn,
   createWeatherQueryFn,
   transformWeatherResponse,
+  useDailySummary,
 } from '../hooks/weather/useWeather';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { useIsMobile } from '../hooks/useIsMobile';
@@ -223,14 +224,12 @@ export default function WeatherPage() {
   const isMobile = useIsMobile();
   const search = useSearch({ from: '/weather' });
   const routeSiteId = search ? search.siteId : '';
-  const selectedDayIndex = getDayIndexFromSearch(search.day);
+  const requestedDayIndex = getDayIndexFromSearch(search.day);
   const selectedObjective =
     parseFlightObjective(search.objective) ??
     parseFlightObjective(appSettings?.default_flight_objective) ??
     DEFAULT_FLIGHT_OBJECTIVE;
   const selectedSearchTarget = getTargetFromSearch(search);
-  const { data: bestSpot } = useBestSpotAPI(selectedDayIndex);
-  const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(selectedDayIndex);
   const routeSelectionTab: WeatherSelectionTab = selectedSearchTarget
     ? 'search'
     : 'favorites';
@@ -254,6 +253,14 @@ export default function WeatherPage() {
     favoriteSites[0]?.id ??
     sites[0]?.id ??
     '';
+  const { data: dailySummary } = useDailySummary(
+    !selectedSearchTarget && selectedSiteId ? selectedSiteId : undefined
+  );
+  const selectedDayIndex = search.day
+    ? requestedDayIndex
+    : (dailySummary?.days[0]?.day_index ?? requestedDayIndex);
+  const { data: bestSpot } = useBestSpotAPI(selectedDayIndex);
+  const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(selectedDayIndex);
   const selectedSite = sites.find((site) => site.id === selectedSiteId);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const flightDecision = useFlightDecision(
