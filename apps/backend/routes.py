@@ -7078,10 +7078,11 @@ def get_flight_gopro_overlay_preview(
             _first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
             manual_offset,
         )
-    # The offset is adjusted locally in the dialog.  Do not let the value
-    # persisted from a previous render shorten the camera preview before the
-    # user can calibrate the current timeline.
-    preview_target_end = min(video_duration, max(0.0, automatic_offset + gpx_duration))
+    # The calibration preview must cover the complete camera timeline.  The
+    # preview proxy keeps only the beginning and the end of this range, so the
+    # end button lands on the end of the video rather than on the end of the
+    # currently recorded GPX sequence.
+    preview_target_end = video_duration
     preview_state = gopro_preview_proxy.get_preview_state(camera_path, preview_target_end)
     preview_segments = list(preview_state.segments)
     if preview_state.available_duration_seconds <= 0 or not preview_segments:
