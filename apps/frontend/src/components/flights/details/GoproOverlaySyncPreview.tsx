@@ -3,7 +3,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Gauge, HeartPulse, MapPin, Mountain, TimerReset } from 'lucide-react';
 import {
-  useFlightOverlayLayer,
   useGenerateGoproPreview,
   useGoproOverlayPreview,
 } from '../../../hooks/gopro/useGoproOverlay';
@@ -119,7 +118,6 @@ export function GoproOverlaySyncPreview({
   const token = useAuthStore((state) => state.token);
   const queryClient = useQueryClient();
   const preview = useGoproOverlayPreview(flightId, true);
-  const layer = useFlightOverlayLayer(flightId);
   const generatePreview = useGenerateGoproPreview(flightId);
   const automaticallyRequestedTarget = useRef<string | null>(null);
   const [videoTime, setVideoTime] = useState(0);
@@ -160,25 +158,6 @@ export function GoproOverlaySyncPreview({
       version: `${preview.data?.video.preview_target_end_seconds}-${preview.data?.video.preview_available_duration_seconds}`,
     }
   );
-  const overlayJob = layer.data?.status === 'completed' ? layer.data.job : null;
-  const overlaySource =
-    overlayJob ??
-    (preview.data?.overlay?.status === 'ready' && preview.data.overlay.job_id
-      ? {
-          job_id: preview.data.overlay.job_id,
-          updated_at: preview.data.overlay.job_id,
-        }
-      : null);
-  const overlayUrl = overlaySource
-    ? getApiUrlWithSearchParams(
-        `gopro-overlays/jobs/${overlaySource.job_id}/download`,
-        {
-          access_token: token,
-          browser_preview: 'true',
-          version: overlaySource.updated_at,
-        }
-      )
-    : undefined;
   const availableMinutes = Math.max(
     0,
     Math.ceil(
@@ -285,9 +264,6 @@ export function GoproOverlaySyncPreview({
           })}
           cameraLabel={t('flights.goproOverlayCameraPreview')}
           flightLabel={t('flights.goproOverlayFlightVideo')}
-          overlayUrl={overlayUrl}
-          overlayStatus={overlayJob ? 'ready' : preview.data?.overlay?.status}
-          overlayError={overlayJob ? null : preview.data?.overlay?.error}
           syncOffsetSeconds={automaticOffset + manualOffset}
           getFlightTime={(previewTime) =>
             sourceTimeAtPreviewTime(previewTime, previewSegments) -
@@ -299,11 +275,6 @@ export function GoproOverlaySyncPreview({
               flightTime + automaticOffset + manualOffset,
               previewSegments
             )
-          }
-          getOverlayTime={(previewTime) =>
-            sourceTimeAtPreviewTime(previewTime, previewSegments) -
-            automaticOffset -
-            manualOffset
           }
           onTimeChange={setVideoTime}
           seekRequest={seekRequest}
