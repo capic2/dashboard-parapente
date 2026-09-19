@@ -93,8 +93,15 @@ def test_begin_status_mark_and_release_enforce_ownership(client):
 
 
 def test_status_counts_manual_stream_and_gopro_preparing_jobs(client):
-    manual = [{"job_id": "manual", "status": "processing", "internal_status": "capturing"}]
-    stream = [{"job_id": "stream", "status": "started"}]
+    manual = [
+        {
+            "job_id": "manual",
+            "mode": "manual",
+            "status": "processing",
+            "internal_status": "capturing",
+        }
+    ]
+    stream = [{"job_id": "stream", "mode": "stream", "status": "started"}]
     gopro = [{"job_id": "gopro", "status": "preparing", "output_filename": "overlay.mp4"}]
 
     with (

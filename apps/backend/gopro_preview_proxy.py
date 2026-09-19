@@ -13,13 +13,12 @@ import threading
 import time
 import uuid
 from collections.abc import Iterator
-from contextlib import AbstractContextManager, contextmanager
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Literal
 
 import config
-from deployment_drain import DeploymentDrainActive, job_admission
 from video_acceleration import h264_encode_args, select_video_accelerator
 
 logger = logging.getLogger(__name__)
@@ -527,7 +526,9 @@ def process_preview_job(
         if available >= requested and _preview_path(camera_path).is_file():
             return
         try:
-            with job_admission("gopro_preview"):
+            # Keep the body scoped without registering a deployment admission:
+            # this cache can be interrupted and safely regenerated later.
+            with nullcontext():
                 source_duration = _probe_duration(camera_path)
                 effective_duration = min(requested, max(1, math.ceil(source_duration or requested)))
                 effective_target = min(
@@ -583,8 +584,6 @@ def process_preview_job(
                     )
                     manifest = latest_manifest
                     _write_manifest(camera_path, manifest)
-        except DeploymentDrainActive:
-            manifest.update(status="missing", generation_started_at=None, error=None)
         except Exception as error:
             logger.warning("GoPro preview generation failed for %s: %s", camera_path, error)
             manifest.update(status="failed", generation_started_at=None, error=str(error)[:1000])
