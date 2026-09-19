@@ -115,7 +115,7 @@ def test_gopro_overlay_preview_returns_shared_timeline(
     monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
 
     with (
-        patch("routes.probe_video_duration", return_value=120.0),
+        patch("routes.probe_video_duration", return_value=1200.0),
         patch(
             "gopro_overlay_export.probe_video_start_time",
             return_value=datetime.fromisoformat("2026-03-15T10:00:00+00:00"),
@@ -124,14 +124,19 @@ def test_gopro_overlay_preview_returns_shared_timeline(
         response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay/preview")
 
     assert response.status_code == 200
-    assert response.json()["video"]["duration_seconds"] == 120.0
-    assert response.json()["video"]["preview_target_end_seconds"] == 70.0
+    assert response.json()["video"]["duration_seconds"] == 1200.0
+    assert response.json()["video"]["preview_target_end_seconds"] == 1200.0
     assert response.json()["video"]["preview_segments"] == [
         {
             "preview_start_seconds": 0.0,
             "source_start_seconds": 0.0,
-            "duration_seconds": 120.0,
-        }
+            "duration_seconds": 180.0,
+        },
+        {
+            "preview_start_seconds": 180.0,
+            "source_start_seconds": 1020.0,
+            "duration_seconds": 180.0,
+        },
     ]
     assert response.json()["gpx"]["duration_seconds"] == 60.0
     assert len(response.json()["gpx"]["coordinates"]) == 2
@@ -224,7 +229,7 @@ def test_gopro_overlay_preview_ignores_camera_mtime_from_a_later_file_copy(
         "manual_offset_seconds": 20.0,
         "effective_offset_seconds": 20.0,
     }
-    assert response.json()["video"]["preview_target_end_seconds"] == 80.0
+    assert response.json()["video"]["preview_target_end_seconds"] == 120.0
 
 
 def test_gopro_overlay_preview_prefers_osv_timestamp_over_late_camera_mtime(
