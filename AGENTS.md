@@ -50,6 +50,14 @@ This file defines global rules for the entire monorepo.
   - `pnpm test`
   - or targeted commands: `pnpm nx lint <project>`, `pnpm nx test <project>`
 
+## Protected Calibration Player
+
+- The calibration player is protected functionality. Do not modify it,
+  refactor it, or change its player implementation without first asking the
+  user for explicit authorization in the current task.
+- This authorization is required even when the change appears to be a
+  regression fix or a necessary consequence of another overlay change.
+
 ## Local Rules
 
 - Backend: see `apps/backend/AGENTS.md`.
