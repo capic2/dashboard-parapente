@@ -1723,6 +1723,21 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         gpx_start = first_gpx_timestamp(render_gpx_path)
         alignment_video_start = resolve_gopro_video_start_time(video_path, gpx_start)
         aligned_video_start = align_video_start_time_to_gpx(alignment_video_start, gpx_start)
+        automatic_offset = (
+            (gpx_start - aligned_video_start).total_seconds()
+            if gpx_start is not None and aligned_video_start is not None
+            else None
+        )
+        effective_offset = automatic_offset + gpx_offset if automatic_offset is not None else None
+        _append_job_log(
+            log_path,
+            "Overlay timeline: "
+            f"camera_start={aligned_video_start.isoformat() if aligned_video_start else 'unknown'} "
+            f"gpx_start={gpx_start.isoformat() if gpx_start else 'unknown'} "
+            f"automatic_offset={automatic_offset if automatic_offset is not None else 'unknown'}s "
+            f"manual_offset={gpx_offset:.3f}s "
+            f"effective_offset={effective_offset if effective_offset is not None else 'unknown'}s",
+        )
         if osv_paths:
             _update_job(job_id, progress=10, message="Merging OSV telemetry")
             video_duration = probe_video_duration(video_path)
