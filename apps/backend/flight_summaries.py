@@ -180,7 +180,7 @@ def _cursor_context(
     sort_order: SortOrder,
 ) -> dict[str, Any]:
     return {
-        "v": 1,
+        "v": 2,
         "q": q,
         "site_id": site_id,
         "gpx_status": gpx_status,
@@ -191,7 +191,7 @@ def _cursor_context(
 
 def _ordering(sort_by: FlightSortBy) -> list[ColumnElement[Any]]:
     if sort_by == "flight_date":
-        return [Flight.flight_date, Flight.departure_time, Flight.id]
+        return [Flight.flight_date, Flight.departure_time, Flight.created_at, Flight.id]
     if sort_by == "site_name":
         return [func.lower(Site.name), Flight.id]
     return [getattr(Flight, sort_by), Flight.id]
@@ -224,7 +224,8 @@ def _deserialize_cursor_values(
             return [
                 date.fromisoformat(values[0]),
                 datetime.fromisoformat(values[1]) if values[1] is not None else None,
-                str(values[2]),
+                datetime.fromisoformat(values[2]) if values[2] is not None else None,
+                str(values[3]),
             ]
         if sort_by in {"duration_minutes", "max_altitude_m"}:
             return [int(values[0]) if values[0] is not None else None, str(values[1])]
@@ -383,6 +384,7 @@ def list_flight_summaries(
         Flight.title,
         Flight.flight_date,
         Flight.departure_time,
+        Flight.created_at,
         Flight.duration_minutes,
         Flight.max_altitude_m,
         Flight.distance_km,
@@ -496,7 +498,7 @@ def list_flight_summaries(
     if has_more and rows:
         last = rows[-1]
         if sort_by == "flight_date":
-            values = [last.flight_date, last.departure_time, last.id]
+            values = [last.flight_date, last.departure_time, last.created_at, last.id]
         elif sort_by == "site_name":
             values = [last.site_name.lower() if last.site_name else None, last.id]
         else:
