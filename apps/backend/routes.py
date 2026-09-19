@@ -6008,6 +6008,20 @@ def parse_gpx_file(gpx_path: Path) -> list[dict]:
         return parse_gpx_file_from_string(content)
 
 
+def _restore_missing_heart_rates(coordinates: list[dict], source_coordinates: list[dict]) -> None:
+    """Keep source GPX heart rates when OSV enrichment omits them."""
+    heart_rates_by_timestamp = {
+        point["timestamp"]: point["heart_rate"]
+        for point in source_coordinates
+        if point.get("timestamp") and point.get("heart_rate") is not None
+    }
+    for point in coordinates:
+        if point.get("heart_rate") is None:
+            heart_rate = heart_rates_by_timestamp.get(point.get("timestamp"))
+            if heart_rate is not None:
+                point["heart_rate"] = heart_rate
+
+
 def calculate_max_speed(coordinates: list[dict]) -> float:
     """
     Calculate maximum speed in km/h from GPX coordinates
@@ -7019,6 +7033,7 @@ def get_flight_gopro_overlay_preview(
         raise HTTPException(status_code=404, detail="Flight not found")
 
     camera_path, gpx_path = _flight_gopro_preview_inputs(db, flight)
+    source_gpx_path = gpx_path
     osv_paths = _matching_files_by_mtime(camera_path.parent, "*.osv")
     video_duration = probe_video_duration(camera_path)
     gpx_start = first_gpx_timestamp(gpx_path)
@@ -7046,7 +7061,10 @@ def get_flight_gopro_overlay_preview(
             video_duration=video_duration,
             first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
         )
-    coordinates = parse_gpx_file(gpx_path)
+    source_coordinates = parse_gpx_file(source_gpx_path)
+    coordinates = source_coordinates if source_gpx_path == gpx_path else parse_gpx_file(gpx_path)
+    if osv_paths:
+        _restore_missing_heart_rates(coordinates, source_coordinates)
     manual_offset = float(flight.gopro_overlay_gpx_offset or 0.0)
     effective_offset = automatic_offset + manual_offset
     overlay_state = _interactive_overlay_state(camera_path)
