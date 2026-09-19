@@ -76,6 +76,7 @@ export function GoproOverlaySyncPreview({
   const [requestedMinutes, setRequestedMinutes] = useState(3);
   const parsedOffset = Number(offset);
   const manualOffset = Number.isFinite(parsedOffset) ? parsedOffset : 0;
+  const [displayOffset, setDisplayOffset] = useState(manualOffset);
   const automaticOffset = preview.data?.alignment.automatic_offset_seconds ?? 0;
   const previewSegments = preview.data?.video.preview_segments ?? [];
   const sourceVideoTime = sourceTimeAtPreviewTime(videoTime, previewSegments);
@@ -86,13 +87,19 @@ export function GoproOverlaySyncPreview({
         )
       )
     : 0;
+
+  useEffect(() => {
+    setDisplayOffset(manualOffset);
+  }, [manualOffset]);
+
   const gpxStart = preview.data
-    ? parseApiUtcDate(preview.data.gpx.start_time).getTime()
+    ? (preview.data.gpx.coordinates[0]?.timestamp ??
+      parseApiUtcDate(preview.data.gpx.start_time).getTime())
     : 0;
   const telemetry = preview.data
     ? telemetryAtTimestamp(
         preview.data.gpx.coordinates,
-        gpxStart + (sourceVideoTime - automaticOffset - manualOffset) * 1000
+        gpxStart + (sourceVideoTime - automaticOffset - displayOffset) * 1000
       )
     : null;
   const heartRate = telemetry?.heart_rate ?? null;
@@ -162,7 +169,9 @@ export function GoproOverlaySyncPreview({
   };
 
   const adjustOffset = (delta: number) => {
-    onOffsetChange((manualOffset + delta).toFixed(1));
+    const nextOffset = (displayOffset + delta).toFixed(1);
+    setDisplayOffset(Number(nextOffset));
+    onOffsetChange(nextOffset);
   };
 
   const seekToPreviewBoundary = (time: number) => {
@@ -177,6 +186,7 @@ export function GoproOverlaySyncPreview({
       sourceVideoTime,
       automaticOffset
     ).toFixed(1);
+    setDisplayOffset(Number(nextOffset));
     onOffsetChange(nextOffset);
     await onOffsetSave(nextOffset);
   };
@@ -369,7 +379,7 @@ export function GoproOverlaySyncPreview({
               {t('flights.goproOverlayEffectiveOffset')}
             </span>
             <span className="font-mono font-semibold">
-              {(automaticOffset + manualOffset).toFixed(1)} s
+              {(automaticOffset + displayOffset).toFixed(1)} s
             </span>
           </div>
           <div className="mt-1 text-xs text-gray-600 dark:text-gray-300">
