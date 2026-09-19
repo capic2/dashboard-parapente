@@ -428,10 +428,28 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Resolve active staging PR
+        id: active_staging_pr
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const pullRequests = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'deploy-staging',
+              per_page: 100,
+            });
+            const activePullRequest = pullRequests.find(
+              (pullRequest) => pullRequest.pull_request?.url,
+            );
+            core.setOutput('pr_number', activePullRequest?.number?.toString() ?? '');
+
       - name: Stop staging when it serves the inactive PR
         uses: appleboy/ssh-action@v1.2.5
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          ACTIVE_STAGING_PR: ${{ steps.active_staging_pr.outputs.pr_number }}
           DEPLOY_PATH: ${{ secrets.STAGING_SSH_DEPLOY_PATH }}
           VM_SHUTDOWN_COMMAND: ${{ secrets.STAGING_VM_SHUTDOWN_COMMAND }}
         with:
@@ -441,7 +459,7 @@ jobs:
           key: ${{ secrets.STAGING_SSH_KEY || secrets.SSH_KEY }}
           fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT || secrets.SSH_FINGERPRINT }}
           port: ${{ secrets.STAGING_SSH_PORT || secrets.SSH_PORT }}
-          envs: PR_NUMBER,DEPLOY_PATH,VM_SHUTDOWN_COMMAND
+          envs: PR_NUMBER,ACTIVE_STAGING_PR,DEPLOY_PATH,VM_SHUTDOWN_COMMAND
           script: |
             set -eu
             STACK_DIR="$DEPLOY_PATH"
@@ -450,14 +468,15 @@ jobs:
             if [ -f "$STACK_DIR/current-pr" ]; then
               CURRENT_PR=$(tr -d '[:space:]' < "$STACK_DIR/current-pr")
             fi
-            if [ "$CURRENT_PR" != "$PR_NUMBER" ]; then
-              echo "Staging currently serves PR ${CURRENT_PR:-unknown}; keeping it running"
+            if [ -n "$ACTIVE_STAGING_PR" ]; then
+              echo "Staging remains owned by active PR #$ACTIVE_STAGING_PR"
               exit 0
             fi
             if [ -f "$STACK_DIR/stack.env" ] && [ -f "$STACK_DIR/docker-compose.yml" ]; then
               cd "$STACK_DIR"
               docker compose --env-file "$STACK_DIR/stack.env" -p "$PROJECT" -f docker-compose.yml down --remove-orphans
               rm -f "$STACK_DIR/current-pr"
+              echo "Stopped orphaned staging stack (previous PR ${CURRENT_PR:-unknown})"
             fi
             if [ -n "$VM_SHUTDOWN_COMMAND" ]; then
               echo "Scheduling configured staging VM shutdown"
