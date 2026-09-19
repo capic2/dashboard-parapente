@@ -1,9 +1,16 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from weather_pipeline import filter_remaining_hours
+from weather_pipeline import filter_remaining_hours, get_forecast_target_date
 
 PARIS_TZ = ZoneInfo("Europe/Paris")
+
+
+def test_forecast_date_uses_paris_day_when_server_time_is_utc() -> None:
+    utc_time = datetime(2026, 9, 19, 23, 30, tzinfo=ZoneInfo("UTC"))
+
+    assert get_forecast_target_date(0, now=utc_time) == "2026-09-20"
+    assert get_forecast_target_date(1, now=utc_time) == "2026-09-21"
 
 
 def test_today_keeps_current_and_future_hours() -> None:
