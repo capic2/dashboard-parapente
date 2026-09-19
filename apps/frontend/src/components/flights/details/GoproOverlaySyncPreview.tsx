@@ -131,7 +131,13 @@ export function GoproOverlaySyncPreview({
   const automaticOffset = preview.data?.alignment.automatic_offset_seconds ?? 0;
   const previewSegments = preview.data?.video.preview_segments ?? [];
   const sourceVideoTime = sourceTimeAtPreviewTime(videoTime, previewSegments);
-  const activeSegmentIndex = previewSegmentIndex(videoTime, previewSegments);
+  const previewEndTime = previewSegments.length
+    ? Math.max(
+        ...previewSegments.map(
+          (segment) => segment.preview_start_seconds + segment.duration_seconds
+        )
+      )
+    : 0;
   const gpxStart = preview.data
     ? parseApiUtcDate(preview.data.gpx.start_time).getTime()
     : 0;
@@ -211,14 +217,12 @@ export function GoproOverlaySyncPreview({
     onOffsetChange((manualOffset + delta).toFixed(1));
   };
 
-  const seekToPreviewSegment = (segmentIndex: number) => {
-    const segment = previewSegments[segmentIndex];
-    if (!segment) return;
+  const seekToPreviewBoundary = (time: number) => {
     setSeekRequest((current) => ({
       id: (current?.id ?? 0) + 1,
-      time: segment.preview_start_seconds,
+      time,
     }));
-    setVideoTime(segment.preview_start_seconds);
+    setVideoTime(time);
   };
 
   const alignGpxStartAtCurrentVideoTime = () => {
@@ -279,26 +283,27 @@ export function GoproOverlaySyncPreview({
           <span>{t('flights.goproOverlayVideoTime')}</span>
           <span>{formatSeconds(sourceVideoTime)}</span>
         </div>
-        {previewSegments.length > 1 && (
-          <div className="grid grid-cols-2 border-t border-gray-800 text-center text-xs font-medium text-gray-400">
-            <button
-              type="button"
-              onClick={() => seekToPreviewSegment(0)}
-              aria-pressed={activeSegmentIndex === 0}
-              className={`cursor-pointer px-3 py-2 transition-colors hover:bg-gray-900 hover:text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 ${activeSegmentIndex === 0 ? 'bg-sky-950 text-sky-200' : ''}`}
-            >
-              {t('flights.goproPreviewStart')}
-            </button>
-            <button
-              type="button"
-              onClick={() => seekToPreviewSegment(1)}
-              aria-pressed={activeSegmentIndex === 1}
-              className={`cursor-pointer border-l border-gray-800 px-3 py-2 transition-colors hover:bg-gray-900 hover:text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 ${activeSegmentIndex === 1 ? 'bg-sky-950 text-sky-200' : ''}`}
-            >
-              {t('flights.goproPreviewEnd')}
-            </button>
-          </div>
-        )}
+        <div className="grid grid-cols-2 border-t border-gray-800 text-center text-xs font-medium text-gray-400">
+          <button
+            type="button"
+            onClick={() => seekToPreviewBoundary(0)}
+            aria-pressed={videoTime <= 0.05}
+            className={`cursor-pointer px-3 py-2 transition-colors hover:bg-gray-900 hover:text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 ${videoTime <= 0.05 ? 'bg-sky-950 text-sky-200' : ''}`}
+          >
+            {t('flights.goproPreviewStart')}
+          </button>
+          <button
+            type="button"
+            onClick={() => seekToPreviewBoundary(previewEndTime)}
+            aria-pressed={
+              previewEndTime > 0 && videoTime >= previewEndTime - 0.05
+            }
+            disabled={!previewEndTime}
+            className={`cursor-pointer border-l border-gray-800 px-3 py-2 transition-colors hover:bg-gray-900 hover:text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 ${previewEndTime > 0 && videoTime >= previewEndTime - 0.05 ? 'bg-sky-950 text-sky-200' : ''}`}
+          >
+            {t('flights.goproPreviewEnd')}
+          </button>
+        </div>
         <div className="space-y-2 border-t border-gray-800 px-3 py-3 text-gray-100">
           <div className="flex items-center justify-between gap-3 text-xs">
             <label htmlFor="gopro-preview-duration">
