@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   useVideoExportJobs,
+  videoExportGpuStatusQueryOptions,
   videoExportJobsQueryOptions,
 } from './useVideoExportJobs';
 
@@ -94,6 +95,14 @@ describe('useVideoExportJobs', () => {
   it('refreshes the list periodically when the SSE connection cannot update it', () => {
     expect(videoExportJobsQueryOptions().refetchInterval).toBe(3000);
     expect(videoExportJobsQueryOptions().refetchOnWindowFocus).toBe('always');
+  });
+
+  it('keeps GPU telemetry fresh even when the tab is in the background', () => {
+    const options = videoExportGpuStatusQueryOptions();
+    expect(options.refetchInterval).toBe(5000);
+    expect(options.refetchIntervalInBackground).toBe(true);
+    expect(options.refetchOnWindowFocus).toBe('always');
+    expect(options.staleTime).toBe(0);
   });
 
   it('updates cached jobs from the global SSE stream', async () => {

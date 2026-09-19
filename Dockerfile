@@ -15,15 +15,19 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 # Copier fichiers de configuration Nx et pnpm
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig.base.json ./
 
-# Copier libs (dépendances du frontend)
-COPY libs/shared-types ./libs/shared-types
-COPY libs/design-system ./libs/design-system
-
-# Copier frontend
-COPY apps/frontend ./apps/frontend
+# Copier uniquement les manifests pour conserver le cache des dépendances
+# lorsque seul le code frontend change.
+COPY libs/shared-types/package.json ./libs/shared-types/package.json
+COPY libs/design-system/package.json ./libs/design-system/package.json
+COPY apps/frontend/package.json ./apps/frontend/package.json
 
 # Installer toutes les dépendances (root + frontend)
 RUN pnpm install --frozen-lockfile --config.enable-global-virtual-store=false
+
+# Copier les sources après l'installation pour préserver le cache pnpm.
+COPY libs/shared-types ./libs/shared-types
+COPY libs/design-system ./libs/design-system
+COPY apps/frontend ./apps/frontend
 
 # Build frontend avec Nx
 RUN pnpm exec nx build frontend --configuration=production
@@ -34,9 +38,6 @@ RUN pnpm exec nx build frontend --configuration=production
 FROM python:3.14-slim
 
 WORKDIR /app
-
-ARG BACKEND_DEPLOY_VERSION
-ENV BACKEND_DEPLOY_VERSION=${BACKEND_DEPLOY_VERSION}
 
 ARG CODEX_CLI_VERSION=0.146.0
 ENV CODEX_HOME=/app/codex-home
@@ -124,6 +125,11 @@ RUN mkdir -p /app/db && chmod 755 /app/db && \
 
 # Rendre le script d'entrypoint exécutable
 RUN chmod +x entrypoint.sh
+
+# This changes for every deployment, so keep it after the expensive dependency
+# layers to preserve their BuildKit cache.
+ARG BACKEND_DEPLOY_VERSION
+ENV BACKEND_DEPLOY_VERSION=${BACKEND_DEPLOY_VERSION}
 
 # Exposer port
 EXPOSE 8001

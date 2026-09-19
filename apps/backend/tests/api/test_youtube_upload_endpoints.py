@@ -59,6 +59,22 @@ def test_existing_youtube_video_ids_tolerates_token_refresh_failure(monkeypatch)
     assert youtube_upload.existing_youtube_video_ids({1: {"dQw4w9WgXcQ"}}) == set()
 
 
+def test_oauth_error_detail_exposes_provider_reason_without_tokens() -> None:
+    response = httpx.Response(
+        400,
+        json={
+            "error": "invalid_grant",
+            "error_description": (
+                "Token has been revoked. refresh_token=super-secret-refresh-token"
+            ),
+        },
+    )
+
+    detail = youtube_upload._oauth_error_detail(response)
+    assert detail == "invalid_grant: Token has been revoked. refresh_token=[redacted]"
+    assert "super-secret-refresh-token" not in detail
+
+
 def _create_completed_overlay(
     db_session: Session, sample_flight: Flight, output_path: Path
 ) -> GoproOverlayJob:
@@ -347,6 +363,8 @@ def test_worker_injects_spherical_metadata_for_panorama_uploads(tmp_path, monkey
     source_path.write_bytes(b"flat panorama")
     monkeypatch.setattr(config, "VIDEO_EXPORT_DIR", str(tmp_path / "exports"))
     injected: list[tuple[Path, Path, str | None]] = []
+    progress_updates: list[int] = []
+    log_messages: list[str] = []
 
     def inject_metadata(source, destination, metadata, _console) -> None:
         destination_path = Path(destination)
@@ -360,12 +378,22 @@ def test_worker_injects_spherical_metadata_for_panorama_uploads(tmp_path, monkey
     }
     monkeypatch.setattr(youtube_upload.metadata_utils, "inject_metadata", inject_metadata)
     monkeypatch.setattr(
+        youtube_upload,
+        "_log_job",
+        lambda _job_id, message: log_messages.append(message),
+    )
+    monkeypatch.setattr(
         youtube_upload.metadata_utils,
         "parse_metadata",
         lambda _path, _console: parsed_metadata,
     )
 
-    upload_path = youtube_upload._prepare_upload_video("youtube-pano", "pano", source_path)
+    upload_path = youtube_upload._prepare_upload_video(
+        "youtube-pano",
+        "pano",
+        source_path,
+        progress_callback=lambda progress: progress_updates.append(progress),
+    )
 
     assert upload_path.read_bytes() == b"spherical panorama"
     assert injected[0][0] == source_path
@@ -374,6 +402,9 @@ def test_worker_injects_spherical_metadata_for_panorama_uploads(tmp_path, monkey
     assert "<GSpherical:ProjectionType>equirectangular</GSpherical:ProjectionType>" in (
         injected[0][2] or ""
     )
+    assert progress_updates == [1, 10]
+    assert any("Preparing panorama for YouTube" in message for message in log_messages)
+    assert any("Panorama preparation complete" in message for message in log_messages)
 
 
 def test_worker_rejects_unverified_spherical_metadata(tmp_path, monkeypatch) -> None:

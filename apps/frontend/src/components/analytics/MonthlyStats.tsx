@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 import { enUS, fr } from 'date-fns/locale';
 import type { Flight } from '../../types';
+import { parseApiLocalDate } from '../../lib/date';
 
 interface MonthlyStatsProps {
   flights: Flight[];
@@ -28,7 +29,7 @@ export default function MonthlyStats({ flights }: MonthlyStatsProps) {
     const monthMap = new Map<string, { count: number; totalMinutes: number }>();
 
     flights.forEach((flight) => {
-      const monthKey = format(new Date(flight.flight_date), 'yyyy-MM');
+      const monthKey = format(parseApiLocalDate(flight.flight_date), 'yyyy-MM');
 
       if (!monthMap.has(monthKey)) {
         monthMap.set(monthKey, { count: 0, totalMinutes: 0 });
@@ -43,10 +44,10 @@ export default function MonthlyStats({ flights }: MonthlyStatsProps) {
     return Array.from(monthMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, stats]) => ({
-        month: format(new Date(key + '-01'), 'MMM yy', {
+        month: format(parseApiLocalDate(key + '-01'), 'MMM yy', {
           locale: i18n.language === 'en' ? enUS : fr,
         }),
-        fullMonth: format(new Date(key + '-01'), 'MMMM yyyy', {
+        fullMonth: format(parseApiLocalDate(key + '-01'), 'MMMM yyyy', {
           locale: i18n.language === 'en' ? enUS : fr,
         }),
         count: stats.count,

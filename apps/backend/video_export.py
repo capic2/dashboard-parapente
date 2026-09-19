@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import config
@@ -209,7 +209,7 @@ def start_video_export_background(
             "status": "started",
             "progress": 0,
             "message": "Initializing...",
-            "started_at": datetime.now().isoformat(),
+            "started_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "video_path": None,
             "error": None,
             "render_method": None,
@@ -647,7 +647,9 @@ async def _export_video_playwright(
             export_jobs[job_id]["progress"] = 100
             export_jobs[job_id]["message"] = f"Video ready! ({file_size_mb:.1f} MB)"
             export_jobs[job_id]["video_path"] = str(output_file)
-            export_jobs[job_id]["completed_at"] = datetime.now().isoformat()
+            export_jobs[job_id]["completed_at"] = (
+                datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            )
 
             print(f"✅ Video exported: {output_file} ({file_size_mb:.1f} MB)")
 
@@ -657,7 +659,9 @@ async def _export_video_playwright(
             _cleanup_export_files(webm_file, output_file)
             export_jobs[job_id]["message"] = "Export cancelled by user"
             export_jobs[job_id]["error"] = None
-            export_jobs[job_id]["cancelled_at"] = datetime.now().isoformat()
+            export_jobs[job_id]["cancelled_at"] = (
+                datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            )
             return
 
         export_jobs[job_id]["status"] = "failed"
@@ -685,7 +689,7 @@ def cancel_video_export(job_id: str) -> bool:
     job["status"] = "cancelled"
     job["message"] = "Export cancelled by user"
     job["error"] = None
-    job["cancelled_at"] = datetime.now().isoformat()
+    job["cancelled_at"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     _mark_flight_export_cancelled(job)
     return True
 

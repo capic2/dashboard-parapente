@@ -17,7 +17,7 @@ Strategy:
 - Test both successful and error scenarios
 """
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -28,6 +28,7 @@ from scheduler import (
     fetch_and_store_weather,
     manual_fetch_all,
     scheduled_weather_fetch,
+    scheduled_video_export_cleanup,
     start_scheduler,
     stop_scheduler,
 )
@@ -55,8 +56,32 @@ def test_start_scheduler_registers_intervals_sync() -> None:
         start_scheduler()
         start_scheduler()
 
-    assert [job["id"] for job in scheduler.jobs] == ["weather_fetch", "weather_fetch"]
+    assert [job["id"] for job in scheduler.jobs] == [
+        "weather_fetch",
+        "video_export_cleanup",
+        "weather_fetch",
+        "video_export_cleanup",
+    ]
     assert scheduler.start_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_scheduled_video_export_cleanup_combines_export_pipelines():
+    cleanup = MagicMock()
+    with (
+        patch("video_export_manual.list_exports", return_value=[{"job_id": "manual"}]),
+        patch("video_export.list_exports", return_value=[{"job_id": "stream"}]),
+        patch("video_export_manual.cleanup_video_export_temp_files", cleanup),
+    ):
+        cleanup.return_value = {
+            "files_deleted": 1,
+            "dirs_deleted": 1,
+            "bytes_deleted": 12,
+            "errors": [],
+        }
+        await scheduled_video_export_cleanup()
+
+    cleanup.assert_called_once_with([{"job_id": "manual"}, {"job_id": "stream"}])
 
 
 def test_start_scheduler_keeps_weather_job_when_intervals_registration_fails() -> None:
@@ -80,7 +105,7 @@ def test_start_scheduler_keeps_weather_job_when_intervals_registration_fails() -
     ):
         start_scheduler()
 
-    assert scheduler.job_ids == ["weather_fetch"]
+    assert scheduler.job_ids == ["weather_fetch", "video_export_cleanup"]
     assert scheduler.started is True
 
 
@@ -208,7 +233,6 @@ async def test_scheduled_weather_fetch(db_session):
         patch("scheduler.fetch_and_cache_weather", new=AsyncMock(return_value=True)) as mock_fetch,
         patch("best_spot.refresh_best_spot_cache", new=AsyncMock()),
     ):
-
         await scheduled_weather_fetch()
 
         # Should fetch all 7 days for each default site
@@ -229,7 +253,6 @@ async def test_scheduled_weather_fetch_with_failures(db_session):
         patch("scheduler.fetch_and_cache_weather", new=mock_fetch_variable),
         patch("best_spot.refresh_best_spot_cache", new=AsyncMock()),
     ):
-
         # Should not crash despite some failures
         await scheduled_weather_fetch()
 
@@ -242,7 +265,6 @@ async def test_scheduled_weather_fetch_refreshes_best_spot(db_session):
         patch("scheduler.fetch_and_cache_weather", new=AsyncMock(return_value=True)),
         patch("best_spot.refresh_best_spot_cache", new=AsyncMock()) as mock_refresh,
     ):
-
         await scheduled_weather_fetch()
 
         # Should refresh best spot cache after weather update
@@ -259,7 +281,6 @@ async def test_scheduled_weather_fetch_handles_best_spot_error(db_session):
             "best_spot.refresh_best_spot_cache", new=AsyncMock(side_effect=Exception("Cache error"))
         ),
     ):
-
         # Should not crash
         await scheduled_weather_fetch()
 

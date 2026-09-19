@@ -36,12 +36,8 @@ import { CreateSiteModal } from '../components/flights/create-site/CreateSiteMod
 import { FlightsTable } from '../components/flights/table/FlightsTable';
 import { FlightDetails } from '../components/flights/details/FlightDetails';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
-import {
-  ToastContainer,
-  Modal,
-  Button,
-} from '@dashboard-parapente/design-system';
-import { useToast, useToastStore } from '../hooks/useToast';
+import { Modal, Button } from '@dashboard-parapente/design-system';
+import { useToast } from '../hooks/useToast';
 import { HTTPError } from 'ky';
 import { api } from '../lib/api';
 import { useIsMobile } from '../hooks/useIsMobile';
@@ -92,6 +88,44 @@ function FlightListError({
   );
 }
 
+function FlightSearchInput({
+  initialQuery,
+  onQueryChange,
+}: {
+  initialQuery: string;
+  onQueryChange: (query: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (query === initialQuery) return;
+    const timeout = window.setTimeout(() => onQueryChange(query), 300);
+    return () => window.clearTimeout(timeout);
+  }, [initialQuery, onQueryChange, searchQuery]);
+
+  return (
+    <TextField
+      value={searchQuery}
+      onChange={setSearchQuery}
+      aria-label={t('flights.searchPlaceholder')}
+    >
+      <div className="relative">
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+          aria-hidden="true"
+        />
+        <Input
+          maxLength={200}
+          placeholder={t('flights.searchPlaceholder')}
+          className="min-h-11 w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+        />
+      </div>
+    </TextField>
+  );
+}
+
 export default function FlightHistory() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -125,8 +159,7 @@ export default function FlightHistory() {
     'file'
   );
   const [showCreateSiteModal, setShowCreateSiteModal] = useState(false);
-  const [showMobileDetail, setShowMobileDetail] = useState(false);
-  const [searchQuery, setSearchQuery] = useState(search.q ?? '');
+  const showMobileDetail = Boolean(isMobile && selectedFlightId);
   const selectedFlightQuery = useFlight(selectedFlightId ?? '');
   const selectedFlight = selectedFlightQuery.data;
   const [isDeleting, setIsDeleting] = useState(false);
@@ -134,7 +167,6 @@ export default function FlightHistory() {
   const sites = sitesQuery.data ?? [];
   const queryClient = useQueryClient();
   const toast = useToast();
-  const { toasts, removeToast } = useToastStore();
   const previousActiveJobs = useRef(activeJobsQuery.data ?? []);
 
   const renderDetailPanel = (mobileMode: boolean) => {
@@ -266,18 +298,9 @@ export default function FlightHistory() {
     [navigate, selectedFlightId]
   );
 
-  useEffect(() => {
-    setSearchQuery(search.q ?? '');
-  }, [search.q]);
-
-  useEffect(() => {
-    const q = searchQuery.trim() || undefined;
-    if (q === search.q) return;
-    const timeout = window.setTimeout(() => {
-      void navigateWithSearch({ ...search, q });
-    }, 300);
-    return () => window.clearTimeout(timeout);
-  }, [navigateWithSearch, search, searchQuery]);
+  const handleSearchQueryChange = (query: string) => {
+    void navigateWithSearch({ ...search, q: query || undefined });
+  };
 
   const setSelectedFlightId = useCallback(
     (flightId: string | undefined) => {
@@ -298,22 +321,14 @@ export default function FlightHistory() {
     [navigate, search]
   );
 
-  useEffect(() => {
-    setShowMobileDetail(Boolean(isMobile && selectedFlightId));
-  }, [isMobile, selectedFlightId]);
-
   const handleSelectFlight = useCallback(
     (flight: FlightSummary) => {
       setSelectedFlightId(flight.id);
-      if (isMobile) {
-        setShowMobileDetail(true);
-      }
     },
-    [isMobile, setSelectedFlightId]
+    [setSelectedFlightId]
   );
 
   const handleCloseMobileDetail = useCallback(() => {
-    setShowMobileDetail(false);
     setSelectedFlightId(undefined);
   }, [setSelectedFlightId]);
 
@@ -321,7 +336,6 @@ export default function FlightHistory() {
     setSelectionMode((prev) => !prev);
     setRowSelection({});
     setSelectedFlightId(undefined);
-    setShowMobileDetail(false);
   }, [setSelectedFlightId]);
 
   const selectedFlightIds = Object.keys(rowSelection);
@@ -386,7 +400,6 @@ export default function FlightHistory() {
         toast.success(t('flights.deletedSuccess'));
         if (selectedFlightId === flightToDelete.id) {
           setSelectedFlightId(undefined);
-          setShowMobileDetail(false);
         }
         setFlightToDelete(null);
       }
@@ -420,9 +433,6 @@ export default function FlightHistory() {
 
   return (
     <div>
-      {/* Toast notifications */}
-      <ToastContainer toasts={toasts} onClose={removeToast} />
-
       <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-950 dark:text-white">
@@ -484,23 +494,11 @@ export default function FlightHistory() {
           <aside className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/40">
             {!selectionMode ? (
               <div className="mb-3 space-y-2 border-b border-slate-200 pb-3 dark:border-slate-700">
-                <TextField
-                  value={searchQuery}
-                  onChange={setSearchQuery}
-                  aria-label={t('flights.searchPlaceholder')}
-                >
-                  <div className="relative">
-                    <Search
-                      className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-                      aria-hidden="true"
-                    />
-                    <Input
-                      maxLength={200}
-                      placeholder={t('flights.searchPlaceholder')}
-                      className="min-h-11 w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                    />
-                  </div>
-                </TextField>
+                <FlightSearchInput
+                  key={search.q ?? ''}
+                  initialQuery={search.q ?? ''}
+                  onQueryChange={handleSearchQueryChange}
+                />
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                   <select
                     value={search.gpx}

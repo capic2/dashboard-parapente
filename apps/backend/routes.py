@@ -39,6 +39,7 @@ from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel, Field
 
 import config
+from datetime_utils import to_api_utc
 from auth import (
     authenticate_user,
     create_access_token,
@@ -89,11 +90,12 @@ from gopro_overlay_export import (
     list_gopro_overlay_layouts,
     probe_video_duration,
     probe_video_resolution,
-    probe_video_start_time,
+    resolve_gopro_video_start_time,
     save_uploaded_file,
     stream_gopro_overlay_job,
 )
 import gopro_preview_proxy
+from video_acceleration import get_gpu_runtime_status
 from models import (
     EmagramAnalysis,
     Flight,
@@ -169,7 +171,9 @@ from video_thumbnail import VideoThumbnailError, get_video_thumbnail
 from gopro_overlay_inputs import first_matching_file, latest_matching_file
 from highlight_video_worker import (
     STATUS_QUEUED as HIGHLIGHT_STATUS_QUEUED,
+    cleanup_highlight_job_files,
     create_highlight_job_id,
+    enqueue_highlight_video_job,
     process_highlight_video_job,
 )
 from video_export import cancel_video_export as cancel_video_export_stream
@@ -189,7 +193,7 @@ from video_export_manual import (
     start_video_export_manual,
     start_video_export_manual_fast,
 )
-from weather_pipeline import get_daily_aggregate, get_normalized_forecast
+from weather_pipeline import filter_remaining_hours, get_daily_aggregate, get_normalized_forecast
 from weather_sources import ensure_weather_source_configs
 from youtube_upload import (
     YoutubeConfigurationError,
@@ -225,6 +229,7 @@ _VIDEO_EXPORT_IN_PROGRESS_STATUSES = {
     "capturing",
     "encoding",
     "preparing",
+    "uploading",
 }
 
 _VIDEO_EXPORT_CANCELLABLE_STATUSES = {
@@ -683,11 +688,11 @@ def _highlight_export_job_payload(job: HighlightVideoJob) -> dict[str, Any]:
         "mode": "highlight",
         "flight_title": "Meilleurs moments",
         "output_filename": Path(output_path).name if output_path else None,
-        "created_at": job.created_at,
-        "updated_at": job.updated_at,
-        "started_at": job.started_at,
-        "completed_at": job.completed_at,
-        "cancelled_at": job.cancelled_at,
+        "created_at": to_api_utc(job.created_at),
+        "updated_at": to_api_utc(job.updated_at),
+        "started_at": to_api_utc(job.started_at),
+        "completed_at": to_api_utc(job.completed_at),
+        "cancelled_at": to_api_utc(job.cancelled_at),
         "has_output_file": bool(output_path and Path(output_path).is_file()),
     }
 
@@ -704,10 +709,10 @@ def _youtube_upload_export_job_payload(job: YoutubeUploadJob) -> dict[str, Any]:
         "mode": "youtube_upload",
         "source_type": job.source_type,
         "youtube_url": job.youtube_url,
-        "created_at": job.created_at,
-        "updated_at": job.updated_at,
-        "started_at": job.started_at,
-        "completed_at": job.completed_at,
+        "created_at": to_api_utc(job.created_at),
+        "updated_at": to_api_utc(job.updated_at),
+        "started_at": to_api_utc(job.started_at),
+        "completed_at": to_api_utc(job.completed_at),
         "log_tail": [],
         "has_output_file": False,
     }
@@ -819,14 +824,8 @@ def _get_video_export_jobs_payload(
         list_exports_manual()
         + list_exports_stream()
         + [_gopro_overlay_export_job_payload(job) for job in list_gopro_overlay_jobs()]
-        + [
-            _highlight_export_job_payload(job)
-            for job in db.query(HighlightVideoJob).all()
-        ]
-        + [
-            _youtube_upload_export_job_payload(job)
-            for job in db.query(YoutubeUploadJob).all()
-        ],
+        + [_highlight_export_job_payload(job) for job in db.query(HighlightVideoJob).all()]
+        + [_youtube_upload_export_job_payload(job) for job in db.query(YoutubeUploadJob).all()],
         db,
     )
     if active_only:
@@ -845,27 +844,19 @@ def _get_video_export_jobs_payload(
         )
     type_counts = {
         "all": len(jobs),
-        "video": sum(
-            job.get("mode") in {"manual", "manual_fast", "stream"} for job in jobs
-        ),
+        "video": sum(job.get("mode") in {"manual", "manual_fast", "stream"} for job in jobs),
         "gopro": sum(job.get("mode") == "gopro_overlay" for job in jobs),
         "highlight": sum(job.get("mode") == "highlight" for job in jobs),
         "youtube": sum(job.get("mode") in {"youtube", "youtube_upload"} for job in jobs),
     }
     if type_filter == "video":
-        jobs = [
-            job
-            for job in jobs
-            if job.get("mode") in {"manual", "manual_fast", "stream"}
-        ]
+        jobs = [job for job in jobs if job.get("mode") in {"manual", "manual_fast", "stream"}]
     elif type_filter == "gopro":
         jobs = [job for job in jobs if job.get("mode") == "gopro_overlay"]
     elif type_filter == "highlight":
         jobs = [job for job in jobs if job.get("mode") == "highlight"]
     elif type_filter == "youtube":
-        jobs = [
-            job for job in jobs if job.get("mode") in {"youtube", "youtube_upload"}
-        ]
+        jobs = [job for job in jobs if job.get("mode") in {"youtube", "youtube_upload"}]
     status_counts = {
         "all": len(jobs),
         "active": sum(
@@ -3449,6 +3440,8 @@ async def _build_coordinate_weather_payload(
         except (ValueError, IndexError):
             pass
 
+    if days == 1:
+        flyable_consensus = filter_remaining_hours(flyable_consensus, day_index)
     para_result = calculate_para_index(flyable_consensus)
     slots = analyze_hourly_slots(flyable_consensus)
 
@@ -3586,6 +3579,8 @@ async def get_weather(
             pass  # Keep all hours if parsing fails
 
     # Calculate para_index (using only flyable hours)
+    if days == 1:
+        flyable_consensus = filter_remaining_hours(flyable_consensus, day_index)
     para_result = calculate_para_index(flyable_consensus)
 
     # Calculate wind-adjusted score (same logic as best_spot)
@@ -3861,6 +3856,7 @@ async def get_weather_summary(
             pass  # Keep all hours if parsing fails
 
     # Calculate para_index (using only flyable hours)
+    flyable_consensus = filter_remaining_hours(flyable_consensus, day_index)
     para_result = calculate_para_index(flyable_consensus)
 
     # Calculate average wind speed for the day (simplified metric)
@@ -4152,8 +4148,8 @@ def get_flights(
             "gopro_overlay_gpx_offset": flight.gopro_overlay_gpx_offset,
             "gopro_overlays": _flight_gopro_overlay_jobs(flight),
             "external_url": flight.external_url,
-            "created_at": flight.created_at.isoformat() if flight.created_at else None,
-            "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
+            "created_at": to_api_utc(flight.created_at),
+            "updated_at": to_api_utc(flight.updated_at),
         }
         flights_data.append(flight_dict)
 
@@ -4537,6 +4533,11 @@ async def sync_intervals_activities(
         activities = await client.list_activities(
             request.date_from, request.date_to, config.INTERVALS_ICU_ACTIVITY_TYPES
         )
+        if request.activity_ids is not None:
+            selected_activity_ids = set(request.activity_ids)
+            activities = [
+                activity for activity in activities if activity.id in selected_activity_ids
+            ]
         result = await import_external_activities(
             db,
             "intervals_icu",
@@ -4614,8 +4615,8 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "gopro_overlay_file_exists": gopro_overlay["file_exists"],
         "gopro_overlay_gpx_offset": flight.gopro_overlay_gpx_offset,
         "gopro_overlays": _flight_gopro_overlay_jobs(flight),
-        "created_at": flight.created_at.isoformat() if flight.created_at else None,
-        "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
+        "created_at": to_api_utc(flight.created_at),
+        "updated_at": to_api_utc(flight.updated_at),
     }
 
     # Include site details with orientation
@@ -4883,7 +4884,9 @@ def _highlight_job_payload(job: HighlightVideoJob) -> HighlightVideoJobResponse:
         status=job.status,
         progress=job.progress,
         message=job.message,
+        log_tail=[job.message] if job.message else [],
         error=job.error,
+        render_method=job.render_method,
         output_format=job.output_format,
         overlay_offset_seconds=float(job.overlay_offset_seconds or 0.0),
         selection=selection,
@@ -4982,14 +4985,21 @@ def delete_flight_highlight_video(
             status_code=409, detail="Highlight video cannot be deleted while active"
         )
 
-    deleted_files = 0
-    if job.output_path:
-        output_path = Path(job.output_path)
-        if output_path.is_file():
-            output_path.unlink()
+    output_dir = (
+        Path(job.output_path).parent
+        if job.output_path
+        else Path(job.source_video_path).parent / "highlights" / job.id
+    )
+    deleted_files = cleanup_highlight_job_files(output_dir, job_id=job.id)
+    # Preserve deletion of legacy rows whose final video predates the
+    # per-job highlights directory layout.
+    if deleted_files == 0 and job.output_path:
+        legacy_output_path = Path(job.output_path)
+        if legacy_output_path.is_file():
+            legacy_output_path.unlink()
             deleted_files = 1
             try:
-                output_path.parent.rmdir()
+                legacy_output_path.parent.rmdir()
             except OSError:
                 pass
 
@@ -5079,16 +5089,10 @@ def create_flight_highlight_video(
         raise
     db.refresh(job)
 
-    from job_queue import enqueue_once, is_rq_enabled
+    from job_queue import is_rq_enabled
 
     if is_rq_enabled():
-        enqueue_once(
-            "highlight_video_worker.process_highlight_video_job",
-            job.id,
-            job_id=f"highlight-video-{job.id}",
-            timeout=config.JOB_QUEUE_TIMEOUT_SECONDS,
-            queue_name=config.JOB_QUEUE_NAME,
-        )
+        enqueue_highlight_video_job(job.id)
     else:
         background_tasks.add_task(process_highlight_video_job, job.id)
     return _highlight_job_payload(job)
@@ -5209,8 +5213,8 @@ def create_flight(flight_data: FlightCreate, db: Session = Depends(get_db)):
         "gopro_overlay_progress": None,
         "gopro_overlay_file_path": None,
         "gopro_overlay_file_exists": False,
-        "created_at": flight.created_at.isoformat() if flight.created_at else None,
-        "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
+        "created_at": to_api_utc(flight.created_at),
+        "updated_at": to_api_utc(flight.updated_at),
     }
 
 
@@ -6240,9 +6244,7 @@ def list_video_export_jobs(
     status_filter: Literal["all", "active", "completed", "failed", "cancelled"] = Query(
         default="all"
     ),
-    type_filter: Literal["all", "video", "gopro", "highlight", "youtube"] = Query(
-        default="all"
-    ),
+    type_filter: Literal["all", "video", "gopro", "highlight", "youtube"] = Query(default="all"),
     db: Session = Depends(get_db),
 ) -> VideoExportJobsResponse:
     """List video export jobs across all flights."""
@@ -6257,6 +6259,14 @@ def list_video_export_jobs(
     return VideoExportJobsResponse(**payload)
 
 
+@router.get("/video-export-gpu-status")
+def video_export_gpu_status(response: Response) -> dict[str, object]:
+    """Return live GPU telemetry for the infrastructure dashboard."""
+
+    response.headers["Cache-Control"] = "no-store"
+    return get_gpu_runtime_status()
+
+
 @router.get("/video-export-jobs/stream")
 async def stream_video_export_jobs(
     request: Request,
@@ -6265,9 +6275,7 @@ async def stream_video_export_jobs(
     status_filter: Literal["all", "active", "completed", "failed", "cancelled"] = Query(
         default="all"
     ),
-    type_filter: Literal["all", "video", "gopro", "highlight", "youtube"] = Query(
-        default="all"
-    ),
+    type_filter: Literal["all", "video", "gopro", "highlight", "youtube"] = Query(default="all"),
 ) -> StreamingResponse:
     """Stream video export job list updates without frontend polling."""
 
@@ -6604,14 +6612,9 @@ def get_flight_gopro_overlay_preview(
 
     camera_path, gpx_path = _flight_gopro_preview_inputs(db, flight)
     video_duration = probe_video_duration(camera_path)
-    video_start = probe_video_start_time(camera_path)
-    if video_start is None:
-        try:
-            video_start = datetime.fromtimestamp(camera_path.stat().st_mtime, tz=timezone.utc)
-        except OSError:
-            video_start = None
     gpx_start = first_gpx_timestamp(gpx_path)
     gpx_duration = gpx_duration_seconds(gpx_path)
+    video_start = resolve_gopro_video_start_time(camera_path, gpx_start)
     coordinates = parse_gpx_file(gpx_path)
     if video_duration is None or video_start is None:
         raise HTTPException(status_code=422, detail="Camera video has no usable time metadata")
@@ -6623,6 +6626,10 @@ def get_flight_gopro_overlay_preview(
         raise HTTPException(status_code=422, detail="Unable to align camera video and GPX track")
     automatic_offset = (gpx_start - aligned_video_start).total_seconds()
     manual_offset = float(flight.gopro_overlay_gpx_offset or 0.0)
+    effective_offset = automatic_offset + manual_offset
+    # The offset is adjusted locally in the dialog.  Do not let the value
+    # persisted from a previous render shorten the camera preview before the
+    # user can calibrate the current timeline.
     preview_target_end = min(video_duration, max(0.0, automatic_offset + gpx_duration))
     preview_state = gopro_preview_proxy.get_preview_state(camera_path, preview_target_end)
     preview_segments = list(preview_state.segments)
@@ -6652,7 +6659,7 @@ def get_flight_gopro_overlay_preview(
         alignment={
             "automatic_offset_seconds": automatic_offset,
             "manual_offset_seconds": manual_offset,
-            "effective_offset_seconds": automatic_offset + manual_offset,
+            "effective_offset_seconds": effective_offset,
         },
     )
 

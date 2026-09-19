@@ -7,6 +7,7 @@ import {
 } from 'react';
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
+import { parseApiUtcDate } from '../lib/date';
 import { Checkbox, Input, TextField } from 'react-aria-components';
 import {
   createColumnHelper,
@@ -23,7 +24,6 @@ import {
   TabList,
   TabPanel,
   Tabs,
-  ToastContainer,
 } from '@dashboard-parapente/design-system';
 import {
   useCacheOverview,
@@ -34,7 +34,6 @@ import type { CacheKeyInfo } from '../hooks/admin/useCache';
 import { useIntervalsStatus } from '../hooks/admin/useIntervalsStatus';
 import { useDeploymentDrainStatus } from '../hooks/admin/useDeploymentDrainStatus';
 import { VideoExportJobsPanel } from '../components/flights/video-export/VideoExportJobsPanel';
-import { useToastStore } from '../hooks/useToast';
 import {
   normalizeInfrastructureTab,
   type InfrastructureSearch,
@@ -72,7 +71,7 @@ function DeploymentStatusBanner() {
     ? status.phase_changed_at
     : status.requested_at;
   const requestedAt = phaseStartedAt
-    ? new Date(phaseStartedAt).getTime()
+    ? parseApiUtcDate(phaseStartedAt).getTime()
     : Number.NaN;
   const elapsedMinutes = Number.isNaN(requestedAt)
     ? null
@@ -888,7 +887,6 @@ export default function InfrastructurePage() {
   const navigate = useNavigate();
   const params = useParams({ strict: false }) as { tab?: string };
   const search = useSearch({ strict: false }) as InfrastructureSearch;
-  const { toasts, removeToast } = useToastStore();
   const { data: intervalsStatus } = useIntervalsStatus();
   const { data: cacheOverview } = useCacheOverview();
   const activeTab = normalizeInfrastructureTab(params.tab);
@@ -938,8 +936,6 @@ export default function InfrastructurePage() {
 
   return (
     <div className="py-4 space-y-8">
-      <ToastContainer toasts={toasts} onClose={removeToast} />
-
       <DeploymentStatusBanner />
 
       <InfrastructureOverview />
@@ -1048,6 +1044,7 @@ function GroupSection({
     [t, onViewKey, onDeleteKey, isPending]
   );
 
+  // oxlint-disable-next-line react/incompatible-library -- TanStack Table exposes non-memoizable functions; this component intentionally relies on its local table state.
   const table = useReactTable({
     data: group.keys,
     columns,

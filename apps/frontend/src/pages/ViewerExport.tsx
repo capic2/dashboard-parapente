@@ -58,7 +58,7 @@ export function ViewerExport() {
           </div>
         }
       >
-        <FlightViewer3D flightId={flightId} />
+        <FlightViewer3D flightId={flightId} exportOnly />
       </Suspense>
     </div>
   );

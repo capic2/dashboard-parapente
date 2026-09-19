@@ -12,21 +12,25 @@ const {
   cleanupTempFiles,
   deleteJobRow,
   deleteHighlightJob,
+  restartJob,
   resumeJob,
   toastError,
   toastSuccess,
   refetch,
   jobs,
+  typeCounts,
 } = vi.hoisted(() => ({
   cancelJob: vi.fn(),
   cancelHighlightJob: vi.fn(),
   cleanupTempFiles: vi.fn(),
   deleteJobRow: vi.fn(),
   deleteHighlightJob: vi.fn(),
+  restartJob: vi.fn(),
   resumeJob: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
   refetch: vi.fn(),
+  typeCounts: { all: 0 },
   jobs: [
     {
       job_id: 'job-active',
@@ -124,6 +128,7 @@ vi.mock('../../../hooks/flights/useVideoExportJobs', () => ({
       pageSize: 25,
       total: jobs.length,
       totalPages: 1,
+      typeCounts,
     },
     isLoading: false,
     isError: false,
@@ -137,6 +142,10 @@ vi.mock('../../../hooks/flights/useVideoExportJobs', () => ({
     mutateAsync: resumeJob,
     isPending: false,
   }),
+  useRestartVideoExportJob: () => ({
+    mutateAsync: restartJob,
+    isPending: false,
+  }),
   useDeleteVideoExportJobRow: () => ({
     mutateAsync: deleteJobRow,
     isPending: false,
@@ -148,6 +157,20 @@ vi.mock('../../../hooks/flights/useVideoExportJobs', () => ({
   useCleanupVideoExportTempFiles: () => ({
     mutateAsync: cleanupTempFiles,
     isPending: false,
+  }),
+  useVideoExportGpuStatus: () => ({
+    data: {
+      available: true,
+      devices: [
+        {
+          name: 'NVIDIA test GPU',
+          utilization_percent: 42,
+          memory_used_mb: 1234,
+          memory_total_mb: 24576,
+        },
+      ],
+    },
+    isLoading: false,
   }),
 }));
 
@@ -206,6 +229,7 @@ vi.mock('../../../hooks/gopro/useGoproOverlay', () => ({
 describe('VideoExportJobsPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    typeCounts.all = 0;
     jobs.splice(
       0,
       jobs.length,
@@ -469,6 +493,27 @@ describe('VideoExportJobsPanel', () => {
     expect(toastSuccess).toHaveBeenCalledWith('Génération relancée');
   });
 
+  it('restarts a cancelled export when no frames can be resumed', async () => {
+    restartJob.mockResolvedValue(undefined);
+    jobs[3] = {
+      ...jobs[3],
+      can_resume: false,
+      mode: 'manual_fast',
+    };
+
+    render(<VideoExportJobsPanel />);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Actions' })[3]!);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Redémarrer' }));
+
+    await waitFor(() =>
+      expect(restartJob).toHaveBeenCalledWith({
+        flightId: 'flight-resumable',
+        mode: 'manual_fast',
+      })
+    );
+    expect(toastSuccess).toHaveBeenCalledWith('Génération redémarrée');
+  });
+
   it('filters jobs by type', () => {
     render(<VideoExportJobsPanel />);
 
@@ -564,6 +609,25 @@ describe('VideoExportJobsPanel', () => {
 
     expect(
       screen.getByText('Aucune génération vidéo pour le moment.')
+    ).toBeInTheDocument();
+  });
+
+  it('keeps filters available when the selected filter has no matching jobs', () => {
+    jobs.splice(0, jobs.length);
+    typeCounts.all = 1;
+
+    render(
+      <VideoExportJobsPanel typeFilter="gopro" onTypeFilterChange={vi.fn()} />
+    );
+
+    expect(
+      screen.getByRole('button', { name: /Tous les types/u })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Réinitialiser' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Aucune génération ne correspond à ce filtre.')
     ).toBeInTheDocument();
   });
 });

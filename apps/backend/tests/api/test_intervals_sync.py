@@ -124,6 +124,41 @@ def test_sync_returns_the_frontend_contract(client):
     assert response.json() == {"success": True, **result}
 
 
+def test_sync_imports_only_selected_activities(client):
+    second_activity = activity()
+    second_activity = ExternalActivity(
+        id="i456",
+        name=second_activity.name,
+        start_date=second_activity.start_date,
+        activity_type=second_activity.activity_type,
+        source=second_activity.source,
+        file_type=second_activity.file_type,
+        external_url=second_activity.external_url,
+    )
+    provider = AsyncMock()
+    provider.list_activities.return_value = [activity(), second_activity]
+    importer = AsyncMock(
+        return_value={"imported": 1, "updated": 0, "skipped": 0, "failed": 0, "flights": []}
+    )
+    with (
+        patch("routes._intervals_client", return_value=provider),
+        patch.object(config, "INTERVALS_ICU_ACTIVITY_TYPES", ["HangGliding"]),
+        patch("external_flight_import.import_external_activities", new=importer),
+    ):
+        response = client.post(
+            "/api/flights/sync-intervals",
+            json={
+                "date_from": "2026-07-01",
+                "date_to": "2026-07-02",
+                "activity_ids": ["i456"],
+            },
+        )
+
+    assert response.status_code == 200
+    importer.assert_awaited_once()
+    assert [item.id for item in importer.await_args.args[3]] == ["i456"]
+
+
 def test_status_never_exposes_api_key(client, monkeypatch):
     monkeypatch.setattr(config, "INTERVALS_ICU_API_KEY", "top-secret")
     monkeypatch.setattr(config, "INTERVALS_ICU_ACTIVITY_TYPES", [])

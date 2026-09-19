@@ -7,6 +7,7 @@ import {
   useGoproOverlayPreview,
 } from '../../../hooks/gopro/useGoproOverlay';
 import { getApiUrlWithSearchParams } from '../../../lib/api';
+import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
 import { telemetryAtTimestamp } from './goproSyncTelemetry';
 import type { GoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
@@ -36,6 +37,13 @@ export function sourceTimeAtPreviewTime(
     segment.duration_seconds
   );
   return segment.source_start_seconds + elapsed;
+}
+
+export function manualOffsetForGpxStartAtVideoTime(
+  sourceVideoTime: number,
+  automaticOffset: number
+) {
+  return sourceVideoTime - automaticOffset;
 }
 
 function previewSegmentIndex(
@@ -70,7 +78,7 @@ export function GoproOverlaySyncPreview({
   const sourceVideoTime = sourceTimeAtPreviewTime(videoTime, previewSegments);
   const activeSegmentIndex = previewSegmentIndex(videoTime, previewSegments);
   const gpxStart = preview.data
-    ? new Date(preview.data.gpx.start_time).getTime()
+    ? parseApiUtcDate(preview.data.gpx.start_time).getTime()
     : 0;
   const telemetry = preview.data
     ? telemetryAtTimestamp(
@@ -147,6 +155,15 @@ export function GoproOverlaySyncPreview({
 
   const adjustOffset = (delta: number) => {
     onOffsetChange((manualOffset + delta).toFixed(1));
+  };
+
+  const alignGpxStartAtCurrentVideoTime = () => {
+    onOffsetChange(
+      manualOffsetForGpxStartAtVideoTime(
+        sourceVideoTime,
+        automaticOffset
+      ).toFixed(1)
+    );
   };
 
   if (preview.isPending) {
@@ -349,6 +366,13 @@ export function GoproOverlaySyncPreview({
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={alignGpxStartAtCurrentVideoTime}
+          className="min-h-10 w-full cursor-pointer rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-800 transition-colors hover:bg-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-200 dark:hover:bg-sky-950/50"
+        >
+          {t('flights.goproOverlayAlignGpxStart')}
+        </button>
       </div>
     </div>
   );

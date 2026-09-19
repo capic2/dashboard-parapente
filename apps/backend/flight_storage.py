@@ -93,6 +93,20 @@ def ensure_flight_directory(db: Session, flight: Flight) -> Path:
     return directory
 
 
+def flight_temporary_directory(db: Session, flight: Flight, namespace: str) -> Path:
+    """Return an isolated temporary workspace for one flight.
+
+    Keeping job artefacts below the flight directory makes the persisted flight
+    storage readable while still allowing each job family to clean up safely.
+    """
+    if not namespace or Path(namespace).name != namespace:
+        raise ValueError("Temporary storage namespace must be a single directory name")
+
+    directory = ensure_flight_directory(db, flight) / ".tmp" / namespace
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
 def write_flight_text_file(db: Session, flight: Flight, filename: str, content: str) -> Path:
     file_path = ensure_flight_directory(db, flight) / filename
     file_path.write_text(content, encoding="utf-8")

@@ -1324,7 +1324,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         scenePosition.ratio > 0 ? scenePosition.position : undefined
       );
 
-      if (timestampsRef.current.length > 0) {
+      const isExportMode =
+        typeof window !== 'undefined' && Boolean(window._exportMode);
+
+      if (timestampsRef.current.length > 0 && !isExportMode) {
         const startTimestamp = timestampsRef.current[0];
         setCurrentElapsedTime(
           (scenePosition.timestamp - startTimestamp) / 1000
@@ -1343,8 +1346,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           lastIndex > 0
             ? (scenePosition.previousIndex + scenePosition.ratio) / lastIndex
             : 0;
-        const isExportMode =
-          typeof window !== 'undefined' && Boolean(window._exportMode);
         const distance = isExportMode
           ? cameraDistanceRef.current
           : getFlightCameraDistance({
@@ -1414,7 +1415,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           100;
       }
       const safeProgress = Math.min(Math.max(progress, 0), 100);
-      setCurrentProgress(safeProgress);
+      // The export page has no playback controls to update. Avoiding a React
+      // state update for every captured frame keeps the Cesium render loop on
+      // the critical path instead of repeatedly reconciling the hidden UI.
+      if (!isExportMode) {
+        setCurrentProgress(safeProgress);
+      }
 
       return {
         index: currentIndexRef.current,

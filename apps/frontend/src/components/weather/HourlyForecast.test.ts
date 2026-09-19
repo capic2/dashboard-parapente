@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_UI_THRESHOLDS, getFlyabilityDisplay } from './HourlyForecast';
+import {
+  DEFAULT_UI_THRESHOLDS,
+  getFlyabilityDisplay,
+  isPastForecastHour,
+} from './HourlyForecast';
 import type { HourlyForecastItem } from '../../types';
 
 const baseHour: HourlyForecastItem = {
@@ -25,6 +29,19 @@ const baseHour: HourlyForecastItem = {
     },
   },
 };
+
+describe('isPastForecastHour', () => {
+  const afternoon = new Date(2026, 5, 15, 14, 30);
+
+  it('identifies earlier hours for today', () => {
+    expect(isPastForecastHour('13:00', 0, afternoon)).toBe(true);
+    expect(isPastForecastHour('14:00', 0, afternoon)).toBe(false);
+  });
+
+  it('does not gray hours from future days', () => {
+    expect(isPastForecastHour('08:00', 1, afternoon)).toBe(false);
+  });
+});
 
 describe('getFlyabilityDisplay', () => {
   it('uses configurable precipitation threshold for reason priority', () => {

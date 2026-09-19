@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { parseApiUtcDate } from '../../../lib/date';
 import {
   AlertCircle,
   CheckCircle2,
@@ -75,7 +76,7 @@ function parseLogLine(line: string) {
 
 function formatLogTimestamp(timestamp: string | null) {
   if (!timestamp) return null;
-  const date = new Date(timestamp);
+  const date = parseApiUtcDate(timestamp);
   if (Number.isNaN(date.getTime())) return timestamp;
   return date.toISOString().replace(/\.\d{3}Z$/u, 'Z');
 }

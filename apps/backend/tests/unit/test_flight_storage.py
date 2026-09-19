@@ -6,6 +6,7 @@ import flight_storage
 from flight_storage import ensure_flight_directory
 from flight_storage import flight_directory
 from flight_storage import flight_sequence_number
+from flight_storage import flight_temporary_directory
 from flight_storage import get_video_output_path
 from flight_storage import pano_video_path
 from flight_storage import write_flight_text_file
@@ -156,6 +157,20 @@ def test_ensure_flight_directory_creates_directory(db_session, monkeypatch, tmp_
     directory = ensure_flight_directory(db_session, flight)
 
     assert directory == Path(tmp_path / "20260516" / "01")
+    assert directory.is_dir()
+
+
+def test_flight_temporary_directory_is_isolated_in_the_flight_directory(
+    db_session, monkeypatch, tmp_path
+):
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    flight = Flight(id="flight-temp", flight_date=date(2026, 5, 16))
+    db_session.add(flight)
+    db_session.commit()
+
+    directory = flight_temporary_directory(db_session, flight, "video-exports")
+
+    assert directory == tmp_path / "20260516" / "01" / ".tmp" / "video-exports"
     assert directory.is_dir()
 
 

@@ -7,6 +7,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Switch, TextField, Input, Text, Link } from 'react-aria-components';
 import { Button } from '@dashboard-parapente/design-system';
+import { parseApiUtcDate } from '../../lib/date';
 import type { WeatherSource } from '../../types/weatherSources';
 import {
   useUpdateWeatherSource,
@@ -230,7 +231,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
   // Format timestamp
   const formatTimestamp = (timestamp: string | null) => {
     if (!timestamp) return t('common.never');
-    const date = new Date(timestamp);
+    const date = parseApiUtcDate(timestamp);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);

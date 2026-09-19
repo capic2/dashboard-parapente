@@ -348,6 +348,7 @@ class HighlightVideoJob(Base):
     progress = Column(Integer, nullable=False, default=0)
     message = Column(Text)
     error = Column(Text)
+    render_method = Column(String, nullable=True)
     source_video_path = Column(String, nullable=False)
     overlay_video_path = Column(String)
     output_path = Column(String)

@@ -113,6 +113,30 @@ test('renders media as a passive status in the flight list', () => {
   expect(screen.queryByText('flights.youtubeBadge')).not.toBeInTheDocument();
 });
 
+test('shows a queued GoPro overlay as waiting instead of in progress', () => {
+  render(
+    <Flight
+      flight={{
+        ...flight,
+        gopro_overlay_status: 'queued',
+        gopro_overlay_progress: 54,
+      }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(
+    screen.getByText('flights.goproOverlayQueuedBadge 54%')
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByText('flights.goproOverlayProcessingBadge 54%')
+  ).not.toBeInTheDocument();
+});
+
 test('renders available media badges in the expected order', () => {
   render(
     <Flight
@@ -180,6 +204,30 @@ test('renders a best moments badge when the video is generated', () => {
   );
 
   expect(screen.getByText('flights.highlightVideoBadge')).toBeInTheDocument();
+});
+
+test('renders best moments progress instead of regular video progress', () => {
+  render(
+    <Flight
+      flight={{
+        ...flight,
+        highlight_video_status: 'running',
+        highlight_video_progress: 42,
+      }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(
+    screen.getByText('flights.highlightVideoBadge 42%')
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByText('flights.videoProcessingBadge 42%')
+  ).not.toBeInTheDocument();
 });
 
 test('renders YouTube upload progress in the media badge', () => {

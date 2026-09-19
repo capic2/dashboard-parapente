@@ -203,7 +203,9 @@ class HighlightVideoJobResponse(BaseModel):
     status: Literal["queued", "running", "completed", "failed", "cancelled"]
     progress: int
     message: str | None = None
+    log_tail: list[str] = Field(default_factory=list)
     error: str | None = None
+    render_method: Literal["cpu", "gpu"] | None = None
     output_format: str
     overlay_offset_seconds: float
     selection: list[HighlightVideoClipResponse] = Field(default_factory=list)
@@ -654,6 +656,7 @@ class FlightSummariesResponse(BaseModel):
 class IntervalsSyncRequest(BaseModel):
     date_from: date
     date_to: date
+    activity_ids: list[str] | None = None
 
     @model_validator(mode="after")
     def validate_date_range(self) -> "IntervalsSyncRequest":

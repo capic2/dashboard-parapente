@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { sourceTimeAtPreviewTime } from './GoproOverlaySyncPreview';
+import {
+  manualOffsetForGpxStartAtVideoTime,
+  sourceTimeAtPreviewTime,
+} from './GoproOverlaySyncPreview';
 
 const segments = [
   {
@@ -34,5 +37,17 @@ describe('sourceTimeAtPreviewTime', () => {
         },
       ])
     ).toBe(900);
+  });
+});
+
+describe('manualOffsetForGpxStartAtVideoTime', () => {
+  // REGRESSION CONTRACT — do not weaken or change these calibration cases
+  // without explicit user authorization. They must match the rendered overlay.
+  it('aligns the first GPX point with the current source-video time', () => {
+    expect(manualOffsetForGpxStartAtVideoTime(42.5, -156)).toBe(198.5);
+  });
+
+  it('advances the GPX track when the selected video instant precedes its automatic start', () => {
+    expect(manualOffsetForGpxStartAtVideoTime(7.5, 10)).toBe(-2.5);
   });
 });

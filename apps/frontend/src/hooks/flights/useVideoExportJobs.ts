@@ -79,6 +79,33 @@ export type VideoExportTempCleanupResult = {
 };
 
 export type VideoExportOutputKind = 'video' | 'gopro';
+export type VideoExportGpuStatus = {
+  available: boolean;
+  driver?: string;
+  devices: {
+    name: string;
+    utilization_percent: number;
+    memory_used_mb: number;
+    memory_total_mb: number;
+  }[];
+};
+
+const VIDEO_EXPORT_GPU_REFRESH_INTERVAL_MS = 5000;
+
+export const videoExportGpuStatusQueryOptions = () =>
+  queryOptions<VideoExportGpuStatus>({
+    queryKey: ['video-export-gpu-status'],
+    queryFn: () =>
+      api.get('video-export-gpu-status').json<VideoExportGpuStatus>(),
+    refetchInterval: VIDEO_EXPORT_GPU_REFRESH_INTERVAL_MS,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: 'always',
+    staleTime: 0,
+  });
+
+export function useVideoExportGpuStatus() {
+  return useQuery(videoExportGpuStatusQueryOptions());
+}
 
 const videoExportJobsQueryKey = ['video-export-jobs'];
 
@@ -229,6 +256,30 @@ export function useResumeVideoExportJob() {
   return useMutation({
     mutationFn: async (jobId: string) => {
       await api.post(`exports/${jobId}/resume`).json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['flights'] });
+    },
+  });
+}
+
+export function useRestartVideoExportJob() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      flightId,
+      mode,
+    }: {
+      flightId: string;
+      mode: 'manual' | 'manual_fast' | 'stream';
+    }) => {
+      await api
+        .post(`flights/${flightId}/export-video`, {
+          searchParams: { mode },
+        })
+        .json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });

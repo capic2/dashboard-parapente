@@ -10,6 +10,7 @@ import select
 import shutil
 import subprocess
 import threading
+import time
 import uuid
 import xml.etree.ElementTree as ET
 from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator
@@ -21,8 +22,10 @@ from typing import Any
 from fastapi import UploadFile
 
 import config
+from datetime_utils import to_api_utc
 from database import SessionLocal
 from deployment_drain import job_admission
+from flight_storage import flight_temporary_directory
 from models import Flight, GoproOverlayJob
 from sqlalchemy.exc import OperationalError
 from video_acceleration import (
@@ -51,8 +54,9 @@ _XSI_NAMESPACE = "http://www.w3.org/2001/XMLSchema-instance"
 _VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v"}
 _GPX_EXTENSIONS = {".gpx", ".fit"}
 _UPLOAD_WORK_ROOT = Path("/tmp/dashboard-parapente/gopro-overlays")
-_PATH_WORK_DIR_NAME = ".gopro-overlay-work"
+_PATH_WORK_DIR_NAME = ".tmp/gopro-overlay"
 _PROGRESS_PERCENT_RE = re.compile(r"(?P<percent>\d{1,3})\s*%")
+_OSV_PROGRESS_RE = re.compile(r"^OSV_PROGRESS\s+(?P<percent>\d{1,3})\s*$")
 _LOG_TAIL_LINE_COUNT = 100
 _PIP_FRAME_RATE = 10
 _OUTPUT_RESOLUTIONS: dict[str, tuple[int, int] | None] = {
@@ -124,6 +128,7 @@ _LOCK = threading.Lock()
 _WORKER_THREAD: threading.Thread | None = None
 _WORKER_STOP = threading.Event()
 _WORKER_LOCK = threading.Lock()
+_JOB_HEARTBEAT_INTERVAL_SECONDS = 30.0
 
 
 def _utc_now() -> str:
@@ -135,7 +140,7 @@ def _utc_now_dt() -> datetime:
 
 
 def _to_iso(value: datetime | None) -> str | None:
-    return value.isoformat() if value else None
+    return to_api_utc(value)
 
 
 def _coerce_datetime(value: Any) -> Any:
@@ -157,7 +162,12 @@ def _layout_path(layout: GoproOverlayLayout) -> Path:
     return _layout_dir() / layout.path
 
 
-def _uploaded_job_work_dir(job_id: str) -> Path:
+def _uploaded_job_work_dir(job_id: str, flight_id: str | None = None) -> Path:
+    if flight_id:
+        with SessionLocal() as db:
+            flight = db.query(Flight).filter(Flight.id == flight_id).first()
+            if flight:
+                return flight_temporary_directory(db, flight, "gopro-overlay") / job_id
     return _UPLOAD_WORK_ROOT / job_id
 
 
@@ -197,6 +207,7 @@ def _merge_osv_files_with_gpx(
     gpx_offset: float = 0.0,
     video_duration: float | None = None,
     first_gpx_at: float | None = None,
+    job_id: str | None = None,
 ) -> Path:
     if not osv_paths:
         return gpx_path
@@ -227,8 +238,11 @@ def _merge_osv_files_with_gpx(
     command = [
         "python3",
         str(merge_script),
+        "--progress",
+        "--exiftool-timeout",
+        str(config.GOPRO_OVERLAY_OSV_EXIFTOOL_TIMEOUT_SECONDS),
         "--sync",
-        "gpx-start",
+        "absolute",
         *(["--video-duration", f"{video_duration:.3f}"] if video_duration is not None else []),
         *(
             ["--first-gpx-at", f"{effective_first_gpx_at:.3f}"]
@@ -241,30 +255,97 @@ def _merge_osv_files_with_gpx(
         str(merged_gpx_path),
     ]
 
+    process = subprocess.Popen(
+        command,
+        cwd=config.GOPRO_OVERLAY_ROOT or None,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    output_lines: list[str] = []
+    current_line = ""
+    deadline = time.monotonic() + config.GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS
+    last_heartbeat = time.monotonic()
+    last_cancellation_check = last_heartbeat
     try:
-        result = subprocess.run(
-            command,
-            cwd=config.GOPRO_OVERLAY_ROOT or None,
-            capture_output=True,
-            check=False,
-            text=True,
-            timeout=config.GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS,
-        )
-    except subprocess.TimeoutExpired as exc:
-        detail = exc.stderr or exc.stdout or "OSV merge timed out"
-        if log_path:
-            _append_job_log(log_path, f"OSV merge timed out: {detail}")
-        raise ValueError(detail) from exc
+        while True:
+            now = time.monotonic()
+            if now >= deadline:
+                process.terminate()
+                raise ValueError("OSV merge timed out")
 
-    if result.returncode != 0:
-        detail = result.stderr.strip() or result.stdout.strip() or "OSV merge failed"
+            stream = process.stdout
+            if stream is None:
+                break
+            ready, _, _ = select.select([stream], [], [], 1)
+            if not ready:
+                if process.poll() is not None:
+                    break
+                now = time.monotonic()
+                if now - last_cancellation_check >= 5:
+                    if job_id and _is_job_cancelled(job_id):
+                        process.terminate()
+                        raise ValueError("OSV merge cancelled")
+                    last_cancellation_check = now
+                if job_id and now - last_heartbeat >= 30:
+                    _update_job(job_id, message="Reading OSV telemetry")
+                    last_heartbeat = now
+                continue
+            char = stream.read(1)
+            if not char:
+                if process.poll() is not None:
+                    break
+                continue
+            if char in {"\n", "\r"}:
+                line = current_line.strip()
+                current_line = ""
+                if not line:
+                    continue
+                output_lines.append(line)
+                if log_path:
+                    _append_job_log(log_path, f"OSV merge: {line}")
+                progress_match = _OSV_PROGRESS_RE.fullmatch(line)
+                if progress_match:
+                    merge_progress = max(0, min(100, int(progress_match.group("percent"))))
+                    if job_id:
+                        _update_job(
+                            job_id,
+                            progress=10 + round(merge_progress * 5 / 100),
+                            message=f"Merging OSV telemetry: {merge_progress}%",
+                        )
+                continue
+            current_line += char
+            now = time.monotonic()
+            if job_id and now - last_heartbeat >= 30:
+                _update_job(job_id, message="Reading OSV telemetry")
+                last_heartbeat = now
+            if job_id and now - last_cancellation_check >= 5:
+                if _is_job_cancelled(job_id):
+                    process.terminate()
+                    raise ValueError("OSV merge cancelled")
+                last_cancellation_check = now
+
+        if current_line.strip():
+            output_lines.append(current_line.strip())
+        return_code = process.wait(timeout=5)
+    except subprocess.TimeoutExpired as exc:
+        process.kill()
+        process.wait()
+        raise ValueError("OSV merge timed out") from exc
+    except Exception:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+        raise
+
+    if return_code != 0:
+        detail = output_lines[-1] if output_lines else "OSV merge failed"
         if log_path:
             _append_job_log(log_path, f"OSV merge failed: {detail}")
         raise ValueError(detail)
-    if log_path:
-        for line in result.stdout.splitlines():
-            if line.strip():
-                _append_job_log(log_path, f"OSV merge: {line.strip()}")
+    if job_id:
+        _update_job(job_id, progress=15, message="OSV telemetry merged")
     if not merged_gpx_path.exists():
         if log_path:
             _append_job_log(log_path, "OSV merge did not create a GPX file")
@@ -300,11 +381,23 @@ def _prepare_layout_file(
     has_pip: bool,
     target_width: int | None = None,
     target_height: int | None = None,
+    layout_width: int | None = None,
+    layout_height: int | None = None,
 ) -> Path:
     tree = ET.parse(layout_path)
     root = tree.getroot()
-    source_width = _parse_float(root.attrib.get("width"))
-    source_height = _parse_float(root.attrib.get("height"))
+    parsed_width = _parse_float(root.attrib.get("width"))
+    parsed_height = _parse_float(root.attrib.get("height"))
+    source_width = (
+        parsed_width
+        if parsed_width is not None and math.isfinite(parsed_width) and parsed_width > 0
+        else layout_width
+    )
+    source_height = (
+        parsed_height
+        if parsed_height is not None and math.isfinite(parsed_height) and parsed_height > 0
+        else layout_height
+    )
     scale_x = target_width / source_width if target_width and source_width else None
     scale_y = target_height / source_height if target_height and source_height else None
 
@@ -318,11 +411,12 @@ def _prepare_layout_file(
     def normalize_video_components(parent: ET.Element) -> None:
         for child in list(parent):
             if child.tag == "component" and child.attrib.get("type") == "video":
-                if child.attrib.get("file") or child.attrib.get("id"):
-                    continue
                 if has_pip:
-                    child.set("id", "pip")
-                else:
+                    continue
+                # The stock parapente layouts may declare the PIP explicitly
+                # as ``id="pip"``. Remove that component too when highlights
+                # intentionally run without a PIP input.
+                if child.attrib.get("id") == "pip" or not child.attrib.get("file"):
                     parent.remove(child)
                 continue
             normalize_video_components(child)
@@ -343,11 +437,10 @@ def _parse_float(value: str | None) -> float | None:
 
 
 def _format_scaled_number(value: float) -> str:
-    rounded = round(value)
-    if abs(value - rounded) < 1e-6:
-        return str(int(rounded))
-    text = f"{value:.6f}".rstrip("0").rstrip(".")
-    return text or "0"
+    # GoPro Overlay parses layout geometry with ``int()``. Rounded integer
+    # coordinates keep non-16:9 targets valid instead of producing XML values
+    # such as ``8.888889`` that make the renderer fail at startup.
+    return str(round(value))
 
 
 def _scale_layout_geometry(parent: ET.Element, scale_x: float, scale_y: float) -> None:
@@ -396,7 +489,8 @@ def _job_preparation_metadata(
     requested_layout_id: str | None,
     output_resolution: str,
     gpx_offset: float = 0.0,
-    render_method: str | None = None,
+    overlay_only: bool = False,
+    overlay_size: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
     metadata = {
         "prepare_overlay_inputs": True,
@@ -404,15 +498,11 @@ def _job_preparation_metadata(
         "requested_layout_id": requested_layout_id,
         "output_resolution": output_resolution,
         "gpx_offset": gpx_offset,
+        "overlay_only": overlay_only,
     }
-    if render_method:
-        metadata["render_method"] = render_method
+    if overlay_size:
+        metadata["overlay_size"] = list(overlay_size)
     return metadata
-
-
-def _queued_render_method() -> str:
-    accelerator = select_video_accelerator(config.VIDEO_ACCELERATOR)
-    return "gpu" if accelerator == "nvidia" and config.GOPRO_OVERLAY_PROFILE else "cpu"
 
 
 def _gpx_offset_from_command_metadata(command: Any) -> float:
@@ -695,11 +785,7 @@ def _read_process_updates(stream: Any) -> Iterator[str]:
 def _is_job_cancelled(job_id: str) -> bool:
     try:
         with SessionLocal() as db:
-            status = (
-                db.query(GoproOverlayJob.status)
-                .filter(GoproOverlayJob.id == job_id)
-                .scalar()
-            )
+            status = db.query(GoproOverlayJob.status).filter(GoproOverlayJob.id == job_id).scalar()
             return status == _STATUS_CANCELLED
     except OperationalError as exc:
         if "no such table: gopro_overlay_jobs" not in str(exc):
@@ -717,18 +803,27 @@ def _read_process_updates_from_process(
         return
 
     current = ""
-    while process.poll() is None:
-        if _is_job_cancelled(job_id):
-            process.terminate()
-            return
+    last_heartbeat = time.monotonic()
+    while True:
+        if process.poll() is None:
+            if _is_job_cancelled(job_id):
+                process.terminate()
+                return
 
-        ready, _, _ = select.select([stream], [], [], 1)
-        if not ready:
-            continue
+            now = time.monotonic()
+            if now - last_heartbeat >= _JOB_HEARTBEAT_INTERVAL_SECONDS:
+                _update_job(job_id)
+                last_heartbeat = now
+
+            ready, _, _ = select.select([stream], [], [], 1)
+            if not ready:
+                continue
 
         char = stream.read(1)
         if not char:
-            continue
+            if process.poll() is None:
+                continue
+            break
         if char in {"\n", "\r"}:
             if current.strip():
                 yield current.strip()
@@ -947,6 +1042,39 @@ def first_gpx_timestamp(gpx_path: Path) -> datetime | None:
     return None
 
 
+def resolve_gopro_video_start_time(video_path: Path, gpx_start: datetime | None) -> datetime | None:
+    """Resolve the camera timeline using the same metadata as the overlay preview."""
+    video_start = probe_video_start_time(video_path)
+    if video_start is not None:
+        return video_start
+
+    osv_paths = _matching_files_by_mtime(video_path.parent, "*.osv")
+    for osv_path in osv_paths:
+        video_start = probe_video_start_time(osv_path)
+        if video_start is not None:
+            logger.info(
+                "Using GoPro OSV timestamp for overlay alignment: osv=%s start=%s",
+                osv_path,
+                video_start,
+            )
+            return video_start
+
+    try:
+        file_mtime = datetime.fromtimestamp(video_path.stat().st_mtime, tz=timezone.utc)
+    except OSError:
+        return gpx_start
+    if gpx_start is None or abs((file_mtime - gpx_start).total_seconds()) <= 30 * 60:
+        return file_mtime
+    logger.warning(
+        "Ignoring camera mtime for GoPro alignment because it is too far from GPX: "
+        "camera=%s mtime=%s gpx=%s",
+        video_path,
+        file_mtime,
+        gpx_start,
+    )
+    return gpx_start
+
+
 def gpx_duration_seconds(gpx_path: Path) -> float | None:
     try:
         root = ET.parse(gpx_path).getroot()
@@ -996,6 +1124,19 @@ def _pip_timeline_offsets(
     if offset >= 0:
         return offset, 0.0
     return 0.0, abs(offset)
+
+
+def _first_gpx_at_for_camera_timeline(
+    gpx_start: datetime | None,
+    video_start: datetime | None,
+    gpx_offset: float,
+) -> float | None:
+    """Return the first GPX position on the camera timeline after calibration."""
+    if gpx_start is None or video_start is None:
+        return None
+
+    first_gpx_at = (gpx_start - video_start).total_seconds() + gpx_offset
+    return first_gpx_at if first_gpx_at > 0 else None
 
 
 def align_video_start_time_to_gpx(
@@ -1460,20 +1601,17 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         osv_paths = _matching_files_by_mtime(source_input_dir, "*.osv")
         gpx_offset = _gpx_offset_from_command_metadata(command_metadata)
         embedded_video_start = probe_video_start_time(video_path)
-        alignment_video_start = embedded_video_start
-        if alignment_video_start is None:
-            try:
-                alignment_video_start = datetime.fromtimestamp(
-                    video_path.stat().st_mtime, tz=timezone.utc
-                )
-            except OSError:
-                alignment_video_start = None
         gpx_start = first_gpx_timestamp(render_gpx_path)
+        alignment_video_start = resolve_gopro_video_start_time(video_path, gpx_start)
         aligned_video_start = align_video_start_time_to_gpx(alignment_video_start, gpx_start)
-        first_gpx_at = (
-            (gpx_start - aligned_video_start).total_seconds() + gpx_offset
-            if gpx_offset and gpx_start is not None and aligned_video_start is not None
-            else None
+        # Keep the camera start as the timeline anchor while the merger shifts
+        # the GPX timestamps by the manual offset.  In its absolute mode, the
+        # first GPX position therefore includes both the detected alignment and
+        # the calibrated offset.
+        first_gpx_at = _first_gpx_at_for_camera_timeline(
+            gpx_start,
+            aligned_video_start,
+            gpx_offset,
         )
         if osv_paths:
             _update_job(job_id, progress=10, message="Merging OSV telemetry")
@@ -1482,6 +1620,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 osv_paths,
                 render_gpx_path,
                 work_dir,
+                job_id=job_id,
                 log_path=log_path,
                 gpx_offset=gpx_offset,
                 video_duration=video_duration,
@@ -1497,6 +1636,10 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 )
 
         command_metadata["render_gpx_path"] = str(render_gpx_path)
+        if aligned_video_start is not None:
+            command_metadata["segment_video_start"] = aligned_video_start.isoformat()
+        else:
+            command_metadata.pop("segment_video_start", None)
         if embedded_video_start is not None:
             command_metadata["video_time_start"] = "video-created"
         else:
@@ -1535,18 +1678,28 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         if not source_layout_path.exists():
             raise ValueError(f"Layout file not found: {source_layout_path}")
         _append_job_log(log_path, f"Using layout {selected_layout.label}")
-        render_width, render_height = _layout_render_size(
-            selected_layout,
-            width,
-            height,
-            output_resolution,
-        )
+        requested_overlay_size = command_metadata.get("overlay_size")
+        if (
+            isinstance(requested_overlay_size, list)
+            and len(requested_overlay_size) == 2
+            and all(isinstance(value, int) and value > 0 for value in requested_overlay_size)
+        ):
+            render_width, render_height = requested_overlay_size
+        else:
+            render_width, render_height = _layout_render_size(
+                selected_layout,
+                width,
+                height,
+                output_resolution,
+            )
         layout_path = _prepare_layout_file(
             source_layout_path,
             work_dir / source_layout_path.name,
             has_pip=pip_path is not None,
             target_width=render_width,
             target_height=render_height,
+            layout_width=selected_layout.width,
+            layout_height=selected_layout.height,
         )
 
         prepared_job = _update_job(
@@ -1599,6 +1752,34 @@ def _finish_job(job_id: str, **changes: Any) -> dict[str, Any]:
 
 def _overlay_segment_path(work_dir: Path, job_id: str, index: int, kind: str) -> Path:
     return work_dir / f"{kind}-{job_id}-{index:05d}.mp4"
+
+
+def _segment_video_start(
+    metadata: dict[str, Any],
+    video_path: Path,
+    gpx_path: Path,
+) -> datetime:
+    stored_start = metadata.get("segment_video_start")
+    if isinstance(stored_start, str):
+        parsed_start = _parse_utc_datetime(stored_start)
+        if parsed_start is not None:
+            return parsed_start
+
+    gpx_start = first_gpx_timestamp(gpx_path)
+    resolved_start = align_video_start_time_to_gpx(
+        resolve_gopro_video_start_time(video_path, gpx_start),
+        gpx_start,
+    )
+    if resolved_start is not None:
+        return resolved_start
+    return datetime.fromtimestamp(video_path.stat().st_mtime, tz=timezone.utc)
+
+
+def _set_segment_video_time_start(command: list[str]) -> None:
+    if "--video-time-start" in command:
+        command[command.index("--video-time-start") + 1] = "file-modified"
+        return
+    command[4:4] = ["--video-time-start", "file-modified"]
 
 
 def _create_overlay_segment(
@@ -1715,9 +1896,8 @@ def _run_segmented_overlay_job(
     if not _transition_job_to_running(job_id, command, render_method):
         return
 
-    base_start = probe_video_start_time(video_path)
-    if base_start is None:
-        base_start = datetime.fromtimestamp(video_path.stat().st_mtime, tz=timezone.utc)
+    render_gpx_path = Path(str(metadata.get("render_gpx_path") or job["gpx_path"]))
+    base_start = _segment_video_start(metadata, video_path, render_gpx_path)
     rendered_segments: list[Path] = []
     try:
         for index in range(total_segments):
@@ -1742,9 +1922,7 @@ def _run_segmented_overlay_job(
                     str(rendered_segment),
                 ]
                 for segment_command_variant in (segment_command, segment_cpu_command):
-                    if "--video-time-start" in segment_command_variant:
-                        time_start_index = segment_command_variant.index("--video-time-start") + 1
-                        segment_command_variant[time_start_index] = "file-modified"
+                    _set_segment_video_time_start(segment_command_variant)
                 if pip_segment:
                     original_pip = f"pip={job['pip_path']}"
                     segment_pip = f"pip={pip_segment}"
@@ -1965,7 +2143,7 @@ async def create_gopro_overlay_job(
     flight_id: str | None = None,
 ) -> dict[str, Any]:
     job_id = str(uuid.uuid4())
-    job_upload_dir = _uploaded_job_work_dir(job_id)
+    job_upload_dir = _uploaded_job_work_dir(job_id, flight_id)
     try:
         video_path = await save_uploaded_file(
             video_file,
@@ -2025,6 +2203,8 @@ def create_gopro_overlay_job_from_paths(
     output_dir: str | None = None,
     gpx_offset: float = 0.0,
     flight_id: str | None = None,
+    overlay_only: bool = False,
+    overlay_size: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
     _validate_file_extension(video_path, _VIDEO_EXTENSIONS)
     _validate_file_extension(gpx_path, _GPX_EXTENSIONS)
@@ -2049,6 +2229,8 @@ def create_gopro_overlay_job_from_paths(
                 output_dir=output_dir,
                 gpx_offset=gpx_offset,
                 flight_id=flight_id,
+                overlay_only=overlay_only,
+                overlay_size=overlay_size,
             )
     except Exception:
         shutil.rmtree(work_dir, ignore_errors=True)
@@ -2068,11 +2250,13 @@ def _create_gopro_overlay_job_from_paths(
     output_dir: str | None = None,
     gpx_offset: float = 0.0,
     flight_id: str | None = None,
+    overlay_only: bool = False,
+    overlay_size: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
     if output_resolution not in _OUTPUT_RESOLUTIONS:
         raise ValueError("Unknown output resolution")
     output_name = _safe_filename(output_filename, f"gopro-overlay-{job_id}.mp4")
-    if Path(output_name).suffix.lower() != ".mp4":
+    if not overlay_only and Path(output_name).suffix.lower() != ".mp4":
         output_name = f"{Path(output_name).stem}.mp4"
     output_path = _output_path_for_dir(output_dir, video_path, output_name)
 
@@ -2087,13 +2271,13 @@ def _create_gopro_overlay_job_from_paths(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temp_output_path = _temp_output_path(output_path, job_id)
     log_path = _gopro_overlay_log_path(job_id)
-    render_method = _queued_render_method()
     preparation_metadata = _job_preparation_metadata(
         pin_inputs=pin_inputs,
         requested_layout_id=layout_id,
         output_resolution=output_resolution,
         gpx_offset=gpx_offset,
-        render_method=render_method,
+        overlay_only=overlay_only,
+        overlay_size=overlay_size,
     )
 
     now = _utc_now_dt()
@@ -2118,7 +2302,7 @@ def _create_gopro_overlay_job_from_paths(
                 output_filename=output_path.name,
                 log_path=str(log_path),
                 command_json=json.dumps(preparation_metadata),
-                render_method=render_method,
+                render_method=None,
                 video_width=None,
                 video_height=None,
                 created_at=now,
@@ -2150,7 +2334,7 @@ def _create_gopro_overlay_job_from_paths(
             "temp_output_path": str(temp_output_path),
             "output_filename": output_path.name,
             "log_path": str(log_path),
-            "render_method": render_method,
+            "render_method": None,
             "video_width": None,
             "video_height": None,
             "gpx_offset": gpx_offset,
@@ -2176,6 +2360,7 @@ def _create_gopro_overlay_job_from_paths(
         "temp_output_path": str(temp_output_path),
         "output_filename": output_path.name,
         "log_path": str(log_path),
+        "render_method": None,
         "video_width": None,
         "video_height": None,
         "output_resolution": output_resolution,
@@ -2218,6 +2403,11 @@ def _run_job(job_id: str) -> None:
         "--use-gpx-only",
         "--gpx",
         str(render_gpx_path),
+        # Dashboard uses this separate source only for aggregate custom-calc
+        # values. Keeping it on the full render GPX makes min/max/averages and
+        # cumulative flight statistics identical across split video segments.
+        "--statistics-gpx",
+        str(render_gpx_path),
         "--layout",
         "xml",
         "--layout-xml",
@@ -2225,6 +2415,7 @@ def _run_job(job_id: str) -> None:
     ]
     if video_time_start := prepared_command.get("video_time_start"):
         command[4:4] = ["--video-time-start", str(video_time_start)]
+    overlay_only = bool(prepared_command.get("overlay_only"))
     if config.GOPRO_OVERLAY_FONT:
         command.extend(["--font", config.GOPRO_OVERLAY_FONT])
     if config.GOPRO_OVERLAY_CONFIG_DIR:
@@ -2235,7 +2426,7 @@ def _run_job(job_id: str) -> None:
     if accelerator == "nvidia" and profile == "nnvgpu" and not ffmpeg_supports_cuda_overlay():
         logger.warning("CUDA overlay filters unavailable; using nvgpu profile")
         profile = "nvgpu"
-    gpu_render_enabled = accelerator == "nvidia" and bool(profile)
+    gpu_render_enabled = not overlay_only and accelerator == "nvidia" and bool(profile)
     render_method = "gpu" if gpu_render_enabled else "cpu"
 
     if gpu_render_enabled:
@@ -2249,6 +2440,12 @@ def _run_job(job_id: str) -> None:
             config.VIDEO_ACCELERATOR,
             profile or "<none>",
         )
+        if overlay_only:
+            # ``mov`` is GoPro Dashboard's built-in PNG-in-MOV profile.  It
+            # preserves the alpha channel needed when compositing each scene.
+            # There is no built-in ``overlay`` profile in Dashboard 0.133.
+            command.extend(["--profile", "mov"])
+            cpu_command.extend(["--profile", "mov"])
     common_args: list[str] = []
     if job.get("video_width") and job.get("video_height"):
         common_args.extend(["--overlay-size", f"{job['video_width']}x{job['video_height']}"])
@@ -2259,7 +2456,14 @@ def _run_job(job_id: str) -> None:
     log_path = Path(job.get("log_path") or temp_output_path.with_suffix(".log"))
     temp_output_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    common_args.extend([job["video_path"], str(temp_output_path)])
+    # GoPro Dashboard renders a transparent movie for a GPX-only command with
+    # no input video.  Passing the synthetic timeline would instead create an
+    # opaque video render, while adding ``--generate overlay`` is rejected in
+    # combination with ``--use-gpx-only``.  The timeline is only retained by
+    # the queued job preparation to establish the calibrated GPX range.
+    if not overlay_only:
+        common_args.append(job["video_path"])
+    common_args.append(str(temp_output_path))
     command.extend(common_args)
     cpu_command.extend(common_args)
 
@@ -2273,9 +2477,11 @@ def _run_job(job_id: str) -> None:
         render_method,
     )
 
-    video_duration = probe_video_duration(Path(str(job["video_path"])))
-    if video_duration is not None and video_duration > max(
-        30, config.GOPRO_OVERLAY_SEGMENT_SECONDS
+    video_duration = None if overlay_only else probe_video_duration(Path(str(job["video_path"])))
+    if (
+        not overlay_only
+        and video_duration is not None
+        and video_duration > max(30, config.GOPRO_OVERLAY_SEGMENT_SECONDS)
     ):
         _run_segmented_overlay_job(
             job_id,
@@ -2597,7 +2803,10 @@ def _job_work_dir(job: dict[str, Any]) -> Path | None:
 def _can_delete_work_dir(work_dir: Path) -> bool:
     if _is_path_inside(work_dir, _UPLOAD_WORK_ROOT):
         return True
-    return work_dir.parent.name == _PATH_WORK_DIR_NAME
+    if work_dir.parent.name == "gopro-overlay" and work_dir.parent.parent.name == ".tmp":
+        return True
+    # Jobs created before the storage migration must remain cleanable.
+    return work_dir.parent.name == ".gopro-overlay-work"
 
 
 def _cleanup_gopro_overlay_temp_files(job: dict[str, Any]) -> None:
@@ -2674,14 +2883,14 @@ def _delete_rq_gopro_overlay_job(job_id: str) -> bool:
     return delete_job(_rq_job_id(job_id), queue_name=config.GOPRO_OVERLAY_QUEUE_NAME)
 
 
-def enqueue_pending_gopro_overlay_jobs(*, mark_interrupted: bool = False) -> int:
-    """Enqueue queued overlay jobs into the dedicated RQ queue."""
+def enqueue_pending_gopro_overlay_jobs(*, recover_active: bool = False) -> int:
+    """Enqueue durable overlay jobs, recovering interrupted work on worker startup."""
     from job_queue import is_rq_enabled
 
     if not is_rq_enabled():
         return 0
 
-    if mark_interrupted:
+    if recover_active:
         _mark_interrupted_jobs_failed()
     job_ids = _queued_job_ids()
     for job_id in job_ids:

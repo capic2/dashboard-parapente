@@ -102,6 +102,15 @@ export function FlightYoutubeUploadControls({
     previousStatus.current = upload.data?.status;
   }, [flight.id, queryClient, t, toast, upload.data?.status]);
 
+  useEffect(() => {
+    const authorizationWasRevoked = upload.data?.error?.startsWith(
+      'Unable to refresh the YouTube authorization (invalid_grant'
+    );
+    if (authorizationWasRevoked) {
+      void queryClient.invalidateQueries({ queryKey: ['youtube', 'status'] });
+    }
+  }, [queryClient, upload.data?.error]);
+
   const handlePrimaryAction = async () => {
     if (!connection.data?.configured) {
       toast.error(t('flights.youtubeUploadNotConfigured'));

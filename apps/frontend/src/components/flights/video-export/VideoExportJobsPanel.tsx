@@ -31,8 +31,10 @@ import {
   useCleanupVideoExportTempFiles,
   useDeleteVideoExportJobRow,
   useDeleteVideoExportOutput,
+  useRestartVideoExportJob,
   useResumeVideoExportJob,
   useVideoExportJobs,
+  useVideoExportGpuStatus,
   VIDEO_EXPORT_JOBS_PAGE_SIZE,
 } from '../../../hooks/flights/useVideoExportJobs';
 import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
@@ -43,6 +45,7 @@ import {
 import { useGoproOverlayJobStream } from '../../../hooks/gopro/useGoproOverlay';
 import { useCancelYoutubeUpload } from '../../../hooks/flights/useYoutubeUpload';
 import { api } from '../../../lib/api';
+import { parseApiUtcDate } from '../../../lib/date';
 import { useToast } from '../../../hooks/useToast';
 import { JobLiveLogsPanel } from './JobLiveLogsPanel';
 
@@ -179,14 +182,14 @@ function getLastActivityTime(job: VideoExportJob) {
     return 0;
   }
 
-  const time = new Date(rawDate).getTime();
+  const time = parseApiUtcDate(rawDate).getTime();
   return Number.isNaN(time) ? 0 : time;
 }
 
 function getStalledJobMinutes(job: VideoExportJob): number | null {
   const phase = getJobPhase(job);
   if (!activeStatusLabels.has(phase) || !job.updated_at) return null;
-  const lastActivity = new Date(job.updated_at).getTime();
+  const lastActivity = parseApiUtcDate(job.updated_at).getTime();
   if (!Number.isFinite(lastActivity)) return null;
   const elapsedMs = Date.now() - lastActivity;
   return elapsedMs >= STALLED_JOB_THRESHOLD_MS
@@ -205,7 +208,7 @@ function getDateLabel(job: VideoExportJob) {
     return null;
   }
 
-  const date = new Date(rawDate);
+  const date = parseApiUtcDate(rawDate);
   if (Number.isNaN(date.getTime())) {
     return null;
   }
@@ -251,6 +254,28 @@ function isHighlightJob(job: VideoExportJob) {
 
 function isYoutubeJob(job: VideoExportJob) {
   return job.mode === 'youtube' || job.mode === 'youtube_upload';
+}
+
+function getRestartMode(job: VideoExportJob) {
+  if (
+    job.mode === 'manual' ||
+    job.mode === 'manual_fast' ||
+    job.mode === 'stream'
+  ) {
+    return job.mode;
+  }
+
+  return 'manual_fast';
+}
+
+function canRestartVideoExport(job: VideoExportJob) {
+  return Boolean(
+    job.flight_id &&
+    !isGoproOverlayJob(job) &&
+    !isHighlightJob(job) &&
+    !isYoutubeJob(job) &&
+    ['failed', 'cancelled'].includes(job.status)
+  );
 }
 
 function isJobInTypeFilter(job: VideoExportJob, filter: TypeFilter) {
@@ -560,11 +585,14 @@ export function VideoExportJobsPanel({
     statusFilter,
     typeFilter,
   });
-  const jobs = jobsPage?.jobs ?? [];
+  const { data: gpuStatus, isLoading: isGpuStatusLoading } =
+    useVideoExportGpuStatus();
+  const jobs = useMemo(() => jobsPage?.jobs ?? [], [jobsPage?.jobs]);
   const totalJobs = jobsPage?.total ?? jobs.length;
   const totalPages = jobsPage?.totalPages ?? 1;
   const cancelJob = useCancelVideoExportJob();
   const cancelHighlightJob = useCancelFlightHighlightVideo('');
+  const restartJob = useRestartVideoExportJob();
   const resumeJob = useResumeVideoExportJob();
   const deleteJobRow = useDeleteVideoExportJobRow();
   const deleteVideoOutput = useDeleteVideoExportOutput();
@@ -589,8 +617,15 @@ export function VideoExportJobsPanel({
     setPage(1);
   }, [statusFilter, typeFilter]);
 
-  const statusCounts = jobsPage?.statusCounts ?? {};
-  const typeCounts = jobsPage?.typeCounts ?? {};
+  const statusCounts = useMemo(
+    () => jobsPage?.statusCounts ?? {},
+    [jobsPage?.statusCounts]
+  );
+  const typeCounts = useMemo(
+    () => jobsPage?.typeCounts ?? {},
+    [jobsPage?.typeCounts]
+  );
+  const hasJobs = jobs.length > 0 || (typeCounts.all ?? 0) > 0;
   const activeCount =
     statusCounts.active ??
     jobs.filter((job) => isJobInFilter(job, 'active')).length;
@@ -602,6 +637,18 @@ export function VideoExportJobsPanel({
   const cancelledCount =
     statusCounts.cancelled ??
     jobs.filter((job) => job.status === 'cancelled').length;
+  let gpuStatusLabel = t(
+    'videoJobs.gpu.unavailable',
+    'GPU NVIDIA indisponible'
+  );
+  if (isGpuStatusLoading) {
+    gpuStatusLabel = t('videoJobs.gpu.checking', 'Vérification du GPU…');
+  } else if (gpuStatus?.available) {
+    gpuStatusLabel = t('videoJobs.gpu.available', 'GPU NVIDIA disponible');
+  }
+  const gpuStatusClassName = gpuStatus?.available
+    ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-900/20 dark:text-green-200'
+    : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-200';
   const jobsInSelectedType = useMemo(
     () => jobs.filter((job) => isJobInTypeFilter(job, typeFilter)),
     [jobs, typeFilter]
@@ -671,6 +718,25 @@ export function VideoExportJobsPanel({
       }
     },
     [resumeJob, t, toast]
+  );
+
+  const handleRestart = useCallback(
+    async (job: VideoExportJob) => {
+      if (!job.flight_id) return;
+
+      try {
+        await restartJob.mutateAsync({
+          flightId: job.flight_id,
+          mode: getRestartMode(job),
+        });
+        toast.success(t('videoJobs.restartSuccess', 'Génération redémarrée'));
+      } catch {
+        toast.error(
+          t('videoJobs.restartError', 'Impossible de redémarrer la génération')
+        );
+      }
+    },
+    [restartJob, t, toast]
   );
 
   const handleDownload = useCallback(
@@ -747,7 +813,10 @@ export function VideoExportJobsPanel({
             toast.success(t('videoJobs.deleteVideoSuccess', 'Vidéo supprimée'));
           } catch {
             toast.error(
-              t('videoJobs.deleteVideoError', 'Impossible de supprimer la vidéo')
+              t(
+                'videoJobs.deleteVideoError',
+                'Impossible de supprimer la vidéo'
+              )
             );
           }
         },
@@ -805,6 +874,18 @@ export function VideoExportJobsPanel({
                 {resumeJob.isPending
                   ? t('videoJobs.resuming', 'Relance...')
                   : t('videoJobs.resume', 'Relancer')}
+              </MenuItem>
+            )}
+            {!job.can_resume && canRestartVideoExport(job) && (
+              <MenuItem
+                onAction={() => void handleRestart(job)}
+                isDisabled={restartJob.isPending}
+                className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+              >
+                <Play className="h-4 w-4" aria-hidden="true" />
+                {restartJob.isPending
+                  ? t('videoJobs.restarting', 'Redémarrage...')
+                  : t('videoJobs.restart', 'Redémarrer')}
               </MenuItem>
             )}
             {job.can_cancel && (
@@ -867,7 +948,9 @@ export function VideoExportJobsPanel({
       handleDeleteJobRow,
       handleDeleteVideoOutput,
       handleDownload,
+      handleRestart,
       handleResume,
+      restartJob.isPending,
       resumeJob.isPending,
       t,
     ]
@@ -959,6 +1042,8 @@ export function VideoExportJobsPanel({
     [renderJobActions, t]
   );
 
+  // TanStack Table exposes functions that React Compiler cannot safely memoize.
+  // oxlint-disable-next-line react/incompatible-library
   const table = useReactTable({
     data: visibleJobs,
     columns,
@@ -1045,6 +1130,21 @@ export function VideoExportJobsPanel({
               })}
             </span>
           </div>
+          <div
+            className={`mt-3 rounded-lg border px-3 py-2 text-xs ${gpuStatusClassName}`}
+            aria-live="polite"
+          >
+            {gpuStatusLabel}
+            {gpuStatus?.devices.map((device) => (
+              <span className="ml-2 font-mono" key={device.name}>
+                {device.name} · {device.utilization_percent}% ·{' '}
+                {device.memory_used_mb}/{device.memory_total_mb} MB
+              </span>
+            ))}
+            <span className="ml-2 opacity-70">
+              {t('videoJobs.gpu.live', 'mis à jour automatiquement')}
+            </span>
+          </div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Button
@@ -1085,13 +1185,13 @@ export function VideoExportJobsPanel({
         </div>
       )}
 
-      {!isLoading && !isError && jobs.length === 0 && (
+      {!isLoading && !isError && !hasJobs && (
         <div className="border-t border-gray-100 p-4 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300">
           {t('videoJobs.empty', 'Aucune génération vidéo pour le moment.')}
         </div>
       )}
 
-      {!isLoading && !isError && jobs.length > 0 && (
+      {!isLoading && !isError && hasJobs && (
         <div className="space-y-4 border-t border-gray-100 bg-gray-50/70 p-4 dark:border-gray-700 dark:bg-gray-900/20">
           <div className="flex flex-col gap-4 xl:flex-row">
             <SegmentedFilter
@@ -1141,17 +1241,14 @@ export function VideoExportJobsPanel({
         </div>
       )}
 
-      {!isLoading &&
-        !isError &&
-        jobs.length > 0 &&
-        visibleJobs.length === 0 && (
-          <div className="border-t border-gray-100 p-4 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300">
-            {t(
-              'videoJobs.emptyFiltered',
-              'Aucune génération ne correspond à ce filtre.'
-            )}
-          </div>
-        )}
+      {!isLoading && !isError && hasJobs && visibleJobs.length === 0 && (
+        <div className="border-t border-gray-100 p-4 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300">
+          {t(
+            'videoJobs.emptyFiltered',
+            'Aucune génération ne correspond à ce filtre.'
+          )}
+        </div>
+      )}
 
       {!isLoading && !isError && visibleJobs.length > 0 && (
         <>

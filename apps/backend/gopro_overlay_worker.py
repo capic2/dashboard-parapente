@@ -55,7 +55,7 @@ def main() -> None:
     logger.info("GoPro overlay GPU runtime preflight: %s", _gpu_runtime_summary())
     _require_gpu_runtime()
 
-    queued_count = enqueue_pending_gopro_overlay_jobs(mark_interrupted=True)
+    queued_count = enqueue_pending_gopro_overlay_jobs(recover_active=True)
     if queued_count:
         logger.info("Enqueued %s pending GoPro overlay job(s)", queued_count)
 
