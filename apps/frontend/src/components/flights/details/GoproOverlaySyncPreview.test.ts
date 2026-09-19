@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  manualOffsetForGpxEndAtVideoTime,
   manualOffsetForGpxStartAtVideoTime,
   sourceTimeAtPreviewTime,
 } from './GoproOverlaySyncPreview';
@@ -49,5 +50,15 @@ describe('manualOffsetForGpxStartAtVideoTime', () => {
 
   it('advances the GPX track when the selected video instant precedes its automatic start', () => {
     expect(manualOffsetForGpxStartAtVideoTime(7.5, 10)).toBe(-2.5);
+  });
+});
+
+describe('manualOffsetForGpxEndAtVideoTime', () => {
+  it('aligns the last GPX point with the current source-video time', () => {
+    expect(manualOffsetForGpxEndAtVideoTime(642.5, -156, 600)).toBe(198.5);
+  });
+
+  it('advances the GPX track when the selected video instant precedes its end', () => {
+    expect(manualOffsetForGpxEndAtVideoTime(607.5, 10, 600)).toBe(-2.5);
   });
 });
