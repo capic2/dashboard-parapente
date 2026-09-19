@@ -5,8 +5,6 @@ FROM node:24-alpine AS frontend-builder
 
 WORKDIR /workspace
 
-ARG VITE_CESIUM_ION_TOKEN
-ENV VITE_CESIUM_ION_TOKEN=${VITE_CESIUM_ION_TOKEN}
 ARG VITE_BASE_PATH=/
 ENV VITE_BASE_PATH=${VITE_BASE_PATH}
 ENV NX_NO_CLOUD=true
@@ -32,7 +30,8 @@ COPY libs/design-system ./libs/design-system
 COPY apps/frontend ./apps/frontend
 
 # Build frontend avec Nx
-RUN pnpm exec nx build frontend --configuration=production
+RUN --mount=type=secret,id=VITE_CESIUM_ION_TOKEN,env=VITE_CESIUM_ION_TOKEN,required=false \
+    pnpm exec nx build frontend --configuration=production
 
 # ============================================
 # Stage 2: Backend Python avec Playwright

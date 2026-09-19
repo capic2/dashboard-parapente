@@ -3,14 +3,23 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/frontend/src",
   "projectType": "application",
+  "tags": [
+    "type:app",
+    "scope:frontend"
+  ],
+  "implicitDependencies": [
+    "shared-types"
+  ],
   "targets": {
     "build": {
-      "executor": "@nx/vite:build",
-      "outputs": ["{options.outputPath}"],
+      "outputs": [
+        "{projectRoot}/{options.outDir}",
+        "{workspaceRoot}/dist/apps/frontend"
+      ],
       "defaultConfiguration": "production",
       "options": {
-        "outputPath": "dist/apps/frontend",
-        "configFile": "apps/frontend/vite.config.ts"
+        "config": "./vite.config.ts",
+        "outDir": "../../dist/apps/frontend"
       },
       "configurations": {
         "development": {
@@ -22,19 +31,13 @@
       }
     },
     "serve": {
-      "executor": "@nx/vite:dev-server",
       "defaultConfiguration": "development",
       "options": {
-        "buildTarget": "frontend:build",
         "port": 5173
       },
       "configurations": {
-        "development": {
-          "buildTarget": "frontend:build:development"
-        },
-        "production": {
-          "buildTarget": "frontend:build:production"
-        }
+        "development": {},
+        "production": {}
       }
     },
     "test": {
@@ -53,7 +56,9 @@
     },
     "test:unit": {
       "executor": "@nx/vitest:test",
-      "outputs": ["{workspaceRoot}/coverage/apps/frontend"],
+      "outputs": [
+        "{workspaceRoot}/coverage/apps/frontend"
+      ],
       "options": {
         "config": "apps/frontend/vitest.config.ts",
         "coverage": true,
@@ -80,7 +85,9 @@
     },
     "type-check": {
       "executor": "nx:run-commands",
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "options": {
         "command": "tsc --noEmit",
         "cwd": "apps/frontend"
@@ -95,13 +102,13 @@
     },
     "build-storybook": {
       "executor": "nx:run-commands",
-      "outputs": ["{workspaceRoot}/dist/storybook/frontend"],
+      "outputs": [
+        "{workspaceRoot}/dist/storybook/frontend"
+      ],
       "options": {
         "command": "pnpm exec storybook build",
         "cwd": "apps/frontend"
       }
     }
-  },
-  "tags": ["type:app", "scope:frontend"],
-  "implicitDependencies": ["shared-types"]
+  }
 }

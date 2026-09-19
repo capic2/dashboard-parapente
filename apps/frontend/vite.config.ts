@@ -6,14 +6,15 @@ import cesium from 'vite-plugin-cesium';
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite';
 import path from 'path';
 
-const cesiumBuildRootPath = path.resolve(__dirname, '../../node_modules/cesium/Build');
+const configDirectory = import.meta.dirname;
+const cesiumBuildRootPath = path.resolve(configDirectory, '../../node_modules/cesium/Build');
 const cesiumBuildPath = path.join(cesiumBuildRootPath, 'Cesium');
-const workspaceRoot = path.resolve(__dirname, '../..');
+const workspaceRoot = path.resolve(configDirectory, '../..');
 const appBasePath = process.env.VITE_BASE_PATH || '/';
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
-  root: __dirname,
+  root: configDirectory,
   base: appBasePath,
   resolve: {
     dedupe: ['react', 'react-dom'],
@@ -24,8 +25,8 @@ export default defineConfig({
   },
   plugins: [
     TanStackRouterVite({
-      routesDirectory: path.resolve(__dirname, './src/routes'),
-      generatedRouteTree: path.resolve(__dirname, './src/routeTree.gen.ts'),
+      routesDirectory: path.resolve(configDirectory, './src/routes'),
+      generatedRouteTree: path.resolve(configDirectory, './src/routeTree.gen.ts'),
       quoteStyle: 'single',
     }),
     react(),

@@ -187,6 +187,11 @@ async def fetch_from_enabled_sources(
             .all()
         )
 
+        # Release the connection before awaiting external weather providers.
+        # Keeping the session transaction open across network I/O exhausts the
+        # pool during the startup warmup burst and makes /health unavailable.
+        db.commit()
+
         if not enabled_sources:
             logger.warning("No enabled weather sources found! Using fallback.")
             # Fallback: enable open-meteo by default
