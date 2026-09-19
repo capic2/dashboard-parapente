@@ -194,6 +194,11 @@ export function GoproOverlaySyncPreview({
     setVideoTime(time);
   };
 
+  const selectAlignmentTarget = (target: GpxAlignmentTarget) => {
+    setAlignmentTarget(target);
+    seekToPreviewBoundary(target === 'start' ? 0 : previewEndTime);
+  };
+
   const alignGpxAtCurrentVideoTime = async () => {
     const nextOffset = (
       alignmentTarget === 'start'
@@ -431,9 +436,10 @@ export function GoproOverlaySyncPreview({
               <button
                 key={target}
                 type="button"
-                onClick={() => setAlignmentTarget(target)}
+                onClick={() => selectAlignmentTarget(target)}
+                disabled={target === 'end' && previewEndTime <= 0}
                 aria-pressed={alignmentTarget === target}
-                className={`min-h-10 cursor-pointer px-2 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 ${target === 'end' ? 'border-l border-gray-300 dark:border-gray-600' : ''} ${alignmentTarget === target ? 'bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-100' : 'bg-white text-gray-700 hover:bg-gray-100 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800'}`}
+                className={`min-h-10 cursor-pointer px-2 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 ${target === 'end' ? 'border-l border-gray-300 dark:border-gray-600' : ''} ${alignmentTarget === target ? 'bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-100' : 'bg-white text-gray-700 hover:bg-gray-100 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800'}`}
               >
                 {t(
                   target === 'start'
