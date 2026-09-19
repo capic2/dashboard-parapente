@@ -143,6 +143,24 @@ def test_gopro_overlay_preview_returns_shared_timeline(
     }
 
 
+def test_enriched_preview_restores_heart_rate_from_source_gpx() -> None:
+    source_coordinates = [
+        {"timestamp": 1_000, "heart_rate": 120},
+        {"timestamp": 2_000, "heart_rate": 126},
+    ]
+    enriched_coordinates = [
+        {"timestamp": 1_000},
+        {"timestamp": 2_000, "heart_rate": 128},
+    ]
+
+    routes._restore_missing_heart_rates(enriched_coordinates, source_coordinates)
+
+    assert enriched_coordinates == [
+        {"timestamp": 1_000, "heart_rate": 120},
+        {"timestamp": 2_000, "heart_rate": 128},
+    ]
+
+
 def test_gopro_overlay_preview_falls_back_to_camera_mtime_when_creation_time_is_missing(
     client: TestClient, db_session, sample_flight, tmp_path, monkeypatch
 ) -> None:
