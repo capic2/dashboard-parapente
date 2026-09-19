@@ -102,6 +102,12 @@ export function FlightOverlayPlayer({
     if (overlay && Math.abs(overlay.currentTime - overlayTime) > 0.08) {
       overlay.currentTime = clamp(overlayTime, overlay.duration);
     }
+    if (!camera.paused && overlay?.paused) {
+      // The camera is the master clock. Browsers can leave a secondary muted
+      // WebM paused when it finishes loading or after a seek, so retry it on
+      // the next synchronization tick instead of letting the layer freeze.
+      playMedia(overlay);
+    }
     if (notify) {
       onTimeChange?.(currentTime);
     }
