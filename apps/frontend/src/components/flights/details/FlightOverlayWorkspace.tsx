@@ -125,7 +125,6 @@ export function FlightOverlayWorkspace({
       <GoproOverlaySyncPreview
         flightId={flightId}
         offset={offset}
-        resetOffset={initialOffset}
         onOffsetChange={setOffset}
         onOffsetSave={async (nextOffset) => {
           await onSaveOffset(nextOffset);
