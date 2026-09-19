@@ -1214,6 +1214,8 @@
     "goproOverlayPlay": "Lire la vidéo",
     "goproOverlayPause": "Mettre la vidéo en pause",
     "goproOverlayTimeline": "Progression de la vidéo",
+    "goproOverlayFullscreen": "Passer en plein écran",
+    "goproOverlayExitFullscreen": "Quitter le plein écran",
     "goproOverlayInteractiveTitle": "Overlay interactif",
     "goproOverlayInteractiveDescription": "Calibrez la caméra avec le panneau de télémétrie GPX tout en regardant l’overlay synchronisé.",
     "overlayWorkspaceTitle": "Synchronisation et couche overlay",

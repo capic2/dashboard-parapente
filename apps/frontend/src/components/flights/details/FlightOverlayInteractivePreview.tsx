@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { CircleAlert, Wand2 } from 'lucide-react';
 import type { FlightOverlayLayer } from '../../../hooks/gopro/useGoproOverlay';
+import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { getApiUrlWithSearchParams } from '../../../lib/api';
 import { useAuthStore } from '../../../stores/authStore';
 import { FlightOverlayPlayer } from './FlightOverlayPlayer';
@@ -18,9 +19,12 @@ export function FlightOverlayInteractivePreview({
 }: FlightOverlayInteractivePreviewProps) {
   const { t } = useTranslation();
   const token = useAuthStore((state) => state.token);
+  const overlayPreview = useGoproOverlayPreview(flightId, true);
   const isReady =
     overlayLayer?.status === 'completed' && Boolean(overlayLayer.job);
   const overlayJob = isReady ? overlayLayer.job : null;
+  const overlayOffsetSeconds =
+    overlayPreview.data?.alignment.effective_offset_seconds ?? 0;
   const overlayUrl = overlayJob
     ? getApiUrlWithSearchParams(
         `gopro-overlays/jobs/${overlayJob.job_id}/download`,
@@ -65,6 +69,7 @@ export function FlightOverlayInteractivePreview({
             cameraLabel={t('flights.goproOverlayCameraPreview')}
             flightLabel={t('flights.goproOverlayFlightVideo')}
             overlayUrl={overlayUrl}
+            getOverlayTime={(cameraTime) => cameraTime - overlayOffsetSeconds}
           />
         ) : (
           <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">

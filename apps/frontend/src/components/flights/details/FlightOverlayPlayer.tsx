@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Columns2,
+  Maximize2,
+  Minimize2,
   Pause,
   PictureInPicture2,
   Play,
@@ -12,6 +14,17 @@ export type FlightOverlayLayout =
   | 'camera-main'
   | 'flight-main'
   | 'side-by-side';
+
+// The GoPro layout is authored on a 3840x2160 canvas. Keep the interactive
+// PiP in that same coordinate system instead of tying it to arbitrary Tailwind
+// fractions of the responsive player container.
+const GOPRO_TEMPLATE_CANVAS = { width: 3840, height: 2160 };
+const GOPRO_TEMPLATE_PIP = {
+  left: 20,
+  bottom: 20,
+  width: 440,
+  height: 440,
+};
 
 interface FlightOverlayPlayerProps {
   mode: 'calibration' | 'interactive';
@@ -59,10 +72,13 @@ export function FlightOverlayPlayer({
   const cameraRef = useRef<HTMLVideoElement>(null);
   const flightRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLVideoElement>(null);
+  const playerRef = useRef<HTMLDivElement>(null);
+  const syncMediaRef = useRef<(() => void) | null>(null);
   const [layout, setLayout] = useState<FlightOverlayLayout>('camera-main');
   const [cameraCurrentTime, setCameraCurrentTime] = useState(0);
   const [cameraDuration, setCameraDuration] = useState(0);
   const [cameraIsPlaying, setCameraIsPlaying] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     if (!seekRequest || !cameraRef.current) {
@@ -71,7 +87,7 @@ export function FlightOverlayPlayer({
     cameraRef.current.currentTime = seekRequest.time;
   }, [seekRequest]);
 
-  const syncMedia = () => {
+  const syncMedia = (notify = true) => {
     const camera = cameraRef.current;
     if (!camera) return;
     const currentTime = camera.currentTime;
@@ -86,14 +102,55 @@ export function FlightOverlayPlayer({
     if (overlay && Math.abs(overlay.currentTime - overlayTime) > 0.08) {
       overlay.currentTime = clamp(overlayTime, overlay.duration);
     }
-    onTimeChange?.(currentTime);
+    if (!camera.paused && overlay?.paused) {
+      // The camera is the master clock. Browsers can leave a secondary muted
+      // WebM paused when it finishes loading or after a seek, so retry it on
+      // the next synchronization tick instead of letting the layer freeze.
+      playMedia(overlay);
+    }
+    if (notify) {
+      onTimeChange?.(currentTime);
+    }
+  };
+
+  syncMediaRef.current = () => syncMedia(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === playerRef.current);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () =>
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    if (!cameraIsPlaying) return;
+
+    let animationFrame = 0;
+    const synchronizePlayback = () => {
+      syncMediaRef.current?.();
+      animationFrame = requestAnimationFrame(synchronizePlayback);
+    };
+
+    animationFrame = requestAnimationFrame(synchronizePlayback);
+    return () => cancelAnimationFrame(animationFrame);
+  }, [cameraIsPlaying]);
+
+  const playMedia = (video: HTMLVideoElement | null) => {
+    if (video) {
+      // The overlay is muted, but browsers can still reject a secondary
+      // play() call. The animation-frame synchronizer keeps it aligned then.
+      void video.play().catch(() => undefined);
+    }
   };
 
   const handlePlay = () => {
     setCameraIsPlaying(true);
     syncMedia();
-    void flightRef.current?.play();
-    void overlayRef.current?.play();
+    playMedia(flightRef.current);
+    playMedia(overlayRef.current);
   };
 
   const handlePause = () => {
@@ -108,7 +165,7 @@ export function FlightOverlayPlayer({
     // Retry playback at that point so the transparent layer cannot remain
     // silently paused after its source becomes playable.
     if (cameraRef.current && !cameraRef.current.paused) {
-      void overlayRef.current?.play();
+      playMedia(overlayRef.current);
     }
   };
 
@@ -128,12 +185,30 @@ export function FlightOverlayPlayer({
     }
   };
 
+  const handleToggleFullscreen = () => {
+    if (!playerRef.current) return;
+    if (document.fullscreenElement === playerRef.current) {
+      void document.exitFullscreen().catch(() => undefined);
+    } else {
+      void playerRef.current.requestFullscreen().catch(() => undefined);
+    }
+  };
+
   const cameraIsMain = layout === 'camera-main';
   const flightIsMain = layout === 'flight-main';
   const isInteractive = mode === 'interactive';
+  const pipStyle = {
+    left: `${(GOPRO_TEMPLATE_PIP.left / GOPRO_TEMPLATE_CANVAS.width) * 100}%`,
+    bottom: `${(GOPRO_TEMPLATE_PIP.bottom / GOPRO_TEMPLATE_CANVAS.height) * 100}%`,
+    width: `${(GOPRO_TEMPLATE_PIP.width / GOPRO_TEMPLATE_CANVAS.width) * 100}%`,
+    aspectRatio: `${GOPRO_TEMPLATE_PIP.width} / ${GOPRO_TEMPLATE_PIP.height}`,
+  };
 
   return (
-    <div className="overflow-hidden rounded-xl bg-black shadow-sm">
+    <div
+      ref={playerRef}
+      className="overflow-hidden rounded-xl bg-black shadow-sm [&:fullscreen]:flex [&:fullscreen]:flex-col [&:fullscreen]:overflow-y-auto [&:fullscreen]:rounded-none"
+    >
       <div
         className={`relative grid min-h-0 bg-black ${layout === 'side-by-side' ? 'grid-cols-1 md:grid-cols-2' : ''}`}
       >
@@ -152,11 +227,14 @@ export function FlightOverlayPlayer({
             syncMedia();
             setCameraCurrentTime(cameraRef.current?.currentTime ?? 0);
           }}
-          onSeeked={syncMedia}
+          onSeeked={() => syncMedia()}
           className={
             cameraIsMain || layout === 'side-by-side'
               ? 'aspect-video w-full object-contain'
-              : 'absolute bottom-[0.93%] left-[0.52%] z-20 aspect-square w-[11.46%] cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
+              : 'absolute z-20 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
+          }
+          style={
+            !cameraIsMain && layout !== 'side-by-side' ? pipStyle : undefined
           }
           onClick={() => {
             if (layout === 'flight-main') setLayout('camera-main');
@@ -185,7 +263,10 @@ export function FlightOverlayPlayer({
             className={
               flightIsMain || layout === 'side-by-side'
                 ? 'aspect-video w-full object-contain'
-                : 'absolute bottom-[0.93%] left-[0.52%] z-10 aspect-square w-[11.46%] cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
+                : 'absolute z-10 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
+            }
+            style={
+              !flightIsMain && layout !== 'side-by-side' ? pipStyle : undefined
             }
             aria-label={flightLabel}
           >
@@ -197,6 +278,8 @@ export function FlightOverlayPlayer({
             ref={overlayRef}
             src={overlayUrl}
             playsInline
+            disablePictureInPicture
+            disableRemotePlayback
             preload="auto"
             onLoadedMetadata={handleOverlayReady}
             onLoadedData={handleOverlayReady}
@@ -287,6 +370,22 @@ export function FlightOverlayPlayer({
               .toString()
               .padStart(2, '0')}
           </span>
+          <button
+            type="button"
+            onClick={handleToggleFullscreen}
+            className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-gray-200 hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+            aria-label={
+              isFullscreen
+                ? t('flights.goproOverlayExitFullscreen')
+                : t('flights.goproOverlayFullscreen')
+            }
+          >
+            {isFullscreen ? (
+              <Minimize2 className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <Maximize2 className="h-4 w-4" aria-hidden="true" />
+            )}
+          </button>
         </div>
       )}
       {isInteractive && (
