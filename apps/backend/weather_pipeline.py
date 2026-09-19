@@ -788,6 +788,7 @@ async def get_daily_aggregate(
     elevation_m: int | None = None,
     db=None,
     force_refresh: bool = False,
+    site_orientation: str | None = None,
 ) -> dict[str, Any] | None:
     """
     Get daily aggregate data (SIMPLIFIED - reuses get_normalized_forecast).
@@ -892,7 +893,7 @@ async def get_daily_aggregate(
     verdict = para_result["verdict"]
     emoji = para_result["emoji"]
 
-    return {
+    daily_result = {
         "date": target_date,
         "para_index": para_index,
         "verdict": verdict,
@@ -905,6 +906,15 @@ async def get_daily_aggregate(
         "precip_total": precip_total,
         "cached_at": forecast_result.get("cached_at"),
     }
+
+    if site_orientation is not None:
+        from best_spot import calculate_daily_wind_adjusted_score
+
+        daily_result["score"] = calculate_daily_wind_adjusted_score(
+            flyable_consensus, site_orientation, slots=slots
+        )
+
+    return daily_result
 
 
 def calculate_daily_para_index(

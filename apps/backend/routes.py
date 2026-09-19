@@ -4025,6 +4025,7 @@ async def get_daily_summary(
                     sources=None,  # Use all 5 sources (default: open-meteo, weatherapi, meteo-parapente, meteociel, meteoblue)
                     site_name=site.name,
                     elevation_m=site.elevation_m,
+                    site_orientation=site.orientation,
                     force_refresh=force_refresh,
                 )
             )
@@ -4059,9 +4060,11 @@ async def get_daily_summary(
                 wind_fav = get_wind_favorability(
                     wind_dir_str, site.orientation, day_result["wind_avg"]
                 )
-                day_score = calculate_wind_adjusted_score(
-                    day_result["para_index"], wind_fav, slots=day_result.get("slots")
-                )
+                day_score = day_result.get("score")
+                if day_score is None:
+                    day_score = calculate_wind_adjusted_score(
+                        day_result["para_index"], wind_fav, slots=day_result.get("slots")
+                    )
 
                 summary_days.append(
                     {

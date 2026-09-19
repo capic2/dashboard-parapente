@@ -29,6 +29,7 @@ from best_spot import (
     calculate_angle_difference,
     calculate_best_spot_from_cache,
     calculate_best_spot_from_db,
+    calculate_daily_wind_adjusted_score,
     calculate_hourly_best_spots_from_cache,
     calculate_wind_adjusted_score,
     degrees_to_cardinal,
@@ -61,6 +62,30 @@ def test_get_current_forecast_hour_uses_forecast_timezone():
         assert _get_current_forecast_hour() == 16
 
     mock_datetime.now.assert_called_once_with(FORECAST_TIME_ZONE)
+
+
+def test_daily_score_is_the_average_of_hourly_wind_adjusted_scores() -> None:
+    """Daily score must not replace varying hourly wind with one daily average."""
+    hourly_data = [
+        {
+            "wind_speed": 15,
+            "wind_gust": 10,
+            "precipitation": 0,
+            "temperature": 20,
+            "lifted_index": 0,
+            "wind_direction": 225,
+        },
+        {
+            "wind_speed": 15,
+            "wind_gust": 10,
+            "precipitation": 0,
+            "temperature": 20,
+            "lifted_index": 0,
+            "wind_direction": 90,
+        },
+    ]
+
+    assert calculate_daily_wind_adjusted_score(hourly_data, "SW") == 68
 
 
 def test_parse_wind_direction_case_insensitive():
