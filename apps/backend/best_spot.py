@@ -8,6 +8,7 @@ This module provides functions to:
 """
 
 import logging
+import statistics
 from datetime import date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -142,6 +143,31 @@ def calculate_wind_adjusted_score(
     return min(adjusted_score, _flyability_safety_cap(slots))
 
 
+def calculate_daily_wind_adjusted_score(
+    hourly_data: list[dict[str, Any]],
+    site_orientation: str | None,
+    slots: list[dict[str, Any]] | None = None,
+) -> int:
+    """Average the same wind-adjusted scores that are displayed hourly."""
+    from para_index import calculate_hourly_para_index
+
+    hourly_scores = []
+    for hour_data in hourly_data:
+        wind_direction = hour_data.get("wind_direction")
+        wind_dir_str = degrees_to_cardinal(wind_direction) if wind_direction is not None else None
+        favorability = get_wind_favorability(
+            wind_dir_str, site_orientation, hour_data.get("wind_speed")
+        )
+        hourly_scores.append(
+            calculate_wind_adjusted_score(calculate_hourly_para_index(hour_data), favorability)
+        )
+
+    if not hourly_scores:
+        return 0
+
+    return min(round(statistics.mean(hourly_scores)), _flyability_safety_cap(slots))
+
+
 def _filter_flyable_hours(
     consensus_hours: list[dict[str, Any]], forecast: dict[str, Any]
 ) -> list[dict[str, Any]]:
@@ -183,8 +209,6 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
     Returns:
         Dict with best spot info or None if no data available
     """
-    import statistics
-
     from para_index import analyze_hourly_slots, calculate_para_index, get_best_slot
     from weather_pipeline import get_normalized_forecast
 
@@ -262,8 +286,8 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
 
                 # Calculate best flyable slot
                 slots = analyze_hourly_slots(flyable_hours)
-                final_score = calculate_wind_adjusted_score(
-                    para_index, wind_favorability, slots=slots
+                final_score = calculate_daily_wind_adjusted_score(
+                    flyable_hours, site.orientation, slots=slots
                 )
                 best_slot = get_best_slot(slots)
                 if not best_slot:
@@ -355,7 +379,7 @@ async def calculate_best_spot_from_cache(db: Session, day_index: int = 0) -> dic
         best_site = scored_sites[0]
 
         # Prepend warning if score is too low (keep enriched reason)
-        if best_site["score"] < 20:
+        if best_site["score"] < 20 or best_site["paraIndex"] < 20:
             best_site["reason"] = f"⚠️ Conditions défavorables — {best_site['reason']}"
 
         # Fetch thermal ceiling from nearest emagram analysis for the winning site
