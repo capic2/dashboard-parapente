@@ -3,7 +3,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Gauge, HeartPulse, MapPin, Mountain, TimerReset } from 'lucide-react';
 import {
-  useFlightOverlayLayer,
   useGenerateGoproPreview,
   useGoproOverlayPreview,
 } from '../../../hooks/gopro/useGoproOverlay';
@@ -70,19 +69,23 @@ export function GoproOverlaySyncPreview({
   const token = useAuthStore((state) => state.token);
   const queryClient = useQueryClient();
   const preview = useGoproOverlayPreview(flightId, true);
-  const layer = useFlightOverlayLayer(flightId);
   const generatePreview = useGenerateGoproPreview(flightId);
   const automaticallyRequestedTarget = useRef<string | null>(null);
   const [videoTime, setVideoTime] = useState(0);
   const cameraRef = useRef<HTMLVideoElement>(null);
-  const overlayRef = useRef<HTMLVideoElement>(null);
   const [requestedMinutes, setRequestedMinutes] = useState(3);
   const parsedOffset = Number(offset);
   const manualOffset = Number.isFinite(parsedOffset) ? parsedOffset : 0;
   const automaticOffset = preview.data?.alignment.automatic_offset_seconds ?? 0;
   const previewSegments = preview.data?.video.preview_segments ?? [];
   const sourceVideoTime = sourceTimeAtPreviewTime(videoTime, previewSegments);
-  const activeSegmentIndex = previewSegmentIndex(videoTime, previewSegments);
+  const previewEndTime = previewSegments.length
+    ? Math.max(
+        ...previewSegments.map(
+          (segment) => segment.preview_start_seconds + segment.duration_seconds
+        )
+      )
+    : 0;
   const gpxStart = preview.data
     ? parseApiUtcDate(preview.data.gpx.start_time).getTime()
     : 0;
@@ -103,17 +106,6 @@ export function GoproOverlaySyncPreview({
       version: `${preview.data?.video.preview_target_end_seconds}-${preview.data?.video.preview_available_duration_seconds}`,
     }
   );
-  const overlayJob = layer.data?.status === 'completed' ? layer.data.job : null;
-  const overlayUrl = overlayJob
-    ? getApiUrlWithSearchParams(
-        `gopro-overlays/jobs/${overlayJob.job_id}/download`,
-        {
-          access_token: token,
-          version: overlayJob.updated_at,
-        }
-      )
-    : undefined;
-
   const availableMinutes = Math.max(
     0,
     Math.ceil(
@@ -173,6 +165,13 @@ export function GoproOverlaySyncPreview({
     onOffsetChange((manualOffset + delta).toFixed(1));
   };
 
+  const seekToPreviewBoundary = (time: number) => {
+    if (cameraRef.current) {
+      cameraRef.current.currentTime = time;
+    }
+    setVideoTime(time);
+  };
+
   const alignGpxStartAtCurrentVideoTime = async () => {
     const nextOffset = manualOffsetForGpxStartAtVideoTime(
       sourceVideoTime,
@@ -180,25 +179,6 @@ export function GoproOverlaySyncPreview({
     ).toFixed(1);
     onOffsetChange(nextOffset);
     await onOffsetSave(nextOffset);
-  };
-
-  const syncOverlay = () => {
-    const camera = cameraRef.current;
-    const overlay = overlayRef.current;
-    if (!camera || !overlay) return;
-    const target = sourceTimeAtPreviewTime(camera.currentTime, previewSegments);
-    if (Math.abs(overlay.currentTime - target) > 0.08) {
-      overlay.currentTime = target;
-    }
-  };
-
-  const handleCameraPlay = () => {
-    syncOverlay();
-    void overlayRef.current?.play();
-  };
-
-  const handleCameraPause = () => {
-    overlayRef.current?.pause();
   };
 
   if (preview.isPending) {
@@ -222,115 +202,114 @@ export function GoproOverlaySyncPreview({
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(17rem,1fr)]">
-      <div className="overflow-hidden rounded-xl bg-black shadow-sm">
-        <div className="relative aspect-video bg-black">
+      <div>
+        <div className="overflow-hidden rounded-xl bg-black shadow-sm">
           <video
             ref={cameraRef}
             src={videoUrl}
             controls
             playsInline
             preload="metadata"
-            className="absolute inset-0 h-full w-full object-contain"
+            className="aspect-video w-full"
             aria-label={t('flights.goproOverlayCameraPreview')}
-            onPlay={handleCameraPlay}
-            onPause={handleCameraPause}
-            onSeeked={syncOverlay}
-            onTimeUpdate={() => {
-              syncOverlay();
-              setVideoTime(cameraRef.current?.currentTime ?? 0);
+            onTimeUpdate={(event) =>
+              setVideoTime(event.currentTarget.currentTime)
+            }
+            onSeeked={(event) => setVideoTime(event.currentTarget.currentTime)}
+            onLoadedMetadata={(event) => {
+              event.currentTarget.currentTime = Math.min(
+                videoTime,
+                event.currentTarget.duration || videoTime
+              );
             }}
           >
             <track kind="captions" />
           </video>
-          {overlayUrl && (
-            <video
-              ref={overlayRef}
-              src={overlayUrl}
-              muted
-              playsInline
-              preload="metadata"
-              className="pointer-events-none absolute inset-0 z-10 h-full w-full object-contain"
-              aria-label={t('flights.overlayLayerReady')}
-            >
-              <track kind="captions" />
-            </video>
+          <div className="flex items-center justify-between px-3 py-2 font-mono text-xs text-gray-200">
+            <span>{t('flights.goproOverlayVideoTime')}</span>
+            <span>{formatSeconds(sourceVideoTime)}</span>
+          </div>
+          {previewSegments.length > 1 && (
+            <div className="grid grid-cols-2 border-t border-gray-800 text-center text-xs font-medium text-gray-400">
+              <button
+                type="button"
+                onClick={() => seekToPreviewBoundary(0)}
+                aria-pressed={videoTime <= 0.05}
+                className={`cursor-pointer px-3 py-2 transition-colors hover:bg-gray-900 hover:text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 ${videoTime <= 0.05 ? 'bg-sky-950 text-sky-200' : ''}`}
+              >
+                {t('flights.goproPreviewStart')}
+              </button>
+              <button
+                type="button"
+                onClick={() => seekToPreviewBoundary(previewEndTime)}
+                aria-pressed={
+                  previewEndTime > 0 && videoTime >= previewEndTime - 0.05
+                }
+                disabled={!previewEndTime}
+                className={`cursor-pointer border-l border-gray-800 px-3 py-2 transition-colors hover:bg-gray-900 hover:text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 ${previewEndTime > 0 && videoTime >= previewEndTime - 0.05 ? 'bg-sky-950 text-sky-200' : ''}`}
+              >
+                {t('flights.goproPreviewEnd')}
+              </button>
+            </div>
           )}
-        </div>
-        <div className="flex items-center justify-between px-3 py-2 font-mono text-xs text-gray-200">
-          <span>{t('flights.goproOverlayVideoTime')}</span>
-          <span>{formatSeconds(sourceVideoTime)}</span>
-        </div>
-        {previewSegments.length > 1 && (
-          <div className="grid grid-cols-2 border-t border-gray-800 text-center text-xs font-medium text-gray-400">
-            <span
-              className={`px-3 py-2 ${activeSegmentIndex === 0 ? 'bg-sky-950 text-sky-200' : ''}`}
-            >
-              {t('flights.goproPreviewStart')}
-            </span>
-            <span
-              className={`border-l border-gray-800 px-3 py-2 ${activeSegmentIndex === 1 ? 'bg-sky-950 text-sky-200' : ''}`}
-            >
-              {t('flights.goproPreviewEnd')}
-            </span>
-          </div>
-        )}
-        <div className="space-y-2 border-t border-gray-800 px-3 py-3 text-gray-100">
-          <div className="flex items-center justify-between gap-3 text-xs">
-            <label htmlFor="gopro-preview-duration">
-              {t('flights.goproPreviewDuration')}
-            </label>
-            <span className="font-mono">
-              {t('flights.goproPreviewMinutes', { count: requestedMinutes })}
-            </span>
-          </div>
-          <input
-            id="gopro-preview-duration"
-            className="w-full accent-sky-500"
-            type="range"
-            min={3}
-            max={maxMinutes}
-            step={1}
-            value={Math.min(requestedMinutes, maxMinutes)}
-            onChange={(event) =>
-              setRequestedMinutes(Number(event.target.value))
-            }
-          />
-          <div className="flex items-center justify-between gap-3 text-xs text-gray-300">
-            <span>
-              {t('flights.goproPreviewAvailable', {
-                count: availableMinutes,
-              })}
-            </span>
-            <button
-              type="button"
-              className="cursor-pointer rounded-md bg-sky-600 px-3 py-2 font-medium text-white transition-colors hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={
-                isGenerating ||
-                generatePreview.isPending ||
-                requestedMinutes <= availableMinutes ||
-                (requestedDurationCoversSource &&
-                  preview.data?.video.preview_status === 'ready')
+          <div className="space-y-2 border-t border-gray-800 px-3 py-3 text-gray-100">
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <label htmlFor="gopro-preview-duration">
+                {t('flights.goproPreviewDuration')}
+              </label>
+              <span className="font-mono">
+                {t('flights.goproPreviewMinutes', { count: requestedMinutes })}
+              </span>
+            </div>
+            <input
+              id="gopro-preview-duration"
+              className="w-full accent-sky-500"
+              type="range"
+              min={3}
+              max={maxMinutes}
+              step={1}
+              value={Math.min(requestedMinutes, maxMinutes)}
+              onChange={(event) =>
+                setRequestedMinutes(Number(event.target.value))
               }
-              onClick={() => void handleGeneratePreview()}
-            >
-              {isGenerating || generatePreview.isPending
-                ? t('flights.goproPreviewGenerating')
-                : t('flights.goproPreviewGenerate', {
-                    count: requestedMinutes,
-                  })}
-            </button>
+            />
+            <div className="flex items-center justify-between gap-3 text-xs text-gray-300">
+              <span>
+                {t('flights.goproPreviewAvailable', {
+                  count: availableMinutes,
+                })}
+              </span>
+              <button
+                type="button"
+                className="cursor-pointer rounded-md bg-sky-600 px-3 py-2 font-medium text-white transition-colors hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={
+                  isGenerating ||
+                  generatePreview.isPending ||
+                  requestedMinutes <= availableMinutes ||
+                  (requestedDurationCoversSource &&
+                    preview.data?.video.preview_status === 'ready')
+                }
+                onClick={() => void handleGeneratePreview()}
+              >
+                {isGenerating || generatePreview.isPending
+                  ? t('flights.goproPreviewGenerating')
+                  : t('flights.goproPreviewGenerate', {
+                      count: requestedMinutes,
+                    })}
+              </button>
+            </div>
+            {isGenerating && (
+              <p className="text-xs text-amber-200">
+                {t('flights.goproPreviewGeneratingNotice')}
+              </p>
+            )}
+            {(preview.data?.video.preview_status === 'failed' ||
+              generatePreview.isError) && (
+              <p role="alert" className="text-xs text-amber-300">
+                {t('flights.goproPreviewFallback')}
+              </p>
+            )}
           </div>
-          {isGenerating && (
-            <p className="text-xs text-amber-200">
-              {t('flights.goproPreviewGeneratingNotice')}
-            </p>
-          )}
-          {(preview.data?.video.preview_status === 'failed' ||
-            generatePreview.isError) && (
-            <p role="alert" className="text-xs text-amber-300">
-              {t('flights.goproPreviewFallback')}
-            </p>
-          )}
         </div>
       </div>
 
