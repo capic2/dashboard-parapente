@@ -3531,7 +3531,9 @@ async def _build_coordinate_weather_payload(
         "verdict": para_result["verdict"],
         "emoji": para_result["emoji"],
         "explanation": para_result["explanation"],
-        "metrics": para_result["metrics"],
+        # Keep the endpoint total even when today's remaining flyable hours
+        # are empty (for example, after sunset).
+        "metrics": para_result.get("metrics", {}),
         "slots": slots,
         "slots_summary": format_slots_summary(slots),
         "total_sources": total_sources,
@@ -3711,7 +3713,9 @@ async def get_weather(
         "verdict": para_result["verdict"],
         "emoji": para_result["emoji"],
         "explanation": para_result["explanation"],
-        "metrics": para_result["metrics"],
+        # Keep the endpoint total even when today's remaining flyable hours
+        # are empty (for example, after sunset).
+        "metrics": para_result.get("metrics", {}),
         "slots": slots,
         "slots_summary": slots_summary,
         "total_sources": total_sources,
