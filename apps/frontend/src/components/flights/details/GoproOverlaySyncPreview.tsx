@@ -100,6 +100,19 @@ export function GoproOverlaySyncPreview({
         )
       )
     : 0;
+  const endPreviewStartTime =
+    previewSegments.length > 1
+      ? previewSegments[previewSegments.length - 1].preview_start_seconds
+      : Math.max(
+          0,
+          previewEndTime -
+            Math.min(
+              preview.data?.video.preview_available_duration_seconds ||
+                preview.data?.video.preview_requested_duration_seconds ||
+                180,
+              previewEndTime
+            )
+        );
 
   useEffect(() => {
     setDisplayOffset(manualOffset);
@@ -196,7 +209,7 @@ export function GoproOverlaySyncPreview({
 
   const selectAlignmentTarget = (target: GpxAlignmentTarget) => {
     setAlignmentTarget(target);
-    seekToPreviewBoundary(target === 'start' ? 0 : previewEndTime);
+    seekToPreviewBoundary(target === 'start' ? 0 : endPreviewStartTime);
   };
 
   const alignGpxAtCurrentVideoTime = async () => {
@@ -274,12 +287,13 @@ export function GoproOverlaySyncPreview({
               </button>
               <button
                 type="button"
-                onClick={() => seekToPreviewBoundary(previewEndTime)}
+                onClick={() => seekToPreviewBoundary(endPreviewStartTime)}
                 aria-pressed={
-                  previewEndTime > 0 && videoTime >= previewEndTime - 0.05
+                  endPreviewStartTime > 0 &&
+                  videoTime >= endPreviewStartTime - 0.05
                 }
-                disabled={!previewEndTime}
-                className={`cursor-pointer border-l border-gray-800 px-3 py-2 transition-colors hover:bg-gray-900 hover:text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 ${previewEndTime > 0 && videoTime >= previewEndTime - 0.05 ? 'bg-sky-950 text-sky-200' : ''}`}
+                disabled={previewEndTime <= 0}
+                className={`cursor-pointer border-l border-gray-800 px-3 py-2 transition-colors hover:bg-gray-900 hover:text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 ${endPreviewStartTime > 0 && videoTime >= endPreviewStartTime - 0.05 ? 'bg-sky-950 text-sky-200' : ''}`}
               >
                 {t('flights.goproPreviewEnd')}
               </button>
