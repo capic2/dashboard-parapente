@@ -527,13 +527,18 @@ def _prepare_layout_file(
                 if has_pip:
                     child.set("id", "pip")
                     continue
-                # The stock parapente layouts may declare the PIP explicitly
-                # as ``id="pip"``. Remove that component too when highlights
-                # intentionally run without a PIP input.
-                if child.attrib.get("id") == "pip" or not child.attrib.get("file"):
-                    parent.remove(child)
+                # A GPX-only render has no video input. Remove every video
+                # component, including templates that carry a default file
+                # attribute, so GoPro Dashboard cannot try to open a missing
+                # PIP source.
+                parent.remove(child)
                 continue
             normalize_video_components(child)
+            if not has_pip and child.tag in {"frame", "translate"} and not list(child):
+                # The standard layout wraps the PIP in a frame and a
+                # translate. Removing only the video leaves the empty frame
+                # visible as a black rectangle in transparent overlays.
+                parent.remove(child)
 
     normalize_video_components(root)
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -1105,7 +1110,8 @@ def probe_video_start_time(video_path: Path) -> datetime | None:
                 "-v",
                 "error",
                 "-show_entries",
-                "format_tags=creation_time:stream_tags=creation_time",
+                "format_tags=creation_time,com.apple.quicktime.creationdate,date:"
+                "stream_tags=creation_time,com.apple.quicktime.creationdate,date",
                 "-of",
                 "json",
                 str(video_path),
@@ -1123,13 +1129,15 @@ def probe_video_start_time(video_path: Path) -> datetime | None:
     except json.JSONDecodeError:
         return None
 
-    candidates = [
-        ((payload.get("format") or {}).get("tags") or {}).get("creation_time"),
-        *[
-            ((stream.get("tags") or {}).get("creation_time"))
-            for stream in payload.get("streams") or []
-        ],
-    ]
+    timestamp_keys = ("creation_time", "com.apple.quicktime.creationdate", "date")
+    format_tags = (payload.get("format") or {}).get("tags") or {}
+    candidates = [format_tags.get(key) for key in timestamp_keys]
+    candidates.extend(
+        tag
+        for stream in payload.get("streams") or []
+        for key in timestamp_keys
+        if (tag := ((stream.get("tags") or {}).get(key)))
+    )
     return next(
         (parsed for candidate in candidates if (parsed := _parse_utc_datetime(candidate))),
         None,
@@ -1212,7 +1220,12 @@ def gpx_duration_seconds(gpx_path: Path) -> float | None:
 
 def _shift_gpx_timestamps(gpx_path: Path, output_path: Path, offset: float) -> Path:
     tree = ET.parse(gpx_path)
-    for trackpoint in tree.getroot().iter():
+    root = tree.getroot()
+    if root.tag.startswith("{"):
+        namespace, _, _ = root.tag[1:].partition("}")
+        ET.register_namespace("", namespace)
+
+    for trackpoint in root.iter():
         if trackpoint.tag.rsplit("}", 1)[-1] != "trkpt":
             continue
         for element in trackpoint:
@@ -1718,6 +1731,21 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         gpx_start = first_gpx_timestamp(render_gpx_path)
         alignment_video_start = resolve_gopro_video_start_time(video_path, gpx_start)
         aligned_video_start = align_video_start_time_to_gpx(alignment_video_start, gpx_start)
+        automatic_offset = (
+            (gpx_start - aligned_video_start).total_seconds()
+            if gpx_start is not None and aligned_video_start is not None
+            else None
+        )
+        effective_offset = automatic_offset + gpx_offset if automatic_offset is not None else None
+        _append_job_log(
+            log_path,
+            "Overlay timeline: "
+            f"camera_start={aligned_video_start.isoformat() if aligned_video_start else 'unknown'} "
+            f"gpx_start={gpx_start.isoformat() if gpx_start else 'unknown'} "
+            f"automatic_offset={automatic_offset if automatic_offset is not None else 'unknown'}s "
+            f"manual_offset={gpx_offset:.3f}s "
+            f"effective_offset={effective_offset if effective_offset is not None else 'unknown'}s",
+        )
         if osv_paths:
             _update_job(job_id, progress=10, message="Merging OSV telemetry")
             video_duration = probe_video_duration(video_path)
@@ -1729,7 +1757,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
             )
             render_gpx_path = enriched_gpx_path
-            if gpx_offset and not command_metadata.get("overlay_only"):
+            if gpx_offset:
                 render_gpx_path = _shift_gpx_timestamps(
                     enriched_gpx_path,
                     work_dir / f"gpx-offset-{job_id}.gpx",
@@ -1737,7 +1765,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 )
         else:
             _append_job_log(log_path, "No OSV files found; using GPX directly")
-            if gpx_offset and not command_metadata.get("overlay_only"):
+            if gpx_offset:
                 render_gpx_path = _shift_gpx_timestamps(
                     render_gpx_path,
                     work_dir / f"gpx-offset-{job_id}.gpx",
