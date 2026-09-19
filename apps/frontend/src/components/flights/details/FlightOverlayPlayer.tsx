@@ -116,13 +116,6 @@ export function FlightOverlayPlayer({
   syncMediaRef.current = () => syncMedia(false);
 
   useEffect(() => {
-    // Calibration changes the offset without changing the camera clock. Apply
-    // the new mapping immediately so the GPX/video image does not stay at the
-    // previous position until the next media event.
-    syncMediaRef.current?.();
-  }, [syncOffsetSeconds]);
-
-  useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(document.fullscreenElement === playerRef.current);
     };

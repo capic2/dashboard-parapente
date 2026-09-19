@@ -127,6 +127,12 @@ export function FlightOverlayWorkspace({
         offset={offset}
         resetOffset={initialOffset}
         onOffsetChange={setOffset}
+        onOffsetSave={async (nextOffset) => {
+          await onSaveOffset(nextOffset);
+          await queryClient.invalidateQueries({
+            queryKey: ['flights', flightId, 'overlay-layer'],
+          });
+        }}
       />
 
       {isGenerating && layerJob && (
@@ -156,15 +162,6 @@ export function FlightOverlayWorkspace({
       )}
 
       <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-cyan-200 pt-4 dark:border-cyan-900">
-        {isDirty && (
-          <Button
-            variant="outline"
-            onPress={() => void saveOffset()}
-            isDisabled={isSaving || generateLayer.isPending || !hasValidOffset}
-          >
-            {t('flights.overlaySaveCalibration')}
-          </Button>
-        )}
         <Button
           onPress={() => void saveAndGenerate()}
           isDisabled={
