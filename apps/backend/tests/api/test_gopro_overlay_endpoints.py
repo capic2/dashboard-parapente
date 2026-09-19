@@ -3215,7 +3215,10 @@ def test_prepare_overlay_only_job_applies_gpx_offset(
     assert prepared is not None
     render_gpx_path = Path(prepared["command"]["render_gpx_path"])
     assert render_gpx_path.name.startswith("gpx-offset-")
-    assert "2026-08-08T09:30:45.500000Z" in render_gpx_path.read_text()
+    render_gpx = render_gpx_path.read_text()
+    assert '<gpx xmlns="http://www.topografix.com/GPX/1/1"' in render_gpx
+    assert "<ns0:" not in render_gpx
+    assert "2026-08-08T09:30:45.500000Z" in render_gpx
 
 
 def test_prepare_queued_job_omits_unreliable_file_time_for_render_timeline(

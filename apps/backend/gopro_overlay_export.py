@@ -1212,7 +1212,12 @@ def gpx_duration_seconds(gpx_path: Path) -> float | None:
 
 def _shift_gpx_timestamps(gpx_path: Path, output_path: Path, offset: float) -> Path:
     tree = ET.parse(gpx_path)
-    for trackpoint in tree.getroot().iter():
+    root = tree.getroot()
+    if root.tag.startswith("{"):
+        namespace, _, _ = root.tag[1:].partition("}")
+        ET.register_namespace("", namespace)
+
+    for trackpoint in root.iter():
         if trackpoint.tag.rsplit("}", 1)[-1] != "trkpt":
             continue
         for element in trackpoint:
