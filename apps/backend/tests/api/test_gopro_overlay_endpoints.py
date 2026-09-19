@@ -35,6 +35,28 @@ from models import VideoExportJob
 API_PREFIX = "/api"
 
 
+def test_probe_video_start_time_reads_quicktime_creation_date(tmp_path, monkeypatch) -> None:
+    video_path = tmp_path / "camera.mp4"
+
+    class Result:
+        stdout = json.dumps(
+            {
+                "format": {"tags": {"com.apple.quicktime.creationdate": "2026-08-26T17:49:58Z"}},
+                "streams": [],
+            }
+        )
+
+    monkeypatch.setattr(
+        gopro_overlay_export.subprocess,
+        "run",
+        lambda *_args, **_kwargs: Result(),
+    )
+
+    assert gopro_overlay_export.probe_video_start_time(video_path) == datetime.fromisoformat(
+        "2026-08-26T17:49:58+00:00"
+    )
+
+
 # REGRESSION CONTRACT — manual overlay calibration must produce the same
 # camera-to-GPX timeline in the preview and in the generated video. Do not
 # weaken, remove, or change these cases without explicit user authorization.

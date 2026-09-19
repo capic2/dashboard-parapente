@@ -1105,7 +1105,8 @@ def probe_video_start_time(video_path: Path) -> datetime | None:
                 "-v",
                 "error",
                 "-show_entries",
-                "format_tags=creation_time:stream_tags=creation_time",
+                "format_tags=creation_time,com.apple.quicktime.creationdate,date:"
+                "stream_tags=creation_time,com.apple.quicktime.creationdate,date",
                 "-of",
                 "json",
                 str(video_path),
@@ -1123,13 +1124,15 @@ def probe_video_start_time(video_path: Path) -> datetime | None:
     except json.JSONDecodeError:
         return None
 
-    candidates = [
-        ((payload.get("format") or {}).get("tags") or {}).get("creation_time"),
-        *[
-            ((stream.get("tags") or {}).get("creation_time"))
-            for stream in payload.get("streams") or []
-        ],
-    ]
+    timestamp_keys = ("creation_time", "com.apple.quicktime.creationdate", "date")
+    format_tags = (payload.get("format") or {}).get("tags") or {}
+    candidates = [format_tags.get(key) for key in timestamp_keys]
+    candidates.extend(
+        tag
+        for stream in payload.get("streams") or []
+        for key in timestamp_keys
+        if (tag := ((stream.get("tags") or {}).get(key)))
+    )
     return next(
         (parsed for candidate in candidates if (parsed := _parse_utc_datetime(candidate))),
         None,
