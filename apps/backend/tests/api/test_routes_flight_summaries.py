@@ -390,6 +390,38 @@ def test_summaries_put_nulls_last_and_keyset_ties_by_id(client, db_session, argu
     ]
 
 
+def test_summaries_order_same_day_without_departure_time_by_creation_date(
+    client, db_session, arguel_site
+):
+    db_session.add_all(
+        [
+            Flight(
+                id="created-older",
+                title="Older",
+                flight_date=date(2026, 1, 1),
+                departure_time=None,
+                created_at=datetime(2026, 1, 1, 9),
+            ),
+            Flight(
+                id="created-newer",
+                title="Newer",
+                flight_date=date(2026, 1, 1),
+                departure_time=None,
+                created_at=datetime(2026, 1, 1, 10),
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(API_URL, params={"sort_by": "flight_date", "sort_order": "desc"})
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["flights"]] == [
+        "created-newer",
+        "created-older",
+    ]
+
+
 def test_summaries_do_no_parser_or_job_work(client, db_session, arguel_site):
     _add_flights(db_session, count=2)
 
