@@ -2537,6 +2537,23 @@ def test_prepare_layout_file_removes_video_component_with_default_file_without_v
     assert 'type="video"' not in destination.read_text()
 
 
+def test_prepare_layout_file_removes_empty_pip_frame_without_video(tmp_path: Path) -> None:
+    source = tmp_path / "layout.xml"
+    destination = tmp_path / "prepared.xml"
+    source.write_text(
+        '<layout><translate x="20" y="1540"><frame width="600" height="600">'
+        '<component type="video" id="pip" size="600" />'
+        "</frame></translate></layout>"
+    )
+
+    _prepare_layout_file(source, destination, has_pip=False)
+
+    prepared = destination.read_text()
+    assert "translate" not in prepared
+    assert "frame" not in prepared
+    assert 'type="video"' not in prepared
+
+
 def test_read_process_updates_drains_output_after_process_exit():
     class ExitedProcess:
         stdout = StringIO("last status line\nTraceback details\n")

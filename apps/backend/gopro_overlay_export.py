@@ -534,6 +534,11 @@ def _prepare_layout_file(
                 parent.remove(child)
                 continue
             normalize_video_components(child)
+            if not has_pip and child.tag in {"frame", "translate"} and not list(child):
+                # The standard layout wraps the PIP in a frame and a
+                # translate. Removing only the video leaves the empty frame
+                # visible as a black rectangle in transparent overlays.
+                parent.remove(child)
 
     normalize_video_components(root)
     destination.parent.mkdir(parents=True, exist_ok=True)
