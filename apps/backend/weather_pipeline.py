@@ -70,6 +70,12 @@ FULL_CONFIDENCE_SOURCE_BASELINE = 5
 PARIS_TIME_ZONE = ZoneInfo("Europe/Paris")
 
 
+def get_forecast_target_date(day_index: int, now: datetime | None = None) -> str:
+    """Return the forecast date using the application's local weather day."""
+    current_time = now.astimezone(PARIS_TIME_ZONE) if now else datetime.now(PARIS_TIME_ZONE)
+    return (current_time + timedelta(days=day_index)).date().isoformat()
+
+
 def filter_remaining_hours(
     hours: list[dict[str, Any]],
     day_index: int,
@@ -826,7 +832,7 @@ async def get_daily_aggregate(
         return None
 
     # Calculate target date
-    target_date = (datetime.now() + timedelta(days=day_index)).strftime("%Y-%m-%d")
+    target_date = get_forecast_target_date(day_index)
 
     # Filter to flyable hours BEFORE calculating para_index (same as /weather endpoint)
     # This ensures consistency between daily-summary cards and hourly view
