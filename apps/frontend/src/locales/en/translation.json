@@ -1216,6 +1216,7 @@
     "overlayWorkspaceTitle": "Synchronization and overlay layer",
     "overlayWorkspaceDescription": "Calibrate telemetry, then generate a transparent layer reusable by exports.",
     "overlayInteractivePreview": "Interactive dynamic overlay",
+    "overlayInteractivePreviewLoading": "Loading telemetry data…",
     "overlayInteractiveSectionTitle": "Interactive telemetry preview",
     "overlayInteractiveSectionDescription": "Experimental interactive view. The existing overlay workflow remains unchanged.",
     "overlayInteractivePreviewReady": "The flight telemetry is ready for interactive playback.",

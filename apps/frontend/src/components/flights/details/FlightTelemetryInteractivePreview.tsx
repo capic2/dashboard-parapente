@@ -20,7 +20,20 @@ export function FlightTelemetryInteractivePreview({
   const overlayPreview = useGoproOverlayPreview(flightId, true);
   const telemetry = useFlightTelemetry(flightId, true);
   const [cameraTime, setCameraTime] = useState(0);
-  const isReady = telemetry.isSuccess && overlayPreview.isSuccess;
+  const isLoading = telemetry.isPending || overlayPreview.isPending;
+  const isReady =
+    telemetry.isSuccess &&
+    overlayPreview.isSuccess &&
+    Boolean(telemetry.data?.points.length);
+  const showUnavailable = !isLoading && !isReady;
+  let previewStatusMessage: string;
+  if (isLoading) {
+    previewStatusMessage = t('flights.overlayInteractivePreviewLoading');
+  } else if (isReady) {
+    previewStatusMessage = t('flights.overlayInteractivePreviewReady');
+  } else {
+    previewStatusMessage = t('flights.overlayInteractivePreviewUnavailable');
+  }
   const overlayOffsetSeconds =
     overlayPreview.data?.alignment.effective_offset_seconds ?? 0;
 
@@ -36,15 +49,21 @@ export function FlightTelemetryInteractivePreview({
               {t('flights.overlayInteractivePreview')}
             </span>
             <span className="block text-sm text-slate-600 dark:text-slate-300">
-              {isReady
-                ? t('flights.overlayInteractivePreviewReady')
-                : t('flights.overlayInteractivePreviewUnavailable')}
+              {previewStatusMessage}
             </span>
           </span>
         </span>
       </div>
       <div className="border-t border-slate-200 p-4 dark:border-slate-700 sm:p-5">
-        {isReady ? (
+        {isLoading && (
+          <output
+            className="block rounded-lg bg-slate-100 p-3 text-sm text-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            aria-live="polite"
+          >
+            {t('flights.overlayInteractivePreviewLoading')}
+          </output>
+        )}
+        {!isLoading && isReady && (
           <FlightOverlayPlayer
             mode="interactive"
             cameraUrl={getApiUrlWithSearchParams(
@@ -65,7 +84,8 @@ export function FlightTelemetryInteractivePreview({
               />
             }
           />
-        ) : (
+        )}
+        {showUnavailable && (
           <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
             <CircleAlert
               className="mt-0.5 h-4 w-4 shrink-0"
