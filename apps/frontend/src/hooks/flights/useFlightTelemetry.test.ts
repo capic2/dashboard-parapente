@@ -59,4 +59,17 @@ describe('interpolateTelemetryAtVideoTime', () => {
 
     expect(interpolateTelemetryAtVideoTime(segmented, 1, 0)?.segment).toBe(1);
   });
+
+  it('returns no telemetry during a GPX segment gap', () => {
+    const segmented = {
+      ...data,
+      points: [
+        data.points[0],
+        { ...data.points[1], timestamp: 10_000, segment: 1 },
+      ],
+    };
+
+    expect(interpolateTelemetryAtVideoTime(segmented, 5, 0)).toBeNull();
+    expect(interpolateTelemetryAtVideoTime(segmented, 9, 0)?.segment).toBe(1);
+  });
 });

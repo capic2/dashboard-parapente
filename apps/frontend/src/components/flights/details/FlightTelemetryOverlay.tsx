@@ -5,8 +5,12 @@ import {
   type FlightTelemetryData,
   type FlightTelemetryPoint,
 } from '../../../hooks/flights/useFlightTelemetry';
+import {
+  DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
+  type FlightTelemetryWidgetLayout,
+} from './flightTelemetryLayout';
 
-type MetricKey =
+export type MetricKey =
   | 'altitude'
   | 'speed'
   | 'vario'
@@ -19,6 +23,7 @@ interface FlightTelemetryOverlayProps {
   data?: FlightTelemetryData;
   videoTimeSeconds: number;
   offsetSeconds: number;
+  layout?: readonly FlightTelemetryWidgetLayout[];
 }
 
 const METRIC_KEYS: MetricKey[] = [
@@ -75,6 +80,7 @@ export function FlightTelemetryOverlay({
   data,
   videoTimeSeconds,
   offsetSeconds,
+  layout = DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
 }: FlightTelemetryOverlayProps) {
   const { t } = useTranslation();
   const point = useMemo(
@@ -82,23 +88,14 @@ export function FlightTelemetryOverlay({
       interpolateTelemetryAtVideoTime(data, videoTimeSeconds, offsetSeconds),
     [data, offsetSeconds, videoTimeSeconds]
   );
-  const [selectedMetrics, setSelectedMetrics] = useState<MetricKey[]>([
-    'altitude',
-    'speed',
-    'vario',
-    'distance',
-  ]);
-
-  const positions = [
-    'left-3 top-3',
-    'right-3 top-3',
-    'left-3 bottom-14',
-    'right-3 bottom-14',
-  ];
+  const [selectedMetrics, setSelectedMetrics] = useState<MetricKey[]>(() =>
+    layout.map((slot) => slot.metric)
+  );
 
   return (
     <div className="pointer-events-none absolute inset-0">
-      {selectedMetrics.map((metric, index) => {
+      {layout.map((slot, index) => {
+        const metric = selectedMetrics[index] ?? slot.metric;
         const [value, unit] = getMetricValue(point, metric) ?? [null, ''];
         const nextMetric =
           METRIC_KEYS[(METRIC_KEYS.indexOf(metric) + 1) % METRIC_KEYS.length];
@@ -106,7 +103,13 @@ export function FlightTelemetryOverlay({
           <button
             key={index}
             type="button"
-            className={`pointer-events-auto absolute ${positions[index]} min-w-24 rounded-lg border border-white/25 bg-slate-950/75 px-3 py-2 text-left text-white shadow-lg backdrop-blur-sm transition hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400`}
+            className="pointer-events-auto absolute min-w-24 cursor-pointer rounded-lg border border-white/25 bg-slate-950/75 px-3 py-2 text-left text-white shadow-lg backdrop-blur-sm transition hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+            style={{
+              top: slot.top,
+              right: slot.right,
+              bottom: slot.bottom,
+              left: slot.left,
+            }}
             onClick={() =>
               setSelectedMetrics((current) =>
                 current.map((currentMetric, currentIndex) =>

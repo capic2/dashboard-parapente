@@ -73,13 +73,11 @@ export function interpolateTelemetryAtVideoTime(
 
   const next = points[low];
   const previous = points[Math.max(0, low - 1)];
-  if (
-    !previous ||
-    !next ||
-    previous.segment !== next.segment ||
-    previous === next
-  ) {
+  if (!previous || !next || previous === next) {
     return next ?? null;
+  }
+  if (previous.segment !== next.segment) {
+    return targetTimestamp === next.timestamp ? next : null;
   }
 
   const duration = next.timestamp - previous.timestamp;

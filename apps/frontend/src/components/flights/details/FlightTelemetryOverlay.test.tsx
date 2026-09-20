@@ -1,0 +1,63 @@
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import type { FlightTelemetryData } from '../../../hooks/flights/useFlightTelemetry';
+import { FlightTelemetryOverlay } from './FlightTelemetryOverlay';
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+  }),
+}));
+
+const telemetry: FlightTelemetryData = {
+  points: [
+    {
+      timestamp: 1_000,
+      lat: 45,
+      lon: 6,
+      elevation: 1_234,
+      segment: 0,
+      speed_kmh: 42.5,
+      vario_ms: 1.2,
+      distance_km: 3.4,
+    },
+  ],
+  source: 'gpx',
+  has_osv: false,
+  start_time: null,
+  end_time: null,
+  duration_seconds: 0,
+};
+
+describe('FlightTelemetryOverlay', () => {
+  it('renders every configured widget with the interpolated values', () => {
+    render(
+      <FlightTelemetryOverlay
+        data={telemetry}
+        videoTimeSeconds={0}
+        offsetSeconds={0}
+      />
+    );
+
+    expect(screen.getByText('1234')).toBeInTheDocument();
+    expect(screen.getByText('42.5')).toBeInTheDocument();
+    expect(screen.getByText('1.2')).toBeInTheDocument();
+    expect(screen.getByText('3.4')).toBeInTheDocument();
+    expect(screen.getAllByRole('button')).toHaveLength(4);
+  });
+
+  it('cycles only the clicked widget to the next metric', () => {
+    render(
+      <FlightTelemetryOverlay
+        data={telemetry}
+        videoTimeSeconds={0}
+        offsetSeconds={0}
+      />
+    );
+
+    fireEvent.click(screen.getAllByRole('button')[0]);
+
+    expect(screen.getAllByText('flights.telemetrySpeed')).toHaveLength(2);
+    expect(screen.getAllByText('42.5')).toHaveLength(2);
+  });
+});

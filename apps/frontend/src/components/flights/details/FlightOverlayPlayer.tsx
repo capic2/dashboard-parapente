@@ -317,7 +317,7 @@ export function FlightOverlayPlayer({
           </button>
         )}
         {overlayContent && (
-          <div className="pointer-events-none absolute left-3 top-3 z-30">
+          <div className="pointer-events-none absolute inset-0 z-30">
             {overlayContent}
           </div>
         )}
