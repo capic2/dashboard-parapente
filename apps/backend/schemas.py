@@ -185,6 +185,7 @@ class FlightTelemetryResponse(BaseModel):
     points: list[FlightTelemetryPoint]
     source: Literal["gpx", "gpx+osv"]
     has_osv: bool
+    enrichment_status: Literal["ready", "pending"]
     start_time: datetime | None = None
     end_time: datetime | None = None
     duration_seconds: float

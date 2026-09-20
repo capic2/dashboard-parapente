@@ -5005,6 +5005,7 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
         points=payload_points,
         source="gpx+osv" if telemetry_path != source_path else "gpx",
         has_osv=telemetry_path != source_path,
+        enrichment_status="ready" if telemetry_path != source_path or not osv_paths else "pending",
         start_time=start_time,
         end_time=end_time,
         duration_seconds=duration_seconds,

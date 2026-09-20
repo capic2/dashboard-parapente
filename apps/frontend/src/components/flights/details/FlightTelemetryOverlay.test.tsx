@@ -24,6 +24,7 @@ const telemetry: FlightTelemetryData = {
   ],
   source: 'gpx',
   has_osv: false,
+  enrichment_status: 'ready',
   start_time: null,
   end_time: null,
   duration_seconds: 0,

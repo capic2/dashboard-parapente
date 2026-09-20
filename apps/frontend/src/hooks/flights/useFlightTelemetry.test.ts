@@ -7,6 +7,7 @@ import {
 const data: FlightTelemetryData = {
   source: 'gpx+osv',
   has_osv: true,
+  enrichment_status: 'ready',
   start_time: null,
   end_time: null,
   duration_seconds: 10,
