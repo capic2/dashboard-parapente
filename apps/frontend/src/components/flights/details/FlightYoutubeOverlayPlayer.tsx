@@ -162,6 +162,10 @@ export function FlightYoutubeOverlayPlayer({
           videoId,
           playerVars: {
             enablejsapi: 1,
+            // Native YouTube fullscreen only expands the iframe and drops the
+            // synchronized flight and overlay layers. Use the parent player
+            // fullscreen control below so all layers stay together.
+            fs: 0,
             origin: window.location.origin,
             playsinline: 1,
           },
