@@ -161,6 +161,10 @@ export function FlightYoutubeOverlayPlayer({
           width: '100%',
           videoId,
           playerVars: {
+            // Playback is controlled by this player, so hide YouTube's native
+            // controls and prevent its captions button from being exposed.
+            controls: 0,
+            cc_load_policy: 0,
             enablejsapi: 1,
             // Native YouTube fullscreen only expands the iframe and drops the
             // synchronized flight and overlay layers. Use the parent player
