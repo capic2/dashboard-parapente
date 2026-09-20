@@ -899,10 +899,7 @@ export function FlightDetails({
       <div className="min-w-0 space-y-4">
         {hasGpx && hasVideo && hasGoproCameraVideo && overlayWorkspacePanel}
         {hasGpx && hasVideo && hasGoproCameraVideo && (
-          <FlightOverlayInteractivePreview
-            flightId={flight.id}
-            overlayLayer={overlayLayer.data}
-          />
+          <FlightOverlayInteractivePreview flightId={flight.id} />
         )}
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
           <button

@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from flight_tracks import calculate_track_stats, normalize_track
+from flight_tracks import calculate_track_stats, enrich_telemetry_points, normalize_track
 
 GPX = b"""<?xml version="1.0"?>
 <gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>
@@ -423,6 +423,29 @@ def test_vario_ignores_untimed_point_at_segment_boundary() -> None:
 
     assert stats["max_climb_rate_ms"] == 0
     assert stats["max_sink_rate_ms"] == 0
+
+
+def test_enriches_points_with_distance_heading_and_relative_altitude() -> None:
+    points = enrich_telemetry_points(
+        [
+            {"lat": 47.2, "lon": 6.0, "elevation": 400.0, "timestamp": 1_000, "segment": 0},
+            {"lat": 47.21, "lon": 6.0, "elevation": 410.0, "timestamp": 11_000, "segment": 0},
+        ]
+    )
+
+    assert points[0]["distance_km"] == 0
+    assert points[0]["altitude_relative_m"] == 0
+    assert points[1]["distance_km"] > 0
+    assert points[1]["heading_deg"] == pytest.approx(0, abs=0.1)
+    assert points[1]["altitude_relative_m"] == 10
+    assert points[1]["vario_ms"] == 1
+
+
+def test_enriches_missing_elevation_with_zero() -> None:
+    points = enrich_telemetry_points([{"lat": 47.2, "lon": 6.0, "timestamp": 1_000, "segment": 0}])
+
+    assert points[0]["elevation"] == 0.0
+    assert points[0]["altitude_relative_m"] == 0.0
 
 
 @pytest.mark.parametrize(

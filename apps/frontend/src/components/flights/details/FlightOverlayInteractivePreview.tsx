@@ -1,40 +1,30 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CircleAlert, Wand2 } from 'lucide-react';
-import type { FlightOverlayLayer } from '../../../hooks/gopro/useGoproOverlay';
 import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
+import { useFlightTelemetry } from '../../../hooks/flights/useFlightTelemetry';
 import { getApiUrlWithSearchParams } from '../../../lib/api';
 import { useAuthStore } from '../../../stores/authStore';
 import { FlightOverlayPlayer } from './FlightOverlayPlayer';
+import { FlightTelemetryOverlay } from './FlightTelemetryOverlay';
 
 // This is the final dynamic overlay player. Calibration and GPX alignment
 // belong to GoproOverlaySyncPreview and must not be changed here by mistake.
 interface FlightOverlayInteractivePreviewProps {
   flightId: string;
-  overlayLayer?: FlightOverlayLayer;
 }
 
 export function FlightOverlayInteractivePreview({
   flightId,
-  overlayLayer,
 }: FlightOverlayInteractivePreviewProps) {
   const { t } = useTranslation();
   const token = useAuthStore((state) => state.token);
   const overlayPreview = useGoproOverlayPreview(flightId, true);
-  const isReady =
-    overlayLayer?.status === 'completed' && Boolean(overlayLayer.job);
-  const overlayJob = isReady ? overlayLayer.job : null;
+  const telemetry = useFlightTelemetry(flightId, true);
+  const [cameraTime, setCameraTime] = useState(0);
+  const isReady = telemetry.isSuccess && overlayPreview.isSuccess;
   const overlayOffsetSeconds =
     overlayPreview.data?.alignment.effective_offset_seconds ?? 0;
-  const overlayUrl = overlayJob
-    ? getApiUrlWithSearchParams(
-        `gopro-overlays/jobs/${overlayJob.job_id}/download`,
-        {
-          access_token: token,
-          browser_preview: 'true',
-          version: overlayJob.updated_at,
-        }
-      )
-    : undefined;
 
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
@@ -56,7 +46,7 @@ export function FlightOverlayInteractivePreview({
         </span>
       </div>
       <div className="border-t border-slate-200 p-4 dark:border-slate-700 sm:p-5">
-        {overlayUrl ? (
+        {isReady ? (
           <FlightOverlayPlayer
             mode="interactive"
             cameraUrl={getApiUrlWithSearchParams(
@@ -68,8 +58,14 @@ export function FlightOverlayInteractivePreview({
             })}
             cameraLabel={t('flights.goproOverlayCameraPreview')}
             flightLabel={t('flights.goproOverlayFlightVideo')}
-            overlayUrl={overlayUrl}
-            getOverlayTime={(cameraTime) => cameraTime - overlayOffsetSeconds}
+            onTimeChange={setCameraTime}
+            overlayContent={
+              <FlightTelemetryOverlay
+                data={telemetry.data}
+                videoTimeSeconds={cameraTime}
+                offsetSeconds={overlayOffsetSeconds}
+              />
+            }
           />
         ) : (
           <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">

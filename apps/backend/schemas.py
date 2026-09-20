@@ -166,6 +166,30 @@ class GoproOverlayPreviewCoordinate(BaseModel):
     heart_rate: int | None = None
 
 
+class FlightTelemetryPoint(BaseModel):
+    timestamp: int
+    lat: float
+    lon: float
+    elevation: float
+    segment: int = 0
+    speed_kmh: float | None = None
+    vario_ms: float | None = None
+    heading_deg: float | None = None
+    distance_km: float | None = None
+    altitude_relative_m: float | None = None
+    heart_rate: int | None = None
+    power: int | None = None
+
+
+class FlightTelemetryResponse(BaseModel):
+    points: list[FlightTelemetryPoint]
+    source: Literal["gpx", "gpx+osv"]
+    has_osv: bool
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    duration_seconds: float
+
+
 class GoproOverlayPreviewGpx(BaseModel):
     start_time: datetime
     end_time: datetime
