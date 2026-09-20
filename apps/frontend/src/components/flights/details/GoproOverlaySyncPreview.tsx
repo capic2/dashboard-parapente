@@ -118,14 +118,11 @@ export function GoproOverlaySyncPreview({
     setDisplayOffset(manualOffset);
   }, [manualOffset]);
 
-  const gpxStart = preview.data
-    ? (preview.data.gpx.coordinates[0]?.timestamp ??
-      parseApiUtcDate(preview.data.gpx.start_time).getTime())
-    : 0;
   const telemetry = preview.data
     ? telemetryAtTimestamp(
         preview.data.gpx.coordinates,
-        gpxStart + (sourceVideoTime - automaticOffset - displayOffset) * 1000
+        parseApiUtcDate(preview.data.video.start_time).getTime() +
+          (sourceVideoTime - displayOffset) * 1000
       )
     : null;
   const heartRate = telemetry?.heart_rate ?? null;

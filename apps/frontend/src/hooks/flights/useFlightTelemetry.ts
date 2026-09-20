@@ -63,7 +63,8 @@ function interpolateHeading(
 export function interpolateTelemetryAtVideoTime(
   data: FlightTelemetryData | undefined,
   videoTimeSeconds: number,
-  offsetSeconds: number
+  offsetSeconds: number,
+  timelineStartTimestamp?: number
 ): FlightTelemetryPoint | null {
   const points = data?.points;
   if (
@@ -76,7 +77,10 @@ export function interpolateTelemetryAtVideoTime(
 
   const firstTimestamp = points[0].timestamp;
   const targetTimestamp =
-    firstTimestamp + (videoTimeSeconds - offsetSeconds) * 1000;
+    (Number.isFinite(timelineStartTimestamp)
+      ? timelineStartTimestamp
+      : firstTimestamp) +
+    (videoTimeSeconds - offsetSeconds) * 1000;
   if (targetTimestamp <= points[0].timestamp) return points[0];
   if (targetTimestamp >= points[points.length - 1].timestamp) {
     return points[points.length - 1];
