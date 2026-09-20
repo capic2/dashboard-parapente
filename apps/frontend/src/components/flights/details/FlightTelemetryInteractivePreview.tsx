@@ -7,6 +7,7 @@ import { getApiUrlWithSearchParams } from '../../../lib/api';
 import { useAuthStore } from '../../../stores/authStore';
 import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 import { FlightTelemetryOverlay } from './FlightTelemetryOverlay';
+import { sourceTimeAtPreviewTime } from './GoproOverlaySyncPreview';
 
 interface FlightTelemetryInteractivePreviewProps {
   flightId: string;
@@ -37,6 +38,7 @@ export function FlightTelemetryInteractivePreview({
   }
   const overlayOffsetSeconds =
     overlayPreview.data?.alignment.effective_offset_seconds ?? 0;
+  const previewSegments = overlayPreview.data?.video.preview_segments ?? [];
 
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
@@ -76,7 +78,11 @@ export function FlightTelemetryInteractivePreview({
             })}
             cameraLabel={t('flights.goproOverlayCameraPreview')}
             flightLabel={t('flights.goproOverlayFlightVideo')}
-            onTimeChange={setCameraTime}
+            onTimeChange={(previewTime) =>
+              setCameraTime(
+                sourceTimeAtPreviewTime(previewTime, previewSegments)
+              )
+            }
             overlayContent={
               <FlightTelemetryOverlay
                 data={telemetry.data}
