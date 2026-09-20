@@ -23,6 +23,7 @@ interface FlightTelemetryOverlayProps {
   data?: FlightTelemetryData;
   videoTimeSeconds: number;
   offsetSeconds: number;
+  timelineStartTimestamp?: number;
   layout?: readonly FlightTelemetryWidgetLayout[];
 }
 
@@ -80,13 +81,19 @@ export function FlightTelemetryOverlay({
   data,
   videoTimeSeconds,
   offsetSeconds,
+  timelineStartTimestamp,
   layout = DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
 }: FlightTelemetryOverlayProps) {
   const { t } = useTranslation();
   const point = useMemo(
     () =>
-      interpolateTelemetryAtVideoTime(data, videoTimeSeconds, offsetSeconds),
-    [data, offsetSeconds, videoTimeSeconds]
+      interpolateTelemetryAtVideoTime(
+        data,
+        videoTimeSeconds,
+        offsetSeconds,
+        timelineStartTimestamp
+      ),
+    [data, offsetSeconds, timelineStartTimestamp, videoTimeSeconds]
   );
   const [selectedMetrics, setSelectedMetrics] = useState<
     Record<string, MetricKey>
