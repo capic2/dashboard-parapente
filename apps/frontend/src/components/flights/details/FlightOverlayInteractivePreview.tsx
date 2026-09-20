@@ -3,19 +3,22 @@ import { CircleAlert, Wand2 } from 'lucide-react';
 import type { FlightOverlayLayer } from '../../../hooks/gopro/useGoproOverlay';
 import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { getApiUrlWithSearchParams } from '../../../lib/api';
+import { getYoutubeVideoId } from '../../../lib/youtube';
 import { useAuthStore } from '../../../stores/authStore';
-import { FlightOverlayPlayer } from './FlightOverlayPlayer';
+import { FlightYoutubeOverlayPlayer } from './FlightYoutubeOverlayPlayer';
 
 // This is the final dynamic overlay player. Calibration and GPX alignment
 // belong to GoproOverlaySyncPreview and must not be changed here by mistake.
 interface FlightOverlayInteractivePreviewProps {
   flightId: string;
   overlayLayer?: FlightOverlayLayer;
+  youtubeUrl?: string;
 }
 
 export function FlightOverlayInteractivePreview({
   flightId,
   overlayLayer,
+  youtubeUrl,
 }: FlightOverlayInteractivePreviewProps) {
   const { t } = useTranslation();
   const token = useAuthStore((state) => state.token);
@@ -56,20 +59,16 @@ export function FlightOverlayInteractivePreview({
         </span>
       </div>
       <div className="border-t border-slate-200 p-4 dark:border-slate-700 sm:p-5">
-        {overlayUrl ? (
-          <FlightOverlayPlayer
-            mode="interactive"
-            cameraUrl={getApiUrlWithSearchParams(
-              `flights/${flightId}/gopro-camera/preview`,
-              { access_token: token }
-            )}
+        {overlayUrl && youtubeUrl && getYoutubeVideoId(youtubeUrl) ? (
+          <FlightYoutubeOverlayPlayer
+            youtubeUrl={youtubeUrl}
             flightUrl={getApiUrlWithSearchParams(`flights/${flightId}/video`, {
               access_token: token,
             })}
-            cameraLabel={t('flights.goproOverlayCameraPreview')}
+            youtubeLabel={t('flights.goproOverlayYoutubePreview')}
             flightLabel={t('flights.goproOverlayFlightVideo')}
             overlayUrl={overlayUrl}
-            getOverlayTime={(cameraTime) => cameraTime - overlayOffsetSeconds}
+            getOverlayTime={(youtubeTime) => youtubeTime - overlayOffsetSeconds}
           />
         ) : (
           <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">

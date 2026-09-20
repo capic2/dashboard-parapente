@@ -43,3 +43,9 @@ export function getYoutubeEmbedUrl(rawUrl: string): string | null {
   }
   return embedUrl.toString();
 }
+
+export function getFirstValidYoutubeUrl(
+  urls: string[] | undefined
+): string | null {
+  return urls?.find((url) => getYoutubeVideoId(url) !== null) ?? null;
+}

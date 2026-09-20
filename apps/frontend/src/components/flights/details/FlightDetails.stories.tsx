@@ -60,6 +60,7 @@ const fullFlight: Flight = {
   video_file_exists: true,
   gopro_camera_file_exists: true,
   gopro_overlay_file_path: '/data/flights/final.mp4',
+  youtube_urls: ['https://www.youtube.com/watch?v=dQw4w9WgXcQ'],
 };
 
 const flightWithMediaThumbnails: Flight = {

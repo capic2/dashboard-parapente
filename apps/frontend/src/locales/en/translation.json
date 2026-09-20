@@ -1202,6 +1202,8 @@
     "goproOverlayGeneratingInteractive": "Generating the overlay…",
     "goproOverlayInteractiveUnavailable": "The interactive overlay is unavailable.",
     "goproOverlayCameraPreview": "GoPro video preview",
+    "goproOverlayYoutubePreview": "YouTube video",
+    "youtubeOverlayUnavailable": "This YouTube video cannot be embedded in the player.",
     "goproOverlayFlightVideo": "Flight video",
     "goproOverlaySideBySide": "Side by side",
     "goproOverlayLayoutLabel": "View",

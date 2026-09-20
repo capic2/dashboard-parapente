@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { getYoutubeEmbedUrl, getYoutubeVideoId } from './youtube';
+import {
+  getFirstValidYoutubeUrl,
+  getYoutubeEmbedUrl,
+  getYoutubeVideoId,
+} from './youtube';
 
 describe('YouTube URL parsing', () => {
   it.each([
@@ -19,6 +23,17 @@ describe('YouTube URL parsing', () => {
     expect(
       getYoutubeVideoId('https://youtube.com/watch?v=too-short')
     ).toBeNull();
+  });
+
+  it('selects the first valid URL from a list', () => {
+    expect(
+      getFirstValidYoutubeUrl([
+        'https://example.com/video',
+        'https://youtu.be/dQw4w9WgXcQ',
+        'https://youtu.be/9bZkp7q19f0',
+      ])
+    ).toBe('https://youtu.be/dQw4w9WgXcQ');
+    expect(getFirstValidYoutubeUrl([])).toBeNull();
   });
 
   it('uses the privacy-enhanced embed domain', () => {

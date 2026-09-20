@@ -1207,6 +1207,8 @@
     "goproOverlayGeneratingInteractive": "Génération de l’overlay en cours…",
     "goproOverlayInteractiveUnavailable": "L’overlay interactif n’est pas disponible.",
     "goproOverlayCameraPreview": "Prévisualisation de la vidéo GoPro",
+    "goproOverlayYoutubePreview": "Vidéo YouTube",
+    "youtubeOverlayUnavailable": "La vidéo YouTube ne peut pas être intégrée dans ce lecteur.",
     "goproOverlayFlightVideo": "Vidéo du vol",
     "goproOverlaySideBySide": "Côte à côte",
     "goproOverlayLayoutLabel": "Affichage",
