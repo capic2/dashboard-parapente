@@ -1221,6 +1221,7 @@
     "overlayWorkspaceTitle": "Synchronisation et couche overlay",
     "overlayWorkspaceDescription": "Calibrez la télémétrie puis générez une couche transparente réutilisable par les exports.",
     "overlayInteractivePreview": "Overlay dynamique interactif",
+    "overlayInteractivePreviewLoading": "Chargement des données de télémétrie…",
     "overlayInteractiveSectionTitle": "Prévisualisation de la télémétrie interactive",
     "overlayInteractiveSectionDescription": "Vue interactive expérimentale. Le workflow d'overlay existant reste inchangé.",
     "overlayInteractivePreviewReady": "La télémétrie du vol est disponible pour la lecture interactive.",
