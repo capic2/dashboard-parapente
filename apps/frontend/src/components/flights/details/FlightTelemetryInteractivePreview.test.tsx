@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { FlightTelemetryInteractivePreview } from './FlightTelemetryInteractivePreview';
 
@@ -36,11 +37,33 @@ vi.mock('../../../stores/authStore', () => ({
 }));
 
 vi.mock('./FlightOverlayPlayer', () => ({
-  FlightOverlayPlayer: () => <div data-testid="overlay-player" />,
+  FlightOverlayPlayer: ({
+    onTimeChange,
+    overlayContent,
+  }: {
+    onTimeChange?: (time: number) => void;
+    overlayContent?: React.ReactNode;
+  }) => (
+    <>
+      <button
+        type="button"
+        data-testid="overlay-player"
+        aria-label="mock overlay player"
+        onClick={() => onTimeChange?.(180)}
+      />
+      {overlayContent}
+    </>
+  ),
 }));
 
 vi.mock('./FlightTelemetryOverlay', () => ({
-  FlightTelemetryOverlay: () => <div data-testid="telemetry-overlay" />,
+  FlightTelemetryOverlay: ({
+    videoTimeSeconds,
+  }: {
+    videoTimeSeconds: number;
+  }) => (
+    <div data-testid="telemetry-overlay" data-video-time={videoTimeSeconds} />
+  ),
 }));
 
 describe('FlightTelemetryInteractivePreview', () => {
@@ -68,5 +91,49 @@ describe('FlightTelemetryInteractivePreview', () => {
       screen.getAllByText('flights.overlayInteractivePreviewUnavailable')
     ).toHaveLength(2);
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('maps preview time to source video time before applying the telemetry offset', () => {
+    hooks.overlayPreview.data = {
+      video: {
+        preview_segments: [
+          {
+            preview_start_seconds: 0,
+            source_start_seconds: 1020,
+            duration_seconds: 180,
+          },
+        ],
+      },
+      alignment: { effective_offset_seconds: 10 },
+    };
+    hooks.overlayPreview.isPending = false;
+    hooks.overlayPreview.isSuccess = true;
+    hooks.telemetry.data = {
+      points: [
+        {
+          timestamp: 1,
+          lat: 0,
+          lon: 0,
+          elevation: 0,
+          segment: 0,
+        },
+      ],
+      source: 'gpx',
+      has_osv: false,
+      enrichment_status: 'ready',
+      start_time: null,
+      end_time: null,
+      duration_seconds: 0,
+    };
+    hooks.telemetry.isPending = false;
+    hooks.telemetry.isSuccess = true;
+
+    render(<FlightTelemetryInteractivePreview flightId="flight-1" />);
+
+    fireEvent.click(screen.getByTestId('overlay-player'));
+    expect(screen.getByTestId('telemetry-overlay')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('telemetry-overlay').getAttribute('data-video-time')
+    ).toBe('1200');
   });
 });
