@@ -19,6 +19,8 @@ interface GoproOverlaySyncPreviewProps {
   onOffsetSave: (offset: string) => Promise<void>;
 }
 
+type GpxAlignmentTarget = 'start' | 'end';
+
 function formatSeconds(seconds: number) {
   const sign = seconds < 0 ? '-' : '';
   const absolute = Math.abs(seconds);
@@ -45,6 +47,14 @@ export function manualOffsetForGpxStartAtVideoTime(
   automaticOffset: number
 ) {
   return sourceVideoTime - automaticOffset;
+}
+
+export function manualOffsetForGpxEndAtVideoTime(
+  sourceVideoTime: number,
+  automaticOffset: number,
+  gpxDuration: number
+) {
+  return sourceVideoTime - gpxDuration - automaticOffset;
 }
 
 function previewSegmentIndex(
@@ -74,10 +84,13 @@ export function GoproOverlaySyncPreview({
   const [videoTime, setVideoTime] = useState(0);
   const cameraRef = useRef<HTMLVideoElement>(null);
   const [requestedMinutes, setRequestedMinutes] = useState(3);
+  const [alignmentTarget, setAlignmentTarget] =
+    useState<GpxAlignmentTarget>('start');
   const parsedOffset = Number(offset);
   const manualOffset = Number.isFinite(parsedOffset) ? parsedOffset : 0;
   const [displayOffset, setDisplayOffset] = useState(manualOffset);
   const automaticOffset = preview.data?.alignment.automatic_offset_seconds ?? 0;
+  const gpxDuration = preview.data?.gpx.duration_seconds ?? 0;
   const previewSegments = preview.data?.video.preview_segments ?? [];
   const sourceVideoTime = sourceTimeAtPreviewTime(videoTime, previewSegments);
   const previewEndTime = previewSegments.length
@@ -87,6 +100,19 @@ export function GoproOverlaySyncPreview({
         )
       )
     : 0;
+  const endPreviewStartTime =
+    previewSegments.length > 1
+      ? previewSegments[previewSegments.length - 1].preview_start_seconds
+      : Math.max(
+          0,
+          previewEndTime -
+            Math.min(
+              preview.data?.video.preview_available_duration_seconds ||
+                preview.data?.video.preview_requested_duration_seconds ||
+                180,
+              previewEndTime
+            )
+        );
 
   useEffect(() => {
     setDisplayOffset(manualOffset);
@@ -181,10 +207,20 @@ export function GoproOverlaySyncPreview({
     setVideoTime(time);
   };
 
-  const alignGpxStartAtCurrentVideoTime = async () => {
-    const nextOffset = manualOffsetForGpxStartAtVideoTime(
-      sourceVideoTime,
-      automaticOffset
+  const selectAlignmentTarget = (target: GpxAlignmentTarget) => {
+    setAlignmentTarget(target);
+    seekToPreviewBoundary(target === 'start' ? 0 : endPreviewStartTime);
+  };
+
+  const alignGpxAtCurrentVideoTime = async () => {
+    const nextOffset = (
+      alignmentTarget === 'start'
+        ? manualOffsetForGpxStartAtVideoTime(sourceVideoTime, automaticOffset)
+        : manualOffsetForGpxEndAtVideoTime(
+            sourceVideoTime,
+            automaticOffset,
+            gpxDuration
+          )
     ).toFixed(1);
     setDisplayOffset(Number(nextOffset));
     onOffsetChange(nextOffset);
@@ -251,12 +287,13 @@ export function GoproOverlaySyncPreview({
               </button>
               <button
                 type="button"
-                onClick={() => seekToPreviewBoundary(previewEndTime)}
+                onClick={() => seekToPreviewBoundary(endPreviewStartTime)}
                 aria-pressed={
-                  previewEndTime > 0 && videoTime >= previewEndTime - 0.05
+                  endPreviewStartTime > 0 &&
+                  videoTime >= endPreviewStartTime - 0.05
                 }
-                disabled={!previewEndTime}
-                className={`cursor-pointer border-l border-gray-800 px-3 py-2 transition-colors hover:bg-gray-900 hover:text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 ${previewEndTime > 0 && videoTime >= previewEndTime - 0.05 ? 'bg-sky-950 text-sky-200' : ''}`}
+                disabled={previewEndTime <= 0}
+                className={`cursor-pointer border-l border-gray-800 px-3 py-2 transition-colors hover:bg-gray-900 hover:text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 ${endPreviewStartTime > 0 && videoTime >= endPreviewStartTime - 0.05 ? 'bg-sky-950 text-sky-200' : ''}`}
               >
                 {t('flights.goproPreviewEnd')}
               </button>
@@ -404,12 +441,39 @@ export function GoproOverlaySyncPreview({
             </button>
           ))}
         </div>
+        <fieldset className="space-y-2">
+          <legend className="text-xs font-medium text-gray-500 dark:text-gray-400">
+            {t('flights.goproOverlayAlignmentTargetLabel')}
+          </legend>
+          <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-gray-300 dark:border-gray-600">
+            {(['start', 'end'] as const).map((target) => (
+              <button
+                key={target}
+                type="button"
+                onClick={() => selectAlignmentTarget(target)}
+                disabled={target === 'end' && previewEndTime <= 0}
+                aria-pressed={alignmentTarget === target}
+                className={`min-h-10 cursor-pointer px-2 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 ${target === 'end' ? 'border-l border-gray-300 dark:border-gray-600' : ''} ${alignmentTarget === target ? 'bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-100' : 'bg-white text-gray-700 hover:bg-gray-100 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800'}`}
+              >
+                {t(
+                  target === 'start'
+                    ? 'flights.goproOverlayAlignmentTargetStart'
+                    : 'flights.goproOverlayAlignmentTargetEnd'
+                )}
+              </button>
+            ))}
+          </div>
+        </fieldset>
         <button
           type="button"
-          onClick={() => void alignGpxStartAtCurrentVideoTime()}
+          onClick={() => void alignGpxAtCurrentVideoTime()}
           className="min-h-10 w-full cursor-pointer rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-800 transition-colors hover:bg-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-200 dark:hover:bg-sky-950/50"
         >
-          {t('flights.goproOverlayAlignGpxStart')}
+          {t(
+            alignmentTarget === 'start'
+              ? 'flights.goproOverlayAlignGpxStart'
+              : 'flights.goproOverlayAlignGpxEnd'
+          )}
         </button>
       </div>
     </div>
