@@ -25,9 +25,10 @@ export function FlightTelemetryInteractivePreview({
     telemetry.isSuccess &&
     overlayPreview.isSuccess &&
     Boolean(telemetry.data?.points.length);
+  const isEnrichmentPending = telemetry.data?.enrichment_status === 'pending';
   const showUnavailable = !isLoading && !isReady;
   let previewStatusMessage: string;
-  if (isLoading) {
+  if (isLoading || isEnrichmentPending) {
     previewStatusMessage = t('flights.overlayInteractivePreviewLoading');
   } else if (isReady) {
     previewStatusMessage = t('flights.overlayInteractivePreviewReady');

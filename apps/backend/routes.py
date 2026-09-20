@@ -4957,7 +4957,12 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
         camera_path = _flight_gopro_camera_path(db, flight)
         osv_paths = _matching_files_by_mtime(camera_path.parent, "*.osv")
         if osv_paths:
-            telemetry_path = ensure_enriched_gpx(osv_paths, source_path, camera_path.parent)
+            # OSV merging can take several minutes for a long camera recording.
+            # The overlay preview endpoint prepares this cache asynchronously;
+            # telemetry must remain responsive while that work is in progress.
+            cached_path = enriched_gpx_path(camera_path.parent)
+            if cached_path.is_file():
+                telemetry_path = cached_path
     except HTTPException:
         # The GPX-only overlay remains usable when no GoPro camera is stored.
         pass
@@ -5000,6 +5005,7 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
         points=payload_points,
         source="gpx+osv" if telemetry_path != source_path else "gpx",
         has_osv=telemetry_path != source_path,
+        enrichment_status="ready" if telemetry_path != source_path or not osv_paths else "pending",
         start_time=start_time,
         end_time=end_time,
         duration_seconds=duration_seconds,

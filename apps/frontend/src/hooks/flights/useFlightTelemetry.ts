@@ -20,6 +20,7 @@ export interface FlightTelemetryData {
   points: FlightTelemetryPoint[];
   source: 'gpx' | 'gpx+osv';
   has_osv: boolean;
+  enrichment_status: 'ready' | 'pending';
   start_time: string | null;
   end_time: string | null;
   duration_seconds: number;
@@ -31,6 +32,8 @@ export function useFlightTelemetry(flightId: string, enabled = true) {
     queryFn: () => api.get(`flights/${flightId}/telemetry`).json(),
     enabled: Boolean(flightId) && enabled,
     staleTime: 1000 * 60 * 60,
+    refetchInterval: (query) =>
+      query.state.data?.enrichment_status === 'pending' ? 2000 : false,
   });
 }
 
