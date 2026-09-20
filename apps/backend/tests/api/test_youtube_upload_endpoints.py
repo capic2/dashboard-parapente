@@ -262,6 +262,39 @@ def test_start_youtube_upload_accepts_panorama_source(
     assert enqueued == [job.id]
 
 
+def test_start_youtube_upload_accepts_camera_source(
+    client, db_session, sample_flight, tmp_path, monkeypatch
+):
+    _configure_youtube(monkeypatch)
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+    camera_path = tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01" / "camera.mp4"
+    camera_path.parent.mkdir(parents=True)
+    camera_path.write_bytes(b"camera")
+    db_session.add(
+        YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
+    )
+    db_session.commit()
+    enqueued: list[str] = []
+    monkeypatch.setattr("routes.enqueue_youtube_upload", enqueued.append)
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload",
+        json={
+            "source_type": "camera",
+            "title": "Camera",
+            "privacy_status": "unlisted",
+        },
+    )
+
+    assert response.status_code == 202
+    payload = response.json()
+    assert payload["source_type"] == "camera"
+    job = db_session.get(YoutubeUploadJob, payload["job_id"])
+    assert job is not None
+    assert job.source_type == "camera"
+    assert enqueued == [job.id]
+
+
 def test_start_youtube_upload_rejects_missing_panorama(
     client, db_session, sample_flight, tmp_path, monkeypatch
 ):

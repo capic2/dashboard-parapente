@@ -1209,6 +1209,8 @@
     "goproOverlayCameraPreview": "Prévisualisation de la vidéo GoPro",
     "goproOverlayYoutubePreview": "Vidéo YouTube",
     "youtubeOverlayUnavailable": "La vidéo YouTube ne peut pas être intégrée dans ce lecteur.",
+    "youtubeOverlayUploadCameraPrompt": "Aucune vidéo YouTube n’est associée à ce vol. Vous pouvez publier camera.mp4 sur YouTube pour activer le lecteur dynamique.",
+    "youtubeOverlayCameraRequired": "Associez une vidéo YouTube à ce vol. camera.mp4 est nécessaire pour pouvoir la publier depuis cette page.",
     "goproOverlayFlightVideo": "Vidéo du vol",
     "goproOverlaySideBySide": "Côte à côte",
     "goproOverlayLayoutLabel": "Affichage",

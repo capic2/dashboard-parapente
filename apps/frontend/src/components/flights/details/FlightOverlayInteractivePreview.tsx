@@ -1,22 +1,29 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CircleAlert, Wand2 } from 'lucide-react';
+import type { Flight } from '../../../types';
 import type { FlightOverlayLayer } from '../../../hooks/gopro/useGoproOverlay';
 import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { getApiUrlWithSearchParams } from '../../../lib/api';
 import { getYoutubeVideoId } from '../../../lib/youtube';
 import { useAuthStore } from '../../../stores/authStore';
 import { FlightYoutubeOverlayPlayer } from './FlightYoutubeOverlayPlayer';
+import { FlightYoutubeUploadControls } from './FlightYoutubeUploadControls';
 
 // This is the final dynamic overlay player. Calibration and GPX alignment
 // belong to GoproOverlaySyncPreview and must not be changed here by mistake.
 interface FlightOverlayInteractivePreviewProps {
   flightId: string;
+  flight: Flight;
+  hasCameraVideo: boolean;
   overlayLayer?: FlightOverlayLayer;
   youtubeUrl?: string;
 }
 
 export function FlightOverlayInteractivePreview({
   flightId,
+  flight,
+  hasCameraVideo,
   overlayLayer,
   youtubeUrl,
 }: FlightOverlayInteractivePreviewProps) {
@@ -38,6 +45,45 @@ export function FlightOverlayInteractivePreview({
         }
       )
     : undefined;
+  let playerContent: ReactNode;
+  if (overlayUrl && youtubeUrl && getYoutubeVideoId(youtubeUrl)) {
+    playerContent = (
+      <FlightYoutubeOverlayPlayer
+        youtubeUrl={youtubeUrl}
+        flightUrl={getApiUrlWithSearchParams(`flights/${flightId}/video`, {
+          access_token: token,
+        })}
+        youtubeLabel={t('flights.goproOverlayYoutubePreview')}
+        flightLabel={t('flights.goproOverlayFlightVideo')}
+        overlayUrl={overlayUrl}
+        getOverlayTime={(youtubeTime) => youtubeTime - overlayOffsetSeconds}
+      />
+    );
+  } else if (youtubeUrl) {
+    playerContent = (
+      <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+        <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <span>{t('flights.overlayInteractivePreviewUnavailable')}</span>
+      </div>
+    );
+  } else if (hasCameraVideo) {
+    playerContent = (
+      <div className="space-y-3 rounded-lg bg-sky-50 p-4 text-sm text-sky-950 dark:bg-sky-950/30 dark:text-sky-100">
+        <p>{t('flights.youtubeOverlayUploadCameraPrompt')}</p>
+        <FlightYoutubeUploadControls
+          flight={flight}
+          source={{ source_type: 'camera' }}
+        />
+      </div>
+    );
+  } else {
+    playerContent = (
+      <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+        <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <span>{t('flights.youtubeOverlayCameraRequired')}</span>
+      </div>
+    );
+  }
 
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
@@ -59,26 +105,7 @@ export function FlightOverlayInteractivePreview({
         </span>
       </div>
       <div className="border-t border-slate-200 p-4 dark:border-slate-700 sm:p-5">
-        {overlayUrl && youtubeUrl && getYoutubeVideoId(youtubeUrl) ? (
-          <FlightYoutubeOverlayPlayer
-            youtubeUrl={youtubeUrl}
-            flightUrl={getApiUrlWithSearchParams(`flights/${flightId}/video`, {
-              access_token: token,
-            })}
-            youtubeLabel={t('flights.goproOverlayYoutubePreview')}
-            flightLabel={t('flights.goproOverlayFlightVideo')}
-            overlayUrl={overlayUrl}
-            getOverlayTime={(youtubeTime) => youtubeTime - overlayOffsetSeconds}
-          />
-        ) : (
-          <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-            <CircleAlert
-              className="mt-0.5 h-4 w-4 shrink-0"
-              aria-hidden="true"
-            />
-            <span>{t('flights.overlayInteractivePreviewUnavailable')}</span>
-          </div>
-        )}
+        {playerContent}
       </div>
     </section>
   );

@@ -900,9 +900,11 @@ export function FlightDetails({
 
       <div className="min-w-0 space-y-4">
         {hasGpx && hasVideo && hasGoproCameraVideo && overlayWorkspacePanel}
-        {hasGpx && hasVideo && youtubeUrl && (
+        {hasGpx && hasVideo && (
           <FlightOverlayInteractivePreview
             flightId={flight.id}
+            flight={flight}
+            hasCameraVideo={hasGoproCameraVideo}
             overlayLayer={overlayLayer.data}
             youtubeUrl={youtubeUrl}
           />

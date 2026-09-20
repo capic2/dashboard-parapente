@@ -13,7 +13,7 @@ export interface YoutubeConnectionStatus {
 export interface YoutubeUploadJob {
   job_id: string;
   flight_id: string;
-  source_type: 'gopro_overlay' | 'pano' | 'highlight';
+  source_type: 'gopro_overlay' | 'pano' | 'camera' | 'highlight';
   gopro_overlay_job_id?: string | null;
   highlight_video_job_id?: string | null;
   status: 'queued' | 'uploading' | 'completed' | 'failed' | 'cancelled';
@@ -27,6 +27,7 @@ export interface YoutubeUploadJob {
 export type YoutubeUploadSource =
   | { source_type: 'gopro_overlay'; gopro_overlay_job_id: string }
   | { source_type: 'pano' }
+  | { source_type: 'camera' }
   | { source_type: 'highlight'; highlight_video_job_id: string };
 
 type YoutubeUploadInput = YoutubeUploadSource & {
@@ -36,7 +37,7 @@ type YoutubeUploadInput = YoutubeUploadSource & {
 };
 
 const sourceFromInput = (input: YoutubeUploadInput): YoutubeUploadSource => {
-  if (input.source_type === 'pano') {
+  if (input.source_type === 'pano' || input.source_type === 'camera') {
     return { source_type: 'pano' };
   }
   if (input.source_type === 'highlight') {

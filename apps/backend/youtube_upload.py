@@ -24,7 +24,7 @@ from spatialmedia import metadata_utils
 
 import config
 from database import SessionLocal
-from flight_storage import pano_video_path
+from flight_storage import flight_sequence_number, pano_video_path
 from models import Flight, GoproOverlayJob, HighlightVideoJob, YoutubeCredential, YoutubeUploadJob
 from schemas import youtube_video_id_from_url
 
@@ -649,6 +649,19 @@ def _finish_upload(job_id: str, video_id: str) -> None:
 
 
 def _source_video_path(db: Session, job: YoutubeUploadJob) -> Path:
+    if job.source_type == "camera":
+        flight = db.get(Flight, job.flight_id)
+        if flight is None:
+            raise RuntimeError("Flight is no longer available")
+        root = config.GOPRO_OVERLAY_PARAGLIDING_ROOT.strip()
+        if not root:
+            raise RuntimeError("GoPro overlay paragliding root is not configured")
+        return (
+            Path(root).expanduser().resolve()
+            / flight.flight_date.strftime("%Y%m%d")
+            / f"{flight_sequence_number(db, flight):02d}"
+            / "camera.mp4"
+        )
     if job.source_type == "pano":
         flight = db.get(Flight, job.flight_id)
         if flight is None:

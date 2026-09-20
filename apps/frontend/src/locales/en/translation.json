@@ -1204,6 +1204,8 @@
     "goproOverlayCameraPreview": "GoPro video preview",
     "goproOverlayYoutubePreview": "YouTube video",
     "youtubeOverlayUnavailable": "This YouTube video cannot be embedded in the player.",
+    "youtubeOverlayUploadCameraPrompt": "No YouTube video is associated with this flight. Publish camera.mp4 to YouTube to enable the dynamic player.",
+    "youtubeOverlayCameraRequired": "Associate a YouTube video with this flight. camera.mp4 is required to publish it from this page.",
     "goproOverlayFlightVideo": "Flight video",
     "goproOverlaySideBySide": "Side by side",
     "goproOverlayLayoutLabel": "View",
