@@ -82,6 +82,33 @@ def test_flight_telemetry_returns_gpx_fallback_and_normalizes_missing_elevation(
     assert response.duration_seconds == 0
 
 
+def test_flight_telemetry_does_not_wait_for_osv_merge_when_cache_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    gpx_path = tmp_path / "flight.gpx"
+    gpx_path.write_text(
+        '<gpx><trk><trkseg><trkpt lat="47.2" lon="6.0">'
+        "<time>2026-07-01T10:00:00Z</time></trkpt></trkseg></trk></gpx>",
+        encoding="utf-8",
+    )
+    camera_path = tmp_path / "camera.mp4"
+    camera_path.touch()
+    (tmp_path / "telemetry.OSV").touch()
+    flight = SimpleNamespace(id="flight-1", gpx_file_path=str(gpx_path))
+    monkeypatch.setattr(routes, "_flight_gopro_camera_path", lambda *_args: camera_path)
+    monkeypatch.setattr(routes, "enriched_gpx_path", lambda *_args: tmp_path / "missing.gpx")
+    monkeypatch.setattr(
+        routes,
+        "ensure_enriched_gpx",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("merge waited")),
+    )
+
+    response = routes.get_flight_telemetry("flight-1", _FakeDb(flight))
+
+    assert response.source == "gpx"
+    assert response.has_osv is False
+
+
 def test_flight_telemetry_returns_not_found_for_unknown_flight() -> None:
     with pytest.raises(HTTPException) as error:
         routes.get_flight_telemetry("missing", _FakeDb(None))
