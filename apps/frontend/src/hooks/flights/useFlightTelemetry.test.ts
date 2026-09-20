@@ -43,9 +43,9 @@ describe('interpolateTelemetryAtVideoTime', () => {
     expect(point?.lat).toBeCloseTo(46.005);
   });
 
-  it('returns null outside the track', () => {
-    expect(interpolateTelemetryAtVideoTime(data, -1, 0)).toBeNull();
-    expect(interpolateTelemetryAtVideoTime(data, 12, 0)).toBeNull();
+  it('uses the nearest point outside the track time range', () => {
+    expect(interpolateTelemetryAtVideoTime(data, -1, 0)?.elevation).toBe(1000);
+    expect(interpolateTelemetryAtVideoTime(data, 12, 0)?.elevation).toBe(1100);
   });
 
   it('does not interpolate across GPX segments', () => {
@@ -71,5 +71,23 @@ describe('interpolateTelemetryAtVideoTime', () => {
 
     expect(interpolateTelemetryAtVideoTime(segmented, 5, 0)).toBeNull();
     expect(interpolateTelemetryAtVideoTime(segmented, 9, 0)?.segment).toBe(1);
+  });
+
+  it('interpolates headings across north without taking the long turn', () => {
+    const headingData = {
+      ...data,
+      points: [
+        { ...data.points[0], heading_deg: 359 },
+        { ...data.points[1], timestamp: 2_000, heading_deg: 1 },
+      ],
+    };
+
+    expect(
+      interpolateTelemetryAtVideoTime(headingData, 0.5, 0)?.heading_deg
+    ).toBe(0);
+  });
+
+  it('returns no telemetry for an invalid time offset', () => {
+    expect(interpolateTelemetryAtVideoTime(data, 0, Number.NaN)).toBeNull();
   });
 });

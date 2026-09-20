@@ -88,20 +88,25 @@ export function FlightTelemetryOverlay({
       interpolateTelemetryAtVideoTime(data, videoTimeSeconds, offsetSeconds),
     [data, offsetSeconds, videoTimeSeconds]
   );
-  const [selectedMetrics, setSelectedMetrics] = useState<MetricKey[]>(() =>
-    layout.map((slot) => slot.metric)
+  const [selectedMetrics, setSelectedMetrics] = useState<
+    Record<string, MetricKey>
+  >(
+    () =>
+      Object.fromEntries(
+        layout.map((slot) => [slot.id, slot.metric])
+      ) as Record<string, MetricKey>
   );
 
   return (
     <div className="pointer-events-none absolute inset-0">
-      {layout.map((slot, index) => {
-        const metric = selectedMetrics[index] ?? slot.metric;
+      {layout.map((slot) => {
+        const metric = selectedMetrics[slot.id] ?? slot.metric;
         const [value, unit] = getMetricValue(point, metric) ?? [null, ''];
         const nextMetric =
           METRIC_KEYS[(METRIC_KEYS.indexOf(metric) + 1) % METRIC_KEYS.length];
         return (
           <button
-            key={index}
+            key={slot.id}
             type="button"
             className="pointer-events-auto absolute min-w-24 cursor-pointer rounded-lg border border-white/25 bg-slate-950/75 px-3 py-2 text-left text-white shadow-lg backdrop-blur-sm transition hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
             style={{
@@ -111,13 +116,12 @@ export function FlightTelemetryOverlay({
               left: slot.left,
             }}
             onClick={() =>
-              setSelectedMetrics((current) =>
-                current.map((currentMetric, currentIndex) =>
-                  currentIndex === index ? nextMetric : currentMetric
-                )
-              )
+              setSelectedMetrics((current) => ({
+                ...current,
+                [slot.id]: nextMetric,
+              }))
             }
-            aria-label={t('flights.telemetryChangeMetric')}
+            aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${formatValue(value)} ${unit}. ${t('flights.telemetryChangeMetric')}`}
           >
             <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-300">
               {t(`flights.${METRIC_LABELS[metric]}`)}

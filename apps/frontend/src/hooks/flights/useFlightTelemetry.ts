@@ -45,22 +45,38 @@ function interpolateOptional(
   return first + (second - first) * ratio;
 }
 
+function interpolateHeading(
+  first: number | null | undefined,
+  second: number | null | undefined,
+  ratio: number
+) {
+  if (first == null || second == null) {
+    return interpolateOptional(first, second, ratio);
+  }
+  const delta = ((second - first + 540) % 360) - 180;
+  return (first + delta * ratio + 360) % 360;
+}
+
 export function interpolateTelemetryAtVideoTime(
   data: FlightTelemetryData | undefined,
   videoTimeSeconds: number,
   offsetSeconds: number
 ): FlightTelemetryPoint | null {
   const points = data?.points;
-  if (!points?.length || !Number.isFinite(videoTimeSeconds)) return null;
+  if (
+    !points?.length ||
+    !Number.isFinite(videoTimeSeconds) ||
+    !Number.isFinite(offsetSeconds)
+  ) {
+    return null;
+  }
 
   const firstTimestamp = points[0].timestamp;
   const targetTimestamp =
     firstTimestamp + (videoTimeSeconds - offsetSeconds) * 1000;
-  if (
-    targetTimestamp < points[0].timestamp ||
-    targetTimestamp > points[points.length - 1].timestamp
-  ) {
-    return null;
+  if (targetTimestamp <= points[0].timestamp) return points[0];
+  if (targetTimestamp >= points[points.length - 1].timestamp) {
+    return points[points.length - 1];
   }
 
   let low = 0;
@@ -92,7 +108,7 @@ export function interpolateTelemetryAtVideoTime(
     segment: previous.segment,
     speed_kmh: interpolateOptional(previous.speed_kmh, next.speed_kmh, ratio),
     vario_ms: interpolateOptional(previous.vario_ms, next.vario_ms, ratio),
-    heading_deg: interpolateOptional(
+    heading_deg: interpolateHeading(
       previous.heading_deg,
       next.heading_deg,
       ratio
