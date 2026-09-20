@@ -37,7 +37,9 @@ export function FlightTelemetryInteractivePreview({
     previewStatusMessage = t('flights.overlayInteractivePreviewUnavailable');
   }
   const overlayOffsetSeconds =
-    overlayPreview.data?.alignment.effective_offset_seconds ?? 0;
+    telemetry.data?.source === 'gpx+osv'
+      ? (overlayPreview.data?.alignment.manual_offset_seconds ?? 0)
+      : (overlayPreview.data?.alignment.effective_offset_seconds ?? 0);
   const previewSegments = overlayPreview.data?.video.preview_segments ?? [];
 
   return (
