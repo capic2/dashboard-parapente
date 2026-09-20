@@ -1,10 +1,31 @@
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 from fastapi import HTTPException
 import pytest
 
+import routes
 from routes import _flight_overlay_layer_job, _require_gopro_overlay_offset
+
+
+class _FakeQuery:
+    def __init__(self, value: object) -> None:
+        self.value = value
+
+    def filter(self, *_args: object) -> "_FakeQuery":
+        return self
+
+    def first(self) -> object:
+        return self.value
+
+
+class _FakeDb:
+    def __init__(self, flight: object) -> None:
+        self.flight = flight
+
+    def query(self, *_args: object) -> _FakeQuery:
+        return _FakeQuery(self.flight)
 
 
 def test_flight_overlay_layer_job_returns_newest_transparent_overlay() -> None:
@@ -33,3 +54,36 @@ def test_gopro_overlay_offset_requires_explicit_persistence() -> None:
 
 def test_gopro_overlay_offset_accepts_zero_as_a_valid_offset() -> None:
     assert _require_gopro_overlay_offset(SimpleNamespace(gopro_overlay_gpx_offset=0.0)) == 0.0
+
+
+def test_flight_telemetry_returns_gpx_fallback_and_normalizes_missing_elevation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    gpx_path = tmp_path / "flight.gpx"
+    gpx_path.write_text(
+        '<gpx><trk><trkseg><trkpt lat="47.2" lon="6.0">'
+        "<time>2026-07-01T10:00:00Z</time></trkpt></trkseg></trk></gpx>",
+        encoding="utf-8",
+    )
+    flight = SimpleNamespace(id="flight-1", gpx_file_path=str(gpx_path))
+    monkeypatch.setattr(
+        routes,
+        "_flight_gopro_camera_path",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            HTTPException(status_code=404, detail="camera missing")
+        ),
+    )
+
+    response = routes.get_flight_telemetry("flight-1", _FakeDb(flight))
+
+    assert response.source == "gpx"
+    assert response.has_osv is False
+    assert response.points[0].elevation == 0
+    assert response.duration_seconds == 0
+
+
+def test_flight_telemetry_returns_not_found_for_unknown_flight() -> None:
+    with pytest.raises(HTTPException) as error:
+        routes.get_flight_telemetry("missing", _FakeDb(None))
+
+    assert error.value.status_code == 404

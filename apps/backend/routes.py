@@ -73,7 +73,7 @@ from flight_storage import (
     pano_video_paths,
     write_flight_text_file,
 )
-from flight_tracks import calculate_track_stats, normalize_track
+from flight_tracks import calculate_track_stats, enrich_telemetry_points, normalize_track
 from gopro_overlay_export import (
     align_video_start_time_to_gpx,
     cancel_gopro_overlay_job,
@@ -136,6 +136,7 @@ from schemas import (
     GoproOverlayDependencies,
     GoproOverlayJob,
     GoproOverlayPreview,
+    FlightTelemetryResponse,
     FlightOverlayLayer,
     GoproPreviewRequest,
     GoproPreviewState,
@@ -4932,6 +4933,77 @@ def get_flight_gpx_data(flight_id: str, db: Session = Depends(get_db)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse GPX file: {str(e)}") from e
+
+
+@router.get(
+    "/flights/{flight_id}/telemetry",
+    response_model=FlightTelemetryResponse,
+)
+def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> FlightTelemetryResponse:
+    """Return normalized GPX/OSV telemetry for the interactive video overlay."""
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    if not flight.gpx_file_path:
+        raise HTTPException(status_code=404, detail="No GPX file available for this flight")
+
+    source_path = Path(flight.gpx_file_path)
+    if not source_path.is_file():
+        raise HTTPException(status_code=404, detail="GPX file not found on disk")
+
+    telemetry_path = source_path
+    osv_paths: list[Path] = []
+    try:
+        camera_path = _flight_gopro_camera_path(db, flight)
+        osv_paths = _matching_files_by_mtime(camera_path.parent, "*.osv")
+        if osv_paths:
+            telemetry_path = ensure_enriched_gpx(osv_paths, source_path, camera_path.parent)
+    except HTTPException:
+        # The GPX-only overlay remains usable when no GoPro camera is stored.
+        pass
+    except (OSError, ValueError) as exc:
+        logger.warning("Unable to enrich telemetry for %s: %s", flight_id, exc)
+
+    try:
+        file_type = telemetry_path.name.rsplit(".", 1)[-1]
+        if telemetry_path.suffix.lower() == ".gz":
+            file_type = telemetry_path.name.rsplit(".", 2)[-2] + ".gz"
+        normalized, points = normalize_track(telemetry_path.read_bytes(), file_type)
+        del normalized
+        enriched_points = enrich_telemetry_points(points)
+    except (OSError, ValueError) as exc:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to parse flight telemetry: {exc}"
+        ) from exc
+
+    timestamps = [point["timestamp"] for point in enriched_points if point.get("timestamp", 0) > 0]
+    payload_points = [dict(point) for point in enriched_points]
+    start_timestamp = min(timestamps) if timestamps else None
+    end_timestamp = max(timestamps) if timestamps else None
+    start_time = (
+        datetime.fromtimestamp(start_timestamp / 1000, tz=timezone.utc)
+        if start_timestamp is not None
+        else None
+    )
+    end_time = (
+        datetime.fromtimestamp(end_timestamp / 1000, tz=timezone.utc)
+        if end_timestamp is not None
+        else None
+    )
+    duration_seconds = (
+        (end_timestamp - start_timestamp) / 1000
+        if start_timestamp is not None and end_timestamp is not None
+        else 0.0
+    )
+
+    return FlightTelemetryResponse(
+        points=payload_points,
+        source="gpx+osv" if telemetry_path != source_path else "gpx",
+        has_osv=telemetry_path != source_path,
+        start_time=start_time,
+        end_time=end_time,
+        duration_seconds=duration_seconds,
+    )
 
 
 @router.get("/flights/{flight_id}/gpx-data/debug")

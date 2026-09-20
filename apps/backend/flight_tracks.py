@@ -16,6 +16,10 @@ class TrackPoint(TypedDict, total=False):
     heart_rate: int
     power: int
     speed_kmh: float
+    vario_ms: float
+    heading_deg: float
+    distance_km: float
+    altitude_relative_m: float
     segment: int
 
 
@@ -79,6 +83,14 @@ def _child_text(element: ET.Element, name: str) -> str | None:
     for child in element.iter():
         if _local_name(child) == name and child.text:
             return child.text
+    return None
+
+
+def _child_text_any(element: ET.Element, names: tuple[str, ...]) -> str | None:
+    for name in names:
+        value = _child_text(element, name)
+        if value is not None:
+            return value
     return None
 
 
@@ -161,12 +173,20 @@ def _parse_gpx(content: bytes) -> list[TrackPoint]:
                 point["heart_rate"] = int(float(heart_rate))
             if power:
                 point["power"] = int(float(power))
-            speed = _child_text(element, "speed")
+            speed = _child_text_any(element, ("speed", "enhancedSpeed"))
             if speed:
                 speed_mps = float(speed)
                 if math.isfinite(speed_mps) and speed_mps >= 0:
                     # GPX TrackPointExtension speed values are meters per second.
                     point["speed_kmh"] = speed_mps * 3.6
+            vario = _child_text_any(
+                element, ("vario", "vertical_speed", "verticalSpeed", "climb_rate")
+            )
+            if vario:
+                point["vario_ms"] = float(vario)
+            heading = _child_text_any(element, ("heading", "course", "track"))
+            if heading:
+                point["heading_deg"] = float(heading)
             _append_point(points, point)
     return points
 
@@ -198,7 +218,7 @@ def _parse_tcx(content: bytes) -> list[TrackPoint]:
                 point["heart_rate"] = int(float(heart_rate))
             if power:
                 point["power"] = int(float(power))
-            speed = _child_text(element, "Speed")
+            speed = _child_text_any(element, ("Speed", "speed"))
             if speed:
                 speed_mps = float(speed)
                 if math.isfinite(speed_mps) and speed_mps >= 0:
@@ -468,9 +488,9 @@ def calculate_track_stats(points: list[TrackPoint]) -> dict[str, Any]:
             if elapsed < VERTICAL_RATE_WINDOW_SECONDS * 1000:
                 continue
 
-            vertical_rate = (
-                current.get("elevation", 0.0) - candidate.get("elevation", 0.0)
-            ) / (elapsed / 1000)
+            vertical_rate = (current.get("elevation", 0.0) - candidate.get("elevation", 0.0)) / (
+                elapsed / 1000
+            )
             if not math.isfinite(vertical_rate) or abs(vertical_rate) > MAX_VERTICAL_RATE_ABS_MS:
                 continue
 
@@ -506,3 +526,52 @@ def calculate_track_stats(points: list[TrackPoint]) -> dict[str, Any]:
             datetime.fromtimestamp(valid_times[0] / 1000, tz=timezone.utc) if valid_times else None
         ),
     }
+
+
+def enrich_telemetry_points(points: list[TrackPoint]) -> list[TrackPoint]:
+    """Add point-level values needed by the interactive telemetry overlay."""
+    enriched: list[TrackPoint] = []
+    cumulative_distance = 0.0
+    takeoff = points[0] if points else None
+
+    for index, source in enumerate(points):
+        point = dict(source)
+        point.setdefault("elevation", 0.0)
+        previous = points[index - 1] if index else None
+        same_segment = previous is not None and previous.get("segment", 0) == point.get(
+            "segment", 0
+        )
+        if same_segment and previous is not None:
+            distance = _precise_haversine_distance(
+                previous["lat"], previous["lon"], point["lat"], point["lon"]
+            )
+            cumulative_distance += distance
+            point["distance_km"] = cumulative_distance
+
+            if "heading_deg" not in point:
+                delta_lon = math.radians(point["lon"] - previous["lon"])
+                lat1 = math.radians(previous["lat"])
+                lat2 = math.radians(point["lat"])
+                x = math.sin(delta_lon) * math.cos(lat2)
+                y = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(
+                    delta_lon
+                )
+                if x or y:
+                    point["heading_deg"] = (math.degrees(math.atan2(x, y)) + 360) % 360
+
+            if "vario_ms" not in point:
+                elapsed = point.get("timestamp", 0) - previous.get("timestamp", 0)
+                if elapsed > 0:
+                    point["vario_ms"] = (
+                        point.get("elevation", 0.0) - previous.get("elevation", 0.0)
+                    ) / (elapsed / 1000)
+        else:
+            point["distance_km"] = cumulative_distance
+
+        if takeoff is not None:
+            point["altitude_relative_m"] = point.get("elevation", 0.0) - takeoff.get(
+                "elevation", 0.0
+            )
+        enriched.append(point)
+
+    return enriched
