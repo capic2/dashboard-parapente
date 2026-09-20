@@ -59,10 +59,16 @@ vi.mock('./FlightOverlayPlayer', () => ({
 vi.mock('./FlightTelemetryOverlay', () => ({
   FlightTelemetryOverlay: ({
     videoTimeSeconds,
+    offsetSeconds,
   }: {
     videoTimeSeconds: number;
+    offsetSeconds: number;
   }) => (
-    <div data-testid="telemetry-overlay" data-video-time={videoTimeSeconds} />
+    <div
+      data-testid="telemetry-overlay"
+      data-video-time={videoTimeSeconds}
+      data-offset={offsetSeconds}
+    />
   ),
 }));
 
@@ -104,7 +110,11 @@ describe('FlightTelemetryInteractivePreview', () => {
           },
         ],
       },
-      alignment: { effective_offset_seconds: 10 },
+      alignment: {
+        automatic_offset_seconds: 25,
+        manual_offset_seconds: 5.9,
+        effective_offset_seconds: 30.9,
+      },
     };
     hooks.overlayPreview.isPending = false;
     hooks.overlayPreview.isSuccess = true;
@@ -118,8 +128,8 @@ describe('FlightTelemetryInteractivePreview', () => {
           segment: 0,
         },
       ],
-      source: 'gpx',
-      has_osv: false,
+      source: 'gpx+osv',
+      has_osv: true,
       enrichment_status: 'ready',
       start_time: null,
       end_time: null,
@@ -135,5 +145,8 @@ describe('FlightTelemetryInteractivePreview', () => {
     expect(
       screen.getByTestId('telemetry-overlay').getAttribute('data-video-time')
     ).toBe('1200');
+    expect(
+      screen.getByTestId('telemetry-overlay').getAttribute('data-offset')
+    ).toBe('5.9');
   });
 });
