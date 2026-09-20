@@ -432,6 +432,9 @@ export function FlightDetails({
       await updateFlight.mutateAsync({
         gopro_overlay_gpx_offset: parsedOffset,
       });
+      await queryClient.invalidateQueries({
+        queryKey: ['flights', flight.id, 'gopro-overlay-preview'],
+      });
     }
   };
 
