@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 
@@ -7,6 +7,52 @@ vi.mock('react-i18next', () => ({
 }));
 
 describe('FlightOverlayPlayer', () => {
+  it('renders interactive controls inside the media stage', () => {
+    render(
+      <FlightOverlayPlayer
+        mode="interactive"
+        cameraUrl="camera.mp4"
+        flightUrl="flight.mp4"
+        cameraLabel="camera"
+        flightLabel="flight"
+      />
+    );
+
+    const controls = screen.getByTestId('flight-overlay-controls');
+    expect(controls).toBeInTheDocument();
+    expect(controls.parentElement).toBe(
+      screen.getByTestId('flight-overlay-media-stage')
+    );
+    expect(
+      screen.getByRole('button', { name: 'flights.goproOverlayPlay' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('slider', { name: 'flights.goproOverlayTimeline' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'flights.goproOverlayFullscreen' })
+    ).toBeInTheDocument();
+  });
+
+  it('uses the larger GoPro PiP size in the interactive layout', () => {
+    render(
+      <FlightOverlayPlayer
+        mode="interactive"
+        cameraUrl="camera.mp4"
+        flightUrl="flight.mp4"
+        cameraLabel="camera"
+        flightLabel="flight"
+      />
+    );
+
+    const camera = screen.getByLabelText('camera') as HTMLVideoElement;
+    fireEvent.click(screen.getByRole('button', { name: 'flight' }));
+
+    expect(camera.style.width).toBe('18.75%');
+    expect(Number.parseFloat(camera.style.left)).toBeCloseTo(0.520833, 5);
+    expect(Number.parseFloat(camera.style.bottom)).toBeCloseTo(0.925926, 5);
+  });
+
   it('resynchronizes the GPX video immediately when the offset changes', () => {
     const { rerender } = render(
       <FlightOverlayPlayer
