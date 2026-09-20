@@ -73,7 +73,13 @@ export function FlightTelemetryInteractivePreview({
             mode="interactive"
             cameraUrl={getApiUrlWithSearchParams(
               `flights/${flightId}/gopro-camera/preview`,
-              { access_token: token }
+              {
+                access_token: token,
+                target_end_seconds: String(
+                  overlayPreview.data?.video.preview_target_end_seconds ?? ''
+                ),
+                version: `${overlayPreview.data?.video.preview_target_end_seconds}-${overlayPreview.data?.video.preview_available_duration_seconds}`,
+              }
             )}
             flightUrl={getApiUrlWithSearchParams(`flights/${flightId}/video`, {
               access_token: token,
