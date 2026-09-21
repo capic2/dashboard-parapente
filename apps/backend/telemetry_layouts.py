@@ -21,6 +21,7 @@ VALID_METRICS = {
     "heart_rate",
     "power",
 }
+MAX_TELEMETRY_WIDGETS = 16
 
 
 def validate_telemetry_layout_xml(xml_content: str) -> str:
@@ -38,8 +39,12 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
         raise ValueError("Telemetry layout canvas must be 1920x1080")
 
     widgets = list(root)
-    if len(widgets) != 4 or any(widget.tag != "widget" for widget in widgets):
-        raise ValueError("Telemetry layout must contain exactly four widgets")
+    if not 1 <= len(widgets) <= MAX_TELEMETRY_WIDGETS or any(
+        widget.tag != "widget" for widget in widgets
+    ):
+        raise ValueError(
+            f"Telemetry layout must contain between 1 and {MAX_TELEMETRY_WIDGETS} widgets"
+        )
     ids: set[str] = set()
     for widget in widgets:
         widget_id = widget.attrib.get("id", "")

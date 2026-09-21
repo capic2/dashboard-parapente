@@ -1724,7 +1724,7 @@
   "telemetryLayout": {
     "title": "Layout télémétrique",
     "flightTitle": "Layout télémétrique du vol",
-    "description": "Placez les quatre cartes télémétriques de la prévisualisation interactive. Ce layout par défaut s’applique aux vols sans personnalisation.",
+    "description": "Ajoutez et placez les champs télémétriques de la prévisualisation interactive. Ce layout par défaut s’applique aux vols sans personnalisation.",
     "flightDescription": "Personnalisez ce vol sans modifier le layout télémétrique global.",
     "back": "Retour",
     "configure": "Configurer le layout",
@@ -1733,6 +1733,8 @@
     "canvasLabel": "Canvas du layout télémétrique",
     "dragHint": "1920 × 1080 · coordonnées normalisées",
     "properties": "Propriétés du widget",
+    "addField": "Ajouter un champ",
+    "removeField": "Supprimer le champ",
     "metric": "Métrique",
     "visible": "Visible",
     "x": "X",

@@ -27,4 +27,23 @@ describe('flight telemetry layout XML', () => {
       DEFAULT_FLIGHT_TELEMETRY_LAYOUT
     );
   });
+
+  it('round-trips an added telemetry field', () => {
+    const layout: FlightTelemetryWidgetLayout[] = [
+      ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
+      {
+        id: 'field-extra',
+        metric: 'heading',
+        x: 0.4,
+        y: 0.4,
+        width: 0.16,
+        height: 0.1,
+        visible: true,
+      },
+    ];
+
+    expect(
+      parseTelemetryLayoutXml(serializeTelemetryLayoutXml(layout))
+    ).toEqual(layout);
+  });
 });

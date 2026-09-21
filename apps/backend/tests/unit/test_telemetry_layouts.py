@@ -21,3 +21,12 @@ def test_default_layout_is_valid() -> None:
 def test_invalid_layouts_are_rejected(xml: str) -> None:
     with pytest.raises(ValueError):
         validate_telemetry_layout_xml(xml)
+
+
+def test_layouts_can_contain_added_widgets() -> None:
+    xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
+        "</telemetry-layout>",
+        '<widget id="extra" metric="heading" x="0.4" y="0.4" width="0.1" height="0.1" visible="true" /></telemetry-layout>',
+    )
+
+    assert 'id="extra"' in validate_telemetry_layout_xml(xml)

@@ -5,9 +5,11 @@ import { Button } from '@dashboard-parapente/design-system';
 import {
   Download,
   Grip,
+  Plus,
   RotateCcw,
   Save,
   SlidersHorizontal,
+  Trash2,
 } from 'lucide-react';
 import { useFlightTelemetry } from '../../hooks/flights/useFlightTelemetry';
 import {
@@ -35,6 +37,7 @@ const METRICS = [
 ] as const;
 
 type Metric = (typeof METRICS)[number];
+const MAX_WIDGETS = 16;
 
 const METRIC_LABELS: Record<Metric, string> = {
   altitude: 'telemetryAltitude',
@@ -82,6 +85,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const saveLayout = useSaveTelemetryLayout(flightId);
   const resetLayout = useResetTelemetryLayout(flightId ?? '');
   const canvasRef = useRef<HTMLDivElement>(null);
+  const widgetIdCounter = useRef(0);
   const [layout, setLayout] = useState<FlightTelemetryWidgetLayout[]>(
     defaultTelemetryLayout
   );
@@ -103,6 +107,35 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
 
   const selected = layout.find((widget) => widget.id === selectedId) ?? null;
   const previewPoint = telemetryQuery.data?.points[0];
+
+  const addField = () => {
+    if (layout.length >= MAX_WIDGETS) return;
+    const id = `field-${Date.now()}-${widgetIdCounter.current++}`;
+    const metric =
+      METRICS.find((candidate) =>
+        layout.every((widget) => widget.metric !== candidate)
+      ) ?? METRICS[0];
+    const column = layout.length % 4;
+    const row = Math.floor(layout.length / 4);
+    const widget: FlightTelemetryWidgetLayout = {
+      id,
+      metric,
+      x: 0.02 + column * 0.24,
+      y: 0.02 + row * 0.2,
+      width: 0.16,
+      height: 0.1,
+      visible: true,
+    };
+    setLayout((current) => [...current, widget]);
+    setSelectedId(id);
+  };
+
+  const removeSelectedField = () => {
+    if (!selectedId || layout.length <= 1) return;
+    const nextLayout = layout.filter((widget) => widget.id !== selectedId);
+    setLayout(nextLayout);
+    setSelectedId(nextLayout[0]?.id ?? null);
+  };
 
   const updateWidget = (
     id: string,
@@ -187,6 +220,15 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={addField}
+            isDisabled={layout.length >= MAX_WIDGETS}
+          >
+            <Plus className="h-4 w-4" />
+            {t('telemetryLayout.addField')}
+          </Button>
           <Button variant="outline" size="sm" onPress={downloadXml}>
             <Download className="h-4 w-4" />
             {t('telemetryLayout.export')}
@@ -278,7 +320,19 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           {selected ? (
             <div className="space-y-4">
               <div className="rounded-lg bg-slate-100 p-3 text-sm font-medium dark:bg-slate-900">
-                {selected.id}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate">{selected.id}</span>
+                  <button
+                    type="button"
+                    className="rounded p-1 text-slate-500 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-300"
+                    onClick={removeSelectedField}
+                    disabled={layout.length <= 1}
+                    aria-label={t('telemetryLayout.removeField')}
+                    title={t('telemetryLayout.removeField')}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
               <label className="block text-sm">
                 <span className="mb-1 block text-slate-600 dark:text-slate-300">

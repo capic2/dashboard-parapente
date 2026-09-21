@@ -58,6 +58,7 @@ const METRICS: MetricKey[] = [
   'heart_rate',
   'power',
 ];
+const MAX_TELEMETRY_WIDGETS = 16;
 
 function numberAttribute(element: Element, name: string, fallback: number) {
   const value = Number(element.getAttribute(name));
@@ -77,10 +78,13 @@ export function parseTelemetryLayoutXml(
   const widgets = Array.from(
     document.documentElement.querySelectorAll(':scope > widget')
   );
-  if (widgets.length !== 4)
+  if (widgets.length < 1 || widgets.length > MAX_TELEMETRY_WIDGETS)
     return DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget) => ({ ...widget }));
   return widgets.map((element, index) => {
-    const fallback = DEFAULT_FLIGHT_TELEMETRY_LAYOUT[index];
+    const fallback =
+      DEFAULT_FLIGHT_TELEMETRY_LAYOUT[
+        index % DEFAULT_FLIGHT_TELEMETRY_LAYOUT.length
+      ];
     const metric = element.getAttribute('metric') as MetricKey;
     return {
       id: element.getAttribute('id') || fallback.id,
