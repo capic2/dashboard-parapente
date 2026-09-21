@@ -44,6 +44,7 @@ VALID_ICONS = {
     "slope-triangle",
 }
 MAX_TELEMETRY_WIDGETS = 16
+VALID_INTERACTION_ACTIONS = {"none", "cycle_metric"}
 
 
 def validate_telemetry_layout_xml(xml_content: str) -> str:
@@ -99,6 +100,11 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
             raise ValueError("Telemetry element border is invalid")
         if widget.attrib.get("label-visible") not in {None, "true", "false"}:
             raise ValueError("Telemetry widget label visibility is invalid")
+        if widget.tag == "widget":
+            for action_name in ("click-action", "long-press-action"):
+                action = widget.attrib.get(action_name)
+                if action is not None and action not in VALID_INTERACTION_ACTIONS:
+                    raise ValueError("Telemetry widget interaction action is invalid")
         if "font-size" in widget.attrib:
             try:
                 font_size = float(widget.attrib["font-size"])

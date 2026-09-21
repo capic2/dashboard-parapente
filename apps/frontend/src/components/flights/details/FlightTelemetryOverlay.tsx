@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   interpolateTelemetryAtVideoTime,
@@ -42,6 +42,8 @@ export function FlightTelemetryOverlay({
   layout = DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
 }: FlightTelemetryOverlayProps) {
   const { t } = useTranslation();
+  const longPressTimer = useRef<number | null>(null);
+  const longPressTriggered = useRef(false);
   const point = useMemo(
     () =>
       interpolateTelemetryAtVideoTime(
@@ -123,6 +125,17 @@ export function FlightTelemetryOverlay({
             CYCLE_METRICS[
               (CYCLE_METRICS.indexOf(metric) + 1) % CYCLE_METRICS.length
             ];
+          const cycleMetric = () =>
+            setSelectedMetrics((current) => ({
+              ...current,
+              [slot.id]: nextMetric,
+            }));
+          const clearLongPressTimer = () => {
+            if (longPressTimer.current !== null) {
+              window.clearTimeout(longPressTimer.current);
+              longPressTimer.current = null;
+            }
+          };
           return (
             <button
               key={slot.id}
@@ -135,12 +148,24 @@ export function FlightTelemetryOverlay({
                 height: `${slot.height * 100}%`,
                 fontSize: `${((slot.fontSize ?? 32) / 1920) * 100}cqw`,
               }}
-              onClick={() =>
-                setSelectedMetrics((current) => ({
-                  ...current,
-                  [slot.id]: nextMetric,
-                }))
-              }
+              onPointerDown={() => {
+                longPressTriggered.current = false;
+                clearLongPressTimer();
+                longPressTimer.current = window.setTimeout(() => {
+                  longPressTriggered.current = true;
+                  if (slot.longPressAction === 'cycle_metric') cycleMetric();
+                }, 550);
+              }}
+              onPointerUp={clearLongPressTimer}
+              onPointerCancel={clearLongPressTimer}
+              onClick={() => {
+                clearLongPressTimer();
+                if (longPressTriggered.current) {
+                  longPressTriggered.current = false;
+                  return;
+                }
+                if (slot.clickAction !== 'none') cycleMetric();
+              }}
               aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${formatTelemetryValue(value)} ${unit}. ${t('flights.telemetryChangeMetric')}`}
             >
               {slot.showLabel !== false && (

@@ -1,5 +1,7 @@
 import { METRIC_KEYS, type MetricKey } from './telemetryMetrics';
 
+export type TelemetryInteractionAction = 'none' | 'cycle_metric';
+
 export type TelemetryIconName =
   | 'mountain'
   | 'wind'
@@ -31,6 +33,8 @@ interface FlightTelemetryLayoutItemBase {
 export interface FlightTelemetryWidgetLayout extends FlightTelemetryLayoutItemBase {
   type: 'widget';
   metric: MetricKey;
+  clickAction?: TelemetryInteractionAction;
+  longPressAction?: TelemetryInteractionAction;
 }
 
 export interface FlightTelemetryIconLayout extends FlightTelemetryLayoutItemBase {
@@ -104,6 +108,10 @@ const ICONS: TelemetryIconName[] = [
   'slope',
   'slope-triangle',
 ];
+const INTERACTION_ACTIONS: TelemetryInteractionAction[] = [
+  'none',
+  'cycle_metric',
+];
 
 function numberAttribute(element: Element, name: string, fallback: number) {
   const value = Number(element.getAttribute(name));
@@ -173,12 +181,38 @@ export function parseTelemetryLayoutXml(
         ? { fontSize: Number(element.getAttribute('font-size')) }
         : {}),
     };
+    const interactions =
+      type === 'widget'
+        ? {
+            ...(INTERACTION_ACTIONS.includes(
+              element.getAttribute('click-action') as TelemetryInteractionAction
+            )
+              ? {
+                  clickAction: element.getAttribute(
+                    'click-action'
+                  ) as TelemetryInteractionAction,
+                }
+              : {}),
+            ...(INTERACTION_ACTIONS.includes(
+              element.getAttribute(
+                'long-press-action'
+              ) as TelemetryInteractionAction
+            )
+              ? {
+                  longPressAction: element.getAttribute(
+                    'long-press-action'
+                  ) as TelemetryInteractionAction,
+                }
+              : {}),
+          }
+        : {};
     if (type === 'icon') {
       return {
         ...common,
         ...grouping,
         ...naming,
         ...styling,
+        ...interactions,
         type: 'icon' as const,
         icon: ICONS.includes(element.getAttribute('name') as TelemetryIconName)
           ? (element.getAttribute('name') as TelemetryIconName)
@@ -191,6 +225,7 @@ export function parseTelemetryLayoutXml(
         ...grouping,
         ...naming,
         ...styling,
+        ...interactions,
         type: 'text' as const,
         content: element.getAttribute('content') ?? '',
       };
@@ -200,6 +235,7 @@ export function parseTelemetryLayoutXml(
       ...grouping,
       ...naming,
       ...styling,
+      ...interactions,
       type: 'widget' as const,
       metric: METRIC_KEYS.includes(metric) ? metric : fallback.metric,
     };
@@ -233,7 +269,15 @@ export function serializeTelemetryLayoutXml(
         item.type === 'widget' && item.fontSize !== undefined
           ? ` font-size="${item.fontSize}"`
           : '';
-      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility}${fontSize} x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
+      const clickAction =
+        item.type === 'widget' && item.clickAction
+          ? ` click-action="${item.clickAction}"`
+          : '';
+      const longPressAction =
+        item.type === 'widget' && item.longPressAction
+          ? ` long-press-action="${item.longPressAction}"`
+          : '';
+      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility}${fontSize}${clickAction}${longPressAction} x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
       if (item.type === 'icon') return `<icon ${common} name="${item.icon}" />`;
       if (item.type === 'text') {
         return `<text ${common} content="${escapeXml(item.content)}" />`;

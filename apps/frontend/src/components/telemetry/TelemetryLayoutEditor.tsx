@@ -626,6 +626,59 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   />
                 </label>
               )}
+              {selected.type === 'widget' && (
+                <div className="space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {t('telemetryLayout.interactions')}
+                  </p>
+                  <label className="block text-sm">
+                    <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                      {t('telemetryLayout.clickAction')}
+                    </span>
+                    <select
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      value={selected.clickAction ?? 'cycle_metric'}
+                      onChange={(event) =>
+                        updateItem(selected.id, {
+                          clickAction: event.target.value as
+                            | 'none'
+                            | 'cycle_metric',
+                        })
+                      }
+                    >
+                      <option value="none">
+                        {t('telemetryLayout.actionNone')}
+                      </option>
+                      <option value="cycle_metric">
+                        {t('telemetryLayout.actionCycleMetric')}
+                      </option>
+                    </select>
+                  </label>
+                  <label className="block text-sm">
+                    <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                      {t('telemetryLayout.longPressAction')}
+                    </span>
+                    <select
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      value={selected.longPressAction ?? 'none'}
+                      onChange={(event) =>
+                        updateItem(selected.id, {
+                          longPressAction: event.target.value as
+                            | 'none'
+                            | 'cycle_metric',
+                        })
+                      }
+                    >
+                      <option value="none">
+                        {t('telemetryLayout.actionNone')}
+                      </option>
+                      <option value="cycle_metric">
+                        {t('telemetryLayout.actionCycleMetric')}
+                      </option>
+                    </select>
+                  </label>
+                </div>
+              )}
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"

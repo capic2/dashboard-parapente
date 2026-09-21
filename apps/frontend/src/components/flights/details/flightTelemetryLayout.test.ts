@@ -122,6 +122,20 @@ describe('flight telemetry layout XML', () => {
     ).toEqual(layout);
   });
 
+  it('round-trips widget click and long-press actions', () => {
+    const layout = [
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[0],
+        clickAction: 'none' as const,
+        longPressAction: 'cycle_metric' as const,
+      },
+    ];
+
+    expect(
+      parseTelemetryLayoutXml(serializeTelemetryLayoutXml(layout))
+    ).toEqual(layout);
+  });
+
   it('evaluates the calculated fields used by the 3840 GoPro layout', () => {
     const data = {
       points: [
