@@ -429,6 +429,11 @@ def list_flight_summaries(
                 continue
             uploaded_youtube_ids[row.id].add(video_id)
             youtube_video_ids_by_user.setdefault(user_id, set()).add(video_id)
+    # Do not keep a database connection checked out while calling YouTube.
+    # The remote request can take up to 30 seconds; holding the connection
+    # here exhausts the SQLite pool and blocks unrelated flight endpoints,
+    # including telemetry calibration.
+    db.close()
     existing_youtube_ids = existing_youtube_video_ids(youtube_video_ids_by_user)
 
     storage_root = flight_storage_root()
