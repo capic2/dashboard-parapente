@@ -142,6 +142,8 @@ export function GoproOverlaySyncPreview({
       (preview.data?.video.preview_available_duration_seconds ?? 0) / 60
     )
   );
+  const gpxPreviewAvailable =
+    (preview.data?.video.preview_available_duration_seconds ?? 0) > 0;
   const maxMinutes = Math.max(
     3,
     Math.floor((preview.data?.video.preview_max_duration_seconds ?? 900) / 60)
@@ -368,7 +370,9 @@ export function GoproOverlaySyncPreview({
               {t('flights.altitude')}
             </div>
             <div className="font-mono text-lg font-semibold">
-              {telemetry ? `${Math.round(telemetry.elevation)} m` : '--'}
+              {gpxPreviewAvailable && telemetry
+                ? `${Math.round(telemetry.elevation)} m`
+                : t('flights.goproOverlayTelemetryUnavailable')}
             </div>
           </div>
           <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
@@ -377,7 +381,9 @@ export function GoproOverlaySyncPreview({
               {t('flights.speed')}
             </div>
             <div className="font-mono text-lg font-semibold">
-              {telemetry ? `${telemetry.speedKmh.toFixed(1)} km/h` : '--'}
+              {gpxPreviewAvailable && telemetry
+                ? `${telemetry.speedKmh.toFixed(1)} km/h`
+                : t('flights.goproOverlayTelemetryUnavailable')}
             </div>
           </div>
         </div>
@@ -390,7 +396,7 @@ export function GoproOverlaySyncPreview({
             {t('flights.goproOverlayHeartRate')}
           </div>
           <div className="font-mono text-lg font-semibold">
-            {heartRate === null
+            {!gpxPreviewAvailable || heartRate === null
               ? t('flights.goproOverlayHeartRateUnavailable')
               : `${heartRate} bpm`}
           </div>
@@ -401,9 +407,9 @@ export function GoproOverlaySyncPreview({
             {t('flights.goproOverlayGpxPosition')}
           </div>
           <div className="mt-1 font-mono text-sm">
-            {telemetry
+            {gpxPreviewAvailable && telemetry
               ? `${telemetry.lat.toFixed(5)}, ${telemetry.lon.toFixed(5)}`
-              : t('flights.goproOverlayOutsideTrack')}
+              : t('flights.goproOverlayTelemetryUnavailable')}
           </div>
         </div>
         <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 dark:border-sky-900 dark:bg-sky-950/30">
