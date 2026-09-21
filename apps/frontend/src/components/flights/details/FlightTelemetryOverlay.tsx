@@ -124,7 +124,7 @@ export function FlightTelemetryOverlay({
             <button
               key={slot.id}
               type="button"
-              className={`pointer-events-auto absolute min-w-24 cursor-pointer rounded-lg border px-3 py-2 text-left text-white shadow-lg backdrop-blur-sm transition hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${slot.transparent ? 'bg-transparent' : 'bg-slate-950/75'} ${slot.border === false ? 'border-transparent' : 'border-white/25'}`}
+              className={`pointer-events-auto absolute min-h-0 min-w-0 overflow-hidden cursor-pointer rounded-lg border px-3 py-2 text-left text-white shadow-lg backdrop-blur-sm transition hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${slot.transparent ? 'bg-transparent' : 'bg-slate-950/75'} ${slot.border === false ? 'border-transparent' : 'border-white/25'}`}
               style={{
                 left: `${slot.x * 100}%`,
                 top: `${slot.y * 100}%`,

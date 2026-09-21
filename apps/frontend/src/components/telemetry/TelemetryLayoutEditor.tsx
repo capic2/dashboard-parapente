@@ -377,14 +377,12 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       : [item.id];
                     setSelectedIds(ids);
                   }}
-                  className={`absolute flex flex-col rounded-lg border px-3 py-2 text-left text-white shadow-lg ${item.transparent ? 'bg-transparent' : 'bg-slate-950/85'} ${item.visible ? '' : 'opacity-35'} ${isSelected ? 'border-sky-400 ring-2 ring-sky-400/40' : item.border === false ? 'border-transparent' : 'border-white/20'}`}
+                  className={`absolute flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border px-3 py-2 text-left text-white shadow-lg ${item.transparent ? 'bg-transparent' : 'bg-slate-950/85'} ${item.visible ? '' : 'opacity-35'} ${isSelected ? 'border-sky-400 ring-2 ring-sky-400/40' : item.border === false ? 'border-transparent' : 'border-white/20'}`}
                   style={{
                     left: `${item.x * 100}%`,
                     top: `${item.y * 100}%`,
                     width: `${item.width * 100}%`,
                     height: `${item.height * 100}%`,
-                    minWidth: '6rem',
-                    minHeight: '3rem',
                   }}
                 >
                   {isText ? (
@@ -395,7 +393,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                     <>
                       <TelemetryLayoutIcon
                         name={item.icon}
-                        className="mx-auto h-1/2 min-h-5 w-1/2 min-w-5"
+                        className="mx-auto h-1/2 w-1/2"
                       />
                       <span className="mt-1 block truncate text-center text-[10px] font-semibold text-slate-300">
                         {item.name ?? item.icon}
