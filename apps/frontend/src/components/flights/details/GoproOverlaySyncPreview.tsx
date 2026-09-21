@@ -142,8 +142,6 @@ export function GoproOverlaySyncPreview({
       (preview.data?.video.preview_available_duration_seconds ?? 0) / 60
     )
   );
-  const gpxPreviewAvailable =
-    (preview.data?.video.preview_available_duration_seconds ?? 0) > 0;
   const maxMinutes = Math.max(
     3,
     Math.floor((preview.data?.video.preview_max_duration_seconds ?? 900) / 60)
@@ -370,7 +368,7 @@ export function GoproOverlaySyncPreview({
               {t('flights.altitude')}
             </div>
             <div className="font-mono text-lg font-semibold">
-              {gpxPreviewAvailable && telemetry
+              {telemetry
                 ? `${Math.round(telemetry.elevation)} m`
                 : t('flights.goproOverlayTelemetryUnavailable')}
             </div>
@@ -381,7 +379,7 @@ export function GoproOverlaySyncPreview({
               {t('flights.speed')}
             </div>
             <div className="font-mono text-lg font-semibold">
-              {gpxPreviewAvailable && telemetry
+              {telemetry
                 ? `${telemetry.speedKmh.toFixed(1)} km/h`
                 : t('flights.goproOverlayTelemetryUnavailable')}
             </div>
@@ -396,7 +394,7 @@ export function GoproOverlaySyncPreview({
             {t('flights.goproOverlayHeartRate')}
           </div>
           <div className="font-mono text-lg font-semibold">
-            {!gpxPreviewAvailable || heartRate === null
+            {heartRate === null
               ? t('flights.goproOverlayHeartRateUnavailable')
               : `${heartRate} bpm`}
           </div>
@@ -407,7 +405,7 @@ export function GoproOverlaySyncPreview({
             {t('flights.goproOverlayGpxPosition')}
           </div>
           <div className="mt-1 font-mono text-sm">
-            {gpxPreviewAvailable && telemetry
+            {telemetry
               ? `${telemetry.lat.toFixed(5)}, ${telemetry.lon.toFixed(5)}`
               : t('flights.goproOverlayTelemetryUnavailable')}
           </div>
