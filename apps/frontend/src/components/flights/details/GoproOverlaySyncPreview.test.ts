@@ -4,6 +4,7 @@ import {
   manualOffsetForGpxStartAtVideoTime,
   sourceTimeAtPreviewTime,
 } from './GoproOverlaySyncPreview';
+import { telemetryTimestampAtVideoTime } from './goproSyncTelemetry';
 
 const segments = [
   {
@@ -38,6 +39,12 @@ describe('sourceTimeAtPreviewTime', () => {
         },
       ])
     ).toBe(900);
+  });
+});
+
+describe('telemetryTimestampAtVideoTime', () => {
+  it('uses only the manual calibration offset', () => {
+    expect(telemetryTimestampAtVideoTime(1_000_000, 37, 6.6)).toBe(1_030_400);
   });
 });
 

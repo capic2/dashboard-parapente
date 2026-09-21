@@ -9,7 +9,10 @@ import {
 import { getApiUrlWithSearchParams } from '../../../lib/api';
 import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
-import { telemetryAtTimestamp } from './goproSyncTelemetry';
+import {
+  telemetryAtTimestamp,
+  telemetryTimestampAtVideoTime,
+} from './goproSyncTelemetry';
 import type { GoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 
 interface GoproOverlaySyncPreviewProps {
@@ -121,8 +124,11 @@ export function GoproOverlaySyncPreview({
   const telemetry = preview.data
     ? telemetryAtTimestamp(
         preview.data.gpx.coordinates,
-        parseApiUtcDate(preview.data.video.start_time).getTime() +
-          (sourceVideoTime - displayOffset) * 1000
+        telemetryTimestampAtVideoTime(
+          parseApiUtcDate(preview.data.video.start_time).getTime(),
+          sourceVideoTime,
+          displayOffset
+        )
       )
     : null;
   const heartRate = telemetry?.heart_rate ?? null;

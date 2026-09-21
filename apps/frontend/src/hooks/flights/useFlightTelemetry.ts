@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { telemetryTimestampAtVideoTime } from '../../components/flights/details/goproSyncTelemetry';
 
 export interface FlightTelemetryPoint {
   timestamp: number;
@@ -76,11 +77,13 @@ export function interpolateTelemetryAtVideoTime(
   }
 
   const firstTimestamp = points[0].timestamp;
-  const targetTimestamp =
-    (Number.isFinite(timelineStartTimestamp)
+  const targetTimestamp = telemetryTimestampAtVideoTime(
+    Number.isFinite(timelineStartTimestamp)
       ? timelineStartTimestamp
-      : firstTimestamp) +
-    (videoTimeSeconds - offsetSeconds) * 1000;
+      : firstTimestamp,
+    videoTimeSeconds,
+    offsetSeconds
+  );
   if (
     targetTimestamp < points[0].timestamp ||
     targetTimestamp > points[points.length - 1].timestamp
