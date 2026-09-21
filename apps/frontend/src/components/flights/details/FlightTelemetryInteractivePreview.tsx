@@ -22,13 +22,17 @@ export function FlightTelemetryInteractivePreview({
   const overlayPreview = useGoproOverlayPreview(flightId, true);
   const telemetry = useFlightTelemetry(flightId, true);
   const [cameraTime, setCameraTime] = useState(0);
-  const isLoading = telemetry.isPending || overlayPreview.isPending;
+  const isEnrichmentPending =
+    telemetry.data?.enrichment_status === 'pending' ||
+    overlayPreview.data?.gpx?.enrichment_status === 'pending';
+  const isLoading =
+    telemetry.isPending || overlayPreview.isPending || isEnrichmentPending;
   const isReady =
     telemetry.isSuccess &&
     overlayPreview.isSuccess &&
+    !isEnrichmentPending &&
     Boolean(telemetry.data?.points.length);
-  const isEnrichmentPending = telemetry.data?.enrichment_status === 'pending';
-  const showUnavailable = !isLoading && !isReady;
+  const showUnavailable = !isLoading && !isEnrichmentPending && !isReady;
   let previewStatusMessage: string;
   if (isLoading || isEnrichmentPending) {
     previewStatusMessage = t('flights.overlayInteractivePreviewLoading');

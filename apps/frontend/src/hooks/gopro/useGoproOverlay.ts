@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { GoproOverlayJob } from '@dashboard-parapente/shared-types';
 import { api } from '../../lib/api';
 import type { GeoPoint } from '../../types/flight';
@@ -27,6 +27,7 @@ export type GoproOverlayPreview = {
     end_time: string;
     duration_seconds: number;
     coordinates: GeoPoint[];
+    enrichment_status?: 'missing' | 'pending' | 'ready';
   };
   alignment: {
     automatic_offset_seconds: number;
@@ -88,6 +89,7 @@ export function useGoproOverlayPreview(flightId: string, enabled: boolean) {
     enabled,
     refetchInterval: (query) => {
       const data = query.state.data;
+      if (data?.gpx?.enrichment_status === 'pending') return 2000;
       if (data?.overlay.status === 'generating') return 2000;
       return goproPreviewRefetchInterval(data?.video.preview_status);
     },
@@ -111,6 +113,20 @@ export function useGenerateGoproPreview(flightId: string) {
           },
         })
         .json(),
+  });
+}
+
+export function useGenerateGoproMerge(flightId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api
+        .post(`flights/${flightId}/gopro-overlay/merge`)
+        .json<{ status: 'missing' | 'pending' | 'ready' }>(),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: ['flights', flightId, 'gopro-overlay-preview'],
+      }),
   });
 }
 
