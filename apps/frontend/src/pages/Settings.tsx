@@ -1,6 +1,6 @@
 import { Suspense, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link } from '@tanstack/react-router';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { Switch } from 'react-aria-components';
 import {
@@ -1025,7 +1025,6 @@ function PerformanceSection() {
 }
 
 export default function Settings() {
-  const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const { preference: themePreference, setPreference: setThemePreference } =
     useThemeStore();
@@ -1171,10 +1170,6 @@ export default function Settings() {
 
       <Link
         to="/settings/telemetry-layout"
-        onClick={(event) => {
-          event.preventDefault();
-          void navigate({ to: '/settings/telemetry-layout' });
-        }}
         className="flex items-center justify-between gap-4 rounded-2xl border border-violet-200 bg-violet-50/70 p-4 text-violet-950 transition-colors hover:bg-violet-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:border-violet-900 dark:bg-violet-950/20 dark:text-violet-100 dark:hover:bg-violet-950/40"
       >
         <span>
