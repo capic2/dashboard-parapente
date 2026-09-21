@@ -31,9 +31,15 @@ export interface FlightTelemetryIconLayout extends FlightTelemetryLayoutItemBase
   icon: TelemetryIconName;
 }
 
+export interface FlightTelemetryTextLayout extends FlightTelemetryLayoutItemBase {
+  type: 'text';
+  content: string;
+}
+
 export type FlightTelemetryLayoutItem =
   | FlightTelemetryWidgetLayout
-  | FlightTelemetryIconLayout;
+  | FlightTelemetryIconLayout
+  | FlightTelemetryTextLayout;
 
 export const DEFAULT_FLIGHT_TELEMETRY_LAYOUT = [
   {
@@ -114,7 +120,9 @@ export function parseTelemetryLayoutXml(
     return DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget) => ({ ...widget }));
   }
   const items = Array.from(
-    document.documentElement.querySelectorAll(':scope > widget, :scope > icon')
+    document.documentElement.querySelectorAll(
+      ':scope > widget, :scope > icon, :scope > text'
+    )
   );
   const groupNames = new Map(
     Array.from(document.documentElement.querySelectorAll(':scope > group'))
@@ -130,7 +138,7 @@ export function parseTelemetryLayoutXml(
       DEFAULT_FLIGHT_TELEMETRY_LAYOUT[
         index % DEFAULT_FLIGHT_TELEMETRY_LAYOUT.length
       ];
-    const type = element.tagName === 'icon' ? 'icon' : 'widget';
+    const type = element.tagName;
     const metric = element.getAttribute('metric') as MetricKey;
     const common = {
       id: element.getAttribute('id') || fallback.id,
@@ -151,25 +159,33 @@ export function parseTelemetryLayoutXml(
       : {};
     const name = element.getAttribute('label');
     const naming = name ? { name } : {};
-    return type === 'icon'
-      ? {
-          ...common,
-          ...grouping,
-          ...naming,
-          type: 'icon' as const,
-          icon: ICONS.includes(
-            element.getAttribute('name') as TelemetryIconName
-          )
-            ? (element.getAttribute('name') as TelemetryIconName)
-            : 'gauge',
-        }
-      : {
-          ...common,
-          ...grouping,
-          ...naming,
-          type: 'widget' as const,
-          metric: METRICS.includes(metric) ? metric : fallback.metric,
-        };
+    if (type === 'icon') {
+      return {
+        ...common,
+        ...grouping,
+        ...naming,
+        type: 'icon' as const,
+        icon: ICONS.includes(element.getAttribute('name') as TelemetryIconName)
+          ? (element.getAttribute('name') as TelemetryIconName)
+          : 'gauge',
+      };
+    }
+    if (type === 'text') {
+      return {
+        ...common,
+        ...grouping,
+        ...naming,
+        type: 'text' as const,
+        content: element.getAttribute('content') ?? '',
+      };
+    }
+    return {
+      ...common,
+      ...grouping,
+      ...naming,
+      type: 'widget' as const,
+      metric: METRICS.includes(metric) ? metric : fallback.metric,
+    };
   });
 }
 
@@ -193,9 +209,11 @@ export function serializeTelemetryLayoutXml(
       const name = item.name ? ` label="${escapeXml(item.name)}"` : '';
       const group = item.groupId ? ` group="${escapeXml(item.groupId)}"` : '';
       const common = `id="${escapeXml(item.id)}"${name}${group} x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
-      return item.type === 'icon'
-        ? `<icon ${common} name="${item.icon}" />`
-        : `<widget ${common} metric="${item.metric}" />`;
+      if (item.type === 'icon') return `<icon ${common} name="${item.icon}" />`;
+      if (item.type === 'text') {
+        return `<text ${common} content="${escapeXml(item.content)}" />`;
+      }
+      return `<widget ${common} metric="${item.metric}" />`;
     })
     .join('')}</telemetry-layout>`;
   return new XMLSerializer().serializeToString(

@@ -102,7 +102,7 @@ export function FlightTelemetryOverlay({
     () =>
       Object.fromEntries(
         layout
-          .filter((slot) => slot.type !== 'icon')
+          .filter((slot) => slot.type === 'widget')
           .map((slot) => [slot.id, slot.metric])
       ) as Record<string, MetricKey>
   );
@@ -111,7 +111,7 @@ export function FlightTelemetryOverlay({
     setSelectedMetrics(
       Object.fromEntries(
         layout
-          .filter((slot) => slot.type !== 'icon')
+          .filter((slot) => slot.type === 'widget')
           .map((slot) => [slot.id, slot.metric])
       ) as Record<string, MetricKey>
     );
@@ -135,6 +135,22 @@ export function FlightTelemetryOverlay({
                 }}
               >
                 <TelemetryLayoutIcon name={slot.icon} className="h-1/2 w-1/2" />
+              </div>
+            );
+          }
+          if (slot.type === 'text') {
+            return (
+              <div
+                key={slot.id}
+                className="pointer-events-auto absolute flex items-center justify-center overflow-hidden rounded-lg border border-white/25 bg-slate-950/75 px-2 text-center text-sm font-semibold text-white shadow-lg backdrop-blur-sm"
+                style={{
+                  left: `${slot.x * 100}%`,
+                  top: `${slot.y * 100}%`,
+                  width: `${slot.width * 100}%`,
+                  height: `${slot.height * 100}%`,
+                }}
+              >
+                <span className="truncate">{slot.content}</span>
               </div>
             );
           }

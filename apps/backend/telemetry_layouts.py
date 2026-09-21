@@ -49,13 +49,13 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
 
     children = list(root)
     groups = [child for child in children if child.tag == "group"]
-    widgets = [child for child in children if child.tag in {"widget", "icon"}]
+    widgets = [child for child in children if child.tag in {"widget", "icon", "text"}]
     group_ids = {group.attrib.get("id", "") for group in groups}
     if (
         not 1 <= len(widgets) <= MAX_TELEMETRY_WIDGETS
         or len(group_ids) != len(groups)
         or "" in group_ids
-        or any(child.tag not in {"widget", "icon", "group"} for child in children)
+        or any(child.tag not in {"widget", "icon", "text", "group"} for child in children)
     ):
         raise ValueError(
             f"Telemetry layout must contain between 1 and {MAX_TELEMETRY_WIDGETS} widgets"
@@ -70,6 +70,10 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
             raise ValueError("Telemetry widget metric is not supported")
         if widget.tag == "icon" and widget.attrib.get("name") not in VALID_ICONS:
             raise ValueError("Telemetry icon is not supported")
+        if widget.tag == "text":
+            content = widget.attrib.get("content", "")
+            if not content or len(content) > 500:
+                raise ValueError("Telemetry text must contain 1 to 500 characters")
         element_name = widget.attrib.get("label")
         if element_name is not None and not 1 <= len(element_name) <= 100:
             raise ValueError("Telemetry element names must contain 1 to 100 characters")

@@ -42,3 +42,12 @@ def test_layouts_can_contain_icons_and_groups() -> None:
     )
 
     assert 'name="wind"' in validate_telemetry_layout_xml(xml)
+
+
+def test_layouts_can_contain_text() -> None:
+    xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
+        "</telemetry-layout>",
+        '<text id="title" label="Titre" content="Vol du matin" x="0.2" y="0.3" width="0.3" height="0.08" visible="true" /></telemetry-layout>',
+    )
+
+    assert 'content="Vol du matin"' in validate_telemetry_layout_xml(xml)

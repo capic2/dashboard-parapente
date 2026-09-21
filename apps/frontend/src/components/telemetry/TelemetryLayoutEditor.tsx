@@ -23,6 +23,7 @@ import {
   serializeTelemetryLayoutXml,
   type FlightTelemetryIconLayout,
   type FlightTelemetryLayoutItem,
+  type FlightTelemetryTextLayout,
 } from '../flights/details/flightTelemetryLayout';
 import { TelemetryLayoutIcon } from './TelemetryLayoutIcon';
 
@@ -119,7 +120,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     const metric =
       METRICS.find((candidate) =>
         layout.every(
-          (widget) => widget.type === 'icon' || widget.metric !== candidate
+          (widget) => widget.type !== 'widget' || widget.metric !== candidate
         )
       ) ?? METRICS[0];
     const column = layout.length % 4;
@@ -156,6 +157,26 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       visible: true,
     };
     setLayout((current) => [...current, icon]);
+    setSelectedIds([id]);
+  };
+
+  const addText = () => {
+    if (layout.length >= MAX_WIDGETS) return;
+    const id = `text-${Date.now()}-${widgetIdCounter.current++}`;
+    const column = layout.length % 4;
+    const row = Math.floor(layout.length / 4);
+    const text: FlightTelemetryTextLayout = {
+      id,
+      type: 'text',
+      name: 'Text',
+      content: 'Votre texte',
+      x: 0.02 + column * 0.24,
+      y: 0.02 + row * 0.2,
+      width: 0.2,
+      height: 0.08,
+      visible: true,
+    };
+    setLayout((current) => [...current, text]);
     setSelectedIds([id]);
   };
 
@@ -319,6 +340,15 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
             <Plus className="h-4 w-4" />
             {t('telemetryLayout.addIcon')}
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={addText}
+            isDisabled={layout.length >= MAX_WIDGETS}
+          >
+            <Plus className="h-4 w-4" />
+            {t('telemetryLayout.addText')}
+          </Button>
           <Button variant="outline" size="sm" onPress={downloadXml}>
             <Download className="h-4 w-4" />
             {t('telemetryLayout.export')}
@@ -360,9 +390,11 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
             <div className="pointer-events-none absolute inset-y-0 left-1/2 border-l border-dashed border-slate-400/20" />
             {layout.map((item) => {
               const isIcon = item.type === 'icon';
-              const [value, unit] = isIcon
-                ? ['—', '']
-                : valueForMetric(previewPoint, item.metric);
+              const isText = item.type === 'text';
+              const [value, unit] =
+                isIcon || isText
+                  ? ['—', '']
+                  : valueForMetric(previewPoint, item.metric);
               const isSelected = selectedIds.includes(item.id);
               return (
                 <button
@@ -391,7 +423,11 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                     minHeight: '3rem',
                   }}
                 >
-                  {isIcon ? (
+                  {isText ? (
+                    <span className="block truncate text-center text-sm font-semibold">
+                      {item.content}
+                    </span>
+                  ) : isIcon ? (
                     <>
                       <TelemetryLayoutIcon
                         name={item.icon}
@@ -542,6 +578,20 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       </option>
                     ))}
                   </select>
+                </label>
+              ) : selected.type === 'text' ? (
+                <label className="block text-sm">
+                  <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                    {t('telemetryLayout.text')}
+                  </span>
+                  <textarea
+                    className="min-h-20 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                    value={selected.content}
+                    maxLength={500}
+                    onChange={(event) =>
+                      updateItem(selected.id, { content: event.target.value })
+                    }
+                  />
                 </label>
               ) : (
                 <label className="block text-sm">
