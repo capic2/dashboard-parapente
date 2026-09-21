@@ -2,6 +2,7 @@ import { METRIC_KEYS, type MetricKey } from './telemetryMetrics';
 
 export type TelemetryInteractionAction = 'none' | 'cycle_metric';
 export type TelemetryWidgetVariant = 'value' | 'speedometer';
+export type TelemetryValueAlignment = 'left' | 'center' | 'right';
 
 export type TelemetryLayout = FlightTelemetryLayoutItem[] & {
   backgroundImage?: string;
@@ -39,6 +40,7 @@ export interface FlightTelemetryWidgetLayout extends FlightTelemetryLayoutItemBa
   type: 'widget';
   metric: MetricKey;
   variant?: TelemetryWidgetVariant;
+  valueAlign?: TelemetryValueAlignment;
   clickAction?: TelemetryInteractionAction;
   longPressAction?: TelemetryInteractionAction;
 }
@@ -119,6 +121,7 @@ const INTERACTION_ACTIONS: TelemetryInteractionAction[] = [
   'cycle_metric',
 ];
 const WIDGET_VARIANTS: TelemetryWidgetVariant[] = ['value', 'speedometer'];
+const VALUE_ALIGNMENTS: TelemetryValueAlignment[] = ['left', 'center', 'right'];
 
 function numberAttribute(element: Element, name: string, fallback: number) {
   const value = Number(element.getAttribute(name));
@@ -222,6 +225,17 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
       )
         ? { variant: element.getAttribute('variant') as TelemetryWidgetVariant }
         : {};
+    const valueAlign =
+      type === 'widget' &&
+      VALUE_ALIGNMENTS.includes(
+        element.getAttribute('align') as TelemetryValueAlignment
+      )
+        ? {
+            valueAlign: element.getAttribute(
+              'align'
+            ) as TelemetryValueAlignment,
+          }
+        : {};
     if (type === 'icon') {
       return {
         ...common,
@@ -230,6 +244,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
         ...styling,
         ...interactions,
         ...variant,
+        ...valueAlign,
         type: 'icon' as const,
         icon: ICONS.includes(element.getAttribute('name') as TelemetryIconName)
           ? (element.getAttribute('name') as TelemetryIconName)
@@ -244,6 +259,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
         ...styling,
         ...interactions,
         ...variant,
+        ...valueAlign,
         type: 'text' as const,
         content: element.getAttribute('content') ?? '',
       };
@@ -255,6 +271,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
       ...styling,
       ...interactions,
       ...variant,
+      ...valueAlign,
       type: 'widget' as const,
       metric: METRIC_KEYS.includes(metric) ? metric : fallback.metric,
     };
@@ -308,7 +325,11 @@ export function serializeTelemetryLayoutXml(
         item.type === 'widget' && item.variant
           ? ` variant="${item.variant}"`
           : '';
-      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility}${fontSize}${clickAction}${longPressAction}${variant} x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
+      const valueAlign =
+        item.type === 'widget' && item.valueAlign
+          ? ` align="${item.valueAlign}"`
+          : '';
+      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility}${fontSize}${clickAction}${longPressAction}${variant}${valueAlign} x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
       if (item.type === 'icon') return `<icon ${common} name="${item.icon}" />`;
       if (item.type === 'text') {
         return `<text ${common} content="${escapeXml(item.content)}" />`;

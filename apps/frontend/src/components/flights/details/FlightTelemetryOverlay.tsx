@@ -157,6 +157,7 @@ export function FlightTelemetryOverlay({
                 width: `${slot.width * 100}%`,
                 height: `${slot.height * 100}%`,
                 fontSize: `${((slot.fontSize ?? 32) / 1920) * 100}cqw`,
+                textAlign: slot.valueAlign ?? 'left',
               }}
               onPointerDown={() => {
                 longPressTriggered.current = false;
