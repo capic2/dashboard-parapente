@@ -36,10 +36,14 @@ export function FlightTelemetryInteractivePreview({
   } else {
     previewStatusMessage = t('flights.overlayInteractivePreviewUnavailable');
   }
+  // Keep the interactive preview on the same timeline as calibration:
+  // telemetry timestamp = GPX start + video time - total alignment offset.
+  // Using the video start plus only the manual offset is not equivalent when
+  // the API returns the source GPX while OSV enrichment is still pending.
   const overlayOffsetSeconds =
-    overlayPreview.data?.alignment.manual_offset_seconds ?? 0;
-  const timelineStartTimestamp = overlayPreview.data?.video.start_time
-    ? Date.parse(overlayPreview.data.video.start_time)
+    overlayPreview.data?.alignment.effective_offset_seconds ?? 0;
+  const timelineStartTimestamp = telemetry.data?.start_time
+    ? Date.parse(telemetry.data.start_time)
     : undefined;
   const previewSegments = overlayPreview.data?.video.preview_segments ?? [];
 
