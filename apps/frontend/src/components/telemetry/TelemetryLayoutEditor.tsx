@@ -383,7 +383,13 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       ref={editorRef}
       className={`space-y-5 ${isFullscreen ? 'overflow-y-auto bg-slate-950 p-4 sm:p-6' : ''}`}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div
+        className={`flex flex-wrap items-center justify-between gap-3 ${
+          isFullscreen
+            ? 'sticky top-0 z-50 rounded-xl bg-slate-950/95 py-2 backdrop-blur'
+            : ''
+        }`}
+      >
         <div>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {t('telemetryLayout.canvasHint')}
@@ -458,7 +464,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
               <Plus className="h-4 w-4" />
               {t('telemetryLayout.addElement')}
             </AriaButton>
-            <Popover className="z-40 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-800">
+            <Popover
+              UNSTABLE_portalContainer={editorRef.current ?? undefined}
+              className="z-40 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-800"
+            >
               <Menu className="outline-none">
                 <MenuItem
                   isDisabled
