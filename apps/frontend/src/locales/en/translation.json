@@ -1753,6 +1753,7 @@
     "removeField": "Remove field",
     "metric": "Metric",
     "visible": "Visible",
+    "showLabel": "Show label",
     "x": "X",
     "y": "Y",
     "width": "Width",

@@ -139,9 +139,11 @@ export function FlightTelemetryOverlay({
               }
               aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${formatTelemetryValue(value)} ${unit}. ${t('flights.telemetryChangeMetric')}`}
             >
-              <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-300">
-                {t(`flights.${METRIC_LABELS[metric]}`)}
-              </span>
+              {slot.showLabel !== false && (
+                <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+                  {t(`flights.${METRIC_LABELS[metric]}`)}
+                </span>
+              )}
               <span className="mt-0.5 block font-mono text-lg font-bold leading-none">
                 {formatTelemetryValue(value)}
                 <span className="ml-1 text-xs font-normal text-slate-300">

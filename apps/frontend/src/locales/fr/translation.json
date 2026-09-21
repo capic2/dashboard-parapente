@@ -1758,6 +1758,7 @@
     "removeField": "Supprimer le champ",
     "metric": "Métrique",
     "visible": "Visible",
+    "showLabel": "Afficher le libellé",
     "x": "X",
     "y": "Y",
     "width": "Largeur",

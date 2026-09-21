@@ -97,6 +97,8 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
             raise ValueError("Telemetry element background is invalid")
         if widget.attrib.get("border") not in {None, "true", "false"}:
             raise ValueError("Telemetry element border is invalid")
+        if widget.attrib.get("label-visible") not in {None, "true", "false"}:
+            raise ValueError("Telemetry widget label visibility is invalid")
         for name in ("x", "y", "width", "height"):
             try:
                 value = float(widget.attrib[name])

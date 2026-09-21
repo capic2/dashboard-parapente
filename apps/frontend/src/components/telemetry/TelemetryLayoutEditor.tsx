@@ -403,10 +403,12 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                     </>
                   ) : (
                     <>
-                      <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-300">
-                        {item.name ??
-                          t(`flights.${METRIC_LABELS[item.metric]}`)}
-                      </span>
+                      {item.showLabel !== false && (
+                        <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+                          {item.name ??
+                            t(`flights.${METRIC_LABELS[item.metric]}`)}
+                        </span>
+                      )}
                       <span className="mt-1 block truncate font-mono text-[clamp(.75rem,2vw,1.2rem)] font-bold">
                         {formatTelemetryValue(value)}
                         <span className="ml-1 text-xs font-normal text-slate-300">
@@ -580,6 +582,20 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       </option>
                     ))}
                   </select>
+                </label>
+              )}
+              {selected.type === 'widget' && (
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={selected.showLabel !== false}
+                    onChange={(event) =>
+                      updateItem(selected.id, {
+                        showLabel: event.target.checked,
+                      })
+                    }
+                  />
+                  {t('telemetryLayout.showLabel')}
                 </label>
               )}
               <label className="flex items-center gap-2 text-sm">
