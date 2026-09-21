@@ -4969,6 +4969,10 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
     except (OSError, ValueError) as exc:
         logger.warning("Unable to enrich telemetry for %s: %s", flight_id, exc)
 
+    # The remaining work is file parsing only. Do not keep the request's DB
+    # connection checked out while reading the GPX/OSV cache.
+    db.close()
+
     try:
         file_type = telemetry_path.name.rsplit(".", 1)[-1]
         if telemetry_path.suffix.lower() == ".gz":
@@ -7118,6 +7122,9 @@ def get_flight_gopro_overlay_preview(
         raise HTTPException(status_code=404, detail="Flight not found")
 
     camera_path, gpx_path = _flight_gopro_preview_inputs(db, flight)
+    # Everything below probes/parses files and schedules background work. The
+    # database connection is no longer needed for this request.
+    db.close()
     source_gpx_path = gpx_path
     osv_paths = _matching_files_by_mtime(camera_path.parent, "*.osv")
     video_duration = probe_video_duration(camera_path)
@@ -7233,6 +7240,7 @@ def stream_flight_gopro_camera_preview(
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
     camera_path = _flight_gopro_camera_path(db, flight)
+    db.close()
     preview_state = gopro_preview_proxy.get_preview_state(camera_path, target_end_seconds)
     preview_path = gopro_preview_proxy.preview_path(camera_path)
     video_path = (
