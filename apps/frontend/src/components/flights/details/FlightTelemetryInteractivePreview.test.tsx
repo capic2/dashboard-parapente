@@ -60,14 +60,17 @@ vi.mock('./FlightTelemetryOverlay', () => ({
   FlightTelemetryOverlay: ({
     videoTimeSeconds,
     offsetSeconds,
+    timelineStartTimestamp,
   }: {
     videoTimeSeconds: number;
     offsetSeconds: number;
+    timelineStartTimestamp?: number;
   }) => (
     <div
       data-testid="telemetry-overlay"
       data-video-time={videoTimeSeconds}
       data-offset={offsetSeconds}
+      data-timeline-start={timelineStartTimestamp}
     />
   ),
 }));
@@ -102,6 +105,7 @@ describe('FlightTelemetryInteractivePreview', () => {
   it('maps preview time to source video time before applying the telemetry offset', () => {
     hooks.overlayPreview.data = {
       video: {
+        start_time: '2026-09-05T16:27:53',
         preview_segments: [
           {
             preview_start_seconds: 0,
@@ -148,5 +152,10 @@ describe('FlightTelemetryInteractivePreview', () => {
     expect(
       screen.getByTestId('telemetry-overlay').getAttribute('data-offset')
     ).toBe('5.9');
+    expect(
+      screen
+        .getByTestId('telemetry-overlay')
+        .getAttribute('data-timeline-start')
+    ).toBe(String(Date.UTC(2026, 8, 5, 16, 27, 53)));
   });
 });

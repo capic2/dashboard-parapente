@@ -4,6 +4,7 @@ import { CircleAlert, Wand2 } from 'lucide-react';
 import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { useFlightTelemetry } from '../../../hooks/flights/useFlightTelemetry';
 import { getApiUrlWithSearchParams } from '../../../lib/api';
+import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
 import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 import { FlightTelemetryOverlay } from './FlightTelemetryOverlay';
@@ -39,7 +40,7 @@ export function FlightTelemetryInteractivePreview({
   const overlayOffsetSeconds =
     overlayPreview.data?.alignment.manual_offset_seconds ?? 0;
   const timelineStartTimestamp = overlayPreview.data?.video.start_time
-    ? Date.parse(overlayPreview.data.video.start_time)
+    ? parseApiUtcDate(overlayPreview.data.video.start_time).getTime()
     : undefined;
   const previewSegments = overlayPreview.data?.video.preview_segments ?? [];
 
