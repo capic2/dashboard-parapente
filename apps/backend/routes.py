@@ -73,7 +73,12 @@ from flight_storage import (
     pano_video_paths,
     write_flight_text_file,
 )
-from flight_tracks import calculate_track_stats, enrich_telemetry_points, normalize_track
+from flight_tracks import (
+    calculate_track_stats,
+    enrich_telemetry_points,
+    normalize_track,
+    shift_track_timestamps,
+)
 from gopro_overlay_export import (
     align_video_start_time_to_gpx,
     cancel_gopro_overlay_job,
@@ -4979,6 +4984,15 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
             file_type = telemetry_path.name.rsplit(".", 2)[-2] + ".gz"
         normalized, points = normalize_track(telemetry_path.read_bytes(), file_type)
         del normalized
+        if telemetry_path != source_path:
+            source_start = first_gpx_timestamp(source_path)
+            cached_timestamps = [
+                point["timestamp"] for point in points if point.get("timestamp", 0) > 0
+            ]
+            if source_start is not None and cached_timestamps:
+                cached_start = min(cached_timestamps)
+                source_start_ms = int(source_start.timestamp() * 1000)
+                shift_track_timestamps(points, source_start_ms - cached_start)
         enriched_points = enrich_telemetry_points(points)
     except (OSError, ValueError) as exc:
         raise HTTPException(

@@ -7,7 +7,24 @@ from typing import Any
 
 import pytest
 
-from flight_tracks import calculate_track_stats, enrich_telemetry_points, normalize_track
+from flight_tracks import (
+    calculate_track_stats,
+    enrich_telemetry_points,
+    normalize_track,
+    shift_track_timestamps,
+)
+
+
+def test_shift_track_timestamps_restores_source_timeline():
+    points = [
+        {"timestamp": 1000, "lat": 46.0, "lon": 6.0, "elevation": 1000.0},
+        {"timestamp": 2000, "lat": 46.0, "lon": 6.0, "elevation": 1000.0},
+    ]
+
+    shift_track_timestamps(points, 25_000)
+
+    assert [point["timestamp"] for point in points] == [26_000, 27_000]
+
 
 GPX = b"""<?xml version="1.0"?>
 <gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>

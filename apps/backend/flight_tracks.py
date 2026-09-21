@@ -345,6 +345,17 @@ def normalize_track(content: bytes, file_type: str) -> tuple[bytes, list[TrackPo
     return track_to_gpx(points), points
 
 
+def shift_track_timestamps(points: list[TrackPoint], offset_ms: int) -> list[TrackPoint]:
+    """Move a track back onto its source timeline without changing its samples."""
+    if offset_ms == 0:
+        return points
+    for point in points:
+        timestamp = point.get("timestamp", 0)
+        if timestamp > 0:
+            point["timestamp"] = timestamp + offset_ms
+    return points
+
+
 def track_to_gpx(points: list[TrackPoint]) -> bytes:
     ET.register_namespace("", "http://www.topografix.com/GPX/1/1")
     ET.register_namespace("gpxtpx", "http://www.garmin.com/xmlschemas/TrackPointExtension/v1")
