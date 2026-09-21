@@ -1740,6 +1740,8 @@
     "addText": "Ajouter du texte",
     "icon": "Icône",
     "text": "Texte",
+    "transparentBackground": "Fond transparent",
+    "showBorder": "Afficher la bordure",
     "group": "Grouper",
     "ungroup": "Dégrouper",
     "grouped": "Groupe",

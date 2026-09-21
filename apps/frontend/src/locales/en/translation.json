@@ -1735,6 +1735,8 @@
     "addText": "Add text",
     "icon": "Icon",
     "text": "Text",
+    "transparentBackground": "Transparent background",
+    "showBorder": "Show border",
     "group": "Group",
     "ungroup": "Ungroup",
     "grouped": "Group",

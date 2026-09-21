@@ -79,6 +79,8 @@ describe('flight telemetry layout XML', () => {
         type: 'text' as const,
         name: 'Titre',
         content: 'Vol du matin',
+        transparent: true,
+        border: false,
         x: 0.2,
         y: 0.3,
         width: 0.3,

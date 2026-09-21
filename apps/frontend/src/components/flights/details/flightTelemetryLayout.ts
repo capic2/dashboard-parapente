@@ -17,6 +17,8 @@ interface FlightTelemetryLayoutItemBase {
   width: number;
   height: number;
   visible: boolean;
+  transparent?: boolean;
+  border?: boolean;
   groupId?: string;
   groupName?: string;
 }
@@ -159,11 +161,18 @@ export function parseTelemetryLayoutXml(
       : {};
     const name = element.getAttribute('label');
     const naming = name ? { name } : {};
+    const styling = {
+      ...(element.getAttribute('background') === 'transparent'
+        ? { transparent: true }
+        : {}),
+      ...(element.getAttribute('border') === 'false' ? { border: false } : {}),
+    };
     if (type === 'icon') {
       return {
         ...common,
         ...grouping,
         ...naming,
+        ...styling,
         type: 'icon' as const,
         icon: ICONS.includes(element.getAttribute('name') as TelemetryIconName)
           ? (element.getAttribute('name') as TelemetryIconName)
@@ -175,6 +184,7 @@ export function parseTelemetryLayoutXml(
         ...common,
         ...grouping,
         ...naming,
+        ...styling,
         type: 'text' as const,
         content: element.getAttribute('content') ?? '',
       };
@@ -183,6 +193,7 @@ export function parseTelemetryLayoutXml(
       ...common,
       ...grouping,
       ...naming,
+      ...styling,
       type: 'widget' as const,
       metric: METRICS.includes(metric) ? metric : fallback.metric,
     };
@@ -208,7 +219,9 @@ export function serializeTelemetryLayoutXml(
     .map((item) => {
       const name = item.name ? ` label="${escapeXml(item.name)}"` : '';
       const group = item.groupId ? ` group="${escapeXml(item.groupId)}"` : '';
-      const common = `id="${escapeXml(item.id)}"${name}${group} x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
+      const background = item.transparent ? ' background="transparent"' : '';
+      const border = item.border === false ? ' border="false"' : '';
+      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border} x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
       if (item.type === 'icon') return `<icon ${common} name="${item.icon}" />`;
       if (item.type === 'text') {
         return `<text ${common} content="${escapeXml(item.content)}" />`;

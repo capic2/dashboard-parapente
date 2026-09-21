@@ -413,7 +413,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       : [item.id];
                     setSelectedIds(ids);
                   }}
-                  className={`absolute flex flex-col rounded-lg border bg-slate-950/85 px-3 py-2 text-left text-white shadow-lg ${item.visible ? '' : 'opacity-35'} ${isSelected ? 'border-sky-400 ring-2 ring-sky-400/40' : 'border-white/20'}`}
+                  className={`absolute flex flex-col rounded-lg border px-3 py-2 text-left text-white shadow-lg ${item.transparent ? 'bg-transparent' : 'bg-slate-950/85'} ${item.visible ? '' : 'opacity-35'} ${isSelected ? 'border-sky-400 ring-2 ring-sky-400/40' : item.border === false ? 'border-transparent' : 'border-white/20'}`}
                   style={{
                     left: `${item.x * 100}%`,
                     top: `${item.y * 100}%`,
@@ -624,6 +624,28 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   }
                 />
                 {t('telemetryLayout.visible')}
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={selected.transparent ?? false}
+                  onChange={(event) =>
+                    updateItem(selected.id, {
+                      transparent: event.target.checked,
+                    })
+                  }
+                />
+                {t('telemetryLayout.transparentBackground')}
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={selected.border !== false}
+                  onChange={(event) =>
+                    updateItem(selected.id, { border: event.target.checked })
+                  }
+                />
+                {t('telemetryLayout.showBorder')}
               </label>
               <div className="grid grid-cols-2 gap-3">
                 {(

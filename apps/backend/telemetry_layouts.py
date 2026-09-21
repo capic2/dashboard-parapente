@@ -80,10 +80,10 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
         group_id = widget.attrib.get("group")
         if group_id and group_id not in group_ids:
             raise ValueError("Telemetry widget group does not exist")
-    for group in groups:
-        group_name = group.attrib.get("name")
-        if group_name is not None and not 1 <= len(group_name) <= 100:
-            raise ValueError("Telemetry group names must contain 1 to 100 characters")
+        if widget.attrib.get("background") not in {None, "transparent"}:
+            raise ValueError("Telemetry element background is invalid")
+        if widget.attrib.get("border") not in {None, "true", "false"}:
+            raise ValueError("Telemetry element border is invalid")
         for name in ("x", "y", "width", "height"):
             try:
                 value = float(widget.attrib[name])
@@ -97,5 +97,9 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
             raise ValueError("Telemetry widget exceeds the canvas height")
         if widget.attrib.get("visible") not in {"true", "false"}:
             raise ValueError("Telemetry widget visibility is invalid")
+    for group in groups:
+        group_name = group.attrib.get("name")
+        if group_name is not None and not 1 <= len(group_name) <= 100:
+            raise ValueError("Telemetry group names must contain 1 to 100 characters")
 
     return ET.tostring(root, encoding="unicode")

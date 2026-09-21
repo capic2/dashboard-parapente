@@ -51,3 +51,12 @@ def test_layouts_can_contain_text() -> None:
     )
 
     assert 'content="Vol du matin"' in validate_telemetry_layout_xml(xml)
+
+
+def test_layout_rejects_invalid_widget_style() -> None:
+    xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
+        'visible="true"', 'visible="true" background="gradient"', 1
+    )
+
+    with pytest.raises(ValueError):
+        validate_telemetry_layout_xml(xml)
