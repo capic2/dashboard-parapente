@@ -37,6 +37,10 @@ type DragMode = 'move' | 'resize';
 
 const MAX_WIDGETS = 16;
 
+function displayWidgetName(name: string) {
+  return name.replaceAll('_', ' ');
+}
+
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.max(minimum, Math.min(maximum, value));
 }
@@ -408,7 +412,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                           className="block font-semibold uppercase tracking-wide text-slate-300"
                           style={{ fontSize: '0.35em' }}
                         >
-                          {item.name ?? item.metric}
+                          {displayWidgetName(item.name ?? item.metric)}
                         </span>
                       )}
                       <span
