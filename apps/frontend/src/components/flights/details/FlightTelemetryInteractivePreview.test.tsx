@@ -131,7 +131,7 @@ describe('FlightTelemetryInteractivePreview', () => {
       source: 'gpx+osv',
       has_osv: true,
       enrichment_status: 'ready',
-      start_time: '2026-09-05T16:27:53Z',
+      start_time: null,
       end_time: null,
       duration_seconds: 0,
     };
@@ -147,6 +147,6 @@ describe('FlightTelemetryInteractivePreview', () => {
     ).toBe('1200');
     expect(
       screen.getByTestId('telemetry-overlay').getAttribute('data-offset')
-    ).toBe('30.9');
+    ).toBe('5.9');
   });
 });
