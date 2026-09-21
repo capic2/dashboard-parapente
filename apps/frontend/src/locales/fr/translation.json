@@ -1733,6 +1733,8 @@
     "canvasLabel": "Canvas du layout télémétrique",
     "dragHint": "1920 × 1080 · coordonnées normalisées",
     "properties": "Propriétés du widget",
+    "name": "Nom",
+    "groupName": "Nom du groupe",
     "addField": "Ajouter un champ",
     "addIcon": "Ajouter une icône",
     "icon": "Icône",

@@ -118,12 +118,16 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     const id = `field-${Date.now()}-${widgetIdCounter.current++}`;
     const metric =
       METRICS.find((candidate) =>
-        layout.every((widget) => widget.metric !== candidate)
+        layout.every(
+          (widget) => widget.type === 'icon' || widget.metric !== candidate
+        )
       ) ?? METRICS[0];
     const column = layout.length % 4;
     const row = Math.floor(layout.length / 4);
     const widget: FlightTelemetryLayoutItem = {
       id,
+      type: 'widget',
+      name: metric,
       metric,
       x: 0.02 + column * 0.24,
       y: 0.02 + row * 0.2,
@@ -142,6 +146,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     const row = Math.floor(layout.length / 4);
     const icon: FlightTelemetryIconLayout = {
       id,
+      name: 'Gauge',
       type: 'icon',
       icon: 'gauge',
       x: 0.02 + column * 0.24,
@@ -167,7 +172,9 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   ) => {
     setLayout((current) =>
       current.map((widget) =>
-        widget.id === id ? { ...widget, ...updates } : widget
+        widget.id === id
+          ? ({ ...widget, ...updates } as FlightTelemetryLayoutItem)
+          : widget
       )
     );
   };
@@ -175,9 +182,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const groupSelected = () => {
     if (selectedIds.length < 2) return;
     const groupId = `group-${Date.now()}-${widgetIdCounter.current++}`;
+    const groupName = `Group ${widgetIdCounter.current}`;
     setLayout((current) =>
       current.map((item) =>
-        selectedIds.includes(item.id) ? { ...item, groupId } : item
+        selectedIds.includes(item.id) ? { ...item, groupId, groupName } : item
       )
     );
   };
@@ -192,7 +200,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     setLayout((current) =>
       current.map((item) =>
         item.groupId && groupIds.has(item.groupId)
-          ? { ...item, groupId: undefined }
+          ? { ...item, groupId: undefined, groupName: undefined }
           : item
       )
     );
@@ -384,14 +392,20 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   }}
                 >
                   {isIcon ? (
-                    <TelemetryLayoutIcon
-                      name={item.icon}
-                      className="mx-auto h-1/2 min-h-5 w-1/2 min-w-5"
-                    />
+                    <>
+                      <TelemetryLayoutIcon
+                        name={item.icon}
+                        className="mx-auto h-1/2 min-h-5 w-1/2 min-w-5"
+                      />
+                      <span className="mt-1 block truncate text-center text-[10px] font-semibold text-slate-300">
+                        {item.name ?? item.icon}
+                      </span>
+                    </>
                   ) : (
                     <>
                       <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-300">
-                        {t(`flights.${METRIC_LABELS[item.metric]}`)}
+                        {item.name ??
+                          t(`flights.${METRIC_LABELS[item.metric]}`)}
                       </span>
                       <span className="mt-1 block truncate font-mono text-[clamp(.75rem,2vw,1.2rem)] font-bold">
                         {value}
@@ -466,6 +480,39 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   </button>
                 </div>
               </div>
+              <label className="block text-sm">
+                <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                  {t('telemetryLayout.name')}
+                </span>
+                <input
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  value={selected.name ?? ''}
+                  placeholder={selected.id}
+                  onChange={(event) =>
+                    updateItem(selected.id, { name: event.target.value })
+                  }
+                />
+              </label>
+              {selected.groupId && (
+                <label className="block text-sm">
+                  <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                    {t('telemetryLayout.groupName')}
+                  </span>
+                  <input
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                    value={selected.groupName ?? selected.groupId}
+                    onChange={(event) =>
+                      setLayout((current) =>
+                        current.map((item) =>
+                          item.groupId === selected.groupId
+                            ? { ...item, groupName: event.target.value }
+                            : item
+                        )
+                      )
+                    }
+                  />
+                </label>
+              )}
               {selected.type === 'icon' ? (
                 <label className="block text-sm">
                   <span className="mb-1 block text-slate-600 dark:text-slate-300">

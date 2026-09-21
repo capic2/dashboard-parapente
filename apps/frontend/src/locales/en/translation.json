@@ -1728,6 +1728,8 @@
     "canvasLabel": "Telemetry layout canvas",
     "dragHint": "1920 × 1080 · normalized coordinates",
     "properties": "Widget properties",
+    "name": "Name",
+    "groupName": "Group name",
     "addField": "Add field",
     "addIcon": "Add icon",
     "icon": "Icon",

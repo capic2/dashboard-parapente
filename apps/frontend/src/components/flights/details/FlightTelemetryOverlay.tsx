@@ -101,14 +101,18 @@ export function FlightTelemetryOverlay({
   >(
     () =>
       Object.fromEntries(
-        layout.map((slot) => [slot.id, slot.metric])
+        layout
+          .filter((slot) => slot.type !== 'icon')
+          .map((slot) => [slot.id, slot.metric])
       ) as Record<string, MetricKey>
   );
 
   useEffect(() => {
     setSelectedMetrics(
       Object.fromEntries(
-        layout.map((slot) => [slot.id, slot.metric])
+        layout
+          .filter((slot) => slot.type !== 'icon')
+          .map((slot) => [slot.id, slot.metric])
       ) as Record<string, MetricKey>
     );
   }, [layout]);

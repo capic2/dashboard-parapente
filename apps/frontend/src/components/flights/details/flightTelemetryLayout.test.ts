@@ -33,6 +33,7 @@ describe('flight telemetry layout XML', () => {
       ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
       {
         id: 'field-extra',
+        type: 'widget',
         metric: 'heading',
         x: 0.4,
         y: 0.4,

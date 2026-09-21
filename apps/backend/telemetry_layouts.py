@@ -70,9 +70,16 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
             raise ValueError("Telemetry widget metric is not supported")
         if widget.tag == "icon" and widget.attrib.get("name") not in VALID_ICONS:
             raise ValueError("Telemetry icon is not supported")
+        element_name = widget.attrib.get("label")
+        if element_name is not None and not 1 <= len(element_name) <= 100:
+            raise ValueError("Telemetry element names must contain 1 to 100 characters")
         group_id = widget.attrib.get("group")
         if group_id and group_id not in group_ids:
             raise ValueError("Telemetry widget group does not exist")
+    for group in groups:
+        group_name = group.attrib.get("name")
+        if group_name is not None and not 1 <= len(group_name) <= 100:
+            raise ValueError("Telemetry group names must contain 1 to 100 characters")
         for name in ("x", "y", "width", "height"):
             try:
                 value = float(widget.attrib[name])

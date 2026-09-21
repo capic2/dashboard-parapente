@@ -11,16 +11,18 @@ export type TelemetryIconName =
 
 interface FlightTelemetryLayoutItemBase {
   id: string;
+  name?: string;
   x: number;
   y: number;
   width: number;
   height: number;
   visible: boolean;
   groupId?: string;
+  groupName?: string;
 }
 
 export interface FlightTelemetryWidgetLayout extends FlightTelemetryLayoutItemBase {
-  type?: 'widget';
+  type: 'widget';
   metric: MetricKey;
 }
 
@@ -36,6 +38,7 @@ export type FlightTelemetryLayoutItem =
 export const DEFAULT_FLIGHT_TELEMETRY_LAYOUT = [
   {
     id: 'top-left',
+    type: 'widget',
     metric: 'altitude',
     x: 0.02,
     y: 0.02,
@@ -45,6 +48,7 @@ export const DEFAULT_FLIGHT_TELEMETRY_LAYOUT = [
   },
   {
     id: 'top-right',
+    type: 'widget',
     metric: 'speed',
     x: 0.82,
     y: 0.02,
@@ -54,6 +58,7 @@ export const DEFAULT_FLIGHT_TELEMETRY_LAYOUT = [
   },
   {
     id: 'bottom-left',
+    type: 'widget',
     metric: 'vario',
     x: 0.02,
     y: 0.82,
@@ -63,6 +68,7 @@ export const DEFAULT_FLIGHT_TELEMETRY_LAYOUT = [
   },
   {
     id: 'bottom-right',
+    type: 'widget',
     metric: 'distance',
     x: 0.82,
     y: 0.82,
@@ -110,6 +116,13 @@ export function parseTelemetryLayoutXml(
   const items = Array.from(
     document.documentElement.querySelectorAll(':scope > widget, :scope > icon')
   );
+  const groupNames = new Map(
+    Array.from(document.documentElement.querySelectorAll(':scope > group'))
+      .map((group) => [group.getAttribute('id'), group.getAttribute('name')])
+      .filter((entry): entry is [string, string] =>
+        Boolean(entry[0] && entry[1])
+      )
+  );
   if (items.length < 1 || items.length > MAX_TELEMETRY_WIDGETS)
     return DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget) => ({ ...widget }));
   return items.map((element, index) => {
@@ -128,11 +141,21 @@ export function parseTelemetryLayoutXml(
       visible: element.getAttribute('visible') !== 'false',
     };
     const groupId = element.getAttribute('group');
-    const grouping = groupId ? { groupId } : {};
+    const grouping = groupId
+      ? {
+          groupId,
+          ...(groupNames.get(groupId)
+            ? { groupName: groupNames.get(groupId) ?? undefined }
+            : {}),
+        }
+      : {};
+    const name = element.getAttribute('label');
+    const naming = name ? { name } : {};
     return type === 'icon'
       ? {
           ...common,
           ...grouping,
+          ...naming,
           type: 'icon' as const,
           icon: ICONS.includes(
             element.getAttribute('name') as TelemetryIconName
@@ -143,6 +166,8 @@ export function parseTelemetryLayoutXml(
       : {
           ...common,
           ...grouping,
+          ...naming,
+          type: 'widget' as const,
           metric: METRICS.includes(metric) ? metric : fallback.metric,
         };
   });
@@ -152,13 +177,22 @@ export function serializeTelemetryLayoutXml(
   layout: readonly FlightTelemetryLayoutItem[]
 ) {
   const groups = Array.from(
-    new Set(layout.flatMap((item) => (item.groupId ? [item.groupId] : [])))
+    new Map(
+      layout
+        .filter((item) => item.groupId)
+        .map((item) => [item.groupId as string, item.groupName] as const)
+    )
   )
-    .map((groupId) => `<group id="${escapeXml(groupId)}" />`)
+    .map(
+      ([groupId, groupName]) =>
+        `<group id="${escapeXml(groupId)}"${groupName ? ` name="${escapeXml(groupName)}"` : ''} />`
+    )
     .join('');
   const root = `<telemetry-layout version="1" width="1920" height="1080">${groups}${layout
     .map((item) => {
-      const common = `id="${escapeXml(item.id)}" group="${escapeXml(item.groupId ?? '')}" x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
+      const name = item.name ? ` label="${escapeXml(item.name)}"` : '';
+      const group = item.groupId ? ` group="${escapeXml(item.groupId)}"` : '';
+      const common = `id="${escapeXml(item.id)}"${name}${group} x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
       return item.type === 'icon'
         ? `<icon ${common} name="${item.icon}" />`
         : `<widget ${common} metric="${item.metric}" />`;
