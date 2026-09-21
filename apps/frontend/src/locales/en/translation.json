@@ -1738,6 +1738,7 @@
     "canvasLabel": "Telemetry layout canvas",
     "dragHint": "1920 × 1080 · normalized coordinates",
     "properties": "Widget properties",
+    "hierarchy": "Layout hierarchy",
     "name": "Name",
     "groupName": "Group name",
     "addField": "Add field",

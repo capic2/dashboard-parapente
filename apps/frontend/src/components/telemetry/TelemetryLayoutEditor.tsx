@@ -96,6 +96,14 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   }, [layoutQuery.data?.layout]);
 
   const selected = layout.find((item) => item.id === selectedIds[0]) ?? null;
+  const groups = Array.from(
+    new Map(
+      layout
+        .filter((item) => item.groupId)
+        .map((item) => [item.groupId as string, item.groupName ?? item.groupId])
+    )
+  );
+  const ungroupedItems = layout.filter((item) => !item.groupId);
   const previewTelemetry = localTelemetry ?? telemetryQuery.data;
   const previewPoint = previewTelemetry?.points[0];
 
@@ -120,6 +128,16 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     };
     reader.readAsDataURL(file);
   };
+
+  const hierarchyLabel = (item: FlightTelemetryLayoutItem) =>
+    displayWidgetName(
+      item.name ??
+        (item.type === 'widget'
+          ? item.metric
+          : item.type === 'icon'
+            ? item.icon
+            : item.content)
+    );
 
   const addField = () => {
     if (layout.length >= MAX_WIDGETS) return;
@@ -605,6 +623,67 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           </div>
         </div>
         <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800">
+          <div className="mb-5 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+            <div className="mb-2 text-sm font-semibold text-slate-900 dark:text-white">
+              {t('telemetryLayout.hierarchy')}
+            </div>
+            <div className="max-h-64 space-y-1 overflow-y-auto">
+              {ungroupedItems.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`flex w-full items-center truncate rounded-md px-2 py-1.5 text-left text-xs transition ${selectedIds.includes(item.id) ? 'bg-sky-100 font-semibold text-sky-800 dark:bg-sky-950/50 dark:text-sky-200' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700'}`}
+                  onClick={() => setSelectedIds([item.id])}
+                >
+                  <span className="mr-2 text-slate-400">
+                    {item.type === 'widget'
+                      ? '◈'
+                      : item.type === 'icon'
+                        ? '◆'
+                        : 'T'}
+                  </span>
+                  <span className="truncate">{hierarchyLabel(item)}</span>
+                </button>
+              ))}
+              {groups.map(([groupId, groupName]) => {
+                const children = layout.filter(
+                  (item) => item.groupId === groupId
+                );
+                const isGroupSelected = children.every((item) =>
+                  selectedIds.includes(item.id)
+                );
+                return (
+                  <div key={groupId}>
+                    <button
+                      type="button"
+                      className={`flex w-full items-center truncate rounded-md px-2 py-1.5 text-left text-xs font-semibold transition ${isGroupSelected ? 'bg-violet-100 text-violet-800 dark:bg-violet-950/50 dark:text-violet-200' : 'text-slate-800 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-700'}`}
+                      onClick={() =>
+                        setSelectedIds(children.map((item) => item.id))
+                      }
+                    >
+                      <span className="mr-2 text-violet-500">▾</span>
+                      <span className="truncate">{groupName}</span>
+                    </button>
+                    <div className="ml-4 border-l border-slate-200 pl-2 dark:border-slate-700">
+                      {children.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className={`flex w-full items-center truncate rounded-md px-2 py-1.5 text-left text-xs transition ${selectedIds.includes(item.id) ? 'bg-sky-100 font-semibold text-sky-800 dark:bg-sky-950/50 dark:text-sky-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700'}`}
+                          onClick={() => setSelectedIds([item.id])}
+                        >
+                          <span className="mr-2 text-slate-400">└</span>
+                          <span className="truncate">
+                            {hierarchyLabel(item)}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
           <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
             <SlidersHorizontal className="h-4 w-4 text-sky-500" />
             {t('telemetryLayout.properties')}
