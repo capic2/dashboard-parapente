@@ -1739,6 +1739,8 @@
     "dragHint": "1920 × 1080 · normalized coordinates",
     "properties": "Widget properties",
     "hierarchy": "Layout hierarchy",
+    "fullscreen": "Fullscreen",
+    "exitFullscreen": "Exit fullscreen",
     "name": "Name",
     "groupName": "Group name",
     "addField": "Add field",

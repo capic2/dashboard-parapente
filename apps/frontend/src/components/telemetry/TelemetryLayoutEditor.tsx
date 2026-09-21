@@ -7,6 +7,8 @@ import {
   Gauge,
   Grip,
   Image as ImageIcon,
+  Maximize2,
+  Minimize2,
   Plus,
   RotateCcw,
   Save,
@@ -67,6 +69,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const saveLayout = useSaveTelemetryLayout(flightId);
   const resetLayout = useResetTelemetryLayout(flightId ?? '');
   const canvasRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
   const widgetIdCounter = useRef(0);
   const [layout, setLayout] = useState<FlightTelemetryLayoutItem[]>(
     defaultTelemetryLayout
@@ -75,6 +78,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const [localTelemetry, setLocalTelemetry] = useState<FlightTelemetryData>();
   const [gpxFileName, setGpxFileName] = useState<string>();
   const [gpxError, setGpxError] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>(
     layout[0]?.id ? [layout[0].id] : []
   );
@@ -138,6 +142,22 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
             ? item.icon
             : item.content)
     );
+
+  useEffect(() => {
+    const handleFullscreenChange = () =>
+      setIsFullscreen(document.fullscreenElement === editorRef.current);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () =>
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    } else {
+      await editorRef.current?.requestFullscreen();
+    }
+  };
 
   const addField = () => {
     if (layout.length >= MAX_WIDGETS) return;
@@ -359,7 +379,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   }
 
   return (
-    <div className="space-y-5">
+    <div
+      ref={editorRef}
+      className={`space-y-5 ${isFullscreen ? 'overflow-y-auto bg-slate-950 p-4 sm:p-6' : ''}`}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -416,6 +439,20 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={() => void toggleFullscreen()}
+          >
+            {isFullscreen ? (
+              <Minimize2 className="h-4 w-4" />
+            ) : (
+              <Maximize2 className="h-4 w-4" />
+            )}
+            {isFullscreen
+              ? t('telemetryLayout.exitFullscreen')
+              : t('telemetryLayout.fullscreen')}
+          </Button>
           <MenuTrigger>
             <AriaButton className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800">
               <Plus className="h-4 w-4" />
@@ -502,7 +539,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
         <div className="rounded-2xl border border-slate-700 bg-slate-950 p-3 shadow-xl">
           <div
             ref={canvasRef}
-            className="relative mx-auto aspect-video max-w-5xl overflow-hidden rounded-lg border border-slate-700 bg-[radial-gradient(circle_at_50%_35%,#1e3a5f,#090f1b_65%)] select-none"
+            className={`relative mx-auto aspect-video overflow-hidden rounded-lg border border-slate-700 bg-[radial-gradient(circle_at_50%_35%,#1e3a5f,#090f1b_65%)] select-none ${isFullscreen ? 'max-w-none' : 'max-w-5xl'}`}
             style={{
               containerType: 'inline-size',
               backgroundImage: backgroundImage
@@ -529,7 +566,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       previewPoint ?? null,
                       previewTelemetry,
                       item.metric
-                    ) ?? ['—', '']);
+                    ) ?? ['', '']);
               const isSelected = selectedIds.includes(item.id);
               return (
                 <button
@@ -591,7 +628,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                         className="mt-1 block truncate font-mono font-bold"
                         style={{ fontSize: '1em' }}
                       >
-                        {formatTelemetryValue(value)}
+                        {formatTelemetryValue(value, '')}
                         <span
                           className="ml-1 font-normal text-slate-300"
                           style={{ fontSize: '0.45em' }}

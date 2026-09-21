@@ -86,7 +86,7 @@ export function TelemetrySpeedometer({
         className="absolute inset-x-0 bottom-[14%] text-center font-mono font-bold leading-none"
         style={{ fontSize: '22%' }}
       >
-        {formatTelemetryValue(value)}
+        {formatTelemetryValue(value, '')}
       </div>
       <div
         className="absolute inset-x-0 bottom-[5%] text-center font-semibold"
