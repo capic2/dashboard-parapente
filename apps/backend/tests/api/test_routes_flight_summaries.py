@@ -259,6 +259,39 @@ def test_summaries_only_report_completed_uploads_that_still_exist(client, db_ses
     verify_videos.assert_called_once_with({1: {"dQw4w9WgXcQ", "9bZkp7q19f0"}})
 
 
+def test_summaries_release_db_connection_before_remote_youtube_check(
+    db_session, monkeypatch
+) -> None:
+    from flight_summaries import list_flight_summaries
+
+    _add_flights(db_session, count=2)
+    youtube_check_started = False
+
+    def fake_existing_youtube_video_ids(_video_ids_by_user):
+        nonlocal youtube_check_started
+        youtube_check_started = True
+        assert not db_session.in_transaction()
+        return set()
+
+    monkeypatch.setattr(
+        "flight_summaries.existing_youtube_video_ids",
+        fake_existing_youtube_video_ids,
+    )
+
+    list_flight_summaries(
+        db_session,
+        page_size=20,
+        cursor=None,
+        q=None,
+        site_id=None,
+        gpx_status="all",
+        sort_by="flight_date",
+        sort_order="desc",
+    )
+
+    assert youtube_check_started
+
+
 def test_summaries_require_completed_generations_and_existing_files(
     client, db_session, tmp_path, monkeypatch
 ) -> None:
