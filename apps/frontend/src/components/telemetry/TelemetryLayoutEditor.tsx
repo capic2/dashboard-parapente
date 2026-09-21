@@ -408,8 +408,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                           className="block font-semibold uppercase tracking-wide text-slate-300"
                           style={{ fontSize: '0.35em' }}
                         >
-                          {item.name ??
-                            t(`flights.${METRIC_LABELS[item.metric]}`)}
+                          {item.name ?? item.metric}
                         </span>
                       )}
                       <span
