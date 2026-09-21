@@ -1251,6 +1251,7 @@
     "goproPreviewFallback": "The low-resolution preview could not be generated. The original video remains available.",
     "goproOverlayHeartRate": "Heart rate",
     "goproOverlayHeartRateUnavailable": "BPM unavailable",
+    "goproOverlayTelemetryUnavailable": "unavailable",
     "goproOverlayGpxPosition": "GPX position",
     "goproOverlayOutsideTrack": "Outside GPX track",
     "goproOverlayEffectiveOffset": "Total offset",
