@@ -1720,5 +1720,31 @@
       "deployingElapsed_other": "Déploiement démarré il y a {{count}} minutes.",
       "openRun": "Voir dans GitHub Actions"
     }
+  },
+  "telemetryLayout": {
+    "title": "Layout télémétrique",
+    "flightTitle": "Layout télémétrique du vol",
+    "description": "Placez les quatre cartes télémétriques de la prévisualisation interactive. Ce layout par défaut s’applique aux vols sans personnalisation.",
+    "flightDescription": "Personnalisez ce vol sans modifier le layout télémétrique global.",
+    "back": "Retour",
+    "configure": "Configurer le layout",
+    "loading": "Chargement du layout…",
+    "canvasHint": "Déplacez une carte par glisser-déposer. Sélectionnez-la pour modifier sa métrique et ses dimensions.",
+    "canvasLabel": "Canvas du layout télémétrique",
+    "dragHint": "1920 × 1080 · coordonnées normalisées",
+    "properties": "Propriétés du widget",
+    "metric": "Métrique",
+    "visible": "Visible",
+    "x": "X",
+    "y": "Y",
+    "width": "Largeur",
+    "height": "Hauteur",
+    "resizeHint": "Tirez la poignée bleue pour redimensionner",
+    "selectWidget": "Sélectionnez un widget sur le canvas.",
+    "usingDefault": "Ce vol utilise actuellement le layout global.",
+    "save": "Enregistrer",
+    "saving": "Enregistrement…",
+    "export": "Exporter XML",
+    "reset": "Utiliser le layout global"
   }
 }

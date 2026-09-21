@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
-import { CircleAlert, Wand2 } from 'lucide-react';
+import { CircleAlert, Edit3, Wand2 } from 'lucide-react';
 import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { useFlightTelemetry } from '../../../hooks/flights/useFlightTelemetry';
+import { useTelemetryLayout } from '../../../hooks/flights/useTelemetryLayout';
 import { getApiUrlWithSearchParams } from '../../../lib/api';
 import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
@@ -21,14 +23,19 @@ export function FlightTelemetryInteractivePreview({
   const token = useAuthStore((state) => state.token);
   const overlayPreview = useGoproOverlayPreview(flightId, true);
   const telemetry = useFlightTelemetry(flightId, true);
+  const layout = useTelemetryLayout(flightId);
   const [cameraTime, setCameraTime] = useState(0);
   const isEnrichmentPending =
     telemetry.data?.enrichment_status === 'pending' ||
     overlayPreview.data?.gpx?.enrichment_status === 'pending';
   const isLoading =
-    telemetry.isPending || overlayPreview.isPending || isEnrichmentPending;
+    telemetry.isPending ||
+    overlayPreview.isPending ||
+    layout.isPending ||
+    isEnrichmentPending;
   const isReady =
     telemetry.isSuccess &&
+    layout.isSuccess &&
     overlayPreview.isSuccess &&
     !isEnrichmentPending &&
     Boolean(telemetry.data?.points.length);
@@ -55,7 +62,7 @@ export function FlightTelemetryInteractivePreview({
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
             <Wand2 className="h-5 w-5" aria-hidden="true" />
           </span>
-          <span>
+          <span className="min-w-0 flex-1">
             <span className="block font-semibold text-slate-950 dark:text-white">
               {t('flights.overlayInteractivePreview')}
             </span>
@@ -63,6 +70,14 @@ export function FlightTelemetryInteractivePreview({
               {previewStatusMessage}
             </span>
           </span>
+          <Link
+            to="/flights/$flightId/telemetry-layout"
+            params={{ flightId }}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs font-semibold text-violet-700 transition-colors hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:border-violet-800 dark:bg-gray-900 dark:text-violet-300 dark:hover:bg-violet-950/40"
+          >
+            <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
+            {t('telemetryLayout.configure')}
+          </Link>
         </span>
       </div>
       <div className="border-t border-slate-200 p-4 dark:border-slate-700 sm:p-5">
@@ -103,6 +118,7 @@ export function FlightTelemetryInteractivePreview({
                 videoTimeSeconds={cameraTime}
                 offsetSeconds={overlayOffsetSeconds}
                 timelineStartTimestamp={timelineStartTimestamp}
+                layout={layout.data?.layout}
               />
             }
           />

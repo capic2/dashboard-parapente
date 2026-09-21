@@ -60,6 +60,35 @@ class AppSetting(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class TelemetryLayout(Base):
+    """User-owned default or flight-specific interactive telemetry layout."""
+
+    __tablename__ = "telemetry_layouts"
+    __table_args__ = (
+        Index(
+            "uq_telemetry_layouts_default_user",
+            "user_id",
+            unique=True,
+            sqlite_where=text("flight_id IS NULL"),
+        ),
+        Index(
+            "uq_telemetry_layouts_flight_user",
+            "user_id",
+            "flight_id",
+            unique=True,
+            sqlite_where=text("flight_id IS NOT NULL"),
+        ),
+    )
+
+    id = Column(String, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    flight_id = Column(String, ForeignKey("flights.id", ondelete="CASCADE"), nullable=True)
+    xml_content = Column(Text, nullable=False)
+    format_version = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
 class ParaglidingSpot(Base):
     """
     External paragliding sites from OpenAIP and ParaglidingSpots.com

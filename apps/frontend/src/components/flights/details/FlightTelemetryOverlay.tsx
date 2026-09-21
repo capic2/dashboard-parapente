@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   interpolateTelemetryAtVideoTime,
@@ -104,44 +104,54 @@ export function FlightTelemetryOverlay({
       ) as Record<string, MetricKey>
   );
 
+  useEffect(() => {
+    setSelectedMetrics(
+      Object.fromEntries(
+        layout.map((slot) => [slot.id, slot.metric])
+      ) as Record<string, MetricKey>
+    );
+  }, [layout]);
+
   return (
     <div className="pointer-events-none absolute inset-0">
-      {layout.map((slot) => {
-        const metric = selectedMetrics[slot.id] ?? slot.metric;
-        const [value, unit] = getMetricValue(point, metric) ?? [null, ''];
-        const nextMetric =
-          METRIC_KEYS[(METRIC_KEYS.indexOf(metric) + 1) % METRIC_KEYS.length];
-        return (
-          <button
-            key={slot.id}
-            type="button"
-            className="pointer-events-auto absolute min-w-24 cursor-pointer rounded-lg border border-white/25 bg-slate-950/75 px-3 py-2 text-left text-white shadow-lg backdrop-blur-sm transition hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
-            style={{
-              top: slot.top,
-              right: slot.right,
-              bottom: slot.bottom,
-              left: slot.left,
-            }}
-            onClick={() =>
-              setSelectedMetrics((current) => ({
-                ...current,
-                [slot.id]: nextMetric,
-              }))
-            }
-            aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${formatValue(value)} ${unit}. ${t('flights.telemetryChangeMetric')}`}
-          >
-            <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-300">
-              {t(`flights.${METRIC_LABELS[metric]}`)}
-            </span>
-            <span className="mt-0.5 block font-mono text-lg font-bold leading-none">
-              {formatValue(value)}
-              <span className="ml-1 text-xs font-normal text-slate-300">
-                {unit}
+      {layout
+        .filter((slot) => slot.visible)
+        .map((slot) => {
+          const metric = selectedMetrics[slot.id] ?? slot.metric;
+          const [value, unit] = getMetricValue(point, metric) ?? [null, ''];
+          const nextMetric =
+            METRIC_KEYS[(METRIC_KEYS.indexOf(metric) + 1) % METRIC_KEYS.length];
+          return (
+            <button
+              key={slot.id}
+              type="button"
+              className="pointer-events-auto absolute min-w-24 cursor-pointer rounded-lg border border-white/25 bg-slate-950/75 px-3 py-2 text-left text-white shadow-lg backdrop-blur-sm transition hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+              style={{
+                left: `${slot.x * 100}%`,
+                top: `${slot.y * 100}%`,
+                width: `${slot.width * 100}%`,
+                height: `${slot.height * 100}%`,
+              }}
+              onClick={() =>
+                setSelectedMetrics((current) => ({
+                  ...current,
+                  [slot.id]: nextMetric,
+                }))
+              }
+              aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${formatValue(value)} ${unit}. ${t('flights.telemetryChangeMetric')}`}
+            >
+              <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+                {t(`flights.${METRIC_LABELS[metric]}`)}
               </span>
-            </span>
-          </button>
-        );
-      })}
+              <span className="mt-0.5 block font-mono text-lg font-bold leading-none">
+                {formatValue(value)}
+                <span className="ml-1 text-xs font-normal text-slate-300">
+                  {unit}
+                </span>
+              </span>
+            </button>
+          );
+        })}
     </div>
   );
 }

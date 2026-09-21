@@ -1715,5 +1715,31 @@
       "deployingElapsed_other": "Deploying for {{count}} minutes.",
       "openRun": "Open GitHub Actions"
     }
+  },
+  "telemetryLayout": {
+    "title": "Telemetry layout",
+    "flightTitle": "Flight telemetry layout",
+    "description": "Arrange the four telemetry cards used by the interactive preview. The default layout applies to every flight without an override.",
+    "flightDescription": "Customize this flight without changing the global telemetry layout.",
+    "back": "Back",
+    "configure": "Configure layout",
+    "loading": "Loading layout…",
+    "canvasHint": "Drag a card to move it. Select a card to edit its metric and dimensions.",
+    "canvasLabel": "Telemetry layout canvas",
+    "dragHint": "1920 × 1080 · normalized coordinates",
+    "properties": "Widget properties",
+    "metric": "Metric",
+    "visible": "Visible",
+    "x": "X",
+    "y": "Y",
+    "width": "Width",
+    "height": "Height",
+    "resizeHint": "Drag the blue handle to resize",
+    "selectWidget": "Select a widget on the canvas.",
+    "usingDefault": "This flight currently uses the global default.",
+    "save": "Save",
+    "saving": "Saving…",
+    "export": "Export XML",
+    "reset": "Use global default"
   }
 }

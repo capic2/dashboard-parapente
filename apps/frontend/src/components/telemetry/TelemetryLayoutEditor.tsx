@@ -1,0 +1,375 @@
+import { useEffect, useRef, useState } from 'react';
+import type { PointerEvent } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Button } from '@dashboard-parapente/design-system';
+import {
+  Download,
+  Grip,
+  RotateCcw,
+  Save,
+  SlidersHorizontal,
+} from 'lucide-react';
+import { useFlightTelemetry } from '../../hooks/flights/useFlightTelemetry';
+import {
+  defaultTelemetryLayout,
+  useResetTelemetryLayout,
+  useSaveTelemetryLayout,
+  useTelemetryLayout,
+} from '../../hooks/flights/useTelemetryLayout';
+import type { FlightTelemetryPoint } from '../../hooks/flights/useFlightTelemetry';
+import {
+  serializeTelemetryLayoutXml,
+  type FlightTelemetryWidgetLayout,
+} from '../flights/details/flightTelemetryLayout';
+
+type DragMode = 'move' | 'resize';
+
+const METRICS = [
+  'altitude',
+  'speed',
+  'vario',
+  'distance',
+  'heading',
+  'heart_rate',
+  'power',
+] as const;
+
+type Metric = (typeof METRICS)[number];
+
+const METRIC_LABELS: Record<Metric, string> = {
+  altitude: 'telemetryAltitude',
+  speed: 'telemetrySpeed',
+  vario: 'telemetryVario',
+  distance: 'telemetryDistance',
+  heading: 'telemetryHeading',
+  heart_rate: 'telemetryHeartRate',
+  power: 'telemetryPower',
+};
+
+function valueForMetric(
+  point: FlightTelemetryPoint | undefined,
+  metric: Metric
+) {
+  if (!point) return ['—', ''];
+  const values: Record<Metric, [number | null | undefined, string]> = {
+    altitude: [point.elevation, 'm'],
+    speed: [point.speed_kmh, 'km/h'],
+    vario: [point.vario_ms, 'm/s'],
+    distance: [point.distance_km, 'km'],
+    heading: [point.heading_deg, '°'],
+    heart_rate: [point.heart_rate, 'bpm'],
+    power: [point.power, 'W'],
+  };
+  const [value, unit] = values[metric];
+  return [
+    value == null
+      ? '—'
+      : Math.abs(value) >= 100
+        ? String(Math.round(value))
+        : value.toFixed(1),
+    unit,
+  ];
+}
+
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
+  const { t } = useTranslation();
+  const layoutQuery = useTelemetryLayout(flightId);
+  const telemetryQuery = useFlightTelemetry(flightId ?? '', Boolean(flightId));
+  const saveLayout = useSaveTelemetryLayout(flightId);
+  const resetLayout = useResetTelemetryLayout(flightId ?? '');
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [layout, setLayout] = useState<FlightTelemetryWidgetLayout[]>(
+    defaultTelemetryLayout
+  );
+  const [selectedId, setSelectedId] = useState(layout[0]?.id ?? null);
+  const [drag, setDrag] = useState<{
+    id: string;
+    mode: DragMode;
+    startX: number;
+    startY: number;
+    widget: FlightTelemetryWidgetLayout;
+  } | null>(null);
+
+  useEffect(() => {
+    if (layoutQuery.data?.layout) {
+      setLayout(layoutQuery.data.layout);
+      setSelectedId(layoutQuery.data.layout[0]?.id ?? null);
+    }
+  }, [layoutQuery.data?.layout]);
+
+  const selected = layout.find((widget) => widget.id === selectedId) ?? null;
+  const previewPoint = telemetryQuery.data?.points[0];
+
+  const updateWidget = (
+    id: string,
+    updates: Partial<FlightTelemetryWidgetLayout>
+  ) => {
+    setLayout((current) =>
+      current.map((widget) =>
+        widget.id === id ? { ...widget, ...updates } : widget
+      )
+    );
+  };
+
+  const beginDrag = (
+    event: PointerEvent,
+    widget: FlightTelemetryWidgetLayout,
+    mode: DragMode
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedId(widget.id);
+    setDrag({
+      id: widget.id,
+      mode,
+      startX: event.clientX,
+      startY: event.clientY,
+      widget,
+    });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const moveDrag = (event: PointerEvent) => {
+    if (!drag || !canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const dx = (event.clientX - drag.startX) / rect.width;
+    const dy = (event.clientY - drag.startY) / rect.height;
+    if (drag.mode === 'move') {
+      updateWidget(drag.id, {
+        x: clamp(drag.widget.x + dx, 0, 1 - drag.widget.width),
+        y: clamp(drag.widget.y + dy, 0, 1 - drag.widget.height),
+      });
+    } else {
+      updateWidget(drag.id, {
+        width: clamp(drag.widget.width + dx, 0.05, 1 - drag.widget.x),
+        height: clamp(drag.widget.height + dy, 0.05, 1 - drag.widget.y),
+      });
+    }
+  };
+
+  const downloadXml = () => {
+    const blob = new Blob([serializeTelemetryLayoutXml(layout)], {
+      type: 'application/xml',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = flightId
+      ? `telemetry-layout-${flightId}.xml`
+      : 'telemetry-layout-default.xml';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (layoutQuery.isPending) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center dark:border-slate-700 dark:bg-gray-800">
+        {t('telemetryLayout.loading')}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {t('telemetryLayout.canvasHint')}
+          </p>
+          {flightId && !layoutQuery.data?.is_override && (
+            <p className="mt-1 text-xs font-medium text-violet-600 dark:text-violet-300">
+              {t('telemetryLayout.usingDefault')}
+            </p>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onPress={downloadXml}>
+            <Download className="h-4 w-4" />
+            {t('telemetryLayout.export')}
+          </Button>
+          {flightId && layoutQuery.data?.is_override && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onPress={() => void resetLayout.mutateAsync()}
+            >
+              <RotateCcw className="h-4 w-4" />
+              {t('telemetryLayout.reset')}
+            </Button>
+          )}
+          <Button
+            size="sm"
+            onPress={() => void saveLayout.mutateAsync(layout)}
+            isDisabled={saveLayout.isPending}
+          >
+            <Save className="h-4 w-4" />
+            {saveLayout.isPending
+              ? t('telemetryLayout.saving')
+              : t('telemetryLayout.save')}
+          </Button>
+        </div>
+      </div>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
+        <div className="rounded-2xl border border-slate-700 bg-slate-950 p-3 shadow-xl">
+          <div
+            ref={canvasRef}
+            className="relative mx-auto aspect-video max-w-5xl overflow-hidden rounded-lg border border-slate-700 bg-[radial-gradient(circle_at_50%_35%,#1e3a5f,#090f1b_65%)] select-none"
+            onPointerMove={moveDrag}
+            onPointerUp={() => setDrag(null)}
+            onPointerCancel={() => setDrag(null)}
+            aria-label={t('telemetryLayout.canvasLabel')}
+          >
+            <div className="pointer-events-none absolute inset-0 opacity-20 [background-image:linear-gradient(#94a3b8_1px,transparent_1px),linear-gradient(90deg,#94a3b8_1px,transparent_1px)] [background-size:10%_10%]" />
+            <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-slate-400/20" />
+            <div className="pointer-events-none absolute inset-y-0 left-1/2 border-l border-dashed border-slate-400/20" />
+            {layout.map((widget) => {
+              const [value, unit] = valueForMetric(previewPoint, widget.metric);
+              const isSelected = selectedId === widget.id;
+              return (
+                <button
+                  type="button"
+                  key={widget.id}
+                  onPointerDown={(event) => beginDrag(event, widget, 'move')}
+                  onClick={() => setSelectedId(widget.id)}
+                  className={`absolute rounded-lg border bg-slate-950/85 px-3 py-2 text-left text-white shadow-lg ${widget.visible ? '' : 'opacity-35'} ${isSelected ? 'border-sky-400 ring-2 ring-sky-400/40' : 'border-white/20'}`}
+                  style={{
+                    left: `${widget.x * 100}%`,
+                    top: `${widget.y * 100}%`,
+                    width: `${widget.width * 100}%`,
+                    height: `${widget.height * 100}%`,
+                    minWidth: '6rem',
+                    minHeight: '3rem',
+                  }}
+                >
+                  <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+                    {t(`flights.${METRIC_LABELS[widget.metric]}`)}
+                  </span>
+                  <span className="mt-1 block truncate font-mono text-[clamp(.75rem,2vw,1.2rem)] font-bold">
+                    {value}
+                    <span className="ml-1 text-xs font-normal text-slate-300">
+                      {unit}
+                    </span>
+                  </span>
+                  {isSelected && (
+                    <span
+                      className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-se-resize rounded-sm border border-white bg-sky-400"
+                      onPointerDown={(event) =>
+                        beginDrag(event, widget, 'resize')
+                      }
+                    />
+                  )}
+                </button>
+              );
+            })}
+            <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded bg-slate-950/70 px-2 py-1 text-[10px] text-slate-300">
+              {t('telemetryLayout.dragHint')}
+            </div>
+          </div>
+        </div>
+        <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800">
+          <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+            <SlidersHorizontal className="h-4 w-4 text-sky-500" />
+            {t('telemetryLayout.properties')}
+          </div>
+          {selected ? (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-slate-100 p-3 text-sm font-medium dark:bg-slate-900">
+                {selected.id}
+              </div>
+              <label className="block text-sm">
+                <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                  {t('telemetryLayout.metric')}
+                </span>
+                <select
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  value={selected.metric}
+                  onChange={(event) =>
+                    updateWidget(selected.id, {
+                      metric: event.target.value as Metric,
+                    })
+                  }
+                >
+                  {METRICS.map((metric) => (
+                    <option key={metric} value={metric}>
+                      {t(`flights.${METRIC_LABELS[metric]}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={selected.visible}
+                  onChange={(event) =>
+                    updateWidget(selected.id, { visible: event.target.checked })
+                  }
+                />
+                {t('telemetryLayout.visible')}
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {(
+                  [
+                    ['x', selected.x],
+                    ['y', selected.y],
+                    ['width', selected.width],
+                    ['height', selected.height],
+                  ] as const
+                ).map(([name, value]) => (
+                  <label key={name} className="text-sm">
+                    <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                      {t(`telemetryLayout.${name}`)} %
+                    </span>
+                    <input
+                      className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-right dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={Math.round(value * 100)}
+                      onChange={(event) => {
+                        const next = clamp(
+                          Number(event.target.value) / 100,
+                          0,
+                          1
+                        );
+                        if (name === 'x') {
+                          updateWidget(selected.id, {
+                            x: clamp(next, 0, 1 - selected.width),
+                          });
+                        } else if (name === 'y') {
+                          updateWidget(selected.id, {
+                            y: clamp(next, 0, 1 - selected.height),
+                          });
+                        } else if (name === 'width') {
+                          updateWidget(selected.id, {
+                            width: clamp(next, 0.05, 1 - selected.x),
+                          });
+                        } else {
+                          updateWidget(selected.id, {
+                            height: clamp(next, 0.05, 1 - selected.y),
+                          });
+                        }
+                      }}
+                    />
+                  </label>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <Grip className="h-4 w-4" />
+                {t('telemetryLayout.resizeHint')}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">
+              {t('telemetryLayout.selectWidget')}
+            </p>
+          )}
+        </aside>
+      </div>
+    </div>
+  );
+}
