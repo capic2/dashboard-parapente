@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@dashboard-parapente/design-system';
 import {
   Download,
+  Gauge,
   Grip,
   Image as ImageIcon,
   Plus,
@@ -13,6 +14,13 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
+import {
+  Button as AriaButton,
+  Menu,
+  MenuItem,
+  MenuTrigger,
+  Popover,
+} from 'react-aria-components';
 import {
   useFlightTelemetry,
   type FlightTelemetryData,
@@ -390,42 +398,60 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onPress={addField}
-            isDisabled={layout.length >= MAX_WIDGETS}
-          >
-            <Plus className="h-4 w-4" />
-            {t('telemetryLayout.addField')}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onPress={addIcon}
-            isDisabled={layout.length >= MAX_WIDGETS}
-          >
-            <Plus className="h-4 w-4" />
-            {t('telemetryLayout.addIcon')}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onPress={addSpeedometer}
-            isDisabled={layout.length >= MAX_WIDGETS}
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            {t('telemetryLayout.addSpeedometer')}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onPress={addText}
-            isDisabled={layout.length >= MAX_WIDGETS}
-          >
-            <Plus className="h-4 w-4" />
-            {t('telemetryLayout.addText')}
-          </Button>
+          <MenuTrigger>
+            <AriaButton className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800">
+              <Plus className="h-4 w-4" />
+              {t('telemetryLayout.addElement')}
+            </AriaButton>
+            <Popover className="z-40 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-800">
+              <Menu className="outline-none">
+                <MenuItem
+                  isDisabled
+                  className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                >
+                  {t('telemetryLayout.telemetryElements')}
+                </MenuItem>
+                <MenuItem
+                  onAction={addField}
+                  isDisabled={layout.length >= MAX_WIDGETS}
+                  className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none hover:bg-slate-100 focus:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100 dark:hover:bg-slate-700 dark:focus:bg-slate-700"
+                >
+                  <Plus className="h-4 w-4" />
+                  {t('telemetryLayout.addField')}
+                </MenuItem>
+                <MenuItem
+                  onAction={addSpeedometer}
+                  isDisabled={layout.length >= MAX_WIDGETS}
+                  className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none hover:bg-slate-100 focus:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100 dark:hover:bg-slate-700 dark:focus:bg-slate-700"
+                >
+                  <Gauge className="h-4 w-4" />
+                  {t('telemetryLayout.addSpeedometer')}
+                </MenuItem>
+                <MenuItem
+                  isDisabled
+                  className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                >
+                  {t('telemetryLayout.visualElements')}
+                </MenuItem>
+                <MenuItem
+                  onAction={addIcon}
+                  isDisabled={layout.length >= MAX_WIDGETS}
+                  className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none hover:bg-slate-100 focus:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100 dark:hover:bg-slate-700 dark:focus:bg-slate-700"
+                >
+                  <Plus className="h-4 w-4" />
+                  {t('telemetryLayout.addIcon')}
+                </MenuItem>
+                <MenuItem
+                  onAction={addText}
+                  isDisabled={layout.length >= MAX_WIDGETS}
+                  className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none hover:bg-slate-100 focus:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100 dark:hover:bg-slate-700 dark:focus:bg-slate-700"
+                >
+                  <Plus className="h-4 w-4" />
+                  {t('telemetryLayout.addText')}
+                </MenuItem>
+              </Menu>
+            </Popover>
+          </MenuTrigger>
           <Button variant="outline" size="sm" onPress={downloadXml}>
             <Download className="h-4 w-4" />
             {t('telemetryLayout.export')}
