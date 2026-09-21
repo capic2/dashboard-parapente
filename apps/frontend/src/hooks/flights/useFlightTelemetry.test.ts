@@ -44,9 +44,9 @@ describe('interpolateTelemetryAtVideoTime', () => {
     expect(point?.lat).toBeCloseTo(46.005);
   });
 
-  it('uses the nearest point outside the track time range', () => {
-    expect(interpolateTelemetryAtVideoTime(data, -1, 0)?.elevation).toBe(1000);
-    expect(interpolateTelemetryAtVideoTime(data, 12, 0)?.elevation).toBe(1100);
+  it('returns no telemetry outside the track time range', () => {
+    expect(interpolateTelemetryAtVideoTime(data, -1, 0)).toBeNull();
+    expect(interpolateTelemetryAtVideoTime(data, 12, 0)).toBeNull();
   });
 
   it('does not interpolate across GPX segments', () => {
