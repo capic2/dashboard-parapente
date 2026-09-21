@@ -151,6 +151,20 @@ describe('flight telemetry layout XML', () => {
     expect(parsed.backgroundImage).toBe(layout.backgroundImage);
   });
 
+  it('round-trips a graphical speedometer widget', () => {
+    const layout = [
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[0],
+        variant: 'speedometer' as const,
+        metric: 'speed' as const,
+      },
+    ];
+
+    expect(
+      parseTelemetryLayoutXml(serializeTelemetryLayoutXml(layout))
+    ).toEqual(layout);
+  });
+
   it('evaluates the calculated fields used by the 3840 GoPro layout', () => {
     const data = {
       points: [

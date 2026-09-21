@@ -98,3 +98,11 @@ def test_layout_rejects_external_background_image() -> None:
 
     with pytest.raises(ValueError):
         validate_telemetry_layout_xml(xml)
+
+
+def test_layout_accepts_graphical_widget_variant() -> None:
+    xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
+        'metric="speed"', 'metric="speed" variant="speedometer"', 1
+    )
+
+    assert 'variant="speedometer"' in validate_telemetry_layout_xml(xml)

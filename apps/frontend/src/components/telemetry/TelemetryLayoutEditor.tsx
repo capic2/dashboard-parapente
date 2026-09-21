@@ -31,6 +31,7 @@ import {
   type FlightTelemetryTextLayout,
 } from '../flights/details/flightTelemetryLayout';
 import { TelemetryLayoutIcon } from './TelemetryLayoutIcon';
+import { TelemetrySpeedometer } from './TelemetrySpeedometer';
 import {
   METRIC_KEYS as METRICS,
   METRIC_LABELS,
@@ -155,6 +156,27 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       visible: true,
     };
     setLayout((current) => [...current, icon]);
+    setSelectedIds([id]);
+  };
+
+  const addSpeedometer = () => {
+    if (layout.length >= MAX_WIDGETS) return;
+    const id = `speedometer-${Date.now()}-${widgetIdCounter.current++}`;
+    const column = layout.length % 4;
+    const row = Math.floor(layout.length / 4);
+    const widget: FlightTelemetryLayoutItem = {
+      id,
+      type: 'widget',
+      name: 'speedometer',
+      metric: 'speed',
+      variant: 'speedometer',
+      x: 0.02 + column * 0.24,
+      y: 0.02 + row * 0.2,
+      width: 0.18,
+      height: 0.18,
+      visible: true,
+    };
+    setLayout((current) => [...current, widget]);
     setSelectedIds([id]);
   };
 
@@ -389,6 +411,15 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           <Button
             variant="outline"
             size="sm"
+            onPress={addSpeedometer}
+            isDisabled={layout.length >= MAX_WIDGETS}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            {t('telemetryLayout.addSpeedometer')}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onPress={addText}
             isDisabled={layout.length >= MAX_WIDGETS}
           >
@@ -496,6 +527,12 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                         {item.name ?? item.icon}
                       </span>
                     </>
+                  ) : item.variant === 'speedometer' ? (
+                    <TelemetrySpeedometer
+                      metric={item.metric}
+                      value={value}
+                      unit={unit}
+                    />
                   ) : (
                     <>
                       {item.showLabel !== false && (

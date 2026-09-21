@@ -1,6 +1,7 @@
 import { METRIC_KEYS, type MetricKey } from './telemetryMetrics';
 
 export type TelemetryInteractionAction = 'none' | 'cycle_metric';
+export type TelemetryWidgetVariant = 'value' | 'speedometer';
 
 export type TelemetryLayout = FlightTelemetryLayoutItem[] & {
   backgroundImage?: string;
@@ -37,6 +38,7 @@ interface FlightTelemetryLayoutItemBase {
 export interface FlightTelemetryWidgetLayout extends FlightTelemetryLayoutItemBase {
   type: 'widget';
   metric: MetricKey;
+  variant?: TelemetryWidgetVariant;
   clickAction?: TelemetryInteractionAction;
   longPressAction?: TelemetryInteractionAction;
 }
@@ -116,6 +118,7 @@ const INTERACTION_ACTIONS: TelemetryInteractionAction[] = [
   'none',
   'cycle_metric',
 ];
+const WIDGET_VARIANTS: TelemetryWidgetVariant[] = ['value', 'speedometer'];
 
 function numberAttribute(element: Element, name: string, fallback: number) {
   const value = Number(element.getAttribute(name));
@@ -212,6 +215,13 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
               : {}),
           }
         : {};
+    const variant =
+      type === 'widget' &&
+      WIDGET_VARIANTS.includes(
+        element.getAttribute('variant') as TelemetryWidgetVariant
+      )
+        ? { variant: element.getAttribute('variant') as TelemetryWidgetVariant }
+        : {};
     if (type === 'icon') {
       return {
         ...common,
@@ -219,6 +229,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
         ...naming,
         ...styling,
         ...interactions,
+        ...variant,
         type: 'icon' as const,
         icon: ICONS.includes(element.getAttribute('name') as TelemetryIconName)
           ? (element.getAttribute('name') as TelemetryIconName)
@@ -232,6 +243,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
         ...naming,
         ...styling,
         ...interactions,
+        ...variant,
         type: 'text' as const,
         content: element.getAttribute('content') ?? '',
       };
@@ -242,6 +254,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
       ...naming,
       ...styling,
       ...interactions,
+      ...variant,
       type: 'widget' as const,
       metric: METRIC_KEYS.includes(metric) ? metric : fallback.metric,
     };
@@ -291,7 +304,11 @@ export function serializeTelemetryLayoutXml(
         item.type === 'widget' && item.longPressAction
           ? ` long-press-action="${item.longPressAction}"`
           : '';
-      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility}${fontSize}${clickAction}${longPressAction} x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
+      const variant =
+        item.type === 'widget' && item.variant
+          ? ` variant="${item.variant}"`
+          : '';
+      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility}${fontSize}${clickAction}${longPressAction}${variant} x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
       if (item.type === 'icon') return `<icon ${common} name="${item.icon}" />`;
       if (item.type === 'text') {
         return `<text ${common} content="${escapeXml(item.content)}" />`;

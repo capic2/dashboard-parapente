@@ -16,6 +16,7 @@ import {
   type MetricKey,
 } from './telemetryMetrics';
 import { TelemetryLayoutIcon } from '../../telemetry/TelemetryLayoutIcon';
+import { TelemetrySpeedometer } from '../../telemetry/TelemetrySpeedometer';
 
 const CYCLE_METRICS: MetricKey[] = [
   'altitude',
@@ -177,13 +178,21 @@ export function FlightTelemetryOverlay({
               }}
               aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${formatTelemetryValue(value)} ${unit}. ${t('flights.telemetryChangeMetric')}`}
             >
-              {slot.showLabel !== false && (
-                <span
-                  className="block font-semibold uppercase tracking-wide text-slate-300"
-                  style={{ fontSize: '0.35em' }}
-                >
-                  {t(`flights.${METRIC_LABELS[metric]}`)}
-                </span>
+              {slot.variant === 'speedometer' ? (
+                <TelemetrySpeedometer
+                  metric={metric}
+                  value={value}
+                  unit={unit}
+                />
+              ) : (
+                slot.showLabel !== false && (
+                  <span
+                    className="block font-semibold uppercase tracking-wide text-slate-300"
+                    style={{ fontSize: '0.35em' }}
+                  >
+                    {t(`flights.${METRIC_LABELS[metric]}`)}
+                  </span>
+                )
               )}
               <span
                 className="mt-0.5 block font-mono font-bold leading-none"

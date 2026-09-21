@@ -45,6 +45,7 @@ VALID_ICONS = {
 }
 MAX_TELEMETRY_WIDGETS = 16
 VALID_INTERACTION_ACTIONS = {"none", "cycle_metric"}
+VALID_WIDGET_VARIANTS = {"value", "speedometer"}
 
 
 def validate_telemetry_layout_xml(xml_content: str) -> str:
@@ -106,6 +107,9 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
         if widget.attrib.get("label-visible") not in {None, "true", "false"}:
             raise ValueError("Telemetry widget label visibility is invalid")
         if widget.tag == "widget":
+            variant = widget.attrib.get("variant")
+            if variant is not None and variant not in VALID_WIDGET_VARIANTS:
+                raise ValueError("Telemetry widget variant is invalid")
             for action_name in ("click-action", "long-press-action"):
                 action = widget.attrib.get(action_name)
                 if action is not None and action not in VALID_INTERACTION_ACTIONS:
