@@ -146,8 +146,8 @@ def test_flight_telemetry_keeps_enriched_gpx_on_absolute_timeline(
     assert response.points[0]["timestamp"] == int(
         datetime(2026, 7, 1, 10, tzinfo=timezone.utc).timestamp() * 1000
     )
-    assert response.points[1]["heart_rate"] == 140
-    assert response.points[1]["timestamp"] == int(
+    assert response.points[1].heart_rate == 140
+    assert response.points[1].timestamp == int(
         datetime(2026, 7, 1, 10, 0, 25, tzinfo=timezone.utc).timestamp() * 1000
     )
 
