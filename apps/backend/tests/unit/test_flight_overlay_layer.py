@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -107,6 +108,45 @@ def test_flight_telemetry_does_not_wait_for_osv_merge_when_cache_is_missing(
 
     assert response.source == "gpx"
     assert response.has_osv is False
+
+
+def test_flight_telemetry_keeps_enriched_gpx_on_absolute_timeline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    gpx_path = tmp_path / "flight.gpx"
+    cached_path = tmp_path / "merged-gopro-overlay.gpx"
+    gpx_path.write_text(
+        '<gpx><trk><trkseg><trkpt lat="47.2" lon="6.0">'
+        "<time>2026-07-01T10:00:25Z</time></trkpt></trkseg></trk></gpx>",
+        encoding="utf-8",
+    )
+    cached_path.write_text(
+        '<gpx xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">'
+        "<trk><trkseg>"
+        '<trkpt lat="47.2" lon="6.0"><time>2026-07-01T10:00:00Z</time></trkpt>'
+        '<trkpt lat="47.2001" lon="6.0001"><time>2026-07-01T10:00:25Z</time>'
+        "<extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>140</gpxtpx:hr>"
+        "</gpxtpx:TrackPointExtension></extensions></trkpt>"
+        "</trkseg></trk></gpx>",
+        encoding="utf-8",
+    )
+    camera_path = tmp_path / "camera.mp4"
+    camera_path.touch()
+    (tmp_path / "telemetry.OSV").touch()
+    flight = SimpleNamespace(id="flight-1", gpx_file_path=str(gpx_path))
+    monkeypatch.setattr(routes, "_flight_gopro_camera_path", lambda *_args: camera_path)
+    monkeypatch.setattr(routes, "enriched_gpx_path", lambda *_args: cached_path)
+
+    response = routes.get_flight_telemetry("flight-1", _FakeDb(flight))
+
+    assert response.source == "gpx+osv"
+    assert response.points[0]["timestamp"] == int(
+        datetime(2026, 7, 1, 10, tzinfo=timezone.utc).timestamp() * 1000
+    )
+    assert response.points[1]["heart_rate"] == 140
+    assert response.points[1]["timestamp"] == int(
+        datetime(2026, 7, 1, 10, 0, 25, tzinfo=timezone.utc).timestamp() * 1000
+    )
 
 
 def test_flight_telemetry_returns_not_found_for_unknown_flight() -> None:
