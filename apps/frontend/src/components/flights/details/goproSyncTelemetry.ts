@@ -4,6 +4,17 @@ export type GoproSyncTelemetry = GeoPoint & { speedKmh: number };
 
 const EARTH_RADIUS_M = 6_371_000;
 
+export function telemetryTimestampAtVideoTime(
+  timelineStartTimestamp: number,
+  sourceVideoTimeSeconds: number,
+  manualOffsetSeconds: number
+) {
+  return (
+    timelineStartTimestamp +
+    (sourceVideoTimeSeconds - manualOffsetSeconds) * 1000
+  );
+}
+
 function distanceMeters(first: GeoPoint, second: GeoPoint) {
   const toRadians = Math.PI / 180;
   const latitudeDelta = (second.lat - first.lat) * toRadians;
