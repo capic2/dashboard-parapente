@@ -4957,6 +4957,7 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
 
     telemetry_path = source_path
     osv_paths: list[Path] = []
+    enrichment_pending = False
     try:
         camera_path = _flight_gopro_camera_path(db, flight)
         osv_paths = _matching_files_by_mtime(camera_path.parent, "*.osv")
@@ -4967,6 +4968,8 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
             cached_path = enriched_gpx_path(camera_path.parent)
             if cached_path.is_file():
                 telemetry_path = cached_path
+            else:
+                enrichment_pending = True
     except HTTPException:
         # The GPX-only overlay remains usable when no GoPro camera is stored.
         pass
@@ -4983,7 +4986,7 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
             file_type = telemetry_path.name.rsplit(".", 2)[-2] + ".gz"
         normalized, points = normalize_track(telemetry_path.read_bytes(), file_type)
         del normalized
-        enriched_points = enrich_telemetry_points(points)
+        enriched_points = [] if enrichment_pending else enrich_telemetry_points(points)
     except (OSError, ValueError) as exc:
         raise HTTPException(
             status_code=500, detail=f"Failed to parse flight telemetry: {exc}"
@@ -5011,9 +5014,9 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
 
     return FlightTelemetryResponse(
         points=payload_points,
-        source="gpx+osv" if telemetry_path != source_path else "gpx",
-        has_osv=telemetry_path != source_path,
-        enrichment_status="ready" if telemetry_path != source_path or not osv_paths else "pending",
+        source="gpx+osv" if osv_paths else "gpx",
+        has_osv=bool(osv_paths),
+        enrichment_status="pending" if enrichment_pending else "ready",
         start_time=start_time,
         end_time=end_time,
         duration_seconds=duration_seconds,
@@ -7130,6 +7133,7 @@ def get_flight_gopro_overlay_preview(
     # database connection is no longer needed for this request.
     db.close()
     source_gpx_path = gpx_path
+    cached_gpx_path: Path | None = None
     osv_paths = _matching_files_by_mtime(camera_path.parent, "*.osv")
     video_duration = probe_video_duration(camera_path)
     gpx_start = first_gpx_timestamp(gpx_path)
@@ -7157,11 +7161,15 @@ def get_flight_gopro_overlay_preview(
             video_duration=video_duration,
             first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
         )
-    source_coordinates = parse_gpx_file(source_gpx_path)
-    # Keep calibration telemetry on the original GPX timeline. The enriched
-    # GPX is shifted onto the camera timeline for rendering, but returning it
-    # here would make the first point appear before the configured offset.
-    coordinates = source_coordinates
+    # The enriched GPX is the only source exposed to the preview once OSV
+    # enrichment is complete. While the merge is running, expose no
+    # coordinates at all.
+    enrichment_status = "ready"
+    if osv_paths and (cached_gpx_path is None or not cached_gpx_path.is_file()):
+        enrichment_status = "pending"
+        coordinates = []
+    else:
+        coordinates = parse_gpx_file(gpx_path)
     manual_offset = float(flight.gopro_overlay_gpx_offset or 0.0)
     effective_offset = automatic_offset + manual_offset
     overlay_state = _interactive_overlay_state(camera_path)
@@ -7204,6 +7212,7 @@ def get_flight_gopro_overlay_preview(
             "end_time": gpx_start + timedelta(seconds=gpx_duration),
             "duration_seconds": gpx_duration,
             "coordinates": coordinates,
+            "enrichment_status": enrichment_status,
         },
         alignment={
             "automatic_offset_seconds": automatic_offset,

@@ -230,7 +230,7 @@ export function GoproOverlaySyncPreview({
     await onOffsetSave(nextOffset);
   };
 
-  if (preview.isPending) {
+  if (preview.isPending || preview.data?.gpx?.enrichment_status === 'pending') {
     return (
       <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
         {t('flights.goproOverlayPreviewLoading')}

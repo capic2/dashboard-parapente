@@ -196,6 +196,7 @@ class GoproOverlayPreviewGpx(BaseModel):
     end_time: datetime
     duration_seconds: float
     coordinates: list[GoproOverlayPreviewCoordinate]
+    enrichment_status: Literal["ready", "pending"]
 
 
 class GoproOverlayPreviewAlignment(BaseModel):

@@ -27,6 +27,7 @@ export type GoproOverlayPreview = {
     end_time: string;
     duration_seconds: number;
     coordinates: GeoPoint[];
+    enrichment_status?: 'ready' | 'pending';
   };
   alignment: {
     automatic_offset_seconds: number;
@@ -88,6 +89,7 @@ export function useGoproOverlayPreview(flightId: string, enabled: boolean) {
     enabled,
     refetchInterval: (query) => {
       const data = query.state.data;
+      if (data?.gpx?.enrichment_status === 'pending') return 2000;
       if (data?.overlay.status === 'generating') return 2000;
       return goproPreviewRefetchInterval(data?.video.preview_status);
     },

@@ -79,6 +79,7 @@ def test_flight_telemetry_returns_gpx_fallback_and_normalizes_missing_elevation(
 
     assert response.source == "gpx"
     assert response.has_osv is False
+    assert response.enrichment_status == "ready"
     assert response.points[0].elevation == 0
     assert response.duration_seconds == 0
 
@@ -106,8 +107,10 @@ def test_flight_telemetry_does_not_wait_for_osv_merge_when_cache_is_missing(
 
     response = routes.get_flight_telemetry("flight-1", _FakeDb(flight))
 
-    assert response.source == "gpx"
-    assert response.has_osv is False
+    assert response.source == "gpx+osv"
+    assert response.has_osv is True
+    assert response.enrichment_status == "pending"
+    assert response.points == []
 
 
 def test_flight_telemetry_keeps_enriched_gpx_on_absolute_timeline(
