@@ -74,7 +74,10 @@ export function FlightTelemetryOverlay({
   }, [layout]);
 
   return (
-    <div className="pointer-events-none absolute inset-0">
+    <div
+      className="pointer-events-none absolute inset-0"
+      style={{ containerType: 'inline-size' }}
+    >
       {layout
         .filter((slot) => slot.visible)
         .map((slot) => {
@@ -130,6 +133,7 @@ export function FlightTelemetryOverlay({
                 top: `${slot.y * 100}%`,
                 width: `${slot.width * 100}%`,
                 height: `${slot.height * 100}%`,
+                fontSize: `${((slot.fontSize ?? 32) / 1920) * 100}cqw`,
               }}
               onClick={() =>
                 setSelectedMetrics((current) => ({
@@ -140,13 +144,22 @@ export function FlightTelemetryOverlay({
               aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${formatTelemetryValue(value)} ${unit}. ${t('flights.telemetryChangeMetric')}`}
             >
               {slot.showLabel !== false && (
-                <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+                <span
+                  className="block font-semibold uppercase tracking-wide text-slate-300"
+                  style={{ fontSize: '0.35em' }}
+                >
                   {t(`flights.${METRIC_LABELS[metric]}`)}
                 </span>
               )}
-              <span className="mt-0.5 block font-mono text-lg font-bold leading-none">
+              <span
+                className="mt-0.5 block font-mono font-bold leading-none"
+                style={{ fontSize: '1em' }}
+              >
                 {formatTelemetryValue(value)}
-                <span className="ml-1 text-xs font-normal text-slate-300">
+                <span
+                  className="ml-1 font-normal text-slate-300"
+                  style={{ fontSize: '0.45em' }}
+                >
                   {unit}
                 </span>
               </span>

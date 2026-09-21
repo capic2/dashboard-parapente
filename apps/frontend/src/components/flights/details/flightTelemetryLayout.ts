@@ -23,6 +23,7 @@ interface FlightTelemetryLayoutItemBase {
   transparent?: boolean;
   border?: boolean;
   showLabel?: boolean;
+  fontSize?: number;
   groupId?: string;
   groupName?: string;
 }
@@ -167,6 +168,10 @@ export function parseTelemetryLayoutXml(
       ...(element.getAttribute('label-visible') === 'false'
         ? { showLabel: false }
         : {}),
+      ...(element.getAttribute('font-size') !== null &&
+      Number.isFinite(Number(element.getAttribute('font-size')))
+        ? { fontSize: Number(element.getAttribute('font-size')) }
+        : {}),
     };
     if (type === 'icon') {
       return {
@@ -224,7 +229,11 @@ export function serializeTelemetryLayoutXml(
       const border = item.border === false ? ' border="false"' : '';
       const labelVisibility =
         item.showLabel === false ? ' label-visible="false"' : '';
-      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility} x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
+      const fontSize =
+        item.type === 'widget' && item.fontSize !== undefined
+          ? ` font-size="${item.fontSize}"`
+          : '';
+      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility}${fontSize} x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
       if (item.type === 'icon') return `<icon ${common} name="${item.icon}" />`;
       if (item.type === 'text') {
         return `<text ${common} content="${escapeXml(item.content)}" />`;

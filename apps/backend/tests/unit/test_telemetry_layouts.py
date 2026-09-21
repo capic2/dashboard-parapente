@@ -60,3 +60,20 @@ def test_layout_rejects_invalid_widget_style() -> None:
 
     with pytest.raises(ValueError):
         validate_telemetry_layout_xml(xml)
+
+
+def test_layout_accepts_widget_font_size() -> None:
+    xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
+        'metric="altitude"', 'metric="altitude" font-size="48"', 1
+    )
+
+    assert 'font-size="48"' in validate_telemetry_layout_xml(xml)
+
+
+def test_layout_rejects_invalid_widget_font_size() -> None:
+    xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
+        'metric="altitude"', 'metric="altitude" font-size="200"', 1
+    )
+
+    with pytest.raises(ValueError):
+        validate_telemetry_layout_xml(xml)

@@ -1754,6 +1754,7 @@
     "metric": "Metric",
     "visible": "Visible",
     "showLabel": "Show label",
+    "fontSize": "Font size (px)",
     "x": "X",
     "y": "Y",
     "width": "Width",

@@ -99,6 +99,13 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
             raise ValueError("Telemetry element border is invalid")
         if widget.attrib.get("label-visible") not in {None, "true", "false"}:
             raise ValueError("Telemetry widget label visibility is invalid")
+        if "font-size" in widget.attrib:
+            try:
+                font_size = float(widget.attrib["font-size"])
+            except (TypeError, ValueError) as exc:
+                raise ValueError("Telemetry widget font size is invalid") from exc
+            if not math.isfinite(font_size) or not 8 <= font_size <= 160:
+                raise ValueError("Telemetry widget font size must be between 8 and 160")
         for name in ("x", "y", "width", "height"):
             try:
                 value = float(widget.attrib[name])

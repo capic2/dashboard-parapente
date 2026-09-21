@@ -1759,6 +1759,7 @@
     "metric": "Métrique",
     "visible": "Visible",
     "showLabel": "Afficher le libellé",
+    "fontSize": "Taille de police (px)",
     "x": "X",
     "y": "Y",
     "width": "Largeur",

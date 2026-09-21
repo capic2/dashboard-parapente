@@ -340,6 +340,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           <div
             ref={canvasRef}
             className="relative mx-auto aspect-video max-w-5xl overflow-hidden rounded-lg border border-slate-700 bg-[radial-gradient(circle_at_50%_35%,#1e3a5f,#090f1b_65%)] select-none"
+            style={{ containerType: 'inline-size' }}
             onPointerMove={moveDrag}
             onPointerUp={() => setDrag(null)}
             onPointerCancel={() => setDrag(null)}
@@ -383,6 +384,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                     top: `${item.y * 100}%`,
                     width: `${item.width * 100}%`,
                     height: `${item.height * 100}%`,
+                    fontSize: `${((item.fontSize ?? 32) / 1920) * 100}cqw`,
                   }}
                 >
                   {isText ? (
@@ -402,14 +404,23 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   ) : (
                     <>
                       {item.showLabel !== false && (
-                        <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+                        <span
+                          className="block font-semibold uppercase tracking-wide text-slate-300"
+                          style={{ fontSize: '0.35em' }}
+                        >
                           {item.name ??
                             t(`flights.${METRIC_LABELS[item.metric]}`)}
                         </span>
                       )}
-                      <span className="mt-1 block truncate font-mono text-[clamp(.75rem,2vw,1.2rem)] font-bold">
+                      <span
+                        className="mt-1 block truncate font-mono font-bold"
+                        style={{ fontSize: '1em' }}
+                      >
                         {formatTelemetryValue(value)}
-                        <span className="ml-1 text-xs font-normal text-slate-300">
+                        <span
+                          className="ml-1 font-normal text-slate-300"
+                          style={{ fontSize: '0.45em' }}
+                        >
                           {unit}
                         </span>
                       </span>
@@ -594,6 +605,26 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                     }
                   />
                   {t('telemetryLayout.showLabel')}
+                </label>
+              )}
+              {selected.type === 'widget' && (
+                <label className="block text-sm">
+                  <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                    {t('telemetryLayout.fontSize')}
+                  </span>
+                  <input
+                    className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-right dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                    type="number"
+                    min="8"
+                    max="160"
+                    step="1"
+                    value={selected.fontSize ?? 32}
+                    onChange={(event) =>
+                      updateItem(selected.id, {
+                        fontSize: clamp(Number(event.target.value), 8, 160),
+                      })
+                    }
+                  />
                 </label>
               )}
               <label className="flex items-center gap-2 text-sm">
