@@ -6,6 +6,7 @@ import {
 } from '../../../hooks/flights/useFlightTelemetry';
 import {
   DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
+  type TelemetryLayout,
   type FlightTelemetryLayoutItem,
 } from './flightTelemetryLayout';
 import {
@@ -44,6 +45,7 @@ export function FlightTelemetryOverlay({
   const { t } = useTranslation();
   const longPressTimer = useRef<number | null>(null);
   const longPressTriggered = useRef(false);
+  const backgroundImage = (layout as TelemetryLayout).backgroundImage;
   const point = useMemo(
     () =>
       interpolateTelemetryAtVideoTime(
@@ -78,7 +80,14 @@ export function FlightTelemetryOverlay({
   return (
     <div
       className="pointer-events-none absolute inset-0"
-      style={{ containerType: 'inline-size' }}
+      style={{
+        containerType: 'inline-size',
+        backgroundImage: backgroundImage
+          ? `url(${JSON.stringify(backgroundImage)})`
+          : undefined,
+        backgroundSize: backgroundImage ? 'cover' : undefined,
+        backgroundPosition: backgroundImage ? 'center' : undefined,
+      }}
     >
       {layout
         .filter((slot) => slot.visible)

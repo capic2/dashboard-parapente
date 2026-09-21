@@ -49,7 +49,7 @@ VALID_INTERACTION_ACTIONS = {"none", "cycle_metric"}
 
 def validate_telemetry_layout_xml(xml_content: str) -> str:
     """Validate and normalize an editor XML document."""
-    if not isinstance(xml_content, str) or len(xml_content) > 50_000:
+    if not isinstance(xml_content, str) or len(xml_content) > 500_000:
         raise ValueError("Telemetry layout XML is invalid or too large")
     try:
         root = ET.fromstring(xml_content)
@@ -60,6 +60,11 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
         raise ValueError("Telemetry layout XML must use version 1")
     if root.attrib.get("width") != "1920" or root.attrib.get("height") != "1080":
         raise ValueError("Telemetry layout canvas must be 1920x1080")
+    background_image = root.attrib.get("background-image")
+    if background_image is not None and (
+        not background_image.startswith("data:image/") or len(background_image) > 450_000
+    ):
+        raise ValueError("Telemetry layout background image is invalid")
 
     children = list(root)
     groups = [child for child in children if child.tag == "group"]

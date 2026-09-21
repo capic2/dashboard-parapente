@@ -77,3 +77,24 @@ def test_layout_rejects_invalid_widget_font_size() -> None:
 
     with pytest.raises(ValueError):
         validate_telemetry_layout_xml(xml)
+
+
+def test_layout_accepts_embedded_background_image() -> None:
+    xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
+        '<telemetry-layout version="1"',
+        '<telemetry-layout background-image="data:image/png;base64,ZmFrZQ==" version="1"',
+        1,
+    )
+
+    assert "background-image" in validate_telemetry_layout_xml(xml)
+
+
+def test_layout_rejects_external_background_image() -> None:
+    xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
+        '<telemetry-layout version="1"',
+        '<telemetry-layout background-image="https://example.com/background.png" version="1"',
+        1,
+    )
+
+    with pytest.raises(ValueError):
+        validate_telemetry_layout_xml(xml)

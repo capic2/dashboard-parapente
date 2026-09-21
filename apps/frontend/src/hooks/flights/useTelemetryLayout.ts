@@ -4,6 +4,7 @@ import {
   DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
   parseTelemetryLayoutXml,
   serializeTelemetryLayoutXml,
+  type TelemetryLayout,
   type FlightTelemetryLayoutItem,
 } from '../../components/flights/details/flightTelemetryLayout';
 
@@ -14,6 +15,11 @@ export interface TelemetryLayoutResponse {
   xml_content: string;
   format_version: number;
   is_override: boolean;
+}
+
+export interface TelemetryLayoutDocument {
+  layout: readonly FlightTelemetryLayoutItem[];
+  backgroundImage?: string;
 }
 
 export function telemetryLayoutQueryKey(flightId?: string) {
@@ -41,15 +47,18 @@ export function useTelemetryLayout(flightId?: string) {
 export function useSaveTelemetryLayout(flightId?: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (layout: readonly FlightTelemetryLayoutItem[]) =>
-      api
+    mutationFn: (document: TelemetryLayoutDocument) => {
+      const layout = [...document.layout] as TelemetryLayout;
+      layout.backgroundImage = document.backgroundImage;
+      return api
         .put(
           flightId
             ? `flights/${flightId}/telemetry-layout`
             : 'telemetry-layouts/default',
           { json: { xml_content: serializeTelemetryLayoutXml(layout) } }
         )
-        .json<TelemetryLayoutResponse>(),
+        .json<TelemetryLayoutResponse>();
+    },
     onSuccess: (response) => {
       queryClient.setQueryData(telemetryLayoutQueryKey(flightId), {
         ...response,

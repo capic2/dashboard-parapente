@@ -5,19 +5,25 @@ import { Button } from '@dashboard-parapente/design-system';
 import {
   Download,
   Grip,
+  Image as ImageIcon,
   Plus,
   RotateCcw,
   Save,
   SlidersHorizontal,
   Trash2,
+  Upload,
 } from 'lucide-react';
-import { useFlightTelemetry } from '../../hooks/flights/useFlightTelemetry';
+import {
+  useFlightTelemetry,
+  type FlightTelemetryData,
+} from '../../hooks/flights/useFlightTelemetry';
 import {
   defaultTelemetryLayout,
   useResetTelemetryLayout,
   useSaveTelemetryLayout,
   useTelemetryLayout,
 } from '../../hooks/flights/useTelemetryLayout';
+import { parseTelemetryGpxFile } from '../flights/details/telemetryGpxPreview';
 import {
   serializeTelemetryLayoutXml,
   type FlightTelemetryIconLayout,
@@ -38,7 +44,7 @@ type DragMode = 'move' | 'resize';
 const MAX_WIDGETS = 16;
 
 function displayWidgetName(name: string) {
-  return name.replaceAll('_', ' ');
+  return name.replace(/_/gu, ' ');
 }
 
 function clamp(value: number, minimum: number, maximum: number) {
@@ -56,6 +62,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const [layout, setLayout] = useState<FlightTelemetryLayoutItem[]>(
     defaultTelemetryLayout
   );
+  const [backgroundImage, setBackgroundImage] = useState<string>();
+  const [localTelemetry, setLocalTelemetry] = useState<FlightTelemetryData>();
+  const [gpxFileName, setGpxFileName] = useState<string>();
+  const [gpxError, setGpxError] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>(
     layout[0]?.id ? [layout[0].id] : []
   );
@@ -69,6 +79,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   useEffect(() => {
     if (layoutQuery.data?.layout) {
       setLayout(layoutQuery.data.layout);
+      setBackgroundImage(layoutQuery.data.layout.backgroundImage);
       setSelectedIds(
         layoutQuery.data.layout[0]?.id ? [layoutQuery.data.layout[0].id] : []
       );
@@ -76,7 +87,30 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   }, [layoutQuery.data?.layout]);
 
   const selected = layout.find((item) => item.id === selectedIds[0]) ?? null;
-  const previewPoint = telemetryQuery.data?.points[0];
+  const previewTelemetry = localTelemetry ?? telemetryQuery.data;
+  const previewPoint = previewTelemetry?.points[0];
+
+  const handleGpxFile = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      setLocalTelemetry(await parseTelemetryGpxFile(file));
+      setGpxFileName(file.name);
+      setGpxError(false);
+    } catch {
+      setLocalTelemetry(undefined);
+      setGpxFileName(undefined);
+      setGpxError(true);
+    }
+  };
+
+  const handleBackgroundImage = (file: File | undefined) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') setBackgroundImage(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const addField = () => {
     if (layout.length >= MAX_WIDGETS) return;
@@ -251,7 +285,11 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   };
 
   const downloadXml = () => {
-    const blob = new Blob([serializeTelemetryLayoutXml(layout)], {
+    const xmlDocument = [...layout] as typeof layout & {
+      backgroundImage?: string;
+    };
+    xmlDocument.backgroundImage = backgroundImage;
+    const blob = new Blob([serializeTelemetryLayoutXml(xmlDocument)], {
       type: 'application/xml',
     });
     const url = URL.createObjectURL(blob);
@@ -283,6 +321,50 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
             <p className="mt-1 text-xs font-medium text-violet-600 dark:text-violet-300">
               {t('telemetryLayout.usingDefault')}
             </p>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 font-medium dark:border-slate-600">
+            <Upload className="h-4 w-4" />
+            {t('telemetryLayout.loadGpx')}
+            <input
+              type="file"
+              accept=".gpx,application/gpx+xml,application/xml"
+              className="sr-only"
+              onChange={(event) => void handleGpxFile(event.target.files?.[0])}
+            />
+          </label>
+          {gpxFileName && (
+            <span className="max-w-40 truncate text-emerald-600 dark:text-emerald-300">
+              {gpxFileName}
+            </span>
+          )}
+          {gpxError && (
+            <span className="text-rose-600 dark:text-rose-300">
+              {t('telemetryLayout.gpxError')}
+            </span>
+          )}
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 font-medium dark:border-slate-600">
+            <ImageIcon className="h-4 w-4" />
+            {t('telemetryLayout.backgroundImage')}
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(event) =>
+                handleBackgroundImage(event.target.files?.[0])
+              }
+            />
+          </label>
+          {backgroundImage && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onPress={() => setBackgroundImage(undefined)}
+            >
+              <Trash2 className="h-4 w-4" />
+              {t('telemetryLayout.removeBackground')}
+            </Button>
           )}
         </div>
         <div className="flex flex-wrap gap-2">
@@ -329,7 +411,9 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           )}
           <Button
             size="sm"
-            onPress={() => void saveLayout.mutateAsync(layout)}
+            onPress={() =>
+              void saveLayout.mutateAsync({ layout, backgroundImage })
+            }
             isDisabled={saveLayout.isPending}
           >
             <Save className="h-4 w-4" />
@@ -344,7 +428,14 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           <div
             ref={canvasRef}
             className="relative mx-auto aspect-video max-w-5xl overflow-hidden rounded-lg border border-slate-700 bg-[radial-gradient(circle_at_50%_35%,#1e3a5f,#090f1b_65%)] select-none"
-            style={{ containerType: 'inline-size' }}
+            style={{
+              containerType: 'inline-size',
+              backgroundImage: backgroundImage
+                ? `url(${JSON.stringify(backgroundImage)})`
+                : undefined,
+              backgroundSize: backgroundImage ? 'cover' : undefined,
+              backgroundPosition: backgroundImage ? 'center' : undefined,
+            }}
             onPointerMove={moveDrag}
             onPointerUp={() => setDrag(null)}
             onPointerCancel={() => setDrag(null)}
@@ -361,7 +452,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   ? ['—', '']
                   : (getTelemetryMetricValue(
                       previewPoint ?? null,
-                      telemetryQuery.data,
+                      previewTelemetry,
                       item.metric
                     ) ?? ['—', '']);
               const isSelected = selectedIds.includes(item.id);

@@ -2,6 +2,10 @@ import { METRIC_KEYS, type MetricKey } from './telemetryMetrics';
 
 export type TelemetryInteractionAction = 'none' | 'cycle_metric';
 
+export type TelemetryLayout = FlightTelemetryLayoutItem[] & {
+  backgroundImage?: string;
+};
+
 export type TelemetryIconName =
   | 'mountain'
   | 'wind'
@@ -118,15 +122,15 @@ function numberAttribute(element: Element, name: string, fallback: number) {
   return Number.isFinite(value) ? value : fallback;
 }
 
-export function parseTelemetryLayoutXml(
-  xml: string
-): FlightTelemetryLayoutItem[] {
+export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
   const document = new DOMParser().parseFromString(xml, 'application/xml');
   if (
     document.querySelector('parsererror') ||
     document.documentElement.tagName !== 'telemetry-layout'
   ) {
-    return DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget) => ({ ...widget }));
+    return withBackground(
+      DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget) => ({ ...widget }))
+    );
   }
   const items = Array.from(
     document.documentElement.querySelectorAll(
@@ -141,8 +145,10 @@ export function parseTelemetryLayoutXml(
       )
   );
   if (items.length < 1 || items.length > MAX_TELEMETRY_WIDGETS)
-    return DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget) => ({ ...widget }));
-  return items.map((element, index) => {
+    return withBackground(
+      DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget) => ({ ...widget }))
+    );
+  const parsed = items.map((element, index) => {
     const fallback =
       DEFAULT_FLIGHT_TELEMETRY_LAYOUT[
         index % DEFAULT_FLIGHT_TELEMETRY_LAYOUT.length
@@ -240,6 +246,10 @@ export function parseTelemetryLayoutXml(
       metric: METRIC_KEYS.includes(metric) ? metric : fallback.metric,
     };
   });
+  return withBackground(
+    parsed,
+    document.documentElement.getAttribute('background-image') ?? undefined
+  );
 }
 
 export function serializeTelemetryLayoutXml(
@@ -257,7 +267,11 @@ export function serializeTelemetryLayoutXml(
         `<group id="${escapeXml(groupId)}"${groupName ? ` name="${escapeXml(groupName)}"` : ''} />`
     )
     .join('');
-  const root = `<telemetry-layout version="1" width="1920" height="1080">${groups}${layout
+  const backgroundImage = (layout as TelemetryLayout).backgroundImage;
+  const background = backgroundImage
+    ? ` background-image="${escapeXml(backgroundImage)}"`
+    : '';
+  const root = `<telemetry-layout version="1" width="1920" height="1080"${background}>${groups}${layout
     .map((item) => {
       const name = item.name ? ` label="${escapeXml(item.name)}"` : '';
       const group = item.groupId ? ` group="${escapeXml(item.groupId)}"` : '';
@@ -288,6 +302,19 @@ export function serializeTelemetryLayoutXml(
   return new XMLSerializer().serializeToString(
     new DOMParser().parseFromString(root, 'application/xml')
   );
+}
+
+function withBackground(
+  items: FlightTelemetryLayoutItem[],
+  backgroundImage?: string
+): TelemetryLayout {
+  Object.defineProperty(items, 'backgroundImage', {
+    value: backgroundImage,
+    enumerable: false,
+    configurable: true,
+    writable: true,
+  });
+  return items as TelemetryLayout;
 }
 
 function escapeXml(value: string) {

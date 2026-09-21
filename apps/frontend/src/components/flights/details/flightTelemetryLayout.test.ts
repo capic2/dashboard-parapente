@@ -136,6 +136,21 @@ describe('flight telemetry layout XML', () => {
     ).toEqual(layout);
   });
 
+  it('round-trips the global background image', () => {
+    const layout = [
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[0],
+      },
+    ] as typeof DEFAULT_FLIGHT_TELEMETRY_LAYOUT & {
+      backgroundImage?: string;
+    };
+    layout.backgroundImage = 'data:image/png;base64,ZmFrZQ==';
+
+    const parsed = parseTelemetryLayoutXml(serializeTelemetryLayoutXml(layout));
+
+    expect(parsed.backgroundImage).toBe(layout.backgroundImage);
+  });
+
   it('evaluates the calculated fields used by the 3840 GoPro layout', () => {
     const data = {
       points: [
