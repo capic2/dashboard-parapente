@@ -1,13 +1,16 @@
-import type { MetricKey } from './FlightTelemetryOverlay';
+import { METRIC_KEYS, type MetricKey } from './telemetryMetrics';
 
 export type TelemetryIconName =
   | 'mountain'
   | 'wind'
   | 'heart'
+  | 'heartbeat'
   | 'compass'
   | 'map-pin'
   | 'flame'
-  | 'gauge';
+  | 'gauge'
+  | 'slope'
+  | 'slope-triangle';
 
 interface FlightTelemetryLayoutItemBase {
   id: string;
@@ -86,24 +89,18 @@ export const DEFAULT_FLIGHT_TELEMETRY_LAYOUT = [
   },
 ] satisfies readonly FlightTelemetryWidgetLayout[];
 
-const METRICS: MetricKey[] = [
-  'altitude',
-  'speed',
-  'vario',
-  'distance',
-  'heading',
-  'heart_rate',
-  'power',
-];
 const MAX_TELEMETRY_WIDGETS = 16;
 const ICONS: TelemetryIconName[] = [
   'mountain',
   'wind',
   'heart',
+  'heartbeat',
   'compass',
   'map-pin',
   'flame',
   'gauge',
+  'slope',
+  'slope-triangle',
 ];
 
 function numberAttribute(element: Element, name: string, fallback: number) {
@@ -195,7 +192,7 @@ export function parseTelemetryLayoutXml(
       ...naming,
       ...styling,
       type: 'widget' as const,
-      metric: METRICS.includes(metric) ? metric : fallback.metric,
+      metric: METRIC_KEYS.includes(metric) ? metric : fallback.metric,
     };
   });
 }

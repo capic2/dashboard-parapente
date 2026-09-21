@@ -3,32 +3,20 @@ import { useTranslation } from 'react-i18next';
 import {
   interpolateTelemetryAtVideoTime,
   type FlightTelemetryData,
-  type FlightTelemetryPoint,
 } from '../../../hooks/flights/useFlightTelemetry';
 import {
   DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
   type FlightTelemetryLayoutItem,
 } from './flightTelemetryLayout';
+import {
+  METRIC_LABELS,
+  getTelemetryMetricValue,
+  formatTelemetryValue,
+  type MetricKey,
+} from './telemetryMetrics';
 import { TelemetryLayoutIcon } from '../../telemetry/TelemetryLayoutIcon';
 
-export type MetricKey =
-  | 'altitude'
-  | 'speed'
-  | 'vario'
-  | 'distance'
-  | 'heading'
-  | 'heart_rate'
-  | 'power';
-
-interface FlightTelemetryOverlayProps {
-  data?: FlightTelemetryData;
-  videoTimeSeconds: number;
-  offsetSeconds: number;
-  timelineStartTimestamp?: number;
-  layout?: readonly FlightTelemetryLayoutItem[];
-}
-
-const METRIC_KEYS: MetricKey[] = [
+const CYCLE_METRICS: MetricKey[] = [
   'altitude',
   'speed',
   'vario',
@@ -38,45 +26,13 @@ const METRIC_KEYS: MetricKey[] = [
   'power',
 ];
 
-const getMetricValue = (
-  point: FlightTelemetryPoint | null,
-  metric: MetricKey
-): [number | null | undefined, string] | null => {
-  if (!point) return null;
-  switch (metric) {
-    case 'altitude':
-      return [point.elevation, 'm'];
-    case 'speed':
-      return [point.speed_kmh, 'km/h'];
-    case 'vario':
-      return [point.vario_ms, 'm/s'];
-    case 'distance':
-      return [point.distance_km, 'km'];
-    case 'heading':
-      return [point.heading_deg, '°'];
-    case 'heart_rate':
-      return [point.heart_rate, 'bpm'];
-    case 'power':
-      return [point.power, 'W'];
-  }
-};
-
-function formatValue(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) return '—';
-  return Math.abs(value) >= 100
-    ? Math.round(value).toString()
-    : value.toFixed(1);
+interface FlightTelemetryOverlayProps {
+  data?: FlightTelemetryData;
+  videoTimeSeconds: number;
+  offsetSeconds: number;
+  timelineStartTimestamp?: number;
+  layout?: readonly FlightTelemetryLayoutItem[];
 }
-
-const METRIC_LABELS: Record<MetricKey, string> = {
-  altitude: 'telemetryAltitude',
-  speed: 'telemetrySpeed',
-  vario: 'telemetryVario',
-  distance: 'telemetryDistance',
-  heading: 'telemetryHeading',
-  heart_rate: 'telemetryHeartRate',
-  power: 'telemetryPower',
-};
 
 export function FlightTelemetryOverlay({
   data,
@@ -155,9 +111,15 @@ export function FlightTelemetryOverlay({
             );
           }
           const metric = selectedMetrics[slot.id] ?? slot.metric;
-          const [value, unit] = getMetricValue(point, metric) ?? [null, ''];
+          const [value, unit] = getTelemetryMetricValue(
+            point,
+            data,
+            metric
+          ) ?? [null, ''];
           const nextMetric =
-            METRIC_KEYS[(METRIC_KEYS.indexOf(metric) + 1) % METRIC_KEYS.length];
+            CYCLE_METRICS[
+              (CYCLE_METRICS.indexOf(metric) + 1) % CYCLE_METRICS.length
+            ];
           return (
             <button
               key={slot.id}
@@ -175,13 +137,13 @@ export function FlightTelemetryOverlay({
                   [slot.id]: nextMetric,
                 }))
               }
-              aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${formatValue(value)} ${unit}. ${t('flights.telemetryChangeMetric')}`}
+              aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${formatTelemetryValue(value)} ${unit}. ${t('flights.telemetryChangeMetric')}`}
             >
               <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-300">
                 {t(`flights.${METRIC_LABELS[metric]}`)}
               </span>
               <span className="mt-0.5 block font-mono text-lg font-bold leading-none">
-                {formatValue(value)}
+                {formatTelemetryValue(value)}
                 <span className="ml-1 text-xs font-normal text-slate-300">
                   {unit}
                 </span>

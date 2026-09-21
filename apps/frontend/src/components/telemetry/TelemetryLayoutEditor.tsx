@@ -18,7 +18,6 @@ import {
   useSaveTelemetryLayout,
   useTelemetryLayout,
 } from '../../hooks/flights/useTelemetryLayout';
-import type { FlightTelemetryPoint } from '../../hooks/flights/useFlightTelemetry';
 import {
   serializeTelemetryLayoutXml,
   type FlightTelemetryIconLayout,
@@ -26,56 +25,17 @@ import {
   type FlightTelemetryTextLayout,
 } from '../flights/details/flightTelemetryLayout';
 import { TelemetryLayoutIcon } from './TelemetryLayoutIcon';
+import {
+  METRIC_KEYS as METRICS,
+  METRIC_LABELS,
+  formatTelemetryValue,
+  getTelemetryMetricValue,
+  type MetricKey as Metric,
+} from '../flights/details/telemetryMetrics';
 
 type DragMode = 'move' | 'resize';
 
-const METRICS = [
-  'altitude',
-  'speed',
-  'vario',
-  'distance',
-  'heading',
-  'heart_rate',
-  'power',
-] as const;
-
-type Metric = (typeof METRICS)[number];
 const MAX_WIDGETS = 16;
-
-const METRIC_LABELS: Record<Metric, string> = {
-  altitude: 'telemetryAltitude',
-  speed: 'telemetrySpeed',
-  vario: 'telemetryVario',
-  distance: 'telemetryDistance',
-  heading: 'telemetryHeading',
-  heart_rate: 'telemetryHeartRate',
-  power: 'telemetryPower',
-};
-
-function valueForMetric(
-  point: FlightTelemetryPoint | undefined,
-  metric: Metric
-) {
-  if (!point) return ['—', ''];
-  const values: Record<Metric, [number | null | undefined, string]> = {
-    altitude: [point.elevation, 'm'],
-    speed: [point.speed_kmh, 'km/h'],
-    vario: [point.vario_ms, 'm/s'],
-    distance: [point.distance_km, 'km'],
-    heading: [point.heading_deg, '°'],
-    heart_rate: [point.heart_rate, 'bpm'],
-    power: [point.power, 'W'],
-  };
-  const [value, unit] = values[metric];
-  return [
-    value == null
-      ? '—'
-      : Math.abs(value) >= 100
-        ? String(Math.round(value))
-        : value.toFixed(1),
-    unit,
-  ];
-}
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.max(minimum, Math.min(maximum, value));
@@ -394,7 +354,11 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
               const [value, unit] =
                 isIcon || isText
                   ? ['—', '']
-                  : valueForMetric(previewPoint, item.metric);
+                  : (getTelemetryMetricValue(
+                      previewPoint ?? null,
+                      telemetryQuery.data,
+                      item.metric
+                    ) ?? ['—', '']);
               const isSelected = selectedIds.includes(item.id);
               return (
                 <button
@@ -444,7 +408,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                           t(`flights.${METRIC_LABELS[item.metric]}`)}
                       </span>
                       <span className="mt-1 block truncate font-mono text-[clamp(.75rem,2vw,1.2rem)] font-bold">
-                        {value}
+                        {formatTelemetryValue(value)}
                         <span className="ml-1 text-xs font-normal text-slate-300">
                           {unit}
                         </span>
@@ -568,10 +532,13 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       'mountain',
                       'wind',
                       'heart',
+                      'heartbeat',
                       'compass',
                       'map-pin',
                       'flame',
                       'gauge',
+                      'slope',
+                      'slope-triangle',
                     ].map((icon) => (
                       <option key={icon} value={icon}>
                         {icon}

@@ -14,21 +14,34 @@ DEFAULT_TELEMETRY_LAYOUT_XML = """<telemetry-layout version=\"1\" width=\"1920\"
 
 VALID_METRICS = {
     "altitude",
+    "altitude_min",
+    "altitude_max",
+    "start_altitude",
     "speed",
     "vario",
+    "vario_min",
+    "vario_max",
     "distance",
     "heading",
     "heart_rate",
+    "heart_rate_min",
+    "heart_rate_max",
     "power",
+    "total_gain",
+    "total_loss",
+    "datetime",
 }
 VALID_ICONS = {
     "mountain",
     "wind",
     "heart",
+    "heartbeat",
     "compass",
     "map-pin",
     "flame",
     "gauge",
+    "slope",
+    "slope-triangle",
 }
 MAX_TELEMETRY_WIDGETS = 16
 

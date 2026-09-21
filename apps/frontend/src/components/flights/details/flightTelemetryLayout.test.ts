@@ -5,6 +5,8 @@ import {
   serializeTelemetryLayoutXml,
 } from './flightTelemetryLayout';
 import type { FlightTelemetryWidgetLayout } from './flightTelemetryLayout';
+import { getTelemetryMetricValue } from './telemetryMetrics';
+import type { FlightTelemetryData } from '../../../hooks/flights/useFlightTelemetry';
 
 describe('flight telemetry layout XML', () => {
   it('round-trips normalized widget positions and metrics', () => {
@@ -92,5 +94,69 @@ describe('flight telemetry layout XML', () => {
     expect(
       parseTelemetryLayoutXml(serializeTelemetryLayoutXml(layout))
     ).toEqual(layout);
+  });
+
+  it('evaluates the calculated fields used by the 3840 GoPro layout', () => {
+    const data = {
+      points: [
+        {
+          timestamp: 1_700_000_000,
+          lat: 0,
+          lon: 0,
+          elevation: 1200,
+          segment: 0,
+          vario_ms: 1,
+          heart_rate: 100,
+        },
+        {
+          timestamp: 1_700_001_000,
+          lat: 0,
+          lon: 0,
+          elevation: 1250,
+          segment: 0,
+          vario_ms: -2,
+          heart_rate: 140,
+        },
+        {
+          timestamp: 1_700_002_000,
+          lat: 0,
+          lon: 0,
+          elevation: 1230,
+          segment: 0,
+          vario_ms: 0,
+          heart_rate: 120,
+        },
+      ],
+    } as FlightTelemetryData;
+    const point = data.points[1];
+
+    expect(getTelemetryMetricValue(point, data, 'start_altitude')).toEqual([
+      1200,
+      'm',
+    ]);
+    expect(getTelemetryMetricValue(point, data, 'altitude_min')).toEqual([
+      1200,
+      'm',
+    ]);
+    expect(getTelemetryMetricValue(point, data, 'altitude_max')).toEqual([
+      1250,
+      'm',
+    ]);
+    expect(getTelemetryMetricValue(point, data, 'total_gain')).toEqual([
+      50,
+      'm',
+    ]);
+    expect(getTelemetryMetricValue(point, data, 'total_loss')).toEqual([
+      20,
+      'm',
+    ]);
+    expect(getTelemetryMetricValue(point, data, 'vario_min')).toEqual([
+      -2,
+      'm/s',
+    ]);
+    expect(getTelemetryMetricValue(point, data, 'heart_rate_max')).toEqual([
+      140,
+      'bpm',
+    ]);
   });
 });
