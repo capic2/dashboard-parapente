@@ -143,11 +143,9 @@ def test_flight_telemetry_keeps_enriched_gpx_on_absolute_timeline(
     response = routes.get_flight_telemetry("flight-1", _FakeDb(flight))
 
     assert response.source == "gpx+osv"
-    assert response.points[0]["timestamp"] == int(
-        datetime(2026, 7, 1, 10, tzinfo=timezone.utc).timestamp() * 1000
-    )
-    assert response.points[1].heart_rate == 140
-    assert response.points[1].timestamp == int(
+    assert len(response.points) == 1
+    assert response.points[0].heart_rate == 140
+    assert response.points[0].timestamp == int(
         datetime(2026, 7, 1, 10, 0, 25, tzinfo=timezone.utc).timestamp() * 1000
     )
 
