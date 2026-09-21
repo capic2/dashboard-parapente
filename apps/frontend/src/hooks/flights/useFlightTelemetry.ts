@@ -81,9 +81,11 @@ export function interpolateTelemetryAtVideoTime(
       ? timelineStartTimestamp
       : firstTimestamp) +
     (videoTimeSeconds - offsetSeconds) * 1000;
-  if (targetTimestamp <= points[0].timestamp) return points[0];
-  if (targetTimestamp >= points[points.length - 1].timestamp) {
-    return points[points.length - 1];
+  if (
+    targetTimestamp < points[0].timestamp ||
+    targetTimestamp > points[points.length - 1].timestamp
+  ) {
+    return null;
   }
 
   let low = 0;
