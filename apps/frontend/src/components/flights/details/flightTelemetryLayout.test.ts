@@ -46,4 +46,28 @@ describe('flight telemetry layout XML', () => {
       parseTelemetryLayoutXml(serializeTelemetryLayoutXml(layout))
     ).toEqual(layout);
   });
+
+  it('round-trips icons and group membership', () => {
+    const layout = [
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[0],
+        groupId: 'flight-info',
+      },
+      {
+        id: 'wind-icon',
+        type: 'icon' as const,
+        icon: 'wind' as const,
+        x: 0.4,
+        y: 0.4,
+        width: 0.06,
+        height: 0.06,
+        visible: true,
+        groupId: 'flight-info',
+      },
+    ];
+
+    expect(
+      parseTelemetryLayoutXml(serializeTelemetryLayoutXml(layout))
+    ).toEqual(layout);
+  });
 });

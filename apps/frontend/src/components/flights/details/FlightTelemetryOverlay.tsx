@@ -7,8 +7,9 @@ import {
 } from '../../../hooks/flights/useFlightTelemetry';
 import {
   DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
-  type FlightTelemetryWidgetLayout,
+  type FlightTelemetryLayoutItem,
 } from './flightTelemetryLayout';
+import { TelemetryLayoutIcon } from '../../telemetry/TelemetryLayoutIcon';
 
 export type MetricKey =
   | 'altitude'
@@ -24,7 +25,7 @@ interface FlightTelemetryOverlayProps {
   videoTimeSeconds: number;
   offsetSeconds: number;
   timelineStartTimestamp?: number;
-  layout?: readonly FlightTelemetryWidgetLayout[];
+  layout?: readonly FlightTelemetryLayoutItem[];
 }
 
 const METRIC_KEYS: MetricKey[] = [
@@ -117,6 +118,22 @@ export function FlightTelemetryOverlay({
       {layout
         .filter((slot) => slot.visible)
         .map((slot) => {
+          if (slot.type === 'icon') {
+            return (
+              <div
+                key={slot.id}
+                className="pointer-events-auto absolute flex items-center justify-center rounded-lg border border-white/25 bg-slate-950/75 text-white shadow-lg backdrop-blur-sm"
+                style={{
+                  left: `${slot.x * 100}%`,
+                  top: `${slot.y * 100}%`,
+                  width: `${slot.width * 100}%`,
+                  height: `${slot.height * 100}%`,
+                }}
+              >
+                <TelemetryLayoutIcon name={slot.icon} className="h-1/2 w-1/2" />
+              </div>
+            );
+          }
           const metric = selectedMetrics[slot.id] ?? slot.metric;
           const [value, unit] = getMetricValue(point, metric) ?? [null, ''];
           const nextMetric =

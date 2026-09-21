@@ -30,3 +30,15 @@ def test_layouts_can_contain_added_widgets() -> None:
     )
 
     assert 'id="extra"' in validate_telemetry_layout_xml(xml)
+
+
+def test_layouts_can_contain_icons_and_groups() -> None:
+    xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
+        '<widget id="top-left"',
+        '<group id="flight-info" /><widget id="top-left" group="flight-info"',
+    ).replace(
+        "</telemetry-layout>",
+        '<icon id="wind-icon" name="wind" group="flight-info" x="0.4" y="0.4" width="0.06" height="0.06" visible="true" /></telemetry-layout>',
+    )
+
+    assert 'name="wind"' in validate_telemetry_layout_xml(xml)

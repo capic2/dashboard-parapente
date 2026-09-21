@@ -4,7 +4,7 @@ import {
   DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
   parseTelemetryLayoutXml,
   serializeTelemetryLayoutXml,
-  type FlightTelemetryWidgetLayout,
+  type FlightTelemetryLayoutItem,
 } from '../../components/flights/details/flightTelemetryLayout';
 
 export interface TelemetryLayoutResponse {
@@ -41,7 +41,7 @@ export function useTelemetryLayout(flightId?: string) {
 export function useSaveTelemetryLayout(flightId?: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (layout: readonly FlightTelemetryWidgetLayout[]) =>
+    mutationFn: (layout: readonly FlightTelemetryLayoutItem[]) =>
       api
         .put(
           flightId

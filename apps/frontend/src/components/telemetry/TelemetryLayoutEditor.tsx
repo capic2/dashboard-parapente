@@ -21,8 +21,10 @@ import {
 import type { FlightTelemetryPoint } from '../../hooks/flights/useFlightTelemetry';
 import {
   serializeTelemetryLayoutXml,
-  type FlightTelemetryWidgetLayout,
+  type FlightTelemetryIconLayout,
+  type FlightTelemetryLayoutItem,
 } from '../flights/details/flightTelemetryLayout';
+import { TelemetryLayoutIcon } from './TelemetryLayoutIcon';
 
 type DragMode = 'move' | 'resize';
 
@@ -86,26 +88,29 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const resetLayout = useResetTelemetryLayout(flightId ?? '');
   const canvasRef = useRef<HTMLDivElement>(null);
   const widgetIdCounter = useRef(0);
-  const [layout, setLayout] = useState<FlightTelemetryWidgetLayout[]>(
+  const [layout, setLayout] = useState<FlightTelemetryLayoutItem[]>(
     defaultTelemetryLayout
   );
-  const [selectedId, setSelectedId] = useState(layout[0]?.id ?? null);
+  const [selectedIds, setSelectedIds] = useState<string[]>(
+    layout[0]?.id ? [layout[0].id] : []
+  );
   const [drag, setDrag] = useState<{
-    id: string;
     mode: DragMode;
     startX: number;
     startY: number;
-    widget: FlightTelemetryWidgetLayout;
+    items: FlightTelemetryLayoutItem[];
   } | null>(null);
 
   useEffect(() => {
     if (layoutQuery.data?.layout) {
       setLayout(layoutQuery.data.layout);
-      setSelectedId(layoutQuery.data.layout[0]?.id ?? null);
+      setSelectedIds(
+        layoutQuery.data.layout[0]?.id ? [layoutQuery.data.layout[0].id] : []
+      );
     }
   }, [layoutQuery.data?.layout]);
 
-  const selected = layout.find((widget) => widget.id === selectedId) ?? null;
+  const selected = layout.find((item) => item.id === selectedIds[0]) ?? null;
   const previewPoint = telemetryQuery.data?.points[0];
 
   const addField = () => {
@@ -117,7 +122,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       ) ?? METRICS[0];
     const column = layout.length % 4;
     const row = Math.floor(layout.length / 4);
-    const widget: FlightTelemetryWidgetLayout = {
+    const widget: FlightTelemetryLayoutItem = {
       id,
       metric,
       x: 0.02 + column * 0.24,
@@ -127,19 +132,38 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       visible: true,
     };
     setLayout((current) => [...current, widget]);
-    setSelectedId(id);
+    setSelectedIds([id]);
+  };
+
+  const addIcon = () => {
+    if (layout.length >= MAX_WIDGETS) return;
+    const id = `icon-${Date.now()}-${widgetIdCounter.current++}`;
+    const column = layout.length % 4;
+    const row = Math.floor(layout.length / 4);
+    const icon: FlightTelemetryIconLayout = {
+      id,
+      type: 'icon',
+      icon: 'gauge',
+      x: 0.02 + column * 0.24,
+      y: 0.02 + row * 0.2,
+      width: 0.1,
+      height: 0.1,
+      visible: true,
+    };
+    setLayout((current) => [...current, icon]);
+    setSelectedIds([id]);
   };
 
   const removeSelectedField = () => {
-    if (!selectedId || layout.length <= 1) return;
-    const nextLayout = layout.filter((widget) => widget.id !== selectedId);
+    if (!selectedIds.length || layout.length <= selectedIds.length) return;
+    const nextLayout = layout.filter((item) => !selectedIds.includes(item.id));
     setLayout(nextLayout);
-    setSelectedId(nextLayout[0]?.id ?? null);
+    setSelectedIds(nextLayout[0]?.id ? [nextLayout[0].id] : []);
   };
 
-  const updateWidget = (
+  const updateItem = (
     id: string,
-    updates: Partial<FlightTelemetryWidgetLayout>
+    updates: Partial<FlightTelemetryLayoutItem>
   ) => {
     setLayout((current) =>
       current.map((widget) =>
@@ -148,20 +172,59 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     );
   };
 
+  const groupSelected = () => {
+    if (selectedIds.length < 2) return;
+    const groupId = `group-${Date.now()}-${widgetIdCounter.current++}`;
+    setLayout((current) =>
+      current.map((item) =>
+        selectedIds.includes(item.id) ? { ...item, groupId } : item
+      )
+    );
+  };
+
+  const ungroupSelected = () => {
+    const groupIds = new Set(
+      layout
+        .filter((item) => selectedIds.includes(item.id) && item.groupId)
+        .map((item) => item.groupId)
+    );
+    if (!groupIds.size) return;
+    setLayout((current) =>
+      current.map((item) =>
+        item.groupId && groupIds.has(item.groupId)
+          ? { ...item, groupId: undefined }
+          : item
+      )
+    );
+  };
+
   const beginDrag = (
     event: PointerEvent,
-    widget: FlightTelemetryWidgetLayout,
+    item: FlightTelemetryLayoutItem,
     mode: DragMode
   ) => {
     event.preventDefault();
     event.stopPropagation();
-    setSelectedId(widget.id);
+    if (event.shiftKey || event.metaKey || event.ctrlKey) {
+      setSelectedIds((current) =>
+        current.includes(item.id)
+          ? current.filter((id) => id !== item.id)
+          : [...current, item.id]
+      );
+      return;
+    }
+    const groupItems = item.groupId
+      ? layout.filter((candidate) => candidate.groupId === item.groupId)
+      : selectedIds.includes(item.id)
+        ? layout.filter((candidate) => selectedIds.includes(candidate.id))
+        : [item];
+    const movingItems = mode === 'resize' ? [item] : groupItems;
+    setSelectedIds(movingItems.map((candidate) => candidate.id));
     setDrag({
-      id: widget.id,
       mode,
       startX: event.clientX,
       startY: event.clientY,
-      widget,
+      items: movingItems,
     });
     event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -172,14 +235,24 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     const dx = (event.clientX - drag.startX) / rect.width;
     const dy = (event.clientY - drag.startY) / rect.height;
     if (drag.mode === 'move') {
-      updateWidget(drag.id, {
-        x: clamp(drag.widget.x + dx, 0, 1 - drag.widget.width),
-        y: clamp(drag.widget.y + dy, 0, 1 - drag.widget.height),
-      });
+      setLayout((current) =>
+        current.map((item) => {
+          const original = drag.items.find(
+            (candidate) => candidate.id === item.id
+          );
+          if (!original) return item;
+          return {
+            ...item,
+            x: clamp(original.x + dx, 0, 1 - original.width),
+            y: clamp(original.y + dy, 0, 1 - original.height),
+          };
+        })
+      );
     } else {
-      updateWidget(drag.id, {
-        width: clamp(drag.widget.width + dx, 0.05, 1 - drag.widget.x),
-        height: clamp(drag.widget.height + dy, 0.05, 1 - drag.widget.y),
+      const original = drag.items[0];
+      updateItem(original.id, {
+        width: clamp(original.width + dx, 0.05, 1 - original.x),
+        height: clamp(original.height + dy, 0.05, 1 - original.y),
       });
     }
   };
@@ -229,6 +302,15 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
             <Plus className="h-4 w-4" />
             {t('telemetryLayout.addField')}
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={addIcon}
+            isDisabled={layout.length >= MAX_WIDGETS}
+          >
+            <Plus className="h-4 w-4" />
+            {t('telemetryLayout.addIcon')}
+          </Button>
           <Button variant="outline" size="sm" onPress={downloadXml}>
             <Download className="h-4 w-4" />
             {t('telemetryLayout.export')}
@@ -268,39 +350,67 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
             <div className="pointer-events-none absolute inset-0 opacity-20 [background-image:linear-gradient(#94a3b8_1px,transparent_1px),linear-gradient(90deg,#94a3b8_1px,transparent_1px)] [background-size:10%_10%]" />
             <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-slate-400/20" />
             <div className="pointer-events-none absolute inset-y-0 left-1/2 border-l border-dashed border-slate-400/20" />
-            {layout.map((widget) => {
-              const [value, unit] = valueForMetric(previewPoint, widget.metric);
-              const isSelected = selectedId === widget.id;
+            {layout.map((item) => {
+              const isIcon = item.type === 'icon';
+              const [value, unit] = isIcon
+                ? ['—', '']
+                : valueForMetric(previewPoint, item.metric);
+              const isSelected = selectedIds.includes(item.id);
               return (
                 <button
                   type="button"
-                  key={widget.id}
-                  onPointerDown={(event) => beginDrag(event, widget, 'move')}
-                  onClick={() => setSelectedId(widget.id)}
-                  className={`absolute rounded-lg border bg-slate-950/85 px-3 py-2 text-left text-white shadow-lg ${widget.visible ? '' : 'opacity-35'} ${isSelected ? 'border-sky-400 ring-2 ring-sky-400/40' : 'border-white/20'}`}
+                  key={item.id}
+                  onPointerDown={(event) => beginDrag(event, item, 'move')}
+                  onClick={(event) => {
+                    if (event.shiftKey || event.metaKey || event.ctrlKey)
+                      return;
+                    const ids = item.groupId
+                      ? layout
+                          .filter(
+                            (candidate) => candidate.groupId === item.groupId
+                          )
+                          .map((candidate) => candidate.id)
+                      : [item.id];
+                    setSelectedIds(ids);
+                  }}
+                  className={`absolute flex flex-col rounded-lg border bg-slate-950/85 px-3 py-2 text-left text-white shadow-lg ${item.visible ? '' : 'opacity-35'} ${isSelected ? 'border-sky-400 ring-2 ring-sky-400/40' : 'border-white/20'}`}
                   style={{
-                    left: `${widget.x * 100}%`,
-                    top: `${widget.y * 100}%`,
-                    width: `${widget.width * 100}%`,
-                    height: `${widget.height * 100}%`,
+                    left: `${item.x * 100}%`,
+                    top: `${item.y * 100}%`,
+                    width: `${item.width * 100}%`,
+                    height: `${item.height * 100}%`,
                     minWidth: '6rem',
                     minHeight: '3rem',
                   }}
                 >
-                  <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-300">
-                    {t(`flights.${METRIC_LABELS[widget.metric]}`)}
-                  </span>
-                  <span className="mt-1 block truncate font-mono text-[clamp(.75rem,2vw,1.2rem)] font-bold">
-                    {value}
-                    <span className="ml-1 text-xs font-normal text-slate-300">
-                      {unit}
+                  {isIcon ? (
+                    <TelemetryLayoutIcon
+                      name={item.icon}
+                      className="mx-auto h-1/2 min-h-5 w-1/2 min-w-5"
+                    />
+                  ) : (
+                    <>
+                      <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+                        {t(`flights.${METRIC_LABELS[item.metric]}`)}
+                      </span>
+                      <span className="mt-1 block truncate font-mono text-[clamp(.75rem,2vw,1.2rem)] font-bold">
+                        {value}
+                        <span className="ml-1 text-xs font-normal text-slate-300">
+                          {unit}
+                        </span>
+                      </span>
+                    </>
+                  )}
+                  {item.groupId && (
+                    <span className="mt-auto text-[9px] text-sky-300">
+                      {t('telemetryLayout.grouped')}
                     </span>
-                  </span>
+                  )}
                   {isSelected && (
                     <span
                       className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-se-resize rounded-sm border border-white bg-sky-400"
                       onPointerDown={(event) =>
-                        beginDrag(event, widget, 'resize')
+                        beginDrag(event, item, 'resize')
                       }
                     />
                   )}
@@ -316,6 +426,28 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
             <SlidersHorizontal className="h-4 w-4 text-sky-500" />
             {t('telemetryLayout.properties')}
+          </div>
+          <div className="mb-4 flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onPress={groupSelected}
+              isDisabled={selectedIds.length < 2}
+            >
+              {t('telemetryLayout.group')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onPress={ungroupSelected}
+              isDisabled={
+                !selectedIds.some(
+                  (id) => layout.find((item) => item.id === id)?.groupId
+                )
+              }
+            >
+              {t('telemetryLayout.ungroup')}
+            </Button>
           </div>
           {selected ? (
             <div className="space-y-4">
@@ -334,32 +466,64 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   </button>
                 </div>
               </div>
-              <label className="block text-sm">
-                <span className="mb-1 block text-slate-600 dark:text-slate-300">
-                  {t('telemetryLayout.metric')}
-                </span>
-                <select
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                  value={selected.metric}
-                  onChange={(event) =>
-                    updateWidget(selected.id, {
-                      metric: event.target.value as Metric,
-                    })
-                  }
-                >
-                  {METRICS.map((metric) => (
-                    <option key={metric} value={metric}>
-                      {t(`flights.${METRIC_LABELS[metric]}`)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {selected.type === 'icon' ? (
+                <label className="block text-sm">
+                  <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                    {t('telemetryLayout.icon')}
+                  </span>
+                  <select
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                    value={selected.icon}
+                    onChange={(event) =>
+                      updateItem(selected.id, {
+                        icon: event.target
+                          .value as FlightTelemetryIconLayout['icon'],
+                      })
+                    }
+                  >
+                    {[
+                      'mountain',
+                      'wind',
+                      'heart',
+                      'compass',
+                      'map-pin',
+                      'flame',
+                      'gauge',
+                    ].map((icon) => (
+                      <option key={icon} value={icon}>
+                        {icon}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <label className="block text-sm">
+                  <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                    {t('telemetryLayout.metric')}
+                  </span>
+                  <select
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                    value={selected.metric}
+                    onChange={(event) =>
+                      updateItem(selected.id, {
+                        metric: event.target.value as Metric,
+                      })
+                    }
+                  >
+                    {METRICS.map((metric) => (
+                      <option key={metric} value={metric}>
+                        {t(`flights.${METRIC_LABELS[metric]}`)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
                   checked={selected.visible}
                   onChange={(event) =>
-                    updateWidget(selected.id, { visible: event.target.checked })
+                    updateItem(selected.id, { visible: event.target.checked })
                   }
                 />
                 {t('telemetryLayout.visible')}
@@ -391,19 +555,19 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                           1
                         );
                         if (name === 'x') {
-                          updateWidget(selected.id, {
+                          updateItem(selected.id, {
                             x: clamp(next, 0, 1 - selected.width),
                           });
                         } else if (name === 'y') {
-                          updateWidget(selected.id, {
+                          updateItem(selected.id, {
                             y: clamp(next, 0, 1 - selected.height),
                           });
                         } else if (name === 'width') {
-                          updateWidget(selected.id, {
+                          updateItem(selected.id, {
                             width: clamp(next, 0.05, 1 - selected.x),
                           });
                         } else {
-                          updateWidget(selected.id, {
+                          updateItem(selected.id, {
                             height: clamp(next, 0.05, 1 - selected.y),
                           });
                         }

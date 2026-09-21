@@ -21,6 +21,15 @@ VALID_METRICS = {
     "heart_rate",
     "power",
 }
+VALID_ICONS = {
+    "mountain",
+    "wind",
+    "heart",
+    "compass",
+    "map-pin",
+    "flame",
+    "gauge",
+}
 MAX_TELEMETRY_WIDGETS = 16
 
 
@@ -38,9 +47,15 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
     if root.attrib.get("width") != "1920" or root.attrib.get("height") != "1080":
         raise ValueError("Telemetry layout canvas must be 1920x1080")
 
-    widgets = list(root)
-    if not 1 <= len(widgets) <= MAX_TELEMETRY_WIDGETS or any(
-        widget.tag != "widget" for widget in widgets
+    children = list(root)
+    groups = [child for child in children if child.tag == "group"]
+    widgets = [child for child in children if child.tag in {"widget", "icon"}]
+    group_ids = {group.attrib.get("id", "") for group in groups}
+    if (
+        not 1 <= len(widgets) <= MAX_TELEMETRY_WIDGETS
+        or len(group_ids) != len(groups)
+        or "" in group_ids
+        or any(child.tag not in {"widget", "icon", "group"} for child in children)
     ):
         raise ValueError(
             f"Telemetry layout must contain between 1 and {MAX_TELEMETRY_WIDGETS} widgets"
@@ -51,8 +66,13 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
         if not widget_id or widget_id in ids:
             raise ValueError("Telemetry widget ids must be unique")
         ids.add(widget_id)
-        if widget.attrib.get("metric") not in VALID_METRICS:
+        if widget.tag == "widget" and widget.attrib.get("metric") not in VALID_METRICS:
             raise ValueError("Telemetry widget metric is not supported")
+        if widget.tag == "icon" and widget.attrib.get("name") not in VALID_ICONS:
+            raise ValueError("Telemetry icon is not supported")
+        group_id = widget.attrib.get("group")
+        if group_id and group_id not in group_ids:
+            raise ValueError("Telemetry widget group does not exist")
         for name in ("x", "y", "width", "height"):
             try:
                 value = float(widget.attrib[name])

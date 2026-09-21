@@ -1,14 +1,37 @@
 import type { MetricKey } from './FlightTelemetryOverlay';
 
-export interface FlightTelemetryWidgetLayout {
+export type TelemetryIconName =
+  | 'mountain'
+  | 'wind'
+  | 'heart'
+  | 'compass'
+  | 'map-pin'
+  | 'flame'
+  | 'gauge';
+
+interface FlightTelemetryLayoutItemBase {
   id: string;
-  metric: MetricKey;
   x: number;
   y: number;
   width: number;
   height: number;
   visible: boolean;
+  groupId?: string;
 }
+
+export interface FlightTelemetryWidgetLayout extends FlightTelemetryLayoutItemBase {
+  type?: 'widget';
+  metric: MetricKey;
+}
+
+export interface FlightTelemetryIconLayout extends FlightTelemetryLayoutItemBase {
+  type: 'icon';
+  icon: TelemetryIconName;
+}
+
+export type FlightTelemetryLayoutItem =
+  | FlightTelemetryWidgetLayout
+  | FlightTelemetryIconLayout;
 
 export const DEFAULT_FLIGHT_TELEMETRY_LAYOUT = [
   {
@@ -59,6 +82,15 @@ const METRICS: MetricKey[] = [
   'power',
 ];
 const MAX_TELEMETRY_WIDGETS = 16;
+const ICONS: TelemetryIconName[] = [
+  'mountain',
+  'wind',
+  'heart',
+  'compass',
+  'map-pin',
+  'flame',
+  'gauge',
+];
 
 function numberAttribute(element: Element, name: string, fallback: number) {
   const value = Number(element.getAttribute(name));
@@ -67,7 +99,7 @@ function numberAttribute(element: Element, name: string, fallback: number) {
 
 export function parseTelemetryLayoutXml(
   xml: string
-): FlightTelemetryWidgetLayout[] {
+): FlightTelemetryLayoutItem[] {
   const document = new DOMParser().parseFromString(xml, 'application/xml');
   if (
     document.querySelector('parsererror') ||
@@ -75,37 +107,62 @@ export function parseTelemetryLayoutXml(
   ) {
     return DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget) => ({ ...widget }));
   }
-  const widgets = Array.from(
-    document.documentElement.querySelectorAll(':scope > widget')
+  const items = Array.from(
+    document.documentElement.querySelectorAll(':scope > widget, :scope > icon')
   );
-  if (widgets.length < 1 || widgets.length > MAX_TELEMETRY_WIDGETS)
+  if (items.length < 1 || items.length > MAX_TELEMETRY_WIDGETS)
     return DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget) => ({ ...widget }));
-  return widgets.map((element, index) => {
+  return items.map((element, index) => {
     const fallback =
       DEFAULT_FLIGHT_TELEMETRY_LAYOUT[
         index % DEFAULT_FLIGHT_TELEMETRY_LAYOUT.length
       ];
+    const type = element.tagName === 'icon' ? 'icon' : 'widget';
     const metric = element.getAttribute('metric') as MetricKey;
-    return {
+    const common = {
       id: element.getAttribute('id') || fallback.id,
-      metric: METRICS.includes(metric) ? metric : fallback.metric,
       x: numberAttribute(element, 'x', fallback.x),
       y: numberAttribute(element, 'y', fallback.y),
       width: numberAttribute(element, 'width', fallback.width),
       height: numberAttribute(element, 'height', fallback.height),
       visible: element.getAttribute('visible') !== 'false',
     };
+    const groupId = element.getAttribute('group');
+    const grouping = groupId ? { groupId } : {};
+    return type === 'icon'
+      ? {
+          ...common,
+          ...grouping,
+          type: 'icon' as const,
+          icon: ICONS.includes(
+            element.getAttribute('name') as TelemetryIconName
+          )
+            ? (element.getAttribute('name') as TelemetryIconName)
+            : 'gauge',
+        }
+      : {
+          ...common,
+          ...grouping,
+          metric: METRICS.includes(metric) ? metric : fallback.metric,
+        };
   });
 }
 
 export function serializeTelemetryLayoutXml(
-  layout: readonly FlightTelemetryWidgetLayout[]
+  layout: readonly FlightTelemetryLayoutItem[]
 ) {
-  const root = `<telemetry-layout version="1" width="1920" height="1080">${layout
-    .map(
-      (widget) =>
-        `<widget id="${escapeXml(widget.id)}" metric="${widget.metric}" x="${widget.x.toFixed(4)}" y="${widget.y.toFixed(4)}" width="${widget.width.toFixed(4)}" height="${widget.height.toFixed(4)}" visible="${widget.visible ? 'true' : 'false'}" />`
-    )
+  const groups = Array.from(
+    new Set(layout.flatMap((item) => (item.groupId ? [item.groupId] : [])))
+  )
+    .map((groupId) => `<group id="${escapeXml(groupId)}" />`)
+    .join('');
+  const root = `<telemetry-layout version="1" width="1920" height="1080">${groups}${layout
+    .map((item) => {
+      const common = `id="${escapeXml(item.id)}" group="${escapeXml(item.groupId ?? '')}" x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
+      return item.type === 'icon'
+        ? `<icon ${common} name="${item.icon}" />`
+        : `<widget ${common} metric="${item.metric}" />`;
+    })
     .join('')}</telemetry-layout>`;
   return new XMLSerializer().serializeToString(
     new DOMParser().parseFromString(root, 'application/xml')
