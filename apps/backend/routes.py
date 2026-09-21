@@ -7154,9 +7154,10 @@ def get_flight_gopro_overlay_preview(
             first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
         )
     source_coordinates = parse_gpx_file(source_gpx_path)
-    coordinates = source_coordinates if source_gpx_path == gpx_path else parse_gpx_file(gpx_path)
-    if osv_paths:
-        _restore_missing_heart_rates(coordinates, source_coordinates)
+    # Keep calibration telemetry on the original GPX timeline. The enriched
+    # GPX is shifted onto the camera timeline for rendering, but returning it
+    # here would make the first point appear before the configured offset.
+    coordinates = source_coordinates
     manual_offset = float(flight.gopro_overlay_gpx_offset or 0.0)
     effective_offset = automatic_offset + manual_offset
     overlay_state = _interactive_overlay_state(camera_path)
