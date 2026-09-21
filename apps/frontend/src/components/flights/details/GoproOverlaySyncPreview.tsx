@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Gauge, HeartPulse, MapPin, Mountain, TimerReset } from 'lucide-react';
 import {
   useGenerateGoproPreview,
+  useGenerateGoproMerge,
   useGoproOverlayPreview,
 } from '../../../hooks/gopro/useGoproOverlay';
 import { getApiUrlWithSearchParams } from '../../../lib/api';
@@ -83,6 +84,7 @@ export function GoproOverlaySyncPreview({
   const queryClient = useQueryClient();
   const preview = useGoproOverlayPreview(flightId, true);
   const generatePreview = useGenerateGoproPreview(flightId);
+  const generateMerge = useGenerateGoproMerge(flightId);
   const automaticallyRequestedTarget = useRef<string | null>(null);
   const [videoTime, setVideoTime] = useState(0);
   const cameraRef = useRef<HTMLVideoElement>(null);
@@ -153,6 +155,7 @@ export function GoproOverlaySyncPreview({
     Math.floor((preview.data?.video.preview_max_duration_seconds ?? 900) / 60)
   );
   const isGenerating = preview.data?.video.preview_status === 'generating';
+  const isMergeMissing = preview.data?.gpx?.enrichment_status === 'missing';
   const requestedDurationCoversSource =
     requestedMinutes * 120 >=
     (preview.data?.video.preview_target_end_seconds ?? Infinity);
@@ -234,6 +237,24 @@ export function GoproOverlaySyncPreview({
     return (
       <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
         {t('flights.goproOverlayPreviewLoading')}
+      </div>
+    );
+  }
+
+  if (isMergeMissing) {
+    return (
+      <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+        <p className="mb-3">{t('flights.goproOverlayMergeRequired')}</p>
+        <button
+          type="button"
+          className="rounded-md bg-sky-600 px-3 py-2 font-medium text-white transition-colors hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={generateMerge.isPending}
+          onClick={() => void generateMerge.mutateAsync()}
+        >
+          {generateMerge.isPending
+            ? t('flights.goproOverlayMergeGenerating')
+            : t('flights.goproOverlayMergeGenerate')}
+        </button>
       </div>
     );
   }

@@ -109,7 +109,7 @@ def test_flight_telemetry_does_not_wait_for_osv_merge_when_cache_is_missing(
 
     assert response.source == "gpx+osv"
     assert response.has_osv is True
-    assert response.enrichment_status == "pending"
+    assert response.enrichment_status == "missing"
     assert response.points == []
 
 
