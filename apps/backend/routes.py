@@ -4989,6 +4989,11 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
             file_type = telemetry_path.name.rsplit(".", 2)[-2] + ".gz"
         normalized, points = normalize_track(telemetry_path.read_bytes(), file_type)
         del normalized
+        if osv_paths and enrichment_status == "ready":
+            source_start = first_gpx_timestamp(source_path)
+            if source_start is not None:
+                source_start_ms = int(source_start.timestamp() * 1000)
+                points = [point for point in points if point.get("timestamp", 0) >= source_start_ms]
         enriched_points = (
             [] if enrichment_status != "ready" and osv_paths else enrich_telemetry_points(points)
         )
@@ -7225,6 +7230,13 @@ def get_flight_gopro_overlay_preview(
         coordinates = []
     else:
         coordinates = parse_gpx_file(gpx_path)
+        if osv_paths:
+            source_start_ms = int(gpx_start.timestamp() * 1000)
+            coordinates = [
+                coordinate
+                for coordinate in coordinates
+                if coordinate.get("timestamp", 0) >= source_start_ms
+            ]
     manual_offset = float(flight.gopro_overlay_gpx_offset or 0.0)
     effective_offset = automatic_offset + manual_offset
     overlay_state = _interactive_overlay_state(camera_path)
