@@ -58,6 +58,16 @@ This file defines global rules for the entire monorepo.
 - This authorization is required even when the change appears to be a
   regression fix or a necessary consequence of another overlay change.
 
+## Protected Telemetry Synchronization
+
+- The GPX/OSV merge, calibration offset, GPX start boundary, timeline mapping,
+  and interactive telemetry preview are protected synchronization behavior.
+- Do not modify, refactor, or change this mechanism without first asking the
+  user for explicit authorization in the current task.
+- This authorization is required for bug fixes, performance changes, schema or
+  endpoint changes, and changes made as a consequence of another overlay
+  change.
+
 ## Local Rules
 
 - Backend: see `apps/backend/AGENTS.md`.
