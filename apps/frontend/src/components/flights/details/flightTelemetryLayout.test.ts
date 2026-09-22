@@ -110,6 +110,26 @@ describe('flight telemetry layout XML', () => {
     ).toEqual(layout);
   });
 
+  it('round-trips a text element font size', () => {
+    const layout = [
+      {
+        id: 'title',
+        type: 'text' as const,
+        content: 'Vol du matin',
+        fontSize: 48,
+        x: 0.2,
+        y: 0.3,
+        width: 0.3,
+        height: 0.08,
+        visible: true,
+      },
+    ];
+
+    expect(
+      parseTelemetryLayoutXml(serializeTelemetryLayoutXml(layout))
+    ).toEqual(layout);
+  });
+
   it('round-trips a widget without its metric label', () => {
     const layout = [
       {

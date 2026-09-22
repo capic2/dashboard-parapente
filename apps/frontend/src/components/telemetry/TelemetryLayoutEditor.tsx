@@ -803,7 +803,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   }}
                 >
                   {isText ? (
-                    <span className="block truncate text-center text-sm font-semibold">
+                    <span
+                      className="block truncate text-center font-semibold"
+                      style={{ fontSize: '1em' }}
+                    >
                       {item.content}
                     </span>
                   ) : isIcon ? (
@@ -1134,7 +1137,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       {t('telemetryLayout.showUnit')}
                     </label>
                   )}
-                  {selected.type === 'widget' && (
+                  {(selected.type === 'widget' || selected.type === 'text') && (
                     <label className="block text-sm">
                       <span className="mb-1 block text-slate-600 dark:text-slate-300">
                         {t('telemetryLayout.fontSize')}

@@ -339,7 +339,7 @@ export function serializeTelemetryLayoutXml(
           ? ' unit-visible="false"'
           : '';
       const fontSize =
-        item.type === 'widget' && item.fontSize !== undefined
+        item.type !== 'icon' && item.fontSize !== undefined
           ? ` font-size="${item.fontSize}"`
           : '';
       const clickAction =

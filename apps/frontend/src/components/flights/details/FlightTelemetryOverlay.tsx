@@ -119,9 +119,12 @@ export function FlightTelemetryOverlay({
                   top: `${slot.y * 100}%`,
                   width: `${slot.width * 100}%`,
                   height: `${slot.height * 100}%`,
+                  fontSize: `${((slot.fontSize ?? 32) / 1920) * 100}cqw`,
                 }}
               >
-                <span className="truncate">{slot.content}</span>
+                <span className="truncate" style={{ fontSize: '1em' }}>
+                  {slot.content}
+                </span>
               </div>
             );
           }
