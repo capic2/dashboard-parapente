@@ -50,6 +50,19 @@ describe('flight telemetry layout XML', () => {
     ).toEqual(layout);
   });
 
+  it('loads layouts containing more than sixteen elements', () => {
+    const layout = Array.from({ length: 22 }, (_, index) => ({
+      ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[index % 4],
+      id: `element-${index}`,
+      x: 0.01,
+      y: 0.01,
+    }));
+
+    expect(
+      parseTelemetryLayoutXml(serializeTelemetryLayoutXml(layout))
+    ).toHaveLength(22);
+  });
+
   it('round-trips icons and group membership', () => {
     const layout = [
       {

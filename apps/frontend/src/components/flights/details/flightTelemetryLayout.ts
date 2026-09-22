@@ -133,7 +133,6 @@ export const DEFAULT_FLIGHT_TELEMETRY_LAYOUT = [
   },
 ] satisfies readonly FlightTelemetryWidgetLayout[];
 
-const MAX_TELEMETRY_WIDGETS = 16;
 const ICONS: TelemetryIconName[] = [
   'mountain',
   'wind',
@@ -190,7 +189,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
         Boolean(entry[0] && entry[1])
       )
   );
-  if (items.length < 1 || items.length > MAX_TELEMETRY_WIDGETS)
+  if (items.length < 1)
     return withBackground(
       DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget) => ({ ...widget }))
     );
