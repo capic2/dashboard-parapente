@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { FlightTelemetryData } from '../../../hooks/flights/useFlightTelemetry';
+import type { FlightTelemetryLayoutItem } from './flightTelemetryLayout';
 import { FlightTelemetryOverlay } from './FlightTelemetryOverlay';
 
 vi.mock('react-i18next', () => ({
@@ -60,5 +61,35 @@ describe('FlightTelemetryOverlay', () => {
 
     expect(screen.getAllByText('flights.telemetrySpeed')).toHaveLength(2);
     expect(screen.getAllByText('42.5')).toHaveLength(2);
+  });
+
+  it('keeps transparent widgets free of visual layers', () => {
+    const layout: FlightTelemetryLayoutItem[] = [
+      {
+        id: 'transparent-widget',
+        type: 'widget',
+        metric: 'altitude',
+        x: 0,
+        y: 0,
+        width: 0.2,
+        height: 0.2,
+        visible: true,
+        transparent: true,
+      },
+    ];
+
+    render(
+      <FlightTelemetryOverlay
+        data={telemetry}
+        videoTimeSeconds={0}
+        offsetSeconds={0}
+        layout={layout}
+      />
+    );
+
+    const widget = screen.getByRole('button');
+    expect(widget).toHaveClass('bg-transparent');
+    expect(widget).not.toHaveClass('backdrop-blur-sm');
+    expect(widget).not.toHaveClass('hover:bg-slate-900');
   });
 });
