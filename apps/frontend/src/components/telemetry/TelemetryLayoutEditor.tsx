@@ -72,6 +72,8 @@ const MAX_WIDGETS = 16;
 const MAX_LAYOUT_XML_LENGTH = 500_000;
 const MAX_BACKGROUND_IMAGE_LENGTH = 480_000;
 const SNAP_THRESHOLD = 0.012;
+const KEYBOARD_PIXEL_STEP_X = 1 / 1920;
+const KEYBOARD_PIXEL_STEP_Y = 1 / 1080;
 
 function displayWidgetName(name: string) {
   return name.replace(/_/gu, ' ');
@@ -768,10 +770,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
         return;
       }
       const movement = {
-        ArrowLeft: [-0.005, 0],
-        ArrowRight: [0.005, 0],
-        ArrowUp: [0, -0.005],
-        ArrowDown: [0, 0.005],
+        ArrowLeft: [-KEYBOARD_PIXEL_STEP_X, 0],
+        ArrowRight: [KEYBOARD_PIXEL_STEP_X, 0],
+        ArrowUp: [0, -KEYBOARD_PIXEL_STEP_Y],
+        ArrowDown: [0, KEYBOARD_PIXEL_STEP_Y],
       }[event.key];
       if (
         movement &&
@@ -783,7 +785,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           selectedIds.includes(item.id)
         );
         if (selectedItem) {
-          const multiplier = event.shiftKey ? 5 : 1;
+          const multiplier = event.ctrlKey || event.metaKey ? 10 : 1;
           event.preventDefault();
           moveWithKeyboard(
             selectedItem,
@@ -1193,12 +1195,17 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                     key={item.id}
                     onPointerDown={(event) => beginDrag(event, item, 'move')}
                     onKeyDown={(event) => {
-                      const step = event.shiftKey ? 0.025 : 0.005;
+                      const stepX =
+                        (event.ctrlKey || event.metaKey ? 10 : 1) *
+                        KEYBOARD_PIXEL_STEP_X;
+                      const stepY =
+                        (event.ctrlKey || event.metaKey ? 10 : 1) *
+                        KEYBOARD_PIXEL_STEP_Y;
                       const movement = {
-                        ArrowLeft: [-step, 0],
-                        ArrowRight: [step, 0],
-                        ArrowUp: [0, -step],
-                        ArrowDown: [0, step],
+                        ArrowLeft: [-stepX, 0],
+                        ArrowRight: [stepX, 0],
+                        ArrowUp: [0, -stepY],
+                        ArrowDown: [0, stepY],
                       }[event.key];
                       if (!movement) return;
                       event.preventDefault();
