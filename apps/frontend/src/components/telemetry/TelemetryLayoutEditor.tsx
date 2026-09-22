@@ -276,6 +276,15 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
             : item.content)
     );
 
+  const selectFromHierarchy = (ids: string[], additive: boolean) => {
+    setSelectedIds((current) => {
+      if (!additive) return ids;
+      const allSelected = ids.every((id) => current.includes(id));
+      if (allSelected) return current.filter((id) => !ids.includes(id));
+      return [...new Set([...current, ...ids])];
+    });
+  };
+
   useEffect(() => {
     const handleFullscreenChange = () =>
       setIsFullscreen(document.fullscreenElement === editorRef.current);
@@ -927,7 +936,13 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   key={item.id}
                   type="button"
                   className={`flex w-full items-center truncate rounded-md px-2 py-1.5 text-left text-xs transition ${selectedIds.includes(item.id) ? 'bg-sky-100 font-semibold text-sky-800 dark:bg-sky-950/50 dark:text-sky-200' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700'}`}
-                  onClick={() => setSelectedIds([item.id])}
+                  aria-pressed={selectedIds.includes(item.id)}
+                  onClick={(event) =>
+                    selectFromHierarchy(
+                      [item.id],
+                      event.ctrlKey || event.metaKey
+                    )
+                  }
                 >
                   <span className="mr-2 text-slate-400">
                     {item.type === 'widget'
@@ -951,8 +966,12 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                     <button
                       type="button"
                       className={`flex w-full items-center truncate rounded-md px-2 py-1.5 text-left text-xs font-semibold transition ${isGroupSelected ? 'bg-violet-100 text-violet-800 dark:bg-violet-950/50 dark:text-violet-200' : 'text-slate-800 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-700'}`}
-                      onClick={() =>
-                        setSelectedIds(children.map((item) => item.id))
+                      aria-pressed={isGroupSelected}
+                      onClick={(event) =>
+                        selectFromHierarchy(
+                          children.map((item) => item.id),
+                          event.ctrlKey || event.metaKey
+                        )
                       }
                     >
                       <span className="mr-2 text-violet-500">▾</span>
@@ -964,7 +983,13 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                           key={item.id}
                           type="button"
                           className={`flex w-full items-center truncate rounded-md px-2 py-1.5 text-left text-xs transition ${selectedIds.includes(item.id) ? 'bg-sky-100 font-semibold text-sky-800 dark:bg-sky-950/50 dark:text-sky-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700'}`}
-                          onClick={() => setSelectedIds([item.id])}
+                          aria-pressed={selectedIds.includes(item.id)}
+                          onClick={(event) =>
+                            selectFromHierarchy(
+                              [item.id],
+                              event.ctrlKey || event.metaKey
+                            )
+                          }
                         >
                           <span className="mr-2 text-slate-400">└</span>
                           <span className="truncate">
