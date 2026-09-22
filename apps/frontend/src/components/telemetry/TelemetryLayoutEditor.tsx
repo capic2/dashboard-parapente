@@ -41,6 +41,7 @@ import {
 import { parseTelemetryGpxFile } from '../flights/details/telemetryGpxPreview';
 import {
   serializeTelemetryLayoutXml,
+  getTelemetryLayoutGroupBounds,
   type FlightTelemetryIconLayout,
   type FlightTelemetryLayoutItem,
   type FlightTelemetryTextLayout,
@@ -798,6 +799,26 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
             <div className="pointer-events-none absolute inset-0 opacity-20 [background-image:linear-gradient(#94a3b8_1px,transparent_1px),linear-gradient(90deg,#94a3b8_1px,transparent_1px)] [background-size:10%_10%]" />
             <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-slate-400/20" />
             <div className="pointer-events-none absolute inset-y-0 left-1/2 border-l border-dashed border-slate-400/20" />
+            {groups.map(([groupId, groupName]) => {
+              const bounds = getTelemetryLayoutGroupBounds(layout, groupId);
+              if (!bounds) return null;
+              return (
+                <div
+                  key={groupId}
+                  className="pointer-events-none absolute rounded-xl border border-dashed border-sky-400/70 bg-sky-400/5"
+                  style={{
+                    left: `${bounds.x * 100}%`,
+                    top: `${bounds.y * 100}%`,
+                    width: `${bounds.width * 100}%`,
+                    height: `${bounds.height * 100}%`,
+                  }}
+                >
+                  <span className="absolute -top-5 left-2 rounded-t bg-sky-500/80 px-2 py-0.5 text-[10px] font-semibold text-white">
+                    {groupName}
+                  </span>
+                </div>
+              );
+            })}
             {layout.map((item) => {
               const isIcon = item.type === 'icon';
               const isText = item.type === 'text';
@@ -902,11 +923,6 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                         )}
                       </span>
                     </>
-                  )}
-                  {item.groupId && (
-                    <span className="mt-auto text-[9px] text-sky-300">
-                      {t('telemetryLayout.grouped')}
-                    </span>
                   )}
                   {isSelected && (
                     <span

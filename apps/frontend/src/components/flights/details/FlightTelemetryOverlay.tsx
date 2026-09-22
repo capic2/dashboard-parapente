@@ -8,6 +8,7 @@ import {
   DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
   type TelemetryLayout,
   type FlightTelemetryLayoutItem,
+  getTelemetryLayoutGroupBounds,
 } from './flightTelemetryLayout';
 import {
   METRIC_LABELS,
@@ -90,6 +91,35 @@ export function FlightTelemetryOverlay({
         backgroundPosition: backgroundImage ? 'center' : undefined,
       }}
     >
+      {Array.from(
+        new Map(
+          layout
+            .filter((slot) => slot.groupId)
+            .map((slot) => [
+              slot.groupId as string,
+              slot.groupName ?? slot.groupId,
+            ])
+        )
+      ).map(([groupId, groupName]) => {
+        const bounds = getTelemetryLayoutGroupBounds(layout, groupId);
+        if (!bounds) return null;
+        return (
+          <div
+            key={groupId}
+            className="pointer-events-none absolute rounded-xl border border-dashed border-sky-400/60 bg-sky-400/5"
+            style={{
+              left: `${bounds.x * 100}%`,
+              top: `${bounds.y * 100}%`,
+              width: `${bounds.width * 100}%`,
+              height: `${bounds.height * 100}%`,
+            }}
+          >
+            <span className="absolute -top-5 left-2 rounded-t bg-sky-500/75 px-2 py-0.5 text-[10px] font-semibold text-white">
+              {groupName}
+            </span>
+          </div>
+        );
+      })}
       {layout
         .filter((slot) => slot.visible)
         .map((slot) => {

@@ -61,6 +61,26 @@ export type FlightTelemetryLayoutItem =
   | FlightTelemetryIconLayout
   | FlightTelemetryTextLayout;
 
+export interface TelemetryLayoutGroupBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export function getTelemetryLayoutGroupBounds(
+  layout: readonly FlightTelemetryLayoutItem[],
+  groupId: string
+): TelemetryLayoutGroupBounds | null {
+  const items = layout.filter((item) => item.groupId === groupId);
+  if (!items.length) return null;
+  const left = Math.min(...items.map((item) => item.x));
+  const top = Math.min(...items.map((item) => item.y));
+  const right = Math.max(...items.map((item) => item.x + item.width));
+  const bottom = Math.max(...items.map((item) => item.y + item.height));
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
 export const DEFAULT_FLIGHT_TELEMETRY_LAYOUT = [
   {
     id: 'top-left',
