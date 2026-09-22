@@ -82,7 +82,6 @@ function elevationChange(
   let total = 0;
   const points = data?.points ?? [];
   for (let index = 1; index < points.length; index += 1) {
-    if (points[index - 1].segment !== points[index].segment) continue;
     const delta = points[index].elevation - points[index - 1].elevation;
     if (positive ? delta > 0 : delta < 0) total += Math.abs(delta);
   }

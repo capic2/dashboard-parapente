@@ -321,4 +321,22 @@ describe('flight telemetry layout XML', () => {
       'bpm',
     ]);
   });
+
+  it('keeps elevation changes across telemetry segments like GoPro overlay', () => {
+    const data = {
+      points: [
+        { timestamp: 1, lat: 0, lon: 0, elevation: 100, segment: 0 },
+        { timestamp: 2, lat: 0, lon: 0, elevation: 140, segment: 0 },
+        { timestamp: 3, lat: 0, lon: 0, elevation: 110, segment: 1 },
+        { timestamp: 4, lat: 0, lon: 0, elevation: 150, segment: 1 },
+      ],
+    } as FlightTelemetryData;
+
+    expect(getTelemetryMetricValue(data.points[3], data, 'total_gain')).toEqual(
+      [80, 'm']
+    );
+    expect(getTelemetryMetricValue(data.points[3], data, 'total_loss')).toEqual(
+      [30, 'm']
+    );
+  });
 });
