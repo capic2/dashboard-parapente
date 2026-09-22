@@ -2607,11 +2607,22 @@ async def get_landing_associations_weather(
 # IMPORTANT: This must be BEFORE /spots/{spot_id} to avoid route collision
 
 
+def _validate_optional_coordinates(latitude: float | None, longitude: float | None) -> None:
+    if (latitude is None) != (longitude is None):
+        raise HTTPException(
+            status_code=422,
+            detail="latitude and longitude must be provided together",
+        )
+
+
 @public_router.get("/spots/best")
 async def get_best_spot(
     day_index: int = Query(
         default=0, ge=0, le=6, description="Day index (0=today, 1=tomorrow, ..., 6=in 6 days)"
     ),
+    latitude: float | None = Query(default=None, ge=-90, le=90),
+    longitude: float | None = Query(default=None, ge=-180, le=180),
+    radius_km: float = Query(default=50, gt=0, le=500),
     db: Session = Depends(get_db),
 ):
     """
@@ -2652,7 +2663,8 @@ async def get_best_spot(
     from best_spot import get_best_spot_cached
 
     try:
-        best_spot = await get_best_spot_cached(db, day_index)
+        _validate_optional_coordinates(latitude, longitude)
+        best_spot = await get_best_spot_cached(db, day_index, latitude, longitude, radius_km)
 
         if not best_spot:
             raise HTTPException(
@@ -2680,13 +2692,19 @@ async def get_hourly_best_spots(
         description="Day index (0=today, 1=tomorrow, ..., 6=in 6 days)",
     ),
     hours: int = Query(default=24, ge=1, le=24, description="Maximum number of hourly winners"),
+    latitude: float | None = Query(default=None, ge=-90, le=90),
+    longitude: float | None = Query(default=None, ge=-180, le=180),
+    radius_km: float = Query(default=50, gt=0, le=500),
     db: Session = Depends(get_db),
 ):
     """Get the best flying spot for each upcoming flyable hour."""
     from best_spot import get_hourly_best_spots_cached
 
     try:
-        hourly_best_spots = await get_hourly_best_spots_cached(db, day_index, hours)
+        _validate_optional_coordinates(latitude, longitude)
+        hourly_best_spots = await get_hourly_best_spots_cached(
+            db, day_index, hours, latitude, longitude, radius_km
+        )
 
         if not hourly_best_spots:
             raise HTTPException(

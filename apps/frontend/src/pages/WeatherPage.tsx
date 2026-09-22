@@ -47,6 +47,8 @@ import type { FlightObjective } from '@dashboard-parapente/shared-types';
 import { useAppSettings } from '../hooks/settings/useAppSettings';
 import WeatherPageMobileLayout from './WeatherPage.mobile';
 import { getSiteDisplayName } from '../lib/siteDisplay';
+import { useCurrentLocation } from '../hooks/useCurrentLocation';
+import { useBestSpotRadius } from '../hooks/useBestSpotRadius';
 
 const isSpotSearchTarget = (
   target: CityWeatherTarget | null
@@ -217,6 +219,8 @@ export default function WeatherPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: sites } = useSuspenseQuery(sitesQueryOptions());
+  const currentLocation = useCurrentLocation();
+  const { radiusKm, setRadiusKm } = useBestSpotRadius();
   const favoriteSiteIds = useAppSettingsStore(
     (state) => state.settings.favoriteSites
   );
@@ -259,8 +263,22 @@ export default function WeatherPage() {
   const selectedDayIndex = search.day
     ? requestedDayIndex
     : (dailySummary?.days[0]?.day_index ?? requestedDayIndex);
-  const { data: bestSpot } = useBestSpotAPI(selectedDayIndex);
-  const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(selectedDayIndex);
+  const nearbyLocation = currentLocation.isLoading
+    ? undefined
+    : currentLocation.location;
+  const { data: bestSpot } = useBestSpotAPI(
+    selectedDayIndex,
+    nearbyLocation,
+    radiusKm,
+    !currentLocation.isLoading
+  );
+  const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(
+    selectedDayIndex,
+    24,
+    nearbyLocation,
+    radiusKm,
+    !currentLocation.isLoading
+  );
   const selectedSite = sites.find((site) => site.id === selectedSiteId);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const flightDecision = useFlightDecision(
@@ -502,6 +520,8 @@ export default function WeatherPage() {
       hourlyStartHour={hourlyBestSpots?.startHour}
       onSelectSite={handleSelectSite}
       selectedDayIndex={selectedDayIndex}
+      radiusKm={radiusKm}
+      onRadiusChange={setRadiusKm}
     />
   );
 

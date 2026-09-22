@@ -229,6 +229,8 @@
     "notCached": "Non mis en cache",
     "forecast7Days": "Prévisions 7 Jours",
     "bestSpotFor": "Meilleur spot pour {{date}}",
+    "bestSpotRadius": "Rayon des spots",
+    "bestSpotRadiusValue": "{{radius}} km",
     "bestSpot": {
       "reasonCodes": {
         "windDecollageCul": "vent de cul au décollage"

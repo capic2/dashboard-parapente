@@ -229,6 +229,8 @@
     "notCached": "Not cached",
     "forecast7Days": "7-Day Forecast",
     "bestSpotFor": "Best spot for {{date}}",
+    "bestSpotRadius": "Spot radius",
+    "bestSpotRadiusValue": "{{radius}} km",
     "bestSpot": {
       "reasonCodes": {
         "windDecollageCul": "tailwind at takeoff"
