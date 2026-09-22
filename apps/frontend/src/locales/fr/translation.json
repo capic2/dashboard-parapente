@@ -1796,6 +1796,13 @@
     "selectWidget": "Sélectionnez un widget sur le canvas.",
     "usingDefault": "Ce vol utilise actuellement le layout global.",
     "save": "Enregistrer",
+    "saveSuccess": "Layout sauvegardé",
+    "saveError": "Erreur lors de la sauvegarde du layout",
+    "nameTooLong": "Le nom d’un élément ne peut pas dépasser 100 caractères",
+    "groupNameTooLong": "Le nom d’un groupe ne peut pas dépasser 100 caractères",
+    "textRequired": "Le texte ne peut pas être vide",
+    "layoutTooLarge": "Le layout est trop volumineux",
+    "backgroundImageTooLarge": "L’image de fond est trop volumineuse",
     "saving": "Enregistrement…",
     "export": "Exporter XML",
     "reset": "Utiliser le layout global"

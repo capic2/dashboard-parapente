@@ -1791,6 +1791,13 @@
     "selectWidget": "Select a widget on the canvas.",
     "usingDefault": "This flight currently uses the global default.",
     "save": "Save",
+    "saveSuccess": "Layout saved",
+    "saveError": "Error saving the layout",
+    "nameTooLong": "An element name cannot exceed 100 characters",
+    "groupNameTooLong": "A group name cannot exceed 100 characters",
+    "textRequired": "Text cannot be empty",
+    "layoutTooLarge": "The layout is too large",
+    "backgroundImageTooLarge": "The background image is too large",
     "saving": "Saving…",
     "export": "Export XML",
     "reset": "Use global default"

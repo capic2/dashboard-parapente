@@ -201,7 +201,7 @@ class TelemetryLayoutResponse(BaseModel):
 
 
 class TelemetryLayoutUpdate(BaseModel):
-    xml_content: str = Field(min_length=1, max_length=50_000)
+    xml_content: str = Field(min_length=1, max_length=500_000)
 
 
 class GoproOverlayEnrichmentResponse(BaseModel):

@@ -30,6 +30,8 @@ import {
   useFlightTelemetry,
   type FlightTelemetryData,
 } from '../../hooks/flights/useFlightTelemetry';
+import { useToast } from '../../hooks/useToast';
+import { getApiErrorMessage } from '../../lib/api';
 import {
   defaultTelemetryLayout,
   useResetTelemetryLayout,
@@ -41,6 +43,7 @@ import {
   serializeTelemetryLayoutXml,
   type FlightTelemetryIconLayout,
   type FlightTelemetryLayoutItem,
+  type TelemetryLayout,
   type FlightTelemetryTextLayout,
 } from '../flights/details/flightTelemetryLayout';
 import { TelemetryLayoutIcon } from './TelemetryLayoutIcon';
@@ -56,6 +59,7 @@ import {
 type DragMode = 'move' | 'resize';
 
 const MAX_WIDGETS = 16;
+const MAX_LAYOUT_XML_LENGTH = 500_000;
 
 function displayWidgetName(name: string) {
   return name.replace(/_/gu, ' ');
@@ -67,6 +71,7 @@ function clamp(value: number, minimum: number, maximum: number) {
 
 export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const { t } = useTranslation();
+  const toast = useToast();
   const layoutQuery = useTelemetryLayout(flightId);
   const telemetryQuery = useFlightTelemetry(flightId ?? '', Boolean(flightId));
   const saveLayout = useSaveTelemetryLayout(flightId);
@@ -83,6 +88,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const [gpxError, setGpxError] = useState(false);
   const [gpxPointIndex, setGpxPointIndex] = useState(0);
   const [isGpxPlaying, setIsGpxPlaying] = useState(false);
+  const [saveError, setSaveError] = useState<string>();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>(
     layout[0]?.id ? [layout[0].id] : []
@@ -153,9 +159,60 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === 'string') setBackgroundImage(reader.result);
+      if (typeof reader.result !== 'string') return;
+      if (reader.result.length > MAX_LAYOUT_XML_LENGTH - 50_000) {
+        const message = t('telemetryLayout.backgroundImageTooLarge');
+        setSaveError(message);
+        toast.error(message);
+        return;
+      }
+      setSaveError(undefined);
+      setBackgroundImage(reader.result);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleSave = async () => {
+    const invalidName = layout.find(
+      (item) => item.name !== undefined && item.name.length > 100
+    );
+    const invalidGroupName = layout.find(
+      (item) => item.groupName !== undefined && item.groupName.length > 100
+    );
+    const emptyText = layout.find(
+      (item) => item.type === 'text' && item.content.trim().length === 0
+    );
+    const layoutDocument = [...layout] as TelemetryLayout;
+    layoutDocument.backgroundImage = backgroundImage;
+    const xmlLength = serializeTelemetryLayoutXml(layoutDocument).length;
+    const validationMessage = invalidName
+      ? t('telemetryLayout.nameTooLong')
+      : invalidGroupName
+        ? t('telemetryLayout.groupNameTooLong')
+        : emptyText
+          ? t('telemetryLayout.textRequired')
+          : xmlLength > MAX_LAYOUT_XML_LENGTH
+            ? t('telemetryLayout.layoutTooLarge')
+            : undefined;
+
+    if (validationMessage) {
+      setSaveError(validationMessage);
+      toast.error(validationMessage);
+      return;
+    }
+
+    try {
+      setSaveError(undefined);
+      await saveLayout.mutateAsync({ layout, backgroundImage });
+      toast.success(t('telemetryLayout.saveSuccess'));
+    } catch (error) {
+      const message = await getApiErrorMessage(
+        error,
+        t('telemetryLayout.saveError')
+      );
+      setSaveError(message);
+      toast.error(message);
+    }
   };
 
   const hierarchyLabel = (item: FlightTelemetryLayoutItem) =>
@@ -612,9 +669,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           )}
           <Button
             size="sm"
-            onPress={() =>
-              void saveLayout.mutateAsync({ layout, backgroundImage })
-            }
+            onPress={() => void handleSave()}
             isDisabled={saveLayout.isPending}
           >
             <Save className="h-4 w-4" />
@@ -624,6 +679,14 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           </Button>
         </div>
       </div>
+      {saveError && (
+        <p
+          role="alert"
+          className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300"
+        >
+          {saveError}
+        </p>
+      )}
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
         <div className="rounded-2xl border border-slate-700 bg-slate-950 p-3 shadow-xl">
           <div
@@ -881,6 +944,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                       value={selected.name ?? ''}
                       placeholder={selected.id}
+                      maxLength={100}
                       onChange={(event) =>
                         updateItem(selected.id, { name: event.target.value })
                       }
@@ -894,6 +958,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       <input
                         className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                         value={selected.groupName ?? selected.groupId}
+                        maxLength={100}
                         onChange={(event) =>
                           setLayout((current) =>
                             current.map((item) =>
@@ -947,6 +1012,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       <textarea
                         className="min-h-20 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                         value={selected.content}
+                        minLength={1}
                         maxLength={500}
                         onChange={(event) =>
                           updateItem(selected.id, {
