@@ -414,8 +414,19 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
 
   const groupSelected = () => {
     if (selectedIds.length < 2) return;
-    const groupId = `group-${Date.now()}-${widgetIdCounter.current++}`;
-    const groupName = `Group ${widgetIdCounter.current}`;
+    const existingGroupIds = new Set(
+      layout
+        .filter((item) => selectedIds.includes(item.id) && item.groupId)
+        .map((item) => item.groupId)
+    );
+    const existingGroupId =
+      existingGroupIds.size === 1 ? [...existingGroupIds][0] : undefined;
+    const existingGroupName = existingGroupId
+      ? layout.find((item) => item.groupId === existingGroupId)?.groupName
+      : undefined;
+    const groupId =
+      existingGroupId ?? `group-${Date.now()}-${widgetIdCounter.current++}`;
+    const groupName = existingGroupName ?? `Group ${widgetIdCounter.current}`;
     setLayout((current) =>
       current.map((item) =>
         selectedIds.includes(item.id) ? { ...item, groupId, groupName } : item
