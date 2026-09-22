@@ -1739,7 +1739,7 @@
     "back": "Retour",
     "configure": "Configurer le layout",
     "loading": "Chargement du layout…",
-    "canvasHint": "Ajoutez des champs ou des icônes. Ctrl/Cmd-clic sélectionne plusieurs éléments pour les grouper et les déplacer ensemble.",
+    "canvasHint": "Ajoutez des champs ou des icônes. Ctrl/Cmd-clic sélectionne plusieurs éléments. Ctrl/Cmd+C copie la sélection et Ctrl/Cmd+V la colle.",
     "canvasLabel": "Canvas du layout télémétrique",
     "dragHint": "1920 × 1080 · coordonnées normalisées",
     "properties": "Propriétés du widget",

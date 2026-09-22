@@ -1734,7 +1734,7 @@
     "back": "Back",
     "configure": "Configure layout",
     "loading": "Loading layout…",
-    "canvasHint": "Add fields or icons. Ctrl/Cmd-click selects multiple items so you can group and move them together.",
+    "canvasHint": "Add fields or icons. Ctrl/Cmd-click selects multiple items. Ctrl/Cmd+C copies the selection and Ctrl/Cmd+V pastes it.",
     "canvasLabel": "Telemetry layout canvas",
     "dragHint": "1920 × 1080 · normalized coordinates",
     "properties": "Widget properties",

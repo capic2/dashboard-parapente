@@ -657,9 +657,11 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   );
 
   const copySelected = useCallback(() => {
-    const items = layout.filter((item) => selectedIds.includes(item.id));
+    const items = selectedGroupId
+      ? layout.filter((item) => item.groupId === selectedGroupId)
+      : layout.filter((item) => selectedIds.includes(item.id));
     if (items.length) setCopiedItems(items);
-  }, [layout, selectedIds]);
+  }, [layout, selectedGroupId, selectedIds]);
 
   const pasteCopied = useCallback(() => {
     if (
@@ -997,6 +999,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
             onPress={copySelected}
             isDisabled={!selectedIds.length}
             aria-label={t('telemetryLayout.copy')}
+            aria-keyshortcuts="Control+C Meta+C"
           >
             <Copy className="h-4 w-4" />
             {t('telemetryLayout.copy')}
@@ -1007,6 +1010,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
             onPress={pasteCopied}
             isDisabled={!copiedItems.length || layout.length >= MAX_WIDGETS}
             aria-label={t('telemetryLayout.paste')}
+            aria-keyshortcuts="Control+V Meta+V"
           >
             <ClipboardPaste className="h-4 w-4" />
             {t('telemetryLayout.paste')}
