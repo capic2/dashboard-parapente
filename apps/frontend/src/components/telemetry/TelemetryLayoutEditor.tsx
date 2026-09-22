@@ -69,6 +69,7 @@ type DragMode = 'move' | 'resize';
 const MAX_WIDGETS = 16;
 const MAX_LAYOUT_XML_LENGTH = 500_000;
 const MAX_BACKGROUND_IMAGE_LENGTH = 480_000;
+const SNAP_THRESHOLD = 0.012;
 
 function displayWidgetName(name: string) {
   return name.replace(/_/gu, ' ');
@@ -165,6 +166,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const [copiedItems, setCopiedItems] = useState<FlightTelemetryLayoutItem[]>(
     []
   );
+  const [snapGuides, setSnapGuides] = useState<{
+    x?: number;
+    y?: number;
+  }>({});
   const [drag, setDrag] = useState<{
     mode: DragMode;
     startX: number;
@@ -500,6 +505,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
         ? layout.filter((candidate) => selectedIds.includes(candidate.id))
         : [item];
     const movingItems = mode === 'resize' ? [item] : groupItems;
+    setSnapGuides({});
     setSelectedIds(movingItems.map((candidate) => candidate.id));
     setDrag({
       mode,
@@ -516,6 +522,74 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     const dx = (event.clientX - drag.startX) / rect.width;
     const dy = (event.clientY - drag.startY) / rect.height;
     if (drag.mode === 'move') {
+      const movingIds = new Set(drag.items.map((item) => item.id));
+      const stationaryItems = layout.filter((item) => !movingIds.has(item.id));
+      const movingBounds = {
+        left: Math.min(...drag.items.map((item) => item.x + dx)),
+        top: Math.min(...drag.items.map((item) => item.y + dy)),
+        right: Math.max(...drag.items.map((item) => item.x + dx + item.width)),
+        bottom: Math.max(
+          ...drag.items.map((item) => item.y + dy + item.height)
+        ),
+      };
+      const findSnap = (
+        anchors: number[],
+        targets: number[]
+      ): { offset: number; target: number } | undefined => {
+        let closest:
+          | { offset: number; target: number; distance: number }
+          | undefined;
+        for (const anchor of anchors) {
+          for (const target of targets) {
+            const offset = target - anchor;
+            const distance = Math.abs(offset);
+            if (
+              distance <= SNAP_THRESHOLD &&
+              (!closest || distance < closest.distance)
+            ) {
+              closest = { offset, target, distance };
+            }
+          }
+        }
+        return closest;
+      };
+      const xSnap = findSnap(
+        [
+          movingBounds.left,
+          (movingBounds.left + movingBounds.right) / 2,
+          movingBounds.right,
+        ],
+        [
+          0,
+          0.5,
+          1,
+          ...stationaryItems.flatMap((item) => [
+            item.x,
+            item.x + item.width / 2,
+            item.x + item.width,
+          ]),
+        ]
+      );
+      const ySnap = findSnap(
+        [
+          movingBounds.top,
+          (movingBounds.top + movingBounds.bottom) / 2,
+          movingBounds.bottom,
+        ],
+        [
+          0,
+          0.5,
+          1,
+          ...stationaryItems.flatMap((item) => [
+            item.y,
+            item.y + item.height / 2,
+            item.y + item.height,
+          ]),
+        ]
+      );
+      const snappedDx = dx + (xSnap?.offset ?? 0);
+      const snappedDy = dy + (ySnap?.offset ?? 0);
+      setSnapGuides({ x: xSnap?.target, y: ySnap?.target });
       setLayout((current) =>
         current.map((item) => {
           const original = drag.items.find(
@@ -524,8 +598,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           if (!original) return item;
           return {
             ...item,
-            x: clamp(original.x + dx, 0, 1 - original.width),
-            y: clamp(original.y + dy, 0, 1 - original.height),
+            x: clamp(original.x + snappedDx, 0, 1 - original.width),
+            y: clamp(original.y + snappedDy, 0, 1 - original.height),
           };
         })
       );
@@ -978,13 +1052,31 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
               backgroundPosition: backgroundImage ? 'center' : undefined,
             }}
             onPointerMove={moveDrag}
-            onPointerUp={() => setDrag(null)}
-            onPointerCancel={() => setDrag(null)}
+            onPointerUp={() => {
+              setDrag(null);
+              setSnapGuides({});
+            }}
+            onPointerCancel={() => {
+              setDrag(null);
+              setSnapGuides({});
+            }}
             aria-label={t('telemetryLayout.canvasLabel')}
           >
             <div className="pointer-events-none absolute inset-0 opacity-20 [background-image:linear-gradient(#94a3b8_1px,transparent_1px),linear-gradient(90deg,#94a3b8_1px,transparent_1px)] [background-size:10%_10%]" />
             <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-slate-400/20" />
             <div className="pointer-events-none absolute inset-y-0 left-1/2 border-l border-dashed border-slate-400/20" />
+            {snapGuides.x !== undefined && (
+              <div
+                className="pointer-events-none absolute inset-y-0 z-30 border-l-2 border-dashed border-amber-300"
+                style={{ left: `${snapGuides.x * 100}%` }}
+              />
+            )}
+            {snapGuides.y !== undefined && (
+              <div
+                className="pointer-events-none absolute inset-x-0 z-30 border-t-2 border-dashed border-amber-300"
+                style={{ top: `${snapGuides.y * 100}%` }}
+              />
+            )}
             {groups.map(([groupId, groupName]) => {
               const bounds = getTelemetryLayoutGroupBounds(layout, groupId);
               if (!bounds) return null;
