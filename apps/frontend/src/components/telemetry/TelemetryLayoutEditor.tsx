@@ -60,6 +60,7 @@ type DragMode = 'move' | 'resize';
 
 const MAX_WIDGETS = 16;
 const MAX_LAYOUT_XML_LENGTH = 500_000;
+const MAX_BACKGROUND_IMAGE_LENGTH = 480_000;
 
 function displayWidgetName(name: string) {
   return name.replace(/_/gu, ' ');
@@ -67,6 +68,63 @@ function displayWidgetName(name: string) {
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.max(minimum, Math.min(maximum, value));
+}
+
+async function compressBackgroundImage(file: File) {
+  const original = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () =>
+      typeof reader.result === 'string'
+        ? resolve(reader.result)
+        : reject(new Error('Unable to read background image'));
+    reader.onerror = () =>
+      reject(reader.error ?? new Error('Unable to read background image'));
+    reader.readAsDataURL(file);
+  });
+  if (original.length <= MAX_BACKGROUND_IMAGE_LENGTH) return original;
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const loadedImage = new Image();
+      loadedImage.onload = () => resolve(loadedImage);
+      loadedImage.onerror = () => reject(new Error('Invalid background image'));
+      loadedImage.src = objectUrl;
+    });
+    const sourceWidth = image.naturalWidth || image.width;
+    const sourceHeight = image.naturalHeight || image.height;
+    if (!sourceWidth || !sourceHeight)
+      throw new Error('Invalid background image');
+
+    const qualityLevels = [0.82, 0.68, 0.54, 0.4];
+    const scaleLevels = [1, 0.8, 0.6, 0.4];
+    for (const scaleLevel of scaleLevels) {
+      const scale = Math.min(
+        scaleLevel,
+        1920 / sourceWidth,
+        1080 / sourceHeight
+      );
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+      canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Canvas is unavailable');
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      for (const quality of qualityLevels) {
+        const webp = canvas.toDataURL('image/webp', quality);
+        const compressed = webp.startsWith('data:image/webp')
+          ? webp
+          : canvas.toDataURL('image/jpeg', quality);
+        if (compressed.length <= MAX_BACKGROUND_IMAGE_LENGTH) {
+          return compressed;
+        }
+      }
+    }
+    throw new Error('Background image is too large after compression');
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
@@ -155,21 +213,17 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     }
   };
 
-  const handleBackgroundImage = (file: File | undefined) => {
+  const handleBackgroundImage = async (file: File | undefined) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') return;
-      if (reader.result.length > MAX_LAYOUT_XML_LENGTH - 50_000) {
-        const message = t('telemetryLayout.backgroundImageTooLarge');
-        setSaveError(message);
-        toast.error(message);
-        return;
-      }
+    try {
+      const compressedImage = await compressBackgroundImage(file);
       setSaveError(undefined);
-      setBackgroundImage(reader.result);
-    };
-    reader.readAsDataURL(file);
+      setBackgroundImage(compressedImage);
+    } catch {
+      const message = t('telemetryLayout.backgroundImageTooLarge');
+      setSaveError(message);
+      toast.error(message);
+    }
   };
 
   const handleSave = async () => {
@@ -566,7 +620,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
               accept="image/*"
               className="sr-only"
               onChange={(event) =>
-                handleBackgroundImage(event.target.files?.[0])
+                void handleBackgroundImage(event.target.files?.[0])
               }
             />
           </label>

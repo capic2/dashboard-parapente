@@ -1797,7 +1797,7 @@
     "groupNameTooLong": "A group name cannot exceed 100 characters",
     "textRequired": "Text cannot be empty",
     "layoutTooLarge": "The layout is too large",
-    "backgroundImageTooLarge": "The background image is too large",
+    "backgroundImageTooLarge": "The background image could not be reduced enough",
     "saving": "Saving…",
     "export": "Export XML",
     "reset": "Use global default"

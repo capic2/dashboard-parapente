@@ -1802,7 +1802,7 @@
     "groupNameTooLong": "Le nom d’un groupe ne peut pas dépasser 100 caractères",
     "textRequired": "Le texte ne peut pas être vide",
     "layoutTooLarge": "Le layout est trop volumineux",
-    "backgroundImageTooLarge": "L’image de fond est trop volumineuse",
+    "backgroundImageTooLarge": "Impossible de réduire suffisamment l’image de fond",
     "saving": "Enregistrement…",
     "export": "Exporter XML",
     "reset": "Utiliser le layout global"

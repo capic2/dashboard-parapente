@@ -64,7 +64,7 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
         raise ValueError("Telemetry layout canvas must be 1920x1080")
     background_image = root.attrib.get("background-image")
     if background_image is not None and (
-        not background_image.startswith("data:image/") or len(background_image) > 450_000
+        not background_image.startswith("data:image/") or len(background_image) > 480_000
     ):
         raise ValueError("Telemetry layout background image is invalid")
 
