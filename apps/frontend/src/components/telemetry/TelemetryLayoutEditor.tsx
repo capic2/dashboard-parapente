@@ -485,6 +485,32 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     }
   };
 
+  const moveWithKeyboard = (
+    item: FlightTelemetryLayoutItem,
+    dx: number,
+    dy: number
+  ) => {
+    const movingIds = item.groupId
+      ? new Set(
+          layout
+            .filter((candidate) => candidate.groupId === item.groupId)
+            .map((candidate) => candidate.id)
+        )
+      : new Set(selectedIds.includes(item.id) ? selectedIds : [item.id]);
+
+    setSelectedIds([...movingIds]);
+    setLayout((current) =>
+      current.map((candidate) => {
+        if (!movingIds.has(candidate.id)) return candidate;
+        return {
+          ...candidate,
+          x: clamp(candidate.x + dx, 0, 1 - candidate.width),
+          y: clamp(candidate.y + dy, 0, 1 - candidate.height),
+        };
+      })
+    );
+  };
+
   const downloadXml = () => {
     const xmlDocument = [...layout] as typeof layout & {
       backgroundImage?: string;
@@ -777,6 +803,19 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   type="button"
                   key={item.id}
                   onPointerDown={(event) => beginDrag(event, item, 'move')}
+                  onKeyDown={(event) => {
+                    const step = event.shiftKey ? 0.025 : 0.005;
+                    const movement = {
+                      ArrowLeft: [-step, 0],
+                      ArrowRight: [step, 0],
+                      ArrowUp: [0, -step],
+                      ArrowDown: [0, step],
+                    }[event.key];
+                    if (!movement) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    moveWithKeyboard(item, movement[0], movement[1]);
+                  }}
                   onClick={(event) => {
                     if (event.shiftKey || event.metaKey || event.ctrlKey)
                       return;
