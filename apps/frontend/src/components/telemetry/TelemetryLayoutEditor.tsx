@@ -1030,7 +1030,15 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                         value={selected.fontSize ?? 32}
                         onChange={(event) =>
                           updateItem(selected.id, {
-                            fontSize: clamp(Number(event.target.value), 8, 160),
+                            fontSize: Math.min(
+                              Number(event.target.value) || 0,
+                              160
+                            ),
+                          })
+                        }
+                        onBlur={() =>
+                          updateItem(selected.id, {
+                            fontSize: clamp(selected.fontSize ?? 32, 8, 160),
                           })
                         }
                       />
