@@ -1739,6 +1739,8 @@
     "dragHint": "1920 × 1080 · normalized coordinates",
     "properties": "Widget properties",
     "hierarchy": "Layout hierarchy",
+    "selectedGroup": "Selected group",
+    "groupSelectionHint": "Select an item in the group to edit its properties.",
     "collapseGroup": "Collapse group",
     "expandGroup": "Expand group",
     "content": "Content",

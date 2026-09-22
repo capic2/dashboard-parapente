@@ -171,6 +171,24 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   }, [layoutQuery.data?.layout]);
 
   const selected = layout.find((item) => item.id === selectedIds[0]) ?? null;
+  const selectedGroupId = (() => {
+    const groupIds = new Set(
+      layout
+        .filter((item) => selectedIds.includes(item.id) && item.groupId)
+        .map((item) => item.groupId)
+    );
+    if (groupIds.size !== 1) return undefined;
+    const groupId = [...groupIds][0];
+    const children = layout.filter((item) => item.groupId === groupId);
+    return children.length === selectedIds.length &&
+      children.every((item) => selectedIds.includes(item.id))
+      ? groupId
+      : undefined;
+  })();
+  const selectedGroupName = selectedGroupId
+    ? (layout.find((item) => item.groupId === selectedGroupId)?.groupName ??
+      selectedGroupId)
+    : undefined;
   const groups = Array.from(
     new Map(
       layout
@@ -1084,7 +1102,40 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
               {t('telemetryLayout.ungroup')}
             </Button>
           </div>
-          {selected ? (
+          {selectedGroupId ? (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-violet-100 p-3 text-sm dark:bg-violet-950/40">
+                <div className="font-semibold text-violet-900 dark:text-violet-100">
+                  {t('telemetryLayout.selectedGroup')}
+                </div>
+                <div className="mt-1 text-violet-700 dark:text-violet-300">
+                  {selectedGroupName}
+                </div>
+              </div>
+              <label className="block text-sm">
+                <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                  {t('telemetryLayout.groupName')}
+                </span>
+                <input
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  value={selectedGroupName}
+                  maxLength={100}
+                  onChange={(event) =>
+                    setLayout((current) =>
+                      current.map((item) =>
+                        item.groupId === selectedGroupId
+                          ? { ...item, groupName: event.target.value }
+                          : item
+                      )
+                    )
+                  }
+                />
+              </label>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {t('telemetryLayout.groupSelectionHint')}
+              </p>
+            </div>
+          ) : selected ? (
             <div className="space-y-4">
               <div className="rounded-lg bg-slate-100 p-3 text-sm font-medium dark:bg-slate-900">
                 <div className="flex items-center justify-between gap-2">
