@@ -59,8 +59,10 @@ describe('FlightTelemetryOverlay', () => {
 
     fireEvent.click(screen.getAllByRole('button')[0]);
 
-    expect(screen.getAllByText('flights.telemetrySpeed')).toHaveLength(2);
     expect(screen.getAllByText('42.5')).toHaveLength(2);
+    expect(
+      screen.queryByText('flights.telemetrySpeed')
+    ).not.toBeInTheDocument();
   });
 
   it('keeps transparent widgets free of visual layers', () => {
@@ -91,6 +93,20 @@ describe('FlightTelemetryOverlay', () => {
     expect(widget).toHaveClass('bg-transparent');
     expect(widget).not.toHaveClass('backdrop-blur-sm');
     expect(widget).not.toHaveClass('hover:bg-slate-900');
+  });
+
+  it('does not render metric labels in the final overlay', () => {
+    render(
+      <FlightTelemetryOverlay
+        data={telemetry}
+        videoTimeSeconds={0}
+        offsetSeconds={0}
+      />
+    );
+
+    expect(
+      screen.queryByText('flights.telemetryAltitude')
+    ).not.toBeInTheDocument();
   });
 
   it('does not render editor group decorations', () => {

@@ -191,16 +191,7 @@ export function FlightTelemetryOverlay({
                   showUnit={slot.showUnit !== false}
                   variant={slot.variant}
                 />
-              ) : (
-                slot.showLabel !== false && (
-                  <span
-                    className="block font-semibold uppercase tracking-wide text-slate-300"
-                    style={{ fontSize: '0.35em' }}
-                  >
-                    {t(`flights.${METRIC_LABELS[metric]}`)}
-                  </span>
-                )
-              )}
+              ) : null}
               <span
                 className="mt-0.5 block font-mono font-bold leading-none"
                 style={{ fontSize: '1em' }}
