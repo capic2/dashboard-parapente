@@ -198,8 +198,15 @@ jobs:
             set -eu
             mkdir -p "${{ secrets.STAGING_SSH_DEPLOY_PATH }}"
 
-      - name: Upload Compose definition
-        uses: appleboy/scp-action@v1.0.0
+      - name: Encode Compose definition
+        id: compose
+        shell: bash
+        run: echo "content=$(base64 -w 0 trusted-compose/docker-compose.yml)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Compose definition over SSH
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          COMPOSE_B64: ${{ steps.compose.outputs.content }}
         with:
           host: ${{ secrets.STAGING_SSH_HOST || secrets.SSH_HOST }}
           username: ${{ secrets.STAGING_SSH_USER || secrets.SSH_USER }}
@@ -207,9 +214,12 @@ jobs:
           key: ${{ secrets.STAGING_SSH_KEY || secrets.SSH_KEY }}
           fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT || secrets.SSH_FINGERPRINT }}
           port: ${{ secrets.STAGING_SSH_PORT || secrets.SSH_PORT }}
-          source: trusted-compose/docker-compose.yml
-          target: ${{ secrets.STAGING_SSH_DEPLOY_PATH }}/
-          strip_components: 1
+          envs: COMPOSE_B64
+          script: |
+            set -eu
+            DEPLOY_PATH='${{ secrets.STAGING_SSH_DEPLOY_PATH }}'
+            mkdir -p "$DEPLOY_PATH"
+            printf '%s' "$COMPOSE_B64" | base64 -d > "$DEPLOY_PATH/docker-compose.yml"
 
       - name: Verify staging deployment is still current before update
         uses: actions/github-script@v9
