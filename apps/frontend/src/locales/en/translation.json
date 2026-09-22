@@ -1764,6 +1764,7 @@
     "metric": "Metric",
     "visible": "Visible",
     "showLabel": "Show label",
+    "showUnit": "Show unit",
     "fontSize": "Font size (px)",
     "valueAlignment": "Value alignment",
     "alignLeft": "Left",

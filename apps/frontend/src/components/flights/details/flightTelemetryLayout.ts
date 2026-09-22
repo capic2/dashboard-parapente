@@ -31,6 +31,7 @@ interface FlightTelemetryLayoutItemBase {
   transparent?: boolean;
   border?: boolean;
   showLabel?: boolean;
+  showUnit?: boolean;
   fontSize?: number;
   groupId?: string;
   groupName?: string;
@@ -188,6 +189,9 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
       ...(element.getAttribute('label-visible') === 'false'
         ? { showLabel: false }
         : {}),
+      ...(type === 'widget' && element.getAttribute('unit-visible') === 'false'
+        ? { showUnit: false }
+        : {}),
       ...(element.getAttribute('font-size') !== null &&
       Number.isFinite(Number(element.getAttribute('font-size')))
         ? { fontSize: Number(element.getAttribute('font-size')) }
@@ -309,6 +313,10 @@ export function serializeTelemetryLayoutXml(
       const border = item.border === false ? ' border="false"' : '';
       const labelVisibility =
         item.showLabel === false ? ' label-visible="false"' : '';
+      const unitVisibility =
+        item.type === 'widget' && item.showUnit === false
+          ? ' unit-visible="false"'
+          : '';
       const fontSize =
         item.type === 'widget' && item.fontSize !== undefined
           ? ` font-size="${item.fontSize}"`
@@ -329,7 +337,7 @@ export function serializeTelemetryLayoutXml(
         item.type === 'widget' && item.valueAlign
           ? ` align="${item.valueAlign}"`
           : '';
-      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility}${fontSize}${clickAction}${longPressAction}${variant}${valueAlign} x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
+      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility}${unitVisibility}${fontSize}${clickAction}${longPressAction}${variant}${valueAlign} x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
       if (item.type === 'icon') return `<icon ${common} name="${item.icon}" />`;
       if (item.type === 'text') {
         return `<text ${common} content="${escapeXml(item.content)}" />`;

@@ -1769,6 +1769,7 @@
     "metric": "Métrique",
     "visible": "Visible",
     "showLabel": "Afficher le libellé",
+    "showUnit": "Afficher l’unité",
     "fontSize": "Taille de police (px)",
     "valueAlignment": "Alignement de la valeur",
     "alignLeft": "Gauche",

@@ -28,10 +28,12 @@ export function TelemetrySpeedometer({
   metric,
   value,
   unit,
+  showUnit = true,
 }: {
   metric: MetricKey;
   value: number | string | null | undefined;
   unit: string;
+  showUnit?: boolean;
 }) {
   const maximum = maximumForMetric(metric);
   const numericValue =
@@ -88,12 +90,14 @@ export function TelemetrySpeedometer({
       >
         {formatTelemetryValue(value, '')}
       </div>
-      <div
-        className="absolute inset-x-0 bottom-[5%] text-center font-semibold"
-        style={{ fontSize: '11%' }}
-      >
-        {unit}
-      </div>
+      {showUnit && (
+        <div
+          className="absolute inset-x-0 bottom-[5%] text-center font-semibold"
+          style={{ fontSize: '11%' }}
+        >
+          {unit}
+        </div>
+      )}
     </div>
   );
 }

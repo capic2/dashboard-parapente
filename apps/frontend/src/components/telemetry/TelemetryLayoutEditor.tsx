@@ -706,6 +706,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       metric={item.metric}
                       value={value}
                       unit={unit}
+                      showUnit={item.showUnit !== false}
                     />
                   ) : (
                     <>
@@ -722,12 +723,14 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                         style={{ fontSize: '1em' }}
                       >
                         {formatTelemetryValue(value, '')}
-                        <span
-                          className="ml-1 font-normal text-slate-300"
-                          style={{ fontSize: '0.45em' }}
-                        >
-                          {unit}
-                        </span>
+                        {item.showUnit !== false && (
+                          <span
+                            className="ml-1 font-normal text-slate-300"
+                            style={{ fontSize: '0.45em' }}
+                          >
+                            {unit}
+                          </span>
+                        )}
                       </span>
                     </>
                   )}
@@ -997,6 +1000,20 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                         }
                       />
                       {t('telemetryLayout.showLabel')}
+                    </label>
+                  )}
+                  {selected.type === 'widget' && (
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selected.showUnit !== false}
+                        onChange={(event) =>
+                          updateItem(selected.id, {
+                            showUnit: event.target.checked,
+                          })
+                        }
+                      />
+                      {t('telemetryLayout.showUnit')}
                     </label>
                   )}
                   {selected.type === 'widget' && (

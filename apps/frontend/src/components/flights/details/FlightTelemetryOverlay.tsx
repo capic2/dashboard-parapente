@@ -177,13 +177,14 @@ export function FlightTelemetryOverlay({
                 }
                 if (slot.clickAction !== 'none') cycleMetric();
               }}
-              aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${formatTelemetryValue(value)} ${unit}. ${t('flights.telemetryChangeMetric')}`}
+              aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${formatTelemetryValue(value)}${slot.showUnit === false ? '' : ` ${unit}`}. ${t('flights.telemetryChangeMetric')}`}
             >
               {slot.variant === 'speedometer' ? (
                 <TelemetrySpeedometer
                   metric={metric}
                   value={value}
                   unit={unit}
+                  showUnit={slot.showUnit !== false}
                 />
               ) : (
                 slot.showLabel !== false && (
@@ -200,12 +201,14 @@ export function FlightTelemetryOverlay({
                 style={{ fontSize: '1em' }}
               >
                 {formatTelemetryValue(value)}
-                <span
-                  className="ml-1 font-normal text-slate-300"
-                  style={{ fontSize: '0.45em' }}
-                >
-                  {unit}
-                </span>
+                {slot.showUnit !== false && (
+                  <span
+                    className="ml-1 font-normal text-slate-300"
+                    style={{ fontSize: '0.45em' }}
+                  >
+                    {unit}
+                  </span>
+                )}
               </span>
             </button>
           );

@@ -114,3 +114,11 @@ def test_layout_accepts_widget_value_alignment() -> None:
     )
 
     assert 'align="right"' in validate_telemetry_layout_xml(xml)
+
+
+def test_layout_accepts_widget_unit_visibility() -> None:
+    xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
+        'metric="altitude"', 'metric="altitude" unit-visible="false"', 1
+    )
+
+    assert 'unit-visible="false"' in validate_telemetry_layout_xml(xml)

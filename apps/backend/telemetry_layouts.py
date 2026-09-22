@@ -107,6 +107,8 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
             raise ValueError("Telemetry element border is invalid")
         if widget.attrib.get("label-visible") not in {None, "true", "false"}:
             raise ValueError("Telemetry widget label visibility is invalid")
+        if widget.attrib.get("unit-visible") not in {None, "true", "false"}:
+            raise ValueError("Telemetry widget unit visibility is invalid")
         if widget.tag == "widget":
             variant = widget.attrib.get("variant")
             if variant is not None and variant not in VALID_WIDGET_VARIANTS:

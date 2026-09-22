@@ -109,6 +109,19 @@ describe('flight telemetry layout XML', () => {
     ).toEqual(layout);
   });
 
+  it('round-trips a widget without its unit', () => {
+    const layout = [
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[0],
+        showUnit: false,
+      },
+    ];
+
+    expect(
+      parseTelemetryLayoutXml(serializeTelemetryLayoutXml(layout))
+    ).toEqual(layout);
+  });
+
   it('round-trips a widget font size', () => {
     const layout = [
       {
