@@ -198,15 +198,9 @@ jobs:
             set -eu
             mkdir -p "${{ secrets.STAGING_SSH_DEPLOY_PATH }}"
 
-      - name: Encode Compose definition
-        id: compose
-        shell: bash
-        run: echo "content=$(base64 -w 0 trusted-compose/docker-compose.yml)" >> "$GITHUB_OUTPUT"
-
-      - name: Upload Compose definition over SSH
+      - name: Remove previous staging images
+        continue-on-error: true
         uses: appleboy/ssh-action@v1.2.5
-        env:
-          COMPOSE_B64: ${{ steps.compose.outputs.content }}
         with:
           host: ${{ secrets.STAGING_SSH_HOST || secrets.SSH_HOST }}
           username: ${{ secrets.STAGING_SSH_USER || secrets.SSH_USER }}
@@ -214,12 +208,39 @@ jobs:
           key: ${{ secrets.STAGING_SSH_KEY || secrets.SSH_KEY }}
           fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT || secrets.SSH_FINGERPRINT }}
           port: ${{ secrets.STAGING_SSH_PORT || secrets.SSH_PORT }}
-          envs: COMPOSE_B64
+          command_timeout: 5m
           script: |
-            set -eu
-            DEPLOY_PATH='${{ secrets.STAGING_SSH_DEPLOY_PATH }}'
-            mkdir -p "$DEPLOY_PATH"
-            printf '%s' "$COMPOSE_B64" | base64 -d > "$DEPLOY_PATH/docker-compose.yml"
+            set -u
+            STACK_DIR='${{ secrets.STAGING_SSH_DEPLOY_PATH }}'
+            if [ -f "$STACK_DIR/docker-compose.yml" ] && [ -f "$STACK_DIR/stack.env" ]; then
+              old_staging_images=$(docker compose --env-file "$STACK_DIR/stack.env" \
+                -p dashboard-parapente-staging \
+                -f "$STACK_DIR/docker-compose.yml" images -q 2>/dev/null | sort -u || true)
+              docker compose --env-file "$STACK_DIR/stack.env" \
+                -p dashboard-parapente-staging \
+                -f "$STACK_DIR/docker-compose.yml" down --remove-orphans || true
+              while read -r image_id; do
+                [ -n "$image_id" ] || continue
+                docker image rm "$image_id" || true
+              done <<EOF
+            $old_staging_images
+            EOF
+            fi
+            docker image prune -af || true
+            docker builder prune -af || true
+
+      - name: Upload Compose definition
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST || secrets.SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER || secrets.SSH_USER }}
+          password: ${{ secrets.STAGING_SSH_PASSWORD || secrets.SSH_PASSWORD }}
+          key: ${{ secrets.STAGING_SSH_KEY || secrets.SSH_KEY }}
+          fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT || secrets.SSH_FINGERPRINT }}
+          port: ${{ secrets.STAGING_SSH_PORT || secrets.SSH_PORT }}
+          source: trusted-compose/docker-compose.yml
+          target: ${{ secrets.STAGING_SSH_DEPLOY_PATH }}
+          strip_components: 1
 
       - name: Verify staging deployment is still current before update
         uses: actions/github-script@v9
@@ -371,9 +392,9 @@ jobs:
               docker compose --env-file "$ENV_FILE" -p "$PROJECT" \
                 -f docker-compose.yml -f staging-internal-auth.yml "$@"
             }
-            printf '%s' "$GHCR_READ_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
             cd "$STACK_DIR"
             ENV_FILE="$STACK_DIR/stack.env"
+            printf '%s' "$GHCR_READ_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
             compose config --quiet
             compose pull
             compose up -d --remove-orphans
