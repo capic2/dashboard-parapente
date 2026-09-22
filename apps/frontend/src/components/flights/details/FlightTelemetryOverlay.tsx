@@ -1,33 +1,25 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   interpolateTelemetryAtVideoTime,
   type FlightTelemetryData,
-  type FlightTelemetryPoint,
 } from '../../../hooks/flights/useFlightTelemetry';
 import {
   DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
-  type FlightTelemetryWidgetLayout,
+  type TelemetryLayout,
+  type FlightTelemetryLayoutItem,
+  getTelemetryLayoutGroupBounds,
 } from './flightTelemetryLayout';
+import {
+  METRIC_LABELS,
+  getTelemetryMetricValue,
+  formatTelemetryValue,
+  type MetricKey,
+} from './telemetryMetrics';
+import { TelemetryLayoutIcon } from '../../telemetry/TelemetryLayoutIcon';
+import { TelemetrySpeedometer } from '../../telemetry/TelemetrySpeedometer';
 
-export type MetricKey =
-  | 'altitude'
-  | 'speed'
-  | 'vario'
-  | 'distance'
-  | 'heading'
-  | 'heart_rate'
-  | 'power';
-
-interface FlightTelemetryOverlayProps {
-  data?: FlightTelemetryData;
-  videoTimeSeconds: number;
-  offsetSeconds: number;
-  timelineStartTimestamp?: number;
-  layout?: readonly FlightTelemetryWidgetLayout[];
-}
-
-const METRIC_KEYS: MetricKey[] = [
+const CYCLE_METRICS: MetricKey[] = [
   'altitude',
   'speed',
   'vario',
@@ -37,45 +29,13 @@ const METRIC_KEYS: MetricKey[] = [
   'power',
 ];
 
-const getMetricValue = (
-  point: FlightTelemetryPoint | null,
-  metric: MetricKey
-): [number | null | undefined, string] | null => {
-  if (!point) return null;
-  switch (metric) {
-    case 'altitude':
-      return [point.elevation, 'm'];
-    case 'speed':
-      return [point.speed_kmh, 'km/h'];
-    case 'vario':
-      return [point.vario_ms, 'm/s'];
-    case 'distance':
-      return [point.distance_km, 'km'];
-    case 'heading':
-      return [point.heading_deg, '°'];
-    case 'heart_rate':
-      return [point.heart_rate, 'bpm'];
-    case 'power':
-      return [point.power, 'W'];
-  }
-};
-
-function formatValue(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) return '—';
-  return Math.abs(value) >= 100
-    ? Math.round(value).toString()
-    : value.toFixed(1);
+interface FlightTelemetryOverlayProps {
+  data?: FlightTelemetryData;
+  videoTimeSeconds: number;
+  offsetSeconds: number;
+  timelineStartTimestamp?: number;
+  layout?: readonly FlightTelemetryLayoutItem[];
 }
-
-const METRIC_LABELS: Record<MetricKey, string> = {
-  altitude: 'telemetryAltitude',
-  speed: 'telemetrySpeed',
-  vario: 'telemetryVario',
-  distance: 'telemetryDistance',
-  heading: 'telemetryHeading',
-  heart_rate: 'telemetryHeartRate',
-  power: 'telemetryPower',
-};
 
 export function FlightTelemetryOverlay({
   data,
@@ -85,6 +45,9 @@ export function FlightTelemetryOverlay({
   layout = DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
 }: FlightTelemetryOverlayProps) {
   const { t } = useTranslation();
+  const longPressTimer = useRef<number | null>(null);
+  const longPressTriggered = useRef(false);
+  const backgroundImage = (layout as TelemetryLayout).backgroundImage;
   const point = useMemo(
     () =>
       interpolateTelemetryAtVideoTime(
@@ -100,48 +63,191 @@ export function FlightTelemetryOverlay({
   >(
     () =>
       Object.fromEntries(
-        layout.map((slot) => [slot.id, slot.metric])
+        layout
+          .filter((slot) => slot.type === 'widget')
+          .map((slot) => [slot.id, slot.metric])
       ) as Record<string, MetricKey>
   );
 
+  useEffect(() => {
+    setSelectedMetrics(
+      Object.fromEntries(
+        layout
+          .filter((slot) => slot.type === 'widget')
+          .map((slot) => [slot.id, slot.metric])
+      ) as Record<string, MetricKey>
+    );
+  }, [layout]);
+
   return (
-    <div className="pointer-events-none absolute inset-0">
-      {layout.map((slot) => {
-        const metric = selectedMetrics[slot.id] ?? slot.metric;
-        const [value, unit] = getMetricValue(point, metric) ?? [null, ''];
-        const nextMetric =
-          METRIC_KEYS[(METRIC_KEYS.indexOf(metric) + 1) % METRIC_KEYS.length];
+    <div
+      className="pointer-events-none absolute inset-0"
+      style={{
+        containerType: 'inline-size',
+        backgroundImage: backgroundImage
+          ? `url(${JSON.stringify(backgroundImage)})`
+          : undefined,
+        backgroundSize: backgroundImage ? 'cover' : undefined,
+        backgroundPosition: backgroundImage ? 'center' : undefined,
+      }}
+    >
+      {Array.from(
+        new Map(
+          layout
+            .filter((slot) => slot.groupId)
+            .map((slot) => [
+              slot.groupId as string,
+              slot.groupName ?? slot.groupId,
+            ])
+        )
+      ).map(([groupId, groupName]) => {
+        const bounds = getTelemetryLayoutGroupBounds(layout, groupId);
+        if (!bounds) return null;
         return (
-          <button
-            key={slot.id}
-            type="button"
-            className="pointer-events-auto absolute min-w-24 cursor-pointer rounded-lg border border-white/25 bg-slate-950/75 px-3 py-2 text-left text-white shadow-lg backdrop-blur-sm transition hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+          <div
+            key={groupId}
+            className="pointer-events-none absolute rounded-xl border border-dashed border-sky-400/60 bg-sky-400/5"
             style={{
-              top: slot.top,
-              right: slot.right,
-              bottom: slot.bottom,
-              left: slot.left,
+              left: `${bounds.x * 100}%`,
+              top: `${bounds.y * 100}%`,
+              width: `${bounds.width * 100}%`,
+              height: `${bounds.height * 100}%`,
             }}
-            onClick={() =>
-              setSelectedMetrics((current) => ({
-                ...current,
-                [slot.id]: nextMetric,
-              }))
-            }
-            aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${formatValue(value)} ${unit}. ${t('flights.telemetryChangeMetric')}`}
           >
-            <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-300">
-              {t(`flights.${METRIC_LABELS[metric]}`)}
+            <span className="absolute -top-5 left-2 rounded-t bg-sky-500/75 px-2 py-0.5 text-[10px] font-semibold text-white">
+              {groupName}
             </span>
-            <span className="mt-0.5 block font-mono text-lg font-bold leading-none">
-              {formatValue(value)}
-              <span className="ml-1 text-xs font-normal text-slate-300">
-                {unit}
-              </span>
-            </span>
-          </button>
+          </div>
         );
       })}
+      {layout
+        .filter((slot) => slot.visible)
+        .map((slot) => {
+          if (slot.type === 'pip') return null;
+          if (slot.type === 'icon') {
+            return (
+              <div
+                key={slot.id}
+                className={`pointer-events-auto absolute flex items-center justify-center rounded-lg border text-white shadow-lg backdrop-blur-sm ${slot.transparent === false ? 'bg-slate-950/75' : 'bg-transparent'} ${slot.border === true ? 'border-white/25' : 'border-transparent'}`}
+                style={{
+                  left: `${slot.x * 100}%`,
+                  top: `${slot.y * 100}%`,
+                  width: `${slot.width * 100}%`,
+                  height: `${slot.height * 100}%`,
+                }}
+              >
+                <TelemetryLayoutIcon name={slot.icon} className="h-1/2 w-1/2" />
+              </div>
+            );
+          }
+          if (slot.type === 'text') {
+            return (
+              <div
+                key={slot.id}
+                className={`pointer-events-auto absolute flex items-center justify-center overflow-hidden rounded-lg border px-2 text-center text-sm font-semibold text-white shadow-lg backdrop-blur-sm ${slot.transparent === false ? 'bg-slate-950/75' : 'bg-transparent'} ${slot.border === true ? 'border-white/25' : 'border-transparent'}`}
+                style={{
+                  left: `${slot.x * 100}%`,
+                  top: `${slot.y * 100}%`,
+                  width: `${slot.width * 100}%`,
+                  height: `${slot.height * 100}%`,
+                  fontSize: `${((slot.fontSize ?? 32) / 1920) * 100}cqw`,
+                }}
+              >
+                <span className="truncate" style={{ fontSize: '1em' }}>
+                  {slot.content}
+                </span>
+              </div>
+            );
+          }
+          const metric = selectedMetrics[slot.id] ?? slot.metric;
+          const [value, unit] = getTelemetryMetricValue(
+            point,
+            data,
+            metric
+          ) ?? [null, ''];
+          const nextMetric =
+            CYCLE_METRICS[
+              (CYCLE_METRICS.indexOf(metric) + 1) % CYCLE_METRICS.length
+            ];
+          const cycleMetric = () =>
+            setSelectedMetrics((current) => ({
+              ...current,
+              [slot.id]: nextMetric,
+            }));
+          const clearLongPressTimer = () => {
+            if (longPressTimer.current !== null) {
+              window.clearTimeout(longPressTimer.current);
+              longPressTimer.current = null;
+            }
+          };
+          return (
+            <button
+              key={slot.id}
+              type="button"
+              className={`pointer-events-auto absolute min-h-0 min-w-0 overflow-hidden cursor-pointer rounded-lg border px-3 py-2 text-left text-white shadow-lg backdrop-blur-sm transition hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${slot.transparent === false ? 'bg-slate-950/75' : 'bg-transparent'} ${slot.border === true ? 'border-white/25' : 'border-transparent'}`}
+              style={{
+                left: `${slot.x * 100}%`,
+                top: `${slot.y * 100}%`,
+                width: `${slot.width * 100}%`,
+                height: `${slot.height * 100}%`,
+                fontSize: `${((slot.fontSize ?? 32) / 1920) * 100}cqw`,
+                textAlign: slot.valueAlign ?? 'left',
+              }}
+              onPointerDown={() => {
+                longPressTriggered.current = false;
+                clearLongPressTimer();
+                longPressTimer.current = window.setTimeout(() => {
+                  longPressTriggered.current = true;
+                  if (slot.longPressAction === 'cycle_metric') cycleMetric();
+                }, 550);
+              }}
+              onPointerUp={clearLongPressTimer}
+              onPointerCancel={clearLongPressTimer}
+              onClick={() => {
+                clearLongPressTimer();
+                if (longPressTriggered.current) {
+                  longPressTriggered.current = false;
+                  return;
+                }
+                if (slot.clickAction !== 'none') cycleMetric();
+              }}
+              aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${formatTelemetryValue(value)}${slot.showUnit === false ? '' : ` ${unit}`}. ${t('flights.telemetryChangeMetric')}`}
+            >
+              {slot.variant && slot.variant !== 'value' ? (
+                <TelemetrySpeedometer
+                  metric={metric}
+                  value={value}
+                  unit={unit}
+                  showUnit={slot.showUnit !== false}
+                  variant={slot.variant}
+                />
+              ) : (
+                slot.showLabel !== false && (
+                  <span
+                    className="block font-semibold uppercase tracking-wide text-slate-300"
+                    style={{ fontSize: '0.35em' }}
+                  >
+                    {t(`flights.${METRIC_LABELS[metric]}`)}
+                  </span>
+                )
+              )}
+              <span
+                className="mt-0.5 block font-mono font-bold leading-none"
+                style={{ fontSize: '1em' }}
+              >
+                {formatTelemetryValue(value)}
+                {slot.showUnit !== false && (
+                  <span
+                    className="ml-1 font-normal text-slate-300"
+                    style={{ fontSize: '0.45em' }}
+                  >
+                    {unit}
+                  </span>
+                )}
+              </span>
+            </button>
+          );
+        })}
     </div>
   );
 }

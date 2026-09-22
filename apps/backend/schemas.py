@@ -191,6 +191,19 @@ class FlightTelemetryResponse(BaseModel):
     duration_seconds: float
 
 
+class TelemetryLayoutResponse(BaseModel):
+    id: str | None = None
+    scope: Literal["default", "flight"]
+    flight_id: str | None = None
+    xml_content: str
+    format_version: int = 1
+    is_override: bool = False
+
+
+class TelemetryLayoutUpdate(BaseModel):
+    xml_content: str = Field(min_length=1, max_length=500_000)
+
+
 class GoproOverlayEnrichmentResponse(BaseModel):
     status: Literal["missing", "pending", "ready"]
 

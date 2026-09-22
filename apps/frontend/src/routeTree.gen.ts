@@ -23,7 +23,9 @@ import { Route as ThermalAnalysisRouteImport } from './routes/thermal-analysis'
 import { Route as WeatherRouteImport } from './routes/weather'
 import { Route as FlightsFlightIdRouteImport } from './routes/flights.$flightId'
 import { Route as InfrastructureTabRouteImport } from './routes/infrastructure.$tab'
+import { Route as SettingsTelemetryLayoutRouteImport } from './routes/settings.telemetry-layout'
 import { Route as ViewerFlightIdRouteImport } from './routes/viewer.$flightId'
+import { Route as FlightsFlightIdTelemetryLayoutRouteImport } from './routes/flights.$flightId.telemetry-layout'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -101,6 +103,13 @@ const InfrastructureTabRoute = InfrastructureTabRouteImport.update({
 } as any).lazy(() =>
   import('./routes/infrastructure.$tab.lazy').then((d) => d.Route),
 )
+const SettingsTelemetryLayoutRoute = SettingsTelemetryLayoutRouteImport.update({
+  id: '/telemetry-layout',
+  path: '/telemetry-layout',
+  getParentRoute: () => SettingsRoute,
+} as any).lazy(() =>
+  import('./routes/settings.telemetry-layout.lazy').then((d) => d.Route),
+)
 const ViewerFlightIdRoute = ViewerFlightIdRouteImport.update({
   id: '/viewer/$flightId',
   path: '/viewer/$flightId',
@@ -108,6 +117,16 @@ const ViewerFlightIdRoute = ViewerFlightIdRouteImport.update({
 } as any).lazy(() =>
   import('./routes/viewer.$flightId.lazy').then((d) => d.Route),
 )
+const FlightsFlightIdTelemetryLayoutRoute =
+  FlightsFlightIdTelemetryLayoutRouteImport.update({
+    id: '/telemetry-layout',
+    path: '/telemetry-layout',
+    getParentRoute: () => FlightsFlightIdRoute,
+  } as any).lazy(() =>
+    import('./routes/flights.$flightId.telemetry-layout.lazy').then(
+      (d) => d.Route,
+    ),
+  )
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -117,14 +136,16 @@ export interface FileRoutesByFullPath {
   '/infrastructure': typeof InfrastructureRouteWithChildren
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
-  '/settings': typeof SettingsRoute
+  '/settings': typeof SettingsRouteWithChildren
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
   '/thermal-analysis': typeof ThermalAnalysisRoute
   '/weather': typeof WeatherRoute
-  '/flights/$flightId': typeof FlightsFlightIdRoute
+  '/flights/$flightId': typeof FlightsFlightIdRouteWithChildren
   '/infrastructure/$tab': typeof InfrastructureTabRoute
+  '/settings/telemetry-layout': typeof SettingsTelemetryLayoutRoute
   '/viewer/$flightId': typeof ViewerFlightIdRoute
+  '/flights/$flightId/telemetry-layout': typeof FlightsFlightIdTelemetryLayoutRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -134,14 +155,16 @@ export interface FileRoutesByTo {
   '/infrastructure': typeof InfrastructureRouteWithChildren
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
-  '/settings': typeof SettingsRoute
+  '/settings': typeof SettingsRouteWithChildren
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
   '/thermal-analysis': typeof ThermalAnalysisRoute
   '/weather': typeof WeatherRoute
-  '/flights/$flightId': typeof FlightsFlightIdRoute
+  '/flights/$flightId': typeof FlightsFlightIdRouteWithChildren
   '/infrastructure/$tab': typeof InfrastructureTabRoute
+  '/settings/telemetry-layout': typeof SettingsTelemetryLayoutRoute
   '/viewer/$flightId': typeof ViewerFlightIdRoute
+  '/flights/$flightId/telemetry-layout': typeof FlightsFlightIdTelemetryLayoutRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -152,14 +175,16 @@ export interface FileRoutesById {
   '/infrastructure': typeof InfrastructureRouteWithChildren
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
-  '/settings': typeof SettingsRoute
+  '/settings': typeof SettingsRouteWithChildren
   '/sites': typeof SitesRoute
   '/thermal': typeof ThermalRoute
   '/thermal-analysis': typeof ThermalAnalysisRoute
   '/weather': typeof WeatherRoute
-  '/flights/$flightId': typeof FlightsFlightIdRoute
+  '/flights/$flightId': typeof FlightsFlightIdRouteWithChildren
   '/infrastructure/$tab': typeof InfrastructureTabRoute
+  '/settings/telemetry-layout': typeof SettingsTelemetryLayoutRoute
   '/viewer/$flightId': typeof ViewerFlightIdRoute
+  '/flights/$flightId/telemetry-layout': typeof FlightsFlightIdTelemetryLayoutRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -178,7 +203,9 @@ export interface FileRouteTypes {
     | '/weather'
     | '/flights/$flightId'
     | '/infrastructure/$tab'
+    | '/settings/telemetry-layout'
     | '/viewer/$flightId'
+    | '/flights/$flightId/telemetry-layout'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -195,7 +222,9 @@ export interface FileRouteTypes {
     | '/weather'
     | '/flights/$flightId'
     | '/infrastructure/$tab'
+    | '/settings/telemetry-layout'
     | '/viewer/$flightId'
+    | '/flights/$flightId/telemetry-layout'
   id:
     | '__root__'
     | '/'
@@ -212,7 +241,9 @@ export interface FileRouteTypes {
     | '/weather'
     | '/flights/$flightId'
     | '/infrastructure/$tab'
+    | '/settings/telemetry-layout'
     | '/viewer/$flightId'
+    | '/flights/$flightId/telemetry-layout'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -223,7 +254,7 @@ export interface RootRouteChildren {
   InfrastructureRoute: typeof InfrastructureRouteWithChildren
   LoginRoute: typeof LoginRoute
   PrivacyRoute: typeof PrivacyRoute
-  SettingsRoute: typeof SettingsRoute
+  SettingsRoute: typeof SettingsRouteWithChildren
   SitesRoute: typeof SitesRoute
   ThermalRoute: typeof ThermalRoute
   ThermalAnalysisRoute: typeof ThermalAnalysisRoute
@@ -331,6 +362,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InfrastructureTabRouteImport
       parentRoute: typeof InfrastructureRoute
     }
+    '/settings/telemetry-layout': {
+      id: '/settings/telemetry-layout'
+      path: '/telemetry-layout'
+      fullPath: '/settings/telemetry-layout'
+      preLoaderRoute: typeof SettingsTelemetryLayoutRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/viewer/$flightId': {
       id: '/viewer/$flightId'
       path: '/viewer/$flightId'
@@ -338,15 +376,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ViewerFlightIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/flights/$flightId/telemetry-layout': {
+      id: '/flights/$flightId/telemetry-layout'
+      path: '/telemetry-layout'
+      fullPath: '/flights/$flightId/telemetry-layout'
+      preLoaderRoute: typeof FlightsFlightIdTelemetryLayoutRouteImport
+      parentRoute: typeof FlightsFlightIdRoute
+    }
   }
 }
 
+interface FlightsFlightIdRouteChildren {
+  FlightsFlightIdTelemetryLayoutRoute: typeof FlightsFlightIdTelemetryLayoutRoute
+}
+
+const FlightsFlightIdRouteChildren: FlightsFlightIdRouteChildren = {
+  FlightsFlightIdTelemetryLayoutRoute: FlightsFlightIdTelemetryLayoutRoute,
+}
+
+const FlightsFlightIdRouteWithChildren = FlightsFlightIdRoute._addFileChildren(
+  FlightsFlightIdRouteChildren,
+)
+
 interface FlightsRouteChildren {
-  FlightsFlightIdRoute: typeof FlightsFlightIdRoute
+  FlightsFlightIdRoute: typeof FlightsFlightIdRouteWithChildren
 }
 
 const FlightsRouteChildren: FlightsRouteChildren = {
-  FlightsFlightIdRoute: FlightsFlightIdRoute,
+  FlightsFlightIdRoute: FlightsFlightIdRouteWithChildren,
 }
 
 const FlightsRouteWithChildren =
@@ -364,6 +421,18 @@ const InfrastructureRouteWithChildren = InfrastructureRoute._addFileChildren(
   InfrastructureRouteChildren,
 )
 
+interface SettingsRouteChildren {
+  SettingsTelemetryLayoutRoute: typeof SettingsTelemetryLayoutRoute
+}
+
+const SettingsRouteChildren: SettingsRouteChildren = {
+  SettingsTelemetryLayoutRoute: SettingsTelemetryLayoutRoute,
+}
+
+const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
+  SettingsRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnalyticsRoute: AnalyticsRoute,
@@ -372,7 +441,7 @@ const rootRouteChildren: RootRouteChildren = {
   InfrastructureRoute: InfrastructureRouteWithChildren,
   LoginRoute: LoginRoute,
   PrivacyRoute: PrivacyRoute,
-  SettingsRoute: SettingsRoute,
+  SettingsRoute: SettingsRouteWithChildren,
   SitesRoute: SitesRoute,
   ThermalRoute: ThermalRoute,
   ThermalAnalysisRoute: ThermalAnalysisRoute,

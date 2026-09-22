@@ -53,6 +53,36 @@ describe('FlightOverlayPlayer', () => {
     expect(Number.parseFloat(camera.style.bottom)).toBeCloseTo(0.925926, 5);
   });
 
+  it('uses the configured PiP bounds from the telemetry layout', () => {
+    render(
+      <FlightOverlayPlayer
+        mode="interactive"
+        cameraUrl="camera.mp4"
+        flightUrl="flight.mp4"
+        cameraLabel="camera"
+        flightLabel="flight"
+        pipLayout={{
+          id: 'video-pip',
+          type: 'pip',
+          action: 'switch_video',
+          x: 0.1,
+          y: 0.2,
+          width: 0.3,
+          height: 0.25,
+          visible: true,
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'flight' }));
+    const camera = screen.getByLabelText('camera') as HTMLVideoElement;
+
+    expect(camera.style.left).toBe('10%');
+    expect(camera.style.top).toBe('20%');
+    expect(camera.style.width).toBe('30%');
+    expect(camera.style.height).toBe('25%');
+  });
+
   it('resynchronizes the GPX video immediately when the offset changes', () => {
     const { rerender } = render(
       <FlightOverlayPlayer

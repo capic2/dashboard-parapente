@@ -1,20 +1,27 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import type { GoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
+import type { FlightTelemetryData } from '../../../hooks/flights/useFlightTelemetry';
 import { FlightTelemetryInteractivePreview } from './FlightTelemetryInteractivePreview';
 
 const hooks = vi.hoisted(() => ({
   overlayPreview: {
-    data: undefined,
+    data: null as unknown as GoproOverlayPreview | undefined,
     isPending: true,
     isSuccess: false,
     isError: false,
   },
   telemetry: {
-    data: undefined,
+    data: null as unknown as FlightTelemetryData | undefined,
     isPending: true,
     isSuccess: false,
     isError: false,
+  },
+  layout: {
+    data: undefined as { layout: never[] } | undefined,
+    isPending: true,
+    isSuccess: false,
   },
 }));
 
@@ -24,12 +31,22 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children }: { children: React.ReactNode }) => (
+    <a href="/layout">{children}</a>
+  ),
+}));
+
 vi.mock('../../../hooks/gopro/useGoproOverlay', () => ({
   useGoproOverlayPreview: () => hooks.overlayPreview,
 }));
 
 vi.mock('../../../hooks/flights/useFlightTelemetry', () => ({
   useFlightTelemetry: () => hooks.telemetry,
+}));
+
+vi.mock('../../../hooks/flights/useTelemetryLayout', () => ({
+  useTelemetryLayout: () => hooks.layout,
 }));
 
 vi.mock('../../../stores/authStore', () => ({
@@ -93,6 +110,7 @@ describe('FlightTelemetryInteractivePreview', () => {
     hooks.overlayPreview.isError = true;
     hooks.telemetry.isPending = false;
     hooks.telemetry.isError = true;
+    hooks.layout.isPending = false;
 
     render(<FlightTelemetryInteractivePreview flightId="flight-1" />);
 
@@ -119,7 +137,7 @@ describe('FlightTelemetryInteractivePreview', () => {
         manual_offset_seconds: 5.9,
         effective_offset_seconds: 30.9,
       },
-    };
+    } as unknown as GoproOverlayPreview;
     hooks.overlayPreview.isPending = false;
     hooks.overlayPreview.isSuccess = true;
     hooks.telemetry.data = {
@@ -141,6 +159,9 @@ describe('FlightTelemetryInteractivePreview', () => {
     };
     hooks.telemetry.isPending = false;
     hooks.telemetry.isSuccess = true;
+    hooks.layout.isPending = false;
+    hooks.layout.isSuccess = true;
+    hooks.layout.data = { layout: [] };
 
     render(<FlightTelemetryInteractivePreview flightId="flight-1" />);
 
