@@ -307,6 +307,12 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   };
 
   const handleSave = async () => {
+    if (!layoutQuery.data) {
+      const message = t('telemetryLayout.loading');
+      setSaveError(message);
+      toast.error(message);
+      return;
+    }
     const invalidName = layout.find(
       (item) => item.name !== undefined && item.name.length > 100
     );
@@ -1199,7 +1205,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           <Button
             size="sm"
             onPress={() => void handleSave()}
-            isDisabled={saveLayout.isPending}
+            isDisabled={saveLayout.isPending || layoutQuery.isLoading}
           >
             <Save className="h-4 w-4" />
             {saveLayout.isPending
