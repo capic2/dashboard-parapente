@@ -43,7 +43,6 @@ VALID_ICONS = {
     "slope",
     "slope-triangle",
 }
-MAX_TELEMETRY_WIDGETS = 64
 VALID_INTERACTION_ACTIONS = {"none", "cycle_metric"}
 VALID_WIDGET_VARIANTS = {
     "value",
@@ -83,14 +82,12 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
     widgets = [child for child in children if child.tag in {"widget", "icon", "text"}]
     group_ids = {group.attrib.get("id", "") for group in groups}
     if (
-        not 1 <= len(widgets) <= MAX_TELEMETRY_WIDGETS
+        not widgets
         or len(group_ids) != len(groups)
         or "" in group_ids
         or any(child.tag not in {"widget", "icon", "text", "group"} for child in children)
     ):
-        raise ValueError(
-            f"Telemetry layout must contain between 1 and {MAX_TELEMETRY_WIDGETS} widgets"
-        )
+        raise ValueError("Telemetry layout must contain at least one widget")
     ids: set[str] = set()
     for widget in widgets:
         widget_id = widget.attrib.get("id", "")

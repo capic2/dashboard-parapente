@@ -70,7 +70,6 @@ import {
 
 type DragMode = 'move' | 'resize';
 
-const MAX_WIDGETS = 64;
 const MAX_LAYOUT_XML_LENGTH = 500_000;
 const MAX_BACKGROUND_IMAGE_LENGTH = 480_000;
 const SNAP_THRESHOLD = 0.012;
@@ -385,7 +384,6 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   };
 
   const addField = () => {
-    if (layout.length >= MAX_WIDGETS) return;
     const id = `field-${Date.now()}-${widgetIdCounter.current++}`;
     const metric =
       METRICS.find((candidate) =>
@@ -411,7 +409,6 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   };
 
   const addIcon = () => {
-    if (layout.length >= MAX_WIDGETS) return;
     const id = `icon-${Date.now()}-${widgetIdCounter.current++}`;
     const column = layout.length % 4;
     const row = Math.floor(layout.length / 4);
@@ -433,7 +430,6 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const addGraphicalWidget = (
     variant: Exclude<TelemetryWidgetVariant, 'value'>
   ) => {
-    if (layout.length >= MAX_WIDGETS) return;
     const id = `${variant}-${Date.now()}-${widgetIdCounter.current++}`;
     const column = layout.length % 4;
     const row = Math.floor(layout.length / 4);
@@ -456,7 +452,6 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const addSpeedometer = () => addGraphicalWidget('speedometer');
 
   const addText = () => {
-    if (layout.length >= MAX_WIDGETS) return;
     const id = `text-${Date.now()}-${widgetIdCounter.current++}`;
     const column = layout.length % 4;
     const row = Math.floor(layout.length / 4);
@@ -715,10 +710,6 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const pasteCopied = useCallback(() => {
     if (!copiedItems.length) {
       toast.error(t('telemetryLayout.nothingToPaste'));
-      return;
-    }
-    if (layout.length + copiedItems.length > MAX_WIDGETS) {
-      toast.error(t('telemetryLayout.pasteLimit'));
       return;
     }
     const copiedIds = new Set(copiedItems.map((item) => item.id));
@@ -1144,7 +1135,6 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                 </MenuItem>
                 <MenuItem
                   onAction={addField}
-                  isDisabled={layout.length >= MAX_WIDGETS}
                   className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none hover:bg-slate-100 focus:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100 dark:hover:bg-slate-700 dark:focus:bg-slate-700"
                 >
                   <Plus className="h-4 w-4" />
@@ -1152,7 +1142,6 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                 </MenuItem>
                 <MenuItem
                   onAction={addSpeedometer}
-                  isDisabled={layout.length >= MAX_WIDGETS}
                   className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none hover:bg-slate-100 focus:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100 dark:hover:bg-slate-700 dark:focus:bg-slate-700"
                 >
                   <Gauge className="h-4 w-4" />
@@ -1163,7 +1152,6 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                     <MenuItem
                       key={variant}
                       onAction={() => addGraphicalWidget(variant)}
-                      isDisabled={layout.length >= MAX_WIDGETS}
                       className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none hover:bg-slate-100 focus:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100 dark:hover:bg-slate-700 dark:focus:bg-slate-700"
                     >
                       <Gauge className="h-4 w-4" />
@@ -1179,7 +1167,6 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                 </MenuItem>
                 <MenuItem
                   onAction={addIcon}
-                  isDisabled={layout.length >= MAX_WIDGETS}
                   className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none hover:bg-slate-100 focus:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100 dark:hover:bg-slate-700 dark:focus:bg-slate-700"
                 >
                   <Plus className="h-4 w-4" />
@@ -1187,7 +1174,6 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                 </MenuItem>
                 <MenuItem
                   onAction={addText}
-                  isDisabled={layout.length >= MAX_WIDGETS}
                   className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none hover:bg-slate-100 focus:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100 dark:hover:bg-slate-700 dark:focus:bg-slate-700"
                 >
                   <Plus className="h-4 w-4" />
