@@ -150,6 +150,9 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const [selectedIds, setSelectedIds] = useState<string[]>(
     layout[0]?.id ? [layout[0].id] : []
   );
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(
+    () => new Set()
+  );
   const [drag, setDrag] = useState<{
     mode: DragMode;
     startX: number;
@@ -961,43 +964,68 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                 const isGroupSelected = children.every((item) =>
                   selectedIds.includes(item.id)
                 );
+                const isCollapsed = collapsedGroupIds.has(groupId);
                 return (
                   <div key={groupId}>
-                    <button
-                      type="button"
-                      className={`flex w-full items-center truncate rounded-md px-2 py-1.5 text-left text-xs font-semibold transition ${isGroupSelected ? 'bg-violet-100 text-violet-800 dark:bg-violet-950/50 dark:text-violet-200' : 'text-slate-800 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-700'}`}
-                      aria-pressed={isGroupSelected}
-                      onClick={(event) =>
-                        selectFromHierarchy(
-                          children.map((item) => item.id),
-                          event.ctrlKey || event.metaKey
-                        )
-                      }
-                    >
-                      <span className="mr-2 text-violet-500">▾</span>
-                      <span className="truncate">{groupName}</span>
-                    </button>
-                    <div className="ml-4 border-l border-slate-200 pl-2 dark:border-slate-700">
-                      {children.map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          className={`flex w-full items-center truncate rounded-md px-2 py-1.5 text-left text-xs transition ${selectedIds.includes(item.id) ? 'bg-sky-100 font-semibold text-sky-800 dark:bg-sky-950/50 dark:text-sky-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700'}`}
-                          aria-pressed={selectedIds.includes(item.id)}
-                          onClick={(event) =>
-                            selectFromHierarchy(
-                              [item.id],
-                              event.ctrlKey || event.metaKey
-                            )
-                          }
-                        >
-                          <span className="mr-2 text-slate-400">└</span>
-                          <span className="truncate">
-                            {hierarchyLabel(item)}
-                          </span>
-                        </button>
-                      ))}
+                    <div className="flex items-center">
+                      <button
+                        type="button"
+                        className={`flex min-w-0 flex-1 items-center truncate rounded-md px-2 py-1.5 text-left text-xs font-semibold transition ${isGroupSelected ? 'bg-violet-100 text-violet-800 dark:bg-violet-950/50 dark:text-violet-200' : 'text-slate-800 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-700'}`}
+                        aria-pressed={isGroupSelected}
+                        onClick={(event) =>
+                          selectFromHierarchy(
+                            children.map((item) => item.id),
+                            event.ctrlKey || event.metaKey
+                          )
+                        }
+                      >
+                        <span className="truncate">{groupName}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded p-1 text-violet-500 hover:bg-slate-100 dark:hover:bg-slate-700"
+                        aria-label={t(
+                          isCollapsed
+                            ? 'telemetryLayout.expandGroup'
+                            : 'telemetryLayout.collapseGroup'
+                        )}
+                        onClick={() =>
+                          setCollapsedGroupIds((current) => {
+                            const next = new Set(current);
+                            if (next.has(groupId)) next.delete(groupId);
+                            else next.add(groupId);
+                            return next;
+                          })
+                        }
+                      >
+                        <ChevronDown
+                          className={`h-3.5 w-3.5 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                        />
+                      </button>
                     </div>
+                    {!isCollapsed && (
+                      <div className="ml-4 border-l border-slate-200 pl-2 dark:border-slate-700">
+                        {children.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            className={`flex w-full items-center truncate rounded-md px-2 py-1.5 text-left text-xs transition ${selectedIds.includes(item.id) ? 'bg-sky-100 font-semibold text-sky-800 dark:bg-sky-950/50 dark:text-sky-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700'}`}
+                            aria-pressed={selectedIds.includes(item.id)}
+                            onClick={(event) =>
+                              selectFromHierarchy(
+                                [item.id],
+                                event.ctrlKey || event.metaKey
+                              )
+                            }
+                          >
+                            <span className="mr-2 text-slate-400">└</span>
+                            <span className="truncate">
+                              {hierarchyLabel(item)}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}

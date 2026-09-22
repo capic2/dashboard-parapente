@@ -1739,6 +1739,8 @@
     "dragHint": "1920 × 1080 · normalized coordinates",
     "properties": "Widget properties",
     "hierarchy": "Layout hierarchy",
+    "collapseGroup": "Collapse group",
+    "expandGroup": "Expand group",
     "content": "Content",
     "appearance": "Appearance",
     "layout": "Position and size",

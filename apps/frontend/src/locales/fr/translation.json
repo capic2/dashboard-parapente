@@ -1744,6 +1744,8 @@
     "dragHint": "1920 × 1080 · coordonnées normalisées",
     "properties": "Propriétés du widget",
     "hierarchy": "Hiérarchie du layout",
+    "collapseGroup": "Replier le groupe",
+    "expandGroup": "Déplier le groupe",
     "content": "Contenu",
     "appearance": "Apparence",
     "layout": "Position et taille",
