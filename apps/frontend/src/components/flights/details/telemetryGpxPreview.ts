@@ -40,6 +40,21 @@ function headingDegrees(
   );
 }
 
+function numericExtensionValue(
+  trackPoint: Element,
+  localNames: readonly string[]
+) {
+  for (const localName of localNames) {
+    const element = Array.from(trackPoint.getElementsByTagName('*')).find(
+      (candidate) =>
+        candidate.localName === localName || candidate.tagName === localName
+    );
+    const value = Number(element?.textContent);
+    if (Number.isFinite(value)) return value;
+  }
+  return undefined;
+}
+
 export async function parseTelemetryGpxFile(
   file: File
 ): Promise<FlightTelemetryData> {
@@ -62,6 +77,7 @@ export async function parseTelemetryGpxFile(
         ? parsedTimestamp
         : lastTimestamp + 1;
     lastTimestamp = timestamp;
+    const heartRate = numericExtensionValue(trackPoint, ['hr', 'heartRate']);
     return {
       timestamp,
       lat: Number(trackPoint.getAttribute('lat') ?? 0),
@@ -69,6 +85,7 @@ export async function parseTelemetryGpxFile(
       elevation: Number(trackPoint.querySelector('ele')?.textContent ?? 0),
       segment: 0,
       distance_km: 0,
+      ...(heartRate !== undefined ? { heart_rate: heartRate } : {}),
     };
   });
 
