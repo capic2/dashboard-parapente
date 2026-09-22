@@ -1424,12 +1424,21 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       </>
                     )}
                     {isSelected && (
-                      <span
-                        className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-se-resize rounded-sm border border-white bg-sky-400"
-                        onPointerDown={(event) =>
-                          beginDrag(event, item, 'resize')
-                        }
-                      />
+                      <>
+                        <span
+                          className="pointer-events-none absolute bottom-1 left-1 rounded bg-slate-950/80 px-1 py-0.5 text-[9px] font-semibold leading-none text-white"
+                          aria-hidden="true"
+                        >
+                          {Math.round(item.width * 1920)} ×{' '}
+                          {Math.round(item.height * 1080)} px
+                        </span>
+                        <span
+                          className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-se-resize rounded-sm border border-white bg-sky-400"
+                          onPointerDown={(event) =>
+                            beginDrag(event, item, 'resize')
+                          }
+                        />
+                      </>
                     )}
                   </button>
                 );
