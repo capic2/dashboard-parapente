@@ -24,6 +24,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from best_spot import (
+    _filter_sites_by_location,
     FORECAST_TIME_ZONE,
     _get_current_forecast_hour,
     calculate_angle_difference,
@@ -42,6 +43,26 @@ from models import Site, WeatherForecast
 # ============================================================================
 # HELPER FUNCTION TESTS
 # ============================================================================
+
+
+def test_filter_sites_by_location_keeps_only_sites_in_radius(arguel_site, chalais_site):
+    """Nearby recommendations must not include sites outside the requested radius."""
+    nearby = _filter_sites_by_location(
+        [arguel_site, chalais_site],
+        latitude=arguel_site.latitude,
+        longitude=arguel_site.longitude,
+        radius_km=10,
+    )
+
+    assert [site.id for site in nearby] == [arguel_site.id]
+
+
+def test_filter_sites_by_location_without_position_keeps_all_sites(arguel_site, chalais_site):
+    """The existing all-sites behavior remains the fallback when GPS is unavailable."""
+    assert _filter_sites_by_location([arguel_site, chalais_site], None, None, 50) == [
+        arguel_site,
+        chalais_site,
+    ]
 
 
 def test_parse_wind_direction_valid():

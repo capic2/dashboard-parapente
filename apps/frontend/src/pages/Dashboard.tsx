@@ -15,18 +15,36 @@ import { createWeatherQueryFn } from '../hooks/weather/useWeather';
 import { getStaleTime, getWeatherRefetchInterval } from '../lib/cacheConfig';
 import type { WeatherData } from '../types';
 import type { SiteWeatherEntry } from '../components/dashboard/AllSitesConditions';
+import { useCurrentLocation } from '../hooks/useCurrentLocation';
+import { useBestSpotRadius } from '../hooks/useBestSpotRadius';
 
 export default function Dashboard() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const currentLocation = useCurrentLocation();
+  const { radiusKm, setRadiusKm } = useBestSpotRadius();
   const {
     data: sites = [],
     isLoading: areSitesLoading,
     isError: sitesLoadFailed,
     refetch: refetchSites,
   } = useQuery(sitesQueryOptions());
-  const { data: bestSpot } = useBestSpotAPI(0);
-  const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(0);
+  const nearbyLocation = currentLocation.isLoading
+    ? undefined
+    : currentLocation.location;
+  const { data: bestSpot } = useBestSpotAPI(
+    0,
+    nearbyLocation,
+    radiusKm,
+    !currentLocation.isLoading
+  );
+  const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(
+    0,
+    24,
+    nearbyLocation,
+    radiusKm,
+    !currentLocation.isLoading
+  );
   const todayLabel = new Intl.DateTimeFormat(
     i18n.language.startsWith('en') ? 'en-US' : 'fr-FR',
     {
@@ -157,6 +175,8 @@ export default function Dashboard() {
             void navigate({ to: '/weather', search: { siteId } })
           }
           selectedDayIndex={0}
+          radiusKm={radiusKm}
+          onRadiusChange={setRadiusKm}
         />
 
         <AllSitesConditions
