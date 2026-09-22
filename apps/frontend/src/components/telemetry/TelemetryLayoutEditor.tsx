@@ -487,6 +487,17 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     );
   };
 
+  const isWholeGroupSelected = (item: FlightTelemetryLayoutItem) => {
+    if (!item.groupId) return false;
+    const groupItems = layout.filter(
+      (candidate) => candidate.groupId === item.groupId
+    );
+    return (
+      groupItems.length === selectedIds.length &&
+      groupItems.every((candidate) => selectedIds.includes(candidate.id))
+    );
+  };
+
   const beginDrag = (
     event: PointerEvent,
     item: FlightTelemetryLayoutItem,
@@ -502,7 +513,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       );
       return;
     }
-    const groupItems = item.groupId
+    const groupItems = isWholeGroupSelected(item)
       ? layout.filter((candidate) => candidate.groupId === item.groupId)
       : selectedIds.includes(item.id)
         ? layout.filter((candidate) => selectedIds.includes(candidate.id))
@@ -620,7 +631,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     dx: number,
     dy: number
   ) => {
-    const movingIds = item.groupId
+    const movingIds = isWholeGroupSelected(item)
       ? new Set(
           layout
             .filter((candidate) => candidate.groupId === item.groupId)
@@ -1169,14 +1180,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                     onClick={(event) => {
                       if (event.shiftKey || event.metaKey || event.ctrlKey)
                         return;
-                      const ids = item.groupId
-                        ? layout
-                            .filter(
-                              (candidate) => candidate.groupId === item.groupId
-                            )
-                            .map((candidate) => candidate.id)
-                        : [item.id];
-                      setSelectedIds(ids);
+                      setSelectedIds([item.id]);
                     }}
                     className={`absolute flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border px-3 py-2 text-left text-white shadow-lg ${item.transparent === false ? 'bg-slate-950/85' : 'bg-transparent'} ${item.visible ? '' : 'opacity-35'} ${isSelected ? 'border-sky-400 ring-2 ring-sky-400/40' : item.border === true ? 'border-white/20' : 'border-transparent'}`}
                     style={{
