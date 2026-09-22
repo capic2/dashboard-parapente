@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@dashboard-parapente/design-system';
 import {
   Download,
   ChevronDown,
+  ClipboardPaste,
+  Copy,
   Gauge,
   Grip,
   Image as ImageIcon,
@@ -153,6 +155,9 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   );
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(
     () => new Set()
+  );
+  const [copiedItems, setCopiedItems] = useState<FlightTelemetryLayoutItem[]>(
+    []
   );
   const [drag, setDrag] = useState<{
     mode: DragMode;
@@ -553,6 +558,79 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     );
   };
 
+  const copySelected = useCallback(() => {
+    const items = layout.filter((item) => selectedIds.includes(item.id));
+    if (items.length) setCopiedItems(items);
+  }, [layout, selectedIds]);
+
+  const pasteCopied = useCallback(() => {
+    if (
+      !copiedItems.length ||
+      layout.length + copiedItems.length > MAX_WIDGETS
+    ) {
+      return;
+    }
+    const copiedIds = new Set(copiedItems.map((item) => item.id));
+    const completeGroupIds = new Set(
+      copiedItems
+        .filter((item) => item.groupId)
+        .map((item) => item.groupId)
+        .filter((groupId, index, groupIds) => {
+          if (!groupId || groupIds.indexOf(groupId) !== index) return false;
+          return layout
+            .filter((item) => item.groupId === groupId)
+            .every((item) => copiedIds.has(item.id));
+        })
+    );
+    const groupIdMap = new Map<string, string>();
+    const pastedItems = copiedItems.map((item) => {
+      const id = `${item.type}-${Date.now()}-${widgetIdCounter.current++}`;
+      const groupId =
+        item.groupId && completeGroupIds.has(item.groupId)
+          ? (groupIdMap.get(item.groupId) ??
+            `group-${Date.now()}-${widgetIdCounter.current++}`)
+          : undefined;
+      if (item.groupId && groupId && !groupIdMap.has(item.groupId)) {
+        groupIdMap.set(item.groupId, groupId);
+      }
+      return {
+        ...item,
+        id,
+        x: clamp(item.x + 0.02, 0, 1 - item.width),
+        y: clamp(item.y + 0.02, 0, 1 - item.height),
+        ...(groupId
+          ? { groupId, groupName: item.groupName }
+          : { groupId: undefined, groupName: undefined }),
+      };
+    });
+    setLayout((current) => [...current, ...pastedItems]);
+    setSelectedIds(pastedItems.map((item) => item.id));
+  }, [copiedItems, layout]);
+
+  useEffect(() => {
+    const handleKeyboardShortcut = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.tagName === 'SELECT' ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+      if (!(event.ctrlKey || event.metaKey)) return;
+      if (event.key.toLowerCase() === 'c') {
+        event.preventDefault();
+        copySelected();
+      } else if (event.key.toLowerCase() === 'v') {
+        event.preventDefault();
+        pasteCopied();
+      }
+    };
+    window.addEventListener('keydown', handleKeyboardShortcut);
+    return () => window.removeEventListener('keydown', handleKeyboardShortcut);
+  }, [copySelected, pasteCopied]);
+
   const downloadXml = () => {
     const xmlDocument = [...layout] as typeof layout & {
       backgroundImage?: string;
@@ -702,6 +780,26 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={copySelected}
+            isDisabled={!selectedIds.length}
+            aria-label={t('telemetryLayout.copy')}
+          >
+            <Copy className="h-4 w-4" />
+            {t('telemetryLayout.copy')}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={pasteCopied}
+            isDisabled={!copiedItems.length || layout.length >= MAX_WIDGETS}
+            aria-label={t('telemetryLayout.paste')}
+          >
+            <ClipboardPaste className="h-4 w-4" />
+            {t('telemetryLayout.paste')}
+          </Button>
           <Button
             variant="outline"
             size="sm"
