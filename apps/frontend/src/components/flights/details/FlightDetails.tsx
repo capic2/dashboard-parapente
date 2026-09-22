@@ -69,7 +69,6 @@ import { FlightStatsGrid } from './FlightStatsGrid';
 import { FlightYoutubeVideos } from './FlightYoutubeVideos';
 import { GoproOverlayJobStack } from './GoproOverlayJobStack';
 import { FlightOverlayWorkspace } from './FlightOverlayWorkspace';
-import { FlightOverlayInteractivePreview } from './FlightOverlayInteractivePreview';
 import { FlightTelemetryInteractivePreview } from './FlightTelemetryInteractivePreview';
 
 interface FlightDetailsProps {
@@ -945,12 +944,6 @@ export function FlightDetails({
 
       <div className="min-w-0 space-y-4">
         {hasGpx && hasVideo && hasGoproCameraVideo && overlayWorkspacePanel}
-        {hasGpx && hasVideo && hasGoproCameraVideo && (
-          <FlightOverlayInteractivePreview
-            flightId={flight.id}
-            overlayLayer={overlayLayer.data}
-          />
-        )}
         {hasGpx && hasVideo && hasGoproCameraVideo && interactiveTelemetryPanel}
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
           <button
