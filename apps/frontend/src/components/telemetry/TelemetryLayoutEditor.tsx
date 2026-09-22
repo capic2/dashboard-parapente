@@ -43,7 +43,6 @@ import {
   serializeTelemetryLayoutXml,
   type FlightTelemetryIconLayout,
   type FlightTelemetryLayoutItem,
-  type TelemetryLayout,
   type FlightTelemetryTextLayout,
 } from '../flights/details/flightTelemetryLayout';
 import { TelemetryLayoutIcon } from './TelemetryLayoutIcon';
@@ -136,7 +135,6 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const resetLayout = useResetTelemetryLayout(flightId ?? '');
   const canvasRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
-  const hydratedScope = useRef<string | null | undefined>(undefined);
   const widgetIdCounter = useRef(0);
   const [layout, setLayout] = useState<FlightTelemetryLayoutItem[]>(
     defaultTelemetryLayout
@@ -161,18 +159,12 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
 
   useEffect(() => {
     if (layoutQuery.data?.layout) {
-      const scopeKey = flightId ?? null;
-      const isNewScope = hydratedScope.current !== scopeKey;
       setLayout(layoutQuery.data.layout);
-      setBackgroundImage((current) =>
-        isNewScope ? layoutQuery.data.layout.backgroundImage : current
-      );
       setSelectedIds(
         layoutQuery.data.layout[0]?.id ? [layoutQuery.data.layout[0].id] : []
       );
-      hydratedScope.current = scopeKey;
     }
-  }, [flightId, layoutQuery.data?.layout]);
+  }, [layoutQuery.data?.layout]);
 
   const selected = layout.find((item) => item.id === selectedIds[0]) ?? null;
   const groups = Array.from(
@@ -242,11 +234,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     const emptyText = layout.find(
       (item) => item.type === 'text' && item.content.trim().length === 0
     );
-    const layoutDocument = [...layout] as TelemetryLayout;
-    layoutDocument.backgroundImage = backgroundImage;
-    const xmlLength = serializeTelemetryLayoutXml(layoutDocument, {
-      backgroundImage,
-    }).length;
+    const xmlLength = serializeTelemetryLayoutXml(layout).length;
     const validationMessage = invalidName
       ? t('telemetryLayout.nameTooLong')
       : invalidGroupName

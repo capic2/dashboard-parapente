@@ -56,9 +56,7 @@ export function useSaveTelemetryLayout(flightId?: string) {
             : 'telemetry-layouts/default',
           {
             json: {
-              xml_content: serializeTelemetryLayoutXml(layout, {
-                backgroundImage: document.backgroundImage,
-              }),
+              xml_content: serializeTelemetryLayoutXml(layout),
             },
           }
         )
