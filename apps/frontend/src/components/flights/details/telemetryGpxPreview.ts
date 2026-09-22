@@ -78,6 +78,22 @@ export async function parseTelemetryGpxFile(
         : lastTimestamp + 1;
     lastTimestamp = timestamp;
     const heartRate = numericExtensionValue(trackPoint, ['hr', 'heartRate']);
+    const power = numericExtensionValue(trackPoint, ['power', 'watts']);
+    const speedMps = numericExtensionValue(trackPoint, [
+      'speed',
+      'enhancedSpeed',
+    ]);
+    const recordedVario = numericExtensionValue(trackPoint, [
+      'vario',
+      'vertical_speed',
+      'verticalSpeed',
+      'climb_rate',
+    ]);
+    const recordedHeading = numericExtensionValue(trackPoint, [
+      'heading',
+      'course',
+      'track',
+    ]);
     return {
       timestamp,
       lat: Number(trackPoint.getAttribute('lat') ?? 0),
@@ -86,6 +102,14 @@ export async function parseTelemetryGpxFile(
       segment: 0,
       distance_km: 0,
       ...(heartRate !== undefined ? { heart_rate: heartRate } : {}),
+      ...(power !== undefined ? { power } : {}),
+      ...(speedMps !== undefined && speedMps >= 0
+        ? { speed_kmh: speedMps * 3.6 }
+        : {}),
+      ...(recordedVario !== undefined ? { vario_ms: recordedVario } : {}),
+      ...(recordedHeading !== undefined
+        ? { heading_deg: recordedHeading }
+        : {}),
     };
   });
 
@@ -95,9 +119,9 @@ export async function parseTelemetryGpxFile(
     const duration = Math.max(point.timestamp - previous.timestamp, 0.001);
     const distance = distanceMeters(previous, point);
     point.distance_km = (previous.distance_km ?? 0) + distance / 1000;
-    point.speed_kmh = (distance / duration) * 3.6;
-    point.vario_ms = (point.elevation - previous.elevation) / duration;
-    point.heading_deg = headingDegrees(previous, point);
+    point.speed_kmh ??= (distance / duration) * 3.6;
+    point.vario_ms ??= (point.elevation - previous.elevation) / duration;
+    point.heading_deg ??= headingDegrees(previous, point);
   }
 
   return {
