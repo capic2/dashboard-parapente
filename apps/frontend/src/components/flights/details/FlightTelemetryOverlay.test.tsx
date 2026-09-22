@@ -92,4 +92,32 @@ describe('FlightTelemetryOverlay', () => {
     expect(widget).not.toHaveClass('backdrop-blur-sm');
     expect(widget).not.toHaveClass('hover:bg-slate-900');
   });
+
+  it('does not render editor group decorations', () => {
+    const layout: FlightTelemetryLayoutItem[] = [
+      {
+        id: 'grouped-widget',
+        type: 'widget',
+        metric: 'altitude',
+        x: 0,
+        y: 0,
+        width: 0.2,
+        height: 0.2,
+        visible: true,
+        groupId: 'flight-stats',
+        groupName: 'Flight stats',
+      },
+    ];
+
+    render(
+      <FlightTelemetryOverlay
+        data={telemetry}
+        videoTimeSeconds={0}
+        offsetSeconds={0}
+        layout={layout}
+      />
+    );
+
+    expect(screen.queryByText('Flight stats')).not.toBeInTheDocument();
+  });
 });
