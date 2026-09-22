@@ -1739,6 +1739,14 @@
     "dragHint": "1920 × 1080 · normalized coordinates",
     "properties": "Widget properties",
     "hierarchy": "Layout hierarchy",
+    "widgetModel": "Gauge model",
+    "widgetModels": {
+      "value": "Simple value",
+      "speedometer": "Needle gauge",
+      "arc": "Arc gauge",
+      "radial": "Radial gauge",
+      "digital": "Digital gauge"
+    },
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
     "resetZoom": "Reset zoom",

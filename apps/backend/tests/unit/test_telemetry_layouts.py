@@ -118,6 +118,15 @@ def test_layout_accepts_graphical_widget_variant() -> None:
     assert 'variant="speedometer"' in validate_telemetry_layout_xml(xml)
 
 
+@pytest.mark.parametrize("variant", ["arc", "radial", "digital"])
+def test_layout_accepts_additional_gauge_variants(variant: str) -> None:
+    xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
+        'metric="speed"', f'metric="speed" variant="{variant}"', 1
+    )
+
+    assert f'variant="{variant}"' in validate_telemetry_layout_xml(xml)
+
+
 def test_layout_accepts_widget_value_alignment() -> None:
     xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
         'metric="altitude"', 'metric="altitude" align="right"', 1

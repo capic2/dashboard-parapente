@@ -223,6 +223,23 @@ describe('flight telemetry layout XML', () => {
     ).toEqual(layout);
   });
 
+  it.each(['arc', 'radial', 'digital'] as const)(
+    'round-trips the %s gauge model',
+    (variant) => {
+      const layout = [
+        {
+          ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[0],
+          variant,
+          metric: 'speed' as const,
+        },
+      ];
+
+      expect(
+        parseTelemetryLayoutXml(serializeTelemetryLayoutXml(layout))
+      ).toEqual(layout);
+    }
+  );
+
   it('round-trips widget value alignment', () => {
     const layout = [
       {

@@ -1744,6 +1744,14 @@
     "dragHint": "1920 × 1080 · coordonnées normalisées",
     "properties": "Propriétés du widget",
     "hierarchy": "Hiérarchie du layout",
+    "widgetModel": "Modèle de compteur",
+    "widgetModels": {
+      "value": "Valeur simple",
+      "speedometer": "Compteur à aiguille",
+      "arc": "Compteur en arc",
+      "radial": "Jauge radiale",
+      "digital": "Compteur numérique"
+    },
     "zoomIn": "Augmenter le zoom",
     "zoomOut": "Réduire le zoom",
     "resetZoom": "Réinitialiser le zoom",

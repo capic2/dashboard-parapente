@@ -212,12 +212,13 @@ export function FlightTelemetryOverlay({
               }}
               aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${formatTelemetryValue(value)}${slot.showUnit === false ? '' : ` ${unit}`}. ${t('flights.telemetryChangeMetric')}`}
             >
-              {slot.variant === 'speedometer' ? (
+              {slot.variant && slot.variant !== 'value' ? (
                 <TelemetrySpeedometer
                   metric={metric}
                   value={value}
                   unit={unit}
                   showUnit={slot.showUnit !== false}
+                  variant={slot.variant}
                 />
               ) : (
                 slot.showLabel !== false && (

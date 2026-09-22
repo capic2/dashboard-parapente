@@ -1,7 +1,12 @@
 import { METRIC_KEYS, type MetricKey } from './telemetryMetrics';
 
 export type TelemetryInteractionAction = 'none' | 'cycle_metric';
-export type TelemetryWidgetVariant = 'value' | 'speedometer';
+export type TelemetryWidgetVariant =
+  | 'value'
+  | 'speedometer'
+  | 'arc'
+  | 'radial'
+  | 'digital';
 export type TelemetryValueAlignment = 'left' | 'center' | 'right';
 
 export type TelemetryLayout = FlightTelemetryLayoutItem[] & {
@@ -141,7 +146,13 @@ const INTERACTION_ACTIONS: TelemetryInteractionAction[] = [
   'none',
   'cycle_metric',
 ];
-const WIDGET_VARIANTS: TelemetryWidgetVariant[] = ['value', 'speedometer'];
+const WIDGET_VARIANTS: TelemetryWidgetVariant[] = [
+  'value',
+  'speedometer',
+  'arc',
+  'radial',
+  'digital',
+];
 const VALUE_ALIGNMENTS: TelemetryValueAlignment[] = ['left', 'center', 'right'];
 
 function numberAttribute(element: Element, name: string, fallback: number) {

@@ -56,6 +56,7 @@ import {
   type FlightTelemetryIconLayout,
   type FlightTelemetryLayoutItem,
   type FlightTelemetryTextLayout,
+  type TelemetryWidgetVariant,
 } from '../flights/details/flightTelemetryLayout';
 import { TelemetryLayoutIcon } from './TelemetryLayoutIcon';
 import { TelemetrySpeedometer } from './TelemetrySpeedometer';
@@ -1335,12 +1336,13 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                           {item.name ?? item.icon}
                         </span>
                       </>
-                    ) : item.variant === 'speedometer' ? (
+                    ) : item.variant && item.variant !== 'value' ? (
                       <TelemetrySpeedometer
                         metric={item.metric}
                         value={value}
                         unit={unit}
                         showUnit={item.showUnit !== false}
+                        variant={item.variant}
                       />
                     ) : (
                       <>
@@ -1708,6 +1710,37 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                         {METRICS.map((metric) => (
                           <option key={metric} value={metric}>
                             {t(`flights.${METRIC_LABELS[metric]}`)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  {selected.type === 'widget' && (
+                    <label className="block text-sm">
+                      <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                        {t('telemetryLayout.widgetModel')}
+                      </span>
+                      <select
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        value={selected.variant ?? 'value'}
+                        onChange={(event) =>
+                          updateItem(selected.id, {
+                            variant: event.target
+                              .value as TelemetryWidgetVariant,
+                          })
+                        }
+                      >
+                        {(
+                          [
+                            'value',
+                            'speedometer',
+                            'arc',
+                            'radial',
+                            'digital',
+                          ] as const
+                        ).map((variant) => (
+                          <option key={variant} value={variant}>
+                            {t(`telemetryLayout.widgetModels.${variant}`)}
                           </option>
                         ))}
                       </select>
