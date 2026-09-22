@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@dashboard-parapente/design-system';
 import {
   Download,
+  ChevronDown,
   Gauge,
   Grip,
   Image as ImageIcon,
@@ -673,10 +674,14 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           </div>
         </div>
         <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800">
-          <div className="mb-5 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-            <div className="mb-2 text-sm font-semibold text-slate-900 dark:text-white">
+          <details
+            open
+            className="group mb-5 rounded-xl border border-slate-200 p-3 dark:border-slate-700"
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-white [&::-webkit-details-marker]:hidden">
               {t('telemetryLayout.hierarchy')}
-            </div>
+              <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
+            </summary>
             <div className="max-h-64 space-y-1 overflow-y-auto">
               {ungroupedItems.map((item) => (
                 <button
@@ -733,7 +738,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                 );
               })}
             </div>
-          </div>
+          </details>
           <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
             <SlidersHorizontal className="h-4 w-4 text-sky-500" />
             {t('telemetryLayout.properties')}
@@ -777,308 +782,347 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   </button>
                 </div>
               </div>
-              <label className="block text-sm">
-                <span className="mb-1 block text-slate-600 dark:text-slate-300">
-                  {t('telemetryLayout.name')}
-                </span>
-                <input
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                  value={selected.name ?? ''}
-                  placeholder={selected.id}
-                  onChange={(event) =>
-                    updateItem(selected.id, { name: event.target.value })
-                  }
-                />
-              </label>
-              {selected.groupId && (
-                <label className="block text-sm">
-                  <span className="mb-1 block text-slate-600 dark:text-slate-300">
-                    {t('telemetryLayout.groupName')}
-                  </span>
-                  <input
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                    value={selected.groupName ?? selected.groupId}
-                    onChange={(event) =>
-                      setLayout((current) =>
-                        current.map((item) =>
-                          item.groupId === selected.groupId
-                            ? { ...item, groupName: event.target.value }
-                            : item
-                        )
-                      )
-                    }
-                  />
-                </label>
-              )}
-              {selected.type === 'icon' ? (
-                <label className="block text-sm">
-                  <span className="mb-1 block text-slate-600 dark:text-slate-300">
-                    {t('telemetryLayout.icon')}
-                  </span>
-                  <select
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                    value={selected.icon}
-                    onChange={(event) =>
-                      updateItem(selected.id, {
-                        icon: event.target
-                          .value as FlightTelemetryIconLayout['icon'],
-                      })
-                    }
-                  >
-                    {[
-                      'mountain',
-                      'wind',
-                      'heart',
-                      'heartbeat',
-                      'compass',
-                      'map-pin',
-                      'flame',
-                      'gauge',
-                      'slope',
-                      'slope-triangle',
-                    ].map((icon) => (
-                      <option key={icon} value={icon}>
-                        {icon}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : selected.type === 'text' ? (
-                <label className="block text-sm">
-                  <span className="mb-1 block text-slate-600 dark:text-slate-300">
-                    {t('telemetryLayout.text')}
-                  </span>
-                  <textarea
-                    className="min-h-20 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                    value={selected.content}
-                    maxLength={500}
-                    onChange={(event) =>
-                      updateItem(selected.id, { content: event.target.value })
-                    }
-                  />
-                </label>
-              ) : (
-                <label className="block text-sm">
-                  <span className="mb-1 block text-slate-600 dark:text-slate-300">
-                    {t('telemetryLayout.metric')}
-                  </span>
-                  <select
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                    value={selected.metric}
-                    onChange={(event) =>
-                      updateItem(selected.id, {
-                        metric: event.target.value as Metric,
-                      })
-                    }
-                  >
-                    {METRICS.map((metric) => (
-                      <option key={metric} value={metric}>
-                        {t(`flights.${METRIC_LABELS[metric]}`)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              {selected.type === 'widget' && (
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={selected.showLabel !== false}
-                    onChange={(event) =>
-                      updateItem(selected.id, {
-                        showLabel: event.target.checked,
-                      })
-                    }
-                  />
-                  {t('telemetryLayout.showLabel')}
-                </label>
-              )}
-              {selected.type === 'widget' && (
-                <label className="block text-sm">
-                  <span className="mb-1 block text-slate-600 dark:text-slate-300">
-                    {t('telemetryLayout.fontSize')}
-                  </span>
-                  <input
-                    className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-right dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                    type="number"
-                    min="8"
-                    max="160"
-                    step="1"
-                    value={selected.fontSize ?? 32}
-                    onChange={(event) =>
-                      updateItem(selected.id, {
-                        fontSize: clamp(Number(event.target.value), 8, 160),
-                      })
-                    }
-                  />
-                </label>
-              )}
-              {selected.type === 'widget' && (
-                <label className="block text-sm">
-                  <span className="mb-1 block text-slate-600 dark:text-slate-300">
-                    {t('telemetryLayout.valueAlignment')}
-                  </span>
-                  <select
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                    value={selected.valueAlign ?? 'left'}
-                    onChange={(event) =>
-                      updateItem(selected.id, {
-                        valueAlign: event.target.value as
-                          | 'left'
-                          | 'center'
-                          | 'right',
-                      })
-                    }
-                  >
-                    <option value="left">
-                      {t('telemetryLayout.alignLeft')}
-                    </option>
-                    <option value="center">
-                      {t('telemetryLayout.alignCenter')}
-                    </option>
-                    <option value="right">
-                      {t('telemetryLayout.alignRight')}
-                    </option>
-                  </select>
-                </label>
-              )}
-              {selected.type === 'widget' && (
-                <div className="space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {t('telemetryLayout.interactions')}
-                  </p>
+              <details
+                open
+                className="group rounded-xl border border-slate-200 p-3 dark:border-slate-700"
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-white [&::-webkit-details-marker]:hidden">
+                  {t('telemetryLayout.content')}
+                  <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="mt-3 space-y-3">
                   <label className="block text-sm">
                     <span className="mb-1 block text-slate-600 dark:text-slate-300">
-                      {t('telemetryLayout.clickAction')}
-                    </span>
-                    <select
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                      value={selected.clickAction ?? 'cycle_metric'}
-                      onChange={(event) =>
-                        updateItem(selected.id, {
-                          clickAction: event.target.value as
-                            | 'none'
-                            | 'cycle_metric',
-                        })
-                      }
-                    >
-                      <option value="none">
-                        {t('telemetryLayout.actionNone')}
-                      </option>
-                      <option value="cycle_metric">
-                        {t('telemetryLayout.actionCycleMetric')}
-                      </option>
-                    </select>
-                  </label>
-                  <label className="block text-sm">
-                    <span className="mb-1 block text-slate-600 dark:text-slate-300">
-                      {t('telemetryLayout.longPressAction')}
-                    </span>
-                    <select
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                      value={selected.longPressAction ?? 'none'}
-                      onChange={(event) =>
-                        updateItem(selected.id, {
-                          longPressAction: event.target.value as
-                            | 'none'
-                            | 'cycle_metric',
-                        })
-                      }
-                    >
-                      <option value="none">
-                        {t('telemetryLayout.actionNone')}
-                      </option>
-                      <option value="cycle_metric">
-                        {t('telemetryLayout.actionCycleMetric')}
-                      </option>
-                    </select>
-                  </label>
-                </div>
-              )}
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={selected.visible}
-                  onChange={(event) =>
-                    updateItem(selected.id, { visible: event.target.checked })
-                  }
-                />
-                {t('telemetryLayout.visible')}
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={selected.transparent ?? false}
-                  onChange={(event) =>
-                    updateItem(selected.id, {
-                      transparent: event.target.checked,
-                    })
-                  }
-                />
-                {t('telemetryLayout.transparentBackground')}
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={selected.border !== false}
-                  onChange={(event) =>
-                    updateItem(selected.id, { border: event.target.checked })
-                  }
-                />
-                {t('telemetryLayout.showBorder')}
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                {(
-                  [
-                    ['x', selected.x],
-                    ['y', selected.y],
-                    ['width', selected.width],
-                    ['height', selected.height],
-                  ] as const
-                ).map(([name, value]) => (
-                  <label key={name} className="text-sm">
-                    <span className="mb-1 block text-slate-600 dark:text-slate-300">
-                      {t(`telemetryLayout.${name}`)} %
+                      {t('telemetryLayout.name')}
                     </span>
                     <input
-                      className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-right dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="1"
-                      value={Math.round(value * 100)}
-                      onChange={(event) => {
-                        const next = clamp(
-                          Number(event.target.value) / 100,
-                          0,
-                          1
-                        );
-                        if (name === 'x') {
-                          updateItem(selected.id, {
-                            x: clamp(next, 0, 1 - selected.width),
-                          });
-                        } else if (name === 'y') {
-                          updateItem(selected.id, {
-                            y: clamp(next, 0, 1 - selected.height),
-                          });
-                        } else if (name === 'width') {
-                          updateItem(selected.id, {
-                            width: clamp(next, 0.05, 1 - selected.x),
-                          });
-                        } else {
-                          updateItem(selected.id, {
-                            height: clamp(next, 0.05, 1 - selected.y),
-                          });
-                        }
-                      }}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      value={selected.name ?? ''}
+                      placeholder={selected.id}
+                      onChange={(event) =>
+                        updateItem(selected.id, { name: event.target.value })
+                      }
                     />
                   </label>
-                ))}
-              </div>
-              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                <Grip className="h-4 w-4" />
-                {t('telemetryLayout.resizeHint')}
-              </div>
+                  {selected.groupId && (
+                    <label className="block text-sm">
+                      <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                        {t('telemetryLayout.groupName')}
+                      </span>
+                      <input
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        value={selected.groupName ?? selected.groupId}
+                        onChange={(event) =>
+                          setLayout((current) =>
+                            current.map((item) =>
+                              item.groupId === selected.groupId
+                                ? { ...item, groupName: event.target.value }
+                                : item
+                            )
+                          )
+                        }
+                      />
+                    </label>
+                  )}
+                  {selected.type === 'icon' ? (
+                    <label className="block text-sm">
+                      <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                        {t('telemetryLayout.icon')}
+                      </span>
+                      <select
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        value={selected.icon}
+                        onChange={(event) =>
+                          updateItem(selected.id, {
+                            icon: event.target
+                              .value as FlightTelemetryIconLayout['icon'],
+                          })
+                        }
+                      >
+                        {[
+                          'mountain',
+                          'wind',
+                          'heart',
+                          'heartbeat',
+                          'compass',
+                          'map-pin',
+                          'flame',
+                          'gauge',
+                          'slope',
+                          'slope-triangle',
+                        ].map((icon) => (
+                          <option key={icon} value={icon}>
+                            {icon}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : selected.type === 'text' ? (
+                    <label className="block text-sm">
+                      <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                        {t('telemetryLayout.text')}
+                      </span>
+                      <textarea
+                        className="min-h-20 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        value={selected.content}
+                        maxLength={500}
+                        onChange={(event) =>
+                          updateItem(selected.id, {
+                            content: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                  ) : (
+                    <label className="block text-sm">
+                      <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                        {t('telemetryLayout.metric')}
+                      </span>
+                      <select
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        value={selected.metric}
+                        onChange={(event) =>
+                          updateItem(selected.id, {
+                            metric: event.target.value as Metric,
+                          })
+                        }
+                      >
+                        {METRICS.map((metric) => (
+                          <option key={metric} value={metric}>
+                            {t(`flights.${METRIC_LABELS[metric]}`)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </div>
+              </details>
+              <details
+                open
+                className="group rounded-xl border border-slate-200 p-3 dark:border-slate-700"
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-white [&::-webkit-details-marker]:hidden">
+                  {t('telemetryLayout.appearance')}
+                  <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="mt-3 space-y-3">
+                  {selected.type === 'widget' && (
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selected.showLabel !== false}
+                        onChange={(event) =>
+                          updateItem(selected.id, {
+                            showLabel: event.target.checked,
+                          })
+                        }
+                      />
+                      {t('telemetryLayout.showLabel')}
+                    </label>
+                  )}
+                  {selected.type === 'widget' && (
+                    <label className="block text-sm">
+                      <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                        {t('telemetryLayout.fontSize')}
+                      </span>
+                      <input
+                        className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-right dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        type="number"
+                        min="8"
+                        max="160"
+                        step="1"
+                        value={selected.fontSize ?? 32}
+                        onChange={(event) =>
+                          updateItem(selected.id, {
+                            fontSize: clamp(Number(event.target.value), 8, 160),
+                          })
+                        }
+                      />
+                    </label>
+                  )}
+                  {selected.type === 'widget' && (
+                    <label className="block text-sm">
+                      <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                        {t('telemetryLayout.valueAlignment')}
+                      </span>
+                      <select
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        value={selected.valueAlign ?? 'left'}
+                        onChange={(event) =>
+                          updateItem(selected.id, {
+                            valueAlign: event.target.value as
+                              | 'left'
+                              | 'center'
+                              | 'right',
+                          })
+                        }
+                      >
+                        <option value="left">
+                          {t('telemetryLayout.alignLeft')}
+                        </option>
+                        <option value="center">
+                          {t('telemetryLayout.alignCenter')}
+                        </option>
+                        <option value="right">
+                          {t('telemetryLayout.alignRight')}
+                        </option>
+                      </select>
+                    </label>
+                  )}
+                </div>
+              </details>
+              {selected.type === 'widget' && (
+                <details className="group rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                  <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-white [&::-webkit-details-marker]:hidden">
+                    {t('telemetryLayout.interactions')}
+                    <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
+                  </summary>
+                  <div className="mt-3 space-y-3">
+                    <label className="block text-sm">
+                      <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                        {t('telemetryLayout.clickAction')}
+                      </span>
+                      <select
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        value={selected.clickAction ?? 'cycle_metric'}
+                        onChange={(event) =>
+                          updateItem(selected.id, {
+                            clickAction: event.target.value as
+                              | 'none'
+                              | 'cycle_metric',
+                          })
+                        }
+                      >
+                        <option value="none">
+                          {t('telemetryLayout.actionNone')}
+                        </option>
+                        <option value="cycle_metric">
+                          {t('telemetryLayout.actionCycleMetric')}
+                        </option>
+                      </select>
+                    </label>
+                    <label className="block text-sm">
+                      <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                        {t('telemetryLayout.longPressAction')}
+                      </span>
+                      <select
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        value={selected.longPressAction ?? 'none'}
+                        onChange={(event) =>
+                          updateItem(selected.id, {
+                            longPressAction: event.target.value as
+                              | 'none'
+                              | 'cycle_metric',
+                          })
+                        }
+                      >
+                        <option value="none">
+                          {t('telemetryLayout.actionNone')}
+                        </option>
+                        <option value="cycle_metric">
+                          {t('telemetryLayout.actionCycleMetric')}
+                        </option>
+                      </select>
+                    </label>
+                  </div>
+                </details>
+              )}
+              <details className="group rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-white [&::-webkit-details-marker]:hidden">
+                  {t('telemetryLayout.layout')}
+                  <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="mt-3 space-y-3">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={selected.visible}
+                      onChange={(event) =>
+                        updateItem(selected.id, {
+                          visible: event.target.checked,
+                        })
+                      }
+                    />
+                    {t('telemetryLayout.visible')}
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={selected.transparent ?? false}
+                      onChange={(event) =>
+                        updateItem(selected.id, {
+                          transparent: event.target.checked,
+                        })
+                      }
+                    />
+                    {t('telemetryLayout.transparentBackground')}
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={selected.border !== false}
+                      onChange={(event) =>
+                        updateItem(selected.id, {
+                          border: event.target.checked,
+                        })
+                      }
+                    />
+                    {t('telemetryLayout.showBorder')}
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(
+                      [
+                        ['x', selected.x],
+                        ['y', selected.y],
+                        ['width', selected.width],
+                        ['height', selected.height],
+                      ] as const
+                    ).map(([name, value]) => (
+                      <label key={name} className="text-sm">
+                        <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                          {t(`telemetryLayout.${name}`)} %
+                        </span>
+                        <input
+                          className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-right dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="1"
+                          value={Math.round(value * 100)}
+                          onChange={(event) => {
+                            const next = clamp(
+                              Number(event.target.value) / 100,
+                              0,
+                              1
+                            );
+                            if (name === 'x') {
+                              updateItem(selected.id, {
+                                x: clamp(next, 0, 1 - selected.width),
+                              });
+                            } else if (name === 'y') {
+                              updateItem(selected.id, {
+                                y: clamp(next, 0, 1 - selected.height),
+                              });
+                            } else if (name === 'width') {
+                              updateItem(selected.id, {
+                                width: clamp(next, 0.05, 1 - selected.x),
+                              });
+                            } else {
+                              updateItem(selected.id, {
+                                height: clamp(next, 0.05, 1 - selected.y),
+                              });
+                            }
+                          }}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                    <Grip className="h-4 w-4" />
+                    {t('telemetryLayout.resizeHint')}
+                  </div>
+                </div>
+              </details>
             </div>
           ) : (
             <p className="text-sm text-slate-500">
