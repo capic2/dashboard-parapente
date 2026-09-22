@@ -1758,6 +1758,7 @@
     "sameColumn": "Mettre sur la même colonne",
     "copy": "Copier",
     "paste": "Coller",
+    "undo": "Annuler",
     "selectedGroup": "Groupe sélectionné",
     "groupSelectionHint": "Sélectionnez un élément du groupe pour modifier ses propriétés.",
     "collapseGroup": "Replier le groupe",

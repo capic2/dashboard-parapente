@@ -25,6 +25,7 @@ import {
   Save,
   SlidersHorizontal,
   Trash2,
+  Undo2,
   Upload,
   ZoomIn,
   ZoomOut,
@@ -150,9 +151,11 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const widgetIdCounter = useRef(0);
-  const [layout, setLayout] = useState<FlightTelemetryLayoutItem[]>(
+  const [layout, setLayoutState] = useState<FlightTelemetryLayoutItem[]>(
     defaultTelemetryLayout
   );
+  const layoutHistory = useRef<FlightTelemetryLayoutItem[][]>([]);
+  const [canUndo, setCanUndo] = useState(false);
   const [backgroundImage, setBackgroundImage] = useState<string>();
   const [localTelemetry, setLocalTelemetry] = useState<FlightTelemetryData>();
   const [gpxFileName, setGpxFileName] = useState<string>();
@@ -182,9 +185,45 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     items: FlightTelemetryLayoutItem[];
   } | null>(null);
 
+  const setLayout = useCallback(
+    (
+      nextLayout:
+        | FlightTelemetryLayoutItem[]
+        | ((
+            current: FlightTelemetryLayoutItem[]
+          ) => FlightTelemetryLayoutItem[])
+    ) => {
+      const next =
+        typeof nextLayout === 'function' ? nextLayout(layout) : nextLayout;
+      if (next === layout) return;
+      layoutHistory.current.push(layout);
+      setCanUndo(true);
+      setLayoutState(next);
+    },
+    [layout]
+  );
+
+  const undoLayout = useCallback(() => {
+    const previous = layoutHistory.current.pop();
+    if (!previous) return;
+    setLayoutState(previous);
+    setCanUndo(layoutHistory.current.length > 0);
+    setSelectedIds((current) => {
+      const validIds = new Set(previous.map((item) => item.id));
+      const retained = current.filter((id) => validIds.has(id));
+      return retained.length
+        ? retained
+        : previous[0]?.id
+          ? [previous[0].id]
+          : [];
+    });
+  }, []);
+
   useEffect(() => {
     if (layoutQuery.data?.layout) {
-      setLayout(layoutQuery.data.layout);
+      layoutHistory.current = [];
+      setCanUndo(false);
+      setLayoutState(layoutQuery.data.layout);
       setSelectedIds(
         layoutQuery.data.layout[0]?.id ? [layoutQuery.data.layout[0].id] : []
       );
@@ -653,7 +692,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
         })
       );
     },
-    [isWholeGroupSelected, layout, selectedIds]
+    [isWholeGroupSelected, layout, selectedIds, setLayout]
   );
 
   const copySelected = useCallback(() => {
@@ -705,7 +744,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     });
     setLayout((current) => [...current, ...pastedItems]);
     setSelectedIds(pastedItems.map((item) => item.id));
-  }, [copiedItems, layout]);
+  }, [copiedItems, layout, setLayout]);
 
   const alignSelected = (
     direction:
@@ -798,7 +837,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
         return;
       }
       if (!(event.ctrlKey || event.metaKey)) return;
-      if (event.key.toLowerCase() === 'c') {
+      if (event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        undoLayout();
+      } else if (event.key.toLowerCase() === 'c') {
         event.preventDefault();
         copySelected();
       } else if (event.key.toLowerCase() === 'v') {
@@ -809,7 +851,14 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     const editor = editorRef.current;
     editor?.addEventListener('keydown', handleKeyboardShortcut);
     return () => editor?.removeEventListener('keydown', handleKeyboardShortcut);
-  }, [copySelected, layout, moveWithKeyboard, pasteCopied, selectedIds]);
+  }, [
+    copySelected,
+    layout,
+    moveWithKeyboard,
+    pasteCopied,
+    selectedIds,
+    undoLayout,
+  ]);
 
   const downloadXml = () => {
     const xmlDocument = [...layout] as typeof layout & {
@@ -960,6 +1009,18 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={undoLayout}
+            isDisabled={!canUndo}
+            aria-label={t('telemetryLayout.undo')}
+            aria-keyshortcuts="Control+Z Meta+Z"
+            title={t('telemetryLayout.undo')}
+          >
+            <Undo2 className="h-4 w-4" />
+            {t('telemetryLayout.undo')}
+          </Button>
           <div className="flex items-center gap-1 rounded-lg border border-slate-300 px-1 dark:border-slate-600">
             <Button
               variant="ghost"

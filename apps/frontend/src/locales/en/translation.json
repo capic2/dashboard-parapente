@@ -1753,6 +1753,7 @@
     "sameColumn": "Place in the same column",
     "copy": "Copy",
     "paste": "Paste",
+    "undo": "Undo",
     "selectedGroup": "Selected group",
     "groupSelectionHint": "Select an item in the group to edit its properties.",
     "collapseGroup": "Collapse group",
