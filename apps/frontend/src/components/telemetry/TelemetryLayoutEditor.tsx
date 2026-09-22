@@ -430,17 +430,19 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     setSelectedIds([id]);
   };
 
-  const addSpeedometer = () => {
+  const addGraphicalWidget = (
+    variant: Exclude<TelemetryWidgetVariant, 'value'>
+  ) => {
     if (layout.length >= MAX_WIDGETS) return;
-    const id = `speedometer-${Date.now()}-${widgetIdCounter.current++}`;
+    const id = `${variant}-${Date.now()}-${widgetIdCounter.current++}`;
     const column = layout.length % 4;
     const row = Math.floor(layout.length / 4);
     const widget: FlightTelemetryLayoutItem = {
       id,
       type: 'widget',
-      name: 'speedometer',
-      metric: 'speed',
-      variant: 'speedometer',
+      name: variant,
+      metric: variant === 'compass' ? 'heading' : 'speed',
+      variant,
       x: 0.02 + column * 0.24,
       y: 0.02 + row * 0.2,
       width: 0.18,
@@ -450,6 +452,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     setLayout((current) => [...current, widget]);
     setSelectedIds([id]);
   };
+
+  const addSpeedometer = () => addGraphicalWidget('speedometer');
 
   const addText = () => {
     if (layout.length >= MAX_WIDGETS) return;
@@ -1154,6 +1158,19 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   <Gauge className="h-4 w-4" />
                   {t('telemetryLayout.addSpeedometer')}
                 </MenuItem>
+                {(['compass', 'bar', 'chart', 'asi'] as const).map(
+                  (variant) => (
+                    <MenuItem
+                      key={variant}
+                      onAction={() => addGraphicalWidget(variant)}
+                      isDisabled={layout.length >= MAX_WIDGETS}
+                      className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none hover:bg-slate-100 focus:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100 dark:hover:bg-slate-700 dark:focus:bg-slate-700"
+                    >
+                      <Gauge className="h-4 w-4" />
+                      {t(`telemetryLayout.widgetModels.${variant}`)}
+                    </MenuItem>
+                  )
+                )}
                 <MenuItem
                   isDisabled
                   className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
