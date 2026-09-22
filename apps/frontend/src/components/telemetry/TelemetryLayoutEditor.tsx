@@ -848,6 +848,40 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     undoLayout,
   ]);
 
+  useEffect(() => {
+    const handleClipboardShortcut = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        !target ||
+        !editorRef.current?.contains(target) ||
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable ||
+        !(event.ctrlKey || event.metaKey)
+      ) {
+        return;
+      }
+      const shortcut = event.key.toLowerCase();
+      if (shortcut === 'c') {
+        event.preventDefault();
+        event.stopPropagation();
+        copySelected();
+      } else if (shortcut === 'v') {
+        event.preventDefault();
+        event.stopPropagation();
+        pasteCopied();
+      } else if (shortcut === 'z') {
+        event.preventDefault();
+        event.stopPropagation();
+        undoLayout();
+      }
+    };
+    document.addEventListener('keydown', handleClipboardShortcut, true);
+    return () =>
+      document.removeEventListener('keydown', handleClipboardShortcut, true);
+  }, [copySelected, pasteCopied, undoLayout]);
+
   const downloadXml = () => {
     const xmlDocument = [...layout] as typeof layout & {
       backgroundImage?: string;
@@ -878,29 +912,6 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   return (
     <div
       ref={editorRef}
-      onKeyDownCapture={(event) => {
-        const target = event.target as HTMLElement | null;
-        if (
-          target?.tagName === 'INPUT' ||
-          target?.tagName === 'TEXTAREA' ||
-          target?.tagName === 'SELECT' ||
-          target?.isContentEditable ||
-          !(event.ctrlKey || event.metaKey)
-        ) {
-          return;
-        }
-        const shortcut = event.key.toLowerCase();
-        if (shortcut === 'c') {
-          event.preventDefault();
-          copySelected();
-        } else if (shortcut === 'v') {
-          event.preventDefault();
-          pasteCopied();
-        } else if (shortcut === 'z') {
-          event.preventDefault();
-          undoLayout();
-        }
-      }}
       className={`space-y-5 ${isFullscreen ? 'overflow-y-auto bg-slate-950 p-4 sm:p-6' : ''}`}
     >
       <div
