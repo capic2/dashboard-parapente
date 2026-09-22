@@ -10,7 +10,9 @@ import {
   Image as ImageIcon,
   Maximize2,
   Minimize2,
+  Pause,
   Plus,
+  Play,
   RotateCcw,
   Save,
   SlidersHorizontal,
@@ -79,6 +81,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const [localTelemetry, setLocalTelemetry] = useState<FlightTelemetryData>();
   const [gpxFileName, setGpxFileName] = useState<string>();
   const [gpxError, setGpxError] = useState(false);
+  const [gpxPointIndex, setGpxPointIndex] = useState(0);
+  const [isGpxPlaying, setIsGpxPlaying] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>(
     layout[0]?.id ? [layout[0].id] : []
@@ -110,7 +114,23 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   );
   const ungroupedItems = layout.filter((item) => !item.groupId);
   const previewTelemetry = localTelemetry ?? telemetryQuery.data;
-  const previewPoint = previewTelemetry?.points[0];
+  const previewPoint =
+    previewTelemetry?.points[localTelemetry ? gpxPointIndex : 0];
+
+  useEffect(() => {
+    if (!isGpxPlaying || !localTelemetry) return;
+    const timer = window.setInterval(() => {
+      setGpxPointIndex((current) => {
+        const lastIndex = localTelemetry.points.length - 1;
+        if (current >= lastIndex) {
+          setIsGpxPlaying(false);
+          return lastIndex;
+        }
+        return current + 1;
+      });
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [isGpxPlaying, localTelemetry]);
 
   const handleGpxFile = async (file: File | undefined) => {
     if (!file) return;
@@ -118,10 +138,14 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       setLocalTelemetry(await parseTelemetryGpxFile(file));
       setGpxFileName(file.name);
       setGpxError(false);
+      setGpxPointIndex(0);
+      setIsGpxPlaying(false);
     } catch {
       setLocalTelemetry(undefined);
       setGpxFileName(undefined);
       setGpxError(true);
+      setGpxPointIndex(0);
+      setIsGpxPlaying(false);
     }
   };
 
@@ -416,6 +440,61 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
             <span className="max-w-40 truncate text-emerald-600 dark:text-emerald-300">
               {gpxFileName}
             </span>
+          )}
+          {localTelemetry && (
+            <div className="flex min-w-72 flex-1 items-center gap-2 rounded-lg border border-slate-300 px-2 py-1.5 dark:border-slate-600">
+              <Button
+                variant="outline"
+                size="sm"
+                onPress={() => {
+                  if (gpxPointIndex >= localTelemetry.points.length - 1) {
+                    setGpxPointIndex(0);
+                  }
+                  setIsGpxPlaying((playing) => !playing);
+                }}
+                aria-label={
+                  isGpxPlaying
+                    ? t('telemetryLayout.pauseGpx')
+                    : t('telemetryLayout.playGpx')
+                }
+              >
+                {isGpxPlaying ? (
+                  <Pause className="h-4 w-4" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+                {isGpxPlaying
+                  ? t('telemetryLayout.pauseGpx')
+                  : t('telemetryLayout.playGpx')}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onPress={() => {
+                  setGpxPointIndex(0);
+                  setIsGpxPlaying(false);
+                }}
+                aria-label={t('telemetryLayout.restartGpx')}
+                title={t('telemetryLayout.restartGpx')}
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+              <input
+                className="min-w-0 flex-1 accent-sky-500"
+                type="range"
+                min="0"
+                max={Math.max(localTelemetry.points.length - 1, 0)}
+                value={gpxPointIndex}
+                onChange={(event) => {
+                  setGpxPointIndex(Number(event.target.value));
+                  setIsGpxPlaying(false);
+                }}
+                aria-label={t('telemetryLayout.gpxProgress')}
+              />
+              <span className="whitespace-nowrap text-xs tabular-nums text-slate-500 dark:text-slate-400">
+                {gpxPointIndex + 1}/{localTelemetry.points.length}
+              </span>
+            </div>
           )}
           {gpxError && (
             <span className="text-rose-600 dark:text-rose-300">
