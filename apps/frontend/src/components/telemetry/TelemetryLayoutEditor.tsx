@@ -487,16 +487,19 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     );
   };
 
-  const isWholeGroupSelected = (item: FlightTelemetryLayoutItem) => {
-    if (!item.groupId) return false;
-    const groupItems = layout.filter(
-      (candidate) => candidate.groupId === item.groupId
-    );
-    return (
-      groupItems.length === selectedIds.length &&
-      groupItems.every((candidate) => selectedIds.includes(candidate.id))
-    );
-  };
+  const isWholeGroupSelected = useCallback(
+    (item: FlightTelemetryLayoutItem) => {
+      if (!item.groupId) return false;
+      const groupItems = layout.filter(
+        (candidate) => candidate.groupId === item.groupId
+      );
+      return (
+        groupItems.length === selectedIds.length &&
+        groupItems.every((candidate) => selectedIds.includes(candidate.id))
+      );
+    },
+    [layout, selectedIds]
+  );
 
   const beginDrag = (
     event: PointerEvent,
@@ -626,31 +629,30 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     }
   };
 
-  const moveWithKeyboard = (
-    item: FlightTelemetryLayoutItem,
-    dx: number,
-    dy: number
-  ) => {
-    const movingIds = isWholeGroupSelected(item)
-      ? new Set(
-          layout
-            .filter((candidate) => candidate.groupId === item.groupId)
-            .map((candidate) => candidate.id)
-        )
-      : new Set(selectedIds.includes(item.id) ? selectedIds : [item.id]);
+  const moveWithKeyboard = useCallback(
+    (item: FlightTelemetryLayoutItem, dx: number, dy: number) => {
+      const movingIds = isWholeGroupSelected(item)
+        ? new Set(
+            layout
+              .filter((candidate) => candidate.groupId === item.groupId)
+              .map((candidate) => candidate.id)
+          )
+        : new Set(selectedIds.includes(item.id) ? selectedIds : [item.id]);
 
-    setSelectedIds([...movingIds]);
-    setLayout((current) =>
-      current.map((candidate) => {
-        if (!movingIds.has(candidate.id)) return candidate;
-        return {
-          ...candidate,
-          x: clamp(candidate.x + dx, 0, 1 - candidate.width),
-          y: clamp(candidate.y + dy, 0, 1 - candidate.height),
-        };
-      })
-    );
-  };
+      setSelectedIds([...movingIds]);
+      setLayout((current) =>
+        current.map((candidate) => {
+          if (!movingIds.has(candidate.id)) return candidate;
+          return {
+            ...candidate,
+            x: clamp(candidate.x + dx, 0, 1 - candidate.width),
+            y: clamp(candidate.y + dy, 0, 1 - candidate.height),
+          };
+        })
+      );
+    },
+    [isWholeGroupSelected, layout, selectedIds]
+  );
 
   const copySelected = useCallback(() => {
     const items = layout.filter((item) => selectedIds.includes(item.id));
@@ -765,6 +767,32 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       ) {
         return;
       }
+      const movement = {
+        ArrowLeft: [-0.005, 0],
+        ArrowRight: [0.005, 0],
+        ArrowUp: [0, -0.005],
+        ArrowDown: [0, 0.005],
+      }[event.key];
+      if (
+        movement &&
+        target &&
+        editorRef.current?.contains(target) &&
+        !canvasRef.current?.contains(target)
+      ) {
+        const selectedItem = layout.find((item) =>
+          selectedIds.includes(item.id)
+        );
+        if (selectedItem) {
+          const multiplier = event.shiftKey ? 5 : 1;
+          event.preventDefault();
+          moveWithKeyboard(
+            selectedItem,
+            movement[0] * multiplier,
+            movement[1] * multiplier
+          );
+        }
+        return;
+      }
       if (!(event.ctrlKey || event.metaKey)) return;
       if (event.key.toLowerCase() === 'c') {
         event.preventDefault();
@@ -776,7 +804,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     };
     window.addEventListener('keydown', handleKeyboardShortcut);
     return () => window.removeEventListener('keydown', handleKeyboardShortcut);
-  }, [copySelected, pasteCopied]);
+  }, [copySelected, layout, moveWithKeyboard, pasteCopied, selectedIds]);
 
   const downloadXml = () => {
     const xmlDocument = [...layout] as typeof layout & {
