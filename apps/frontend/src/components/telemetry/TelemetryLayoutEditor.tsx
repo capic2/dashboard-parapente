@@ -789,7 +789,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       : [item.id];
                     setSelectedIds(ids);
                   }}
-                  className={`absolute flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border px-3 py-2 text-left text-white shadow-lg ${item.transparent ? 'bg-transparent' : 'bg-slate-950/85'} ${item.visible ? '' : 'opacity-35'} ${isSelected ? 'border-sky-400 ring-2 ring-sky-400/40' : item.border === false ? 'border-transparent' : 'border-white/20'}`}
+                  className={`absolute flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border px-3 py-2 text-left text-white shadow-lg ${item.transparent === false ? 'bg-slate-950/85' : 'bg-transparent'} ${item.visible ? '' : 'opacity-35'} ${isSelected ? 'border-sky-400 ring-2 ring-sky-400/40' : item.border === true ? 'border-white/20' : 'border-transparent'}`}
                   style={{
                     left: `${item.x * 100}%`,
                     top: `${item.y * 100}%`,
@@ -1270,7 +1270,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   <label className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
-                      checked={selected.transparent ?? false}
+                      checked={selected.transparent !== false}
                       onChange={(event) =>
                         updateItem(selected.id, {
                           transparent: event.target.checked,
@@ -1282,7 +1282,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   <label className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
-                      checked={selected.border !== false}
+                      checked={selected.border === true}
                       onChange={(event) =>
                         updateItem(selected.id, {
                           border: event.target.checked,

@@ -97,7 +97,7 @@ export function FlightTelemetryOverlay({
             return (
               <div
                 key={slot.id}
-                className={`pointer-events-auto absolute flex items-center justify-center rounded-lg border text-white shadow-lg backdrop-blur-sm ${slot.transparent ? 'bg-transparent' : 'bg-slate-950/75'} ${slot.border === false ? 'border-transparent' : 'border-white/25'}`}
+                className={`pointer-events-auto absolute flex items-center justify-center rounded-lg border text-white shadow-lg backdrop-blur-sm ${slot.transparent === false ? 'bg-slate-950/75' : 'bg-transparent'} ${slot.border === true ? 'border-white/25' : 'border-transparent'}`}
                 style={{
                   left: `${slot.x * 100}%`,
                   top: `${slot.y * 100}%`,
@@ -113,7 +113,7 @@ export function FlightTelemetryOverlay({
             return (
               <div
                 key={slot.id}
-                className={`pointer-events-auto absolute flex items-center justify-center overflow-hidden rounded-lg border px-2 text-center text-sm font-semibold text-white shadow-lg backdrop-blur-sm ${slot.transparent ? 'bg-transparent' : 'bg-slate-950/75'} ${slot.border === false ? 'border-transparent' : 'border-white/25'}`}
+                className={`pointer-events-auto absolute flex items-center justify-center overflow-hidden rounded-lg border px-2 text-center text-sm font-semibold text-white shadow-lg backdrop-blur-sm ${slot.transparent === false ? 'bg-slate-950/75' : 'bg-transparent'} ${slot.border === true ? 'border-white/25' : 'border-transparent'}`}
                 style={{
                   left: `${slot.x * 100}%`,
                   top: `${slot.y * 100}%`,
@@ -150,7 +150,7 @@ export function FlightTelemetryOverlay({
             <button
               key={slot.id}
               type="button"
-              className={`pointer-events-auto absolute min-h-0 min-w-0 overflow-hidden cursor-pointer rounded-lg border px-3 py-2 text-left text-white shadow-lg backdrop-blur-sm transition hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${slot.transparent ? 'bg-transparent' : 'bg-slate-950/75'} ${slot.border === false ? 'border-transparent' : 'border-white/25'}`}
+              className={`pointer-events-auto absolute min-h-0 min-w-0 overflow-hidden cursor-pointer rounded-lg border px-3 py-2 text-left text-white shadow-lg backdrop-blur-sm transition hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${slot.transparent === false ? 'bg-slate-950/75' : 'bg-transparent'} ${slot.border === true ? 'border-white/25' : 'border-transparent'}`}
               style={{
                 left: `${slot.x * 100}%`,
                 top: `${slot.y * 100}%`,

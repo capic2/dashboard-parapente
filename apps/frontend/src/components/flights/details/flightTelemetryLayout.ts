@@ -181,11 +181,19 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
       : {};
     const name = element.getAttribute('label');
     const naming = name ? { name } : {};
+    const backgroundAttribute = element.getAttribute('background');
+    const borderAttribute = element.getAttribute('border');
     const styling = {
-      ...(element.getAttribute('background') === 'transparent'
+      ...(backgroundAttribute === 'transparent'
         ? { transparent: true }
-        : {}),
-      ...(element.getAttribute('border') === 'false' ? { border: false } : {}),
+        : backgroundAttribute === 'solid'
+          ? { transparent: false }
+          : {}),
+      ...(borderAttribute === 'true'
+        ? { border: true }
+        : borderAttribute === 'false'
+          ? { border: false }
+          : {}),
       ...(element.getAttribute('label-visible') === 'false'
         ? { showLabel: false }
         : {}),
@@ -312,8 +320,18 @@ export function serializeTelemetryLayoutXml(
     .map((item) => {
       const name = item.name ? ` label="${escapeXml(item.name)}"` : '';
       const group = item.groupId ? ` group="${escapeXml(item.groupId)}"` : '';
-      const background = item.transparent ? ' background="transparent"' : '';
-      const border = item.border === false ? ' border="false"' : '';
+      const background =
+        item.transparent === true
+          ? ' background="transparent"'
+          : item.transparent === false
+            ? ' background="solid"'
+            : '';
+      const border =
+        item.border === true
+          ? ' border="true"'
+          : item.border === false
+            ? ' border="false"'
+            : '';
       const labelVisibility =
         item.showLabel === false ? ' label-visible="false"' : '';
       const unitVisibility =

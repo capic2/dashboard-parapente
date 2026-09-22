@@ -101,7 +101,7 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
         group_id = widget.attrib.get("group")
         if group_id and group_id not in group_ids:
             raise ValueError("Telemetry widget group does not exist")
-        if widget.attrib.get("background") not in {None, "transparent"}:
+        if widget.attrib.get("background") not in {None, "transparent", "solid"}:
             raise ValueError("Telemetry element background is invalid")
         if widget.attrib.get("border") not in {None, "true", "false"}:
             raise ValueError("Telemetry element border is invalid")

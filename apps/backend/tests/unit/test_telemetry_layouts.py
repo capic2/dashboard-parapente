@@ -62,6 +62,16 @@ def test_layout_rejects_invalid_widget_style() -> None:
         validate_telemetry_layout_xml(xml)
 
 
+def test_layout_accepts_explicit_widget_background_and_border() -> None:
+    xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
+        'visible="true"',
+        'visible="true" background="solid" border="true"',
+        1,
+    )
+
+    assert 'background="solid"' in validate_telemetry_layout_xml(xml)
+
+
 def test_layout_accepts_widget_font_size() -> None:
     xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
         'metric="altitude"', 'metric="altitude" font-size="48"', 1
