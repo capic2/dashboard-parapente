@@ -9,6 +9,7 @@ import {
   Play,
   Repeat2,
 } from 'lucide-react';
+import type { FlightTelemetryPipLayout } from './flightTelemetryLayout';
 
 export type FlightOverlayLayout =
   | 'camera-main'
@@ -42,6 +43,7 @@ interface FlightOverlayPlayerProps {
   onTimeChange?: (time: number) => void;
   seekRequest?: { id: number; time: number } | null;
   overlayContent?: ReactNode;
+  pipLayout?: FlightTelemetryPipLayout;
 }
 
 function clamp(value: number, maximum: number) {
@@ -67,6 +69,7 @@ export function FlightOverlayPlayer({
   onTimeChange,
   seekRequest,
   overlayContent,
+  pipLayout,
 }: FlightOverlayPlayerProps) {
   const { t } = useTranslation();
   const cameraRef = useRef<HTMLVideoElement>(null);
@@ -204,12 +207,20 @@ export function FlightOverlayPlayer({
   const cameraIsMain = layout === 'camera-main';
   const flightIsMain = layout === 'flight-main';
   const isInteractive = mode === 'interactive';
-  const pipStyle = {
-    left: `${(GOPRO_TEMPLATE_PIP.left / GOPRO_TEMPLATE_CANVAS.width) * 100}%`,
-    bottom: `${(GOPRO_TEMPLATE_PIP.bottom / GOPRO_TEMPLATE_CANVAS.height) * 100}%`,
-    width: `${(GOPRO_TEMPLATE_PIP.width / GOPRO_TEMPLATE_CANVAS.width) * 100}%`,
-    aspectRatio: `${GOPRO_TEMPLATE_PIP.width} / ${GOPRO_TEMPLATE_PIP.height}`,
-  };
+  const pipStyle = pipLayout
+    ? {
+        left: `${pipLayout.x * 100}%`,
+        top: `${pipLayout.y * 100}%`,
+        width: `${pipLayout.width * 100}%`,
+        height: `${pipLayout.height * 100}%`,
+        display: pipLayout.visible ? undefined : 'none',
+      }
+    : {
+        left: `${(GOPRO_TEMPLATE_PIP.left / GOPRO_TEMPLATE_CANVAS.width) * 100}%`,
+        bottom: `${(GOPRO_TEMPLATE_PIP.bottom / GOPRO_TEMPLATE_CANVAS.height) * 100}%`,
+        width: `${(GOPRO_TEMPLATE_PIP.width / GOPRO_TEMPLATE_CANVAS.width) * 100}%`,
+        aspectRatio: `${GOPRO_TEMPLATE_PIP.width} / ${GOPRO_TEMPLATE_PIP.height}`,
+      };
 
   return (
     <div

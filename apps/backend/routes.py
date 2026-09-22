@@ -118,7 +118,9 @@ from models import (
     WeatherForecast,
     WeatherSourceConfig,
     YoutubeUploadJob,
+    TelemetryLayout,
 )
+from telemetry_layouts import DEFAULT_TELEMETRY_LAYOUT_XML, validate_telemetry_layout_xml
 from para_index import analyze_hourly_slots, calculate_para_index, format_slots_summary
 from schemas import (
     AzbaAirspaceResponse,
@@ -142,6 +144,8 @@ from schemas import (
     GoproOverlayJob,
     GoproOverlayPreview,
     FlightTelemetryResponse,
+    TelemetryLayoutResponse,
+    TelemetryLayoutUpdate,
     FlightOverlayLayer,
     GoproOverlayEnrichmentResponse,
     GoproPreviewRequest,
@@ -5031,6 +5035,141 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
         end_time=end_time,
         duration_seconds=duration_seconds,
     )
+
+
+def _telemetry_layout_response(
+    layout: TelemetryLayout | None,
+    *,
+    flight_id: str | None,
+    default_xml: str,
+    is_override: bool = False,
+) -> dict[str, Any]:
+    return {
+        "id": layout.id if layout else None,
+        "scope": "flight" if flight_id else "default",
+        "flight_id": flight_id,
+        "xml_content": layout.xml_content if layout else default_xml,
+        "format_version": layout.format_version if layout else 1,
+        "is_override": is_override,
+    }
+
+
+@router.get("/telemetry-layouts/default", response_model=TelemetryLayoutResponse)
+def get_default_telemetry_layout(
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> dict[str, Any]:
+    layout = (
+        db.query(TelemetryLayout)
+        .filter(TelemetryLayout.user_id == user.id, TelemetryLayout.flight_id.is_(None))
+        .first()
+    )
+    return _telemetry_layout_response(
+        layout, flight_id=None, default_xml=DEFAULT_TELEMETRY_LAYOUT_XML
+    )
+
+
+@router.put("/telemetry-layouts/default", response_model=TelemetryLayoutResponse)
+def update_default_telemetry_layout(
+    payload: TelemetryLayoutUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    try:
+        xml_content = validate_telemetry_layout_xml(payload.xml_content)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    layout = (
+        db.query(TelemetryLayout)
+        .filter(TelemetryLayout.user_id == user.id, TelemetryLayout.flight_id.is_(None))
+        .first()
+    )
+    if layout is None:
+        layout = TelemetryLayout(id=str(uuid.uuid4()), user_id=user.id, xml_content=xml_content)
+        db.add(layout)
+    else:
+        layout.xml_content = xml_content
+    db.commit()
+    db.refresh(layout)
+    return _telemetry_layout_response(
+        layout, flight_id=None, default_xml=DEFAULT_TELEMETRY_LAYOUT_XML
+    )
+
+
+@router.get("/flights/{flight_id}/telemetry-layout", response_model=TelemetryLayoutResponse)
+def get_flight_telemetry_layout(
+    flight_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    if db.get(Flight, flight_id) is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    layout = (
+        db.query(TelemetryLayout)
+        .filter(TelemetryLayout.user_id == user.id, TelemetryLayout.flight_id == flight_id)
+        .first()
+    )
+    is_override = layout is not None
+    if layout is None:
+        layout = (
+            db.query(TelemetryLayout)
+            .filter(TelemetryLayout.user_id == user.id, TelemetryLayout.flight_id.is_(None))
+            .first()
+        )
+    return _telemetry_layout_response(
+        layout,
+        flight_id=flight_id,
+        default_xml=DEFAULT_TELEMETRY_LAYOUT_XML,
+        is_override=is_override,
+    )
+
+
+@router.put("/flights/{flight_id}/telemetry-layout", response_model=TelemetryLayoutResponse)
+def update_flight_telemetry_layout(
+    flight_id: str,
+    payload: TelemetryLayoutUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    if db.get(Flight, flight_id) is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    try:
+        xml_content = validate_telemetry_layout_xml(payload.xml_content)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    layout = (
+        db.query(TelemetryLayout)
+        .filter(TelemetryLayout.user_id == user.id, TelemetryLayout.flight_id == flight_id)
+        .first()
+    )
+    if layout is None:
+        layout = TelemetryLayout(
+            id=str(uuid.uuid4()), user_id=user.id, flight_id=flight_id, xml_content=xml_content
+        )
+        db.add(layout)
+    else:
+        layout.xml_content = xml_content
+    db.commit()
+    db.refresh(layout)
+    return _telemetry_layout_response(
+        layout, flight_id=flight_id, default_xml=DEFAULT_TELEMETRY_LAYOUT_XML
+    )
+
+
+@router.delete("/flights/{flight_id}/telemetry-layout", status_code=204)
+def delete_flight_telemetry_layout(
+    flight_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    layout = (
+        db.query(TelemetryLayout)
+        .filter(TelemetryLayout.user_id == user.id, TelemetryLayout.flight_id == flight_id)
+        .first()
+    )
+    if layout is not None:
+        db.delete(layout)
+        db.commit()
+    return Response(status_code=204)
 
 
 @router.get("/flights/{flight_id}/gpx-data/debug")
