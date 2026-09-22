@@ -238,7 +238,9 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     );
     const layoutDocument = [...layout] as TelemetryLayout;
     layoutDocument.backgroundImage = backgroundImage;
-    const xmlLength = serializeTelemetryLayoutXml(layoutDocument).length;
+    const xmlLength = serializeTelemetryLayoutXml(layoutDocument, {
+      backgroundImage,
+    }).length;
     const validationMessage = invalidName
       ? t('telemetryLayout.nameTooLong')
       : invalidGroupName
@@ -493,9 +495,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       backgroundImage?: string;
     };
     xmlDocument.backgroundImage = backgroundImage;
-    const blob = new Blob([serializeTelemetryLayoutXml(xmlDocument)], {
-      type: 'application/xml',
-    });
+    const blob = new Blob(
+      [serializeTelemetryLayoutXml(xmlDocument, { backgroundImage })],
+      { type: 'application/xml' }
+    );
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

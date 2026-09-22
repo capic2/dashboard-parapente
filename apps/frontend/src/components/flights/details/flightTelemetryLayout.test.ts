@@ -164,6 +164,17 @@ describe('flight telemetry layout XML', () => {
     expect(parsed.backgroundImage).toBe(layout.backgroundImage);
   });
 
+  it('serializes an explicitly provided background image', () => {
+    const xml = serializeTelemetryLayoutXml(
+      [DEFAULT_FLIGHT_TELEMETRY_LAYOUT[0]],
+      { backgroundImage: 'data:image/png;base64,ZmFrZQ==' }
+    );
+
+    expect(parseTelemetryLayoutXml(xml).backgroundImage).toBe(
+      'data:image/png;base64,ZmFrZQ=='
+    );
+  });
+
   it('round-trips a graphical speedometer widget', () => {
     const layout = [
       {

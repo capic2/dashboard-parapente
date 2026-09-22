@@ -287,7 +287,8 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
 }
 
 export function serializeTelemetryLayoutXml(
-  layout: readonly FlightTelemetryLayoutItem[]
+  layout: readonly FlightTelemetryLayoutItem[],
+  options?: { backgroundImage?: string }
 ) {
   const groups = Array.from(
     new Map(
@@ -301,7 +302,9 @@ export function serializeTelemetryLayoutXml(
         `<group id="${escapeXml(groupId)}"${groupName ? ` name="${escapeXml(groupName)}"` : ''} />`
     )
     .join('');
-  const backgroundImage = (layout as TelemetryLayout).backgroundImage;
+  const backgroundImage = options
+    ? options.backgroundImage
+    : (layout as TelemetryLayout).backgroundImage;
   const background = backgroundImage
     ? ` background-image="${escapeXml(backgroundImage)}"`
     : '';

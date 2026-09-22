@@ -49,13 +49,18 @@ export function useSaveTelemetryLayout(flightId?: string) {
   return useMutation({
     mutationFn: (document: TelemetryLayoutDocument) => {
       const layout = [...document.layout] as TelemetryLayout;
-      layout.backgroundImage = document.backgroundImage;
       return api
         .put(
           flightId
             ? `flights/${flightId}/telemetry-layout`
             : 'telemetry-layouts/default',
-          { json: { xml_content: serializeTelemetryLayoutXml(layout) } }
+          {
+            json: {
+              xml_content: serializeTelemetryLayoutXml(layout, {
+                backgroundImage: document.backgroundImage,
+              }),
+            },
+          }
         )
         .json<TelemetryLayoutResponse>();
     },
