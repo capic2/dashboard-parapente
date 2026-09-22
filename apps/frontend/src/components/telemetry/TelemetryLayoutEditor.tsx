@@ -808,7 +808,6 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
         target?.tagName === 'SELECT' ||
         target?.isContentEditable
       ) {
-        return;
       }
       const movement = {
         ArrowLeft: [-KEYBOARD_PIXEL_STEP_X, 0],
@@ -835,17 +834,6 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           );
         }
         return;
-      }
-      if (!(event.ctrlKey || event.metaKey)) return;
-      if (event.key.toLowerCase() === 'z') {
-        event.preventDefault();
-        undoLayout();
-      } else if (event.key.toLowerCase() === 'c') {
-        event.preventDefault();
-        copySelected();
-      } else if (event.key.toLowerCase() === 'v') {
-        event.preventDefault();
-        pasteCopied();
       }
     };
     const editor = editorRef.current;
@@ -890,6 +878,29 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   return (
     <div
       ref={editorRef}
+      onKeyDownCapture={(event) => {
+        const target = event.target as HTMLElement | null;
+        if (
+          target?.tagName === 'INPUT' ||
+          target?.tagName === 'TEXTAREA' ||
+          target?.tagName === 'SELECT' ||
+          target?.isContentEditable ||
+          !(event.ctrlKey || event.metaKey)
+        ) {
+          return;
+        }
+        const shortcut = event.key.toLowerCase();
+        if (shortcut === 'c') {
+          event.preventDefault();
+          copySelected();
+        } else if (shortcut === 'v') {
+          event.preventDefault();
+          pasteCopied();
+        } else if (shortcut === 'z') {
+          event.preventDefault();
+          undoLayout();
+        }
+      }}
       className={`space-y-5 ${isFullscreen ? 'overflow-y-auto bg-slate-950 p-4 sm:p-6' : ''}`}
     >
       <div
