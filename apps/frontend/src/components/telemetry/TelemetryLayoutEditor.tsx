@@ -26,6 +26,8 @@ import {
   SlidersHorizontal,
   Trash2,
   Upload,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import {
   Button as AriaButton,
@@ -157,6 +159,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const [isGpxPlaying, setIsGpxPlaying] = useState(false);
   const [saveError, setSaveError] = useState<string>();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [canvasZoom, setCanvasZoom] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>(
     layout[0]?.id ? [layout[0].id] : []
   );
@@ -913,6 +916,40 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          <div className="flex items-center gap-1 rounded-lg border border-slate-300 px-1 dark:border-slate-600">
+            <Button
+              variant="ghost"
+              size="sm"
+              onPress={() =>
+                setCanvasZoom((current) => clamp(current - 0.25, 0.5, 2))
+              }
+              isDisabled={canvasZoom <= 0.5}
+              aria-label={t('telemetryLayout.zoomOut')}
+              title={t('telemetryLayout.zoomOut')}
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <button
+              type="button"
+              className="min-w-12 px-1 text-center text-xs font-medium text-slate-600 dark:text-slate-300"
+              onClick={() => setCanvasZoom(1)}
+              title={t('telemetryLayout.resetZoom')}
+            >
+              {Math.round(canvasZoom * 100)}%
+            </button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onPress={() =>
+                setCanvasZoom((current) => clamp(current + 0.25, 0.5, 2))
+              }
+              isDisabled={canvasZoom >= 2}
+              aria-label={t('telemetryLayout.zoomIn')}
+              title={t('telemetryLayout.zoomIn')}
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -1039,182 +1076,185 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
         </p>
       )}
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
-        <div className="rounded-2xl border border-slate-700 bg-slate-950 p-3 shadow-xl">
-          <div
-            ref={canvasRef}
-            className={`relative mx-auto aspect-video overflow-hidden rounded-lg border border-slate-700 bg-[radial-gradient(circle_at_50%_35%,#1e3a5f,#090f1b_65%)] select-none ${isFullscreen ? 'max-w-none' : 'max-w-5xl'}`}
-            style={{
-              containerType: 'inline-size',
-              backgroundImage: backgroundImage
-                ? `url(${JSON.stringify(backgroundImage)})`
-                : undefined,
-              backgroundSize: backgroundImage ? 'cover' : undefined,
-              backgroundPosition: backgroundImage ? 'center' : undefined,
-            }}
-            onPointerMove={moveDrag}
-            onPointerUp={() => {
-              setDrag(null);
-              setSnapGuides({});
-            }}
-            onPointerCancel={() => {
-              setDrag(null);
-              setSnapGuides({});
-            }}
-            aria-label={t('telemetryLayout.canvasLabel')}
-          >
-            <div className="pointer-events-none absolute inset-0 opacity-20 [background-image:linear-gradient(#94a3b8_1px,transparent_1px),linear-gradient(90deg,#94a3b8_1px,transparent_1px)] [background-size:10%_10%]" />
-            <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-slate-400/20" />
-            <div className="pointer-events-none absolute inset-y-0 left-1/2 border-l border-dashed border-slate-400/20" />
-            {snapGuides.x !== undefined && (
-              <div
-                className="pointer-events-none absolute inset-y-0 z-30 border-l-2 border-dashed border-amber-300"
-                style={{ left: `${snapGuides.x * 100}%` }}
-              />
-            )}
-            {snapGuides.y !== undefined && (
-              <div
-                className="pointer-events-none absolute inset-x-0 z-30 border-t-2 border-dashed border-amber-300"
-                style={{ top: `${snapGuides.y * 100}%` }}
-              />
-            )}
-            {groups.map(([groupId, groupName]) => {
-              const bounds = getTelemetryLayoutGroupBounds(layout, groupId);
-              if (!bounds) return null;
-              return (
+        <div className="min-w-0 rounded-2xl border border-slate-700 bg-slate-950 p-3 shadow-xl">
+          <div className="max-w-full overflow-auto">
+            <div
+              ref={canvasRef}
+              className={`relative mx-auto aspect-video overflow-hidden rounded-lg border border-slate-700 bg-[radial-gradient(circle_at_50%_35%,#1e3a5f,#090f1b_65%)] select-none ${canvasZoom === 1 && !isFullscreen ? 'max-w-5xl' : ''}`}
+              style={{
+                width: `${canvasZoom * 100}%`,
+                containerType: 'inline-size',
+                backgroundImage: backgroundImage
+                  ? `url(${JSON.stringify(backgroundImage)})`
+                  : undefined,
+                backgroundSize: backgroundImage ? 'cover' : undefined,
+                backgroundPosition: backgroundImage ? 'center' : undefined,
+              }}
+              onPointerMove={moveDrag}
+              onPointerUp={() => {
+                setDrag(null);
+                setSnapGuides({});
+              }}
+              onPointerCancel={() => {
+                setDrag(null);
+                setSnapGuides({});
+              }}
+              aria-label={t('telemetryLayout.canvasLabel')}
+            >
+              <div className="pointer-events-none absolute inset-0 opacity-20 [background-image:linear-gradient(#94a3b8_1px,transparent_1px),linear-gradient(90deg,#94a3b8_1px,transparent_1px)] [background-size:10%_10%]" />
+              <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-slate-400/20" />
+              <div className="pointer-events-none absolute inset-y-0 left-1/2 border-l border-dashed border-slate-400/20" />
+              {snapGuides.x !== undefined && (
                 <div
-                  key={groupId}
-                  className="pointer-events-none absolute rounded-xl border border-dashed border-sky-400/70 bg-sky-400/5"
-                  style={{
-                    left: `${bounds.x * 100}%`,
-                    top: `${bounds.y * 100}%`,
-                    width: `${bounds.width * 100}%`,
-                    height: `${bounds.height * 100}%`,
-                  }}
-                >
-                  <span className="absolute -top-5 left-2 rounded-t bg-sky-500/80 px-2 py-0.5 text-[10px] font-semibold text-white">
-                    {groupName}
-                  </span>
-                </div>
-              );
-            })}
-            {layout.map((item) => {
-              const isIcon = item.type === 'icon';
-              const isText = item.type === 'text';
-              const [value, unit] =
-                isIcon || isText
-                  ? ['—', '']
-                  : (getTelemetryMetricValue(
-                      previewPoint ?? null,
-                      previewTelemetry,
-                      item.metric
-                    ) ?? ['', '']);
-              const isSelected = selectedIds.includes(item.id);
-              return (
-                <button
-                  type="button"
-                  key={item.id}
-                  onPointerDown={(event) => beginDrag(event, item, 'move')}
-                  onKeyDown={(event) => {
-                    const step = event.shiftKey ? 0.025 : 0.005;
-                    const movement = {
-                      ArrowLeft: [-step, 0],
-                      ArrowRight: [step, 0],
-                      ArrowUp: [0, -step],
-                      ArrowDown: [0, step],
-                    }[event.key];
-                    if (!movement) return;
-                    event.preventDefault();
-                    event.stopPropagation();
-                    moveWithKeyboard(item, movement[0], movement[1]);
-                  }}
-                  onClick={(event) => {
-                    if (event.shiftKey || event.metaKey || event.ctrlKey)
-                      return;
-                    const ids = item.groupId
-                      ? layout
-                          .filter(
-                            (candidate) => candidate.groupId === item.groupId
-                          )
-                          .map((candidate) => candidate.id)
-                      : [item.id];
-                    setSelectedIds(ids);
-                  }}
-                  className={`absolute flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border px-3 py-2 text-left text-white shadow-lg ${item.transparent === false ? 'bg-slate-950/85' : 'bg-transparent'} ${item.visible ? '' : 'opacity-35'} ${isSelected ? 'border-sky-400 ring-2 ring-sky-400/40' : item.border === true ? 'border-white/20' : 'border-transparent'}`}
-                  style={{
-                    left: `${item.x * 100}%`,
-                    top: `${item.y * 100}%`,
-                    width: `${item.width * 100}%`,
-                    height: `${item.height * 100}%`,
-                    fontSize: `${((item.fontSize ?? 32) / 1920) * 100}cqw`,
-                    textAlign:
-                      item.type === 'widget'
-                        ? (item.valueAlign ?? 'left')
-                        : undefined,
-                  }}
-                >
-                  {isText ? (
-                    <span
-                      className="block truncate text-center font-semibold"
-                      style={{ fontSize: '1em' }}
-                    >
-                      {item.content}
+                  className="pointer-events-none absolute inset-y-0 z-30 border-l-2 border-dashed border-amber-300"
+                  style={{ left: `${snapGuides.x * 100}%` }}
+                />
+              )}
+              {snapGuides.y !== undefined && (
+                <div
+                  className="pointer-events-none absolute inset-x-0 z-30 border-t-2 border-dashed border-amber-300"
+                  style={{ top: `${snapGuides.y * 100}%` }}
+                />
+              )}
+              {groups.map(([groupId, groupName]) => {
+                const bounds = getTelemetryLayoutGroupBounds(layout, groupId);
+                if (!bounds) return null;
+                return (
+                  <div
+                    key={groupId}
+                    className="pointer-events-none absolute rounded-xl border border-dashed border-sky-400/70 bg-sky-400/5"
+                    style={{
+                      left: `${bounds.x * 100}%`,
+                      top: `${bounds.y * 100}%`,
+                      width: `${bounds.width * 100}%`,
+                      height: `${bounds.height * 100}%`,
+                    }}
+                  >
+                    <span className="absolute -top-5 left-2 rounded-t bg-sky-500/80 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      {groupName}
                     </span>
-                  ) : isIcon ? (
-                    <>
-                      <TelemetryLayoutIcon
-                        name={item.icon}
-                        className="mx-auto h-1/2 w-1/2"
-                      />
-                      <span className="mt-1 block truncate text-center text-[10px] font-semibold text-slate-300">
-                        {item.name ?? item.icon}
-                      </span>
-                    </>
-                  ) : item.variant === 'speedometer' ? (
-                    <TelemetrySpeedometer
-                      metric={item.metric}
-                      value={value}
-                      unit={unit}
-                      showUnit={item.showUnit !== false}
-                    />
-                  ) : (
-                    <>
-                      {item.showLabel !== false && (
-                        <span
-                          className="block font-semibold uppercase tracking-wide text-slate-300"
-                          style={{ fontSize: '0.35em' }}
-                        >
-                          {displayWidgetName(item.name ?? item.metric)}
-                        </span>
-                      )}
+                  </div>
+                );
+              })}
+              {layout.map((item) => {
+                const isIcon = item.type === 'icon';
+                const isText = item.type === 'text';
+                const [value, unit] =
+                  isIcon || isText
+                    ? ['—', '']
+                    : (getTelemetryMetricValue(
+                        previewPoint ?? null,
+                        previewTelemetry,
+                        item.metric
+                      ) ?? ['', '']);
+                const isSelected = selectedIds.includes(item.id);
+                return (
+                  <button
+                    type="button"
+                    key={item.id}
+                    onPointerDown={(event) => beginDrag(event, item, 'move')}
+                    onKeyDown={(event) => {
+                      const step = event.shiftKey ? 0.025 : 0.005;
+                      const movement = {
+                        ArrowLeft: [-step, 0],
+                        ArrowRight: [step, 0],
+                        ArrowUp: [0, -step],
+                        ArrowDown: [0, step],
+                      }[event.key];
+                      if (!movement) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      moveWithKeyboard(item, movement[0], movement[1]);
+                    }}
+                    onClick={(event) => {
+                      if (event.shiftKey || event.metaKey || event.ctrlKey)
+                        return;
+                      const ids = item.groupId
+                        ? layout
+                            .filter(
+                              (candidate) => candidate.groupId === item.groupId
+                            )
+                            .map((candidate) => candidate.id)
+                        : [item.id];
+                      setSelectedIds(ids);
+                    }}
+                    className={`absolute flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border px-3 py-2 text-left text-white shadow-lg ${item.transparent === false ? 'bg-slate-950/85' : 'bg-transparent'} ${item.visible ? '' : 'opacity-35'} ${isSelected ? 'border-sky-400 ring-2 ring-sky-400/40' : item.border === true ? 'border-white/20' : 'border-transparent'}`}
+                    style={{
+                      left: `${item.x * 100}%`,
+                      top: `${item.y * 100}%`,
+                      width: `${item.width * 100}%`,
+                      height: `${item.height * 100}%`,
+                      fontSize: `${((item.fontSize ?? 32) / 1920) * 100}cqw`,
+                      textAlign:
+                        item.type === 'widget'
+                          ? (item.valueAlign ?? 'left')
+                          : undefined,
+                    }}
+                  >
+                    {isText ? (
                       <span
-                        className="mt-1 block truncate font-mono font-bold"
+                        className="block truncate text-center font-semibold"
                         style={{ fontSize: '1em' }}
                       >
-                        {formatTelemetryValue(value, '')}
-                        {item.showUnit !== false && (
+                        {item.content}
+                      </span>
+                    ) : isIcon ? (
+                      <>
+                        <TelemetryLayoutIcon
+                          name={item.icon}
+                          className="mx-auto h-1/2 w-1/2"
+                        />
+                        <span className="mt-1 block truncate text-center text-[10px] font-semibold text-slate-300">
+                          {item.name ?? item.icon}
+                        </span>
+                      </>
+                    ) : item.variant === 'speedometer' ? (
+                      <TelemetrySpeedometer
+                        metric={item.metric}
+                        value={value}
+                        unit={unit}
+                        showUnit={item.showUnit !== false}
+                      />
+                    ) : (
+                      <>
+                        {item.showLabel !== false && (
                           <span
-                            className="ml-1 font-normal text-slate-300"
-                            style={{ fontSize: '0.45em' }}
+                            className="block font-semibold uppercase tracking-wide text-slate-300"
+                            style={{ fontSize: '0.35em' }}
                           >
-                            {unit}
+                            {displayWidgetName(item.name ?? item.metric)}
                           </span>
                         )}
-                      </span>
-                    </>
-                  )}
-                  {isSelected && (
-                    <span
-                      className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-se-resize rounded-sm border border-white bg-sky-400"
-                      onPointerDown={(event) =>
-                        beginDrag(event, item, 'resize')
-                      }
-                    />
-                  )}
-                </button>
-              );
-            })}
-            <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded bg-slate-950/70 px-2 py-1 text-[10px] text-slate-300">
-              {t('telemetryLayout.dragHint')}
+                        <span
+                          className="mt-1 block truncate font-mono font-bold"
+                          style={{ fontSize: '1em' }}
+                        >
+                          {formatTelemetryValue(value, '')}
+                          {item.showUnit !== false && (
+                            <span
+                              className="ml-1 font-normal text-slate-300"
+                              style={{ fontSize: '0.45em' }}
+                            >
+                              {unit}
+                            </span>
+                          )}
+                        </span>
+                      </>
+                    )}
+                    {isSelected && (
+                      <span
+                        className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-se-resize rounded-sm border border-white bg-sky-400"
+                        onPointerDown={(event) =>
+                          beginDrag(event, item, 'resize')
+                        }
+                      />
+                    )}
+                  </button>
+                );
+              })}
+              <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded bg-slate-950/70 px-2 py-1 text-[10px] text-slate-300">
+                {t('telemetryLayout.dragHint')}
+              </div>
             </div>
           </div>
         </div>
