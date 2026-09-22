@@ -208,7 +208,7 @@ jobs:
           fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT || secrets.SSH_FINGERPRINT }}
           port: ${{ secrets.STAGING_SSH_PORT || secrets.SSH_PORT }}
           source: trusted-compose/docker-compose.yml
-          target: ${{ secrets.STAGING_SSH_DEPLOY_PATH }}
+          target: ${{ secrets.STAGING_SSH_DEPLOY_PATH }}/
           strip_components: 1
 
       - name: Verify staging deployment is still current before update
