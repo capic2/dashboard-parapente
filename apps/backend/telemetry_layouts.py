@@ -43,7 +43,7 @@ VALID_ICONS = {
     "slope",
     "slope-triangle",
 }
-MAX_TELEMETRY_WIDGETS = 16
+MAX_TELEMETRY_WIDGETS = 64
 VALID_INTERACTION_ACTIONS = {"none", "cycle_metric"}
 VALID_WIDGET_VARIANTS = {
     "value",

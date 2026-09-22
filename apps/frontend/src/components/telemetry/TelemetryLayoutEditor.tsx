@@ -70,7 +70,7 @@ import {
 
 type DragMode = 'move' | 'resize';
 
-const MAX_WIDGETS = 16;
+const MAX_WIDGETS = 64;
 const MAX_LAYOUT_XML_LENGTH = 500_000;
 const MAX_BACKGROUND_IMAGE_LENGTH = 480_000;
 const SNAP_THRESHOLD = 0.012;
