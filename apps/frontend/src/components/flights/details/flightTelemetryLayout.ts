@@ -6,7 +6,11 @@ export type TelemetryWidgetVariant =
   | 'speedometer'
   | 'arc'
   | 'radial'
-  | 'digital';
+  | 'digital'
+  | 'compass'
+  | 'bar'
+  | 'chart'
+  | 'asi';
 export type TelemetryValueAlignment = 'left' | 'center' | 'right';
 
 export type TelemetryLayout = FlightTelemetryLayoutItem[] & {
@@ -152,6 +156,10 @@ const WIDGET_VARIANTS: TelemetryWidgetVariant[] = [
   'arc',
   'radial',
   'digital',
+  'compass',
+  'bar',
+  'chart',
+  'asi',
 ];
 const VALUE_ALIGNMENTS: TelemetryValueAlignment[] = ['left', 'center', 'right'];
 

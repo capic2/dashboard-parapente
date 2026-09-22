@@ -1750,7 +1750,11 @@
       "speedometer": "Compteur à aiguille",
       "arc": "Compteur en arc",
       "radial": "Jauge radiale",
-      "digital": "Compteur numérique"
+      "digital": "Compteur numérique",
+      "compass": "Compas",
+      "bar": "Barre de progression",
+      "chart": "Courbe historique",
+      "asi": "Indicateur de vitesse"
     },
     "zoomIn": "Augmenter le zoom",
     "zoomOut": "Réduire le zoom",

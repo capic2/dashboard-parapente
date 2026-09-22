@@ -1745,7 +1745,11 @@
       "speedometer": "Needle gauge",
       "arc": "Arc gauge",
       "radial": "Radial gauge",
-      "digital": "Digital gauge"
+      "digital": "Digital gauge",
+      "compass": "Compass",
+      "bar": "Progress bar",
+      "chart": "History chart",
+      "asi": "Airspeed indicator"
     },
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",

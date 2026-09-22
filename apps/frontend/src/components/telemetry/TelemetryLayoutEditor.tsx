@@ -1745,6 +1745,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                             'arc',
                             'radial',
                             'digital',
+                            'compass',
+                            'bar',
+                            'chart',
+                            'asi',
                           ] as const
                         ).map((variant) => (
                           <option key={variant} value={variant}>

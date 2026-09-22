@@ -45,7 +45,17 @@ VALID_ICONS = {
 }
 MAX_TELEMETRY_WIDGETS = 16
 VALID_INTERACTION_ACTIONS = {"none", "cycle_metric"}
-VALID_WIDGET_VARIANTS = {"value", "speedometer", "arc", "radial", "digital"}
+VALID_WIDGET_VARIANTS = {
+    "value",
+    "speedometer",
+    "arc",
+    "radial",
+    "digital",
+    "compass",
+    "bar",
+    "chart",
+    "asi",
+}
 VALID_VALUE_ALIGNMENTS = {"left", "center", "right"}
 
 
