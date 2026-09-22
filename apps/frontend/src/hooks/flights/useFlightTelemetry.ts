@@ -78,7 +78,8 @@ export function interpolateTelemetryAtVideoTime(
 
   const firstTimestamp = points[0].timestamp;
   const targetTimestamp = telemetryTimestampAtVideoTime(
-    Number.isFinite(timelineStartTimestamp)
+    timelineStartTimestamp !== undefined &&
+      Number.isFinite(timelineStartTimestamp)
       ? timelineStartTimestamp
       : firstTimestamp,
     videoTimeSeconds,
