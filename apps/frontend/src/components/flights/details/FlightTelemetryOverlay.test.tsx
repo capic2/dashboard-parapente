@@ -93,6 +93,7 @@ describe('FlightTelemetryOverlay', () => {
     expect(widget).toHaveClass('bg-transparent');
     expect(widget).not.toHaveClass('backdrop-blur-sm');
     expect(widget).not.toHaveClass('hover:bg-slate-900');
+    expect(widget).not.toHaveClass('shadow-lg');
   });
 
   it('does not render metric labels in the final overlay', () => {
