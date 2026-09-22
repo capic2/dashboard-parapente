@@ -44,6 +44,7 @@ VALID_ICONS = {
     "slope-triangle",
 }
 VALID_INTERACTION_ACTIONS = {"none", "cycle_metric"}
+VALID_PIP_ACTIONS = {"switch_video"}
 VALID_WIDGET_VARIANTS = {
     "value",
     "speedometer",
@@ -79,13 +80,13 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
 
     children = list(root)
     groups = [child for child in children if child.tag == "group"]
-    widgets = [child for child in children if child.tag in {"widget", "icon", "text"}]
+    widgets = [child for child in children if child.tag in {"widget", "icon", "text", "pip"}]
     group_ids = {group.attrib.get("id", "") for group in groups}
     if (
         not widgets
         or len(group_ids) != len(groups)
         or "" in group_ids
-        or any(child.tag not in {"widget", "icon", "text", "group"} for child in children)
+        or any(child.tag not in {"widget", "icon", "text", "pip", "group"} for child in children)
     ):
         raise ValueError("Telemetry layout must contain at least one widget")
     ids: set[str] = set()
@@ -102,6 +103,8 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
             content = widget.attrib.get("content", "")
             if not content or len(content) > 500:
                 raise ValueError("Telemetry text must contain 1 to 500 characters")
+        if widget.tag == "pip" and widget.attrib.get("action") not in VALID_PIP_ACTIONS:
+            raise ValueError("Telemetry PiP action is invalid")
         element_name = widget.attrib.get("label")
         if element_name is not None and not 1 <= len(element_name) <= 100:
             raise ValueError("Telemetry element names must contain 1 to 100 characters")

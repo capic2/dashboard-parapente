@@ -123,6 +123,7 @@ export function FlightTelemetryOverlay({
       {layout
         .filter((slot) => slot.visible)
         .map((slot) => {
+          if (slot.type === 'pip') return null;
           if (slot.type === 'icon') {
             return (
               <div

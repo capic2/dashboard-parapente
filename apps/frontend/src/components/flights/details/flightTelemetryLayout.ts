@@ -1,6 +1,7 @@
 import { METRIC_KEYS, type MetricKey } from './telemetryMetrics';
 
 export type TelemetryInteractionAction = 'none' | 'cycle_metric';
+export type TelemetryPipAction = 'switch_video';
 export type TelemetryWidgetVariant =
   | 'value'
   | 'speedometer'
@@ -65,10 +66,16 @@ export interface FlightTelemetryTextLayout extends FlightTelemetryLayoutItemBase
   content: string;
 }
 
+export interface FlightTelemetryPipLayout extends FlightTelemetryLayoutItemBase {
+  type: 'pip';
+  action: TelemetryPipAction;
+}
+
 export type FlightTelemetryLayoutItem =
   | FlightTelemetryWidgetLayout
   | FlightTelemetryIconLayout
-  | FlightTelemetryTextLayout;
+  | FlightTelemetryTextLayout
+  | FlightTelemetryPipLayout;
 
 export interface TelemetryLayoutGroupBounds {
   x: number;
@@ -149,6 +156,7 @@ const INTERACTION_ACTIONS: TelemetryInteractionAction[] = [
   'none',
   'cycle_metric',
 ];
+const PIP_ACTIONS: TelemetryPipAction[] = ['switch_video'];
 const WIDGET_VARIANTS: TelemetryWidgetVariant[] = [
   'value',
   'speedometer',
@@ -179,7 +187,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
   }
   const items = Array.from(
     document.documentElement.querySelectorAll(
-      ':scope > widget, :scope > icon, :scope > text'
+      ':scope > widget, :scope > icon, :scope > text, :scope > pip'
     )
   );
   const groupNames = new Map(
@@ -314,6 +322,20 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
         content: element.getAttribute('content') ?? '',
       };
     }
+    if (type === 'pip') {
+      return {
+        ...common,
+        ...grouping,
+        ...naming,
+        ...styling,
+        type: 'pip' as const,
+        action: PIP_ACTIONS.includes(
+          element.getAttribute('action') as TelemetryPipAction
+        )
+          ? (element.getAttribute('action') as TelemetryPipAction)
+          : 'switch_video',
+      };
+    }
     return {
       ...common,
       ...grouping,
@@ -396,11 +418,13 @@ export function serializeTelemetryLayoutXml(
         item.type === 'widget' && item.valueAlign
           ? ` align="${item.valueAlign}"`
           : '';
+      const pipAction = item.type === 'pip' ? ` action="${item.action}"` : '';
       const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility}${unitVisibility}${fontSize}${clickAction}${longPressAction}${variant}${valueAlign} x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
       if (item.type === 'icon') return `<icon ${common} name="${item.icon}" />`;
       if (item.type === 'text') {
         return `<text ${common} content="${escapeXml(item.content)}" />`;
       }
+      if (item.type === 'pip') return `<pip ${common}${pipAction} />`;
       return `<widget ${common} metric="${item.metric}" />`;
     })
     .join('')}</telemetry-layout>`;

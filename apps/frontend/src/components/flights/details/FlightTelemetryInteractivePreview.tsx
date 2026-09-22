@@ -10,6 +10,7 @@ import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
 import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 import { FlightTelemetryOverlay } from './FlightTelemetryOverlay';
+import type { FlightTelemetryPipLayout } from './flightTelemetryLayout';
 import { sourceTimeAtPreviewTime } from './GoproOverlaySyncPreview';
 
 interface FlightTelemetryInteractivePreviewProps {
@@ -107,6 +108,9 @@ export function FlightTelemetryInteractivePreview({
             })}
             cameraLabel={t('flights.goproOverlayCameraPreview')}
             flightLabel={t('flights.goproOverlayFlightVideo')}
+            pipLayout={layout.data?.layout.find(
+              (item): item is FlightTelemetryPipLayout => item.type === 'pip'
+            )}
             onTimeChange={(previewTime) =>
               setCameraTime(
                 sourceTimeAtPreviewTime(previewTime, previewSegments)

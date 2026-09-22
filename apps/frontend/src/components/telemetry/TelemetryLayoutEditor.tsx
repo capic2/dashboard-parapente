@@ -19,6 +19,7 @@ import {
   Maximize2,
   Minimize2,
   Pause,
+  PictureInPicture2,
   Plus,
   Play,
   RotateCcw,
@@ -55,6 +56,7 @@ import {
   getTelemetryLayoutGroupBounds,
   type FlightTelemetryIconLayout,
   type FlightTelemetryLayoutItem,
+  type FlightTelemetryPipLayout,
   type FlightTelemetryTextLayout,
   type TelemetryWidgetVariant,
 } from '../flights/details/flightTelemetryLayout';
@@ -361,7 +363,9 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           ? item.metric
           : item.type === 'icon'
             ? item.icon
-            : item.content)
+            : item.type === 'text'
+              ? item.content
+              : 'PiP vidéo')
     );
 
   const selectFromHierarchy = (ids: string[], additive: boolean) => {
@@ -473,6 +477,23 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       visible: true,
     };
     setLayout((current) => [...current, text]);
+    setSelectedIds([id]);
+  };
+
+  const addPip = () => {
+    const id = `pip-${Date.now()}-${widgetIdCounter.current++}`;
+    const pip: FlightTelemetryPipLayout = {
+      id,
+      type: 'pip',
+      name: 'PiP vidéo',
+      action: 'switch_video',
+      x: 0.02,
+      y: 0.78,
+      width: 0.18,
+      height: 0.18,
+      visible: true,
+    };
+    setLayout((current) => [...current, pip]);
     setSelectedIds([id]);
   };
 
@@ -1185,6 +1206,13 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   <Plus className="h-4 w-4" />
                   {t('telemetryLayout.addText')}
                 </MenuItem>
+                <MenuItem
+                  onAction={addPip}
+                  className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none hover:bg-slate-100 focus:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100 dark:hover:bg-slate-700 dark:focus:bg-slate-700"
+                >
+                  <PictureInPicture2 className="h-4 w-4" />
+                  {t('telemetryLayout.addPip')}
+                </MenuItem>
               </Menu>
             </Popover>
           </MenuTrigger>
@@ -1286,8 +1314,9 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
               {layout.map((item) => {
                 const isIcon = item.type === 'icon';
                 const isText = item.type === 'text';
+                const isPip = item.type === 'pip';
                 const [value, unit] =
-                  isIcon || isText
+                  isIcon || isText || isPip
                     ? ['—', '']
                     : (getTelemetryMetricValue(
                         previewPoint ?? null,
@@ -1336,7 +1365,14 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                           : undefined,
                     }}
                   >
-                    {isText ? (
+                    {isPip ? (
+                      <>
+                        <PictureInPicture2 className="mx-auto h-1/2 w-1/2" />
+                        <span className="mt-1 block truncate text-center text-[10px] font-semibold text-slate-300">
+                          {item.name ?? t('telemetryLayout.pip')}
+                        </span>
+                      </>
+                    ) : isText ? (
                       <span
                         className="block truncate text-center font-semibold"
                         style={{ fontSize: '1em' }}
@@ -1432,7 +1468,9 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       ? '◈'
                       : item.type === 'icon'
                         ? '◆'
-                        : 'T'}
+                        : item.type === 'text'
+                          ? 'T'
+                          : '▣'}
                   </span>
                   <span className="truncate">{hierarchyLabel(item)}</span>
                 </button>
@@ -1709,6 +1747,25 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                           })
                         }
                       />
+                    </label>
+                  ) : selected.type === 'pip' ? (
+                    <label className="block text-sm">
+                      <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                        {t('telemetryLayout.pipAction')}
+                      </span>
+                      <select
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        value={selected.action}
+                        onChange={(event) =>
+                          updateItem(selected.id, {
+                            action: event.target.value as 'switch_video',
+                          })
+                        }
+                      >
+                        <option value="switch_video">
+                          {t('telemetryLayout.actionSwitchVideo')}
+                        </option>
+                      </select>
                     </label>
                   ) : (
                     <label className="block text-sm">

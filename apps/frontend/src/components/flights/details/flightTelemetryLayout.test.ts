@@ -236,6 +236,26 @@ describe('flight telemetry layout XML', () => {
     ).toEqual(layout);
   });
 
+  it('round-trips a video PiP component and its switch action', () => {
+    const layout = [
+      {
+        id: 'video-pip',
+        type: 'pip' as const,
+        name: 'Caméra embarquée',
+        action: 'switch_video' as const,
+        x: 0.02,
+        y: 0.78,
+        width: 0.18,
+        height: 0.18,
+        visible: true,
+      },
+    ];
+
+    expect(
+      parseTelemetryLayoutXml(serializeTelemetryLayoutXml(layout))
+    ).toEqual(layout);
+  });
+
   it.each([
     'arc',
     'radial',

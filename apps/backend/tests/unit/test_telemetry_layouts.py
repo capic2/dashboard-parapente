@@ -53,6 +53,25 @@ def test_layouts_can_contain_text() -> None:
     assert 'content="Vol du matin"' in validate_telemetry_layout_xml(xml)
 
 
+def test_layouts_can_contain_a_video_pip() -> None:
+    xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
+        "</telemetry-layout>",
+        '<pip id="video-pip" label="Caméra" action="switch_video" x="0.02" y="0.78" width="0.18" height="0.18" visible="true" /></telemetry-layout>',
+    )
+
+    assert 'action="switch_video"' in validate_telemetry_layout_xml(xml)
+
+
+def test_layout_rejects_unknown_video_pip_action() -> None:
+    xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
+        "</telemetry-layout>",
+        '<pip id="video-pip" action="open_settings" x="0.02" y="0.78" width="0.18" height="0.18" visible="true" /></telemetry-layout>',
+    )
+
+    with pytest.raises(ValueError):
+        validate_telemetry_layout_xml(xml)
+
+
 def test_layout_rejects_invalid_widget_style() -> None:
     xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
         'visible="true"', 'visible="true" background="gradient"', 1
