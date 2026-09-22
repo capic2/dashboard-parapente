@@ -56,6 +56,14 @@ export function TelemetrySpeedometer({
   const needleAngle = -225 + ratio * 270;
   const needle = polarPoint(needleAngle, 31);
   const valueLabel = formatTelemetryValue(value, '');
+  const dialLabels = Array.from({ length: 6 }, (_, index) => {
+    const point = polarPoint(-225 + index * 54, 28);
+    return {
+      value: Math.round((maximum * index) / 5),
+      x: point.x,
+      y: point.y,
+    };
+  });
 
   if (variant === 'digital') {
     return (
@@ -288,6 +296,19 @@ export function TelemetrySpeedometer({
               />
             );
           })}
+          {dialLabels.map((label) => (
+            <text
+              key={`${label.value}-${label.x}`}
+              x={label.x}
+              y={label.y + 2.5}
+              textAnchor="middle"
+              fill="rgba(255,255,255,.82)"
+              fontSize="5.5"
+              fontWeight="600"
+            >
+              {label.value}
+            </text>
+          ))}
           <line
             x1="50"
             y1="50"
@@ -452,6 +473,19 @@ export function TelemetrySpeedometer({
             />
           );
         })}
+        {dialLabels.map((label) => (
+          <text
+            key={`${label.value}-${label.x}`}
+            x={label.x}
+            y={label.y + 2.5}
+            textAnchor="middle"
+            fill="rgba(255,255,255,.82)"
+            fontSize="5.5"
+            fontWeight="600"
+          >
+            {label.value}
+          </text>
+        ))}
         <line
           x1="50"
           y1="50"
