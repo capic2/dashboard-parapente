@@ -1424,21 +1424,12 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       </>
                     )}
                     {isSelected && (
-                      <>
-                        <span
-                          className="pointer-events-none absolute bottom-1 left-1 rounded bg-slate-950/80 px-1 py-0.5 text-[9px] font-semibold leading-none text-white"
-                          aria-hidden="true"
-                        >
-                          {Math.round(item.width * 1920)} ×{' '}
-                          {Math.round(item.height * 1080)} px
-                        </span>
-                        <span
-                          className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-se-resize rounded-sm border border-white bg-sky-400"
-                          onPointerDown={(event) =>
-                            beginDrag(event, item, 'resize')
-                          }
-                        />
-                      </>
+                      <span
+                        className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-se-resize rounded-sm border border-white bg-sky-400"
+                        onPointerDown={(event) =>
+                          beginDrag(event, item, 'resize')
+                        }
+                      />
                     )}
                   </button>
                 );
@@ -2076,6 +2067,15 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                         />
                       </label>
                     ))}
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg bg-slate-100 px-3 py-2 text-sm dark:bg-slate-900">
+                    <span className="text-slate-600 dark:text-slate-300">
+                      {t('telemetryLayout.pixelSize')}
+                    </span>
+                    <span className="font-mono font-semibold text-slate-900 dark:text-white">
+                      {Math.round(selected.width * 1920)} ×{' '}
+                      {Math.round(selected.height * 1080)} px
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                     <Grip className="h-4 w-4" />

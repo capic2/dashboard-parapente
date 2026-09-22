@@ -1832,6 +1832,7 @@
     "y": "Y",
     "width": "Largeur",
     "height": "Hauteur",
+    "pixelSize": "Taille en pixels",
     "resizeHint": "Tirez la poignée bleue pour redimensionner",
     "selectWidget": "Sélectionnez un widget sur le canvas.",
     "usingDefault": "Ce vol utilise actuellement le layout global.",

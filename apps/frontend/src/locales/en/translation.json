@@ -1827,6 +1827,7 @@
     "y": "Y",
     "width": "Width",
     "height": "Height",
+    "pixelSize": "Pixel size",
     "resizeHint": "Drag the blue handle to resize",
     "selectWidget": "Select a widget on the canvas.",
     "usingDefault": "This flight currently uses the global default.",
