@@ -806,8 +806,9 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
         pasteCopied();
       }
     };
-    window.addEventListener('keydown', handleKeyboardShortcut);
-    return () => window.removeEventListener('keydown', handleKeyboardShortcut);
+    const editor = editorRef.current;
+    editor?.addEventListener('keydown', handleKeyboardShortcut);
+    return () => editor?.removeEventListener('keydown', handleKeyboardShortcut);
   }, [copySelected, layout, moveWithKeyboard, pasteCopied, selectedIds]);
 
   const downloadXml = () => {
