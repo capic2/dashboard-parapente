@@ -700,14 +700,21 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     const items = selectedGroupId
       ? layout.filter((item) => item.groupId === selectedGroupId)
       : layout.filter((item) => selectedIds.includes(item.id));
-    if (items.length) setCopiedItems(items);
-  }, [layout, selectedGroupId, selectedIds]);
+    if (!items.length) {
+      toast.error(t('telemetryLayout.nothingToCopy'));
+      return;
+    }
+    setCopiedItems(items);
+    toast.success(t('telemetryLayout.copySuccess'));
+  }, [layout, selectedGroupId, selectedIds, t, toast]);
 
   const pasteCopied = useCallback(() => {
-    if (
-      !copiedItems.length ||
-      layout.length + copiedItems.length > MAX_WIDGETS
-    ) {
+    if (!copiedItems.length) {
+      toast.error(t('telemetryLayout.nothingToPaste'));
+      return;
+    }
+    if (layout.length + copiedItems.length > MAX_WIDGETS) {
+      toast.error(t('telemetryLayout.pasteLimit'));
       return;
     }
     const copiedIds = new Set(copiedItems.map((item) => item.id));
@@ -745,7 +752,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     });
     setLayout((current) => [...current, ...pastedItems]);
     setSelectedIds(pastedItems.map((item) => item.id));
-  }, [copiedItems, layout, setLayout]);
+    toast.success(t('telemetryLayout.pasteSuccess'));
+  }, [copiedItems, layout, setLayout, t, toast]);
 
   const alignSelected = (
     direction:
@@ -1093,7 +1101,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
             variant="outline"
             size="sm"
             onPress={pasteCopied}
-            isDisabled={!copiedItems.length || layout.length >= MAX_WIDGETS}
+            isDisabled={!copiedItems.length}
             aria-label={t('telemetryLayout.paste')}
             aria-keyshortcuts="Control+V Meta+V"
           >
