@@ -7,6 +7,12 @@ import {
   ChevronDown,
   ClipboardPaste,
   Copy,
+  AlignCenter,
+  AlignCenterVertical,
+  AlignEndVertical,
+  AlignLeft,
+  AlignRight,
+  AlignStartVertical,
   Gauge,
   Grip,
   Image as ImageIcon,
@@ -607,6 +613,59 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     setSelectedIds(pastedItems.map((item) => item.id));
   }, [copiedItems, layout]);
 
+  const alignSelected = (
+    direction:
+      | 'left'
+      | 'center'
+      | 'right'
+      | 'top'
+      | 'middle'
+      | 'bottom'
+      | 'row'
+      | 'column'
+  ) => {
+    const selectedItems = layout.filter((item) =>
+      selectedIds.includes(item.id)
+    );
+    if (selectedItems.length < 2) return;
+    const left = Math.min(...selectedItems.map((item) => item.x));
+    const top = Math.min(...selectedItems.map((item) => item.y));
+    const right = Math.max(...selectedItems.map((item) => item.x + item.width));
+    const bottom = Math.max(
+      ...selectedItems.map((item) => item.y + item.height)
+    );
+    const centerX = (left + right) / 2;
+    const centerY = (top + bottom) / 2;
+    const referenceX = selectedItems[0].x;
+    const referenceY = selectedItems[0].y;
+
+    setLayout((current) =>
+      current.map((item) => {
+        if (!selectedIds.includes(item.id)) return item;
+        if (direction === 'row') return { ...item, y: referenceY };
+        if (direction === 'column') return { ...item, x: referenceX };
+        if (direction === 'left') return { ...item, x: left };
+        if (direction === 'center') {
+          return {
+            ...item,
+            x: clamp(centerX - item.width / 2, 0, 1 - item.width),
+          };
+        }
+        if (direction === 'right') {
+          return { ...item, x: clamp(right - item.width, 0, 1 - item.width) };
+        }
+        if (direction === 'top') return { ...item, y: top };
+        if (direction === 'middle') {
+          return {
+            ...item,
+            y: clamp(centerY - item.height / 2, 0, 1 - item.height),
+          };
+        }
+        return { ...item, y: clamp(bottom - item.height, 0, 1 - item.height) };
+      })
+    );
+  };
+
   useEffect(() => {
     const handleKeyboardShortcut = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -1199,6 +1258,35 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
             >
               {t('telemetryLayout.ungroup')}
             </Button>
+          </div>
+          <div className="mb-4 flex flex-wrap gap-1 rounded-lg border border-slate-200 p-2 dark:border-slate-700">
+            <span className="mr-1 self-center text-xs text-slate-500 dark:text-slate-400">
+              {t('telemetryLayout.align')}
+            </span>
+            {(
+              [
+                ['left', AlignLeft, 'alignLeft'],
+                ['center', AlignCenter, 'alignCenter'],
+                ['right', AlignRight, 'alignRight'],
+                ['top', AlignStartVertical, 'alignTop'],
+                ['middle', AlignCenterVertical, 'alignMiddle'],
+                ['bottom', AlignEndVertical, 'alignBottom'],
+                ['row', AlignCenter, 'sameRow'],
+                ['column', AlignCenterVertical, 'sameColumn'],
+              ] as const
+            ).map(([direction, Icon, label]) => (
+              <Button
+                key={direction}
+                variant="ghost"
+                size="sm"
+                onPress={() => alignSelected(direction)}
+                isDisabled={selectedIds.length < 2}
+                aria-label={t(`telemetryLayout.${label}`)}
+                title={t(`telemetryLayout.${label}`)}
+              >
+                <Icon className="h-4 w-4" />
+              </Button>
+            ))}
           </div>
           {selectedGroupId ? (
             <div className="space-y-4">
