@@ -114,16 +114,20 @@ export function FlightTelemetryOverlay({
             return (
               <div
                 key={slot.id}
-                className={`pointer-events-auto absolute flex items-center justify-center overflow-hidden rounded-lg border px-2 text-center text-sm font-semibold text-white ${slot.transparent === false ? 'bg-slate-950/75 shadow-lg backdrop-blur-sm' : 'bg-transparent'} ${slot.border === true ? 'border-white/25' : 'border-transparent'}`}
+                className={`pointer-events-auto absolute flex items-center justify-center overflow-hidden rounded-lg border px-2 text-sm font-semibold text-white ${slot.transparent === false ? 'bg-slate-950/75 shadow-lg backdrop-blur-sm' : 'bg-transparent'} ${slot.border === true ? 'border-white/25' : 'border-transparent'}`}
                 style={{
                   left: `${slot.x * 100}%`,
                   top: `${slot.y * 100}%`,
                   width: `${slot.width * 100}%`,
                   height: `${slot.height * 100}%`,
                   fontSize: `${((slot.fontSize ?? 32) / 1920) * 100}cqw`,
+                  textAlign: slot.textAlign ?? 'left',
                 }}
               >
-                <span className="truncate" style={{ fontSize: '1em' }}>
+                <span
+                  className="block w-full truncate"
+                  style={{ fontSize: '1em' }}
+                >
                   {slot.content}
                 </span>
               </div>

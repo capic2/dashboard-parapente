@@ -64,6 +64,7 @@ export interface FlightTelemetryIconLayout extends FlightTelemetryLayoutItemBase
 export interface FlightTelemetryTextLayout extends FlightTelemetryLayoutItemBase {
   type: 'text';
   content: string;
+  textAlign?: TelemetryValueAlignment;
 }
 
 export interface FlightTelemetryPipLayout extends FlightTelemetryLayoutItemBase {
@@ -108,66 +109,41 @@ export function alignTelemetryLayoutItems(
     .filter((item): item is FlightTelemetryLayoutItem => Boolean(item));
   if (!selectedItems.length) return [...layout];
 
-  if (selectedItems.length === 1) {
-    if (direction === 'row' || direction === 'column') return [...layout];
+  if (selectedItems.length < 2) return [...layout];
 
-    const selectedItem = selectedItems[0];
-    let x = selectedItem.x;
-    let y = selectedItem.y;
-    if (direction === 'left') x = 0;
-    if (direction === 'center') x = (1 - selectedItem.width) / 2;
-    if (direction === 'right') x = 1 - selectedItem.width;
-    if (direction === 'top') y = 0;
-    if (direction === 'middle') y = (1 - selectedItem.height) / 2;
-    if (direction === 'bottom') y = 1 - selectedItem.height;
-
-    return layout.map((item) =>
-      item.id === selectedItem.id
-        ? {
-            ...item,
-            x: clampLayoutPosition(x, item.width),
-            y: clampLayoutPosition(y, item.height),
-          }
-        : item
-    );
-  }
-
-  const left = Math.min(...selectedItems.map((item) => item.x));
-  const top = Math.min(...selectedItems.map((item) => item.y));
-  const right = Math.max(...selectedItems.map((item) => item.x + item.width));
-  const bottom = Math.max(...selectedItems.map((item) => item.y + item.height));
-  const centerX = (left + right) / 2;
-  const centerY = (top + bottom) / 2;
-  const referenceX = selectedItems[0].x;
-  const referenceY = selectedItems[0].y;
+  const reference = selectedItems[0];
+  const referenceRight = reference.x + reference.width;
+  const referenceBottom = reference.y + reference.height;
+  const referenceCenterX = reference.x + reference.width / 2;
+  const referenceCenterY = reference.y + reference.height / 2;
 
   return layout.map((item) => {
     if (!selectedIds.includes(item.id)) return item;
-    if (direction === 'row') return { ...item, y: referenceY };
-    if (direction === 'column') return { ...item, x: referenceX };
-    if (direction === 'left') return { ...item, x: left };
+    if (direction === 'row') return { ...item, y: reference.y };
+    if (direction === 'column') return { ...item, x: reference.x };
+    if (direction === 'left') return { ...item, x: reference.x };
     if (direction === 'center') {
       return {
         ...item,
-        x: clampLayoutPosition(centerX - item.width / 2, item.width),
+        x: clampLayoutPosition(referenceCenterX - item.width / 2, item.width),
       };
     }
     if (direction === 'right') {
       return {
         ...item,
-        x: clampLayoutPosition(right - item.width, item.width),
+        x: clampLayoutPosition(referenceRight - item.width, item.width),
       };
     }
-    if (direction === 'top') return { ...item, y: top };
+    if (direction === 'top') return { ...item, y: reference.y };
     if (direction === 'middle') {
       return {
         ...item,
-        y: clampLayoutPosition(centerY - item.height / 2, item.height),
+        y: clampLayoutPosition(referenceCenterY - item.height / 2, item.height),
       };
     }
     return {
       ...item,
-      y: clampLayoutPosition(bottom - item.height, item.height),
+      y: clampLayoutPosition(referenceBottom - item.height, item.height),
     };
   });
 }
@@ -382,6 +358,15 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
             ) as TelemetryValueAlignment,
           }
         : {};
+    const textAlign =
+      type === 'text' &&
+      VALUE_ALIGNMENTS.includes(
+        element.getAttribute('align') as TelemetryValueAlignment
+      )
+        ? {
+            textAlign: element.getAttribute('align') as TelemetryValueAlignment,
+          }
+        : {};
     if (type === 'icon') {
       return {
         ...common,
@@ -405,7 +390,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
         ...styling,
         ...interactions,
         ...variant,
-        ...valueAlign,
+        ...textAlign,
         type: 'text' as const,
         content: element.getAttribute('content') ?? '',
       };
@@ -506,8 +491,12 @@ export function serializeTelemetryLayoutXml(
         item.type === 'widget' && item.valueAlign
           ? ` align="${item.valueAlign}"`
           : '';
+      const textAlign =
+        item.type === 'text' && item.textAlign
+          ? ` align="${item.textAlign}"`
+          : '';
       const pipAction = item.type === 'pip' ? ` action="${item.action}"` : '';
-      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility}${unitVisibility}${fontSize}${clickAction}${longPressAction}${variant}${valueAlign} x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
+      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility}${unitVisibility}${fontSize}${clickAction}${longPressAction}${variant}${valueAlign}${textAlign} x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
       if (item.type === 'icon') return `<icon ${common} name="${item.icon}" />`;
       if (item.type === 'text') {
         return `<text ${common} content="${escapeXml(item.content)}" />`;
