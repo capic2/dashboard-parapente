@@ -908,6 +908,7 @@ export function FlightDetails({
           <FlightTelemetryInteractivePreview
             flightId={flight.id}
             hasFlightVideo={hasVideo}
+            manualOffsetSeconds={Number(goproOverlayGpxOffset)}
           />
         </div>
       )}
