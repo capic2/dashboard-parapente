@@ -204,6 +204,40 @@ export const DEFAULT_FLIGHT_TELEMETRY_LAYOUT = [
   },
 ] satisfies readonly FlightTelemetryWidgetLayout[];
 
+const REQUIRED_INTERACTIVE_TELEMETRY_WIDGETS = [
+  ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
+  {
+    id: 'interactive-heart-rate',
+    type: 'widget' as const,
+    metric: 'heart_rate' as const,
+    x: 0.02,
+    y: 0.14,
+    width: 0.16,
+    height: 0.1,
+    visible: true,
+  },
+  {
+    id: 'interactive-total-gain',
+    type: 'widget' as const,
+    metric: 'total_gain' as const,
+    x: 0.82,
+    y: 0.14,
+    width: 0.16,
+    height: 0.1,
+    visible: true,
+  },
+  {
+    id: 'interactive-total-loss',
+    type: 'widget' as const,
+    metric: 'total_loss' as const,
+    x: 0.82,
+    y: 0.26,
+    width: 0.16,
+    height: 0.1,
+    visible: true,
+  },
+] satisfies readonly FlightTelemetryWidgetLayout[];
+
 /**
  * Older saved layouts may contain only aggregate widgets. Keep those custom
  * widgets, but make sure the interactive preview still exposes the core
@@ -220,11 +254,13 @@ export function ensureInteractiveDynamicTelemetryWidgets(
       )
       .map((item) => item.metric)
   );
-  const missingWidgets = DEFAULT_FLIGHT_TELEMETRY_LAYOUT.filter(
+  const missingWidgets = REQUIRED_INTERACTIVE_TELEMETRY_WIDGETS.filter(
     (widget) => !visibleMetrics.has(widget.metric)
   ).map((widget) => ({
     ...widget,
-    id: `interactive-${widget.id}`,
+    id: widget.id.startsWith('interactive-')
+      ? widget.id
+      : `interactive-${widget.id}`,
   }));
   return withBackground(
     [...layout, ...missingWidgets],
