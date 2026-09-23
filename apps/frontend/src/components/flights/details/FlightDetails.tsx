@@ -909,6 +909,7 @@ export function FlightDetails({
             flightId={flight.id}
             hasFlightVideo={hasVideo}
             manualOffsetSeconds={Number(goproOverlayGpxOffset)}
+            youtubeUrls={flight.youtube_urls ?? []}
           />
         </div>
       )}

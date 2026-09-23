@@ -16,17 +16,22 @@ import {
   type FlightTelemetryPipLayout,
 } from './flightTelemetryLayout';
 import { sourceTimeAtPreviewTime } from './GoproOverlaySyncPreview';
+import { getYoutubeVideoId } from '../../../lib/youtube';
 
 interface FlightTelemetryInteractivePreviewProps {
   flightId: string;
   hasFlightVideo?: boolean;
   manualOffsetSeconds?: number;
+  youtubeUrls?: string[];
 }
+
+const EMPTY_YOUTUBE_URLS: string[] = [];
 
 export function FlightTelemetryInteractivePreview({
   flightId,
   hasFlightVideo = true,
   manualOffsetSeconds,
+  youtubeUrls = EMPTY_YOUTUBE_URLS,
 }: FlightTelemetryInteractivePreviewProps) {
   const { t } = useTranslation();
   const token = useAuthStore((state) => state.token);
@@ -86,6 +91,7 @@ export function FlightTelemetryInteractivePreview({
         height: pipLayout.height / TELEMETRY_CANVAS_HEIGHT,
       }
     : undefined;
+  const youtubeUrl = youtubeUrls.find((url) => getYoutubeVideoId(url));
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
       <div className="flex items-start gap-3 p-4 sm:p-5">
@@ -143,6 +149,7 @@ export function FlightTelemetryInteractivePreview({
                       })
                     : undefined
                 }
+                youtubeUrl={youtubeUrl}
                 cameraLabel={t('flights.goproOverlayCameraPreview')}
                 flightLabel={t('flights.goproOverlayFlightVideo')}
                 pipLayout={playerPipLayout}
