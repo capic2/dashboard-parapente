@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
   alignTelemetryLayoutItems,
-  ensureInteractiveDynamicTelemetryWidgets,
   parseTelemetryLayoutXml,
   serializeTelemetryLayoutXml,
 } from './flightTelemetryLayout';
@@ -11,62 +10,6 @@ import { getTelemetryMetricValue } from './telemetryMetrics';
 import type { FlightTelemetryData } from '../../../hooks/flights/useFlightTelemetry';
 
 describe('flight telemetry layout XML', () => {
-  it('adds missing dynamic widgets without removing saved aggregate widgets', () => {
-    const layout: FlightTelemetryWidgetLayout[] = [
-      {
-        id: 'heart-rate-min',
-        type: 'widget',
-        metric: 'heart_rate_min',
-        x: 0.7,
-        y: 0.1,
-        width: 0.1,
-        height: 0.1,
-        visible: true,
-      },
-      {
-        id: 'speed',
-        type: 'widget',
-        metric: 'speed',
-        x: 0.8,
-        y: 0.1,
-        width: 0.1,
-        height: 0.1,
-        visible: true,
-      },
-    ];
-
-    const result = ensureInteractiveDynamicTelemetryWidgets(layout);
-
-    expect(result.map((item) => item.type === 'widget' && item.metric)).toEqual(
-      [
-        'heart_rate_min',
-        'speed',
-        'altitude',
-        'vario',
-        'distance',
-        'heart_rate',
-        'total_gain',
-        'total_loss',
-      ]
-    );
-    expect(result.find((item) => item.id === 'speed')).toEqual(layout[1]);
-  });
-
-  it('moves legacy default dynamic widgets to the right overlay column', () => {
-    const result = ensureInteractiveDynamicTelemetryWidgets([
-      ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
-    ]);
-
-    expect(result.find((item) => item.id === 'top-left')).toMatchObject({
-      x: 0.82,
-      y: 0.14,
-    });
-    expect(result.find((item) => item.id === 'bottom-left')).toMatchObject({
-      x: 0.82,
-      y: 0.5,
-    });
-  });
-
   it('round-trips normalized widget positions and metrics', () => {
     const layout: FlightTelemetryWidgetLayout[] =
       DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget, index) => ({
