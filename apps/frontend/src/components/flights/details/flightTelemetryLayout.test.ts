@@ -52,6 +52,21 @@ describe('flight telemetry layout XML', () => {
     expect(result.find((item) => item.id === 'speed')).toEqual(layout[1]);
   });
 
+  it('moves legacy default dynamic widgets to the right overlay column', () => {
+    const result = ensureInteractiveDynamicTelemetryWidgets([
+      ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
+    ]);
+
+    expect(result.find((item) => item.id === 'top-left')).toMatchObject({
+      x: 0.82,
+      y: 0.14,
+    });
+    expect(result.find((item) => item.id === 'bottom-left')).toMatchObject({
+      x: 0.82,
+      y: 0.5,
+    });
+  });
+
   it('round-trips normalized widget positions and metrics', () => {
     const layout: FlightTelemetryWidgetLayout[] =
       DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget, index) => ({
