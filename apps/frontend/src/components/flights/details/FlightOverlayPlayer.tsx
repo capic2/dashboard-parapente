@@ -29,6 +29,35 @@ interface YoutubeApi {
   ) => YoutubePlayer;
 }
 
+let youtubeApiPromise: Promise<YoutubeApi> | null = null;
+
+function loadYoutubeApi(): Promise<YoutubeApi> {
+  if (window.YT) return Promise.resolve(window.YT);
+  if (youtubeApiPromise) return youtubeApiPromise;
+
+  youtubeApiPromise = new Promise<YoutubeApi>((resolve, reject) => {
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      'script[src="https://www.youtube.com/iframe_api"]'
+    );
+    const previousCallback = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      previousCallback?.();
+      if (window.YT) resolve(window.YT);
+      else reject(new Error('YouTube API did not initialize'));
+    };
+
+    if (!existingScript) {
+      const script = document.createElement('script');
+      script.src = 'https://www.youtube.com/iframe_api';
+      script.async = true;
+      script.onerror = () => reject(new Error('YouTube API failed to load'));
+      document.head.appendChild(script);
+    }
+  });
+
+  return youtubeApiPromise;
+}
+
 declare global {
   interface Window {
     YT?: YoutubeApi;
@@ -210,19 +239,10 @@ export function FlightOverlayPlayer({
     if (!youtubeId || !youtubeHostRef.current) return;
     let cancelled = false;
     const load = async () => {
-      if (!window.YT) {
-        await new Promise<void>((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://www.youtube.com/iframe_api';
-          script.onload = () => resolve();
-          script.onerror = () => reject(new Error('YouTube API failed'));
-          document.head.appendChild(script);
-          window.onYouTubeIframeAPIReady = resolve;
-        });
-      }
-      if (cancelled || !window.YT || !youtubeHostRef.current) return;
+      const api = await loadYoutubeApi();
+      if (cancelled || !youtubeHostRef.current) return;
       setYoutubeFailed(false);
-      youtubeRef.current = new window.YT.Player(youtubeHostRef.current, {
+      youtubeRef.current = new api.Player(youtubeHostRef.current, {
         height: '100%',
         width: '100%',
         videoId: youtubeId,
