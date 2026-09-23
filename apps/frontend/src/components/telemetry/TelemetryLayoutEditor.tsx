@@ -1370,7 +1370,9 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       textAlign:
                         item.type === 'widget'
                           ? (item.valueAlign ?? 'left')
-                          : undefined,
+                          : item.type === 'text'
+                            ? (item.textAlign ?? 'left')
+                            : undefined,
                     }}
                   >
                     {isPip ? (
@@ -1382,7 +1384,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       </>
                     ) : isText ? (
                       <span
-                        className="block truncate text-center font-semibold"
+                        className="block truncate font-semibold"
                         style={{ fontSize: '1em' }}
                       >
                         {item.content}
@@ -1585,7 +1587,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           </div>
           <div className="mb-4 flex flex-wrap gap-1 rounded-lg border border-slate-200 p-2 dark:border-slate-700">
             <span className="mr-1 self-center text-xs text-slate-500 dark:text-slate-400">
-              {t('telemetryLayout.align')}
+              {t('telemetryLayout.alignComponents')}
             </span>
             {(
               [
@@ -1604,11 +1606,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                 variant="ghost"
                 size="sm"
                 onPress={() => alignSelected(direction)}
-                isDisabled={
-                  selectedIds.length === 0 ||
-                  ((direction === 'row' || direction === 'column') &&
-                    selectedIds.length < 2)
-                }
+                isDisabled={selectedIds.length < 2}
                 aria-label={t(`telemetryLayout.${label}`)}
                 title={t(`telemetryLayout.${label}`)}
               >
@@ -1833,6 +1831,35 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                             {t(`telemetryLayout.widgetModels.${variant}`)}
                           </option>
                         ))}
+                      </select>
+                    </label>
+                  )}
+                  {selected.type === 'text' && (
+                    <label className="block text-sm">
+                      <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                        {t('telemetryLayout.textAlignment')}
+                      </span>
+                      <select
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        value={selected.textAlign ?? 'left'}
+                        onChange={(event) =>
+                          updateItem(selected.id, {
+                            textAlign: event.target.value as
+                              | 'left'
+                              | 'center'
+                              | 'right',
+                          })
+                        }
+                      >
+                        <option value="left">
+                          {t('telemetryLayout.alignLeft')}
+                        </option>
+                        <option value="center">
+                          {t('telemetryLayout.alignCenter')}
+                        </option>
+                        <option value="right">
+                          {t('telemetryLayout.alignRight')}
+                        </option>
                       </select>
                     </label>
                   )}
