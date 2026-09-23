@@ -415,6 +415,15 @@ export function FlightOverlayPlayer({
             <track kind="captions" />
           </video>
         )}
+        {masterIsYoutube && !cameraIsMain && layout !== 'side-by-side' && (
+          <button
+            type="button"
+            className="absolute z-30 cursor-pointer rounded-lg border-2 border-white/80 bg-transparent shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+            style={pipStyle}
+            onClick={() => setLayout('camera-main')}
+            aria-label={cameraLabel}
+          />
+        )}
         {flightIsMain && getCameraTime && (
           <div className="pointer-events-none absolute inset-0">
             <span className="sr-only">
