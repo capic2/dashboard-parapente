@@ -46,7 +46,7 @@ describe('FlightTelemetryOverlay', () => {
     expect(screen.getByText('42.5')).toBeInTheDocument();
     expect(screen.getByText('1.2')).toBeInTheDocument();
     expect(screen.getByText('3.4')).toBeInTheDocument();
-    expect(screen.getAllByRole('button')).toHaveLength(4);
+    expect(screen.getAllByRole('button')).toHaveLength(7);
   });
 
   it('cycles only the clicked widget to the next metric', () => {
