@@ -61,6 +61,19 @@ export function manualOffsetForGpxEndAtVideoTime(
   return sourceVideoTime - gpxDuration - automaticOffset;
 }
 
+export function calibrationTelemetryTimestampAtVideoTime(
+  gpxStartTimestamp: number,
+  sourceVideoTime: number,
+  automaticOffset: number,
+  manualOffset: number
+) {
+  return telemetryTimestampAtVideoTime(
+    gpxStartTimestamp,
+    sourceVideoTime,
+    automaticOffset + manualOffset
+  );
+}
+
 function previewSegmentIndex(
   previewTime: number,
   segments: GoproOverlayPreview['video']['preview_segments']
@@ -123,12 +136,17 @@ export function GoproOverlaySyncPreview({
     setDisplayOffset(manualOffset);
   }, [manualOffset]);
 
+  const gpxStartTimestamp = preview.data
+    ? (preview.data.gpx.coordinates[0]?.timestamp ??
+      parseApiUtcDate(preview.data.gpx.start_time).getTime())
+    : 0;
   const telemetry = preview.data
     ? telemetryAtTimestamp(
         preview.data.gpx.coordinates,
-        telemetryTimestampAtVideoTime(
-          parseApiUtcDate(preview.data.video.start_time).getTime(),
+        calibrationTelemetryTimestampAtVideoTime(
+          gpxStartTimestamp,
           sourceVideoTime,
+          automaticOffset,
           displayOffset
         )
       )
