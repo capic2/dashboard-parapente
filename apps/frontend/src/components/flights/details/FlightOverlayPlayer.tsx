@@ -1,14 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Columns2,
-  Maximize2,
-  Minimize2,
-  Pause,
-  PictureInPicture2,
-  Play,
-  Repeat2,
-} from 'lucide-react';
+import { Maximize2, Minimize2, Pause, Play, Repeat2 } from 'lucide-react';
 import type { FlightTelemetryPipLayout } from './flightTelemetryLayout';
 
 export type FlightOverlayLayout =
@@ -412,45 +404,6 @@ export function FlightOverlayPlayer({
                   <Maximize2 className="h-4 w-4" aria-hidden="true" />
                 )}
               </button>
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-white/15 pt-2">
-              <span className="mr-auto text-xs font-medium text-gray-200">
-                {t('flights.goproOverlayLayoutLabel')}
-              </span>
-              <button
-                type="button"
-                onClick={() => setLayout('camera-main')}
-                aria-pressed={cameraIsMain}
-                className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-200 transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 aria-pressed:bg-sky-600 aria-pressed:text-white"
-              >
-                <PictureInPicture2 className="h-3.5 w-3.5" aria-hidden="true" />
-                {cameraLabel}
-              </button>
-              {hasFlightVideo && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setLayout('flight-main')}
-                    aria-pressed={flightIsMain}
-                    className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-200 transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 aria-pressed:bg-sky-600 aria-pressed:text-white"
-                  >
-                    <PictureInPicture2
-                      className="h-3.5 w-3.5"
-                      aria-hidden="true"
-                    />
-                    {flightLabel}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLayout('side-by-side')}
-                    aria-pressed={layout === 'side-by-side'}
-                    className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-200 transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 aria-pressed:bg-sky-600 aria-pressed:text-white"
-                  >
-                    <Columns2 className="h-3.5 w-3.5" aria-hidden="true" />
-                    {t('flights.goproOverlaySideBySide')}
-                  </button>
-                </>
-              )}
             </div>
           </div>
         )}
