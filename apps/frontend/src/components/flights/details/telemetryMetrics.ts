@@ -87,6 +87,14 @@ function numericValues(
     );
 }
 
+function minimum(values: readonly number[]) {
+  return values.length ? Math.min(...values) : null;
+}
+
+function maximum(values: readonly number[]) {
+  return values.length ? Math.max(...values) : null;
+}
+
 function elevationChange(
   data: FlightTelemetryData | undefined,
   positive: boolean
@@ -115,9 +123,9 @@ export function getTelemetryMetricValue(
     case 'altitude':
       return [point?.elevation, 'm'];
     case 'altitude_min':
-      return [Math.min(...altitudes), 'm'];
+      return [minimum(altitudes), 'm'];
     case 'altitude_max':
-      return [Math.max(...altitudes), 'm'];
+      return [maximum(altitudes), 'm'];
     case 'start_altitude':
       return [data?.points[0]?.elevation, 'm'];
     case 'speed':
@@ -125,9 +133,9 @@ export function getTelemetryMetricValue(
     case 'vario':
       return [point?.vario_ms, 'm/s'];
     case 'vario_min':
-      return [Math.min(...varioValues), 'm/s'];
+      return [minimum(varioValues), 'm/s'];
     case 'vario_max':
-      return [Math.max(...varioValues), 'm/s'];
+      return [maximum(varioValues), 'm/s'];
     case 'distance':
       return [point?.distance_km, 'km'];
     case 'heading':
@@ -135,9 +143,9 @@ export function getTelemetryMetricValue(
     case 'heart_rate':
       return [point?.heart_rate, 'bpm'];
     case 'heart_rate_min':
-      return [Math.min(...heartRates), 'bpm'];
+      return [minimum(heartRates), 'bpm'];
     case 'heart_rate_max':
-      return [Math.max(...heartRates), 'bpm'];
+      return [maximum(heartRates), 'bpm'];
     case 'power':
       return [point?.power, 'W'];
     case 'total_gain':

@@ -97,6 +97,30 @@ describe('FlightTelemetryOverlay', () => {
     expect(widget).not.toHaveClass('shadow-lg');
   });
 
+  it('keeps omitted transparency opaque by default', () => {
+    render(
+      <FlightTelemetryOverlay
+        data={telemetry}
+        videoTimeSeconds={0}
+        offsetSeconds={0}
+        layout={[
+          {
+            id: 'default-widget',
+            type: 'widget',
+            metric: 'altitude',
+            x: 0,
+            y: 0,
+            width: 0.2,
+            height: 0.2,
+            visible: true,
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByRole('button')).toHaveClass('backdrop-blur-sm');
+  });
+
   it('does not render metric labels in the final overlay', () => {
     render(
       <FlightTelemetryOverlay
@@ -116,6 +140,9 @@ describe('FlightTelemetryOverlay', () => {
       0,
       'm',
     ]);
+    expect(
+      getTelemetryMetricValue(null, { ...telemetry, points: [] }, 'vario_min')
+    ).toEqual([null, 'm/s']);
   });
 
   it('does not render editor group decorations', () => {
