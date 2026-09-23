@@ -349,7 +349,6 @@ export function FlightOverlayPlayer({
       >
         {masterIsYoutube ? (
           <div
-            ref={youtubeHostRef}
             className={
               cameraIsMain || layout === 'side-by-side'
                 ? 'aspect-video w-full object-contain'
@@ -359,7 +358,9 @@ export function FlightOverlayPlayer({
               !cameraIsMain && layout !== 'side-by-side' ? pipStyle : undefined
             }
             aria-label={cameraLabel}
-          />
+          >
+            <div ref={youtubeHostRef} className="h-full w-full" />
+          </div>
         ) : (
           <video
             ref={cameraRef}
