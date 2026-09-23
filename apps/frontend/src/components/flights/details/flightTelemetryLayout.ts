@@ -238,6 +238,17 @@ const REQUIRED_INTERACTIVE_TELEMETRY_WIDGETS = [
   },
 ] satisfies readonly FlightTelemetryWidgetLayout[];
 
+const RIGHT_COLUMN_DYNAMIC_POSITIONS: Partial<
+  Record<MetricKey, Pick<FlightTelemetryWidgetLayout, 'x' | 'y'>>
+> = {
+  altitude: { x: 0.82, y: 0.14 },
+  heart_rate: { x: 0.82, y: 0.26 },
+  vario: { x: 0.82, y: 0.5 },
+  total_gain: { x: 0.82, y: 0.38 },
+  total_loss: { x: 0.82, y: 0.62 },
+  distance: { x: 0.82, y: 0.82 },
+};
+
 /**
  * Older saved layouts may contain only aggregate widgets. Keep those custom
  * widgets, but make sure the interactive preview still exposes the core
@@ -246,8 +257,16 @@ const REQUIRED_INTERACTIVE_TELEMETRY_WIDGETS = [
 export function ensureInteractiveDynamicTelemetryWidgets(
   layout: readonly FlightTelemetryLayoutItem[]
 ): TelemetryLayout {
+  const positionedLayout = layout.map((item) => {
+    if (item.type !== 'widget') return item;
+    const position = RIGHT_COLUMN_DYNAMIC_POSITIONS[item.metric];
+    if (!position || !item.id.match(/^(top-left|bottom-left|bottom-right)$/)) {
+      return item;
+    }
+    return { ...item, ...position };
+  });
   const visibleMetrics = new Set(
-    layout
+    positionedLayout
       .filter(
         (item): item is FlightTelemetryWidgetLayout =>
           item.type === 'widget' && item.visible
@@ -263,7 +282,7 @@ export function ensureInteractiveDynamicTelemetryWidgets(
       : `interactive-${widget.id}`,
   }));
   return withBackground(
-    [...layout, ...missingWidgets],
+    [...positionedLayout, ...missingWidgets],
     (layout as TelemetryLayout).backgroundImage
   );
 }
