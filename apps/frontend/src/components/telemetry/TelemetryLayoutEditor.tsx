@@ -7,12 +7,13 @@ import {
   ChevronDown,
   ClipboardPaste,
   Copy,
-  AlignCenter,
-  AlignCenterVertical,
-  AlignEndVertical,
-  AlignLeft,
-  AlignRight,
-  AlignStartVertical,
+  AlignHorizontalJustifyCenter,
+  AlignHorizontalJustifyEnd,
+  AlignHorizontalJustifyStart,
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyEnd,
+  AlignVerticalJustifyStart,
+  Columns3,
   Gauge,
   Grip,
   Image as ImageIcon,
@@ -23,6 +24,7 @@ import {
   Plus,
   Play,
   RotateCcw,
+  Rows3,
   Save,
   SlidersHorizontal,
   Trash2,
@@ -37,6 +39,8 @@ import {
   MenuItem,
   MenuTrigger,
   Popover,
+  Tooltip,
+  TooltipTrigger,
 } from 'react-aria-components';
 import {
   useFlightTelemetry,
@@ -1591,27 +1595,33 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
             </span>
             {(
               [
-                ['left', AlignLeft, 'alignLeft'],
-                ['center', AlignCenter, 'alignCenter'],
-                ['right', AlignRight, 'alignRight'],
-                ['top', AlignStartVertical, 'alignTop'],
-                ['middle', AlignCenterVertical, 'alignMiddle'],
-                ['bottom', AlignEndVertical, 'alignBottom'],
-                ['row', AlignCenter, 'sameRow'],
-                ['column', AlignCenterVertical, 'sameColumn'],
+                ['left', AlignHorizontalJustifyStart, 'alignLeft'],
+                ['center', AlignHorizontalJustifyCenter, 'alignCenter'],
+                ['right', AlignHorizontalJustifyEnd, 'alignRight'],
+                ['top', AlignVerticalJustifyStart, 'alignTop'],
+                ['middle', AlignVerticalJustifyCenter, 'alignMiddle'],
+                ['bottom', AlignVerticalJustifyEnd, 'alignBottom'],
+                ['row', Rows3, 'sameRow'],
+                ['column', Columns3, 'sameColumn'],
               ] as const
             ).map(([direction, Icon, label]) => (
-              <Button
-                key={direction}
-                variant="ghost"
-                size="sm"
-                onPress={() => alignSelected(direction)}
-                isDisabled={selectedIds.length < 2}
-                aria-label={t(`telemetryLayout.${label}`)}
-                title={t(`telemetryLayout.${label}`)}
-              >
-                <Icon className="h-4 w-4" />
-              </Button>
+              <TooltipTrigger key={direction} delay={150} closeDelay={100}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onPress={() => alignSelected(direction)}
+                  isDisabled={selectedIds.length < 2}
+                  aria-label={t(`telemetryLayout.${label}`)}
+                >
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                </Button>
+                <Tooltip
+                  offset={8}
+                  className="z-50 rounded bg-slate-900 px-2 py-1 text-xs text-white shadow-lg dark:bg-slate-100 dark:text-slate-900"
+                >
+                  {t(`telemetryLayout.${label}`)}
+                </Tooltip>
+              </TooltipTrigger>
             ))}
           </div>
           {selectedGroupId ? (
