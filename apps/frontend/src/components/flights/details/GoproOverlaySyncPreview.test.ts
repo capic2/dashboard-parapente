@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  calibrationTelemetryTimestampAtVideoTime,
   manualOffsetForGpxEndAtVideoTime,
   manualOffsetForGpxStartAtVideoTime,
   sourceTimeAtPreviewTime,
@@ -45,6 +46,20 @@ describe('sourceTimeAtPreviewTime', () => {
 describe('telemetryTimestampAtVideoTime', () => {
   it('uses only the manual calibration offset', () => {
     expect(telemetryTimestampAtVideoTime(1_000_000, 37, 6.6)).toBe(1_030_400);
+  });
+});
+
+describe('calibrationTelemetryTimestampAtVideoTime', () => {
+  it('keeps calibration on the GPX timeline and applies both offsets', () => {
+    expect(
+      calibrationTelemetryTimestampAtVideoTime(1_000_000, 6.6, -3, 10.4)
+    ).toBe(999_200);
+  });
+
+  it('uses the first coordinate timestamp when the GPX start metadata differs', () => {
+    expect(
+      calibrationTelemetryTimestampAtVideoTime(1_002_000, 7.4, -3, 10.4)
+    ).toBe(1_002_000);
   });
 });
 
