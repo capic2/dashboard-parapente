@@ -179,4 +179,60 @@ describe('FlightTelemetryInteractivePreview', () => {
         .getAttribute('data-timeline-start')
     ).toBe(String(Date.UTC(2026, 8, 5, 16, 44, 53)));
   });
+
+  it('uses the saved flight offset immediately when the preview query is stale', () => {
+    hooks.overlayPreview.data = {
+      video: {
+        start_time: '2026-09-05T16:27:53Z',
+        preview_segments: [
+          {
+            preview_start_seconds: 0,
+            source_start_seconds: 0,
+            duration_seconds: 180,
+          },
+        ],
+      },
+      alignment: {
+        automatic_offset_seconds: 25,
+        manual_offset_seconds: 0,
+        effective_offset_seconds: 25,
+      },
+    } as unknown as GoproOverlayPreview;
+    hooks.overlayPreview.isPending = false;
+    hooks.overlayPreview.isSuccess = true;
+    hooks.telemetry.data = {
+      points: [
+        {
+          timestamp: Date.UTC(2026, 8, 5, 16, 27, 53),
+          lat: 0,
+          lon: 0,
+          elevation: 0,
+          segment: 0,
+        },
+      ],
+      source: 'gpx',
+      has_osv: false,
+      enrichment_status: 'ready',
+      start_time: '2026-09-05T16:27:53Z',
+      end_time: null,
+      duration_seconds: 0,
+    };
+    hooks.telemetry.isPending = false;
+    hooks.telemetry.isSuccess = true;
+    hooks.layout.isPending = false;
+    hooks.layout.isSuccess = true;
+    hooks.layout.data = { layout: [] };
+
+    render(
+      <FlightTelemetryInteractivePreview
+        flightId="flight-1"
+        manualOffsetSeconds={12.5}
+      />
+    );
+
+    expect(screen.getByTestId('telemetry-overlay')).toHaveAttribute(
+      'data-offset',
+      '12.5'
+    );
+  });
 });
