@@ -145,6 +145,9 @@ export function FlightTelemetryOverlay({
               ...current,
               [slot.id]: nextMetric,
             }));
+          const hasClickAction = slot.clickAction === 'cycle_metric';
+          const hasLongPressAction = slot.longPressAction === 'cycle_metric';
+          const isInteractive = hasClickAction || hasLongPressAction;
           const clearLongPressTimer = () => {
             if (longPressTimer.current !== null) {
               window.clearTimeout(longPressTimer.current);
@@ -155,7 +158,8 @@ export function FlightTelemetryOverlay({
             <button
               key={slot.id}
               type="button"
-              className={`pointer-events-auto absolute min-h-0 min-w-0 overflow-hidden cursor-pointer rounded-lg border px-3 py-2 text-left text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${slot.transparent === false ? 'bg-slate-950/75 shadow-lg backdrop-blur-sm hover:bg-slate-900' : 'bg-transparent'} ${slot.border === true ? 'border-white/25' : 'border-transparent'}`}
+              tabIndex={isInteractive ? 0 : -1}
+              className={`pointer-events-auto absolute min-h-0 min-w-0 overflow-hidden ${isInteractive ? 'cursor-pointer' : 'cursor-default'} rounded-lg border px-3 py-2 text-left text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${slot.transparent === false ? 'bg-slate-950/75 shadow-lg backdrop-blur-sm hover:bg-slate-900' : 'bg-transparent'} ${slot.border === true ? 'border-white/25' : 'border-transparent'}`}
               style={{
                 left: `${slot.x * 100}%`,
                 top: `${slot.y * 100}%`,
@@ -167,10 +171,12 @@ export function FlightTelemetryOverlay({
               onPointerDown={() => {
                 longPressTriggered.current = false;
                 clearLongPressTimer();
-                longPressTimer.current = window.setTimeout(() => {
-                  longPressTriggered.current = true;
-                  if (slot.longPressAction === 'cycle_metric') cycleMetric();
-                }, 550);
+                if (hasLongPressAction) {
+                  longPressTimer.current = window.setTimeout(() => {
+                    longPressTriggered.current = true;
+                    cycleMetric();
+                  }, 550);
+                }
               }}
               onPointerUp={clearLongPressTimer}
               onPointerCancel={clearLongPressTimer}
@@ -180,7 +186,7 @@ export function FlightTelemetryOverlay({
                   longPressTriggered.current = false;
                   return;
                 }
-                if (slot.clickAction !== 'none') cycleMetric();
+                if (hasClickAction) cycleMetric();
               }}
               aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${formatTelemetryValue(value)}${slot.showUnit === false ? '' : ` ${unit}`}. ${t('flights.telemetryChangeMetric')}`}
             >

@@ -55,6 +55,29 @@ describe('FlightTelemetryOverlay', () => {
         data={telemetry}
         videoTimeSeconds={0}
         offsetSeconds={0}
+        layout={[
+          {
+            id: 'cycle-widget',
+            type: 'widget',
+            metric: 'altitude',
+            x: 0,
+            y: 0,
+            width: 0.2,
+            height: 0.2,
+            visible: true,
+            clickAction: 'cycle_metric',
+          },
+          {
+            id: 'speed-widget',
+            type: 'widget',
+            metric: 'speed',
+            x: 0.2,
+            y: 0,
+            width: 0.2,
+            height: 0.2,
+            visible: true,
+          },
+        ]}
       />
     );
 
@@ -95,6 +118,36 @@ describe('FlightTelemetryOverlay', () => {
     expect(widget).not.toHaveClass('backdrop-blur-sm');
     expect(widget).not.toHaveClass('hover:bg-slate-900');
     expect(widget).not.toHaveClass('shadow-lg');
+  });
+
+  it('does not make a widget interactive when no action is configured', () => {
+    render(
+      <FlightTelemetryOverlay
+        data={telemetry}
+        videoTimeSeconds={0}
+        offsetSeconds={0}
+        layout={[
+          {
+            id: 'static-widget',
+            type: 'widget',
+            metric: 'altitude',
+            x: 0,
+            y: 0,
+            width: 0.2,
+            height: 0.2,
+            visible: true,
+          },
+        ]}
+      />
+    );
+
+    const widget = screen.getByRole('button');
+    fireEvent.click(widget);
+
+    expect(widget).toHaveClass('cursor-default');
+    expect(widget).toHaveAttribute('tabindex', '-1');
+    expect(screen.getByText('1234')).toBeInTheDocument();
+    expect(screen.queryByText('42.5')).not.toBeInTheDocument();
   });
 
   it('keeps omitted transparency transparent by default', () => {
