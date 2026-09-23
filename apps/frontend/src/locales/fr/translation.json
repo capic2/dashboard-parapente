@@ -1847,6 +1847,9 @@
     "layoutTooLarge": "Le layout est trop volumineux",
     "backgroundImageTooLarge": "Impossible de réduire suffisamment l’image de fond",
     "saving": "Enregistrement…",
+    "import": "Importer XML",
+    "importSuccess": "Layout XML importé. Pensez à l’enregistrer.",
+    "importError": "Impossible d’importer ce layout XML",
     "export": "Exporter XML",
     "reset": "Utiliser le layout global"
   }
