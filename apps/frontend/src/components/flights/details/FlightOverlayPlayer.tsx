@@ -347,51 +347,53 @@ export function FlightOverlayPlayer({
         data-testid="flight-overlay-media-stage"
         className={`relative grid min-h-0 bg-black ${layout === 'side-by-side' ? 'grid-cols-1 md:grid-cols-2' : ''}`}
       >
-        <div
-          className={
-            masterIsYoutube ? 'aspect-video w-full object-contain' : 'contents'
-          }
-          aria-label={masterIsYoutube ? cameraLabel : undefined}
-        >
-          {masterIsYoutube ? (
-            <div ref={youtubeHostRef} className="h-full w-full" />
-          ) : (
-            <video
-              ref={cameraRef}
-              src={cameraUrl}
-              controls={!isInteractive}
-              playsInline
-              preload="metadata"
-              onPlay={handlePlay}
-              onPause={handlePause}
-              onLoadedMetadata={() => {
-                setCameraDuration(cameraRef.current?.duration ?? 0);
-                syncMedia();
-              }}
-              onTimeUpdate={() => {
-                syncMedia();
-                setCameraCurrentTime(cameraRef.current?.currentTime ?? 0);
-              }}
-              onSeeked={() => syncMedia()}
-              className={
-                cameraIsMain || layout === 'side-by-side'
-                  ? 'aspect-video w-full object-contain'
-                  : 'absolute z-20 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
-              }
-              style={
-                !cameraIsMain && layout !== 'side-by-side'
-                  ? pipStyle
-                  : undefined
-              }
-              onClick={() => {
-                if (layout === 'flight-main') setLayout('camera-main');
-              }}
-              aria-label={cameraLabel}
-            >
-              <track kind="captions" />
-            </video>
-          )}
-        </div>
+        {masterIsYoutube ? (
+          <div
+            ref={youtubeHostRef}
+            className={
+              cameraIsMain || layout === 'side-by-side'
+                ? 'aspect-video w-full object-contain'
+                : 'absolute z-20 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
+            }
+            style={
+              !cameraIsMain && layout !== 'side-by-side' ? pipStyle : undefined
+            }
+            aria-label={cameraLabel}
+          />
+        ) : (
+          <video
+            ref={cameraRef}
+            src={cameraUrl}
+            controls={!isInteractive}
+            playsInline
+            preload="metadata"
+            onPlay={handlePlay}
+            onPause={handlePause}
+            onLoadedMetadata={() => {
+              setCameraDuration(cameraRef.current?.duration ?? 0);
+              syncMedia();
+            }}
+            onTimeUpdate={() => {
+              syncMedia();
+              setCameraCurrentTime(cameraRef.current?.currentTime ?? 0);
+            }}
+            onSeeked={() => syncMedia()}
+            className={
+              cameraIsMain || layout === 'side-by-side'
+                ? 'aspect-video w-full object-contain'
+                : 'absolute z-20 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300'
+            }
+            style={
+              !cameraIsMain && layout !== 'side-by-side' ? pipStyle : undefined
+            }
+            onClick={() => {
+              if (layout === 'flight-main') setLayout('camera-main');
+            }}
+            aria-label={cameraLabel}
+          >
+            <track kind="captions" />
+          </video>
+        )}
         {flightIsMain && getCameraTime && (
           <div className="pointer-events-none absolute inset-0">
             <span className="sr-only">
