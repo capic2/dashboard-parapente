@@ -112,7 +112,7 @@ export function FlightDetails({
   const [activeTab, setActiveTab] = useState<FlightDetailsTab>('infos');
   const [isReplayExpanded, setIsReplayExpanded] = useState(false);
   const [isInteractiveTelemetryExpanded, setIsInteractiveTelemetryExpanded] =
-    useState(false);
+    useState(hasReadyOverlayLayer);
   const [isOverlayWorkspaceExpanded, setIsOverlayWorkspaceExpanded] =
     useState(!hasReadyOverlayLayer);
   const [isGoproOverlayDialogOpen, setIsGoproOverlayDialogOpen] =
@@ -821,7 +821,10 @@ export function FlightDetails({
     />
   );
   useEffect(() => {
-    setIsOverlayWorkspaceExpanded(!hasReadyOverlayLayer);
+    if (hasReadyOverlayLayer) {
+      setIsOverlayWorkspaceExpanded(false);
+      setIsInteractiveTelemetryExpanded(true);
+    }
   }, [hasReadyOverlayLayer]);
 
   const overlayWorkspacePanel = (
