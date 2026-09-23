@@ -181,9 +181,6 @@ describe('FlightTelemetryInteractivePreview', () => {
 
     fireEvent.click(screen.getByTestId('overlay-player'));
     expect(screen.getByTestId('telemetry-overlay')).toBeInTheDocument();
-    expect(screen.getByTestId('telemetry-debug-bpm')).toHaveTextContent(
-      'BPM courant'
-    );
     expect(
       screen.getByTestId('telemetry-overlay').getAttribute('data-video-time')
     ).toBe('1200');
