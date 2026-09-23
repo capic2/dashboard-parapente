@@ -3,10 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { CircleAlert, Edit3, Wand2 } from 'lucide-react';
 import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
-import {
-  interpolateTelemetryAtVideoTime,
-  useFlightTelemetry,
-} from '../../../hooks/flights/useFlightTelemetry';
+import { useFlightTelemetry } from '../../../hooks/flights/useFlightTelemetry';
 import { useTelemetryLayout } from '../../../hooks/flights/useTelemetryLayout';
 import { getApiUrlWithSearchParams } from '../../../lib/api';
 import { parseApiUtcDate } from '../../../lib/date';
@@ -73,14 +70,6 @@ export function FlightTelemetryInteractivePreview({
       ? parseApiUtcDate(overlayPreview.data.gpx.start_time).getTime()
       : telemetry.data?.points[0]?.timestamp);
   const previewSegments = overlayPreview.data?.video.preview_segments ?? [];
-  const currentTelemetryPoint = interpolateTelemetryAtVideoTime(
-    telemetry.data,
-    cameraTime,
-    calibrationOffsetSeconds,
-    telemetryStartTimestamp
-  );
-  const currentHeartRate = currentTelemetryPoint?.heart_rate;
-
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
       <div className="flex items-start gap-3 p-4 sm:p-5">
@@ -116,7 +105,7 @@ export function FlightTelemetryInteractivePreview({
           </output>
         )}
         {!isLoading && isReady && (
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+          <div>
             <div className="min-w-0 flex-1">
               <FlightOverlayPlayer
                 mode="interactive"
@@ -160,21 +149,6 @@ export function FlightTelemetryInteractivePreview({
                 }
               />
             </div>
-            <aside
-              data-testid="telemetry-debug-bpm"
-              className="shrink-0 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100 lg:w-44"
-            >
-              <div className="text-xs font-semibold uppercase tracking-wide">
-                Debug télémétrie
-              </div>
-              <div className="mt-2 text-xs">BPM courant</div>
-              <div className="font-mono text-xl font-bold">
-                {currentHeartRate == null ? '—' : `${currentHeartRate} bpm`}
-              </div>
-              <div className="mt-2 text-xs opacity-75">
-                t vidéo: {cameraTime.toFixed(1)} s
-              </div>
-            </aside>
           </div>
         )}
         {showUnavailable && (
