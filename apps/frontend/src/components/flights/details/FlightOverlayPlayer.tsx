@@ -242,6 +242,7 @@ export function FlightOverlayPlayer({
           onPause={handlePause}
           onLoadedMetadata={() => {
             setCameraDuration(cameraRef.current?.duration ?? 0);
+            syncMedia();
           }}
           onTimeUpdate={() => {
             syncMedia();
