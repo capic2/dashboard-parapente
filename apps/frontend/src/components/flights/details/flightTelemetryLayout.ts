@@ -18,6 +18,9 @@ export type TelemetryLayout = FlightTelemetryLayoutItem[] & {
   backgroundImage?: string;
 };
 
+export const TELEMETRY_CANVAS_WIDTH = 1920;
+export const TELEMETRY_CANVAS_HEIGHT = 1080;
+
 export type TelemetryIconName =
   | 'mountain'
   | 'wind'
@@ -33,6 +36,7 @@ export type TelemetryIconName =
 interface FlightTelemetryLayoutItemBase {
   id: string;
   name?: string;
+  /** Coordinates in the logical 1920x1080 canvas, expressed in pixels. */
   x: number;
   y: number;
   width: number;
@@ -96,7 +100,11 @@ export type TelemetryAlignmentDirection =
   | 'column';
 
 function clampLayoutPosition(value: number, size: number) {
-  return Math.max(0, Math.min(1 - size, value));
+  return Math.max(0, Math.min(TELEMETRY_CANVAS_WIDTH - size, value));
+}
+
+function clampLayoutVerticalPosition(value: number, size: number) {
+  return Math.max(0, Math.min(TELEMETRY_CANVAS_HEIGHT - size, value));
 }
 
 export function alignTelemetryLayoutItems(
@@ -138,12 +146,18 @@ export function alignTelemetryLayoutItems(
     if (direction === 'middle') {
       return {
         ...item,
-        y: clampLayoutPosition(referenceCenterY - item.height / 2, item.height),
+        y: clampLayoutVerticalPosition(
+          referenceCenterY - item.height / 2,
+          item.height
+        ),
       };
     }
     return {
       ...item,
-      y: clampLayoutPosition(referenceBottom - item.height, item.height),
+      y: clampLayoutVerticalPosition(
+        referenceBottom - item.height,
+        item.height
+      ),
     };
   });
 }
@@ -166,70 +180,70 @@ export const DEFAULT_FLIGHT_TELEMETRY_LAYOUT = [
     id: 'top-left',
     type: 'widget',
     metric: 'altitude',
-    x: 0.02,
-    y: 0.02,
-    width: 0.16,
-    height: 0.1,
+    x: 38.4,
+    y: 21.6,
+    width: 307.2,
+    height: 108,
     visible: true,
   },
   {
     id: 'top-right',
     type: 'widget',
     metric: 'speed',
-    x: 0.82,
-    y: 0.02,
-    width: 0.16,
-    height: 0.1,
+    x: 1574.4,
+    y: 21.6,
+    width: 307.2,
+    height: 108,
     visible: true,
   },
   {
     id: 'heart-rate',
     type: 'widget',
     metric: 'heart_rate',
-    x: 0.02,
-    y: 0.14,
-    width: 0.16,
-    height: 0.1,
+    x: 38.4,
+    y: 151.2,
+    width: 307.2,
+    height: 108,
     visible: true,
   },
   {
     id: 'total-gain',
     type: 'widget',
     metric: 'total_gain',
-    x: 0.82,
-    y: 0.14,
-    width: 0.16,
-    height: 0.1,
+    x: 1574.4,
+    y: 151.2,
+    width: 307.2,
+    height: 108,
     visible: true,
   },
   {
     id: 'total-loss',
     type: 'widget',
     metric: 'total_loss',
-    x: 0.82,
-    y: 0.26,
-    width: 0.16,
-    height: 0.1,
+    x: 1574.4,
+    y: 280.8,
+    width: 307.2,
+    height: 108,
     visible: true,
   },
   {
     id: 'bottom-left',
     type: 'widget',
     metric: 'vario',
-    x: 0.02,
-    y: 0.82,
-    width: 0.16,
-    height: 0.1,
+    x: 38.4,
+    y: 885.6,
+    width: 307.2,
+    height: 108,
     visible: true,
   },
   {
     id: 'bottom-right',
     type: 'widget',
     metric: 'distance',
-    x: 0.82,
-    y: 0.82,
-    width: 0.16,
-    height: 0.1,
+    x: 1574.4,
+    y: 885.6,
+    width: 307.2,
+    height: 108,
     visible: true,
   },
 ] satisfies readonly FlightTelemetryWidgetLayout[];
@@ -269,6 +283,10 @@ function numberAttribute(element: Element, name: string, fallback: number) {
   return Number.isFinite(value) ? value : fallback;
 }
 
+function normalizedToCanvasPixels(value: number, canvasSize: number) {
+  return Number((value * canvasSize).toFixed(4));
+}
+
 export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
   const document = new DOMParser().parseFromString(xml, 'application/xml');
   if (
@@ -304,10 +322,30 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
     const metric = element.getAttribute('metric') as MetricKey;
     const common = {
       id: element.getAttribute('id') || fallback.id,
-      x: numberAttribute(element, 'x', fallback.x),
-      y: numberAttribute(element, 'y', fallback.y),
-      width: numberAttribute(element, 'width', fallback.width),
-      height: numberAttribute(element, 'height', fallback.height),
+      x: normalizedToCanvasPixels(
+        numberAttribute(element, 'x', fallback.x / TELEMETRY_CANVAS_WIDTH),
+        TELEMETRY_CANVAS_WIDTH
+      ),
+      y: normalizedToCanvasPixels(
+        numberAttribute(element, 'y', fallback.y / TELEMETRY_CANVAS_HEIGHT),
+        TELEMETRY_CANVAS_HEIGHT
+      ),
+      width: normalizedToCanvasPixels(
+        numberAttribute(
+          element,
+          'width',
+          fallback.width / TELEMETRY_CANVAS_WIDTH
+        ),
+        TELEMETRY_CANVAS_WIDTH
+      ),
+      height: normalizedToCanvasPixels(
+        numberAttribute(
+          element,
+          'height',
+          fallback.height / TELEMETRY_CANVAS_HEIGHT
+        ),
+        TELEMETRY_CANVAS_HEIGHT
+      ),
       visible: element.getAttribute('visible') !== 'false',
     };
     const groupId = element.getAttribute('group');
@@ -526,7 +564,7 @@ export function serializeTelemetryLayoutXml(
           ? ` align="${item.textAlign}"`
           : '';
       const pipAction = item.type === 'pip' ? ` action="${item.action}"` : '';
-      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility}${unitVisibility}${fontSize}${clickAction}${longPressAction}${variant}${valueAlign}${textAlign} x="${item.x.toFixed(4)}" y="${item.y.toFixed(4)}" width="${item.width.toFixed(4)}" height="${item.height.toFixed(4)}" visible="${item.visible ? 'true' : 'false'}"`;
+      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility}${unitVisibility}${fontSize}${clickAction}${longPressAction}${variant}${valueAlign}${textAlign} x="${(item.x / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" y="${(item.y / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" width="${(item.width / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" height="${(item.height / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" visible="${item.visible ? 'true' : 'false'}"`;
       if (item.type === 'icon') return `<icon ${common} name="${item.icon}" />`;
       if (item.type === 'text') {
         return `<text ${common} content="${escapeXml(item.content)}" />`;
