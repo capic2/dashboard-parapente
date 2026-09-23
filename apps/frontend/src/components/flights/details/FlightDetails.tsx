@@ -96,6 +96,7 @@ export function FlightDetails({
   const uploadGPXMutation = useUploadGPXToFlight(flight.id);
   const createGoproOverlayJob = useCreateFlightGoproOverlayJob(flight.id);
   const overlayLayer = useFlightOverlayLayer(flight.id);
+  const hasReadyOverlayLayer = overlayLayer.data?.status === 'completed';
   const hasSavedOverlaySynchronization =
     flight.gopro_overlay_gpx_offset != null;
   const highlightVideosQuery = useFlightHighlightVideos(flight.id);
@@ -112,6 +113,8 @@ export function FlightDetails({
   const [notesText, setNotesText] = useState(flight.notes ?? '');
   const [activeTab, setActiveTab] = useState<FlightDetailsTab>('infos');
   const [isReplayExpanded, setIsReplayExpanded] = useState(false);
+  const [isInteractiveTelemetryExpanded, setIsInteractiveTelemetryExpanded] =
+    useState(false);
   const [isOverlayWorkspaceExpanded, setIsOverlayWorkspaceExpanded] = useState(
     !hasSavedOverlaySynchronization
   );
