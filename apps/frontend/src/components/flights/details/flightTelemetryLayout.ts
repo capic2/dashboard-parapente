@@ -84,6 +84,94 @@ export interface TelemetryLayoutGroupBounds {
   height: number;
 }
 
+export type TelemetryAlignmentDirection =
+  | 'left'
+  | 'center'
+  | 'right'
+  | 'top'
+  | 'middle'
+  | 'bottom'
+  | 'row'
+  | 'column';
+
+function clampLayoutPosition(value: number, size: number) {
+  return Math.max(0, Math.min(1 - size, value));
+}
+
+export function alignTelemetryLayoutItems(
+  layout: readonly FlightTelemetryLayoutItem[],
+  selectedIds: readonly string[],
+  direction: TelemetryAlignmentDirection
+): FlightTelemetryLayoutItem[] {
+  const selectedItems = selectedIds
+    .map((id) => layout.find((item) => item.id === id))
+    .filter((item): item is FlightTelemetryLayoutItem => Boolean(item));
+  if (!selectedItems.length) return [...layout];
+
+  if (selectedItems.length === 1) {
+    if (direction === 'row' || direction === 'column') return [...layout];
+
+    const selectedItem = selectedItems[0];
+    let x = selectedItem.x;
+    let y = selectedItem.y;
+    if (direction === 'left') x = 0;
+    if (direction === 'center') x = (1 - selectedItem.width) / 2;
+    if (direction === 'right') x = 1 - selectedItem.width;
+    if (direction === 'top') y = 0;
+    if (direction === 'middle') y = (1 - selectedItem.height) / 2;
+    if (direction === 'bottom') y = 1 - selectedItem.height;
+
+    return layout.map((item) =>
+      item.id === selectedItem.id
+        ? {
+            ...item,
+            x: clampLayoutPosition(x, item.width),
+            y: clampLayoutPosition(y, item.height),
+          }
+        : item
+    );
+  }
+
+  const left = Math.min(...selectedItems.map((item) => item.x));
+  const top = Math.min(...selectedItems.map((item) => item.y));
+  const right = Math.max(...selectedItems.map((item) => item.x + item.width));
+  const bottom = Math.max(...selectedItems.map((item) => item.y + item.height));
+  const centerX = (left + right) / 2;
+  const centerY = (top + bottom) / 2;
+  const referenceX = selectedItems[0].x;
+  const referenceY = selectedItems[0].y;
+
+  return layout.map((item) => {
+    if (!selectedIds.includes(item.id)) return item;
+    if (direction === 'row') return { ...item, y: referenceY };
+    if (direction === 'column') return { ...item, x: referenceX };
+    if (direction === 'left') return { ...item, x: left };
+    if (direction === 'center') {
+      return {
+        ...item,
+        x: clampLayoutPosition(centerX - item.width / 2, item.width),
+      };
+    }
+    if (direction === 'right') {
+      return {
+        ...item,
+        x: clampLayoutPosition(right - item.width, item.width),
+      };
+    }
+    if (direction === 'top') return { ...item, y: top };
+    if (direction === 'middle') {
+      return {
+        ...item,
+        y: clampLayoutPosition(centerY - item.height / 2, item.height),
+      };
+    }
+    return {
+      ...item,
+      y: clampLayoutPosition(bottom - item.height, item.height),
+    };
+  });
+}
+
 export function getTelemetryLayoutGroupBounds(
   layout: readonly FlightTelemetryLayoutItem[],
   groupId: string
