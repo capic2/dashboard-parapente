@@ -30,7 +30,7 @@ const GOPRO_TEMPLATE_PIP = {
 interface FlightOverlayPlayerProps {
   mode: 'calibration' | 'interactive';
   cameraUrl: string;
-  flightUrl: string;
+  flightUrl?: string;
   overlayUrl?: string;
   cameraLabel: string;
   flightLabel: string;
@@ -207,6 +207,7 @@ export function FlightOverlayPlayer({
   const cameraIsMain = layout === 'camera-main';
   const flightIsMain = layout === 'flight-main';
   const isInteractive = mode === 'interactive';
+  const hasFlightVideo = Boolean(flightUrl);
   const pipStyle = pipLayout
     ? {
         left: `${pipLayout.x * 100}%`,
@@ -241,6 +242,7 @@ export function FlightOverlayPlayer({
           onPause={handlePause}
           onLoadedMetadata={() => {
             setCameraDuration(cameraRef.current?.duration ?? 0);
+            syncMedia();
           }}
           onTimeUpdate={() => {
             syncMedia();
@@ -269,7 +271,7 @@ export function FlightOverlayPlayer({
             </span>
           </div>
         )}
-        {isInteractive && (
+        {isInteractive && hasFlightVideo && (
           <video
             ref={flightRef}
             src={flightUrl}
@@ -310,7 +312,7 @@ export function FlightOverlayPlayer({
             <track kind="captions" />
           </video>
         )}
-        {isInteractive && layout !== 'side-by-side' && (
+        {isInteractive && hasFlightVideo && layout !== 'side-by-side' && (
           <button
             type="button"
             onClick={() =>
@@ -424,24 +426,31 @@ export function FlightOverlayPlayer({
                 <PictureInPicture2 className="h-3.5 w-3.5" aria-hidden="true" />
                 {cameraLabel}
               </button>
-              <button
-                type="button"
-                onClick={() => setLayout('flight-main')}
-                aria-pressed={flightIsMain}
-                className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-200 transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 aria-pressed:bg-sky-600 aria-pressed:text-white"
-              >
-                <PictureInPicture2 className="h-3.5 w-3.5" aria-hidden="true" />
-                {flightLabel}
-              </button>
-              <button
-                type="button"
-                onClick={() => setLayout('side-by-side')}
-                aria-pressed={layout === 'side-by-side'}
-                className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-200 transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 aria-pressed:bg-sky-600 aria-pressed:text-white"
-              >
-                <Columns2 className="h-3.5 w-3.5" aria-hidden="true" />
-                {t('flights.goproOverlaySideBySide')}
-              </button>
+              {hasFlightVideo && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setLayout('flight-main')}
+                    aria-pressed={flightIsMain}
+                    className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-200 transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 aria-pressed:bg-sky-600 aria-pressed:text-white"
+                  >
+                    <PictureInPicture2
+                      className="h-3.5 w-3.5"
+                      aria-hidden="true"
+                    />
+                    {flightLabel}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLayout('side-by-side')}
+                    aria-pressed={layout === 'side-by-side'}
+                    className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-200 transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 aria-pressed:bg-sky-600 aria-pressed:text-white"
+                  >
+                    <Columns2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    {t('flights.goproOverlaySideBySide')}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}

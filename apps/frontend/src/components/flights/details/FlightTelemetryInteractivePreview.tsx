@@ -15,10 +15,12 @@ import { sourceTimeAtPreviewTime } from './GoproOverlaySyncPreview';
 
 interface FlightTelemetryInteractivePreviewProps {
   flightId: string;
+  hasFlightVideo?: boolean;
 }
 
 export function FlightTelemetryInteractivePreview({
   flightId,
+  hasFlightVideo = true,
 }: FlightTelemetryInteractivePreviewProps) {
   const { t } = useTranslation();
   const token = useAuthStore((state) => state.token);
@@ -111,9 +113,13 @@ export function FlightTelemetryInteractivePreview({
                 version: `${overlayPreview.data?.video.preview_target_end_seconds}-${overlayPreview.data?.video.preview_available_duration_seconds}`,
               }
             )}
-            flightUrl={getApiUrlWithSearchParams(`flights/${flightId}/video`, {
-              access_token: token,
-            })}
+            flightUrl={
+              hasFlightVideo
+                ? getApiUrlWithSearchParams(`flights/${flightId}/video`, {
+                    access_token: token,
+                  })
+                : undefined
+            }
             cameraLabel={t('flights.goproOverlayCameraPreview')}
             flightLabel={t('flights.goproOverlayFlightVideo')}
             pipLayout={layout.data?.layout.find(
