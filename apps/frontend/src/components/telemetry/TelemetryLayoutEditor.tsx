@@ -52,6 +52,7 @@ import {
 } from '../../hooks/flights/useTelemetryLayout';
 import { parseTelemetryGpxFile } from '../flights/details/telemetryGpxPreview';
 import {
+  parseTelemetryLayoutXml,
   serializeTelemetryLayoutXml,
   getTelemetryLayoutGroupBounds,
   type FlightTelemetryIconLayout,
@@ -303,6 +304,45 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       setBackgroundImage(compressedImage);
     } catch {
       const message = t('telemetryLayout.backgroundImageTooLarge');
+      setSaveError(message);
+      toast.error(message);
+    }
+  };
+
+  const handleLayoutXmlFile = async (file: File | undefined) => {
+    if (!file) return;
+
+    try {
+      if (file.size > MAX_LAYOUT_XML_LENGTH) {
+        throw new Error('Layout XML is too large');
+      }
+      const xml = await file.text();
+      if (xml.length > MAX_LAYOUT_XML_LENGTH) {
+        throw new Error('Layout XML is too large');
+      }
+
+      const document = new DOMParser().parseFromString(xml, 'application/xml');
+      if (
+        document.querySelector('parsererror') ||
+        document.documentElement.tagName !== 'telemetry-layout'
+      ) {
+        throw new Error('Invalid telemetry layout XML');
+      }
+
+      const importedLayout = parseTelemetryLayoutXml(xml);
+      if (!importedLayout.length) {
+        throw new Error('Telemetry layout XML is empty');
+      }
+
+      layoutHistory.current = [];
+      setCanUndo(false);
+      setLayoutState(importedLayout);
+      setBackgroundImage(importedLayout.backgroundImage);
+      setSelectedIds(importedLayout[0]?.id ? [importedLayout[0].id] : []);
+      setSaveError(undefined);
+      toast.success(t('telemetryLayout.importSuccess'));
+    } catch {
+      const message = t('telemetryLayout.importError');
       setSaveError(message);
       toast.error(message);
     }
@@ -971,6 +1011,19 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
               accept=".gpx,application/gpx+xml,application/xml"
               className="sr-only"
               onChange={(event) => void handleGpxFile(event.target.files?.[0])}
+            />
+          </label>
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 font-medium dark:border-slate-600">
+            <Upload className="h-4 w-4" />
+            {t('telemetryLayout.import')}
+            <input
+              type="file"
+              accept=".xml,application/xml,text/xml"
+              className="sr-only"
+              onChange={(event) => {
+                void handleLayoutXmlFile(event.target.files?.[0]);
+                event.target.value = '';
+              }}
             />
           </label>
           {gpxFileName && (
