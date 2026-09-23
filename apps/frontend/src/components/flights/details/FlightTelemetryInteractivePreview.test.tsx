@@ -19,7 +19,7 @@ const hooks = vi.hoisted(() => ({
     isError: false,
   },
   layout: {
-    data: undefined as { layout: never[] } | undefined,
+    data: undefined as { layout: unknown[] } | undefined,
     isPending: true,
     isSuccess: false,
   },
@@ -58,9 +58,11 @@ vi.mock('./FlightOverlayPlayer', () => ({
   FlightOverlayPlayer: ({
     onTimeChange,
     overlayContent,
+    pipLayout,
   }: {
     onTimeChange?: (time: number) => void;
     overlayContent?: React.ReactNode;
+    pipLayout?: { x: number; y: number; width: number; height: number };
   }) => (
     <>
       <button
@@ -68,6 +70,13 @@ vi.mock('./FlightOverlayPlayer', () => ({
         data-testid="overlay-player"
         aria-label="mock overlay player"
         onClick={() => onTimeChange?.(180)}
+      />
+      <div
+        data-testid="player-pip-layout"
+        data-x={pipLayout?.x}
+        data-y={pipLayout?.y}
+        data-width={pipLayout?.width}
+        data-height={pipLayout?.height}
       />
       {overlayContent}
     </>
@@ -192,6 +201,70 @@ describe('FlightTelemetryInteractivePreview', () => {
         .getByTestId('telemetry-overlay')
         .getAttribute('data-timeline-start')
     ).toBe(String(Date.UTC(2026, 8, 5, 16, 44, 55)));
+  });
+
+  it('converts the saved pixel PiP bounds to player-relative fractions', () => {
+    hooks.overlayPreview.data = {
+      video: { preview_segments: [] },
+      alignment: { automatic_offset_seconds: 0, manual_offset_seconds: 0 },
+      gpx: { coordinates: [] },
+    } as unknown as GoproOverlayPreview;
+    hooks.overlayPreview.isPending = false;
+    hooks.overlayPreview.isSuccess = true;
+    hooks.telemetry.data = {
+      points: [
+        {
+          timestamp: 0,
+          lat: 0,
+          lon: 0,
+          elevation: 0,
+          segment: 0,
+        },
+      ],
+      source: 'gpx',
+      has_osv: false,
+      enrichment_status: 'ready',
+      start_time: null,
+      end_time: null,
+      duration_seconds: 0,
+    };
+    hooks.telemetry.isPending = false;
+    hooks.telemetry.isSuccess = true;
+    hooks.layout.isPending = false;
+    hooks.layout.isSuccess = true;
+    hooks.layout.data = {
+      layout: [
+        {
+          id: 'video-pip',
+          type: 'pip',
+          action: 'switch_video',
+          x: 38.4,
+          y: 842.4,
+          width: 345.6,
+          height: 194.4,
+          visible: true,
+        },
+      ],
+    };
+
+    render(<FlightTelemetryInteractivePreview flightId="flight-1" />);
+
+    expect(screen.getByTestId('player-pip-layout')).toHaveAttribute(
+      'data-x',
+      '0.02'
+    );
+    expect(screen.getByTestId('player-pip-layout')).toHaveAttribute(
+      'data-y',
+      '0.78'
+    );
+    expect(
+      Number(screen.getByTestId('player-pip-layout').getAttribute('data-width'))
+    ).toBeCloseTo(0.18);
+    expect(
+      Number(
+        screen.getByTestId('player-pip-layout').getAttribute('data-height')
+      )
+    ).toBeCloseTo(0.18);
   });
 
   it('uses the saved flight offset immediately when the preview query is stale', () => {
