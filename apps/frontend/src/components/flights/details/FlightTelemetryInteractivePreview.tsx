@@ -16,11 +16,13 @@ import { sourceTimeAtPreviewTime } from './GoproOverlaySyncPreview';
 interface FlightTelemetryInteractivePreviewProps {
   flightId: string;
   hasFlightVideo?: boolean;
+  manualOffsetSeconds?: number;
 }
 
 export function FlightTelemetryInteractivePreview({
   flightId,
   hasFlightVideo = true,
+  manualOffsetSeconds,
 }: FlightTelemetryInteractivePreviewProps) {
   const { t } = useTranslation();
   const token = useAuthStore((state) => state.token);
@@ -52,7 +54,9 @@ export function FlightTelemetryInteractivePreview({
     previewStatusMessage = t('flights.overlayInteractivePreviewUnavailable');
   }
   const overlayOffsetSeconds =
-    overlayPreview.data?.alignment.manual_offset_seconds ?? 0;
+    manualOffsetSeconds ??
+    overlayPreview.data?.alignment.manual_offset_seconds ??
+    0;
   const timelineStartTimestamp = overlayPreview.data?.video.start_time
     ? parseApiUtcDate(overlayPreview.data.video.start_time).getTime()
     : undefined;
