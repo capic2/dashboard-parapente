@@ -3,7 +3,10 @@ import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { CircleAlert, Edit3, Wand2 } from 'lucide-react';
 import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
-import { useFlightTelemetry } from '../../../hooks/flights/useFlightTelemetry';
+import {
+  interpolateTelemetryAtVideoTime,
+  useFlightTelemetry,
+} from '../../../hooks/flights/useFlightTelemetry';
 import { useTelemetryLayout } from '../../../hooks/flights/useTelemetryLayout';
 import { getApiUrlWithSearchParams } from '../../../lib/api';
 import { parseApiUtcDate } from '../../../lib/date';
@@ -70,6 +73,13 @@ export function FlightTelemetryInteractivePreview({
       ? parseApiUtcDate(overlayPreview.data.gpx.start_time).getTime()
       : telemetry.data?.points[0]?.timestamp);
   const previewSegments = overlayPreview.data?.video.preview_segments ?? [];
+  const currentTelemetryPoint = interpolateTelemetryAtVideoTime(
+    telemetry.data,
+    cameraTime,
+    calibrationOffsetSeconds,
+    telemetryStartTimestamp
+  );
+  const currentHeartRate = currentTelemetryPoint?.heart_rate;
 
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
@@ -106,45 +116,66 @@ export function FlightTelemetryInteractivePreview({
           </output>
         )}
         {!isLoading && isReady && (
-          <FlightOverlayPlayer
-            mode="interactive"
-            cameraUrl={getApiUrlWithSearchParams(
-              `flights/${flightId}/gopro-camera/preview`,
-              {
-                access_token: token,
-                target_end_seconds: String(
-                  overlayPreview.data?.video.preview_target_end_seconds ?? ''
-                ),
-                version: `${overlayPreview.data?.video.preview_target_end_seconds}-${overlayPreview.data?.video.preview_available_duration_seconds}`,
-              }
-            )}
-            flightUrl={
-              hasFlightVideo
-                ? getApiUrlWithSearchParams(`flights/${flightId}/video`, {
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+            <div className="min-w-0 flex-1">
+              <FlightOverlayPlayer
+                mode="interactive"
+                cameraUrl={getApiUrlWithSearchParams(
+                  `flights/${flightId}/gopro-camera/preview`,
+                  {
                     access_token: token,
-                  })
-                : undefined
-            }
-            cameraLabel={t('flights.goproOverlayCameraPreview')}
-            flightLabel={t('flights.goproOverlayFlightVideo')}
-            pipLayout={layout.data?.layout.find(
-              (item): item is FlightTelemetryPipLayout => item.type === 'pip'
-            )}
-            onTimeChange={(previewTime) =>
-              setCameraTime(
-                sourceTimeAtPreviewTime(previewTime, previewSegments)
-              )
-            }
-            overlayContent={
-              <FlightTelemetryOverlay
-                data={telemetry.data}
-                videoTimeSeconds={cameraTime}
-                offsetSeconds={calibrationOffsetSeconds}
-                timelineStartTimestamp={telemetryStartTimestamp}
-                layout={layout.data?.layout}
+                    target_end_seconds: String(
+                      overlayPreview.data?.video.preview_target_end_seconds ??
+                        ''
+                    ),
+                    version: `${overlayPreview.data?.video.preview_target_end_seconds}-${overlayPreview.data?.video.preview_available_duration_seconds}`,
+                  }
+                )}
+                flightUrl={
+                  hasFlightVideo
+                    ? getApiUrlWithSearchParams(`flights/${flightId}/video`, {
+                        access_token: token,
+                      })
+                    : undefined
+                }
+                cameraLabel={t('flights.goproOverlayCameraPreview')}
+                flightLabel={t('flights.goproOverlayFlightVideo')}
+                pipLayout={layout.data?.layout.find(
+                  (item): item is FlightTelemetryPipLayout =>
+                    item.type === 'pip'
+                )}
+                onTimeChange={(previewTime) =>
+                  setCameraTime(
+                    sourceTimeAtPreviewTime(previewTime, previewSegments)
+                  )
+                }
+                overlayContent={
+                  <FlightTelemetryOverlay
+                    data={telemetry.data}
+                    videoTimeSeconds={cameraTime}
+                    offsetSeconds={calibrationOffsetSeconds}
+                    timelineStartTimestamp={telemetryStartTimestamp}
+                    layout={layout.data?.layout}
+                  />
+                }
               />
-            }
-          />
+            </div>
+            <aside
+              data-testid="telemetry-debug-bpm"
+              className="shrink-0 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100 lg:w-44"
+            >
+              <div className="text-xs font-semibold uppercase tracking-wide">
+                Debug télémétrie
+              </div>
+              <div className="mt-2 text-xs">BPM courant</div>
+              <div className="font-mono text-xl font-bold">
+                {currentHeartRate == null ? '—' : `${currentHeartRate} bpm`}
+              </div>
+              <div className="mt-2 text-xs opacity-75">
+                t vidéo: {cameraTime.toFixed(1)} s
+              </div>
+            </aside>
+          </div>
         )}
         {showUnavailable && (
           <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
