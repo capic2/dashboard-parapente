@@ -905,7 +905,10 @@ export function FlightDetails({
           id="flight-interactive-telemetry-panel"
           className="border-t border-violet-200 p-4 dark:border-violet-900 sm:p-5"
         >
-          <FlightTelemetryInteractivePreview flightId={flight.id} />
+          <FlightTelemetryInteractivePreview
+            flightId={flight.id}
+            hasFlightVideo={hasVideo}
+          />
         </div>
       )}
     </section>
@@ -944,7 +947,7 @@ export function FlightDetails({
 
       <div className="min-w-0 space-y-4">
         {hasGpx && hasVideo && hasGoproCameraVideo && overlayWorkspacePanel}
-        {hasGpx && hasVideo && hasGoproCameraVideo && interactiveTelemetryPanel}
+        {hasGpx && hasGoproCameraVideo && interactiveTelemetryPanel}
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
           <button
             type="button"
