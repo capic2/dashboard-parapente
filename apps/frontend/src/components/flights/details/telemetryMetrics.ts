@@ -64,6 +64,18 @@ export const METRIC_LABELS: Record<MetricKey, string> = {
 
 type DisplayValue = number | string | null | undefined;
 
+const POINT_INDEPENDENT_METRICS = new Set<MetricKey>([
+  'altitude_min',
+  'altitude_max',
+  'start_altitude',
+  'vario_min',
+  'vario_max',
+  'heart_rate_min',
+  'heart_rate_max',
+  'total_gain',
+  'total_loss',
+]);
+
 function numericValues(
   data: FlightTelemetryData | undefined,
   read: (point: FlightTelemetryPoint) => number | null | undefined
@@ -73,6 +85,14 @@ function numericValues(
     .filter(
       (value): value is number => value != null && Number.isFinite(value)
     );
+}
+
+function minimum(values: readonly number[]) {
+  return values.length ? Math.min(...values) : null;
+}
+
+function maximum(values: readonly number[]) {
+  return values.length ? Math.max(...values) : null;
 }
 
 function elevationChange(
@@ -93,7 +113,7 @@ export function getTelemetryMetricValue(
   data: FlightTelemetryData | undefined,
   metric: MetricKey
 ): [DisplayValue, string] | null {
-  if (!point && metric !== 'altitude_min' && metric !== 'altitude_max') {
+  if (!point && !POINT_INDEPENDENT_METRICS.has(metric)) {
     return null;
   }
   const altitudes = numericValues(data, (item) => item.elevation);
@@ -103,9 +123,9 @@ export function getTelemetryMetricValue(
     case 'altitude':
       return [point?.elevation, 'm'];
     case 'altitude_min':
-      return [Math.min(...altitudes), 'm'];
+      return [minimum(altitudes), 'm'];
     case 'altitude_max':
-      return [Math.max(...altitudes), 'm'];
+      return [maximum(altitudes), 'm'];
     case 'start_altitude':
       return [data?.points[0]?.elevation, 'm'];
     case 'speed':
@@ -113,9 +133,9 @@ export function getTelemetryMetricValue(
     case 'vario':
       return [point?.vario_ms, 'm/s'];
     case 'vario_min':
-      return [Math.min(...varioValues), 'm/s'];
+      return [minimum(varioValues), 'm/s'];
     case 'vario_max':
-      return [Math.max(...varioValues), 'm/s'];
+      return [maximum(varioValues), 'm/s'];
     case 'distance':
       return [point?.distance_km, 'km'];
     case 'heading':
@@ -123,9 +143,9 @@ export function getTelemetryMetricValue(
     case 'heart_rate':
       return [point?.heart_rate, 'bpm'];
     case 'heart_rate_min':
-      return [Math.min(...heartRates), 'bpm'];
+      return [minimum(heartRates), 'bpm'];
     case 'heart_rate_max':
-      return [Math.max(...heartRates), 'bpm'];
+      return [maximum(heartRates), 'bpm'];
     case 'power':
       return [point?.power, 'W'];
     case 'total_gain':
