@@ -6,7 +6,6 @@ import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { useFlightTelemetry } from '../../../hooks/flights/useFlightTelemetry';
 import { useTelemetryLayout } from '../../../hooks/flights/useTelemetryLayout';
 import { getApiUrlWithSearchParams } from '../../../lib/api';
-import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
 import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 import { FlightTelemetryOverlay } from './FlightTelemetryOverlay';
@@ -57,17 +56,14 @@ export function FlightTelemetryInteractivePreview({
     manualOffsetSeconds ??
     overlayPreview.data?.alignment.manual_offset_seconds ??
     0;
-  const timelineStartTimestamp = overlayPreview.data?.video.start_time
-    ? parseApiUtcDate(overlayPreview.data.video.start_time).getTime()
-    : undefined;
-  const mergedGpxStartTimestamp = telemetry.data?.start_time
-    ? parseApiUtcDate(telemetry.data.start_time).getTime()
-    : undefined;
-  const mergedGpxStartOffsetSeconds =
-    mergedGpxStartTimestamp !== undefined &&
-    timelineStartTimestamp !== undefined
-      ? (mergedGpxStartTimestamp - timelineStartTimestamp) / 1000
-      : 0;
+  const automaticOffsetSeconds =
+    overlayPreview.data?.alignment.automatic_offset_seconds ?? 0;
+  // PROTECTED CALIBRATION SYNC CONTRACT — use the same GPX origin and
+  // combined offset as GoproOverlaySyncPreview. Changes require explicit
+  // user authorization in the current task.
+  const calibrationOffsetSeconds =
+    automaticOffsetSeconds + overlayOffsetSeconds;
+  const telemetryStartTimestamp = telemetry.data?.points[0]?.timestamp;
   const previewSegments = overlayPreview.data?.video.preview_segments ?? [];
 
   return (
@@ -137,11 +133,9 @@ export function FlightTelemetryInteractivePreview({
             overlayContent={
               <FlightTelemetryOverlay
                 data={telemetry.data}
-                videoTimeSeconds={cameraTime - mergedGpxStartOffsetSeconds}
-                offsetSeconds={overlayOffsetSeconds}
-                timelineStartTimestamp={
-                  mergedGpxStartTimestamp ?? timelineStartTimestamp
-                }
+                videoTimeSeconds={cameraTime}
+                offsetSeconds={calibrationOffsetSeconds}
+                timelineStartTimestamp={telemetryStartTimestamp}
                 layout={layout.data?.layout}
               />
             }

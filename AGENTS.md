@@ -73,6 +73,9 @@ This file defines global rules for the entire monorepo.
 - The calibration cards must resolve telemetry from the first coordinate
   timestamp (`gpx.coordinates[0].timestamp`, falling back to GPX metadata),
   then apply the combined automatic and manual offsets.
+- The dynamic interactive overlay must use that same GPX origin and combined
+  offset; it must pass source-video time through without replacing the mapping
+  with the video start timestamp or a manual-only offset.
 - Do not replace this with the video start timestamp or with the manual offset
   alone: that changes the established synchronization behavior.
 - Before changing this formula, its regression tests, or the data source used

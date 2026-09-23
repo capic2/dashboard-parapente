@@ -120,7 +120,7 @@ describe('FlightTelemetryInteractivePreview', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('maps preview time to source video time before applying the telemetry offset', () => {
+  it('uses the GPX origin and combined calibration offset', () => {
     hooks.overlayPreview.data = {
       video: {
         start_time: '2026-09-05T16:27:53',
@@ -143,7 +143,7 @@ describe('FlightTelemetryInteractivePreview', () => {
     hooks.telemetry.data = {
       points: [
         {
-          timestamp: 1,
+          timestamp: Date.UTC(2026, 8, 5, 16, 44, 53),
           lat: 0,
           lon: 0,
           elevation: 0,
@@ -169,10 +169,10 @@ describe('FlightTelemetryInteractivePreview', () => {
     expect(screen.getByTestId('telemetry-overlay')).toBeInTheDocument();
     expect(
       screen.getByTestId('telemetry-overlay').getAttribute('data-video-time')
-    ).toBe('180');
+    ).toBe('1200');
     expect(
       screen.getByTestId('telemetry-overlay').getAttribute('data-offset')
-    ).toBe('5.9');
+    ).toBe('30.9');
     expect(
       screen
         .getByTestId('telemetry-overlay')
@@ -232,7 +232,11 @@ describe('FlightTelemetryInteractivePreview', () => {
 
     expect(screen.getByTestId('telemetry-overlay')).toHaveAttribute(
       'data-offset',
-      '12.5'
+      '37.5'
+    );
+    expect(screen.getByTestId('telemetry-overlay')).toHaveAttribute(
+      'data-timeline-start',
+      String(Date.UTC(2026, 8, 5, 16, 27, 53))
     );
   });
 });
