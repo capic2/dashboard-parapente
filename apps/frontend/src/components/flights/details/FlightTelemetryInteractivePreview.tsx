@@ -10,7 +10,11 @@ import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
 import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 import { FlightTelemetryOverlay } from './FlightTelemetryOverlay';
-import type { FlightTelemetryPipLayout } from './flightTelemetryLayout';
+import {
+  TELEMETRY_CANVAS_HEIGHT,
+  TELEMETRY_CANVAS_WIDTH,
+  type FlightTelemetryPipLayout,
+} from './flightTelemetryLayout';
 import { sourceTimeAtPreviewTime } from './GoproOverlaySyncPreview';
 
 interface FlightTelemetryInteractivePreviewProps {
@@ -70,6 +74,18 @@ export function FlightTelemetryInteractivePreview({
       ? parseApiUtcDate(overlayPreview.data.gpx.start_time).getTime()
       : telemetry.data?.points[0]?.timestamp);
   const previewSegments = overlayPreview.data?.video.preview_segments ?? [];
+  const pipLayout = layout.data?.layout.find(
+    (item): item is FlightTelemetryPipLayout => item.type === 'pip'
+  );
+  const playerPipLayout = pipLayout
+    ? {
+        ...pipLayout,
+        x: pipLayout.x / TELEMETRY_CANVAS_WIDTH,
+        y: pipLayout.y / TELEMETRY_CANVAS_HEIGHT,
+        width: pipLayout.width / TELEMETRY_CANVAS_WIDTH,
+        height: pipLayout.height / TELEMETRY_CANVAS_HEIGHT,
+      }
+    : undefined;
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
       <div className="flex items-start gap-3 p-4 sm:p-5">
@@ -129,10 +145,7 @@ export function FlightTelemetryInteractivePreview({
                 }
                 cameraLabel={t('flights.goproOverlayCameraPreview')}
                 flightLabel={t('flights.goproOverlayFlightVideo')}
-                pipLayout={layout.data?.layout.find(
-                  (item): item is FlightTelemetryPipLayout =>
-                    item.type === 'pip'
-                )}
+                pipLayout={playerPipLayout}
                 onTimeChange={(previewTime) =>
                   setCameraTime(
                     sourceTimeAtPreviewTime(previewTime, previewSegments)
