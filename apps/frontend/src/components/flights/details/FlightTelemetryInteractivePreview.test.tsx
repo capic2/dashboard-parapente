@@ -137,6 +137,19 @@ describe('FlightTelemetryInteractivePreview', () => {
         manual_offset_seconds: 5.9,
         effective_offset_seconds: 30.9,
       },
+      gpx: {
+        start_time: '2026-09-05T16:44:55Z',
+        end_time: '2026-09-05T16:45:05Z',
+        duration_seconds: 10,
+        coordinates: [
+          {
+            timestamp: Date.UTC(2026, 8, 5, 16, 44, 55),
+            lat: 0,
+            lon: 0,
+            elevation: 0,
+          },
+        ],
+      },
     } as unknown as GoproOverlayPreview;
     hooks.overlayPreview.isPending = false;
     hooks.overlayPreview.isSuccess = true;
@@ -177,7 +190,7 @@ describe('FlightTelemetryInteractivePreview', () => {
       screen
         .getByTestId('telemetry-overlay')
         .getAttribute('data-timeline-start')
-    ).toBe(String(Date.UTC(2026, 8, 5, 16, 44, 53)));
+    ).toBe(String(Date.UTC(2026, 8, 5, 16, 44, 55)));
   });
 
   it('uses the saved flight offset immediately when the preview query is stale', () => {

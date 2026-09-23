@@ -6,6 +6,7 @@ import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { useFlightTelemetry } from '../../../hooks/flights/useFlightTelemetry';
 import { useTelemetryLayout } from '../../../hooks/flights/useTelemetryLayout';
 import { getApiUrlWithSearchParams } from '../../../lib/api';
+import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
 import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 import { FlightTelemetryOverlay } from './FlightTelemetryOverlay';
@@ -63,7 +64,11 @@ export function FlightTelemetryInteractivePreview({
   // user authorization in the current task.
   const calibrationOffsetSeconds =
     automaticOffsetSeconds + overlayOffsetSeconds;
-  const telemetryStartTimestamp = telemetry.data?.points[0]?.timestamp;
+  const telemetryStartTimestamp =
+    overlayPreview.data?.gpx?.coordinates[0]?.timestamp ??
+    (overlayPreview.data?.gpx?.start_time
+      ? parseApiUtcDate(overlayPreview.data.gpx.start_time).getTime()
+      : telemetry.data?.points[0]?.timestamp);
   const previewSegments = overlayPreview.data?.video.preview_segments ?? [];
 
   return (
