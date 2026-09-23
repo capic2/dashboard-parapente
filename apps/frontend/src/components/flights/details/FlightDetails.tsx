@@ -96,7 +96,8 @@ export function FlightDetails({
   const uploadGPXMutation = useUploadGPXToFlight(flight.id);
   const createGoproOverlayJob = useCreateFlightGoproOverlayJob(flight.id);
   const overlayLayer = useFlightOverlayLayer(flight.id);
-  const hasReadyOverlayLayer = overlayLayer.data?.status === 'completed';
+  const hasSavedOverlaySynchronization =
+    flight.gopro_overlay_gpx_offset != null;
   const highlightVideosQuery = useFlightHighlightVideos(flight.id);
   const createHighlightVideo = useCreateFlightHighlightVideo(flight.id);
   const cancelHighlightVideo = useCancelFlightHighlightVideo(flight.id);
@@ -111,10 +112,9 @@ export function FlightDetails({
   const [notesText, setNotesText] = useState(flight.notes ?? '');
   const [activeTab, setActiveTab] = useState<FlightDetailsTab>('infos');
   const [isReplayExpanded, setIsReplayExpanded] = useState(false);
-  const [isInteractiveTelemetryExpanded, setIsInteractiveTelemetryExpanded] =
-    useState(false);
-  const [isOverlayWorkspaceExpanded, setIsOverlayWorkspaceExpanded] =
-    useState(!hasReadyOverlayLayer);
+  const [isOverlayWorkspaceExpanded, setIsOverlayWorkspaceExpanded] = useState(
+    !hasSavedOverlaySynchronization
+  );
   const [isGoproOverlayDialogOpen, setIsGoproOverlayDialogOpen] =
     useState(false);
   const [goproOverlayJobId, setGoproOverlayJobId] = useState<string | null>(
@@ -821,8 +821,8 @@ export function FlightDetails({
     />
   );
   useEffect(() => {
-    setIsOverlayWorkspaceExpanded(!hasReadyOverlayLayer);
-  }, [hasReadyOverlayLayer]);
+    setIsOverlayWorkspaceExpanded(!hasSavedOverlaySynchronization);
+  }, [hasSavedOverlaySynchronization]);
 
   const overlayWorkspacePanel = (
     <section className="overflow-hidden rounded-2xl border border-cyan-200 bg-cyan-50/50 shadow-sm dark:border-cyan-900 dark:bg-cyan-950/20">

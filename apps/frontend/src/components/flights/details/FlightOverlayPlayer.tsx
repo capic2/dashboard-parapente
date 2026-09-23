@@ -1,14 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Columns2,
-  Maximize2,
-  Minimize2,
-  Pause,
-  PictureInPicture2,
-  Play,
-  Repeat2,
-} from 'lucide-react';
+import { Maximize2, Minimize2, Pause, Play } from 'lucide-react';
 import type { FlightTelemetryPipLayout } from './flightTelemetryLayout';
 import { getYoutubeVideoId } from '../../../lib/youtube';
 
@@ -472,23 +464,6 @@ export function FlightOverlayPlayer({
             <track kind="captions" />
           </video>
         )}
-        {isInteractive && hasFlightVideo && layout !== 'side-by-side' && (
-          <button
-            type="button"
-            onClick={() =>
-              setLayout((current) =>
-                current === 'camera-main' ? 'flight-main' : 'camera-main'
-              )
-            }
-            className="absolute right-3 top-3 z-30 flex cursor-pointer items-center gap-1.5 rounded-md bg-slate-950/80 px-2.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
-            aria-label={t('flights.goproOverlaySwapVideos', {
-              name: cameraIsMain ? flightLabel : cameraLabel,
-            })}
-          >
-            <Repeat2 className="h-3.5 w-3.5" aria-hidden="true" />
-            {cameraIsMain ? flightLabel : cameraLabel}
-          </button>
-        )}
         {overlayContent && (
           <div
             className={`pointer-events-none absolute z-30 ${overlayUrl ? 'left-3 top-3' : 'inset-0'}`}
@@ -577,45 +552,6 @@ export function FlightOverlayPlayer({
                   <Maximize2 className="h-4 w-4" aria-hidden="true" />
                 )}
               </button>
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-white/15 pt-2">
-              <span className="mr-auto text-xs font-medium text-gray-200">
-                {t('flights.goproOverlayLayoutLabel')}
-              </span>
-              <button
-                type="button"
-                onClick={() => setLayout('camera-main')}
-                aria-pressed={cameraIsMain}
-                className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-200 transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 aria-pressed:bg-sky-600 aria-pressed:text-white"
-              >
-                <PictureInPicture2 className="h-3.5 w-3.5" aria-hidden="true" />
-                {cameraLabel}
-              </button>
-              {hasFlightVideo && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setLayout('flight-main')}
-                    aria-pressed={flightIsMain}
-                    className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-200 transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 aria-pressed:bg-sky-600 aria-pressed:text-white"
-                  >
-                    <PictureInPicture2
-                      className="h-3.5 w-3.5"
-                      aria-hidden="true"
-                    />
-                    {flightLabel}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLayout('side-by-side')}
-                    aria-pressed={layout === 'side-by-side'}
-                    className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-200 transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 aria-pressed:bg-sky-600 aria-pressed:text-white"
-                  >
-                    <Columns2 className="h-3.5 w-3.5" aria-hidden="true" />
-                    {t('flights.goproOverlaySideBySide')}
-                  </button>
-                </>
-              )}
             </div>
           </div>
         )}
