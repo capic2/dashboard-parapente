@@ -3,6 +3,7 @@ import type { GeoPoint } from '../../../types/flight';
 export type GoproSyncTelemetry = GeoPoint & { speedKmh: number };
 
 const EARTH_RADIUS_M = 6_371_000;
+type TelemetrySample = Pick<GeoPoint, 'lat' | 'lon' | 'timestamp'>;
 
 export function telemetryTimestampAtVideoTime(
   timelineStartTimestamp: number,
@@ -15,7 +16,7 @@ export function telemetryTimestampAtVideoTime(
   );
 }
 
-function distanceMeters(first: GeoPoint, second: GeoPoint) {
+function distanceMeters(first: TelemetrySample, second: TelemetrySample) {
   const toRadians = Math.PI / 180;
   const latitudeDelta = (second.lat - first.lat) * toRadians;
   const longitudeDelta = (second.lon - first.lon) * toRadians;
@@ -27,6 +28,16 @@ function distanceMeters(first: GeoPoint, second: GeoPoint) {
       Math.cos(secondLatitude) *
       Math.sin(longitudeDelta / 2) ** 2;
   return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(haversine));
+}
+
+export function telemetrySpeedKmhBetween(
+  first: TelemetrySample,
+  second: TelemetrySample
+) {
+  const durationMs = second.timestamp - first.timestamp;
+  return durationMs > 0
+    ? (distanceMeters(first, second) / durationMs) * 3_600
+    : 0;
 }
 
 export function telemetryAtTimestamp(
@@ -54,8 +65,7 @@ export function telemetryAtTimestamp(
   const durationMs = next.timestamp - previous.timestamp;
   const progress =
     durationMs > 0 ? (timestamp - previous.timestamp) / durationMs : 0;
-  const speedKmh =
-    durationMs > 0 ? (distanceMeters(previous, next) / durationMs) * 3_600 : 0;
+  const speedKmh = telemetrySpeedKmhBetween(previous, next);
   return {
     lat: previous.lat + (next.lat - previous.lat) * progress,
     lon: previous.lon + (next.lon - previous.lon) * progress,
