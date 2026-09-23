@@ -17,7 +17,7 @@ interface FlightOverlayInteractivePreviewProps {
   flight: Flight;
   hasCameraVideo: boolean;
   overlayLayer?: FlightOverlayLayer;
-  youtubeUrl?: string;
+  youtubeUrl?: string | null;
 }
 
 export function FlightOverlayInteractivePreview({
@@ -56,6 +56,7 @@ export function FlightOverlayInteractivePreview({
         youtubeLabel={t('flights.goproOverlayYoutubePreview')}
         flightLabel={t('flights.goproOverlayFlightVideo')}
         overlayUrl={overlayUrl}
+        syncOffsetSeconds={overlayOffsetSeconds}
         getOverlayTime={(youtubeTime) => youtubeTime - overlayOffsetSeconds}
       />
     );
