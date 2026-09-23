@@ -120,7 +120,6 @@ describe('FlightTelemetryOverlay', () => {
 
     expect(screen.getByRole('button')).toHaveClass('backdrop-blur-sm');
   });
-
   it('does not render metric labels in the final overlay', () => {
     render(
       <FlightTelemetryOverlay
@@ -144,7 +143,6 @@ describe('FlightTelemetryOverlay', () => {
       getTelemetryMetricValue(null, { ...telemetry, points: [] }, 'vario_min')
     ).toEqual([null, 'm/s']);
   });
-
   it('does not render editor group decorations', () => {
     const layout: FlightTelemetryLayoutItem[] = [
       {
