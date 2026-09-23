@@ -40,8 +40,21 @@ describe('interpolateTelemetryAtVideoTime', () => {
     const point = interpolateTelemetryAtVideoTime(data, 6, 1);
 
     expect(point?.elevation).toBe(1050);
-    expect(point?.speed_kmh).toBe(25);
+    expect(point?.speed_kmh).toBeCloseTo(487.4, 0);
     expect(point?.lat).toBeCloseTo(46.005);
+  });
+
+  it('derives speed like calibration when the track has no speed field', () => {
+    const point = interpolateTelemetryAtVideoTime(
+      {
+        ...data,
+        points: data.points.map(({ speed_kmh: _speed, ...item }) => item),
+      },
+      6,
+      1
+    );
+
+    expect(point?.speed_kmh).toBeCloseTo(487.4, 0);
   });
 
   it('returns no telemetry outside the track time range', () => {

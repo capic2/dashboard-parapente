@@ -1,6 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { telemetryTimestampAtVideoTime } from '../../components/flights/details/goproSyncTelemetry';
+import {
+  telemetrySpeedKmhBetween,
+  telemetryTimestampAtVideoTime,
+} from '../../components/flights/details/goproSyncTelemetry';
 
 export interface FlightTelemetryPoint {
   timestamp: number;
@@ -121,7 +124,9 @@ export function interpolateTelemetryAtVideoTime(
     elevation:
       previous.elevation + (next.elevation - previous.elevation) * ratio,
     segment: previous.segment,
-    speed_kmh: interpolateOptional(previous.speed_kmh, next.speed_kmh, ratio),
+    // Match the calibration preview: derive speed from the two GPX samples
+    // when interpolating instead of requiring a recorded speed field.
+    speed_kmh: telemetrySpeedKmhBetween(previous, next),
     vario_ms: interpolateOptional(previous.vario_ms, next.vario_ms, ratio),
     heading_deg: interpolateHeading(
       previous.heading_deg,
