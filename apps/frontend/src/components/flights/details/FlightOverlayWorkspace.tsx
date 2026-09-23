@@ -19,6 +19,20 @@ interface FlightOverlayWorkspaceProps {
 
 const ACTIVE_LAYER_STATUSES = new Set(['queued', 'preparing', 'running']);
 
+async function invalidateOverlaySyncQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  flightId: string
+) {
+  await Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: ['flights', flightId, 'overlay-layer'],
+    }),
+    queryClient.invalidateQueries({
+      queryKey: ['flights', flightId, 'gopro-overlay-preview'],
+    }),
+  ]);
+}
+
 export function FlightOverlayWorkspace({
   flightId,
   initialOffset,
@@ -52,9 +66,7 @@ export function FlightOverlayWorkspace({
     setIsSaving(true);
     try {
       await onSaveOffset(offset);
-      await queryClient.invalidateQueries({
-        queryKey: ['flights', flightId, 'overlay-layer'],
-      });
+      await invalidateOverlaySyncQueries(queryClient, flightId);
     } finally {
       setIsSaving(false);
     }
@@ -64,9 +76,7 @@ export function FlightOverlayWorkspace({
     if (isGenerating || generateLayer.isPending) return;
     await saveOffset();
     await generateLayer.mutateAsync();
-    await queryClient.invalidateQueries({
-      queryKey: ['flights', flightId, 'overlay-layer'],
-    });
+    await invalidateOverlaySyncQueries(queryClient, flightId);
   };
 
   let status = t('flights.overlayLayerMissing');
@@ -128,9 +138,7 @@ export function FlightOverlayWorkspace({
         onOffsetChange={setOffset}
         onOffsetSave={async (nextOffset) => {
           await onSaveOffset(nextOffset);
-          await queryClient.invalidateQueries({
-            queryKey: ['flights', flightId, 'overlay-layer'],
-          });
+          await invalidateOverlaySyncQueries(queryClient, flightId);
         }}
       />
 
