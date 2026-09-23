@@ -97,7 +97,7 @@ describe('FlightTelemetryOverlay', () => {
     expect(widget).not.toHaveClass('shadow-lg');
   });
 
-  it('keeps omitted transparency opaque by default', () => {
+  it('keeps omitted transparency transparent by default', () => {
     render(
       <FlightTelemetryOverlay
         data={telemetry}
@@ -113,6 +113,33 @@ describe('FlightTelemetryOverlay', () => {
             width: 0.2,
             height: 0.2,
             visible: true,
+          },
+        ]}
+      />
+    );
+
+    const widget = screen.getByRole('button');
+    expect(widget).toHaveClass('bg-transparent');
+    expect(widget).not.toHaveClass('backdrop-blur-sm');
+  });
+
+  it('renders an opaque background only when the layout disables transparency', () => {
+    render(
+      <FlightTelemetryOverlay
+        data={telemetry}
+        videoTimeSeconds={0}
+        offsetSeconds={0}
+        layout={[
+          {
+            id: 'opaque-widget',
+            type: 'widget',
+            metric: 'altitude',
+            x: 0,
+            y: 0,
+            width: 0.2,
+            height: 0.2,
+            visible: true,
+            transparent: false,
           },
         ]}
       />
