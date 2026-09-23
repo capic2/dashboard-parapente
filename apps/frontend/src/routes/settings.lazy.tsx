@@ -1,18 +1,13 @@
-import {
-  createLazyFileRoute,
-  Outlet,
-  useMatchRoute,
-} from '@tanstack/react-router';
+import { createLazyFileRoute, Outlet, useMatch } from '@tanstack/react-router';
 import Settings from '../pages/Settings';
 
 function SettingsRoute() {
-  const matchRoute = useMatchRoute();
+  const telemetryLayoutMatch = useMatch({
+    from: '/settings/telemetry-layout',
+    shouldThrow: false,
+  });
 
-  return matchRoute({ to: '/settings/telemetry-layout' }) ? (
-    <Outlet />
-  ) : (
-    <Settings />
-  );
+  return telemetryLayoutMatch ? <Outlet /> : <Settings />;
 }
 
 export const Route = createLazyFileRoute('/settings')({
