@@ -8,6 +8,9 @@ import xml.etree.ElementTree as ET
 DEFAULT_TELEMETRY_LAYOUT_XML = """<telemetry-layout version=\"1\" width=\"1920\" height=\"1080\">
   <widget id=\"top-left\" metric=\"altitude\" x=\"0.02\" y=\"0.02\" width=\"0.16\" height=\"0.10\" visible=\"true\" />
   <widget id=\"top-right\" metric=\"speed\" x=\"0.82\" y=\"0.02\" width=\"0.16\" height=\"0.10\" visible=\"true\" />
+  <widget id=\"heart-rate\" metric=\"heart_rate\" x=\"0.02\" y=\"0.14\" width=\"0.16\" height=\"0.10\" visible=\"true\" />
+  <widget id=\"total-gain\" metric=\"total_gain\" x=\"0.82\" y=\"0.14\" width=\"0.16\" height=\"0.10\" visible=\"true\" />
+  <widget id=\"total-loss\" metric=\"total_loss\" x=\"0.82\" y=\"0.26\" width=\"0.16\" height=\"0.10\" visible=\"true\" />
   <widget id=\"bottom-left\" metric=\"vario\" x=\"0.02\" y=\"0.82\" width=\"0.16\" height=\"0.10\" visible=\"true\" />
   <widget id=\"bottom-right\" metric=\"distance\" x=\"0.82\" y=\"0.82\" width=\"0.16\" height=\"0.10\" visible=\"true\" />
 </telemetry-layout>"""
