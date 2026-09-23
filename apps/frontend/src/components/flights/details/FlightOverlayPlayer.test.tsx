@@ -118,4 +118,24 @@ describe('FlightOverlayPlayer', () => {
 
     expect(overlay.currentTime).toBe(32.5);
   });
+
+  it('uses the provided time mapping for the GPX-generated flight video', () => {
+    render(
+      <FlightOverlayPlayer
+        mode="interactive"
+        cameraUrl="camera.mp4"
+        flightUrl="flight.mp4"
+        cameraLabel="camera"
+        flightLabel="flight"
+        getFlightTime={(cameraTime) => cameraTime - 30.9}
+      />
+    );
+
+    const camera = screen.getByLabelText('camera') as HTMLVideoElement;
+    const flight = screen.getByLabelText('flight') as HTMLVideoElement;
+    camera.currentTime = 42.5;
+    fireEvent.timeUpdate(camera);
+
+    expect(flight.currentTime).toBeCloseTo(11.6, 5);
+  });
 });
