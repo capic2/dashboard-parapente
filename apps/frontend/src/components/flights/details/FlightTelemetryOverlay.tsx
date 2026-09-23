@@ -6,6 +6,8 @@ import {
 } from '../../../hooks/flights/useFlightTelemetry';
 import {
   DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
+  TELEMETRY_CANVAS_HEIGHT,
+  TELEMETRY_CANVAS_WIDTH,
   type TelemetryLayout,
   type FlightTelemetryLayoutItem,
 } from './flightTelemetryLayout';
@@ -100,10 +102,10 @@ export function FlightTelemetryOverlay({
                 key={slot.id}
                 className={`pointer-events-auto absolute flex items-center justify-center rounded-lg border text-white ${slot.transparent === false ? 'bg-slate-950/75 shadow-lg backdrop-blur-sm' : 'bg-transparent'} ${slot.border === true ? 'border-white/25' : 'border-transparent'}`}
                 style={{
-                  left: `${slot.x * 100}%`,
-                  top: `${slot.y * 100}%`,
-                  width: `${slot.width * 100}%`,
-                  height: `${slot.height * 100}%`,
+                  left: `${(slot.x / TELEMETRY_CANVAS_WIDTH) * 100}%`,
+                  top: `${(slot.y / TELEMETRY_CANVAS_HEIGHT) * 100}%`,
+                  width: `${(slot.width / TELEMETRY_CANVAS_WIDTH) * 100}%`,
+                  height: `${(slot.height / TELEMETRY_CANVAS_HEIGHT) * 100}%`,
                 }}
               >
                 <TelemetryLayoutIcon name={slot.icon} className="h-1/2 w-1/2" />
@@ -116,11 +118,11 @@ export function FlightTelemetryOverlay({
                 key={slot.id}
                 className={`pointer-events-auto absolute flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border px-3 py-2 text-left font-semibold text-white ${slot.transparent === false ? 'bg-slate-950/75 shadow-lg backdrop-blur-sm' : 'bg-transparent'} ${slot.border === true ? 'border-white/25' : 'border-transparent'}`}
                 style={{
-                  left: `${slot.x * 100}%`,
-                  top: `${slot.y * 100}%`,
-                  width: `${slot.width * 100}%`,
-                  height: `${slot.height * 100}%`,
-                  fontSize: `${((slot.fontSize ?? 32) / 1920) * 100}cqw`,
+                  left: `${(slot.x / TELEMETRY_CANVAS_WIDTH) * 100}%`,
+                  top: `${(slot.y / TELEMETRY_CANVAS_HEIGHT) * 100}%`,
+                  width: `${(slot.width / TELEMETRY_CANVAS_WIDTH) * 100}%`,
+                  height: `${(slot.height / TELEMETRY_CANVAS_HEIGHT) * 100}%`,
+                  fontSize: `${((slot.fontSize ?? 32) / TELEMETRY_CANVAS_WIDTH) * 100}cqw`,
                   textAlign: slot.textAlign ?? 'left',
                 }}
               >
@@ -161,11 +163,11 @@ export function FlightTelemetryOverlay({
               tabIndex={isInteractive ? 0 : -1}
               className={`pointer-events-auto absolute min-h-0 min-w-0 overflow-hidden ${isInteractive ? 'cursor-pointer' : 'cursor-default'} rounded-lg border px-3 py-2 text-left text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${slot.transparent === false ? 'bg-slate-950/75 shadow-lg backdrop-blur-sm hover:bg-slate-900' : 'bg-transparent'} ${slot.border === true ? 'border-white/25' : 'border-transparent'}`}
               style={{
-                left: `${slot.x * 100}%`,
-                top: `${slot.y * 100}%`,
-                width: `${slot.width * 100}%`,
-                height: `${slot.height * 100}%`,
-                fontSize: `${((slot.fontSize ?? 32) / 1920) * 100}cqw`,
+                left: `${(slot.x / TELEMETRY_CANVAS_WIDTH) * 100}%`,
+                top: `${(slot.y / TELEMETRY_CANVAS_HEIGHT) * 100}%`,
+                width: `${(slot.width / TELEMETRY_CANVAS_WIDTH) * 100}%`,
+                height: `${(slot.height / TELEMETRY_CANVAS_HEIGHT) * 100}%`,
+                fontSize: `${((slot.fontSize ?? 32) / TELEMETRY_CANVAS_WIDTH) * 100}cqw`,
                 textAlign: slot.valueAlign ?? 'left',
               }}
               onPointerDown={() => {
