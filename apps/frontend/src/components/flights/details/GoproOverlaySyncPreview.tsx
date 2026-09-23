@@ -67,6 +67,8 @@ export function calibrationTelemetryTimestampAtVideoTime(
   automaticOffset: number,
   manualOffset: number
 ) {
+  // PROTECTED CALIBRATION SYNC CONTRACT — see the root AGENTS.md. Changes
+  // require explicit user authorization in the current task.
   return telemetryTimestampAtVideoTime(
     gpxStartTimestamp,
     sourceVideoTime,

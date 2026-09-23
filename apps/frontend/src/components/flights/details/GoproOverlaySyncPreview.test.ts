@@ -49,6 +49,8 @@ describe('telemetryTimestampAtVideoTime', () => {
   });
 });
 
+// PROTECTED CALIBRATION SYNC CONTRACT — changes require explicit user
+// authorization and must preserve the rendered calibration behavior.
 describe('calibrationTelemetryTimestampAtVideoTime', () => {
   it('keeps calibration on the GPX timeline and applies both offsets', () => {
     expect(

@@ -68,6 +68,17 @@ This file defines global rules for the entire monorepo.
   endpoint changes, and changes made as a consequence of another overlay
   change.
 
+### Calibration Timeline Contract
+
+- The calibration cards must resolve telemetry from the first coordinate
+  timestamp (`gpx.coordinates[0].timestamp`, falling back to GPX metadata),
+  then apply the combined automatic and manual offsets.
+- Do not replace this with the video start timestamp or with the manual offset
+  alone: that changes the established synchronization behavior.
+- Before changing this formula, its regression tests, or the data source used
+  by the calibration panel, explicitly ask the user for authorization in the
+  current task and wait for that authorization.
+
 ## Local Rules
 
 - Backend: see `apps/backend/AGENTS.md`.
