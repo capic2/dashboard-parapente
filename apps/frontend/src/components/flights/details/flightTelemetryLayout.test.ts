@@ -95,6 +95,7 @@ describe('flight telemetry layout XML', () => {
         type: 'text' as const,
         name: 'Titre',
         content: 'Vol du matin',
+        textAlign: 'right' as const,
         transparent: true,
         border: false,
         x: 0.2,
@@ -376,7 +377,7 @@ describe('flight telemetry layout XML', () => {
 });
 
 describe('flight telemetry layout alignment', () => {
-  it('aligns one selected item against the canvas', () => {
+  it('requires multiple selected items for component alignment', () => {
     const layout = [
       {
         id: 'title',
@@ -390,21 +391,9 @@ describe('flight telemetry layout alignment', () => {
       },
     ];
 
-    expect(
-      alignTelemetryLayoutItems(layout, ['title'], 'left')[0]
-    ).toMatchObject({
-      x: 0,
-      y: 0.3,
-    });
-    expect(
-      alignTelemetryLayoutItems(layout, ['title'], 'center')[0]
-    ).toMatchObject({ x: 0.35, y: 0.3 });
-    expect(
-      alignTelemetryLayoutItems(layout, ['title'], 'middle')[0]
-    ).toMatchObject({ x: 0.2, y: 0.46 });
-    expect(
-      alignTelemetryLayoutItems(layout, ['title'], 'bottom')[0]
-    ).toMatchObject({ x: 0.2, y: 0.92 });
+    expect(alignTelemetryLayoutItems(layout, ['title'], 'left')).toEqual(
+      layout
+    );
   });
 
   it('keeps same-row and same-column actions for multi-selection only', () => {
@@ -435,8 +424,8 @@ describe('flight telemetry layout alignment', () => {
         content: 'Premier',
         x: 0.1,
         y: 0.2,
-        width: 0.2,
-        height: 0.1,
+        width: 0.1,
+        height: 0.05,
         visible: true,
       },
       {
@@ -465,5 +454,40 @@ describe('flight telemetry layout alignment', () => {
         'column'
       ).map((item) => item.x)
     ).toEqual([0.6, 0.6]);
+    expect(
+      alignTelemetryLayoutItems(
+        layout,
+        ['selected-first', 'first-in-layout'],
+        'right'
+      ).map((item) => Number(item.x.toFixed(3)))
+    ).toEqual([0.7, 0.6]);
+    expect(
+      alignTelemetryLayoutItems(
+        layout,
+        ['selected-first', 'first-in-layout'],
+        'center'
+      ).map((item) => Number(item.x.toFixed(3)))
+    ).toEqual([0.65, 0.6]);
+    expect(
+      alignTelemetryLayoutItems(
+        layout,
+        ['selected-first', 'first-in-layout'],
+        'top'
+      ).map((item) => item.y)
+    ).toEqual([0.7, 0.7]);
+    expect(
+      alignTelemetryLayoutItems(
+        layout,
+        ['selected-first', 'first-in-layout'],
+        'bottom'
+      ).map((item) => Number(item.y.toFixed(3)))
+    ).toEqual([0.75, 0.7]);
+    expect(
+      alignTelemetryLayoutItems(
+        layout,
+        ['selected-first', 'first-in-layout'],
+        'middle'
+      ).map((item) => Number(item.y.toFixed(3)))
+    ).toEqual([0.725, 0.7]);
   });
 });
