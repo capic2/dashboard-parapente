@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { CircleAlert, Edit3, Wand2 } from 'lucide-react';
@@ -13,7 +13,10 @@ import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
 import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 import { FlightTelemetryOverlay } from './FlightTelemetryOverlay';
-import type { FlightTelemetryPipLayout } from './flightTelemetryLayout';
+import {
+  ensureInteractiveDynamicTelemetryWidgets,
+  type FlightTelemetryPipLayout,
+} from './flightTelemetryLayout';
 import { sourceTimeAtPreviewTime } from './GoproOverlaySyncPreview';
 
 interface FlightTelemetryInteractivePreviewProps {
@@ -32,6 +35,13 @@ export function FlightTelemetryInteractivePreview({
   const overlayPreview = useGoproOverlayPreview(flightId, true);
   const telemetry = useFlightTelemetry(flightId, true);
   const layout = useTelemetryLayout(flightId);
+  const interactiveLayout = useMemo(
+    () =>
+      layout.data?.layout
+        ? ensureInteractiveDynamicTelemetryWidgets(layout.data.layout)
+        : undefined,
+    [layout.data?.layout]
+  );
   const [cameraTime, setCameraTime] = useState(0);
   const isEnrichmentPending =
     telemetry.data?.enrichment_status === 'pending' ||
@@ -140,7 +150,7 @@ export function FlightTelemetryInteractivePreview({
                 }
                 cameraLabel={t('flights.goproOverlayCameraPreview')}
                 flightLabel={t('flights.goproOverlayFlightVideo')}
-                pipLayout={layout.data?.layout.find(
+                pipLayout={interactiveLayout?.find(
                   (item): item is FlightTelemetryPipLayout =>
                     item.type === 'pip'
                 )}
@@ -155,7 +165,7 @@ export function FlightTelemetryInteractivePreview({
                     videoTimeSeconds={cameraTime}
                     offsetSeconds={calibrationOffsetSeconds}
                     timelineStartTimestamp={telemetryStartTimestamp}
-                    layout={layout.data?.layout}
+                    layout={interactiveLayout}
                   />
                 }
               />

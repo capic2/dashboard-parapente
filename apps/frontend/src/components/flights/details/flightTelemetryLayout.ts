@@ -204,6 +204,34 @@ export const DEFAULT_FLIGHT_TELEMETRY_LAYOUT = [
   },
 ] satisfies readonly FlightTelemetryWidgetLayout[];
 
+/**
+ * Older saved layouts may contain only aggregate widgets. Keep those custom
+ * widgets, but make sure the interactive preview still exposes the core
+ * time-varying telemetry fields.
+ */
+export function ensureInteractiveDynamicTelemetryWidgets(
+  layout: readonly FlightTelemetryLayoutItem[]
+): TelemetryLayout {
+  const visibleMetrics = new Set(
+    layout
+      .filter(
+        (item): item is FlightTelemetryWidgetLayout =>
+          item.type === 'widget' && item.visible
+      )
+      .map((item) => item.metric)
+  );
+  const missingWidgets = DEFAULT_FLIGHT_TELEMETRY_LAYOUT.filter(
+    (widget) => !visibleMetrics.has(widget.metric)
+  ).map((widget) => ({
+    ...widget,
+    id: `interactive-${widget.id}`,
+  }));
+  return withBackground(
+    [...layout, ...missingWidgets],
+    (layout as TelemetryLayout).backgroundImage
+  );
+}
+
 const ICONS: TelemetryIconName[] = [
   'mountain',
   'wind',
