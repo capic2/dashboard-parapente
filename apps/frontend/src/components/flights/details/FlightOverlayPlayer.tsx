@@ -76,7 +76,7 @@ export function FlightOverlayPlayer({
   const flightRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
-  const syncMediaRef = useRef<(() => void) | null>(null);
+  const syncMediaRef = useRef<((notify?: boolean) => void) | null>(null);
   const [layout, setLayout] = useState<FlightOverlayLayout>('camera-main');
   const [cameraCurrentTime, setCameraCurrentTime] = useState(0);
   const [cameraDuration, setCameraDuration] = useState(0);
@@ -116,7 +116,7 @@ export function FlightOverlayPlayer({
     }
   };
 
-  syncMediaRef.current = () => syncMedia(false);
+  syncMediaRef.current = (notify = false) => syncMedia(notify);
 
   useEffect(() => {
     // Calibration changes the offset without changing the camera clock. Apply
@@ -140,7 +140,7 @@ export function FlightOverlayPlayer({
 
     let animationFrame = 0;
     const synchronizePlayback = () => {
-      syncMediaRef.current?.();
+      syncMediaRef.current?.(true);
       animationFrame = requestAnimationFrame(synchronizePlayback);
     };
 
