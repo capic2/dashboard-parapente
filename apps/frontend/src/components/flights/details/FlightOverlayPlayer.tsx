@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Maximize2, Minimize2, Pause, Play, Repeat2 } from 'lucide-react';
+import { Maximize2, Minimize2, Pause, Play } from 'lucide-react';
 import type { FlightTelemetryPipLayout } from './flightTelemetryLayout';
 
 export type FlightOverlayLayout =
@@ -303,23 +303,6 @@ export function FlightOverlayPlayer({
           >
             <track kind="captions" />
           </video>
-        )}
-        {isInteractive && hasFlightVideo && layout !== 'side-by-side' && (
-          <button
-            type="button"
-            onClick={() =>
-              setLayout((current) =>
-                current === 'camera-main' ? 'flight-main' : 'camera-main'
-              )
-            }
-            className="absolute right-3 top-3 z-30 flex cursor-pointer items-center gap-1.5 rounded-md bg-slate-950/80 px-2.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
-            aria-label={t('flights.goproOverlaySwapVideos', {
-              name: cameraIsMain ? flightLabel : cameraLabel,
-            })}
-          >
-            <Repeat2 className="h-3.5 w-3.5" aria-hidden="true" />
-            {cameraIsMain ? flightLabel : cameraLabel}
-          </button>
         )}
         {overlayContent && (
           <div
