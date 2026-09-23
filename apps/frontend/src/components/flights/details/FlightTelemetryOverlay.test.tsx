@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { FlightTelemetryData } from '../../../hooks/flights/useFlightTelemetry';
 import type { FlightTelemetryLayoutItem } from './flightTelemetryLayout';
 import { FlightTelemetryOverlay } from './FlightTelemetryOverlay';
+import { getTelemetryMetricValue } from './telemetryMetrics';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -108,6 +109,13 @@ describe('FlightTelemetryOverlay', () => {
     expect(
       screen.queryByText('flights.telemetryAltitude')
     ).not.toBeInTheDocument();
+  });
+
+  it('keeps aggregate metrics available before a point is interpolated', () => {
+    expect(getTelemetryMetricValue(null, telemetry, 'total_loss')).toEqual([
+      0,
+      'm',
+    ]);
   });
 
   it('does not render editor group decorations', () => {

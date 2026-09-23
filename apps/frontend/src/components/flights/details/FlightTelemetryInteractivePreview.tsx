@@ -54,6 +54,14 @@ export function FlightTelemetryInteractivePreview({
   const timelineStartTimestamp = overlayPreview.data?.video.start_time
     ? parseApiUtcDate(overlayPreview.data.video.start_time).getTime()
     : undefined;
+  const mergedGpxStartTimestamp = telemetry.data?.start_time
+    ? parseApiUtcDate(telemetry.data.start_time).getTime()
+    : undefined;
+  const mergedGpxStartOffsetSeconds =
+    mergedGpxStartTimestamp !== undefined &&
+    timelineStartTimestamp !== undefined
+      ? (mergedGpxStartTimestamp - timelineStartTimestamp) / 1000
+      : 0;
   const previewSegments = overlayPreview.data?.video.preview_segments ?? [];
 
   return (
@@ -119,9 +127,11 @@ export function FlightTelemetryInteractivePreview({
             overlayContent={
               <FlightTelemetryOverlay
                 data={telemetry.data}
-                videoTimeSeconds={cameraTime}
+                videoTimeSeconds={cameraTime - mergedGpxStartOffsetSeconds}
                 offsetSeconds={overlayOffsetSeconds}
-                timelineStartTimestamp={timelineStartTimestamp}
+                timelineStartTimestamp={
+                  mergedGpxStartTimestamp ?? timelineStartTimestamp
+                }
                 layout={layout.data?.layout}
               />
             }

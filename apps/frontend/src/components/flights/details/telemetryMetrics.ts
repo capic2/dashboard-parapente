@@ -64,6 +64,18 @@ export const METRIC_LABELS: Record<MetricKey, string> = {
 
 type DisplayValue = number | string | null | undefined;
 
+const POINT_INDEPENDENT_METRICS = new Set<MetricKey>([
+  'altitude_min',
+  'altitude_max',
+  'start_altitude',
+  'vario_min',
+  'vario_max',
+  'heart_rate_min',
+  'heart_rate_max',
+  'total_gain',
+  'total_loss',
+]);
+
 function numericValues(
   data: FlightTelemetryData | undefined,
   read: (point: FlightTelemetryPoint) => number | null | undefined
@@ -93,7 +105,7 @@ export function getTelemetryMetricValue(
   data: FlightTelemetryData | undefined,
   metric: MetricKey
 ): [DisplayValue, string] | null {
-  if (!point && metric !== 'altitude_min' && metric !== 'altitude_max') {
+  if (!point && !POINT_INDEPENDENT_METRICS.has(metric)) {
     return null;
   }
   const altitudes = numericValues(data, (item) => item.elevation);
