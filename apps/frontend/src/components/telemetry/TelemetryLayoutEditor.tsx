@@ -54,11 +54,13 @@ import { parseTelemetryGpxFile } from '../flights/details/telemetryGpxPreview';
 import {
   parseTelemetryLayoutXml,
   serializeTelemetryLayoutXml,
+  alignTelemetryLayoutItems,
   getTelemetryLayoutGroupBounds,
   type FlightTelemetryIconLayout,
   type FlightTelemetryLayoutItem,
   type FlightTelemetryPipLayout,
   type FlightTelemetryTextLayout,
+  type TelemetryAlignmentDirection,
   type TelemetryWidgetVariant,
 } from '../flights/details/flightTelemetryLayout';
 import { TelemetryLayoutIcon } from './TelemetryLayoutIcon';
@@ -817,56 +819,9 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     toast.success(t('telemetryLayout.pasteSuccess'));
   }, [copiedItems, layout, setLayout, t, toast]);
 
-  const alignSelected = (
-    direction:
-      | 'left'
-      | 'center'
-      | 'right'
-      | 'top'
-      | 'middle'
-      | 'bottom'
-      | 'row'
-      | 'column'
-  ) => {
-    const selectedItems = layout.filter((item) =>
-      selectedIds.includes(item.id)
-    );
-    if (selectedItems.length < 2) return;
-    const left = Math.min(...selectedItems.map((item) => item.x));
-    const top = Math.min(...selectedItems.map((item) => item.y));
-    const right = Math.max(...selectedItems.map((item) => item.x + item.width));
-    const bottom = Math.max(
-      ...selectedItems.map((item) => item.y + item.height)
-    );
-    const centerX = (left + right) / 2;
-    const centerY = (top + bottom) / 2;
-    const referenceX = selectedItems[0].x;
-    const referenceY = selectedItems[0].y;
-
+  const alignSelected = (direction: TelemetryAlignmentDirection) => {
     setLayout((current) =>
-      current.map((item) => {
-        if (!selectedIds.includes(item.id)) return item;
-        if (direction === 'row') return { ...item, y: referenceY };
-        if (direction === 'column') return { ...item, x: referenceX };
-        if (direction === 'left') return { ...item, x: left };
-        if (direction === 'center') {
-          return {
-            ...item,
-            x: clamp(centerX - item.width / 2, 0, 1 - item.width),
-          };
-        }
-        if (direction === 'right') {
-          return { ...item, x: clamp(right - item.width, 0, 1 - item.width) };
-        }
-        if (direction === 'top') return { ...item, y: top };
-        if (direction === 'middle') {
-          return {
-            ...item,
-            y: clamp(centerY - item.height / 2, 0, 1 - item.height),
-          };
-        }
-        return { ...item, y: clamp(bottom - item.height, 0, 1 - item.height) };
-      })
+      alignTelemetryLayoutItems(current, selectedIds, direction)
     );
   };
 
@@ -1649,7 +1604,11 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                 variant="ghost"
                 size="sm"
                 onPress={() => alignSelected(direction)}
-                isDisabled={selectedIds.length < 2}
+                isDisabled={
+                  selectedIds.length === 0 ||
+                  ((direction === 'row' || direction === 'column') &&
+                    selectedIds.length < 2)
+                }
                 aria-label={t(`telemetryLayout.${label}`)}
                 title={t(`telemetryLayout.${label}`)}
               >

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
+  alignTelemetryLayoutItems,
   parseTelemetryLayoutXml,
   serializeTelemetryLayoutXml,
 } from './flightTelemetryLayout';
@@ -371,5 +372,98 @@ describe('flight telemetry layout XML', () => {
     expect(getTelemetryMetricValue(data.points[3], data, 'total_loss')).toEqual(
       [30, 'm']
     );
+  });
+});
+
+describe('flight telemetry layout alignment', () => {
+  it('aligns one selected item against the canvas', () => {
+    const layout = [
+      {
+        id: 'title',
+        type: 'text' as const,
+        content: 'Vol du matin',
+        x: 0.2,
+        y: 0.3,
+        width: 0.3,
+        height: 0.08,
+        visible: true,
+      },
+    ];
+
+    expect(
+      alignTelemetryLayoutItems(layout, ['title'], 'left')[0]
+    ).toMatchObject({
+      x: 0,
+      y: 0.3,
+    });
+    expect(
+      alignTelemetryLayoutItems(layout, ['title'], 'center')[0]
+    ).toMatchObject({ x: 0.35, y: 0.3 });
+    expect(
+      alignTelemetryLayoutItems(layout, ['title'], 'middle')[0]
+    ).toMatchObject({ x: 0.2, y: 0.46 });
+    expect(
+      alignTelemetryLayoutItems(layout, ['title'], 'bottom')[0]
+    ).toMatchObject({ x: 0.2, y: 0.92 });
+  });
+
+  it('keeps same-row and same-column actions for multi-selection only', () => {
+    const layout = [
+      {
+        id: 'title',
+        type: 'text' as const,
+        content: 'Vol du matin',
+        x: 0.2,
+        y: 0.3,
+        width: 0.3,
+        height: 0.08,
+        visible: true,
+      },
+    ];
+
+    expect(alignTelemetryLayoutItems(layout, ['title'], 'row')).toEqual(layout);
+    expect(alignTelemetryLayoutItems(layout, ['title'], 'column')).toEqual(
+      layout
+    );
+  });
+
+  it('uses the first selected item as the row and column reference', () => {
+    const layout = [
+      {
+        id: 'first-in-layout',
+        type: 'text' as const,
+        content: 'Premier',
+        x: 0.1,
+        y: 0.2,
+        width: 0.2,
+        height: 0.1,
+        visible: true,
+      },
+      {
+        id: 'selected-first',
+        type: 'text' as const,
+        content: 'Sélectionné en premier',
+        x: 0.6,
+        y: 0.7,
+        width: 0.2,
+        height: 0.1,
+        visible: true,
+      },
+    ];
+
+    expect(
+      alignTelemetryLayoutItems(
+        layout,
+        ['selected-first', 'first-in-layout'],
+        'row'
+      ).map((item) => item.y)
+    ).toEqual([0.7, 0.7]);
+    expect(
+      alignTelemetryLayoutItems(
+        layout,
+        ['selected-first', 'first-in-layout'],
+        'column'
+      ).map((item) => item.x)
+    ).toEqual([0.6, 0.6]);
   });
 });
