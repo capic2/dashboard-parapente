@@ -87,19 +87,10 @@ export function interpolateTelemetryAtVideoTime(
   );
   const firstPointTimestamp = points[0].timestamp;
   const lastPointTimestamp = points[points.length - 1].timestamp;
-  const isWithinTrack = (timestamp: number) =>
-    timestamp >= firstPointTimestamp && timestamp <= lastPointTimestamp;
-  const relativeTargetTimestamp = telemetryTimestampAtVideoTime(
-    firstTimestamp,
-    videoTimeSeconds,
-    offsetSeconds
-  );
-  const resolvedTargetTimestamp = isWithinTrack(targetTimestamp)
-    ? targetTimestamp
-    : isWithinTrack(relativeTargetTimestamp)
-      ? relativeTargetTimestamp
-      : null;
-  if (resolvedTargetTimestamp === null) {
+  if (
+    targetTimestamp < firstPointTimestamp ||
+    targetTimestamp > lastPointTimestamp
+  ) {
     return null;
   }
 
@@ -107,7 +98,7 @@ export function interpolateTelemetryAtVideoTime(
   let high = points.length - 1;
   while (low < high) {
     const middle = Math.floor((low + high) / 2);
-    if (points[middle].timestamp < resolvedTargetTimestamp) low = middle + 1;
+    if (points[middle].timestamp < targetTimestamp) low = middle + 1;
     else high = middle;
   }
 
@@ -117,16 +108,14 @@ export function interpolateTelemetryAtVideoTime(
     return next ?? null;
   }
   if (previous.segment !== next.segment) {
-    return resolvedTargetTimestamp === next.timestamp ? next : null;
+    return targetTimestamp === next.timestamp ? next : null;
   }
 
   const duration = next.timestamp - previous.timestamp;
   const ratio =
-    duration > 0
-      ? (resolvedTargetTimestamp - previous.timestamp) / duration
-      : 0;
+    duration > 0 ? (targetTimestamp - previous.timestamp) / duration : 0;
   return {
-    timestamp: resolvedTargetTimestamp,
+    timestamp: targetTimestamp,
     lat: previous.lat + (next.lat - previous.lat) * ratio,
     lon: previous.lon + (next.lon - previous.lon) * ratio,
     elevation:

@@ -49,7 +49,7 @@ describe('interpolateTelemetryAtVideoTime', () => {
     expect(interpolateTelemetryAtVideoTime(data, 12, 0)).toBeNull();
   });
 
-  it('falls back to the GPX-relative timeline when video metadata is offset', () => {
+  it('does not fall back to a relative timeline when the calibrated origin is out of range', () => {
     const point = interpolateTelemetryAtVideoTime(
       data,
       6,
@@ -57,8 +57,7 @@ describe('interpolateTelemetryAtVideoTime', () => {
       1_700_000_000_000
     );
 
-    expect(point?.elevation).toBe(1050);
-    expect(point?.speed_kmh).toBe(25);
+    expect(point).toBeNull();
   });
 
   it('does not interpolate across GPX segments', () => {
