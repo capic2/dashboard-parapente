@@ -38,7 +38,16 @@ describe('flight telemetry layout XML', () => {
     const result = ensureInteractiveDynamicTelemetryWidgets(layout);
 
     expect(result.map((item) => item.type === 'widget' && item.metric)).toEqual(
-      ['heart_rate_min', 'speed', 'altitude', 'vario', 'distance']
+      [
+        'heart_rate_min',
+        'speed',
+        'altitude',
+        'vario',
+        'distance',
+        'heart_rate',
+        'total_gain',
+        'total_loss',
+      ]
     );
     expect(result.find((item) => item.id === 'speed')).toEqual(layout[1]);
   });
