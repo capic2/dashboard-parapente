@@ -83,7 +83,6 @@ interface FlightYoutubeOverlayPlayerProps {
   flightLabel: string;
   onTimeChange?: (time: number) => void;
   getOverlayTime?: (youtubeTime: number) => number;
-  syncOffsetSeconds?: number;
 }
 
 const YOUTUBE_PLAYING = 1;
@@ -97,7 +96,6 @@ export function FlightYoutubeOverlayPlayer({
   flightLabel,
   onTimeChange,
   getOverlayTime,
-  syncOffsetSeconds = 0,
 }: FlightYoutubeOverlayPlayerProps) {
   const { t } = useTranslation();
   const youtubeContainerRef = useRef<HTMLDivElement>(null);
@@ -145,13 +143,6 @@ export function FlightYoutubeOverlayPlayer({
       onTimeChangeRef.current?.(youtubeTime);
     }
   }, []);
-
-  useEffect(() => {
-    // The YouTube iframe remains paused while the saved GPX offset changes.
-    // Reapply the mapping immediately so the transparent telemetry layer does
-    // not keep its previous timestamp until the next playback tick.
-    syncMedia(false);
-  }, [syncMedia, syncOffsetSeconds]);
 
   const playSecondaryMedia = useCallback(() => {
     void flightRef.current?.play().catch(() => undefined);
