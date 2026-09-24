@@ -295,6 +295,14 @@ vi.mock('../../../hooks/flights/useHighlightVideos', () => ({
 
 vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
   useYoutubeUpload: () => ({ data: youtubeUploadMock.current }),
+  useStartYoutubeOverlayExport: () => ({
+    isPending: false,
+    isError: false,
+    mutateAsync: vi.fn().mockResolvedValue({
+      job_id: 'export-job-1',
+      status: 'queued',
+    }),
+  }),
   useYoutubeVideoAssociations: () => ({
     data: youtubeAssociationsMock.current,
   }),

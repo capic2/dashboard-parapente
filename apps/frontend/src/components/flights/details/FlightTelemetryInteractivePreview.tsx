@@ -6,6 +6,7 @@ import { CircleAlert, Edit3, Wand2 } from 'lucide-react';
 import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { useFlightTelemetry } from '../../../hooks/flights/useFlightTelemetry';
 import { useTelemetryLayout } from '../../../hooks/flights/useTelemetryLayout';
+import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
 import { getApiUrlWithSearchParams } from '../../../lib/api';
 import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
@@ -42,7 +43,12 @@ export function FlightTelemetryInteractivePreview({
   const layout = useTelemetryLayout(flightId);
   const [cameraTime, setCameraTime] = useState(0);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [youtubeExportJobId, setYoutubeExportJobId] = useState<string | null>(
+    null
+  );
   const startExport = useStartYoutubeOverlayExport(flightId);
+  const { status: youtubeExportStatus } =
+    useVideoExportStatus(youtubeExportJobId);
   const isEnrichmentPending =
     telemetry.data?.enrichment_status === 'pending' ||
     overlayPreview.data?.gpx?.enrichment_status === 'pending';
@@ -96,6 +102,27 @@ export function FlightTelemetryInteractivePreview({
       }
     : undefined;
   const youtubeUrl = youtubeUrls.find((url) => getYoutubeVideoId(url));
+  const youtubeExportStatusValue =
+    youtubeExportStatus?.internal_status ?? youtubeExportStatus?.status;
+  const youtubeExportProgress = Math.max(
+    0,
+    Math.min(100, youtubeExportStatus?.progress ?? 0)
+  );
+  let youtubeExportStatusLabel =
+    youtubeExportStatus?.message ?? t('flights.youtubeOverlayExportInProgress');
+  if (youtubeExportStatusValue === 'completed') {
+    youtubeExportStatusLabel = t('flights.youtubeOverlayExportCompleted');
+  } else if (youtubeExportStatusValue === 'failed') {
+    youtubeExportStatusLabel = t('flights.youtubeOverlayExportFailed');
+  } else if (youtubeExportStatusValue === 'cancelled') {
+    youtubeExportStatusLabel = t('flights.youtubeOverlayExportCancelled');
+  }
+  let youtubeExportProgressClass = 'bg-cyan-500';
+  if (youtubeExportStatusValue === 'failed') {
+    youtubeExportProgressClass = 'bg-red-500';
+  } else if (youtubeExportStatusValue === 'completed') {
+    youtubeExportProgressClass = 'bg-emerald-500';
+  }
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
       <div className="flex items-start gap-3 p-4 sm:p-5">
@@ -150,10 +177,11 @@ export function FlightTelemetryInteractivePreview({
             <Button
               isDisabled={startExport.isPending}
               onPress={async () => {
-                await startExport.mutateAsync({
+                const { job_id } = await startExport.mutateAsync({
                   youtube_url: youtubeUrl,
                   rights_confirmed: true,
                 });
+                setYoutubeExportJobId(job_id);
                 setIsExportDialogOpen(false);
               }}
             >
@@ -170,6 +198,32 @@ export function FlightTelemetryInteractivePreview({
               {t('flights.youtubeOverlayExportError')}
             </p>
           )}
+        </div>
+      )}
+      {youtubeExportJobId && (
+        <div
+          className="border-t border-cyan-200 bg-cyan-50/70 p-4 dark:border-cyan-900 dark:bg-cyan-950/20 sm:px-5"
+          aria-live="polite"
+        >
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="font-semibold text-slate-900 dark:text-white">
+              {t('flights.youtubeOverlayExportProgress')}
+            </span>
+            <span className="text-slate-700 dark:text-slate-200">
+              {youtubeExportStatusValue === 'completed'
+                ? t('flights.youtubeOverlayExportCompleted')
+                : `${youtubeExportProgress}%`}
+            </span>
+          </div>
+          <progress
+            className={`mt-2 block h-2 w-full overflow-hidden rounded-full bg-cyan-100 dark:bg-cyan-950 ${youtubeExportProgressClass}`}
+            aria-label={t('flights.youtubeOverlayExportProgress')}
+            value={youtubeExportProgress}
+            max={100}
+          />
+          <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">
+            {youtubeExportStatus?.error ?? youtubeExportStatusLabel}
+          </p>
         </div>
       )}
       <div className="border-t border-slate-200 p-4 dark:border-slate-700 sm:p-5">
