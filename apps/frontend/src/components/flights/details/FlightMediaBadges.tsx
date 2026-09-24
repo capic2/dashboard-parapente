@@ -148,8 +148,8 @@ export function FlightMediaBadges({
             </Button>
           </div>
         </div>
-        <div className="order-3 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
-          {hasGoproCameraVideo ? (
+        {hasGoproCameraVideo && (
+          <div className="order-3 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
             <FlightMediaThumbnail
               path={`/flights/${flightId}/gopro-camera/thumbnail`}
               videoPath={`/flights/${flightId}/gopro-camera`}
@@ -158,52 +158,40 @@ export function FlightMediaBadges({
                 'Miniature de la vidéo caméra'
               )}
             />
-          ) : (
-            <div className="flex aspect-video items-center justify-center bg-slate-100 p-6 text-center dark:bg-slate-800">
-              <div>
-                <Camera
-                  className="mx-auto h-8 w-8 text-slate-400"
-                  aria-hidden="true"
-                />
-                <p className="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  {t('flights.cameraUnavailable', 'Aucun fichier camera.mp4')}
-                </p>
-              </div>
+            <div className="flex items-center gap-3 p-3">
+              <Camera className="h-5 w-5 text-slate-500" aria-hidden="true" />
+              <span className="font-semibold text-slate-950 dark:text-white">
+                {t('flights.cameraBadge')}
+              </span>
             </div>
-          )}
-          <div className="flex items-center gap-3 p-3">
-            <Camera className="h-5 w-5 text-slate-500" aria-hidden="true" />
-            <span className="font-semibold text-slate-950 dark:text-white">
-              {t('flights.cameraBadge')}
-            </span>
+            <div className="px-3 pb-3">
+              <input
+                ref={cameraFileInputRef}
+                type="file"
+                accept="video/mp4,video/quicktime,.mp4,.mov,.m4v"
+                className="sr-only"
+                onChange={onUploadCameraVideo}
+                disabled={isUploadingCameraVideo}
+                aria-label={t('flights.goproOverlayCameraVideoUploadLabel')}
+              />
+              <Button
+                variant="outline"
+                className="min-h-10 w-full rounded-lg px-3 py-2 text-sm"
+                onPress={() => cameraFileInputRef.current?.click()}
+                isDisabled={isUploadingCameraVideo}
+              >
+                <FileUp className="h-4 w-4" aria-hidden="true" />
+                {isUploadingCameraVideo
+                  ? t('flights.goproOverlayCameraVideoUploading')
+                  : t(
+                      hasGoproCameraVideo
+                        ? 'flights.goproOverlayCameraVideoReplace'
+                        : 'flights.goproOverlayCameraVideoUpload'
+                    )}
+              </Button>
+            </div>
           </div>
-          <div className="px-3 pb-3">
-            <input
-              ref={cameraFileInputRef}
-              type="file"
-              accept="video/mp4,video/quicktime,.mp4,.mov,.m4v"
-              className="sr-only"
-              onChange={onUploadCameraVideo}
-              disabled={isUploadingCameraVideo}
-              aria-label={t('flights.goproOverlayCameraVideoUploadLabel')}
-            />
-            <Button
-              variant="outline"
-              className="min-h-10 w-full rounded-lg px-3 py-2 text-sm"
-              onPress={() => cameraFileInputRef.current?.click()}
-              isDisabled={isUploadingCameraVideo}
-            >
-              <FileUp className="h-4 w-4" aria-hidden="true" />
-              {isUploadingCameraVideo
-                ? t('flights.goproOverlayCameraVideoUploading')
-                : t(
-                    hasGoproCameraVideo
-                      ? 'flights.goproOverlayCameraVideoReplace'
-                      : 'flights.goproOverlayCameraVideoUpload'
-                  )}
-            </Button>
-          </div>
-        </div>
+        )}
         <div className="order-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
           {hasVideo && (
             <FlightMediaThumbnail
@@ -299,43 +287,29 @@ export function FlightMediaBadges({
             </div>
           </div>
         </div>
-        <div className="order-4 overflow-hidden rounded-xl border border-violet-200 bg-white shadow-sm dark:border-violet-800 dark:bg-slate-900/60">
-          {hasPanoVideo ? (
+        {hasPanoVideo && (
+          <div className="order-4 overflow-hidden rounded-xl border border-violet-200 bg-white shadow-sm dark:border-violet-800 dark:bg-slate-900/60">
             <FlightMediaThumbnail
               path={`/flights/${flightId}/pano/thumbnail`}
               videoPath={`/flights/${flightId}/pano`}
               alt={t('flights.panoThumbnailAlt')}
             />
-          ) : (
-            <div className="flex aspect-video items-center justify-center bg-violet-50 p-6 text-center dark:bg-violet-950/20">
-              <div>
-                <Orbit
-                  className="mx-auto h-8 w-8 text-violet-500"
-                  aria-hidden="true"
-                />
-                <p className="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  {t('flights.panoUnavailable', 'Aucun fichier pano.mp4')}
-                </p>
+            <div className="p-3">
+              <div className="flex items-center gap-3">
+                <Orbit className="h-5 w-5 text-violet-600" aria-hidden="true" />
+                <span className="font-semibold text-slate-950 dark:text-white">
+                  {t('flights.panoBadge')}
+                </span>
               </div>
-            </div>
-          )}
-          <div className="p-3">
-            <div className="flex items-center gap-3">
-              <Orbit className="h-5 w-5 text-violet-600" aria-hidden="true" />
-              <span className="font-semibold text-slate-950 dark:text-white">
-                {t('flights.panoBadge')}
-              </span>
-            </div>
-            {hasPanoVideo && (
               <div className="mt-3">
                 <FlightYoutubeUploadControls
                   flight={flight}
                   source={{ source_type: 'pano' }}
                 />
               </div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
         {showPersistedOverlayBadge && (
           <div className="order-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
             <FlightMediaThumbnail
