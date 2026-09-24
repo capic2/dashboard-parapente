@@ -1313,6 +1313,8 @@
     "goproOverlayCameraVideoUploading": "Envoi de la vidéo caméra…",
     "goproOverlayCameraVideoUploaded": "Vidéo caméra enregistrée",
     "goproOverlayCameraVideoUploadError": "Impossible d'envoyer la vidéo caméra",
+    "goproOverlayCameraVideoUpload": "Ajouter la vidéo caméra",
+    "goproOverlayCameraVideoReplace": "Remplacer la vidéo caméra",
     "goproOverlayGpxFile": "Chemin GPX/FIT optionnel",
     "goproOverlayGpxFallback": "Si aucun chemin n'est renseigné, le GPX du vol sera utilisé.",
     "goproOverlayOsvVideo": "Chemin vidéo PIP optionnel",
