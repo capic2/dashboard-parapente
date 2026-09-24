@@ -18,11 +18,14 @@ from youtube_upload import decode_oauth_state, encrypt_secret, playlist_title_fo
 API_PREFIX = "/api"
 
 
-def test_playlist_title_includes_flight_identity() -> None:
+def test_playlist_title_uses_daily_sequence_and_date(db_session: Session) -> None:
     first = Flight(id="flight-a", name="Annecy", flight_date=date(2026, 9, 24))
     second = Flight(id="flight-b", name="Annecy", flight_date=date(2026, 9, 24))
+    db_session.add_all([first, second])
+    db_session.flush()
 
-    assert playlist_title_for_flight(first) != playlist_title_for_flight(second)
+    assert playlist_title_for_flight(db_session, first) == "Parapente - Vol 1 du 24/09/2026"
+    assert playlist_title_for_flight(db_session, second) == "Parapente - Vol 2 du 24/09/2026"
 
 
 def _configure_youtube(monkeypatch) -> None:
