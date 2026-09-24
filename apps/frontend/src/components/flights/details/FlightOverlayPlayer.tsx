@@ -12,6 +12,11 @@ interface YoutubePlayer {
   pauseVideo: () => void;
   playVideo: () => void;
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
+  setOption: (
+    module: 'captions',
+    option: 'track',
+    value: Record<string, never>
+  ) => void;
 }
 
 interface YoutubeApi {
@@ -257,6 +262,9 @@ export function FlightOverlayPlayer({
         },
         events: {
           onReady: () => {
+            // cc_load_policy follows the viewer's preference. Passing an
+            // empty caption track clears that preference for this player.
+            youtubeRef.current?.setOption('captions', 'track', {});
             const duration = youtubeRef.current?.getDuration() ?? 0;
             setCameraDuration(duration);
             setYoutubeReady(true);
@@ -264,6 +272,9 @@ export function FlightOverlayPlayer({
               youtubeRef.current?.seekTo(seekRequestRef.current.time, true);
             }
             syncMediaRef.current?.(true);
+          },
+          onApiChange: () => {
+            youtubeRef.current?.setOption('captions', 'track', {});
           },
           onStateChange: ({ data }: { data: number }) => {
             const duration = youtubeRef.current?.getDuration() ?? 0;
