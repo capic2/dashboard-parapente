@@ -7,7 +7,10 @@ import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { useFlightTelemetry } from '../../../hooks/flights/useFlightTelemetry';
 import { useTelemetryLayout } from '../../../hooks/flights/useTelemetryLayout';
 import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
-import { getApiUrlWithSearchParams } from '../../../lib/api';
+import {
+  getApiErrorMessage,
+  getApiUrlWithSearchParams,
+} from '../../../lib/api';
 import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
 import { FlightOverlayPlayer } from './FlightOverlayPlayer';
@@ -43,6 +46,9 @@ export function FlightTelemetryInteractivePreview({
   const layout = useTelemetryLayout(flightId);
   const [cameraTime, setCameraTime] = useState(0);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [youtubeExportError, setYoutubeExportError] = useState<string | null>(
+    null
+  );
   const [youtubeExportJobId, setYoutubeExportJobId] = useState<string | null>(
     null
   );
@@ -151,6 +157,7 @@ export function FlightTelemetryInteractivePreview({
               variant="secondary"
               className="shrink-0 rounded-lg border border-cyan-200 px-3 py-2 text-xs font-semibold text-cyan-700 dark:border-cyan-800 dark:text-cyan-300"
               onPress={() => {
+                setYoutubeExportError(null);
                 setIsExportDialogOpen(true);
               }}
             >
@@ -177,12 +184,21 @@ export function FlightTelemetryInteractivePreview({
             <Button
               isDisabled={startExport.isPending}
               onPress={async () => {
-                const { job_id } = await startExport.mutateAsync({
-                  youtube_url: youtubeUrl,
-                  rights_confirmed: true,
-                });
-                setYoutubeExportJobId(job_id);
-                setIsExportDialogOpen(false);
+                setYoutubeExportError(null);
+                try {
+                  const { job_id } = await startExport.mutateAsync({
+                    youtube_url: youtubeUrl,
+                  });
+                  setYoutubeExportJobId(job_id);
+                  setIsExportDialogOpen(false);
+                } catch (error) {
+                  setYoutubeExportError(
+                    await getApiErrorMessage(
+                      error,
+                      t('flights.youtubeOverlayExportError')
+                    )
+                  );
+                }
               }}
             >
               {startExport.isPending
@@ -190,12 +206,12 @@ export function FlightTelemetryInteractivePreview({
                 : t('flights.youtubeOverlayExportStart')}
             </Button>
           </div>
-          {startExport.isError && (
+          {(youtubeExportError || startExport.isError) && (
             <p
               className="mt-2 text-sm text-red-700 dark:text-red-300"
               role="alert"
             >
-              {t('flights.youtubeOverlayExportError')}
+              {youtubeExportError ?? t('flights.youtubeOverlayExportError')}
             </p>
           )}
         </div>

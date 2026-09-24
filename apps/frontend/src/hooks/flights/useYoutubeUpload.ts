@@ -108,7 +108,7 @@ export function useYoutubeVideoAssociations(flightId: string) {
 export function useStartYoutubeOverlayExport(flightId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { youtube_url: string; rights_confirmed: boolean }) =>
+    mutationFn: (input: { youtube_url: string }) =>
       api
         .post(`flights/${flightId}/youtube-overlay-export`, { json: input })
         .json<{ job_id: string; status: string }>(),

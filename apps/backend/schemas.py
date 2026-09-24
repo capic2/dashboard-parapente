@@ -629,13 +629,6 @@ class YoutubeUploadCreate(BaseModel):
 
 class YoutubeOverlayExportCreate(BaseModel):
     youtube_url: str = Field(min_length=1)
-    rights_confirmed: bool = False
-
-    @model_validator(mode="after")
-    def require_rights_confirmation(self) -> "YoutubeOverlayExportCreate":
-        if not self.rights_confirmed:
-            raise ValueError("rights_confirmed must be true")
-        return self
 
 
 class YoutubeUploadJobResponse(BaseModel):

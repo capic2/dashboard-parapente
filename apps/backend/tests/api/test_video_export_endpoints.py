@@ -101,10 +101,10 @@ API_PREFIX = "/api"
 class TestVideoExportStartEndpoint:
     """Tests for POST /flights/{flight_id}/export-video"""
 
-    def test_youtube_overlay_export_requires_rights_confirmation(self, client):
+    def test_youtube_overlay_export_requires_youtube_url(self, client):
         response = client.post(
             f"{API_PREFIX}/flights/unknown/youtube-overlay-export",
-            json={"youtube_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+            json={},
             headers={"Authorization": "Bearer test-token"},
         )
         assert response.status_code == 422
@@ -114,7 +114,6 @@ class TestVideoExportStartEndpoint:
             f"{API_PREFIX}/flights/unknown/youtube-overlay-export",
             json={
                 "youtube_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-                "rights_confirmed": True,
             },
             headers={"Authorization": "Bearer test-token"},
         )
@@ -125,7 +124,6 @@ class TestVideoExportStartEndpoint:
             f"{API_PREFIX}/flights/{sample_flight.id}/youtube-overlay-export",
             json={
                 "youtube_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-                "rights_confirmed": True,
             },
             headers={"Authorization": "Bearer test-token"},
         )
