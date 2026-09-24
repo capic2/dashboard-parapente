@@ -246,6 +246,12 @@ export function FlightMediaBadges({
                   showLogsPanel={false}
                 />
               )}
+              {hasVideo && (
+                <FlightYoutubeUploadControls
+                  flight={flight}
+                  source={{ source_type: 'video' }}
+                />
+              )}
               {!hasGpx && !hasVideo && (
                 <>
                   <p className="mb-3 rounded-lg bg-amber-50 p-2 text-xs font-medium text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">

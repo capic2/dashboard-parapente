@@ -591,7 +591,7 @@ class YoutubeAuthUrlRequest(BaseModel):
 
 
 class YoutubeUploadCreate(BaseModel):
-    source_type: Literal["gopro_overlay", "pano", "highlight"] = "gopro_overlay"
+    source_type: Literal["gopro_overlay", "video", "pano", "highlight"] = "gopro_overlay"
     gopro_overlay_job_id: str | None = None
     highlight_video_job_id: str | None = None
     title: str = Field(min_length=1, max_length=100)
@@ -630,7 +630,7 @@ class YoutubeUploadCreate(BaseModel):
 class YoutubeUploadJobResponse(BaseModel):
     job_id: str
     flight_id: str
-    source_type: Literal["gopro_overlay", "pano", "highlight"]
+    source_type: Literal["gopro_overlay", "video", "pano", "highlight"]
     gopro_overlay_job_id: str | None = None
     highlight_video_job_id: str | None = None
     status: Literal["queued", "uploading", "completed", "failed", "cancelled"]
