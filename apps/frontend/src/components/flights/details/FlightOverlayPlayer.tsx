@@ -163,6 +163,14 @@ export function FlightOverlayPlayer({
     if (flight && Math.abs(flight.currentTime - flightTime) > 0.12) {
       flight.currentTime = clamp(flightTime, flight.duration);
     }
+    if (
+      flight &&
+      cameraIsPlaying &&
+      flight.paused &&
+      (!Number.isFinite(flight.duration) || flightTime < flight.duration)
+    ) {
+      playMedia(flight);
+    }
     const overlay = overlayRef.current;
     const overlayTime = getOverlayTime?.(currentTime) ?? currentTime;
     if (overlay && Math.abs(overlay.currentTime - overlayTime) > 0.08) {
@@ -299,6 +307,10 @@ export function FlightOverlayPlayer({
     }
   };
 
+  const handleFlightReady = () => {
+    syncMedia();
+  };
+
   const handleTimelineChange = (time: number) => {
     if (!cameraRef.current) return;
     cameraRef.current.currentTime = time;
@@ -430,6 +442,8 @@ export function FlightOverlayPlayer({
             playsInline
             preload="metadata"
             muted
+            onLoadedData={handleFlightReady}
+            onCanPlay={handleFlightReady}
             onClick={() => {
               if (layout === 'camera-main') setLayout('flight-main');
             }}

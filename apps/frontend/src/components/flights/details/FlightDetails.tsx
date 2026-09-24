@@ -18,7 +18,6 @@ import {
   CircleAlert,
   Edit3,
   FileUp,
-  Gauge,
   Images,
   Play,
   Wand2,
@@ -113,8 +112,6 @@ export function FlightDetails({
   const [notesText, setNotesText] = useState(flight.notes ?? '');
   const [activeTab, setActiveTab] = useState<FlightDetailsTab>('infos');
   const [isReplayExpanded, setIsReplayExpanded] = useState(false);
-  const [isInteractiveTelemetryExpanded, setIsInteractiveTelemetryExpanded] =
-    useState(false);
   const [isOverlayWorkspaceExpanded, setIsOverlayWorkspaceExpanded] = useState(
     !hasSavedOverlaySynchronization
   );
@@ -874,51 +871,6 @@ export function FlightDetails({
     </section>
   );
 
-  const interactiveTelemetryPanel = (
-    <section className="overflow-hidden rounded-2xl border border-violet-200 bg-violet-50/50 shadow-sm dark:border-violet-900 dark:bg-violet-950/20">
-      <button
-        type="button"
-        className="flex w-full cursor-pointer items-center justify-between gap-3 p-4 text-left transition-colors hover:bg-violet-100/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-inset dark:hover:bg-violet-950/40 sm:p-5"
-        aria-expanded={isInteractiveTelemetryExpanded}
-        aria-controls="flight-interactive-telemetry-panel"
-        onClick={() =>
-          setIsInteractiveTelemetryExpanded((isExpanded) => !isExpanded)
-        }
-      >
-        <span className="flex min-w-0 items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
-            <Gauge className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <span>
-            <span className="block font-semibold text-slate-950 dark:text-white">
-              {t('flights.overlayInteractiveSectionTitle')}
-            </span>
-            <span className="block text-sm text-slate-600 dark:text-slate-300">
-              {t('flights.overlayInteractiveSectionDescription')}
-            </span>
-          </span>
-        </span>
-        <ChevronDown
-          aria-hidden="true"
-          className={`size-5 shrink-0 text-violet-700 transition-transform duration-200 dark:text-violet-300 ${isInteractiveTelemetryExpanded ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {isInteractiveTelemetryExpanded && (
-        <div
-          id="flight-interactive-telemetry-panel"
-          className="border-t border-violet-200 p-4 dark:border-violet-900 sm:p-5"
-        >
-          <FlightTelemetryInteractivePreview
-            flightId={flight.id}
-            hasFlightVideo={hasVideo}
-            manualOffsetSeconds={Number(goproOverlayGpxOffset)}
-            youtubeUrls={flight.youtube_urls ?? []}
-          />
-        </div>
-      )}
-    </section>
-  );
-
   const logsPanel = (
     <FlightGenerationLogsPanel
       videoJobId={flight.video_export_job_id}
@@ -952,7 +904,14 @@ export function FlightDetails({
 
       <div className="min-w-0 space-y-4">
         {hasGpx && hasVideo && hasGoproCameraVideo && overlayWorkspacePanel}
-        {hasGpx && hasGoproCameraVideo && interactiveTelemetryPanel}
+        {hasGpx && hasGoproCameraVideo && (
+          <FlightTelemetryInteractivePreview
+            flightId={flight.id}
+            hasFlightVideo={hasVideo}
+            manualOffsetSeconds={Number(goproOverlayGpxOffset)}
+            youtubeUrls={flight.youtube_urls ?? []}
+          />
+        )}
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
           <button
             type="button"
