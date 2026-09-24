@@ -97,7 +97,7 @@ export function FlightYoutubeUploadControls({
     flight.youtube_urls?.includes(upload.data.youtube_url) &&
     associations.data?.find(
       (association) => association.url === upload.data?.youtube_url
-    )?.exists_on_youtube !== false
+    )?.exists_on_youtube === true
   );
 
   useEffect(() => {
