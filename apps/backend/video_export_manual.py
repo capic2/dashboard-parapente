@@ -32,7 +32,7 @@ from deployment_drain import DeploymentDrainActive, job_admission
 from auth import create_job_token, decode_job_token
 from database import SessionLocal
 from flight_storage import flight_temporary_directory, get_video_output_path
-from models import Flight, VideoExportJob
+from models import Flight, GoproOverlayJob, VideoExportJob
 from video_acceleration import (
     VideoAccelerator,
     chromium_launch_args,
@@ -342,6 +342,9 @@ def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
         "quality": job.quality,
         "speed": job.speed,
         "mode": job.mode,
+        "source_type": job.source_type,
+        "youtube_url": job.youtube_url,
+        "overlay_job_id": job.overlay_job_id,
         "render_method": job.render_method,
         "created_at": _to_iso(job.created_at),
         "updated_at": _to_iso(job.updated_at),
@@ -808,7 +811,68 @@ def process_video_export_job(job_id: str) -> None:
     if not acquired_job_id:
         return
 
+    job = _get_job(acquired_job_id)
+    if job and job.mode == "youtube_overlay":
+        _export_youtube_overlay_job(acquired_job_id)
+        return
     asyncio.run(_export_video_manual_render(acquired_job_id))
+
+
+def _export_youtube_overlay_job(job_id: str) -> None:
+    """Download a selected YouTube source and compose the existing alpha layer."""
+    from youtube_overlay_export import (
+        YoutubeExportError,
+        cleanup_work_dir,
+        export_youtube_overlay,
+        new_work_dir,
+        output_path,
+    )
+
+    job = _get_job(job_id)
+    if not job or not job.youtube_url or not job.overlay_job_id:
+        _update_job(job_id, status=_STATUS_FAILED, error="Paramètres d’export YouTube incomplets")
+        return
+    with SessionLocal() as db:
+        overlay = db.get(GoproOverlayJob, job.overlay_job_id)
+        overlay_path = Path(overlay.output_path) if overlay else None
+    if overlay_path is None or not overlay_path.is_file():
+        _update_job(job_id, status=_STATUS_FAILED, error="La couche overlay n’est pas disponible")
+        return
+
+    work_dir = new_work_dir(job_id)
+    destination = output_path(job_id)
+
+    def progress(message: str) -> None:
+        if _is_cancelled(job_id):
+            raise YoutubeExportError("Export annulé")
+        _update_job(job_id, status=_STATUS_RUNNING, message=message, progress=50)
+
+    try:
+        _update_job(
+            job_id, status=_STATUS_RUNNING, message="Préparation de l’export YouTube", progress=1
+        )
+        export_youtube_overlay(
+            url=job.youtube_url,
+            overlay_path=overlay_path,
+            output_path=destination,
+            offset_seconds=float(job.overlay_offset_seconds or 0),
+            work_dir=work_dir,
+            progress=progress,
+        )
+        _update_job(
+            job_id,
+            status=_STATUS_COMPLETED,
+            progress=100,
+            message="Export YouTube terminé",
+            video_path=str(destination),
+        )
+    except YoutubeExportError as exc:
+        _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
+    except Exception as exc:
+        _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
+    finally:
+        cleanup_work_dir(work_dir)
+        _clear_job_cancel_requested(job_id)
 
 
 def _cleanup_temp_dir(temp_dir: Path | None) -> None:
@@ -1695,6 +1759,10 @@ def _enqueue_video_export_job(
     frontend_url: str = "http://localhost:5173",
     update_db: bool = True,
     auth_token: str | None = None,
+    source_type: str = "flight",
+    youtube_url: str | None = None,
+    overlay_job_id: str | None = None,
+    overlay_offset_seconds: float | None = None,
 ):
     """Create a new export job and enqueue it for the configured queue backend."""
     if not _dependencies_ok:
@@ -1724,6 +1792,10 @@ def _enqueue_video_export_job(
                 started_at=None,
                 updated_at=now,
                 created_at=now,
+                source_type=source_type,
+                youtube_url=youtube_url,
+                overlay_job_id=overlay_job_id,
+                overlay_offset_seconds=overlay_offset_seconds,
             )
             db.add(job)
 
@@ -1745,6 +1817,31 @@ def _enqueue_video_export_job(
         _set_job_auth_token(job_id, _resolve_video_export_job_token(job_id, flight_id, auth_token))
         _enqueue_existing_video_export_job(job_id)
     return job_id
+
+
+def start_youtube_overlay_export(
+    *,
+    flight_id: str,
+    youtube_url: str,
+    overlay_job_id: str,
+    overlay_offset_seconds: float,
+    auth_token: str | None = None,
+) -> str:
+    """Queue an export using a YouTube source and an already generated layer."""
+    return _enqueue_video_export_job(
+        flight_id=flight_id,
+        mode="youtube_overlay",
+        quality="1080p",
+        fps=30,
+        speed=1,
+        frontend_url="",
+        update_db=False,
+        auth_token=auth_token,
+        source_type="youtube",
+        youtube_url=youtube_url,
+        overlay_job_id=overlay_job_id,
+        overlay_offset_seconds=overlay_offset_seconds,
+    )
 
 
 def start_video_export_manual(

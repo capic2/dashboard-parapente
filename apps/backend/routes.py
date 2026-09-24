@@ -163,6 +163,7 @@ from schemas import (
     YoutubeVideoRemoveRequest,
     YoutubeUploadCreate,
     YoutubeUploadJobResponse,
+    YoutubeOverlayExportCreate,
 )
 from schemas import LandingAssociation as LandingAssociationSchema
 from schemas import (
@@ -211,6 +212,7 @@ from video_export_manual import (
     resume_video_export,
     start_video_export_manual,
     start_video_export_manual_fast,
+    start_youtube_overlay_export,
 )
 from weather_pipeline import filter_remaining_hours, get_daily_aggregate, get_normalized_forecast
 from weather_sources import ensure_weather_source_configs
@@ -7262,6 +7264,40 @@ def get_flight_overlay_layer(flight_id: str, db: Session = Depends(get_db)) -> F
         status=job.status,
         job=GoproOverlayJob.model_validate(gopro_overlay_job_to_payload(job)),
     )
+
+
+@router.post("/flights/{flight_id}/youtube-overlay-export", status_code=202)
+def create_youtube_overlay_export(
+    flight_id: str,
+    payload: YoutubeOverlayExportCreate,
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Queue a downloadable MP4 composed from an associated YouTube video."""
+    flight = db.get(Flight, flight_id)
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    if payload.youtube_url not in (flight.youtube_urls or []):
+        raise HTTPException(
+            status_code=400, detail="YouTube video is not associated with this flight"
+        )
+    overlay_job = _require_ready_gopro_overlay_layer(flight)
+    offset = _require_gopro_overlay_offset(flight)
+    try:
+        job_id = start_youtube_overlay_export(
+            flight_id=flight_id,
+            youtube_url=payload.youtube_url,
+            overlay_job_id=overlay_job.id,
+            overlay_offset_seconds=offset,
+        )
+    except DeploymentDrainActive:
+        raise
+    except Exception as exc:
+        logger.exception("Unable to queue YouTube overlay export for flight %s", flight_id)
+        raise HTTPException(
+            status_code=503,
+            detail="The video export queue is unavailable. Try again later.",
+        ) from exc
+    return {"job_id": job_id, "status": "queued"}
 
 
 @router.post(

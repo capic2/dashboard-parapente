@@ -101,6 +101,36 @@ API_PREFIX = "/api"
 class TestVideoExportStartEndpoint:
     """Tests for POST /flights/{flight_id}/export-video"""
 
+    def test_youtube_overlay_export_requires_rights_confirmation(self, client):
+        response = client.post(
+            f"{API_PREFIX}/flights/unknown/youtube-overlay-export",
+            json={"youtube_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+            headers={"Authorization": "Bearer test-token"},
+        )
+        assert response.status_code == 422
+
+    def test_youtube_overlay_export_rejects_unknown_flight(self, client):
+        response = client.post(
+            f"{API_PREFIX}/flights/unknown/youtube-overlay-export",
+            json={
+                "youtube_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                "rights_confirmed": True,
+            },
+            headers={"Authorization": "Bearer test-token"},
+        )
+        assert response.status_code == 404
+
+    def test_youtube_overlay_export_rejects_unassociated_video(self, client, sample_flight):
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/youtube-overlay-export",
+            json={
+                "youtube_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                "rights_confirmed": True,
+            },
+            headers={"Authorization": "Bearer test-token"},
+        )
+        assert response.status_code == 400
+
     def test_start_video_export_prefers_manual_when_available(
         self, client: TestClient, sample_flight
     ):

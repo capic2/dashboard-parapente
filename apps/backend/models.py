@@ -359,6 +359,10 @@ class VideoExportJob(Base):
     cancelled_at = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    source_type = Column(String(32), nullable=True, default="flight")
+    youtube_url = Column(Text, nullable=True)
+    overlay_job_id = Column(String, nullable=True)
+    overlay_offset_seconds = Column(Float, nullable=True)
 
     flight = relationship("Flight", back_populates="export_jobs")
 
