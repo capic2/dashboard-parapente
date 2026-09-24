@@ -60,6 +60,8 @@ import {
   serializeTelemetryLayoutXml,
   alignTelemetryLayoutItems,
   getTelemetryLayoutGroupBounds,
+  TELEMETRY_CANVAS_HEIGHT,
+  TELEMETRY_CANVAS_WIDTH,
   type FlightTelemetryIconLayout,
   type FlightTelemetryLayoutItem,
   type FlightTelemetryPipLayout,
@@ -81,9 +83,11 @@ type DragMode = 'move' | 'resize';
 
 const MAX_LAYOUT_XML_LENGTH = 500_000;
 const MAX_BACKGROUND_IMAGE_LENGTH = 480_000;
-const SNAP_THRESHOLD = 0.012;
-const KEYBOARD_PIXEL_STEP_X = 1 / 1920;
-const KEYBOARD_PIXEL_STEP_Y = 1 / 1080;
+const SNAP_THRESHOLD = 24;
+const KEYBOARD_PIXEL_STEP_X = 1;
+const KEYBOARD_PIXEL_STEP_Y = 1;
+const MIN_ITEM_WIDTH = 48;
+const MIN_ITEM_HEIGHT = 24;
 
 function displayWidgetName(name: string) {
   return name.replace(/_/gu, ' ');
@@ -454,10 +458,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       type: 'widget',
       name: metric,
       metric,
-      x: 0.02 + column * 0.24,
-      y: 0.02 + row * 0.2,
-      width: 0.16,
-      height: 0.1,
+      x: 38.4 + column * 460.8,
+      y: 21.6 + row * 216,
+      width: 307.2,
+      height: 108,
       visible: true,
     };
     setLayout((current) => [...current, widget]);
@@ -473,10 +477,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       name: 'Gauge',
       type: 'icon',
       icon: 'gauge',
-      x: 0.02 + column * 0.24,
-      y: 0.02 + row * 0.2,
-      width: 0.1,
-      height: 0.1,
+      x: 38.4 + column * 460.8,
+      y: 21.6 + row * 216,
+      width: 192,
+      height: 108,
       visible: true,
     };
     setLayout((current) => [...current, icon]);
@@ -495,10 +499,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       name: variant,
       metric: variant === 'compass' ? 'heading' : 'speed',
       variant,
-      x: 0.02 + column * 0.24,
-      y: 0.02 + row * 0.2,
-      width: 0.18,
-      height: 0.18,
+      x: 38.4 + column * 460.8,
+      y: 21.6 + row * 216,
+      width: 345.6,
+      height: 194.4,
       visible: true,
     };
     setLayout((current) => [...current, widget]);
@@ -516,10 +520,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       type: 'text',
       name: 'Text',
       content: 'Votre texte',
-      x: 0.02 + column * 0.24,
-      y: 0.02 + row * 0.2,
-      width: 0.2,
-      height: 0.08,
+      x: 38.4 + column * 460.8,
+      y: 21.6 + row * 216,
+      width: 384,
+      height: 86.4,
       visible: true,
     };
     setLayout((current) => [...current, text]);
@@ -533,10 +537,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       type: 'pip',
       name: 'PiP vidéo',
       action: 'switch_video',
-      x: 0.02,
-      y: 0.78,
-      width: 0.18,
-      height: 0.18,
+      x: 38.4,
+      y: 842.4,
+      width: 345.6,
+      height: 194.4,
       visible: true,
     };
     setLayout((current) => [...current, pip]);
@@ -650,8 +654,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const moveDrag = (event: PointerEvent) => {
     if (!drag || !canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
-    const dx = (event.clientX - drag.startX) / rect.width;
-    const dy = (event.clientY - drag.startY) / rect.height;
+    const scaleX = rect.width / TELEMETRY_CANVAS_WIDTH;
+    const scaleY = rect.height / TELEMETRY_CANVAS_HEIGHT;
+    const dx = (event.clientX - drag.startX) / scaleX;
+    const dy = (event.clientY - drag.startY) / scaleY;
     if (drag.mode === 'move') {
       const movingIds = new Set(drag.items.map((item) => item.id));
       const stationaryItems = layout.filter((item) => !movingIds.has(item.id));
@@ -692,8 +698,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
         ],
         [
           0,
-          0.5,
-          1,
+          TELEMETRY_CANVAS_WIDTH / 2,
+          TELEMETRY_CANVAS_WIDTH,
           ...stationaryItems.flatMap((item) => [
             item.x,
             item.x + item.width / 2,
@@ -709,8 +715,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
         ],
         [
           0,
-          0.5,
-          1,
+          TELEMETRY_CANVAS_HEIGHT / 2,
+          TELEMETRY_CANVAS_HEIGHT,
           ...stationaryItems.flatMap((item) => [
             item.y,
             item.y + item.height / 2,
@@ -729,16 +735,32 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           if (!original) return item;
           return {
             ...item,
-            x: clamp(original.x + snappedDx, 0, 1 - original.width),
-            y: clamp(original.y + snappedDy, 0, 1 - original.height),
+            x: clamp(
+              original.x + snappedDx,
+              0,
+              TELEMETRY_CANVAS_WIDTH - original.width
+            ),
+            y: clamp(
+              original.y + snappedDy,
+              0,
+              TELEMETRY_CANVAS_HEIGHT - original.height
+            ),
           };
         })
       );
     } else {
       const original = drag.items[0];
       updateItem(original.id, {
-        width: clamp(original.width + dx, 0.05, 1 - original.x),
-        height: clamp(original.height + dy, 0.05, 1 - original.y),
+        width: clamp(
+          original.width + dx,
+          MIN_ITEM_WIDTH,
+          TELEMETRY_CANVAS_WIDTH - original.x
+        ),
+        height: clamp(
+          original.height + dy,
+          MIN_ITEM_HEIGHT,
+          TELEMETRY_CANVAS_HEIGHT - original.y
+        ),
       });
     }
   };
@@ -759,8 +781,16 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           if (!movingIds.has(candidate.id)) return candidate;
           return {
             ...candidate,
-            x: clamp(candidate.x + dx, 0, 1 - candidate.width),
-            y: clamp(candidate.y + dy, 0, 1 - candidate.height),
+            x: clamp(
+              candidate.x + dx,
+              0,
+              TELEMETRY_CANVAS_WIDTH - candidate.width
+            ),
+            y: clamp(
+              candidate.y + dy,
+              0,
+              TELEMETRY_CANVAS_HEIGHT - candidate.height
+            ),
           };
         })
       );
@@ -811,8 +841,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       return {
         ...item,
         id,
-        x: clamp(item.x + 0.02, 0, 1 - item.width),
-        y: clamp(item.y + 0.02, 0, 1 - item.height),
+        x: clamp(item.x + 38.4, 0, TELEMETRY_CANVAS_WIDTH - item.width),
+        y: clamp(item.y + 21.6, 0, TELEMETRY_CANVAS_HEIGHT - item.height),
         ...(groupId
           ? { groupId, groupName: item.groupName }
           : { groupId: undefined, groupName: undefined }),
@@ -1266,190 +1296,200 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
         <div className="min-w-0 rounded-2xl border border-slate-700 bg-slate-950 p-3 shadow-xl">
           <div className="max-w-full overflow-auto">
             <div
-              ref={canvasRef}
-              className={`relative mx-auto aspect-video overflow-hidden rounded-lg border border-slate-700 bg-[radial-gradient(circle_at_50%_35%,#1e3a5f,#090f1b_65%)] select-none ${canvasZoom === 1 && !isFullscreen ? 'max-w-5xl' : ''}`}
+              className="relative mx-auto shrink-0"
               style={{
-                width: `${canvasZoom * 100}%`,
-                containerType: 'inline-size',
-                backgroundImage: backgroundImage
-                  ? `url(${JSON.stringify(backgroundImage)})`
-                  : undefined,
-                backgroundSize: backgroundImage ? 'cover' : undefined,
-                backgroundPosition: backgroundImage ? 'center' : undefined,
+                width: `${TELEMETRY_CANVAS_WIDTH * canvasZoom}px`,
+                height: `${TELEMETRY_CANVAS_HEIGHT * canvasZoom}px`,
               }}
-              onPointerMove={moveDrag}
-              onPointerUp={() => {
-                setDrag(null);
-                setSnapGuides({});
-              }}
-              onPointerCancel={() => {
-                setDrag(null);
-                setSnapGuides({});
-              }}
-              aria-label={t('telemetryLayout.canvasLabel')}
             >
-              <div className="pointer-events-none absolute inset-0 opacity-20 [background-image:linear-gradient(#94a3b8_1px,transparent_1px),linear-gradient(90deg,#94a3b8_1px,transparent_1px)] [background-size:10%_10%]" />
-              <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-slate-400/20" />
-              <div className="pointer-events-none absolute inset-y-0 left-1/2 border-l border-dashed border-slate-400/20" />
-              {snapGuides.x !== undefined && (
-                <div
-                  className="pointer-events-none absolute inset-y-0 z-30 border-l-2 border-dashed border-amber-300"
-                  style={{ left: `${snapGuides.x * 100}%` }}
-                />
-              )}
-              {snapGuides.y !== undefined && (
-                <div
-                  className="pointer-events-none absolute inset-x-0 z-30 border-t-2 border-dashed border-amber-300"
-                  style={{ top: `${snapGuides.y * 100}%` }}
-                />
-              )}
-              {groups.map(([groupId, groupName]) => {
-                const bounds = getTelemetryLayoutGroupBounds(layout, groupId);
-                if (!bounds) return null;
-                return (
+              <div
+                ref={canvasRef}
+                className="absolute left-0 top-0 overflow-hidden rounded-lg border border-slate-700 bg-[radial-gradient(circle_at_50%_35%,#1e3a5f,#090f1b_65%)] select-none"
+                style={{
+                  width: `${TELEMETRY_CANVAS_WIDTH}px`,
+                  height: `${TELEMETRY_CANVAS_HEIGHT}px`,
+                  transform: `scale(${canvasZoom})`,
+                  transformOrigin: 'top left',
+                  backgroundImage: backgroundImage
+                    ? `url(${JSON.stringify(backgroundImage)})`
+                    : undefined,
+                  backgroundSize: backgroundImage ? 'cover' : undefined,
+                  backgroundPosition: backgroundImage ? 'center' : undefined,
+                }}
+                onPointerMove={moveDrag}
+                onPointerUp={() => {
+                  setDrag(null);
+                  setSnapGuides({});
+                }}
+                onPointerCancel={() => {
+                  setDrag(null);
+                  setSnapGuides({});
+                }}
+                aria-label={t('telemetryLayout.canvasLabel')}
+              >
+                <div className="pointer-events-none absolute inset-0 opacity-20 [background-image:linear-gradient(#94a3b8_1px,transparent_1px),linear-gradient(90deg,#94a3b8_1px,transparent_1px)] [background-size:10%_10%]" />
+                <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-slate-400/20" />
+                <div className="pointer-events-none absolute inset-y-0 left-1/2 border-l border-dashed border-slate-400/20" />
+                {snapGuides.x !== undefined && (
                   <div
-                    key={groupId}
-                    className="pointer-events-none absolute rounded-xl border border-dashed border-sky-400/70 bg-sky-400/5"
-                    style={{
-                      left: `${bounds.x * 100}%`,
-                      top: `${bounds.y * 100}%`,
-                      width: `${bounds.width * 100}%`,
-                      height: `${bounds.height * 100}%`,
-                    }}
-                  >
-                    <span className="absolute -top-5 left-2 rounded-t bg-sky-500/80 px-2 py-0.5 text-[10px] font-semibold text-white">
-                      {groupName}
-                    </span>
-                  </div>
-                );
-              })}
-              {layout.map((item) => {
-                const isIcon = item.type === 'icon';
-                const isText = item.type === 'text';
-                const isPip = item.type === 'pip';
-                const [value, unit] =
-                  isIcon || isText || isPip
-                    ? ['—', '']
-                    : (getTelemetryMetricValue(
-                        previewPoint ?? null,
-                        previewTelemetry,
-                        item.metric
-                      ) ?? ['', '']);
-                const isSelected = selectedIds.includes(item.id);
-                return (
-                  <button
-                    type="button"
-                    key={item.id}
-                    onPointerDown={(event) => beginDrag(event, item, 'move')}
-                    onKeyDown={(event) => {
-                      const stepX =
-                        (event.ctrlKey || event.metaKey ? 10 : 1) *
-                        KEYBOARD_PIXEL_STEP_X;
-                      const stepY =
-                        (event.ctrlKey || event.metaKey ? 10 : 1) *
-                        KEYBOARD_PIXEL_STEP_Y;
-                      const movement = {
-                        ArrowLeft: [-stepX, 0],
-                        ArrowRight: [stepX, 0],
-                        ArrowUp: [0, -stepY],
-                        ArrowDown: [0, stepY],
-                      }[event.key];
-                      if (!movement) return;
-                      event.preventDefault();
-                      event.stopPropagation();
-                      moveWithKeyboard(item, movement[0], movement[1]);
-                    }}
-                    onClick={(event) => {
-                      if (event.shiftKey || event.metaKey || event.ctrlKey)
-                        return;
-                      setSelectedIds([item.id]);
-                    }}
-                    className={`absolute flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border px-3 py-2 text-left text-white shadow-lg ${item.transparent === false ? 'bg-slate-950/85' : 'bg-transparent'} ${item.visible ? '' : 'opacity-35'} ${isSelected ? 'border-sky-400 ring-2 ring-sky-400/40' : item.border === true ? 'border-white/20' : 'border-transparent'}`}
-                    style={{
-                      left: `${item.x * 100}%`,
-                      top: `${item.y * 100}%`,
-                      width: `${item.width * 100}%`,
-                      height: `${item.height * 100}%`,
-                      fontSize: `${((item.fontSize ?? 32) / 1920) * 100}cqw`,
-                      textAlign:
-                        item.type === 'widget'
-                          ? (item.valueAlign ?? 'left')
-                          : item.type === 'text'
-                            ? (item.textAlign ?? 'left')
-                            : undefined,
-                    }}
-                  >
-                    {isPip ? (
-                      <>
-                        <PictureInPicture2 className="mx-auto h-1/2 w-1/2" />
-                        <span className="mt-1 block truncate text-center text-[10px] font-semibold text-slate-300">
-                          {item.name ?? t('telemetryLayout.pip')}
-                        </span>
-                      </>
-                    ) : isText ? (
-                      <span
-                        className="block truncate font-semibold"
-                        style={{ fontSize: '1em' }}
-                      >
-                        {item.content}
+                    className="pointer-events-none absolute inset-y-0 z-30 border-l-2 border-dashed border-amber-300"
+                    style={{ left: `${snapGuides.x}px` }}
+                  />
+                )}
+                {snapGuides.y !== undefined && (
+                  <div
+                    className="pointer-events-none absolute inset-x-0 z-30 border-t-2 border-dashed border-amber-300"
+                    style={{ top: `${snapGuides.y}px` }}
+                  />
+                )}
+                {groups.map(([groupId, groupName]) => {
+                  const bounds = getTelemetryLayoutGroupBounds(layout, groupId);
+                  if (!bounds) return null;
+                  return (
+                    <div
+                      key={groupId}
+                      className="pointer-events-none absolute rounded-xl border border-dashed border-sky-400/70 bg-sky-400/5"
+                      style={{
+                        left: `${bounds.x}px`,
+                        top: `${bounds.y}px`,
+                        width: `${bounds.width}px`,
+                        height: `${bounds.height}px`,
+                      }}
+                    >
+                      <span className="absolute -top-5 left-2 rounded-t bg-sky-500/80 px-2 py-0.5 text-[10px] font-semibold text-white">
+                        {groupName}
                       </span>
-                    ) : isIcon ? (
-                      <>
-                        <TelemetryLayoutIcon
-                          name={item.icon}
-                          className="mx-auto h-1/2 w-1/2"
-                        />
-                        <span className="mt-1 block truncate text-center text-[10px] font-semibold text-slate-300">
-                          {item.name ?? item.icon}
-                        </span>
-                      </>
-                    ) : item.variant && item.variant !== 'value' ? (
-                      <TelemetrySpeedometer
-                        metric={item.metric}
-                        value={value}
-                        unit={unit}
-                        showUnit={item.showUnit !== false}
-                        variant={item.variant}
-                      />
-                    ) : (
-                      <>
-                        {item.showLabel !== false && (
-                          <span
-                            className="block font-semibold uppercase tracking-wide text-slate-300"
-                            style={{ fontSize: '0.35em' }}
-                          >
-                            {displayWidgetName(item.name ?? item.metric)}
+                    </div>
+                  );
+                })}
+                {layout.map((item) => {
+                  const isIcon = item.type === 'icon';
+                  const isText = item.type === 'text';
+                  const isPip = item.type === 'pip';
+                  const [value, unit] =
+                    isIcon || isText || isPip
+                      ? ['—', '']
+                      : (getTelemetryMetricValue(
+                          previewPoint ?? null,
+                          previewTelemetry,
+                          item.metric
+                        ) ?? ['', '']);
+                  const isSelected = selectedIds.includes(item.id);
+                  return (
+                    <button
+                      type="button"
+                      key={item.id}
+                      onPointerDown={(event) => beginDrag(event, item, 'move')}
+                      onKeyDown={(event) => {
+                        const stepX =
+                          (event.ctrlKey || event.metaKey ? 10 : 1) *
+                          KEYBOARD_PIXEL_STEP_X;
+                        const stepY =
+                          (event.ctrlKey || event.metaKey ? 10 : 1) *
+                          KEYBOARD_PIXEL_STEP_Y;
+                        const movement = {
+                          ArrowLeft: [-stepX, 0],
+                          ArrowRight: [stepX, 0],
+                          ArrowUp: [0, -stepY],
+                          ArrowDown: [0, stepY],
+                        }[event.key];
+                        if (!movement) return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        moveWithKeyboard(item, movement[0], movement[1]);
+                      }}
+                      onClick={(event) => {
+                        if (event.shiftKey || event.metaKey || event.ctrlKey)
+                          return;
+                        setSelectedIds([item.id]);
+                      }}
+                      className={`absolute flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border px-3 py-2 text-left text-white shadow-lg ${item.transparent === false ? 'bg-slate-950/85' : 'bg-transparent'} ${item.visible ? '' : 'opacity-35'} ${isSelected ? 'border-sky-400 ring-2 ring-sky-400/40' : item.border === true ? 'border-white/20' : 'border-transparent'}`}
+                      style={{
+                        left: `${item.x}px`,
+                        top: `${item.y}px`,
+                        width: `${item.width}px`,
+                        height: `${item.height}px`,
+                        fontSize: `${item.fontSize ?? 32}px`,
+                        textAlign:
+                          item.type === 'widget'
+                            ? (item.valueAlign ?? 'left')
+                            : item.type === 'text'
+                              ? (item.textAlign ?? 'left')
+                              : undefined,
+                      }}
+                    >
+                      {isPip ? (
+                        <>
+                          <PictureInPicture2 className="mx-auto h-1/2 w-1/2" />
+                          <span className="mt-1 block truncate text-center text-[10px] font-semibold text-slate-300">
+                            {item.name ?? t('telemetryLayout.pip')}
                           </span>
-                        )}
+                        </>
+                      ) : isText ? (
                         <span
-                          className="mt-1 block truncate font-mono font-bold"
+                          className="block truncate font-semibold"
                           style={{ fontSize: '1em' }}
                         >
-                          {formatTelemetryValue(value, '')}
-                          {item.showUnit !== false && (
+                          {item.content}
+                        </span>
+                      ) : isIcon ? (
+                        <>
+                          <TelemetryLayoutIcon
+                            name={item.icon}
+                            className="mx-auto h-1/2 w-1/2"
+                          />
+                          <span className="mt-1 block truncate text-center text-[10px] font-semibold text-slate-300">
+                            {item.name ?? item.icon}
+                          </span>
+                        </>
+                      ) : item.variant && item.variant !== 'value' ? (
+                        <TelemetrySpeedometer
+                          metric={item.metric}
+                          value={value}
+                          unit={unit}
+                          showUnit={item.showUnit !== false}
+                          variant={item.variant}
+                        />
+                      ) : (
+                        <>
+                          {item.showLabel !== false && (
                             <span
-                              className="ml-1 font-normal text-slate-300"
-                              style={{ fontSize: '0.45em' }}
+                              className="block font-semibold uppercase tracking-wide text-slate-300"
+                              style={{ fontSize: '0.35em' }}
                             >
-                              {unit}
+                              {displayWidgetName(item.name ?? item.metric)}
                             </span>
                           )}
-                        </span>
-                      </>
-                    )}
-                    {isSelected && (
-                      <span
-                        className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-se-resize rounded-sm border border-white bg-sky-400"
-                        onPointerDown={(event) =>
-                          beginDrag(event, item, 'resize')
-                        }
-                      />
-                    )}
-                  </button>
-                );
-              })}
-              <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded bg-slate-950/70 px-2 py-1 text-[10px] text-slate-300">
-                {t('telemetryLayout.dragHint')}
+                          <span
+                            className="mt-1 block truncate font-mono font-bold"
+                            style={{ fontSize: '1em' }}
+                          >
+                            {formatTelemetryValue(value, '')}
+                            {item.showUnit !== false && (
+                              <span
+                                className="ml-1 font-normal text-slate-300"
+                                style={{ fontSize: '0.45em' }}
+                              >
+                                {unit}
+                              </span>
+                            )}
+                          </span>
+                        </>
+                      )}
+                      {isSelected && (
+                        <span
+                          className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-se-resize rounded-sm border border-white bg-sky-400"
+                          onPointerDown={(event) =>
+                            beginDrag(event, item, 'resize')
+                          }
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+                <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded bg-slate-950/70 px-2 py-1 text-[10px] text-slate-300">
+                  {t('telemetryLayout.dragHint')}
+                </div>
               </div>
             </div>
           </div>
@@ -2080,36 +2120,52 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                     ).map(([name, value]) => (
                       <label key={name} className="text-sm">
                         <span className="mb-1 block text-slate-600 dark:text-slate-300">
-                          {t(`telemetryLayout.${name}`)} %
+                          {t(`telemetryLayout.${name}`)} px
                         </span>
                         <input
                           className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-right dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                           type="number"
                           min="0"
-                          max="100"
+                          max={
+                            name === 'x' || name === 'width'
+                              ? TELEMETRY_CANVAS_WIDTH
+                              : TELEMETRY_CANVAS_HEIGHT
+                          }
                           step="1"
-                          value={Math.round(value * 100)}
+                          value={Math.round(value)}
                           onChange={(event) => {
-                            const next = clamp(
-                              Number(event.target.value) / 100,
-                              0,
-                              1
-                            );
+                            const next = Number(event.target.value) || 0;
                             if (name === 'x') {
                               updateItem(selected.id, {
-                                x: clamp(next, 0, 1 - selected.width),
+                                x: clamp(
+                                  next,
+                                  0,
+                                  TELEMETRY_CANVAS_WIDTH - selected.width
+                                ),
                               });
                             } else if (name === 'y') {
                               updateItem(selected.id, {
-                                y: clamp(next, 0, 1 - selected.height),
+                                y: clamp(
+                                  next,
+                                  0,
+                                  TELEMETRY_CANVAS_HEIGHT - selected.height
+                                ),
                               });
                             } else if (name === 'width') {
                               updateItem(selected.id, {
-                                width: clamp(next, 0.05, 1 - selected.x),
+                                width: clamp(
+                                  next,
+                                  MIN_ITEM_WIDTH,
+                                  TELEMETRY_CANVAS_WIDTH - selected.x
+                                ),
                               });
                             } else {
                               updateItem(selected.id, {
-                                height: clamp(next, 0.05, 1 - selected.y),
+                                height: clamp(
+                                  next,
+                                  MIN_ITEM_HEIGHT,
+                                  TELEMETRY_CANVAS_HEIGHT - selected.y
+                                ),
                               });
                             }
                           }}
@@ -2122,8 +2178,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       {t('telemetryLayout.pixelSize')}
                     </span>
                     <span className="font-mono font-semibold text-slate-900 dark:text-white">
-                      {Math.round(selected.width * 1920)} ×{' '}
-                      {Math.round(selected.height * 1080)} px
+                      {Math.round(selected.width)} ×{' '}
+                      {Math.round(selected.height)} px
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">

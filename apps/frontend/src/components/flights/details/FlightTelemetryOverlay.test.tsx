@@ -46,7 +46,7 @@ describe('FlightTelemetryOverlay', () => {
     expect(screen.getByText('42.5')).toBeInTheDocument();
     expect(screen.getByText('1.2')).toBeInTheDocument();
     expect(screen.getByText('3.4')).toBeInTheDocument();
-    expect(screen.getAllByRole('button')).toHaveLength(4);
+    expect(screen.getAllByRole('button')).toHaveLength(7);
   });
 
   it('cycles only the clicked widget to the next metric', () => {
@@ -62,8 +62,8 @@ describe('FlightTelemetryOverlay', () => {
             metric: 'altitude',
             x: 0,
             y: 0,
-            width: 0.2,
-            height: 0.2,
+            width: 384,
+            height: 216,
             visible: true,
             clickAction: 'cycle_metric',
           },
@@ -71,10 +71,10 @@ describe('FlightTelemetryOverlay', () => {
             id: 'speed-widget',
             type: 'widget',
             metric: 'speed',
-            x: 0.2,
+            x: 384,
             y: 0,
-            width: 0.2,
-            height: 0.2,
+            width: 384,
+            height: 216,
             visible: true,
           },
         ]}
@@ -97,8 +97,8 @@ describe('FlightTelemetryOverlay', () => {
         metric: 'altitude',
         x: 0,
         y: 0,
-        width: 0.2,
-        height: 0.2,
+        width: 384,
+        height: 216,
         visible: true,
         transparent: true,
       },
@@ -133,8 +133,8 @@ describe('FlightTelemetryOverlay', () => {
             metric: 'altitude',
             x: 0,
             y: 0,
-            width: 0.2,
-            height: 0.2,
+            width: 384,
+            height: 216,
             visible: true,
           },
         ]}
@@ -163,8 +163,8 @@ describe('FlightTelemetryOverlay', () => {
             metric: 'altitude',
             x: 0,
             y: 0,
-            width: 0.2,
-            height: 0.2,
+            width: 384,
+            height: 216,
             visible: true,
           },
         ]}
@@ -189,8 +189,8 @@ describe('FlightTelemetryOverlay', () => {
             metric: 'altitude',
             x: 0,
             y: 0,
-            width: 0.2,
-            height: 0.2,
+            width: 384,
+            height: 216,
             visible: true,
             transparent: false,
           },
@@ -231,8 +231,8 @@ describe('FlightTelemetryOverlay', () => {
         metric: 'altitude',
         x: 0,
         y: 0,
-        width: 0.2,
-        height: 0.2,
+        width: 384,
+        height: 216,
         visible: true,
         groupId: 'flight-stats',
         groupName: 'Flight stats',

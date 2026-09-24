@@ -10,7 +10,7 @@ import { getTelemetryMetricValue } from './telemetryMetrics';
 import type { FlightTelemetryData } from '../../../hooks/flights/useFlightTelemetry';
 
 describe('flight telemetry layout XML', () => {
-  it('round-trips normalized widget positions and metrics', () => {
+  it('round-trips pixel widget positions and metrics', () => {
     const layout: FlightTelemetryWidgetLayout[] =
       DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget, index) => ({
         ...widget,
@@ -23,6 +23,19 @@ describe('flight telemetry layout XML', () => {
     ).toEqual(
       layout.map((widget) => ({ ...widget, x: Number(widget.x.toFixed(4)) }))
     );
+  });
+
+  it('converts legacy normalized XML into logical canvas pixels', () => {
+    const parsed = parseTelemetryLayoutXml(
+      '<telemetry-layout version="1" width="1920" height="1080"><widget id="legacy" metric="altitude" x="0.02" y="0.02" width="0.16" height="0.1" visible="true" /></telemetry-layout>'
+    );
+
+    expect(parsed[0]).toMatchObject({
+      x: 38.4,
+      y: 21.6,
+      width: 307.2,
+      height: 108,
+    });
   });
 
   it('falls back to the default layout for malformed XML', () => {

@@ -10,19 +10,28 @@ import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
 import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 import { FlightTelemetryOverlay } from './FlightTelemetryOverlay';
-import type { FlightTelemetryPipLayout } from './flightTelemetryLayout';
+import {
+  TELEMETRY_CANVAS_HEIGHT,
+  TELEMETRY_CANVAS_WIDTH,
+  type FlightTelemetryPipLayout,
+} from './flightTelemetryLayout';
 import { sourceTimeAtPreviewTime } from './GoproOverlaySyncPreview';
+import { getYoutubeVideoId } from '../../../lib/youtube';
 
 interface FlightTelemetryInteractivePreviewProps {
   flightId: string;
   hasFlightVideo?: boolean;
   manualOffsetSeconds?: number;
+  youtubeUrls?: string[];
 }
+
+const EMPTY_YOUTUBE_URLS: string[] = [];
 
 export function FlightTelemetryInteractivePreview({
   flightId,
   hasFlightVideo = true,
   manualOffsetSeconds,
+  youtubeUrls = EMPTY_YOUTUBE_URLS,
 }: FlightTelemetryInteractivePreviewProps) {
   const { t } = useTranslation();
   const token = useAuthStore((state) => state.token);
@@ -70,6 +79,19 @@ export function FlightTelemetryInteractivePreview({
       ? parseApiUtcDate(overlayPreview.data.gpx.start_time).getTime()
       : telemetry.data?.points[0]?.timestamp);
   const previewSegments = overlayPreview.data?.video.preview_segments ?? [];
+  const pipLayout = layout.data?.layout.find(
+    (item): item is FlightTelemetryPipLayout => item.type === 'pip'
+  );
+  const playerPipLayout = pipLayout
+    ? {
+        ...pipLayout,
+        x: pipLayout.x / TELEMETRY_CANVAS_WIDTH,
+        y: pipLayout.y / TELEMETRY_CANVAS_HEIGHT,
+        width: pipLayout.width / TELEMETRY_CANVAS_WIDTH,
+        height: pipLayout.height / TELEMETRY_CANVAS_HEIGHT,
+      }
+    : undefined;
+  const youtubeUrl = youtubeUrls.find((url) => getYoutubeVideoId(url));
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
       <div className="flex items-start gap-3 p-4 sm:p-5">
@@ -127,12 +149,14 @@ export function FlightTelemetryInteractivePreview({
                       })
                     : undefined
                 }
+                youtubeUrl={youtubeUrl}
+                getFlightTime={(previewTime) =>
+                  sourceTimeAtPreviewTime(previewTime, previewSegments) -
+                  calibrationOffsetSeconds
+                }
                 cameraLabel={t('flights.goproOverlayCameraPreview')}
                 flightLabel={t('flights.goproOverlayFlightVideo')}
-                pipLayout={layout.data?.layout.find(
-                  (item): item is FlightTelemetryPipLayout =>
-                    item.type === 'pip'
-                )}
+                pipLayout={playerPipLayout}
                 onTimeChange={(previewTime) =>
                   setCameraTime(
                     sourceTimeAtPreviewTime(previewTime, previewSegments)
