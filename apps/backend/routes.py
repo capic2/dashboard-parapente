@@ -7538,6 +7538,23 @@ def generate_flight_gopro_camera_preview(
 
 
 @router.post(
+    "/flights/{flight_id}/gopro-camera",
+)
+async def upload_flight_gopro_camera(
+    flight_id: str,
+    video_file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Store the onboard camera video for a flight before overlay setup."""
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    input_dir = _gopro_overlay_flight_directory(db, flight)
+    await save_uploaded_file(video_file, input_dir / "camera.mp4", {".mp4", ".mov", ".m4v"})
+    return {"filename": "camera.mp4"}
+
+
+@router.post(
     "/flights/{flight_id}/gopro-overlay",
     response_model=GoproOverlayJob,
 )

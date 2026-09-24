@@ -881,7 +881,7 @@ describe('FlightDetails GoPro overlay action', () => {
     ).toBeDisabled();
   });
 
-  it('shows why overlay generation is unavailable', () => {
+  it('allows providing the camera video when it is not on the server', () => {
     mockFlight.gopro_camera_file_exists = false;
 
     render(
@@ -895,9 +895,14 @@ describe('FlightDetails GoPro overlay action', () => {
     openTab('Media');
 
     expect(screen.getByText('Needs camera video')).toBeInTheDocument();
+    const generateButton = screen.getByRole('button', {
+      name: /Generate overlay/u,
+    });
+    expect(generateButton).toBeEnabled();
+    fireEvent.click(generateButton);
     expect(
-      screen.getByRole('button', { name: /Generate overlay/u })
-    ).toBeDisabled();
+      screen.getByLabelText('Onboard camera video (MP4/MOV)')
+    ).toBeInTheDocument();
   });
 
   it('turns the overlay button into cancel while generation is running', async () => {

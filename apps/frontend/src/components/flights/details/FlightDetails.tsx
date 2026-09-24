@@ -130,6 +130,10 @@ export function FlightDetails({
   );
   const [goproOverlayOutputResolution, setGoproOverlayOutputResolution] =
     useState<GoproOverlayOutputResolution>('4k');
+  const [goproOverlayCameraVideo, setGoproOverlayCameraVideo] =
+    useState<File | null>(null);
+  const [isUploadingGoproCameraVideo, setIsUploadingGoproCameraVideo] =
+    useState(false);
   const [downloadingMedia, setDownloadingMedia] =
     useState<DownloadableFlightMedia | null>(null);
   const [deletingGoproOverlayJobId, setDeletingGoproOverlayJobId] = useState<
@@ -390,7 +394,7 @@ export function FlightDetails({
       toast.error(t('flights.goproOverlayNeedsLayer'));
       return;
     }
-    if (!hasGoproCameraVideo) {
+    if (!hasGoproCameraVideo && !goproOverlayCameraVideo) {
       toast.error(t('flights.goproOverlayNeedsCameraVideo'));
       return;
     }
@@ -403,6 +407,9 @@ export function FlightDetails({
     const formData = new FormData();
     setIsGoproOverlayDialogOpen(false);
     formData.append('output_resolution', goproOverlayOutputResolution);
+    if (goproOverlayCameraVideo) {
+      formData.append('video_file', goproOverlayCameraVideo);
+    }
 
     try {
       const job = await createGoproOverlayJob.mutateAsync(formData);
@@ -412,6 +419,9 @@ export function FlightDetails({
       void queryClient.invalidateQueries({ queryKey: ['flights'] });
       toast.success(t('flights.goproOverlayStarted'));
     } catch (error) {
+      if (goproOverlayCameraVideo) {
+        void queryClient.invalidateQueries({ queryKey: ['flights'] });
+      }
       toast.error(
         await getApiErrorMessage(error, t('flights.goproOverlayStartError'))
       );
@@ -421,7 +431,37 @@ export function FlightDetails({
   const handleOpenGoproOverlayDialog = () => {
     if (createGoproOverlayJob.isPending || isGoproOverlayRunning) return;
     setGoproOverlayOutputResolution('4k');
+    setGoproOverlayCameraVideo(null);
     setIsGoproOverlayDialogOpen(true);
+  };
+
+  const handleGoproCameraVideoChange = async (
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.currentTarget.files?.[0] ?? null;
+    setGoproOverlayCameraVideo(file);
+    if (!file) return;
+    setIsUploadingGoproCameraVideo(true);
+    try {
+      const formData = new FormData();
+      formData.append('video_file', file);
+      await api.post(`flights/${flight.id}/gopro-camera`, {
+        body: formData,
+        timeout: false,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['flights'] });
+      toast.success(t('flights.goproOverlayCameraVideoUploaded'));
+    } catch (error) {
+      setGoproOverlayCameraVideo(null);
+      toast.error(
+        await getApiErrorMessage(
+          error,
+          t('flights.goproOverlayCameraVideoUploadError')
+        )
+      );
+    } finally {
+      setIsUploadingGoproCameraVideo(false);
+    }
   };
 
   const handleGoproOverlayOffsetChange = async (nextOffset: string) => {
@@ -621,7 +661,9 @@ export function FlightDetails({
   }
   let goproOverlayUnavailableReason: string | null = null;
   if (!isGoproOverlayRunning && !hasGoproCameraVideo) {
-    goproOverlayUnavailableReason = t('flights.goproOverlayNeedsCameraVideo');
+    goproOverlayUnavailableReason = t(
+      'flights.goproOverlayNeedsCameraVideoUpload'
+    );
   } else if (!isGoproOverlayRunning && !hasVideo) {
     goproOverlayUnavailableReason = t('flights.goproOverlayNeedsVideo');
   } else if (!isGoproOverlayRunning && !hasGoproOverlayOffset) {
@@ -631,11 +673,10 @@ export function FlightDetails({
   }
   const canUseGoproOverlayAction =
     (isGoproOverlayRunning && Boolean(effectiveGoproOverlayJobId)) ||
-    (hasGoproCameraVideo &&
-      hasVideo &&
-      hasGoproOverlayOffset &&
-      hasReadyOverlayLayer &&
-      !isGoproOverlayRunning);
+    (hasVideo &&
+      !isGoproOverlayRunning &&
+      (!hasGoproCameraVideo ||
+        (hasGoproOverlayOffset && hasReadyOverlayLayer)));
   const hasGenerationLogs = Boolean(
     flight.video_export_job_id ||
     videoExportStatus?.internal_status ||
@@ -652,6 +693,17 @@ export function FlightDetails({
   );
   const visibleActiveTab =
     !hasGenerationLogs && activeTab === 'logs' ? 'infos' : activeTab;
+  let cameraVideoUploadHint = t(
+    'flights.goproOverlayCameraVideoUploadHintRequired'
+  );
+  if (hasGoproCameraVideo) {
+    cameraVideoUploadHint = t(
+      'flights.goproOverlayCameraVideoUploadHintExisting'
+    );
+  }
+  if (isUploadingGoproCameraVideo) {
+    cameraVideoUploadHint = t('flights.goproOverlayCameraVideoUploading');
+  }
 
   const goproOverlayModal = (
     <Modal
@@ -664,6 +716,32 @@ export function FlightDetails({
         <p className="text-sm text-gray-600 dark:text-gray-300">
           {t('flights.goproOverlayOffsetDialogDescription')}
         </p>
+
+        <div className="flex flex-col gap-1">
+          <label
+            htmlFor="gopro-overlay-camera-video"
+            className="text-sm font-medium text-gray-700 dark:text-gray-200"
+          >
+            {t('flights.goproOverlayCameraVideoUploadLabel')}
+          </label>
+          <input
+            id="gopro-overlay-camera-video"
+            type="file"
+            accept="video/mp4,video/quicktime,.mp4,.mov,.m4v"
+            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+              void handleGoproCameraVideoChange(event)
+            }
+            disabled={isUploadingGoproCameraVideo}
+            className="block min-h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:file:bg-gray-800"
+            aria-describedby="gopro-overlay-camera-video-hint"
+          />
+          <span
+            id="gopro-overlay-camera-video-hint"
+            className="text-xs text-gray-500 dark:text-gray-400"
+          >
+            {cameraVideoUploadHint}
+          </span>
+        </div>
 
         {hasPersistedGoproOverlay && (
           <div
@@ -722,7 +800,9 @@ export function FlightDetails({
           <Button
             className="min-h-10 rounded-lg px-3 py-2 text-sm"
             onPress={() => void handleStartGoproOverlay()}
-            isDisabled={createGoproOverlayJob.isPending}
+            isDisabled={
+              createGoproOverlayJob.isPending || isUploadingGoproCameraVideo
+            }
           >
             {createGoproOverlayJob.isPending
               ? t('flights.goproOverlayStarting')
