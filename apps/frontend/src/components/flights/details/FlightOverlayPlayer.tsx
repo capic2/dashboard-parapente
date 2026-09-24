@@ -248,6 +248,8 @@ export function FlightOverlayPlayer({
         videoId: youtubeId,
         playerVars: {
           controls: 0,
+          // YouTube chooses the best quality available for the viewing
+          // conditions; its iframe API no longer supports forcing quality.
           cc_load_policy: 0,
           fs: 0,
           playsinline: 1,
