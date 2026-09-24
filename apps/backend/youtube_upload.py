@@ -71,10 +71,10 @@ class YoutubeRemoteDeletionError(RuntimeError):
     pass
 
 
-def playlist_title_for_flight(flight: Flight) -> str:
-    """Return the stable YouTube playlist name used by all videos of a flight."""
-    label = (flight.name or flight.title or "").strip()
-    return f"Vol – {label or flight.flight_date.isoformat()} – {flight.id}"[:150]
+def playlist_title_for_flight(db: Session, flight: Flight) -> str:
+    """Return the YouTube playlist name for a flight's daily sequence."""
+    sequence = flight_sequence_number(db, flight)
+    return f"Parapente - Vol {sequence} du {flight.flight_date.strftime('%d/%m/%Y')}"
 
 
 class YoutubeVideoAssociationPayload(TypedDict):
@@ -388,7 +388,7 @@ def migrate_flight_playlists(*, user_id: int) -> dict[str, int]:
                     video_id = youtube_video_id_from_url(url)
                     if not add_video_to_flight_playlist(
                         user_id=user_id,
-                        playlist_title=playlist_title_for_flight(flight),
+                        playlist_title=playlist_title_for_flight(db, flight),
                         video_id=video_id,
                     ):
                         skipped += 1
@@ -766,7 +766,7 @@ def _finish_upload(job_id: str, video_id: str) -> None:
         urls = flight.youtube_urls
         if youtube_url not in urls:
             flight.youtube_urls = [*urls, youtube_url]
-        playlist_title = playlist_title_for_flight(flight)
+        playlist_title = playlist_title_for_flight(db, flight)
         db.commit()
         user_id = job.user_id
     _log_job(job_id, f"YouTube upload completed: {youtube_url}")
