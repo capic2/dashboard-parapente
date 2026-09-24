@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -13,9 +13,16 @@ from fastapi.testclient import TestClient
 from models import Flight, GoproOverlayJob, YoutubeCredential, YoutubeUploadJob
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from youtube_upload import decode_oauth_state, encrypt_secret
+from youtube_upload import decode_oauth_state, encrypt_secret, playlist_title_for_flight
 
 API_PREFIX = "/api"
+
+
+def test_playlist_title_includes_flight_identity() -> None:
+    first = Flight(id="flight-a", name="Annecy", flight_date=date(2026, 9, 24))
+    second = Flight(id="flight-b", name="Annecy", flight_date=date(2026, 9, 24))
+
+    assert playlist_title_for_flight(first) != playlist_title_for_flight(second)
 
 
 def _configure_youtube(monkeypatch) -> None:

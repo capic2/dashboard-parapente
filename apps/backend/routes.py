@@ -232,6 +232,7 @@ from youtube_upload import (
     job_payload as youtube_upload_job_payload,
     latest_job as latest_youtube_upload_job,
     remove_youtube_video,
+    migrate_flight_playlists,
     youtube_video_availability,
     youtube_video_associations,
 )
@@ -1104,6 +1105,17 @@ def delete_youtube_connection(
 ) -> Response:
     disconnect_youtube(db, user.id)
     return Response(status_code=204)
+
+
+@router.post("/youtube/playlists/migrate")
+def migrate_youtube_playlists(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, int]:
+    """Organize existing locally linked YouTube videos by flight."""
+    if not is_youtube_connected(db, user.id):
+        raise HTTPException(status_code=409, detail="Connect YouTube before migrating playlists")
+    return migrate_flight_playlists(user_id=user.id)
 
 
 @router.get(
