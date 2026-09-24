@@ -316,6 +316,37 @@ describe('FlightYoutubeUploadControls', () => {
     ).toBeInTheDocument();
   });
 
+  it('allows reupload when the old association is no longer available', () => {
+    useYoutubeUpload.mockReturnValue({
+      data: {
+        status: 'completed',
+        youtube_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      },
+      isLoading: false,
+    });
+    useYoutubeVideoAssociations.mockReturnValue({ data: [] });
+    const queryClient = new QueryClient();
+    const flight = {
+      id: 'flight-1',
+      flight_date: '2026-08-19',
+      name: 'Vol test',
+      youtube_urls: ['https://www.youtube.com/watch?v=dQw4w9WgXcQ'],
+    } as Flight;
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FlightYoutubeUploadControls
+          flight={flight}
+          source={{ source_type: 'pano' }}
+        />
+      </QueryClientProvider>
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Publier sur YouTube' })
+    ).toBeEnabled();
+  });
+
   it('refreshes YouTube associations when an upload completes', async () => {
     let status = 'uploading';
     useYoutubeUpload.mockImplementation(
