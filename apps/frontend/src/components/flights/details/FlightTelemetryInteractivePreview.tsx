@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
+import { Button } from '@dashboard-parapente/design-system';
 import { CircleAlert, Edit3, Wand2 } from 'lucide-react';
 import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { useFlightTelemetry } from '../../../hooks/flights/useFlightTelemetry';
@@ -17,6 +18,7 @@ import {
 } from './flightTelemetryLayout';
 import { sourceTimeAtPreviewTime } from './GoproOverlaySyncPreview';
 import { getYoutubeVideoId } from '../../../lib/youtube';
+import { useStartYoutubeOverlayExport } from '../../../hooks/flights/useYoutubeUpload';
 
 interface FlightTelemetryInteractivePreviewProps {
   flightId: string;
@@ -39,6 +41,9 @@ export function FlightTelemetryInteractivePreview({
   const telemetry = useFlightTelemetry(flightId, true);
   const layout = useTelemetryLayout(flightId);
   const [cameraTime, setCameraTime] = useState(0);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [rightsConfirmed, setRightsConfirmed] = useState(false);
+  const startExport = useStartYoutubeOverlayExport(flightId);
   const isEnrichmentPending =
     telemetry.data?.enrichment_status === 'pending' ||
     overlayPreview.data?.gpx?.enrichment_status === 'pending';
@@ -115,8 +120,68 @@ export function FlightTelemetryInteractivePreview({
             <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
             {t('telemetryLayout.configure')}
           </Link>
+          {youtubeUrl && (
+            <Button
+              variant="secondary"
+              className="shrink-0 rounded-lg border border-cyan-200 px-3 py-2 text-xs font-semibold text-cyan-700 dark:border-cyan-800 dark:text-cyan-300"
+              onPress={() => {
+                setIsExportDialogOpen(true);
+                setRightsConfirmed(false);
+              }}
+            >
+              {t('flights.youtubeOverlayExport')}
+            </Button>
+          )}
         </span>
       </div>
+      {isExportDialogOpen && youtubeUrl && (
+        <div className="border-t border-cyan-200 bg-cyan-50/70 p-4 dark:border-cyan-900 dark:bg-cyan-950/20 sm:px-5">
+          <p className="text-sm font-semibold text-slate-900 dark:text-white">
+            {t('flights.youtubeOverlayExportTitle')}
+          </p>
+          <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+            {t('flights.youtubeOverlayExportDescription')}
+          </p>
+          <label className="mt-3 flex items-start gap-2 text-sm text-slate-800 dark:text-slate-100">
+            <input
+              type="checkbox"
+              checked={rightsConfirmed}
+              onChange={(event) => setRightsConfirmed(event.target.checked)}
+            />
+            {t('flights.youtubeOverlayExportRights')}
+          </label>
+          <div className="mt-3 flex gap-2">
+            <Button
+              variant="secondary"
+              onPress={() => setIsExportDialogOpen(false)}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              isDisabled={!rightsConfirmed || startExport.isPending}
+              onPress={async () => {
+                await startExport.mutateAsync({
+                  youtube_url: youtubeUrl,
+                  rights_confirmed: true,
+                });
+                setIsExportDialogOpen(false);
+              }}
+            >
+              {startExport.isPending
+                ? t('common.loading')
+                : t('flights.youtubeOverlayExportStart')}
+            </Button>
+          </div>
+          {startExport.isError && (
+            <p
+              className="mt-2 text-sm text-red-700 dark:text-red-300"
+              role="alert"
+            >
+              {t('flights.youtubeOverlayExportError')}
+            </p>
+          )}
+        </div>
+      )}
       <div className="border-t border-slate-200 p-4 dark:border-slate-700 sm:p-5">
         {isLoading && (
           <output
