@@ -92,6 +92,9 @@ export function FlightTelemetryInteractivePreview({
       }
     : undefined;
   const youtubeUrl = youtubeUrls.find((url) => getYoutubeVideoId(url));
+  const flightTimeAtPreviewTime = (previewTime: number) =>
+    sourceTimeAtPreviewTime(previewTime, previewSegments) -
+    calibrationOffsetSeconds;
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
       <div className="flex items-start gap-3 p-4 sm:p-5">
@@ -150,10 +153,7 @@ export function FlightTelemetryInteractivePreview({
                     : undefined
                 }
                 youtubeUrl={youtubeUrl}
-                getFlightTime={(previewTime) =>
-                  sourceTimeAtPreviewTime(previewTime, previewSegments) -
-                  calibrationOffsetSeconds
-                }
+                getFlightTime={flightTimeAtPreviewTime}
                 cameraLabel={t('flights.goproOverlayCameraPreview')}
                 flightLabel={t('flights.goproOverlayFlightVideo')}
                 pipLayout={playerPipLayout}

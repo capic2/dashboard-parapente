@@ -271,6 +271,10 @@ export function FlightOverlayPlayer({
             if (playing) {
               playMedia(flightRef.current);
               playMedia(overlayRef.current);
+              // Apply the GPX/video offset immediately when YouTube becomes
+              // the master clock; the animation frame loop then keeps it
+              // aligned for the rest of playback.
+              syncMediaRef.current?.(true);
             } else {
               flightRef.current?.pause();
               overlayRef.current?.pause();
