@@ -1050,8 +1050,6 @@ export function FlightDetails({
           onDownloadPersistedGoproOverlay={() =>
             void handleDownloadPersistedGoproOverlay()
           }
-          onUploadCameraVideo={handleGoproCameraVideoChange}
-          isUploadingCameraVideo={isUploadingGoproCameraVideo}
         >
           <HighlightVideoJobCard
             job={latestHighlightVideo}

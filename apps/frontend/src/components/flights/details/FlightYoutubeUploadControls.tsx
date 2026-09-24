@@ -35,6 +35,8 @@ function getDefaultYoutubeTitle(
   let suffix = ' pano';
   if (source.source_type === 'highlight') {
     suffix = ' meilleurs moments';
+  } else if (source.source_type === 'camera') {
+    suffix = ' caméra';
   } else if (source.source_type === 'video') {
     suffix = ' vidéo';
   }
@@ -45,8 +47,15 @@ function getDefaultYoutubeTitle(
     !/meilleurs moments/iu.test(baseTitle);
   const needsVideoSuffix =
     source.source_type === 'video' && !/vidéo/iu.test(baseTitle);
+  const needsCameraSuffix =
+    source.source_type === 'camera' && !/caméra/iu.test(baseTitle);
 
-  if (!needsPanoSuffix && !needsHighlightSuffix && !needsVideoSuffix) {
+  if (
+    !needsPanoSuffix &&
+    !needsHighlightSuffix &&
+    !needsVideoSuffix &&
+    !needsCameraSuffix
+  ) {
     return baseTitle.slice(0, YOUTUBE_TITLE_MAX_LENGTH);
   }
 

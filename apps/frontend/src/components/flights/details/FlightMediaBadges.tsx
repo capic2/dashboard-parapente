@@ -1,4 +1,4 @@
-import { useRef, type ChangeEvent, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@dashboard-parapente/design-system';
 import {
@@ -36,8 +36,6 @@ interface FlightMediaBadgesProps {
   onUploadGpx: () => void;
   onDownloadVideo: () => void;
   onDownloadPersistedGoproOverlay: () => void;
-  onUploadCameraVideo: (event: ChangeEvent<HTMLInputElement>) => void;
-  isUploadingCameraVideo: boolean;
   children: ReactNode;
 }
 
@@ -58,12 +56,9 @@ export function FlightMediaBadges({
   onUploadGpx,
   onDownloadVideo,
   onDownloadPersistedGoproOverlay,
-  onUploadCameraVideo,
-  isUploadingCameraVideo,
   children,
 }: FlightMediaBadgesProps) {
   const { t } = useTranslation();
-  const cameraFileInputRef = useRef<HTMLInputElement>(null);
   const showPersistedOverlayBadge =
     hasPersistedGoproOverlay && !hasCompletedGoproOverlayJob;
   const videoProgress = Math.max(
@@ -164,32 +159,14 @@ export function FlightMediaBadges({
                 {t('flights.cameraBadge')}
               </span>
             </div>
-            <div className="px-3 pb-3">
-              <input
-                ref={cameraFileInputRef}
-                type="file"
-                accept="video/mp4,video/quicktime,.mp4,.mov,.m4v"
-                className="sr-only"
-                onChange={onUploadCameraVideo}
-                disabled={isUploadingCameraVideo}
-                aria-label={t('flights.goproOverlayCameraVideoUploadLabel')}
-              />
-              <Button
-                variant="outline"
-                className="min-h-10 w-full rounded-lg px-3 py-2 text-sm"
-                onPress={() => cameraFileInputRef.current?.click()}
-                isDisabled={isUploadingCameraVideo}
-              >
-                <FileUp className="h-4 w-4" aria-hidden="true" />
-                {isUploadingCameraVideo
-                  ? t('flights.goproOverlayCameraVideoUploading')
-                  : t(
-                      hasGoproCameraVideo
-                        ? 'flights.goproOverlayCameraVideoReplace'
-                        : 'flights.goproOverlayCameraVideoUpload'
-                    )}
-              </Button>
-            </div>
+            {hasGoproCameraVideo && (
+              <div className="mt-3">
+                <FlightYoutubeUploadControls
+                  flight={flight}
+                  source={{ source_type: 'camera' }}
+                />
+              </div>
+            )}
           </div>
         )}
         <div className="order-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
