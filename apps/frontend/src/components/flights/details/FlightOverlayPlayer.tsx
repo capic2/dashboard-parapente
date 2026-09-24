@@ -133,7 +133,13 @@ export function FlightOverlayPlayer({
   const overlayRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
   const syncMediaRef = useRef<((notify?: boolean) => void) | null>(null);
-  const [layout, setLayout] = useState<FlightOverlayLayout>('camera-main');
+  // When a YouTube video is available it is the flat primary view; otherwise
+  // fall back to the generated flight video. Calibration keeps camera-first.
+  const [layout, setLayout] = useState<FlightOverlayLayout>(
+    mode === 'calibration' || youtubeUrl || !flightUrl
+      ? 'camera-main'
+      : 'flight-main'
+  );
   const [cameraCurrentTime, setCameraCurrentTime] = useState(0);
   const [cameraDuration, setCameraDuration] = useState(0);
   const [cameraIsPlaying, setCameraIsPlaying] = useState(false);
