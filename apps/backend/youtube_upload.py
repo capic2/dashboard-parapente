@@ -777,6 +777,11 @@ def _finish_upload(job_id: str, video_id: str) -> None:
 
 
 def _source_video_path(db: Session, job: YoutubeUploadJob) -> Path:
+    if job.source_type == "video":
+        flight = db.get(Flight, job.flight_id)
+        if flight is None or not flight.video_file_path:
+            raise RuntimeError("Flat flight video is no longer available")
+        return Path(flight.video_file_path)
     if job.source_type == "pano":
         flight = db.get(Flight, job.flight_id)
         if flight is None:
