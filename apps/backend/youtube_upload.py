@@ -290,7 +290,7 @@ def _youtube_api_error(response: httpx.Response) -> RuntimeError:
     return RuntimeError(f"YouTube API request failed ({response.status_code})")
 
 
-def _find_or_create_playlist(*, user_id: int, title: str) -> str:
+def _find_or_create_playlist(*, user_id: int, title: str) -> tuple[str, bool]:
     access_token = _access_token(user_id)
     headers = {"Authorization": f"Bearer {access_token}"}
     page_token: str | None = None
@@ -311,7 +311,7 @@ def _find_or_create_playlist(*, user_id: int, title: str) -> str:
         payload = response.json()
         for item in payload.get("items", []):
             if item.get("snippet", {}).get("title") == title:
-                return item["id"]
+                return item["id"], False
         page_token = payload.get("nextPageToken")
         if not page_token:
             break
@@ -327,37 +327,40 @@ def _find_or_create_playlist(*, user_id: int, title: str) -> str:
     playlist_id = response.json().get("id")
     if not isinstance(playlist_id, str) or not playlist_id:
         raise RuntimeError("YouTube did not return a playlist identifier")
-    return playlist_id
+    return playlist_id, True
 
 
 def add_video_to_flight_playlist(*, user_id: int, playlist_title: str, video_id: str) -> bool:
     """Create/reuse the flight playlist and add the video once."""
-    playlist_id = _find_or_create_playlist(user_id=user_id, title=playlist_title)
+    playlist_id, playlist_created = _find_or_create_playlist(
+        user_id=user_id, title=playlist_title
+    )
     access_token = _access_token(user_id)
-    page_token: str | None = None
-    while True:
-        response = httpx.get(
-            _PLAYLIST_ITEMS_URL,
-            params={
-                "part": "snippet",
-                "playlistId": playlist_id,
-                "maxResults": 50,
-                **({"pageToken": page_token} if page_token else {}),
-            },
-            headers={"Authorization": f"Bearer {access_token}"},
-            timeout=30,
-        )
-        if response.is_error:
-            raise _youtube_api_error(response)
-        payload = response.json()
-        if any(
-            item.get("snippet", {}).get("resourceId", {}).get("videoId") == video_id
-            for item in payload.get("items", [])
-        ):
-            return False
-        page_token = payload.get("nextPageToken")
-        if not page_token:
-            break
+    if not playlist_created:
+        page_token: str | None = None
+        while True:
+            response = httpx.get(
+                _PLAYLIST_ITEMS_URL,
+                params={
+                    "part": "snippet",
+                    "playlistId": playlist_id,
+                    "maxResults": 50,
+                    **({"pageToken": page_token} if page_token else {}),
+                },
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=30,
+            )
+            if response.is_error:
+                raise _youtube_api_error(response)
+            payload = response.json()
+            if any(
+                item.get("snippet", {}).get("resourceId", {}).get("videoId") == video_id
+                for item in payload.get("items", [])
+            ):
+                return False
+            page_token = payload.get("nextPageToken")
+            if not page_token:
+                break
     response = httpx.post(
         _PLAYLIST_ITEMS_URL,
         params={"part": "snippet"},
