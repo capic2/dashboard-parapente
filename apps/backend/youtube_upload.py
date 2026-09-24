@@ -330,9 +330,9 @@ def _find_or_create_playlist(*, user_id: int, title: str) -> str:
     return playlist_id
 
 
-def add_video_to_flight_playlist(*, user_id: int, flight: Flight, video_id: str) -> bool:
+def add_video_to_flight_playlist(*, user_id: int, playlist_title: str, video_id: str) -> bool:
     """Create/reuse the flight playlist and add the video once."""
-    playlist_id = _find_or_create_playlist(user_id=user_id, title=playlist_title_for_flight(flight))
+    playlist_id = _find_or_create_playlist(user_id=user_id, title=playlist_title)
     access_token = _access_token(user_id)
     page_token: str | None = None
     while True:
@@ -387,7 +387,9 @@ def migrate_flight_playlists(*, user_id: int) -> dict[str, int]:
                 for url in flight.youtube_urls:
                     video_id = youtube_video_id_from_url(url)
                     if not add_video_to_flight_playlist(
-                        user_id=user_id, flight=flight, video_id=video_id
+                        user_id=user_id,
+                        playlist_title=playlist_title_for_flight(flight),
+                        video_id=video_id,
                     ):
                         skipped += 1
                     else:
@@ -764,11 +766,14 @@ def _finish_upload(job_id: str, video_id: str) -> None:
         urls = flight.youtube_urls
         if youtube_url not in urls:
             flight.youtube_urls = [*urls, youtube_url]
+        playlist_title = playlist_title_for_flight(flight)
         db.commit()
         user_id = job.user_id
     _log_job(job_id, f"YouTube upload completed: {youtube_url}")
     try:
-        add_video_to_flight_playlist(user_id=user_id, flight=flight, video_id=video_id)
+        add_video_to_flight_playlist(
+            user_id=user_id, playlist_title=playlist_title, video_id=video_id
+        )
         _log_job(job_id, "Video added to the flight playlist")
     except Exception as exc:
         # The upload remains successful; playlist organization can be retried later.
