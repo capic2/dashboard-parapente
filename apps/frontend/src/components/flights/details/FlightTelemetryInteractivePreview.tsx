@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
-import { CircleAlert, Edit3, Wand2 } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  CircleAlert,
+  Edit3,
+  Wand2,
+} from 'lucide-react';
 import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { useFlightTelemetry } from '../../../hooks/flights/useFlightTelemetry';
 import { useTelemetryLayout } from '../../../hooks/flights/useTelemetryLayout';
@@ -39,6 +45,12 @@ export function FlightTelemetryInteractivePreview({
   const telemetry = useFlightTelemetry(flightId, true);
   const layout = useTelemetryLayout(flightId);
   const [cameraTime, setCameraTime] = useState(0);
+  const validYoutubeUrls = youtubeUrls.filter((url) => getYoutubeVideoId(url));
+  const [selectedYoutubeIndex, setSelectedYoutubeIndex] = useState(0);
+  const activeYoutubeIndex = Math.min(
+    selectedYoutubeIndex,
+    Math.max(validYoutubeUrls.length - 1, 0)
+  );
   const isEnrichmentPending =
     telemetry.data?.enrichment_status === 'pending' ||
     overlayPreview.data?.gpx?.enrichment_status === 'pending';
@@ -91,7 +103,15 @@ export function FlightTelemetryInteractivePreview({
         height: pipLayout.height / TELEMETRY_CANVAS_HEIGHT,
       }
     : undefined;
-  const youtubeUrl = youtubeUrls.find((url) => getYoutubeVideoId(url));
+  const youtubeUrl = validYoutubeUrls[activeYoutubeIndex];
+  const hasYoutubeCarousel = validYoutubeUrls.length > 1;
+  const selectYoutubeVideo = (index: number) => {
+    if (validYoutubeUrls.length === 0) return;
+    setSelectedYoutubeIndex(
+      (index + validYoutubeUrls.length) % validYoutubeUrls.length
+    );
+    setCameraTime(0);
+  };
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
       <div className="flex items-start gap-3 p-4 sm:p-5">
@@ -128,8 +148,38 @@ export function FlightTelemetryInteractivePreview({
         )}
         {!isLoading && isReady && (
           <div>
+            {hasYoutubeCarousel && (
+              <div
+                className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/70"
+                aria-label={t('flights.overlayVideoCarouselLabel')}
+              >
+                <button
+                  type="button"
+                  className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-white hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                  onClick={() => selectYoutubeVideo(activeYoutubeIndex - 1)}
+                  aria-label={t('flights.overlayVideoPrevious')}
+                >
+                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <span className="min-w-0 text-center text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  {t('flights.overlayVideoPosition', {
+                    current: activeYoutubeIndex + 1,
+                    total: validYoutubeUrls.length,
+                  })}
+                </span>
+                <button
+                  type="button"
+                  className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-white hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                  onClick={() => selectYoutubeVideo(activeYoutubeIndex + 1)}
+                  aria-label={t('flights.overlayVideoNext')}
+                >
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <FlightOverlayPlayer
+                key={youtubeUrl ?? 'camera-only'}
                 mode="interactive"
                 cameraUrl={getApiUrlWithSearchParams(
                   `flights/${flightId}/gopro-camera/preview`,
