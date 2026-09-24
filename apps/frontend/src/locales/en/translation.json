@@ -1308,6 +1308,8 @@
     "goproOverlayCameraVideoUploading": "Uploading camera video…",
     "goproOverlayCameraVideoUploaded": "Camera video saved",
     "goproOverlayCameraVideoUploadError": "Unable to upload camera video",
+    "goproOverlayCameraVideoUpload": "Upload camera video",
+    "goproOverlayCameraVideoReplace": "Replace camera video",
     "goproOverlayGpxFile": "Optional GPX/FIT path",
     "goproOverlayGpxFallback": "If no path is entered, the flight GPX will be used.",
     "goproOverlayOsvVideo": "Optional PIP video path",
