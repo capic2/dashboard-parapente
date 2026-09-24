@@ -158,8 +158,12 @@ export function FlightOverlayPlayer({
       : (camera?.currentTime ?? 0);
     if (!camera && !masterIsYoutube) return;
     const flight = flightRef.current;
-    const flightTime =
-      getFlightTime?.(currentTime) ?? currentTime - syncOffsetSeconds;
+    // When YouTube is available it is the generated flight video, so its
+    // timeline is already the flight/GPX timeline. The GoPro preview is only
+    // a short camera window and must not be used to clock the full flight.
+    const flightTime = masterIsYoutube
+      ? currentTime
+      : (getFlightTime?.(currentTime) ?? currentTime - syncOffsetSeconds);
     if (flight && Math.abs(flight.currentTime - flightTime) > 0.12) {
       flight.currentTime = clamp(flightTime, flight.duration);
     }
@@ -184,7 +188,11 @@ export function FlightOverlayPlayer({
     }
     if (notify) {
       setCameraCurrentTime(currentTime);
-      onTimeChange?.(currentTime);
+      onTimeChange?.(
+        masterIsYoutube
+          ? (getCameraTime?.(currentTime) ?? currentTime)
+          : currentTime
+      );
     }
   };
 

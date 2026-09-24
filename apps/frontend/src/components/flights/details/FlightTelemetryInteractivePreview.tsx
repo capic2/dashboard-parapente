@@ -154,6 +154,9 @@ export function FlightTelemetryInteractivePreview({
                 }
                 youtubeUrl={youtubeUrl}
                 getFlightTime={flightTimeAtPreviewTime}
+                getCameraTime={(flightTime) =>
+                  flightTime + calibrationOffsetSeconds
+                }
                 cameraLabel={t('flights.goproOverlayCameraPreview')}
                 flightLabel={t('flights.goproOverlayFlightVideo')}
                 pipLayout={playerPipLayout}
