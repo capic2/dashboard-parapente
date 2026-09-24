@@ -166,11 +166,21 @@ export function FlightMediaBadges({
               </div>
             </div>
           )}
-          <div className="flex items-center gap-3 p-3">
-            <Camera className="h-5 w-5 text-slate-500" aria-hidden="true" />
-            <span className="font-semibold text-slate-950 dark:text-white">
-              {t('flights.cameraBadge')}
-            </span>
+          <div className="p-3">
+            <div className="flex items-center gap-3">
+              <Camera className="h-5 w-5 text-slate-500" aria-hidden="true" />
+              <span className="font-semibold text-slate-950 dark:text-white">
+                {t('flights.cameraBadge')}
+              </span>
+            </div>
+            {hasGoproCameraVideo && (
+              <div className="mt-3">
+                <FlightYoutubeUploadControls
+                  flight={flight}
+                  source={{ source_type: 'camera' }}
+                />
+              </div>
+            )}
           </div>
         </div>
         <div className="order-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
@@ -244,12 +254,6 @@ export function FlightMediaBadges({
                   showModeSelector={false}
                   showCancelAction={false}
                   showLogsPanel={false}
-                />
-              )}
-              {hasVideo && (
-                <FlightYoutubeUploadControls
-                  flight={flight}
-                  source={{ source_type: 'video' }}
                 />
               )}
               {!hasGpx && !hasVideo && (

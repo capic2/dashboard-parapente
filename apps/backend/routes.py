@@ -1172,7 +1172,7 @@ def remove_flight_youtube_video(
 )
 def get_flight_youtube_upload(
     flight_id: str,
-    source_type: Literal["gopro_overlay", "video", "pano", "highlight"] | None = None,
+    source_type: Literal["gopro_overlay", "camera", "video", "pano", "highlight"] | None = None,
     gopro_overlay_job_id: str | None = None,
     highlight_video_job_id: str | None = None,
     db: Session = Depends(get_db),
@@ -1236,6 +1236,8 @@ def start_flight_youtube_upload(
         video_path = pano_video_path(db, flight)
         if not video_path.is_file():
             raise HTTPException(status_code=409, detail="Panorama video is not available")
+    elif payload.source_type == "camera":
+        video_path = _flight_gopro_camera_path(db, flight)
     else:
         video_path = _resolve_flight_file_path(flight.video_file_path)
         if video_path is None or not video_path.is_file():
