@@ -387,18 +387,31 @@ def _flight_gopro_overlay_path(
     return output_path if output_path.exists() else None
 
 
+def _directory_file_exists(path: Path) -> bool:
+    """Check a media file via its parent directory to avoid stale NFS dentries."""
+    try:
+        return any(
+            entry.name == path.name
+            and not entry.is_symlink()
+            and entry.is_file()
+            for entry in path.parent.iterdir()
+        )
+    except OSError:
+        return False
+
+
 def _flight_gopro_camera_file_exists(db: Session, flight: Flight) -> bool:
     try:
         camera_path = _gopro_overlay_flight_directory(db, flight, create=False) / "camera.mp4"
     except HTTPException:
         return False
-    return camera_path.exists()
+    return _directory_file_exists(camera_path)
 
 
 def _flight_gopro_camera_path(db: Session, flight: Flight) -> Path:
     input_dir = _gopro_overlay_flight_directory(db, flight, create=False)
     camera_path = input_dir / "camera.mp4"
-    if not camera_path.is_file():
+    if not _directory_file_exists(camera_path):
         raise HTTPException(status_code=404, detail="GoPro camera video not found")
     return camera_path
 
@@ -4265,7 +4278,7 @@ def get_flights(
             "video_export_progress": video_export["progress"],
             "video_file_path": flight.video_file_path,
             "video_file_exists": _flight_video_file_exists(flight),
-            "pano_video_file_exists": pano_paths[flight.id].is_file(),
+            "pano_video_file_exists": _directory_file_exists(pano_paths[flight.id]),
             "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
             "gopro_overlay_job_id": flight.gopro_overlay_job_id,
             "gopro_overlay_status": gopro_overlay["status"],
@@ -4816,7 +4829,7 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "video_export_progress": video_export["progress"],
         "video_file_path": flight.video_file_path,
         "video_file_exists": _flight_video_file_exists(flight),
-        "pano_video_file_exists": pano_path.is_file(),
+        "pano_video_file_exists": _directory_file_exists(pano_path),
         "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
         "gopro_overlay_job_id": flight.gopro_overlay_job_id,
         "gopro_overlay_status": gopro_overlay["status"],

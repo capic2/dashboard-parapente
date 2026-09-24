@@ -119,6 +119,19 @@ def _flight_directory(flight_date: date, sequence: int) -> Path:
     return Path(config.PARAGLIDING_DATA_ROOT) / flight_date.strftime("%Y%m%d") / f"{sequence:02d}"
 
 
+def _directory_file_exists(path: Path) -> bool:
+    """Check a media file via its parent directory to avoid stale NFS dentries."""
+    try:
+        return any(
+            entry.name == path.name
+            and not entry.is_symlink()
+            and entry.is_file()
+            for entry in path.parent.iterdir()
+        )
+    except OSError:
+        return False
+
+
 def _null_safe_equal(left: Any, right: Any) -> ColumnElement[bool]:
     return or_(left == right, and_(left.is_(None), right.is_(None)))
 
@@ -448,7 +461,7 @@ def list_flight_summaries(
             / f"{row.flight_sequence:02d}"
             / "pano.mp4"
         )
-        pano_flags[row.id] = path.is_file()
+        pano_flags[row.id] = _directory_file_exists(path)
         if pano_flags[row.id] and not row.pano_video_file_path:
             detected_pano_paths.append({"id": row.id, "pano_video_file_path": str(path.resolve())})
     if detected_pano_paths:
@@ -474,9 +487,9 @@ def list_flight_summaries(
             video_export_status=row.video_export_status,
             video_export_progress=None,
             has_video=row.video_export_status == "completed" and _file_exists(row.video_file_path),
-            has_camera=(
+            has_camera=_directory_file_exists(
                 _flight_directory(row.flight_date, row.flight_sequence) / "camera.mp4"
-            ).is_file(),
+            ),
             has_youtube_video=bool(uploaded_youtube_ids[row.id] & existing_youtube_ids),
             youtube_video_count=len(uploaded_youtube_ids[row.id] & existing_youtube_ids),
             youtube_upload_status=None,

@@ -7,9 +7,24 @@ from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 import config
+from flight_summaries import _directory_file_exists
 from models import Flight, GoproOverlayJob, HighlightVideoJob, YoutubeUploadJob
 
 API_URL = "/api/flights/summaries"
+
+
+def test_directory_file_exists_ignores_missing_and_symlinked_media(tmp_path: Path) -> None:
+    media = tmp_path / "camera.mp4"
+    assert not _directory_file_exists(media)
+
+    media.write_bytes(b"video")
+    assert _directory_file_exists(media)
+
+    media.unlink()
+    target = tmp_path / "other.mp4"
+    target.write_bytes(b"video")
+    media.symlink_to(target)
+    assert not _directory_file_exists(media)
 
 
 def _add_flights(db_session, *, count: int, site_id: str = "site-arguel") -> None:
