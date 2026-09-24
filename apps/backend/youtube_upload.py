@@ -36,6 +36,8 @@ _AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
 _UPLOAD_URL = "https://www.googleapis.com/upload/youtube/v3/videos"
 _VIDEOS_URL = "https://www.googleapis.com/youtube/v3/videos"
+_PLAYLISTS_URL = "https://www.googleapis.com/youtube/v3/playlists"
+_PLAYLIST_ITEMS_URL = "https://www.googleapis.com/youtube/v3/playlistItems"
 _ACTIVE_STATUSES = {"queued", "uploading"}
 _CANCELLED_STATUS = "cancelled"
 _RANGE_PATTERN = re.compile(r"bytes=0-(\d+)")
@@ -67,6 +69,12 @@ class YoutubeVideoDeletionForbiddenError(RuntimeError):
 
 class YoutubeRemoteDeletionError(RuntimeError):
     pass
+
+
+def playlist_title_for_flight(flight: Flight) -> str:
+    """Return the stable YouTube playlist name used by all videos of a flight."""
+    label = (flight.name or flight.title or "").strip()
+    return f"Vol – {label or flight.flight_date.isoformat()} – {flight.id}"[:150]
 
 
 class YoutubeVideoAssociationPayload(TypedDict):
@@ -276,6 +284,118 @@ def _access_token(user_id: int) -> str:
     if not isinstance(access_token, str) or not access_token:
         raise YoutubeOAuthError("Google returned an invalid access token")
     return access_token
+
+
+def _youtube_api_error(response: httpx.Response) -> RuntimeError:
+    return RuntimeError(f"YouTube API request failed ({response.status_code})")
+
+
+def _find_or_create_playlist(*, user_id: int, title: str) -> str:
+    access_token = _access_token(user_id)
+    headers = {"Authorization": f"Bearer {access_token}"}
+    page_token: str | None = None
+    while True:
+        response = httpx.get(
+            _PLAYLISTS_URL,
+            params={
+                "part": "snippet",
+                "mine": "true",
+                "maxResults": 50,
+                **({"pageToken": page_token} if page_token else {}),
+            },
+            headers=headers,
+            timeout=30,
+        )
+        if response.is_error:
+            raise _youtube_api_error(response)
+        payload = response.json()
+        for item in payload.get("items", []):
+            if item.get("snippet", {}).get("title") == title:
+                return item["id"]
+        page_token = payload.get("nextPageToken")
+        if not page_token:
+            break
+    response = httpx.post(
+        _PLAYLISTS_URL,
+        params={"part": "snippet,status"},
+        headers={**headers, "Content-Type": "application/json"},
+        json={"snippet": {"title": title}, "status": {"privacyStatus": "private"}},
+        timeout=30,
+    )
+    if response.is_error:
+        raise _youtube_api_error(response)
+    playlist_id = response.json().get("id")
+    if not isinstance(playlist_id, str) or not playlist_id:
+        raise RuntimeError("YouTube did not return a playlist identifier")
+    return playlist_id
+
+
+def add_video_to_flight_playlist(*, user_id: int, flight: Flight, video_id: str) -> bool:
+    """Create/reuse the flight playlist and add the video once."""
+    playlist_id = _find_or_create_playlist(user_id=user_id, title=playlist_title_for_flight(flight))
+    access_token = _access_token(user_id)
+    page_token: str | None = None
+    while True:
+        response = httpx.get(
+            _PLAYLIST_ITEMS_URL,
+            params={
+                "part": "snippet",
+                "playlistId": playlist_id,
+                "maxResults": 50,
+                **({"pageToken": page_token} if page_token else {}),
+            },
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=30,
+        )
+        if response.is_error:
+            raise _youtube_api_error(response)
+        payload = response.json()
+        if any(
+            item.get("snippet", {}).get("resourceId", {}).get("videoId") == video_id
+            for item in payload.get("items", [])
+        ):
+            return False
+        page_token = payload.get("nextPageToken")
+        if not page_token:
+            break
+    response = httpx.post(
+        _PLAYLIST_ITEMS_URL,
+        params={"part": "snippet"},
+        headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
+        json={
+            "snippet": {
+                "playlistId": playlist_id,
+                "resourceId": {"kind": "youtube#video", "videoId": video_id},
+            }
+        },
+        timeout=30,
+    )
+    if response.status_code == 409:
+        return True
+    if response.is_error:
+        raise _youtube_api_error(response)
+    return True
+
+
+def migrate_flight_playlists(*, user_id: int) -> dict[str, int]:
+    """Organize all locally associated historical videos for a YouTube account."""
+    added = skipped = failed = 0
+    with SessionLocal() as db:
+        flights = db.query(Flight).filter(Flight.youtube_urls_json != "[]").all()
+        for flight in flights:
+            try:
+                for url in flight.youtube_urls:
+                    video_id = youtube_video_id_from_url(url)
+                    if not add_video_to_flight_playlist(
+                        user_id=user_id, flight=flight, video_id=video_id
+                    ):
+                        skipped += 1
+                    else:
+                        added += 1
+            except Exception:
+                logger.exception("Unable to migrate YouTube playlist for flight %s", flight.id)
+                failed += 1
+    return {"added": added, "skipped": skipped, "failed": failed}
 
 
 def job_payload(job: YoutubeUploadJob) -> dict[str, Any]:
@@ -645,7 +765,15 @@ def _finish_upload(job_id: str, video_id: str) -> None:
         if youtube_url not in urls:
             flight.youtube_urls = [*urls, youtube_url]
         db.commit()
+        user_id = job.user_id
     _log_job(job_id, f"YouTube upload completed: {youtube_url}")
+    try:
+        add_video_to_flight_playlist(user_id=user_id, flight=flight, video_id=video_id)
+        _log_job(job_id, "Video added to the flight playlist")
+    except Exception as exc:
+        # The upload remains successful; playlist organization can be retried later.
+        logger.exception("Unable to add YouTube video %s to its flight playlist", video_id)
+        _log_job(job_id, f"Playlist organization failed: {_safe_log_error(exc)}")
 
 
 def _source_video_path(db: Session, job: YoutubeUploadJob) -> Path:
