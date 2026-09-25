@@ -107,6 +107,7 @@ from gopro_overlay_export import (
 import gopro_preview_proxy
 from video_acceleration import get_gpu_runtime_status
 from models import (
+    BackgroundOperation as BackgroundOperationModel,
     EmagramAnalysis,
     Flight,
     GoproOverlayJob as GoproOverlayJobModel,
@@ -133,6 +134,8 @@ from schemas import (
     DeploymentDrainRequest,
     DeploymentDrainJob,
     DeploymentDrainStatus,
+    BackgroundOperation,
+    BackgroundOperationStart,
     ExternalImportResult,
     FlightCreate,
     FlightDecisionResponse,
@@ -237,6 +240,14 @@ from youtube_upload import (
     migrate_flight_playlists,
     youtube_video_availability,
     youtube_video_associations,
+)
+from operations import (
+    ACTIVE_STATUSES as OPERATION_ACTIVE_STATUSES,
+    OperationReporter,
+    get_user_operation,
+    operation_payload,
+    purge_expired_operations,
+    sync_operation_from_snapshot,
 )
 
 logger = logging.getLogger(__name__)
@@ -1062,6 +1073,318 @@ public_router = APIRouter(prefix="/api", tags=["api"])
 router = APIRouter(prefix="/api", tags=["api"], dependencies=[Depends(get_current_user)])
 
 
+def _operation_start_payload(operation: BackgroundOperationModel) -> BackgroundOperationStart:
+    return BackgroundOperationStart(
+        operation_id=operation.id,
+        status="queued",
+        detail_url=f"/api/operations/{operation.id}",
+    )
+
+
+def _ensure_job_operation(
+    db: Session,
+    *,
+    user_id: int,
+    source_kind: str,
+    source_id: str,
+    operation_type: str,
+    title_key: str,
+    steps: list[str],
+    can_cancel: bool = False,
+    can_retry: bool = False,
+) -> BackgroundOperationModel:
+    existing = (
+        db.query(BackgroundOperationModel)
+        .filter(
+            BackgroundOperationModel.user_id == user_id,
+            BackgroundOperationModel.source_kind == source_kind,
+            BackgroundOperationModel.source_id == source_id,
+        )
+        .first()
+    )
+    if existing is not None:
+        return existing
+    return OperationReporter.create(
+        db,
+        user_id=user_id,
+        operation_type=operation_type,
+        title_key=title_key,
+        steps=steps,
+        source_kind=source_kind,
+        source_id=source_id,
+        can_cancel=can_cancel,
+        can_retry=can_retry,
+    ).operation
+
+
+def _refresh_operation_from_source(db: Session, operation: BackgroundOperationModel) -> None:
+    if not operation.source_kind or not operation.source_id:
+        return
+    status: str | None = None
+    progress: int | float | None = None
+    detail: str | None = None
+    error: str | None = None
+    if operation.source_kind == "video_export":
+        snapshot = _resolve_export_status(operation.source_id)
+        if snapshot:
+            status = snapshot.get("internal_status") or snapshot.get("status")
+            progress = snapshot.get("progress")
+            detail = snapshot.get("message")
+            error = snapshot.get("error")
+    elif operation.source_kind == "gopro_overlay":
+        snapshot = get_gopro_overlay_job(operation.source_id)
+        if snapshot:
+            status = snapshot.get("status")
+            progress = snapshot.get("progress")
+            detail = snapshot.get("message")
+            error = snapshot.get("error")
+    elif operation.source_kind == "highlight_video":
+        job = (
+            db.query(HighlightVideoJob).filter(HighlightVideoJob.id == operation.source_id).first()
+        )
+        if job:
+            status = job.status
+            progress = job.progress
+            detail = job.message
+            error = job.error
+    elif operation.source_kind == "youtube_upload":
+        job = db.query(YoutubeUploadJob).filter(YoutubeUploadJob.id == operation.source_id).first()
+        if job:
+            status = job.status
+            progress = job.progress
+            detail = job.title
+            error = job.error
+    if status is not None:
+        sync_operation_from_snapshot(
+            db,
+            operation,
+            status=status,
+            progress=progress,
+            detail=detail,
+            error=error,
+        )
+
+
+def _refresh_operations(db: Session, operations: list[BackgroundOperationModel]) -> None:
+    for operation in operations:
+        _refresh_operation_from_source(db, operation)
+
+
+def _spots_data_is_recent(last_sync_value: Any, *, now: datetime | None = None) -> bool:
+    if not last_sync_value:
+        return False
+    try:
+        last_sync = datetime.fromisoformat(str(last_sync_value))
+    except (TypeError, ValueError):
+        return False
+    reference = now or datetime.utcnow()
+    if last_sync.tzinfo and reference.tzinfo is None:
+        reference = reference.replace(tzinfo=last_sync.tzinfo)
+    elif last_sync.tzinfo is None and reference.tzinfo is not None:
+        reference = reference.replace(tzinfo=None)
+    return reference - last_sync < timedelta(days=7)
+
+
+def _cancel_operation_source(db: Session, operation: BackgroundOperationModel) -> None:
+    source_id = operation.source_id
+    if not operation.source_kind or not source_id:
+        return
+    if operation.source_kind == "video_export":
+        if not cancel_video_export_manual(source_id):
+            cancel_video_export_stream(source_id)
+    elif operation.source_kind == "gopro_overlay":
+        cancel_gopro_overlay_job(source_id)
+    elif operation.source_kind == "highlight_video":
+        job = db.query(HighlightVideoJob).filter(HighlightVideoJob.id == source_id).first()
+        if job is not None and job.status in {HIGHLIGHT_STATUS_QUEUED, "running"}:
+            job.status = "cancelled"
+            job.message = "Rendu des meilleurs moments annulé"
+            job.completed_at = datetime.utcnow()
+            job.cancelled_at = datetime.utcnow()
+            db.commit()
+    elif operation.source_kind == "youtube_upload":
+        cancel_youtube_upload(db, job_id=source_id, user_id=operation.user_id)
+
+
+def _read_operations_payload(user_id: int) -> list[dict[str, Any]]:
+    with SessionLocal() as db:
+        purge_expired_operations(db)
+        operations = (
+            db.query(BackgroundOperationModel)
+            .filter(BackgroundOperationModel.user_id == user_id)
+            .order_by(BackgroundOperationModel.updated_at.desc())
+            .limit(100)
+            .all()
+        )
+        _refresh_operations(db, operations)
+        return [
+            BackgroundOperation.model_validate(operation_payload(item)).model_dump(mode="json")
+            for item in operations
+        ]
+
+
+@router.get("/operations", response_model=list[BackgroundOperation])
+def list_background_operations(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    include_completed: bool = Query(default=True),
+    limit: int = Query(default=100, ge=1, le=200),
+) -> list[BackgroundOperation]:
+    purge_expired_operations(db)
+    query = db.query(BackgroundOperationModel).filter(BackgroundOperationModel.user_id == user.id)
+    if not include_completed:
+        query = query.filter(BackgroundOperationModel.status.in_(OPERATION_ACTIVE_STATUSES))
+    operations = query.order_by(BackgroundOperationModel.updated_at.desc()).limit(limit).all()
+    _refresh_operations(db, operations)
+    return [BackgroundOperation.model_validate(operation_payload(item)) for item in operations]
+
+
+@router.get("/operations/stream")
+async def stream_background_operations(
+    request: Request,
+    user: User = Depends(get_current_user),
+) -> StreamingResponse:
+    async def event_stream():
+        last_payload = ""
+        while not await request.is_disconnected():
+            operations = await asyncio.to_thread(_read_operations_payload, user.id)
+            payload = json.dumps(
+                operations,
+                ensure_ascii=False,
+                default=str,
+                separators=(",", ":"),
+            )
+            if payload != last_payload:
+                last_payload = payload
+                yield f"event: operations\ndata: {payload}\n\n"
+            await asyncio.sleep(2)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.get("/operations/{operation_id}", response_model=BackgroundOperation)
+def get_background_operation(
+    operation_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BackgroundOperation:
+    operation = get_user_operation(db, operation_id, user.id)
+    if operation is None:
+        raise HTTPException(status_code=404, detail="Operation not found")
+    _refresh_operation_from_source(db, operation)
+    return BackgroundOperation.model_validate(operation_payload(operation))
+
+
+@router.patch("/operations/{operation_id}/read", response_model=BackgroundOperation)
+def mark_background_operation_read(
+    operation_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BackgroundOperation:
+    operation = get_user_operation(db, operation_id, user.id)
+    if operation is None:
+        raise HTTPException(status_code=404, detail="Operation not found")
+    operation.read_at = datetime.utcnow()
+    db.commit()
+    db.refresh(operation)
+    return BackgroundOperation.model_validate(operation_payload(operation))
+
+
+@router.post("/operations/{operation_id}/cancel", response_model=BackgroundOperation)
+def cancel_background_operation(
+    operation_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BackgroundOperation:
+    operation = get_user_operation(db, operation_id, user.id)
+    if operation is None:
+        raise HTTPException(status_code=404, detail="Operation not found")
+    if operation.status not in OPERATION_ACTIVE_STATUSES or not operation.can_cancel:
+        raise HTTPException(status_code=409, detail="Operation cannot be cancelled")
+    _cancel_operation_source(db, operation)
+    reporter = OperationReporter(db, operation)
+    reporter.cancel()
+    return BackgroundOperation.model_validate(operation_payload(operation))
+
+
+@router.post("/operations/{operation_id}/retry", response_model=BackgroundOperation)
+def retry_background_operation(
+    operation_id: str,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BackgroundOperation:
+    operation = get_user_operation(db, operation_id, user.id)
+    if operation is None:
+        raise HTTPException(status_code=404, detail="Operation not found")
+    if operation.status not in {"failed", "cancelled"} or not operation.can_retry:
+        raise HTTPException(status_code=409, detail="Operation cannot be retried")
+    if not operation.source_id:
+        raise HTTPException(status_code=409, detail="Operation has no retryable source")
+
+    if operation.source_kind == "video_export":
+        from video_export_manual import resume_video_export
+
+        if not resume_video_export(operation.source_id):
+            raise HTTPException(status_code=409, detail="Video export cannot be resumed")
+    elif operation.source_kind == "gopro_overlay":
+        from gopro_overlay_export import _enqueue_existing_gopro_overlay_job
+
+        if get_gopro_overlay_job(operation.source_id) is None:
+            raise HTTPException(status_code=404, detail="GoPro overlay job not found")
+        _enqueue_existing_gopro_overlay_job(operation.source_id)
+    elif operation.source_kind == "highlight_video":
+        job = (
+            db.query(HighlightVideoJob).filter(HighlightVideoJob.id == operation.source_id).first()
+        )
+        if job is None:
+            raise HTTPException(status_code=404, detail="Highlight job not found")
+        job.status = HIGHLIGHT_STATUS_QUEUED
+        job.progress = 0
+        job.error = None
+        job.message = "En attente du rendu"
+        job.completed_at = None
+        job.cancelled_at = None
+        try:
+            db.commit()
+        except IntegrityError as exc:
+            db.rollback()
+            raise HTTPException(
+                status_code=409, detail="A highlight render is already in progress"
+            ) from exc
+        from job_queue import is_rq_enabled
+
+        if is_rq_enabled():
+            enqueue_highlight_video_job(job.id)
+        else:
+            background_tasks.add_task(process_highlight_video_job, job.id)
+    elif operation.source_kind == "youtube_upload":
+        job = db.query(YoutubeUploadJob).filter(YoutubeUploadJob.id == operation.source_id).first()
+        if job is None or job.user_id != user.id:
+            raise HTTPException(status_code=404, detail="YouTube upload not found")
+        job.status = "queued"
+        job.progress = 0
+        job.error = None
+        job.completed_at = None
+        try:
+            db.commit()
+        except IntegrityError as exc:
+            db.rollback()
+            raise HTTPException(
+                status_code=409, detail="A YouTube upload is already in progress"
+            ) from exc
+        enqueue_youtube_upload(job.id)
+    else:
+        raise HTTPException(status_code=409, detail="Operation has no retry handler")
+
+    OperationReporter(db, operation).reopen()
+    return BackgroundOperation.model_validate(operation_payload(operation))
+
+
 @router.get("/youtube/status")
 def get_youtube_status(
     user: User = Depends(get_current_user), db: Session = Depends(get_db)
@@ -1322,6 +1645,18 @@ def start_flight_youtube_upload(
         ) from exc
     db.refresh(job)
     response_payload = youtube_upload_job_payload(job)
+    operation = _ensure_job_operation(
+        db,
+        user_id=user.id,
+        source_kind="youtube_upload",
+        source_id=job.id,
+        operation_type="youtube_upload",
+        title_key="operations.youtubeUpload",
+        steps=["prepare", "upload", "finalize"],
+        can_cancel=True,
+        can_retry=True,
+    )
+    response_payload["operation_id"] = operation.id
     enqueue_youtube_upload(job.id)
     return response_payload
 
@@ -1492,8 +1827,52 @@ def get_me(user: User = Depends(get_current_user)):
 # ============================================================================
 
 
-@router.post("/spots/sync")
-async def sync_paragliding_spots(force: bool = False, db: Session = Depends(get_db)):
+def _run_spots_sync_operation(operation_id: str, force: bool) -> None:
+    from spots import get_sync_status, sync_to_database
+
+    db = SessionLocal()
+    operation = (
+        db.query(BackgroundOperationModel)
+        .filter(BackgroundOperationModel.id == operation_id)
+        .first()
+    )
+    if operation is None:
+        db.close()
+        return
+    reporter = OperationReporter(db, operation)
+    try:
+        reporter.start()
+        reporter.start_step("check_freshness")
+        status = get_sync_status(db)
+        reporter.complete_step("check_freshness")
+        if not force and _spots_data_is_recent(status.get("last_sync")):
+            reporter.start_step("finalize", "Les données sont déjà récentes")
+            reporter.complete_step("finalize")
+            reporter.complete({"synced": False, "stats": status})
+            return
+        reporter.start_step("sync_sources")
+        stats = sync_to_database(db)
+        if "error" in stats:
+            raise RuntimeError(str(stats["error"]))
+        reporter.complete_step("sync_sources", f"{stats.get('total', 0)} site(s)")
+        reporter.start_step("finalize")
+        reporter.complete_step("finalize")
+        reporter.complete({"synced": True, "stats": stats})
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Spots sync operation %s failed", operation_id)
+        reporter.fail(str(exc))
+    finally:
+        db.close()
+
+
+@router.post("/spots/sync", response_model=BackgroundOperationStart, status_code=202)
+async def sync_paragliding_spots(
+    background_tasks: BackgroundTasks,
+    force: bool = False,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BackgroundOperationStart:
     """
     Sync paragliding spots from OpenAIP and ParaglidingSpots.com
 
@@ -1507,44 +1886,16 @@ async def sync_paragliding_spots(force: bool = False, db: Session = Depends(get_
         POST /api/spots/sync
         POST /api/spots/sync?force=true
     """
-    from datetime import datetime
-
-    from spots import get_sync_status, sync_to_database
-
-    # Check if sync is needed
-    status = get_sync_status(db)
-
-    if not force and status.get("last_sync"):
-        # Parse last sync time
-        try:
-            last_sync = datetime.fromisoformat(status["last_sync"])
-            days_since_sync = (datetime.utcnow() - last_sync).days
-
-            if days_since_sync < 7:
-                return {
-                    "success": True,
-                    "message": f"Data is recent (synced {days_since_sync} days ago). Use force=true to sync anyway.",
-                    "stats": status,
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "synced": False,
-                }
-        except (ValueError, TypeError):
-            pass
-
-    # Perform sync
-    logger.info("Starting paragliding spots sync...")
-    stats = sync_to_database(db)
-
-    if "error" in stats:
-        raise HTTPException(status_code=500, detail=f"Sync failed: {stats['error']}")
-
-    return {
-        "success": True,
-        "message": f"Synced {stats['total']} spots ({stats['added']} new, {stats['updated']} updated)",
-        "stats": stats,
-        "timestamp": datetime.utcnow().isoformat(),
-        "synced": True,
-    }
+    operation = OperationReporter.create(
+        db,
+        user_id=user.id,
+        operation_type="spots_sync",
+        title_key="operations.spotsSync",
+        steps=["check_freshness", "sync_sources", "finalize"],
+        can_retry=False,
+    ).operation
+    background_tasks.add_task(_run_spots_sync_operation, operation.id, force)
+    return _operation_start_payload(operation)
 
 
 @public_router.get("/spots/geocode")
@@ -4716,16 +5067,80 @@ async def preview_intervals_activities(
     )
 
 
-@router.post("/flights/sync-intervals", response_model=ExternalImportResult)
-async def sync_intervals_activities(
-    request: IntervalsSyncRequest, db: Session = Depends(get_db)
-) -> ExternalImportResult:
+async def _run_intervals_sync_operation(operation_id: str, payload: dict[str, Any]) -> None:
     from external_flight_import import import_external_activities
-    from intervals_sync import (
-        _acquire_shared_lock,
-        _release_shared_lock,
-        _renew_shared_lock,
+    from intervals_sync import _acquire_shared_lock, _release_shared_lock, _renew_shared_lock
+
+    db = SessionLocal()
+    operation = (
+        db.query(BackgroundOperationModel)
+        .filter(BackgroundOperationModel.id == operation_id)
+        .first()
     )
+    if operation is None:
+        db.close()
+        return
+    reporter = OperationReporter(db, operation)
+    redis = None
+    token = ""
+    stop_renewal = asyncio.Event()
+    renewal_task = None
+    try:
+        request = IntervalsSyncRequest.model_validate(payload)
+        reporter.start()
+        reporter.start_step("fetch_activities")
+        redis, token = await _acquire_shared_lock()
+        if token == "":
+            raise RuntimeError("Another Intervals.icu synchronization is already running")
+        lock_lost = asyncio.Event()
+        renewal_task = (
+            asyncio.create_task(_renew_shared_lock(redis, token, stop_renewal, lock_lost))
+            if redis is not None and token
+            else None
+        )
+        client = _intervals_client()
+        activities = await client.list_activities(
+            request.date_from, request.date_to, config.INTERVALS_ICU_ACTIVITY_TYPES
+        )
+        if request.activity_ids is not None:
+            selected_activity_ids = set(request.activity_ids)
+            activities = [
+                activity for activity in activities if activity.id in selected_activity_ids
+            ]
+        reporter.complete_step("fetch_activities", f"{len(activities)} activité(s) trouvée(s)")
+        reporter.start_step("import_flights")
+        result = await import_external_activities(
+            db,
+            "intervals_icu",
+            client,
+            activities,
+            should_stop=lock_lost.is_set,
+        )
+        reporter.complete_step("import_flights")
+        reporter.start_step("finalize")
+        reporter.complete_step("finalize")
+        reporter.complete(
+            result=ExternalImportResult.model_validate(result).model_dump(mode="json")
+        )
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Intervals operation %s failed", operation_id)
+        reporter.fail(str(exc))
+    finally:
+        stop_renewal.set()
+        if renewal_task is not None:
+            await renewal_task
+        await _release_shared_lock(redis, token)
+        db.close()
+
+
+@router.post("/flights/sync-intervals", response_model=BackgroundOperationStart, status_code=202)
+async def sync_intervals_activities(
+    request: IntervalsSyncRequest,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BackgroundOperationStart:
 
     if not config.INTERVALS_ICU_ACTIVITY_TYPES:
         raise HTTPException(
@@ -4736,45 +5151,20 @@ async def sync_intervals_activities(
             ),
         )
 
-    redis, token = await _acquire_shared_lock()
-    if token == "":
-        raise HTTPException(
-            status_code=409,
-            detail="Another Intervals.icu synchronization is already running.",
-        )
-    stop_renewal = asyncio.Event()
-    lock_lost = asyncio.Event()
-    renewal_task = (
-        asyncio.create_task(_renew_shared_lock(redis, token, stop_renewal, lock_lost))
-        if redis is not None and token
-        else None
+    operation = OperationReporter.create(
+        db,
+        user_id=user.id,
+        operation_type="intervals_sync",
+        title_key="operations.intervalsSync",
+        steps=["fetch_activities", "import_flights", "finalize"],
+        can_retry=False,
+    ).operation
+    background_tasks.add_task(
+        _run_intervals_sync_operation,
+        operation.id,
+        request.model_dump(mode="json"),
     )
-    client = _intervals_client()
-    try:
-        activities = await client.list_activities(
-            request.date_from, request.date_to, config.INTERVALS_ICU_ACTIVITY_TYPES
-        )
-        if request.activity_ids is not None:
-            selected_activity_ids = set(request.activity_ids)
-            activities = [
-                activity for activity in activities if activity.id in selected_activity_ids
-            ]
-        result = await import_external_activities(
-            db,
-            "intervals_icu",
-            client,
-            activities,
-            should_stop=lock_lost.is_set,
-        )
-    except Exception as exc:
-        db.rollback()
-        _raise_intervals_http_error(exc)
-    finally:
-        stop_renewal.set()
-        if renewal_task is not None:
-            await renewal_task
-        await _release_shared_lock(redis, token)
-    return ExternalImportResult.model_validate(result)
+    return _operation_start_payload(operation)
 
 
 @router.get("/flights/{flight_id}")
@@ -5515,6 +5905,7 @@ def get_flight_highlight_video_thumbnail(
 def create_flight_highlight_video(
     flight_id: str,
     background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> HighlightVideoJobResponse:
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
@@ -5584,7 +5975,18 @@ def create_flight_highlight_video(
         enqueue_highlight_video_job(job.id)
     else:
         background_tasks.add_task(process_highlight_video_job, job.id)
-    return _highlight_job_payload(job)
+    operation = _ensure_job_operation(
+        db,
+        user_id=user.id,
+        source_kind="highlight_video",
+        source_id=job.id,
+        operation_type="highlight_video",
+        title_key="operations.highlightVideo",
+        steps=["prepare", "select", "render", "finalize"],
+        can_cancel=True,
+        can_retry=True,
+    )
+    return _highlight_job_payload(job).model_copy(update={"operation_id": operation.id})
 
 
 @router.get("/flights/{flight_id}/gopro-overlay")
@@ -6544,6 +6946,7 @@ def start_flight_video_export(
     speed: int = 1,
     mode: str = "manual",  # "manual", "manual_fast", or "stream"
     director_style: str = "natural",
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -6665,9 +7068,21 @@ def start_flight_video_export(
         effective_mode = "stream"
         _mark_flight_export_processing(db=db, flight=flight, job_id=job_id)
 
+    operation = _ensure_job_operation(
+        db,
+        user_id=user.id,
+        source_kind="video_export",
+        source_id=job_id,
+        operation_type="video_export",
+        title_key="operations.videoExport",
+        steps=["prepare", "render", "finalize"],
+        can_cancel=True,
+        can_retry=True,
+    )
     return _with_video_export_job_token(
         {
             "job_id": job_id,
+            "operation_id": operation.id,
             "message": f"Video export started ({_video_export_mode_label(effective_mode)})",
             "mode": effective_mode,
             "status_url": f"/api/exports/{job_id}/status",
@@ -6681,6 +7096,7 @@ def start_flight_video_export(
 def generate_flight_video(
     request: Request,
     flight_id: str,
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -6739,9 +7155,21 @@ def generate_flight_video(
 
     logger.info(f" Video generation started: job_id={job_id}")
 
+    operation = _ensure_job_operation(
+        db,
+        user_id=user.id,
+        source_kind="video_export",
+        source_id=job_id,
+        operation_type="video_export",
+        title_key="operations.videoExport",
+        steps=["prepare", "render", "finalize"],
+        can_cancel=True,
+        can_retry=True,
+    )
     return _with_video_export_job_token(
         {
             "job_id": job_id,
+            "operation_id": operation.id,
             "message": started_message,
             "status_url": f"/api/exports/{job_id}/status",
         },
@@ -7361,7 +7789,18 @@ def create_youtube_overlay_export(
             status_code=503,
             detail="The video export queue is unavailable. Try again later.",
         ) from exc
-    return {"job_id": job_id, "status": "queued"}
+    operation = _ensure_job_operation(
+        db,
+        user_id=user.id,
+        source_kind="video_export",
+        source_id=job_id,
+        operation_type="youtube_overlay_export",
+        title_key="operations.youtubeOverlayExport",
+        steps=["prepare", "render", "finalize"],
+        can_cancel=True,
+        can_retry=True,
+    )
+    return {"job_id": job_id, "operation_id": operation.id, "status": "queued"}
 
 
 @router.post(
@@ -7370,7 +7809,9 @@ def create_youtube_overlay_export(
 )
 @_map_async_deployment_drain_rejection
 async def create_flight_overlay_layer(
-    flight_id: str, db: Session = Depends(get_db)
+    flight_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> GoproOverlayJob:
     """Queue one alpha overlay timeline that exports and highlights can reuse."""
     dependencies = check_gopro_overlay_dependencies()
@@ -7414,7 +7855,18 @@ async def create_flight_overlay_layer(
         )
     except (OSError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return GoproOverlayJob.model_validate(job)
+    operation = _ensure_job_operation(
+        db,
+        user_id=user.id,
+        source_kind="gopro_overlay",
+        source_id=str(job["job_id"]),
+        operation_type="gopro_overlay",
+        title_key="operations.goproOverlay",
+        steps=["prepare", "render", "finalize"],
+        can_cancel=True,
+        can_retry=True,
+    )
+    return GoproOverlayJob.model_validate({**job, "operation_id": operation.id})
 
 
 @router.post(
@@ -7699,6 +8151,7 @@ async def create_flight_gopro_overlay_job(
     output_filename: str | None = Form(None),
     output_resolution: Literal["1080p", "4k"] = Form("4k"),
     gpx_offset: float = Form(0.0),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> GoproOverlayJob:
     """Create a GoPro overlay render job from provided media and the flight GPX fallback."""
@@ -7786,7 +8239,18 @@ async def create_flight_gopro_overlay_job(
                 flight_id=flight.id,
             )
             _mark_flight_gopro_overlay_job(db, flight, job, gpx_offset=gpx_offset)
-            return _with_gopro_overlay_job_token(job)
+            operation = _ensure_job_operation(
+                db,
+                user_id=user.id,
+                source_kind="gopro_overlay",
+                source_id=str(job["job_id"]),
+                operation_type="gopro_overlay",
+                title_key="operations.goproOverlay",
+                steps=["prepare", "render", "finalize"],
+                can_cancel=True,
+                can_retry=True,
+            )
+            return _with_gopro_overlay_job_token({**job, "operation_id": operation.id})
 
         if not video_file or not video_file.filename:
             raise HTTPException(status_code=400, detail="GoPro camera video is required")
@@ -7818,7 +8282,18 @@ async def create_flight_gopro_overlay_job(
             flight_id=flight.id,
         )
         _mark_flight_gopro_overlay_job(db, flight, job, gpx_offset=gpx_offset)
-        return _with_gopro_overlay_job_token(job)
+        operation = _ensure_job_operation(
+            db,
+            user_id=user.id,
+            source_kind="gopro_overlay",
+            source_id=str(job["job_id"]),
+            operation_type="gopro_overlay",
+            title_key="operations.goproOverlay",
+            steps=["prepare", "render", "finalize"],
+            can_cancel=True,
+            can_retry=True,
+        )
+        return _with_gopro_overlay_job_token({**job, "operation_id": operation.id})
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -7869,6 +8344,8 @@ async def create_gopro_overlay_render_job(
     output_filename: str | None = Form(None),
     output_resolution: Literal["1080p", "4k"] = Form("4k"),
     gpx_offset: float = Form(0.0),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> GoproOverlayJob:
     """Create a GoPro overlay render job from uploaded video, GPX, and optional PIP video."""
     _validate_gpx_offset(gpx_offset)
@@ -7892,7 +8369,18 @@ async def create_gopro_overlay_render_job(
             output_resolution=output_resolution,
             gpx_offset=gpx_offset,
         )
-        return _with_gopro_overlay_job_token(job)
+        operation = _ensure_job_operation(
+            db,
+            user_id=user.id,
+            source_kind="gopro_overlay",
+            source_id=str(job["job_id"]),
+            operation_type="gopro_overlay",
+            title_key="operations.goproOverlay",
+            steps=["prepare", "render", "finalize"],
+            can_cancel=True,
+            can_retry=True,
+        )
+        return _with_gopro_overlay_job_token({**job, "operation_id": operation.id})
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -8910,7 +9398,10 @@ async def export_emagram_csv(
 @router.post("/emagram/analyze", response_model=EmagramAnalysisSchema, tags=["Emagram"])
 @_map_async_deployment_drain_rejection
 async def trigger_emagram_analysis(
-    request: EmagramTriggerRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+    request: EmagramTriggerRequest,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Trigger multi-source emagram analysis for closest spot
@@ -8934,6 +9425,16 @@ async def trigger_emagram_analysis(
           "force_refresh": false
         }
     """
+    operation = OperationReporter.create(
+        db,
+        user_id=user.id,
+        operation_type="emagram_analysis",
+        title_key="operations.emagramAnalysis",
+        steps=["find_site", "check_cache", "generate", "finalize"],
+        can_retry=False,
+    )
+    operation.start()
+    operation.start_step("find_site")
     try:
         # Step 1: Find target site
         if request.site_id:
@@ -8975,6 +9476,9 @@ async def trigger_emagram_analysis(
                 detail="Either site_id or user_latitude/user_longitude required",
             )
 
+        operation.complete_step("find_site", closest_site.name)
+        operation.start_step("check_cache")
+
         # Step 2: Check for recent analysis (unless force_refresh)
         forecast_date = (datetime.utcnow() + timedelta(days=request.day_index)).date()
         cutoff_time = None if request.force_refresh else get_emagram_cutoff_utc(db=db)
@@ -9011,6 +9515,8 @@ async def trigger_emagram_analysis(
                     await _cache_emagram_analysis_marker(
                         closest_site, existing, forecast_date, request.hour, db=db
                     )
+                    operation.complete_step("check_cache", "Résultat en cache")
+                    operation.complete({"analysis_id": existing.id})
                 return existing
 
         # Step 2b: Check cache for specific hour
@@ -9036,10 +9542,14 @@ async def trigger_emagram_analysis(
                 await _cache_emagram_analysis_marker(
                     closest_site, existing, forecast_date, request.hour, db=db
                 )
+                operation.complete_step("check_cache", "Résultat en cache")
+                operation.complete({"analysis_id": existing.id})
                 return existing
 
         # Step 3: Generate new analysis
         logger.info(f"Generating emagram for {closest_site.name} (hour={request.hour})...")
+        operation.complete_step("check_cache")
+        operation.start_step("generate")
 
         result = await _run_emagram_analysis_with_admission(
             site_id=closest_site.id,
@@ -9070,14 +9580,22 @@ async def trigger_emagram_analysis(
         await _cache_emagram_analysis_marker(
             closest_site, analysis, forecast_date, request.hour, db=db
         )
+        operation.complete_step("generate")
+        operation.start_step("finalize")
+        operation.complete_step("finalize")
+        operation.complete({"analysis_id": analysis.id})
 
         return analysis
 
     except DeploymentDrainActive:
+        operation.fail("Le déploiement est en cours")
         raise
     except HTTPException:
+        operation.fail("La demande d’analyse n’a pas pu aboutir")
         raise
     except Exception as e:
+        db.rollback()
+        operation.fail(str(e))
         logger.error(f"Failed to trigger emagram analysis: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 

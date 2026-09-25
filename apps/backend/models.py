@@ -478,6 +478,54 @@ Index(
     sqlite_where=text("status IN ('queued', 'uploading')"),
 )
 
+
+class BackgroundOperation(Base):
+    """User-visible progress for a long-running treatment."""
+
+    __tablename__ = "background_operations"
+
+    id = Column(String, primary_key=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    operation_type = Column(String(64), nullable=False, index=True)
+    title_key = Column(String(128), nullable=False)
+    status = Column(String(16), nullable=False, index=True)
+    progress = Column(Integer, nullable=True)
+    current_step_key = Column(String(128), nullable=True)
+    current_step_progress = Column(Integer, nullable=True)
+    current_step_detail = Column(Text, nullable=True)
+    steps_json = Column(Text, nullable=False, default="[]")
+    result_json = Column(Text, nullable=True)
+    error_key = Column(String(128), nullable=True)
+    error_detail = Column(Text, nullable=True)
+    source_kind = Column(String(64), nullable=True, index=True)
+    source_id = Column(String, nullable=True, index=True)
+    can_cancel = Column(Boolean, nullable=False, default=False)
+    can_retry = Column(Boolean, nullable=False, default=False)
+    read_at = Column(DateTime, nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True, index=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+Index(
+    "idx_background_operations_user_status",
+    BackgroundOperation.user_id,
+    BackgroundOperation.status,
+    BackgroundOperation.updated_at,
+)
+Index(
+    "uq_background_operations_source",
+    BackgroundOperation.user_id,
+    BackgroundOperation.source_kind,
+    BackgroundOperation.source_id,
+    unique=True,
+    sqlite_where=text("source_kind IS NOT NULL AND source_id IS NOT NULL"),
+)
+
 Index(
     "uq_youtube_upload_jobs_preparing_or_active_flight",
     YoutubeUploadJob.flight_id,

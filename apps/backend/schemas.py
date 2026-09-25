@@ -106,6 +106,7 @@ class GoproOverlayProbeResponse(GoproOverlayLayoutsResponse):
 
 class GoproOverlayJob(BaseModel):
     job_id: str
+    operation_id: str | None = None
     flight_id: str | None = None
     status: Literal["queued", "preparing", "running", "completed", "failed", "cancelled"]
     progress: int
@@ -259,6 +260,7 @@ class HighlightVideoClipResponse(BaseModel):
 
 class HighlightVideoJobResponse(BaseModel):
     job_id: str
+    operation_id: str | None = None
     flight_id: str
     status: Literal["queued", "running", "completed", "failed", "cancelled"]
     progress: int
@@ -317,6 +319,45 @@ class DeploymentDrainStatus(BaseModel):
     requested_at: datetime | None = None
     phase_changed_at: datetime | None = None
     expires_at: datetime | None = None
+
+
+class BackgroundOperationStep(BaseModel):
+    key: str
+    status: Literal["pending", "running", "completed", "failed", "cancelled", "skipped"]
+    progress: int | None = Field(default=None, ge=0, le=100)
+    detail: str | None = None
+    started_at: str | None = None
+    completed_at: str | None = None
+
+
+class BackgroundOperation(BaseModel):
+    operation_id: str
+    operation_type: str
+    title_key: str
+    status: Literal["queued", "running", "completed", "failed", "cancelled"]
+    progress: int | None = Field(default=None, ge=0, le=100)
+    current_step_key: str | None = None
+    current_step_progress: int | None = Field(default=None, ge=0, le=100)
+    current_step_detail: str | None = None
+    steps: list[BackgroundOperationStep] = Field(default_factory=list)
+    result: dict[str, Any] | None = None
+    error_key: str | None = None
+    error_detail: str | None = None
+    source_kind: str | None = None
+    source_id: str | None = None
+    can_cancel: bool = False
+    can_retry: bool = False
+    unread: bool = False
+    created_at: datetime
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    updated_at: datetime
+
+
+class BackgroundOperationStart(BaseModel):
+    operation_id: str
+    status: Literal["queued", "running"] = "queued"
+    detail_url: str
 
 
 # Sites
@@ -634,6 +675,7 @@ class YoutubeOverlayExportCreate(BaseModel):
 
 
 class YoutubeUploadJobResponse(BaseModel):
+    operation_id: str | None = None
     job_id: str
     flight_id: str
     source_type: Literal["gopro_overlay", "camera", "video", "pano", "highlight", "youtube_overlay"]

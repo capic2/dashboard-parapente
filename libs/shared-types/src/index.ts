@@ -257,6 +257,51 @@ export const ActiveFlightMediaJobsResponseSchema = z.object({
   jobs: z.array(ActiveFlightMediaJobSchema),
 });
 
+export const BackgroundOperationStepSchema = z.object({
+  key: z.string(),
+  status: z.enum([
+    'pending',
+    'running',
+    'completed',
+    'failed',
+    'cancelled',
+    'skipped',
+  ]),
+  progress: z.number().nullable().optional(),
+  detail: z.string().nullable().optional(),
+  started_at: z.string().nullable().optional(),
+  completed_at: z.string().nullable().optional(),
+});
+
+export const BackgroundOperationSchema = z.object({
+  operation_id: z.string(),
+  operation_type: z.string(),
+  title_key: z.string(),
+  status: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
+  progress: z.number().nullable().optional(),
+  current_step_key: z.string().nullable().optional(),
+  current_step_progress: z.number().nullable().optional(),
+  current_step_detail: z.string().nullable().optional(),
+  steps: z.array(BackgroundOperationStepSchema),
+  result: z.record(z.string(), z.unknown()).nullable().optional(),
+  error_key: z.string().nullable().optional(),
+  error_detail: z.string().nullable().optional(),
+  source_kind: z.string().nullable().optional(),
+  source_id: z.string().nullable().optional(),
+  can_cancel: z.boolean(),
+  can_retry: z.boolean(),
+  unread: z.boolean(),
+  created_at: z.string(),
+  started_at: z.string().nullable().optional(),
+  completed_at: z.string().nullable().optional(),
+  updated_at: z.string(),
+});
+
+export type BackgroundOperation = z.infer<typeof BackgroundOperationSchema>;
+export type BackgroundOperationStep = z.infer<
+  typeof BackgroundOperationStepSchema
+>;
+
 export const FlightStatsSchema = z.object({
   total_flights: z.number().catch(0),
   total_hours: z.number().catch(0),

@@ -1882,5 +1882,51 @@
     "importError": "Impossible d’importer ce layout XML",
     "export": "Exporter XML",
     "reset": "Utiliser le layout global"
+  },
+  "operations": {
+    "title": "Traitements",
+    "active": "en cours",
+    "empty": "Aucun traitement récent",
+    "openCenter": "Ouvrir les traitements",
+    "timeline": "Progression du traitement",
+    "cancel": "Annuler",
+    "genericError": "Le traitement a échoué",
+    "videoExport": "Export vidéo",
+    "goproOverlay": "Génération de l’overlay GoPro",
+    "highlightVideo": "Génération des meilleurs moments",
+    "youtubeUpload": "Upload YouTube",
+    "youtubeOverlayExport": "Export overlay YouTube",
+    "intervalsSync": "Synchronisation Intervals.icu",
+    "spotsSync": "Synchronisation des sites",
+    "emagramAnalysis": "Analyse emagramme",
+    "status": {
+      "queued": "En attente",
+      "running": "En cours",
+      "completed": "Terminé",
+      "failed": "Échec",
+      "cancelled": "Annulé"
+    },
+    "steps": {
+      "prepare": "Préparation",
+      "render": "Génération",
+      "finalize": "Finalisation",
+      "select": "Sélection des scènes",
+      "upload": "Upload",
+      "find_site": "Recherche du site",
+      "check_cache": "Vérification des données existantes",
+      "generate": "Analyse et génération",
+      "fetch_activities": "Récupération des activités",
+      "import_flights": "Import des vols",
+      "sync_sources": "Synchronisation des sources",
+      "check_freshness": "Vérification de la fraîcheur des données"
+    },
+    "result": "Résultat",
+    "resultFields": {
+      "success": "Succès",
+      "imported": "Importés",
+      "updated": "Mis à jour",
+      "skipped": "Ignorés",
+      "failed": "Échecs"
+    }
   }
 }
