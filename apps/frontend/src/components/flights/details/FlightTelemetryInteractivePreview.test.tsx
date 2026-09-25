@@ -348,4 +348,58 @@ describe('FlightTelemetryInteractivePreview', () => {
       String(Date.UTC(2026, 8, 5, 16, 27, 53))
     );
   });
+
+  it('uses only the manual offset for a YouTube dynamic overlay', () => {
+    hooks.overlayPreview.data = {
+      video: { preview_segments: [] },
+      alignment: {
+        automatic_offset_seconds: -156,
+        manual_offset_seconds: 5.9,
+        effective_offset_seconds: -150.1,
+      },
+      gpx: { coordinates: [] },
+    } as unknown as GoproOverlayPreview;
+    hooks.overlayPreview.isPending = false;
+    hooks.overlayPreview.isSuccess = true;
+    hooks.telemetry.data = {
+      points: [
+        {
+          timestamp: Date.UTC(2026, 8, 5, 16, 44, 53),
+          lat: 0,
+          lon: 0,
+          elevation: 0,
+          segment: 0,
+        },
+      ],
+      source: 'gpx+osv',
+      has_osv: true,
+      enrichment_status: 'ready',
+      start_time: '2026-09-05T16:44:53Z',
+      end_time: null,
+      duration_seconds: 10,
+    };
+    hooks.telemetry.isPending = false;
+    hooks.telemetry.isSuccess = true;
+    hooks.layout.isPending = false;
+    hooks.layout.isSuccess = true;
+    hooks.layout.data = { layout: [] };
+
+    render(
+      <FlightTelemetryInteractivePreview
+        flightId="flight-1"
+        manualOffsetSeconds={5.9}
+        youtubeUrls={['https://www.youtube.com/watch?v=dQw4w9WgXcQ']}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('overlay-player'));
+    expect(screen.getByTestId('telemetry-overlay')).toHaveAttribute(
+      'data-offset',
+      '5.9'
+    );
+    expect(screen.getByTestId('telemetry-overlay')).toHaveAttribute(
+      'data-timeline-start',
+      String(Date.UTC(2026, 8, 5, 16, 44, 53))
+    );
+  });
 });
