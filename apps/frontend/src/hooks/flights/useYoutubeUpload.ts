@@ -49,12 +49,13 @@ export const sourceFromInput = (
       highlight_video_job_id: input.highlight_video_job_id,
     };
   }
-  return input.source_type === 'gopro_overlay'
-    ? {
-        source_type: 'gopro_overlay',
-        gopro_overlay_job_id: input.gopro_overlay_job_id,
-      }
-    : { source_type: input.source_type };
+  if (input.source_type === 'camera' || input.source_type === 'video') {
+    return { source_type: input.source_type };
+  }
+  return {
+    source_type: 'gopro_overlay',
+    gopro_overlay_job_id: input.gopro_overlay_job_id,
+  };
 };
 
 export function useYoutubeStatus() {
@@ -102,6 +103,19 @@ export function useYoutubeVideoAssociations(flightId: string) {
     queryFn: async () => {
       const data = await api.get(`flights/${flightId}/youtube-videos`).json();
       return YoutubeVideoAssociationsSchema.parse(data);
+    },
+  });
+}
+
+export function useStartYoutubeOverlayExport(flightId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { youtube_url: string }) =>
+      api
+        .post(`flights/${flightId}/youtube-overlay-export`, { json: input })
+        .json<{ job_id: string; status: string }>(),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });
     },
   });
 }

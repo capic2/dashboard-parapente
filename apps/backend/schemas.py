@@ -627,6 +627,10 @@ class YoutubeUploadCreate(BaseModel):
         return title
 
 
+class YoutubeOverlayExportCreate(BaseModel):
+    youtube_url: str = Field(min_length=1)
+
+
 class YoutubeUploadJobResponse(BaseModel):
     job_id: str
     flight_id: str

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
+import { Button } from '@dashboard-parapente/design-system';
 import {
   ChevronLeft,
   ChevronRight,
@@ -11,7 +12,11 @@ import {
 import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { useFlightTelemetry } from '../../../hooks/flights/useFlightTelemetry';
 import { useTelemetryLayout } from '../../../hooks/flights/useTelemetryLayout';
-import { getApiUrlWithSearchParams } from '../../../lib/api';
+import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
+import {
+  getApiErrorMessage,
+  getApiUrlWithSearchParams,
+} from '../../../lib/api';
 import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
 import { FlightOverlayPlayer } from './FlightOverlayPlayer';
@@ -23,6 +28,7 @@ import {
 } from './flightTelemetryLayout';
 import { sourceTimeAtPreviewTime } from './GoproOverlaySyncPreview';
 import { getYoutubeVideoId } from '../../../lib/youtube';
+import { useStartYoutubeOverlayExport } from '../../../hooks/flights/useYoutubeUpload';
 
 interface FlightTelemetryInteractivePreviewProps {
   flightId: string;
@@ -45,6 +51,15 @@ export function FlightTelemetryInteractivePreview({
   const telemetry = useFlightTelemetry(flightId, true);
   const layout = useTelemetryLayout(flightId);
   const [cameraTime, setCameraTime] = useState(0);
+  const [youtubeExportError, setYoutubeExportError] = useState<string | null>(
+    null
+  );
+  const [youtubeExportJobId, setYoutubeExportJobId] = useState<string | null>(
+    null
+  );
+  const startExport = useStartYoutubeOverlayExport(flightId);
+  const { status: youtubeExportStatus, error: youtubeExportStatusError } =
+    useVideoExportStatus(youtubeExportJobId);
   const validYoutubeUrls = youtubeUrls.filter((url) => getYoutubeVideoId(url));
   const [selectedYoutubeIndex, setSelectedYoutubeIndex] = useState(0);
   const activeYoutubeIndex = Math.min(
@@ -112,6 +127,42 @@ export function FlightTelemetryInteractivePreview({
     );
     setCameraTime(0);
   };
+  const youtubeExportStatusValue =
+    youtubeExportStatus?.internal_status ?? youtubeExportStatus?.status;
+  const youtubeExportProgress = Math.max(
+    0,
+    Math.min(100, youtubeExportStatus?.progress ?? 0)
+  );
+  let youtubeExportStatusLabel =
+    youtubeExportStatus?.message ?? t('flights.youtubeOverlayExportInProgress');
+  if (youtubeExportStatusValue === 'completed') {
+    youtubeExportStatusLabel = t('flights.youtubeOverlayExportCompleted');
+  } else if (youtubeExportStatusValue === 'failed') {
+    youtubeExportStatusLabel = t('flights.youtubeOverlayExportFailed');
+  } else if (youtubeExportStatusValue === 'cancelled') {
+    youtubeExportStatusLabel = t('flights.youtubeOverlayExportCancelled');
+  }
+  let youtubeExportProgressClass = 'bg-cyan-500';
+  if (youtubeExportStatusValue === 'failed') {
+    youtubeExportProgressClass = 'bg-red-500';
+  } else if (youtubeExportStatusValue === 'completed') {
+    youtubeExportProgressClass = 'bg-emerald-500';
+  }
+  const launchYoutubeExport = async () => {
+    if (!youtubeUrl) return;
+
+    setYoutubeExportError(null);
+    try {
+      const { job_id } = await startExport.mutateAsync({
+        youtube_url: youtubeUrl,
+      });
+      setYoutubeExportJobId(job_id);
+    } catch (error) {
+      setYoutubeExportError(
+        await getApiErrorMessage(error, t('flights.youtubeOverlayExportError'))
+      );
+    }
+  };
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
       <div className="flex items-start gap-3 p-4 sm:p-5">
@@ -135,8 +186,57 @@ export function FlightTelemetryInteractivePreview({
             <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
             {t('telemetryLayout.configure')}
           </Link>
+          {youtubeUrl && (
+            <Button
+              variant="secondary"
+              isDisabled={startExport.isPending}
+              className="shrink-0 rounded-lg border border-cyan-200 px-3 py-2 text-xs font-semibold text-cyan-700 dark:border-cyan-800 dark:text-cyan-300"
+              onPress={launchYoutubeExport}
+            >
+              {startExport.isPending
+                ? t('common.loading')
+                : t('flights.youtubeOverlayExport')}
+            </Button>
+          )}
         </span>
       </div>
+      {(youtubeExportError || startExport.isError) && (
+        <p
+          className="border-t border-red-200 bg-red-50/70 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/20 dark:text-red-300 sm:px-5"
+          role="alert"
+        >
+          {youtubeExportError ?? t('flights.youtubeOverlayExportError')}
+        </p>
+      )}
+      {youtubeExportJobId && (
+        <div
+          className="border-t border-cyan-200 bg-cyan-50/70 p-4 dark:border-cyan-900 dark:bg-cyan-950/20 sm:px-5"
+          aria-live="polite"
+        >
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="font-semibold text-slate-900 dark:text-white">
+              {t('flights.youtubeOverlayExportProgress')}
+            </span>
+            <span className="text-slate-700 dark:text-slate-200">
+              {youtubeExportStatusValue === 'completed'
+                ? t('flights.youtubeOverlayExportCompleted')
+                : `${youtubeExportProgress}%`}
+            </span>
+          </div>
+          <progress
+            className={`mt-2 block h-2 w-full overflow-hidden rounded-full bg-cyan-100 dark:bg-cyan-950 ${youtubeExportProgressClass}`}
+            aria-label={t('flights.youtubeOverlayExportProgress')}
+            value={youtubeExportProgress}
+            max={100}
+          />
+          <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">
+            {youtubeExportStatus?.error ??
+              (youtubeExportStatusError
+                ? t('flights.youtubeOverlayExportStatusError')
+                : youtubeExportStatusLabel)}
+          </p>
+        </div>
+      )}
       <div className="border-t border-slate-200 p-4 dark:border-slate-700 sm:p-5">
         {isLoading && (
           <output

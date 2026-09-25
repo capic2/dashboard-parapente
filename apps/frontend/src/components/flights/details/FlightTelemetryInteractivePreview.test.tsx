@@ -23,12 +23,19 @@ const hooks = vi.hoisted(() => ({
     isPending: true,
     isSuccess: false,
   },
+  exportStatus: null as {
+    status: string;
+    progress?: number;
+    message?: string | null;
+    error?: string | null;
+  } | null,
 }));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
   }),
+  withTranslation: () => (Component: React.ComponentType) => Component,
 }));
 
 vi.mock('@tanstack/react-router', () => ({
@@ -48,6 +55,21 @@ vi.mock('../../../hooks/flights/useFlightTelemetry', () => ({
 
 vi.mock('../../../hooks/flights/useTelemetryLayout', () => ({
   useTelemetryLayout: () => hooks.layout,
+}));
+
+vi.mock('../../../hooks/flights/useVideoExportStatus', () => ({
+  useVideoExportStatus: () => ({ status: hooks.exportStatus }),
+}));
+
+vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
+  useStartYoutubeOverlayExport: () => ({
+    isPending: false,
+    isError: false,
+    mutateAsync: vi.fn().mockResolvedValue({
+      job_id: 'export-job-1',
+      status: 'queued',
+    }),
+  }),
 }));
 
 vi.mock('../../../stores/authStore', () => ({
