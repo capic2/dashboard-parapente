@@ -7,6 +7,7 @@ const {
   apiDelete,
   confirmMock,
   createOverlayMock,
+  generateMergeMock,
   generatePreviewMutateMock,
   generatePreviewMock,
   mockFlight,
@@ -24,6 +25,7 @@ const {
   apiDelete: vi.fn(),
   confirmMock: vi.fn(),
   createOverlayMock: vi.fn(),
+  generateMergeMock: vi.fn(),
   generatePreviewMutateMock: vi.fn(),
   generatePreviewMock: vi.fn(),
   highlightVideoMock: { current: null as unknown },
@@ -335,6 +337,14 @@ vi.mock('../../../hooks/gopro/useGoproOverlay', () => ({
     mutate: generatePreviewMutateMock,
     mutateAsync: generatePreviewMock,
   }),
+  useGenerateGoproMerge: () => ({
+    isPending: false,
+    mutateAsync: generateMergeMock,
+  }),
+}));
+
+vi.mock('./FlightTelemetryInteractivePreview', () => ({
+  FlightTelemetryInteractivePreview: () => null,
 }));
 
 vi.mock('../../../hooks/useToast', () => ({
@@ -1248,6 +1258,28 @@ describe('FlightDetails GoPro overlay action', () => {
         gopro_overlay_gpx_offset: 2.5,
       })
     );
+  });
+
+  it('shows calibration for a YouTube video without a pano file', () => {
+    mockFlight.video_file_exists = false;
+    mockFlight.video_file_path = null;
+    mockFlight.youtube_urls = ['https://www.youtube.com/watch?v=dQw4w9WgXcQ'];
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    openTab('Media');
+
+    expect(
+      screen.getByRole('button', {
+        name: /Synchronization and overlay layer/u,
+      })
+    ).toBeInTheDocument();
   });
 
   it('collapses the synchronization workspace when the overlay layer is ready', async () => {
