@@ -108,6 +108,64 @@ def _create_completed_overlay(
     return overlay
 
 
+def test_youtube_overlay_upload_job_waits_for_generated_source(
+    db_session: Session, sample_flight: Flight, tmp_path: Path, monkeypatch
+) -> None:
+    generated_video = tmp_path / "youtube-overlay.mp4"
+    generated_video.write_bytes(b"video")
+    job = youtube_upload.create_youtube_overlay_upload_job(
+        db_session,
+        flight_id=sample_flight.id,
+        user_id=1,
+        title="Vol d’essai - overlay YouTube",
+        description="Description",
+        gopro_overlay_job_id="saved-overlay",
+    )
+
+    assert job.source_type == "youtube_overlay"
+    assert job.source_path is None
+    assert job.status == "preparing"
+
+    enqueued: list[str] = []
+    monkeypatch.setattr(youtube_upload, "enqueue_youtube_upload", enqueued.append)
+    monkeypatch.setattr(
+        youtube_upload,
+        "SessionLocal",
+        lambda: type(
+            "SessionContext",
+            (),
+            {
+                "__enter__": lambda self: db_session,
+                "__exit__": lambda self, *_args: False,
+            },
+        )(),
+    )
+    youtube_upload.enqueue_youtube_overlay_upload(job.id, generated_video)
+
+    db_session.refresh(job)
+    assert job.source_path == str(generated_video)
+    assert job.status == "queued"
+    assert enqueued == [job.id]
+
+
+def test_generated_youtube_overlay_cleanup_is_limited_to_export_storage(
+    tmp_path: Path, monkeypatch
+) -> None:
+    export_root = tmp_path / "exports"
+    export_root.mkdir()
+    generated = export_root / "youtube-overlay.mp4"
+    generated.write_bytes(b"video")
+    outside = tmp_path / "flight-source.mp4"
+    outside.write_bytes(b"source")
+    monkeypatch.setattr(config, "VIDEO_EXPORT_DIR", str(export_root))
+
+    youtube_upload._delete_generated_overlay_source(generated)
+    youtube_upload._delete_generated_overlay_source(outside)
+
+    assert not generated.exists()
+    assert outside.exists()
+
+
 def test_youtube_status_reports_configuration_and_connection(client, db_session, monkeypatch):
     _configure_youtube(monkeypatch)
 

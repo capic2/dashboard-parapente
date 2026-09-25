@@ -1185,7 +1185,9 @@ def remove_flight_youtube_video(
 )
 def get_flight_youtube_upload(
     flight_id: str,
-    source_type: Literal["gopro_overlay", "camera", "video", "pano", "highlight"] | None = None,
+    source_type: (
+        Literal["gopro_overlay", "camera", "video", "pano", "highlight", "youtube_overlay"] | None
+    ) = None,
     gopro_overlay_job_id: str | None = None,
     highlight_video_job_id: str | None = None,
     db: Session = Depends(get_db),
@@ -7324,6 +7326,7 @@ def get_flight_overlay_layer(flight_id: str, db: Session = Depends(get_db)) -> F
 def create_youtube_overlay_export(
     flight_id: str,
     payload: YoutubeOverlayExportCreate,
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
     """Queue a downloadable MP4 composed from an associated YouTube video."""
@@ -7334,6 +7337,12 @@ def create_youtube_overlay_export(
         raise HTTPException(
             status_code=400, detail="YouTube video is not associated with this flight"
         )
+    if not is_youtube_configured():
+        raise HTTPException(status_code=503, detail="YouTube upload is not configured")
+    if not is_youtube_connected(db, user.id):
+        raise HTTPException(status_code=409, detail="Connect YouTube before exporting")
+    if active_youtube_upload_job(db, flight.id) is not None:
+        raise HTTPException(status_code=409, detail="A YouTube upload is already in progress")
     overlay_job = _require_saved_gopro_overlay(flight)
     offset = _require_gopro_overlay_offset(flight)
     try:
@@ -7342,6 +7351,7 @@ def create_youtube_overlay_export(
             youtube_url=payload.youtube_url,
             overlay_job_id=overlay_job.id,
             overlay_offset_seconds=offset,
+            youtube_user_id=user.id,
         )
     except DeploymentDrainActive:
         raise

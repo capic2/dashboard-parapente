@@ -129,8 +129,71 @@ class TestVideoExportStartEndpoint:
         )
         assert response.status_code == 400
 
+    def test_youtube_overlay_export_rejects_unconfigured_youtube(
+        self, client, db_session, sample_flight, monkeypatch
+    ):
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        sample_flight.youtube_urls = [youtube_url]
+        db_session.commit()
+        monkeypatch.setattr("routes.is_youtube_configured", lambda: False)
+
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/youtube-overlay-export",
+            json={"youtube_url": youtube_url},
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 503
+
+    def test_youtube_overlay_export_rejects_disconnected_youtube(
+        self, client, db_session, sample_flight, monkeypatch
+    ):
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        sample_flight.youtube_urls = [youtube_url]
+        db_session.commit()
+        monkeypatch.setattr("routes.is_youtube_configured", lambda: True)
+        monkeypatch.setattr("routes.is_youtube_connected", lambda db, user_id: False)
+
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/youtube-overlay-export",
+            json={"youtube_url": youtube_url},
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 409
+
+    def test_youtube_overlay_export_rejects_active_youtube_upload(
+        self, client, db_session, sample_flight, monkeypatch
+    ):
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        sample_flight.youtube_urls = [youtube_url]
+        db_session.add(
+            YoutubeUploadJob(
+                id="active-youtube-overlay-upload",
+                flight_id=sample_flight.id,
+                user_id=1,
+                source_type="youtube_overlay",
+                status="preparing",
+                progress=0,
+                title="Overlay en préparation",
+                description="",
+                privacy_status="unlisted",
+            )
+        )
+        db_session.commit()
+        monkeypatch.setattr("routes.is_youtube_configured", lambda: True)
+        monkeypatch.setattr("routes.is_youtube_connected", lambda db, user_id: True)
+
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/youtube-overlay-export",
+            json={"youtube_url": youtube_url},
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 409
+
     def test_youtube_overlay_export_accepts_saved_legacy_overlay(
-        self, client, db_session, sample_flight
+        self, client, db_session, sample_flight, monkeypatch
     ):
         youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
         sample_flight.youtube_urls = [youtube_url]
@@ -152,6 +215,8 @@ class TestVideoExportStartEndpoint:
             )
         )
         db_session.commit()
+        monkeypatch.setattr("routes.is_youtube_configured", lambda: True)
+        monkeypatch.setattr("routes.is_youtube_connected", lambda db, user_id: True)
 
         with patch(
             "routes.start_youtube_overlay_export", return_value="youtube-export-1"

@@ -8,6 +8,7 @@ worker while keeping a small in-memory status snapshot for compatibility.
 
 import asyncio
 import json
+import logging
 import shutil
 import threading
 import uuid
@@ -39,6 +40,8 @@ from video_acceleration import (
     h264_encode_args,
     select_video_accelerator,
 )
+
+logger = logging.getLogger(__name__)
 
 # Storage for export jobs (compatibility snapshot)
 export_jobs: dict[str, dict[str, Any]] = {}
@@ -836,6 +839,7 @@ def _export_youtube_overlay_job(job_id: str) -> None:
 
     work_dir = new_work_dir(job_id)
     destination = output_path(job_id)
+    upload_started = False
 
     def progress(message: str, download_percent: int | None = None) -> None:
         if _is_cancelled(job_id):
@@ -864,23 +868,48 @@ def _export_youtube_overlay_job(job_id: str) -> None:
             work_dir=work_dir,
             progress=progress,
         )
-        _log_job(job_id, "Export YouTube terminé")
-        _update_job(
-            job_id,
-            status=_STATUS_COMPLETED,
-            progress=100,
-            message="Export YouTube terminé",
-            video_path=str(destination),
-        )
+        if _is_cancelled(job_id):
+            raise YoutubeExportError("Export annulé")
+        if not job.youtube_upload_job_id:
+            raise YoutubeExportError("Job d’upload YouTube introuvable")
+        from youtube_upload import enqueue_youtube_overlay_upload
+
+        enqueue_youtube_overlay_upload(job.youtube_upload_job_id, destination)
+        upload_started = True
+        _log_job(job_id, "Vidéo composée et upload YouTube lancé")
+        try:
+            completed_job = _update_job(
+                job_id,
+                status=_STATUS_COMPLETED,
+                progress=100,
+                message="Vidéo composée, envoi YouTube en cours",
+                video_path=str(destination),
+            )
+        except Exception as exc:
+            logger.exception("Unable to finalize handed-off YouTube export %s", job_id)
+            _log_job(job_id, f"Upload YouTube lancé, statut d’export non mis à jour: {exc}")
+            return
+        if completed_job is None:
+            _log_job(job_id, "Upload YouTube lancé, mais le job d’export a été annulé")
     except YoutubeExportError as exc:
         _log_job(job_id, f"Export YouTube échoué: {exc}")
+        if not upload_started and job and job.youtube_upload_job_id:
+            from youtube_upload import fail_youtube_overlay_upload
+
+            fail_youtube_overlay_upload(job.youtube_upload_job_id, str(exc))
         _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
     except Exception as exc:
         _log_job(job_id, f"Export YouTube échoué avec une erreur inattendue: {exc}")
+        if not upload_started and job and job.youtube_upload_job_id:
+            from youtube_upload import fail_youtube_overlay_upload
+
+            fail_youtube_overlay_upload(job.youtube_upload_job_id, str(exc))
         _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
     finally:
         _log_job(job_id, "Nettoyage des fichiers temporaires YouTube")
         cleanup_work_dir(work_dir)
+        if not upload_started:
+            destination.unlink(missing_ok=True)
         _clear_job_cancel_requested(job_id)
 
 
@@ -1707,7 +1736,11 @@ def _worker_loop():
                 _WORKER_STOP.wait(1)
                 continue
 
-            asyncio.run(_export_video_manual_render(job_id))
+            job = _get_job(job_id)
+            if job and job.mode == "youtube_overlay":
+                _export_youtube_overlay_job(job_id)
+            else:
+                asyncio.run(_export_video_manual_render(job_id))
         except Exception as e:
             if job_id:
                 print(f"❌ Worker failed for job {job_id}: {e}")
@@ -1772,6 +1805,7 @@ def _enqueue_video_export_job(
     youtube_url: str | None = None,
     overlay_job_id: str | None = None,
     overlay_offset_seconds: float | None = None,
+    youtube_upload_job_id: str | None = None,
 ):
     """Create a new export job and enqueue it for the configured queue backend."""
     if not _dependencies_ok:
@@ -1805,6 +1839,7 @@ def _enqueue_video_export_job(
                 youtube_url=youtube_url,
                 overlay_job_id=overlay_job_id,
                 overlay_offset_seconds=overlay_offset_seconds,
+                youtube_upload_job_id=youtube_upload_job_id,
             )
             db.add(job)
 
@@ -1834,23 +1869,45 @@ def start_youtube_overlay_export(
     youtube_url: str,
     overlay_job_id: str,
     overlay_offset_seconds: float,
+    youtube_user_id: int,
     auth_token: str | None = None,
 ) -> str:
-    """Queue an export using a YouTube source and an already generated layer."""
-    return _enqueue_video_export_job(
-        flight_id=flight_id,
-        mode="youtube_overlay",
-        quality="1080p",
-        fps=30,
-        speed=1,
-        frontend_url="",
-        update_db=False,
-        auth_token=auth_token,
-        source_type="youtube",
-        youtube_url=youtube_url,
-        overlay_job_id=overlay_job_id,
-        overlay_offset_seconds=overlay_offset_seconds,
-    )
+    """Queue a YouTube overlay export followed by automatic YouTube publication."""
+    from youtube_upload import create_youtube_overlay_upload_job, fail_youtube_overlay_upload
+
+    with SessionLocal() as db:
+        flight = db.get(Flight, flight_id)
+        if flight is None:
+            raise RuntimeError("Flight not found")
+        flight_date = flight.flight_date.strftime("%d/%m/%Y") if flight.flight_date else "sans date"
+        title = flight.name or f"Vol du {flight_date}"
+        upload_job = create_youtube_overlay_upload_job(
+            db,
+            flight_id=flight.id,
+            user_id=youtube_user_id,
+            title=f"{title} - overlay YouTube",
+            description=flight.notes or "",
+            gopro_overlay_job_id=overlay_job_id,
+        )
+    try:
+        return _enqueue_video_export_job(
+            flight_id=flight_id,
+            mode="youtube_overlay",
+            quality="1080p",
+            fps=30,
+            speed=1,
+            frontend_url="",
+            update_db=False,
+            auth_token=auth_token,
+            source_type="youtube",
+            youtube_url=youtube_url,
+            overlay_job_id=overlay_job_id,
+            overlay_offset_seconds=overlay_offset_seconds,
+            youtube_upload_job_id=upload_job.id,
+        )
+    except Exception as exc:
+        fail_youtube_overlay_upload(upload_job.id, str(exc))
+        raise
 
 
 def start_video_export_manual(

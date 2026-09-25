@@ -87,10 +87,13 @@ export function FlightYoutubeUploadControls({
   const [privacyStatus, setPrivacyStatus] = useState<PrivacyStatus>('unlisted');
 
   const hasActiveUpload =
+    activeUpload.data?.status === 'preparing' ||
     activeUpload.data?.status === 'queued' ||
     activeUpload.data?.status === 'uploading';
   const isActive =
-    upload.data?.status === 'queued' || upload.data?.status === 'uploading';
+    upload.data?.status === 'preparing' ||
+    upload.data?.status === 'queued' ||
+    upload.data?.status === 'uploading';
   const isPublished = Boolean(
     upload.data?.status === 'completed' &&
     upload.data.youtube_url &&
