@@ -947,6 +947,7 @@ export function FlightDetails({
               flightId={flight.id}
               initialOffset={goproOverlayGpxOffset}
               onSaveOffset={handleGoproOverlayOffsetChange}
+              youtubeUrls={flight.youtube_urls ?? []}
               showHeader={false}
             />
           )}
