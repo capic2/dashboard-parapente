@@ -90,9 +90,10 @@ export function FlightTelemetryInteractivePreview({
     previewStatusMessage = t('flights.overlayInteractivePreviewUnavailable');
   }
   const overlayOffsetSeconds =
-    manualOffsetSeconds ??
-    overlayPreview.data?.alignment.manual_offset_seconds ??
-    0;
+    typeof manualOffsetSeconds === 'number' &&
+    Number.isFinite(manualOffsetSeconds)
+      ? manualOffsetSeconds
+      : (overlayPreview.data?.alignment.manual_offset_seconds ?? 0);
   const automaticOffsetSeconds =
     overlayPreview.data?.alignment.automatic_offset_seconds ?? 0;
   // PROTECTED CALIBRATION SYNC CONTRACT — use the same GPX origin and
