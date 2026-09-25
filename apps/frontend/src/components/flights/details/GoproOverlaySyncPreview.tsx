@@ -10,6 +10,7 @@ import {
 import { getApiUrlWithSearchParams } from '../../../lib/api';
 import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
+import { useFlightTelemetry } from '../../../hooks/flights/useFlightTelemetry';
 import {
   telemetryAtTimestamp,
   telemetryTimestampAtVideoTime,
@@ -143,7 +144,10 @@ export function GoproOverlaySyncPreview({
   const { t } = useTranslation();
   const token = useAuthStore((state) => state.token);
   const queryClient = useQueryClient();
-  const preview = useGoproOverlayPreview(flightId, true);
+  const youtubeId = youtubeUrls.map(getYoutubeVideoId).find(Boolean) ?? null;
+  const isYoutubeCalibration = Boolean(youtubeId);
+  const preview = useGoproOverlayPreview(flightId, !isYoutubeCalibration);
+  const flightTelemetry = useFlightTelemetry(flightId, isYoutubeCalibration);
   const generatePreview = useGenerateGoproPreview(flightId);
   const generateMerge = useGenerateGoproMerge(flightId);
   const automaticallyRequestedTarget = useRef<string | null>(null);
@@ -151,7 +155,6 @@ export function GoproOverlaySyncPreview({
   const cameraRef = useRef<HTMLVideoElement>(null);
   const youtubeHostRef = useRef<HTMLDivElement>(null);
   const youtubeRef = useRef<YoutubePlayer | null>(null);
-  const youtubeId = youtubeUrls.map(getYoutubeVideoId).find(Boolean) ?? null;
   const [youtubeReady, setYoutubeReady] = useState(false);
   const [youtubeFailed, setYoutubeFailed] = useState(false);
   const [youtubeDuration, setYoutubeDuration] = useState(0);
@@ -161,9 +164,23 @@ export function GoproOverlaySyncPreview({
   const parsedOffset = Number(offset);
   const manualOffset = Number.isFinite(parsedOffset) ? parsedOffset : 0;
   const [displayOffset, setDisplayOffset] = useState(manualOffset);
-  const automaticOffset = preview.data?.alignment.automatic_offset_seconds ?? 0;
-  const gpxDuration = preview.data?.gpx.duration_seconds ?? 0;
-  const previewSegments = preview.data?.video.preview_segments ?? [];
+  const automaticOffset = isYoutubeCalibration
+    ? 0
+    : (preview.data?.alignment.automatic_offset_seconds ?? 0);
+  const gpxDuration = isYoutubeCalibration
+    ? (flightTelemetry.data?.duration_seconds ?? 0)
+    : (preview.data?.gpx.duration_seconds ?? 0);
+  const previewSegments = isYoutubeCalibration
+    ? youtubeDuration > 0
+      ? [
+          {
+            preview_start_seconds: 0,
+            source_start_seconds: 0,
+            duration_seconds: youtubeDuration,
+          },
+        ]
+      : []
+    : (preview.data?.video.preview_segments ?? []);
   const sourceVideoTime = youtubeId
     ? videoTime
     : sourceTimeAtPreviewTime(videoTime, previewSegments);
@@ -192,13 +209,21 @@ export function GoproOverlaySyncPreview({
     setDisplayOffset(manualOffset);
   }, [manualOffset]);
 
-  const gpxStartTimestamp = preview.data
-    ? (preview.data.gpx.coordinates[0]?.timestamp ??
-      parseApiUtcDate(preview.data.gpx.start_time).getTime())
-    : 0;
-  const telemetry = preview.data
+  const gpxCoordinates = isYoutubeCalibration
+    ? (flightTelemetry.data?.points ?? [])
+    : (preview.data?.gpx.coordinates ?? []);
+  const gpxStartTimestamp = isYoutubeCalibration
+    ? (gpxCoordinates[0]?.timestamp ??
+      (flightTelemetry.data?.start_time
+        ? parseApiUtcDate(flightTelemetry.data.start_time).getTime()
+        : 0))
+    : preview.data
+      ? (preview.data.gpx.coordinates[0]?.timestamp ??
+        parseApiUtcDate(preview.data.gpx.start_time).getTime())
+      : 0;
+  const telemetry = gpxCoordinates.length
     ? telemetryAtTimestamp(
-        preview.data.gpx.coordinates,
+        gpxCoordinates,
         calibrationTelemetryTimestampAtVideoTime(
           gpxStartTimestamp,
           sourceVideoTime,
@@ -367,7 +392,11 @@ export function GoproOverlaySyncPreview({
     await onOffsetSave(nextOffset);
   };
 
-  if (preview.isPending || preview.data?.gpx?.enrichment_status === 'pending') {
+  if (
+    isYoutubeCalibration
+      ? flightTelemetry.isPending
+      : preview.isPending || preview.data?.gpx?.enrichment_status === 'pending'
+  ) {
     return (
       <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
         {t('flights.goproOverlayPreviewLoading')}
@@ -375,7 +404,7 @@ export function GoproOverlaySyncPreview({
     );
   }
 
-  if (isMergeMissing) {
+  if (!isYoutubeCalibration && isMergeMissing) {
     return (
       <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
         <p className="mb-3">{t('flights.goproOverlayMergeRequired')}</p>
@@ -393,7 +422,7 @@ export function GoproOverlaySyncPreview({
     );
   }
 
-  if (preview.isError) {
+  if (isYoutubeCalibration ? flightTelemetry.isError : preview.isError) {
     return (
       <div
         role="alert"
@@ -468,64 +497,68 @@ export function GoproOverlaySyncPreview({
               </button>
             </div>
           )}
-          <div className="space-y-2 border-t border-gray-800 px-3 py-3 text-gray-100">
-            <div className="flex items-center justify-between gap-3 text-xs">
-              <label htmlFor="gopro-preview-duration">
-                {t('flights.goproPreviewDuration')}
-              </label>
-              <span className="font-mono">
-                {t('flights.goproPreviewMinutes', { count: requestedMinutes })}
-              </span>
-            </div>
-            <input
-              id="gopro-preview-duration"
-              className="w-full accent-sky-500"
-              type="range"
-              min={3}
-              max={maxMinutes}
-              step={1}
-              value={Math.min(requestedMinutes, maxMinutes)}
-              onChange={(event) =>
-                setRequestedMinutes(Number(event.target.value))
-              }
-            />
-            <div className="flex items-center justify-between gap-3 text-xs text-gray-300">
-              <span>
-                {t('flights.goproPreviewAvailable', {
-                  count: availableMinutes,
-                })}
-              </span>
-              <button
-                type="button"
-                className="cursor-pointer rounded-md bg-sky-600 px-3 py-2 font-medium text-white transition-colors hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={
-                  isGenerating ||
-                  generatePreview.isPending ||
-                  requestedMinutes <= availableMinutes ||
-                  (requestedDurationCoversSource &&
-                    preview.data?.video.preview_status === 'ready')
+          {!isYoutubeCalibration && (
+            <div className="space-y-2 border-t border-gray-800 px-3 py-3 text-gray-100">
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <label htmlFor="gopro-preview-duration">
+                  {t('flights.goproPreviewDuration')}
+                </label>
+                <span className="font-mono">
+                  {t('flights.goproPreviewMinutes', {
+                    count: requestedMinutes,
+                  })}
+                </span>
+              </div>
+              <input
+                id="gopro-preview-duration"
+                className="w-full accent-sky-500"
+                type="range"
+                min={3}
+                max={maxMinutes}
+                step={1}
+                value={Math.min(requestedMinutes, maxMinutes)}
+                onChange={(event) =>
+                  setRequestedMinutes(Number(event.target.value))
                 }
-                onClick={() => void handleGeneratePreview()}
-              >
-                {isGenerating || generatePreview.isPending
-                  ? t('flights.goproPreviewGenerating')
-                  : t('flights.goproPreviewGenerate', {
-                      count: requestedMinutes,
-                    })}
-              </button>
+              />
+              <div className="flex items-center justify-between gap-3 text-xs text-gray-300">
+                <span>
+                  {t('flights.goproPreviewAvailable', {
+                    count: availableMinutes,
+                  })}
+                </span>
+                <button
+                  type="button"
+                  className="cursor-pointer rounded-md bg-sky-600 px-3 py-2 font-medium text-white transition-colors hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={
+                    isGenerating ||
+                    generatePreview.isPending ||
+                    requestedMinutes <= availableMinutes ||
+                    (requestedDurationCoversSource &&
+                      preview.data?.video.preview_status === 'ready')
+                  }
+                  onClick={() => void handleGeneratePreview()}
+                >
+                  {isGenerating || generatePreview.isPending
+                    ? t('flights.goproPreviewGenerating')
+                    : t('flights.goproPreviewGenerate', {
+                        count: requestedMinutes,
+                      })}
+                </button>
+              </div>
+              {isGenerating && (
+                <p className="text-xs text-amber-200">
+                  {t('flights.goproPreviewGeneratingNotice')}
+                </p>
+              )}
+              {(preview.data?.video.preview_status === 'failed' ||
+                generatePreview.isError) && (
+                <p role="alert" className="text-xs text-amber-300">
+                  {t('flights.goproPreviewFallback')}
+                </p>
+              )}
             </div>
-            {isGenerating && (
-              <p className="text-xs text-amber-200">
-                {t('flights.goproPreviewGeneratingNotice')}
-              </p>
-            )}
-            {(preview.data?.video.preview_status === 'failed' ||
-              generatePreview.isError) && (
-              <p role="alert" className="text-xs text-amber-300">
-                {t('flights.goproPreviewFallback')}
-              </p>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
