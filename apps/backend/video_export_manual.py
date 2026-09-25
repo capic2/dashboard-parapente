@@ -32,7 +32,7 @@ from deployment_drain import DeploymentDrainActive, job_admission
 from auth import create_job_token, decode_job_token
 from database import SessionLocal
 from flight_storage import flight_temporary_directory, get_video_output_path
-from models import Flight, GoproOverlayJob, VideoExportJob
+from models import Flight, VideoExportJob
 from video_acceleration import (
     VideoAccelerator,
     chromium_launch_args,
@@ -833,13 +833,6 @@ def _export_youtube_overlay_job(job_id: str) -> None:
         _log_job(job_id, "Export YouTube échoué: paramètres d’export incomplets")
         _update_job(job_id, status=_STATUS_FAILED, error="Paramètres d’export YouTube incomplets")
         return
-    with SessionLocal() as db:
-        overlay = db.get(GoproOverlayJob, job.overlay_job_id)
-        overlay_path = Path(overlay.output_path) if overlay else None
-    if overlay_path is None or not overlay_path.is_file():
-        _log_job(job_id, "Export YouTube échoué: la couche overlay n’est pas disponible")
-        _update_job(job_id, status=_STATUS_FAILED, error="La couche overlay n’est pas disponible")
-        return
 
     work_dir = new_work_dir(job_id)
     destination = output_path(job_id)
@@ -865,7 +858,7 @@ def _export_youtube_overlay_job(job_id: str) -> None:
         )
         export_youtube_overlay(
             url=job.youtube_url,
-            overlay_path=overlay_path,
+            overlay_job_id=job.overlay_job_id,
             output_path=destination,
             offset_seconds=float(job.overlay_offset_seconds or 0),
             work_dir=work_dir,

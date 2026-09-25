@@ -7262,6 +7262,14 @@ def _flight_overlay_layer_job(flight: Flight) -> GoproOverlayJobModel | None:
     return None
 
 
+def _flight_saved_overlay_job(flight: Flight) -> GoproOverlayJobModel | None:
+    """Return the newest completed overlay configuration saved for the flight."""
+    for job in reversed(flight.gopro_overlay_jobs):
+        if job.status == "completed":
+            return job
+    return None
+
+
 def _require_gopro_overlay_offset(flight: Flight) -> float:
     """Require an explicit persisted synchronization offset before rendering."""
     if flight.gopro_overlay_gpx_offset is None:
@@ -7279,6 +7287,17 @@ def _require_ready_gopro_overlay_layer(flight: Flight) -> GoproOverlayJobModel:
         raise HTTPException(
             status_code=409,
             detail="Generate the synchronized overlay layer before generating media",
+        )
+    return job
+
+
+def _require_saved_gopro_overlay(flight: Flight) -> GoproOverlayJobModel:
+    """Require a completed saved overlay; its transparent layer is rendered on demand."""
+    job = _flight_saved_overlay_job(flight)
+    if job is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Enregistrez un overlay avant de générer la vidéo YouTube",
         )
     return job
 
@@ -7315,7 +7334,7 @@ def create_youtube_overlay_export(
         raise HTTPException(
             status_code=400, detail="YouTube video is not associated with this flight"
         )
-    overlay_job = _require_ready_gopro_overlay_layer(flight)
+    overlay_job = _require_saved_gopro_overlay(flight)
     offset = _require_gopro_overlay_offset(flight)
     try:
         job_id = start_youtube_overlay_export(

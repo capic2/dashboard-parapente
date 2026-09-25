@@ -5,6 +5,7 @@ from __future__ import annotations
 import shutil
 import re
 import subprocess
+import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
@@ -17,6 +18,7 @@ class YoutubeExportError(RuntimeError):
 
 _DOWNLOAD_PROGRESS_RE = re.compile(r"\[download\]\s+(?P<percent>\d+(?:\.\d+)?)%")
 ProgressCallback = Callable[[str, int | None], None]
+_OVERLAY_TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
 
 
 def _iter_process_output(stream: object) -> Iterator[str]:
@@ -110,6 +112,83 @@ def download_youtube(url: str, directory: Path, progress: ProgressCallback) -> P
     return files[0]
 
 
+def render_saved_overlay(
+    overlay_job_id: str,
+    *,
+    offset_seconds: float,
+    output_directory: Path,
+    progress: ProgressCallback,
+) -> Path:
+    """Render the saved overlay as a temporary transparent layer for YouTube."""
+    from gopro_overlay_export import (
+        create_gopro_overlay_job_from_paths,
+        get_gopro_overlay_job,
+    )
+
+    saved_job = get_gopro_overlay_job(overlay_job_id, include_command=True)
+    if not saved_job:
+        raise YoutubeExportError("L’overlay enregistré est introuvable")
+
+    saved_command = saved_job.get("command")
+    if not isinstance(saved_command, dict):
+        saved_command = {}
+    if saved_command.get("overlay_only") is True:
+        saved_output = Path(str(saved_job.get("output_path") or ""))
+        if saved_output.is_file():
+            return saved_output
+
+    video_path = Path(str(saved_job.get("video_path") or ""))
+    render_gpx_path = Path(str(saved_command.get("render_gpx_path") or ""))
+    saved_gpx_path = Path(str(saved_job.get("gpx_path") or ""))
+    gpx_path = render_gpx_path if render_gpx_path.is_file() else saved_gpx_path
+    pip_value = saved_job.get("pip_path")
+    pip_path = Path(str(pip_value)) if pip_value else None
+    if not video_path.is_file() or not gpx_path.is_file():
+        raise YoutubeExportError("Les sources de l’overlay enregistré sont indisponibles")
+    if pip_path and not pip_path.is_file():
+        pip_path = None
+
+    progress("Génération temporaire de l’overlay synchronisé", None)
+    internal_job = create_gopro_overlay_job_from_paths(
+        video_path=video_path,
+        gpx_path=gpx_path,
+        pip_path=pip_path,
+        layout_id=saved_job.get("layout_id"),
+        output_filename=f"youtube-overlay-{overlay_job_id}.webm",
+        output_resolution="source",
+        output_dir=str(output_directory),
+        gpx_offset=float(offset_seconds),
+        flight_id=None,
+        overlay_only=True,
+    )
+    internal_job_id = str(internal_job["job_id"])
+    deadline = time.monotonic() + config.GOPRO_OVERLAY_JOB_TIMEOUT_SECONDS
+    while True:
+        current_job = get_gopro_overlay_job(internal_job_id)
+        if not current_job:
+            raise YoutubeExportError("Le rendu temporaire de l’overlay a disparu")
+
+        status = str(current_job.get("status") or "")
+        if status == "completed":
+            output = Path(str(current_job.get("output_path") or ""))
+            if output.is_file():
+                progress("Overlay synchronisé prêt", None)
+                return output
+            raise YoutubeExportError("Le rendu temporaire de l’overlay est vide")
+        if status in _OVERLAY_TERMINAL_STATUSES:
+            detail = current_job.get("error") or current_job.get("message")
+            raise YoutubeExportError(f"Le rendu de l’overlay a échoué: {detail or status}")
+        if time.monotonic() >= deadline:
+            raise YoutubeExportError("Le rendu temporaire de l’overlay a expiré")
+
+        current_progress = current_job.get("progress")
+        progress(
+            f"Génération de l’overlay synchronisé: {current_progress or 0}%",
+            None,
+        )
+        time.sleep(1)
+
+
 def compose_with_overlay(
     source: Path,
     overlay: Path,
@@ -162,15 +241,19 @@ def compose_with_overlay(
 def export_youtube_overlay(
     *,
     url: str,
-    overlay_path: Path,
+    overlay_job_id: str,
     output_path: Path,
     offset_seconds: float,
     work_dir: Path,
     progress: ProgressCallback,
 ) -> None:
     source = download_youtube(url, work_dir, progress)
-    if not overlay_path.is_file():
-        raise YoutubeExportError("La couche overlay n’est plus disponible")
+    overlay_path = render_saved_overlay(
+        overlay_job_id,
+        offset_seconds=offset_seconds,
+        output_directory=work_dir,
+        progress=progress,
+    )
     compose_with_overlay(source, overlay_path, output_path, offset_seconds, progress)
     if not output_path.is_file() or output_path.stat().st_size == 0:
         raise YoutubeExportError("Le fichier MP4 final est vide")

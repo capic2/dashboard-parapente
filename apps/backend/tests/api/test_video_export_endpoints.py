@@ -14,7 +14,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from auth import create_job_token
-from models import YoutubeUploadJob
+from models import GoproOverlayJob, YoutubeUploadJob
 from routes import (
     _get_video_export_jobs_payload,
     _video_export_can_cancel,
@@ -128,6 +128,44 @@ class TestVideoExportStartEndpoint:
             headers={"Authorization": "Bearer test-token"},
         )
         assert response.status_code == 400
+
+    def test_youtube_overlay_export_accepts_saved_legacy_overlay(
+        self, client, db_session, sample_flight
+    ):
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        sample_flight.youtube_urls = [youtube_url]
+        sample_flight.gopro_overlay_gpx_offset = 12.5
+        db_session.add(
+            GoproOverlayJob(
+                id="saved-legacy-overlay",
+                flight_id=sample_flight.id,
+                status="completed",
+                video_path="/data/source.mp4",
+                gpx_path="/data/flight.gpx",
+                layout_id="default",
+                layout_label="Default",
+                layout_path="/data/layout.json",
+                output_path="/data/render.mp4",
+                temp_output_path="/data/render.mp4.tmp",
+                output_filename="render.mp4",
+                command_json=json.dumps({"overlay_only": False}),
+            )
+        )
+        db_session.commit()
+
+        with patch(
+            "routes.start_youtube_overlay_export", return_value="youtube-export-1"
+        ) as mock_start:
+            response = client.post(
+                f"{API_PREFIX}/flights/{sample_flight.id}/youtube-overlay-export",
+                json={"youtube_url": youtube_url},
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        assert response.status_code == 202
+        assert response.json() == {"job_id": "youtube-export-1", "status": "queued"}
+        assert mock_start.call_args.kwargs["overlay_job_id"] == "saved-legacy-overlay"
+        assert mock_start.call_args.kwargs["overlay_offset_seconds"] == 12.5
 
     def test_start_video_export_prefers_manual_when_available(
         self, client: TestClient, sample_flight
