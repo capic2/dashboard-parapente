@@ -81,10 +81,12 @@ vi.mock('./FlightOverlayPlayer', () => ({
     onTimeChange,
     overlayContent,
     pipLayout,
+    syncOffsetSeconds,
   }: {
     onTimeChange?: (time: number) => void;
     overlayContent?: React.ReactNode;
     pipLayout?: { x: number; y: number; width: number; height: number };
+    syncOffsetSeconds?: number;
   }) => (
     <>
       <button
@@ -100,6 +102,7 @@ vi.mock('./FlightOverlayPlayer', () => ({
         data-width={pipLayout?.width}
         data-height={pipLayout?.height}
       />
+      <div data-testid="player-sync-offset" data-offset={syncOffsetSeconds} />
       {overlayContent}
     </>
   ),
@@ -394,6 +397,10 @@ describe('FlightTelemetryInteractivePreview', () => {
 
     fireEvent.click(screen.getByTestId('overlay-player'));
     expect(screen.getByTestId('telemetry-overlay')).toHaveAttribute(
+      'data-offset',
+      '5.9'
+    );
+    expect(screen.getByTestId('player-sync-offset')).toHaveAttribute(
       'data-offset',
       '5.9'
     );

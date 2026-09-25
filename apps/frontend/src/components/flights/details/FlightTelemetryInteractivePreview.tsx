@@ -318,6 +318,7 @@ export function FlightTelemetryInteractivePreview({
                     : undefined
                 }
                 youtubeUrl={youtubeUrl}
+                syncOffsetSeconds={calibrationOffsetSeconds}
                 getFlightTime={(cameraTime) =>
                   cameraTime - calibrationOffsetSeconds
                 }

@@ -13,6 +13,7 @@ import { GoproOverlaySyncPreview } from './GoproOverlaySyncPreview';
 interface FlightOverlayWorkspaceProps {
   flightId: string;
   initialOffset: string;
+  onOffsetPreviewChange?: (offset: string) => void;
   onSaveOffset: (offset: string) => Promise<void>;
   youtubeUrls?: string[];
   showHeader?: boolean;
@@ -37,6 +38,7 @@ async function invalidateOverlaySyncQueries(
 export function FlightOverlayWorkspace({
   flightId,
   initialOffset,
+  onOffsetPreviewChange,
   onSaveOffset,
   youtubeUrls,
   showHeader = true,
@@ -138,7 +140,10 @@ export function FlightOverlayWorkspace({
         flightId={flightId}
         youtubeUrls={youtubeUrls}
         offset={offset}
-        onOffsetChange={setOffset}
+        onOffsetChange={(nextOffset) => {
+          setOffset(nextOffset);
+          onOffsetPreviewChange?.(nextOffset);
+        }}
         onOffsetSave={async (nextOffset) => {
           await onSaveOffset(nextOffset);
           await invalidateOverlaySyncQueries(queryClient, flightId);
