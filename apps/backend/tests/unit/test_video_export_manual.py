@@ -17,6 +17,7 @@ from models import Flight, VideoExportJob
 
 import video_export
 import video_export_manual
+import youtube_overlay_export
 
 
 def test_video_export_log_survives_temp_cleanup_until_job_deletion(tmp_path, monkeypatch):
@@ -879,6 +880,53 @@ def test_thread_worker_dispatches_youtube_overlay_jobs(test_db, monkeypatch):
         video_export_manual._WORKER_STOP.clear()
 
     assert dispatched_job_ids == ["job-process-youtube-overlay"]
+
+
+def test_youtube_overlay_worker_cleans_temp_files_after_success(tmp_path, monkeypatch):
+    job_id = "job-youtube-overlay-cleanup"
+    work_dir = tmp_path / "temp" / job_id
+    output = tmp_path / "exports" / f"youtube-overlay-{job_id}.mp4"
+    job = SimpleNamespace(
+        youtube_url="https://www.youtube.com/watch?v=test",
+        overlay_job_id="saved-overlay-job",
+        overlay_offset_seconds=0,
+        youtube_upload_job_id="upload-job",
+    )
+    uploaded: list[tuple[str, object]] = []
+
+    monkeypatch.setattr(video_export_manual, "_get_job", lambda _: job)
+    monkeypatch.setattr(video_export_manual, "_is_cancelled", lambda _: False)
+    monkeypatch.setattr(video_export_manual, "_log_job", lambda *args: None)
+    monkeypatch.setattr(video_export_manual, "_update_job", lambda *args, **kwargs: job)
+    monkeypatch.setattr(video_export_manual, "_clear_job_cancel_requested", lambda _: None)
+    monkeypatch.setattr(youtube_overlay_export, "new_work_dir", lambda _: work_dir)
+    monkeypatch.setattr(youtube_overlay_export, "output_path", lambda _: output)
+
+    def fake_export_youtube_overlay(**kwargs):
+        kwargs["work_dir"].mkdir(parents=True)
+        (kwargs["work_dir"] / "temporary-source.mp4").write_bytes(b"temporary")
+        kwargs["output_path"].parent.mkdir(parents=True)
+        kwargs["output_path"].write_bytes(b"final")
+
+    monkeypatch.setattr(
+        youtube_overlay_export,
+        "export_youtube_overlay",
+        fake_export_youtube_overlay,
+    )
+
+    import youtube_upload
+
+    monkeypatch.setattr(
+        youtube_upload,
+        "enqueue_youtube_overlay_upload",
+        lambda upload_job_id, source_path: uploaded.append((upload_job_id, source_path)),
+    )
+
+    video_export_manual._export_youtube_overlay_job(job_id)
+
+    assert uploaded == [("upload-job", output)]
+    assert not work_dir.exists()
+    assert output.read_bytes() == b"final"
 
 
 def test_first_missing_frame_index_returns_resume_point(tmp_path):

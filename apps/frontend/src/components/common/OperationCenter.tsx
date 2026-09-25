@@ -41,12 +41,21 @@ export function OperationCenter() {
   const cancel = useCancelOperation();
   const retry = useRetryOperation();
   const [selected, setSelected] = useState<BackgroundOperation | null>(null);
+  const displayableOperations = useMemo(
+    () => operations.filter((operation) => operation.status !== 'cancelled'),
+    [operations]
+  );
   const activeCount = operations.filter(
     (operation) =>
       operation.status === 'queued' || operation.status === 'running'
   ).length;
-  const unreadCount = operations.filter((operation) => operation.unread).length;
-  const visibleOperations = useMemo(() => operations.slice(0, 8), [operations]);
+  const unreadCount = displayableOperations.filter(
+    (operation) => operation.unread
+  ).length;
+  const visibleOperations = useMemo(
+    () => displayableOperations.slice(0, 8),
+    [displayableOperations]
+  );
 
   function openOperation(operation: BackgroundOperation) {
     setSelected(operation);
