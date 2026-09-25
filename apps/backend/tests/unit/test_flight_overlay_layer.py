@@ -7,7 +7,11 @@ from fastapi import HTTPException, Response
 import pytest
 
 import routes
-from routes import _flight_overlay_layer_job, _require_gopro_overlay_offset
+from routes import (
+    _flight_overlay_layer_job,
+    _flight_saved_overlay_job,
+    _require_gopro_overlay_offset,
+)
 
 
 class _FakeQuery:
@@ -47,6 +51,23 @@ def test_flight_overlay_layer_job_ignores_invalid_or_regular_jobs() -> None:
     flight = SimpleNamespace(gopro_overlay_jobs=[invalid, regular_export])
 
     assert _flight_overlay_layer_job(flight) is None
+
+
+def test_flight_saved_overlay_job_accepts_completed_legacy_render() -> None:
+    legacy_render = SimpleNamespace(
+        status="completed",
+        command_json=json.dumps({"overlay_only": False}),
+    )
+    flight = SimpleNamespace(gopro_overlay_jobs=[legacy_render])
+
+    assert _flight_saved_overlay_job(flight) is legacy_render
+
+
+def test_flight_saved_overlay_job_ignores_incomplete_jobs() -> None:
+    queued = SimpleNamespace(status="queued", command_json="{}")
+    flight = SimpleNamespace(gopro_overlay_jobs=[queued])
+
+    assert _flight_saved_overlay_job(flight) is None
 
 
 def test_gopro_overlay_offset_requires_explicit_persistence() -> None:

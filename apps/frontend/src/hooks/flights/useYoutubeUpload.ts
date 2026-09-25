@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   YoutubeVideoAssociationsSchema,
@@ -13,10 +14,22 @@ export interface YoutubeConnectionStatus {
 export interface YoutubeUploadJob {
   job_id: string;
   flight_id: string;
-  source_type: 'gopro_overlay' | 'camera' | 'video' | 'pano' | 'highlight';
+  source_type:
+    | 'gopro_overlay'
+    | 'camera'
+    | 'video'
+    | 'pano'
+    | 'highlight'
+    | 'youtube_overlay';
   gopro_overlay_job_id?: string | null;
   highlight_video_job_id?: string | null;
-  status: 'queued' | 'uploading' | 'completed' | 'failed' | 'cancelled';
+  status:
+    | 'preparing'
+    | 'queued'
+    | 'uploading'
+    | 'completed'
+    | 'failed'
+    | 'cancelled';
   progress: number;
   youtube_url?: string | null;
   error?: string | null;
@@ -75,7 +88,8 @@ export function useYoutubeUpload(
   flightId: string,
   source?: YoutubeUploadSource
 ) {
-  return useQuery({
+  const queryClient = useQueryClient();
+  const query = useQuery({
     queryKey: youtubeUploadQueryKey(flightId, source),
     queryFn: () =>
       api
@@ -85,11 +99,25 @@ export function useYoutubeUpload(
         .json<YoutubeUploadJob | null>(),
     refetchInterval: (query) => {
       const job = query.state.data;
-      return job?.status === 'queued' || job?.status === 'uploading'
+      return job?.status === 'preparing' ||
+        job?.status === 'queued' ||
+        job?.status === 'uploading'
         ? 3_000
         : false;
     },
   });
+
+  useEffect(() => {
+    if (query.data?.status !== 'completed') return;
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['flights'] }),
+      queryClient.invalidateQueries({
+        queryKey: youtubeVideoAssociationsQueryKey(flightId),
+      }),
+    ]);
+  }, [flightId, query.data?.status, queryClient]);
+
+  return query;
 }
 
 export const youtubeVideoAssociationsQueryKey = (flightId: string) => [
@@ -116,6 +144,9 @@ export function useStartYoutubeOverlayExport(flightId: string) {
         .json<{ job_id: string; status: string }>(),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['youtube-upload', flightId],
+      });
     },
   });
 }

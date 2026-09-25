@@ -636,10 +636,10 @@ class YoutubeOverlayExportCreate(BaseModel):
 class YoutubeUploadJobResponse(BaseModel):
     job_id: str
     flight_id: str
-    source_type: Literal["gopro_overlay", "camera", "video", "pano", "highlight"]
+    source_type: Literal["gopro_overlay", "camera", "video", "pano", "highlight", "youtube_overlay"]
     gopro_overlay_job_id: str | None = None
     highlight_video_job_id: str | None = None
-    status: Literal["queued", "uploading", "completed", "failed", "cancelled"]
+    status: Literal["preparing", "queued", "uploading", "completed", "failed", "cancelled"]
     progress: int = Field(ge=0, le=100)
     youtube_url: str | None = None
     error: str | None = None

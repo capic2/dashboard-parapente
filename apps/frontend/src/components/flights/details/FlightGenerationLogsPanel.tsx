@@ -346,7 +346,7 @@ export function FlightGenerationLogsPanel({
             key={`youtube-${youtubeUploadJob.job_id}`}
             title={t('flights.generationLogs.youtubeUploadTitle')}
             status={youtubeUploadJob.status}
-            isInProgress={['queued', 'uploading'].includes(
+            isInProgress={['preparing', 'queued', 'uploading'].includes(
               youtubeUploadJob.status
             )}
             statusLabel={t(

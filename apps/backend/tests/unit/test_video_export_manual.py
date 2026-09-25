@@ -835,6 +835,52 @@ def test_process_video_export_job_runs_only_requested_queued_job(test_db, monkey
     assert job.status == "running"
 
 
+def test_thread_worker_dispatches_youtube_overlay_jobs(test_db, monkeypatch):
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+    with test_db() as db_session:
+        db_session.add(
+            VideoExportJob(
+                id="job-process-youtube-overlay",
+                flight_id="flight-test-001",
+                status="queued",
+                mode="youtube_overlay",
+                quality="1080p",
+                fps=30,
+                speed=1,
+                progress=0,
+                message="queued",
+                frontend_url="",
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+        )
+        db_session.commit()
+
+    dispatched_job_ids: list[str] = []
+    monkeypatch.setattr(
+        video_export_manual,
+        "_acquire_next_job",
+        lambda: "job-process-youtube-overlay",
+    )
+
+    def fake_youtube_overlay_export(job_id: str) -> None:
+        dispatched_job_ids.append(job_id)
+        video_export_manual._WORKER_STOP.set()
+
+    monkeypatch.setattr(
+        video_export_manual,
+        "_export_youtube_overlay_job",
+        fake_youtube_overlay_export,
+    )
+    video_export_manual._WORKER_STOP.clear()
+    try:
+        video_export_manual._worker_loop()
+    finally:
+        video_export_manual._WORKER_STOP.clear()
+
+    assert dispatched_job_ids == ["job-process-youtube-overlay"]
+
+
 def test_first_missing_frame_index_returns_resume_point(tmp_path):
     frames_dir = tmp_path / "frames"
     frames_dir.mkdir()

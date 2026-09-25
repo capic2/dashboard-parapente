@@ -8,6 +8,7 @@ import logging
 import re
 import threading
 import time
+import uuid
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
@@ -19,13 +20,21 @@ import httpx
 from cryptography.fernet import Fernet, InvalidToken
 from jose import JWTError, jwt
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from spatialmedia import metadata_utils
 
 import config
 from database import SessionLocal
 from flight_storage import flight_sequence_number, pano_video_path
-from models import Flight, GoproOverlayJob, HighlightVideoJob, YoutubeCredential, YoutubeUploadJob
+from models import (
+    Flight,
+    GoproOverlayJob,
+    HighlightVideoJob,
+    VideoExportJob,
+    YoutubeCredential,
+    YoutubeUploadJob,
+)
 from schemas import youtube_video_id_from_url
 
 logger = logging.getLogger(__name__)
@@ -44,6 +53,8 @@ _RANGE_PATTERN = re.compile(r"bytes=0-(\d+)")
 _EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="youtube-upload")
 _SUBMITTED: set[str] = set()
 _SUBMITTED_LOCK = threading.Lock()
+_PREPARING_STATUS = "preparing"
+_VISIBLE_ACTIVE_STATUSES = _ACTIVE_STATUSES | {_PREPARING_STATUS}
 _LOG_TAIL_LINE_COUNT = 100
 _PANORAMA_PREPARATION_PROGRESS_MAX = 10
 _PANORAMA_PREPARATION_POLL_SECONDS = 10
@@ -332,9 +343,7 @@ def _find_or_create_playlist(*, user_id: int, title: str) -> tuple[str, bool]:
 
 def add_video_to_flight_playlist(*, user_id: int, playlist_title: str, video_id: str) -> bool:
     """Create/reuse the flight playlist and add the video once."""
-    playlist_id, playlist_created = _find_or_create_playlist(
-        user_id=user_id, title=playlist_title
-    )
+    playlist_id, playlist_created = _find_or_create_playlist(user_id=user_id, title=playlist_title)
     access_token = _access_token(user_id)
     if not playlist_created:
         page_token: str | None = None
@@ -600,11 +609,95 @@ def active_job(db: Session, flight_id: str) -> YoutubeUploadJob | None:
         db.query(YoutubeUploadJob)
         .filter(
             YoutubeUploadJob.flight_id == flight_id,
-            YoutubeUploadJob.status.in_(_ACTIVE_STATUSES),
+            YoutubeUploadJob.status.in_(_VISIBLE_ACTIVE_STATUSES),
         )
         .order_by(YoutubeUploadJob.created_at.desc())
         .first()
     )
+
+
+def create_youtube_overlay_upload_job(
+    db: Session,
+    *,
+    flight_id: str,
+    user_id: int,
+    title: str,
+    description: str = "",
+    privacy_status: str = "unlisted",
+    gopro_overlay_job_id: str | None = None,
+) -> YoutubeUploadJob:
+    """Create the upload job before the export so the UI can follow the full chain."""
+    if active_job(db, flight_id) is not None:
+        raise RuntimeError("A YouTube upload is already in progress")
+    job = YoutubeUploadJob(
+        id=str(uuid.uuid4()),
+        flight_id=flight_id,
+        user_id=user_id,
+        source_type="youtube_overlay",
+        gopro_overlay_job_id=gopro_overlay_job_id,
+        status=_PREPARING_STATUS,
+        progress=0,
+        title=title[:100],
+        description=description[:5000],
+        privacy_status=privacy_status,
+    )
+    db.add(job)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise RuntimeError("A YouTube upload is already in progress") from exc
+    db.refresh(job)
+    return job
+
+
+def enqueue_youtube_overlay_upload(job_id: str, source_path: Path) -> YoutubeUploadJob:
+    """Attach the generated file to a preparing job and enqueue the upload."""
+    with SessionLocal() as db:
+        job = db.get(YoutubeUploadJob, job_id)
+        if job is None or job.source_type != "youtube_overlay":
+            raise RuntimeError("YouTube overlay upload job not found")
+        updated = (
+            db.query(YoutubeUploadJob)
+            .filter(
+                YoutubeUploadJob.id == job_id,
+                YoutubeUploadJob.status == _PREPARING_STATUS,
+            )
+            .update(
+                {
+                    "source_path": str(source_path),
+                    "status": "queued",
+                    "updated_at": datetime.utcnow(),
+                }
+            )
+        )
+        if updated != 1:
+            db.rollback()
+            raise RuntimeError("YouTube overlay upload job is no longer preparing")
+        db.commit()
+    try:
+        enqueue_youtube_upload(job.id)
+    except Exception as exc:
+        fail_youtube_overlay_upload(job.id, str(exc))
+        _delete_generated_overlay_source(source_path)
+        raise
+    return job
+
+
+def fail_youtube_overlay_upload(job_id: str, error: str) -> None:
+    """Fail an upload when its preceding video export or queue submission fails."""
+    with SessionLocal() as db:
+        db.query(YoutubeUploadJob).filter(
+            YoutubeUploadJob.id == job_id,
+            YoutubeUploadJob.status.in_({_PREPARING_STATUS, "queued"}),
+        ).update(
+            {
+                "status": "failed",
+                "error": error[:1000],
+                "updated_at": datetime.utcnow(),
+            }
+        )
+        db.commit()
 
 
 def _is_cancelled(job_id: str) -> bool:
@@ -630,12 +723,32 @@ def _update_active_job(job_id: str, **changes: Any) -> bool:
 
 def cancel_upload(db: Session, *, job_id: str, user_id: int) -> YoutubeUploadJob | None:
     """Persist cancellation and stop the RQ job when one exists."""
+    job = (
+        db.query(YoutubeUploadJob)
+        .filter(YoutubeUploadJob.id == job_id, YoutubeUploadJob.user_id == user_id)
+        .first()
+    )
+    linked_export_job_id = None
+    generated_overlay_path = None
+    if job is not None and job.status == _PREPARING_STATUS:
+        linked_export_job_id = (
+            db.query(VideoExportJob.id)
+            .filter(
+                VideoExportJob.youtube_upload_job_id == job_id,
+                VideoExportJob.status.in_(
+                    {"queued", "running", "initializing", "capturing", "encoding"}
+                ),
+            )
+            .scalar()
+        )
+    if job is not None and job.source_type == "youtube_overlay" and job.source_path:
+        generated_overlay_path = Path(job.source_path)
     updated = (
         db.query(YoutubeUploadJob)
         .filter(
             YoutubeUploadJob.id == job_id,
             YoutubeUploadJob.user_id == user_id,
-            YoutubeUploadJob.status.in_(_ACTIVE_STATUSES),
+            YoutubeUploadJob.status.in_(_VISIBLE_ACTIVE_STATUSES),
         )
         .update(
             {
@@ -649,6 +762,12 @@ def cancel_upload(db: Session, *, job_id: str, user_id: int) -> YoutubeUploadJob
     db.commit()
     if updated != 1:
         return None
+    if linked_export_job_id is not None:
+        from video_export_manual import cancel_video_export
+
+        cancel_video_export(linked_export_job_id)
+    if generated_overlay_path is not None:
+        _delete_generated_overlay_source(generated_overlay_path)
     _log_job(job_id, "YouTube upload cancelled")
 
     from job_queue import delete_job, is_rq_enabled
@@ -737,10 +856,13 @@ def _session_offset(
 
 def _finish_upload(job_id: str, video_id: str) -> None:
     youtube_url = f"https://www.youtube.com/watch?v={video_id}"
+    generated_overlay_path: Path | None = None
     with SessionLocal() as db:
         job = db.get(YoutubeUploadJob, job_id)
         if job is None:
             return
+        if job.source_type == "youtube_overlay" and job.source_path:
+            generated_overlay_path = Path(job.source_path)
         flight = db.get(Flight, job.flight_id)
         if flight is None:
             raise RuntimeError("Flight was deleted during the YouTube upload")
@@ -782,9 +904,29 @@ def _finish_upload(job_id: str, video_id: str) -> None:
         # The upload remains successful; playlist organization can be retried later.
         logger.exception("Unable to add YouTube video %s to its flight playlist", video_id)
         _log_job(job_id, f"Playlist organization failed: {_safe_log_error(exc)}")
+    if generated_overlay_path is not None:
+        _delete_generated_overlay_source(generated_overlay_path)
+
+
+def _delete_generated_overlay_source(path: Path) -> None:
+    """Delete only generated YouTube-overlay files after upload and playlisting."""
+    try:
+        path.resolve().relative_to(Path(config.VIDEO_EXPORT_DIR).resolve())
+    except ValueError:
+        logger.warning("Refusing to delete YouTube overlay source outside export storage: %s", path)
+        return
+    try:
+        path.unlink(missing_ok=True)
+        logger.info("Removed generated YouTube overlay source %s", path)
+    except OSError:
+        logger.warning("Unable to remove generated YouTube overlay source %s", path)
 
 
 def _source_video_path(db: Session, job: YoutubeUploadJob) -> Path:
+    if job.source_type == "youtube_overlay":
+        if not job.source_path:
+            raise RuntimeError("YouTube overlay upload has no generated video source")
+        return Path(job.source_path)
     if job.source_type == "camera":
         flight = db.get(Flight, job.flight_id)
         if flight is None:
@@ -1148,6 +1290,18 @@ def process_youtube_upload(job_id: str) -> None:
                 prepared_video_path.unlink(missing_ok=True)
             except OSError:
                 logger.warning("Unable to remove prepared panorama for YouTube upload %s", job_id)
+        generated_overlay_path: Path | None = None
+        with SessionLocal() as db:
+            job = db.get(YoutubeUploadJob, job_id)
+            if (
+                job is not None
+                and job.source_type == "youtube_overlay"
+                and job.source_path
+                and job.status in {"completed", "failed", "cancelled"}
+            ):
+                generated_overlay_path = Path(job.source_path)
+        if generated_overlay_path is not None:
+            _delete_generated_overlay_source(generated_overlay_path)
         with _SUBMITTED_LOCK:
             _SUBMITTED.discard(job_id)
 
