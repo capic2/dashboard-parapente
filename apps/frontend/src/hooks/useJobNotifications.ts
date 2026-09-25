@@ -1,25 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
-import { useAuthStore } from '../stores/authStore';
+import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from './useToast';
-import {
-  videoExportJobsQueryOptions,
-  type VideoExportJob,
-} from './flights/useVideoExportJobs';
-
-const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled']);
-const JOB_NOTIFICATION_PAGE_SIZE = 100;
-
-function jobLabel(job: VideoExportJob): string {
-  return (
-    job.flight_title ||
-    job.flight_name ||
-    job.output_filename ||
-    job.layout_label ||
-    job.job_id
-  );
-}
+import { useOperations } from './useOperations';
 
 export function requestJobNotificationPermission(): Promise<NotificationPermission | null> {
   if (typeof window === 'undefined' || !('Notification' in window)) {
@@ -44,69 +27,56 @@ function sendSystemNotification(title: string, body: string) {
   notification.onclick = () => window.focus();
 }
 
-export function useJobCompletionNotifications() {
+export function useOperationCompletionNotifications() {
   const { t } = useTranslation();
   const { success, error, info } = useToast();
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const queryClient = useQueryClient();
+  const { data: operations = [], isSuccess } = useOperations();
   const previousStatuses = useRef<Map<string, string>>(new Map());
   const hasInitialSnapshot = useRef(false);
-  const jobsQuery = useQuery({
-    ...videoExportJobsQueryOptions({ pageSize: JOB_NOTIFICATION_PAGE_SIZE }),
-    enabled: isAuthenticated,
-  });
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      previousStatuses.current = new Map();
-      hasInitialSnapshot.current = false;
-      return;
-    }
-    if (!jobsQuery.data) return;
-
+    if (!isSuccess) return;
     const nextStatuses = new Map(
-      jobsQuery.data.jobs.map((job) => [job.job_id, job.status])
+      operations.map((operation) => [operation.operation_id, operation.status])
     );
-
     if (!hasInitialSnapshot.current) {
       previousStatuses.current = nextStatuses;
       hasInitialSnapshot.current = true;
       return;
     }
 
-    for (const job of jobsQuery.data.jobs) {
-      const previousStatus = previousStatuses.current.get(job.job_id);
-      if (previousStatus === job.status || !TERMINAL_STATUSES.has(job.status)) {
+    for (const operation of operations) {
+      const previousStatus = previousStatuses.current.get(
+        operation.operation_id
+      );
+      if (
+        previousStatus === operation.status ||
+        !['completed', 'failed', 'cancelled'].includes(operation.status)
+      ) {
         continue;
       }
-
-      const label = jobLabel(job);
-      const isSuccess = job.status === 'completed';
-      const isFailure = job.status === 'failed';
-      let title: string;
-      let body: string;
-      if (isSuccess) {
-        title = t('notifications.jobCompleted', 'Job terminé');
-        body = t('notifications.jobCompletedDetail', '{{job}} est terminé', {
-          job: label,
-        });
-      } else if (isFailure) {
-        title = t('notifications.jobFailed', 'Job échoué');
-        body = t('notifications.jobFailedDetail', '{{job}} a échoué', {
-          job: label,
-        });
-      } else {
-        title = t('notifications.jobCancelled', 'Job annulé');
-        body = t('notifications.jobCancelledDetail', '{{job}} a été annulé', {
-          job: label,
+      const label = t(operation.title_key, operation.operation_type);
+      const title = t(
+        `operations.status.${operation.status}`,
+        operation.status
+      );
+      const body = operation.error_detail || label;
+      if (operation.status === 'failed') error(`${title} : ${body}`);
+      else if (operation.status === 'completed') success(`${title} : ${body}`);
+      else info(`${title} : ${body}`);
+      if (
+        operation.status === 'completed' &&
+        operation.operation_type === 'intervals_sync'
+      ) {
+        void queryClient.invalidateQueries({ queryKey: ['flights'] });
+        void queryClient.invalidateQueries({ queryKey: ['flights', 'stats'] });
+        void queryClient.invalidateQueries({
+          queryKey: ['flights', 'records'],
         });
       }
-
-      if (isFailure) error(`${title} : ${body}`);
-      else if (isSuccess) success(`${title} : ${body}`);
-      else info(`${title} : ${body}`);
       sendSystemNotification(title, body);
     }
-
     previousStatuses.current = nextStatuses;
-  }, [error, info, isAuthenticated, jobsQuery.data, success, t]);
+  }, [error, info, isSuccess, operations, queryClient, success, t]);
 }

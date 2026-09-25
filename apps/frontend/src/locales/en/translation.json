@@ -1877,5 +1877,51 @@
     "importError": "Unable to import this XML layout",
     "export": "Export XML",
     "reset": "Use global default"
+  },
+  "operations": {
+    "title": "Treatments",
+    "active": "active",
+    "empty": "No recent treatments",
+    "openCenter": "Open treatments",
+    "timeline": "Treatment progress",
+    "cancel": "Cancel",
+    "genericError": "The treatment failed",
+    "videoExport": "Video export",
+    "goproOverlay": "GoPro overlay generation",
+    "highlightVideo": "Highlight video generation",
+    "youtubeUpload": "YouTube upload",
+    "youtubeOverlayExport": "YouTube overlay export",
+    "intervalsSync": "Intervals.icu synchronization",
+    "spotsSync": "Site synchronization",
+    "emagramAnalysis": "Emagram analysis",
+    "status": {
+      "queued": "Queued",
+      "running": "Running",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "steps": {
+      "prepare": "Preparation",
+      "render": "Generation",
+      "finalize": "Finalization",
+      "select": "Scene selection",
+      "upload": "Upload",
+      "find_site": "Finding the site",
+      "check_cache": "Checking existing data",
+      "generate": "Analysis and generation",
+      "fetch_activities": "Fetching activities",
+      "import_flights": "Importing flights",
+      "sync_sources": "Synchronizing sources",
+      "check_freshness": "Checking data freshness"
+    },
+    "result": "Result",
+    "resultFields": {
+      "success": "Success",
+      "imported": "Imported",
+      "updated": "Updated",
+      "skipped": "Skipped",
+      "failed": "Failed"
+    }
   }
 }

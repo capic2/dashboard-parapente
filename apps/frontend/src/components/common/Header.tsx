@@ -18,6 +18,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore, type ThemePreference } from '../../stores/themeStore';
 import { requestJobNotificationPermission } from '../../hooks/useJobNotifications';
 import { appTitle } from '../../lib/appEnvironment';
+import { OperationCenter } from './OperationCenter';
 
 const linkClass =
   'px-3.5 py-2 rounded-md text-gray-600 dark:text-gray-300 text-sm transition-all hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-sky-600 [&.active]:bg-sky-600 [&.active]:text-white';
@@ -115,6 +116,7 @@ export default function Header() {
       {/* Desktop navigation */}
       <nav className="hidden sm:flex gap-2 flex-wrap items-center">
         {navLinks(linkClass)}
+        {isAuthenticated && <OperationCenter />}
         {isAuthenticated &&
           typeof window !== 'undefined' &&
           'Notification' in window && (
@@ -277,6 +279,11 @@ export default function Header() {
                     </div>
                     <nav className="flex-1 overflow-y-auto p-3 flex flex-col gap-1">
                       {navLinks(drawerLinkClass, close)}
+                      {isAuthenticated && (
+                        <div className="px-1 py-2">
+                          <OperationCenter />
+                        </div>
+                      )}
                       {isAuthenticated &&
                         typeof window !== 'undefined' &&
                         'Notification' in window && (
