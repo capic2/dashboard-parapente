@@ -37,9 +37,9 @@ catalog:
   '@types/react': ^19.0.0
   '@types/react-dom': ^19.0.0
   '@vitejs/plugin-react': ^6.0.0
-  '@vitest/browser-playwright': 5.0.1
-  '@vitest/coverage-v8': 5.0.1
-  '@vitest/ui': 5.0.1
+  '@vitest/browser-playwright': 5.0.2
+  '@vitest/coverage-v8': 5.0.2
+  '@vitest/ui': 5.0.2
   '@internationalized/date': ^3.7.0
   cesium: ^1.139.1
   chromatic: ^18.0.0
@@ -72,6 +72,6 @@ catalog:
   typescript: ^6.0.2
   vite: 8.3.1
   vite-plugin-cesium: 1.2.23
-  vitest: 5.0.1
+  vitest: 5.0.2
   zod: ^4.3.6
   zustand: ^5.0.11
