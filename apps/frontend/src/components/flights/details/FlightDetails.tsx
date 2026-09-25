@@ -1281,7 +1281,7 @@ export function FlightDetails({
           <TabPanel id="infos" className="outline-none">
             {infoCard}
           </TabPanel>
-          <TabPanel id="replay" className="outline-none">
+          <TabPanel id="replay" className="outline-none" shouldForceMount>
             {mediaPanel}
           </TabPanel>
           {hasGenerationLogs && (
@@ -1314,7 +1314,9 @@ export function FlightDetails({
         {hasGenerationLogs && <Tab id="logs">{t('flights.logsTab')}</Tab>}
       </TabList>
       <TabPanel id="infos">{infoCard}</TabPanel>
-      <TabPanel id="replay">{mediaPanel}</TabPanel>
+      <TabPanel id="replay" shouldForceMount>
+        {mediaPanel}
+      </TabPanel>
       {hasGenerationLogs && <TabPanel id="logs">{processingPanel}</TabPanel>}
     </Tabs>
   );
