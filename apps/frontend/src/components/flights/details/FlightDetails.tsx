@@ -129,6 +129,9 @@ export function FlightDetails({
   const [goproOverlayGpxOffset, setGoproOverlayGpxOffset] = useState(
     String(flight.gopro_overlay_gpx_offset ?? 0)
   );
+  const [goproOverlayPreviewOffset, setGoproOverlayPreviewOffset] = useState(
+    String(flight.gopro_overlay_gpx_offset ?? 0)
+  );
   const [goproOverlayOutputResolution, setGoproOverlayOutputResolution] =
     useState<GoproOverlayOutputResolution>('4k');
   const [goproOverlayCameraVideo, setGoproOverlayCameraVideo] =
@@ -470,6 +473,7 @@ export function FlightDetails({
 
   const handleGoproOverlayOffsetChange = async (nextOffset: string) => {
     setGoproOverlayGpxOffset(nextOffset);
+    setGoproOverlayPreviewOffset(nextOffset);
     const parsedOffset = Number(nextOffset);
     if (Number.isFinite(parsedOffset)) {
       await updateFlight.mutateAsync({
@@ -946,6 +950,7 @@ export function FlightDetails({
             <FlightOverlayWorkspace
               flightId={flight.id}
               initialOffset={goproOverlayGpxOffset}
+              onOffsetPreviewChange={setGoproOverlayPreviewOffset}
               onSaveOffset={handleGoproOverlayOffsetChange}
               youtubeUrls={flight.youtube_urls ?? []}
               showHeader={false}
@@ -995,7 +1000,7 @@ export function FlightDetails({
           <FlightTelemetryInteractivePreview
             flightId={flight.id}
             hasFlightVideo={hasVideo}
-            manualOffsetSeconds={Number(goproOverlayGpxOffset)}
+            manualOffsetSeconds={Number(goproOverlayPreviewOffset)}
             youtubeUrls={flight.youtube_urls ?? []}
           />
         )}
