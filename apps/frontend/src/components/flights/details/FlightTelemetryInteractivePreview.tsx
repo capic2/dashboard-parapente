@@ -61,6 +61,7 @@ export function FlightTelemetryInteractivePreview({
   const { status: youtubeExportStatus, error: youtubeExportStatusError } =
     useVideoExportStatus(youtubeExportJobId);
   const validYoutubeUrls = youtubeUrls.filter((url) => getYoutubeVideoId(url));
+  const isYoutubeCalibration = validYoutubeUrls.length > 0;
   const [selectedYoutubeIndex, setSelectedYoutubeIndex] = useState(0);
   const activeYoutubeIndex = Math.min(
     selectedYoutubeIndex,
@@ -100,18 +101,23 @@ export function FlightTelemetryInteractivePreview({
     Number.isFinite(manualOffsetSeconds)
       ? manualOffsetSeconds
       : (overlayPreview.data?.alignment.manual_offset_seconds ?? 0);
-  const automaticOffsetSeconds =
-    overlayPreview.data?.alignment.automatic_offset_seconds ?? 0;
+  const automaticOffsetSeconds = isYoutubeCalibration
+    ? 0
+    : (overlayPreview.data?.alignment.automatic_offset_seconds ?? 0);
   // PROTECTED CALIBRATION SYNC CONTRACT — use the same GPX origin and
   // combined offset as GoproOverlaySyncPreview. Changes require explicit
   // user authorization in the current task.
   const calibrationOffsetSeconds =
     automaticOffsetSeconds + overlayOffsetSeconds;
-  const telemetryStartTimestamp =
-    overlayPreview.data?.gpx?.coordinates[0]?.timestamp ??
-    (overlayPreview.data?.gpx?.start_time
-      ? parseApiUtcDate(overlayPreview.data.gpx.start_time).getTime()
-      : telemetry.data?.points[0]?.timestamp);
+  const telemetryStartTimestamp = isYoutubeCalibration
+    ? (telemetry.data?.points[0]?.timestamp ??
+      (telemetry.data?.start_time
+        ? parseApiUtcDate(telemetry.data.start_time).getTime()
+        : undefined))
+    : (overlayPreview.data?.gpx?.coordinates[0]?.timestamp ??
+      (overlayPreview.data?.gpx?.start_time
+        ? parseApiUtcDate(overlayPreview.data.gpx.start_time).getTime()
+        : telemetry.data?.points[0]?.timestamp));
   const previewSegments = overlayPreview.data?.video.preview_segments ?? [];
   const pipLayout = layout.data?.layout.find(
     (item): item is FlightTelemetryPipLayout => item.type === 'pip'
