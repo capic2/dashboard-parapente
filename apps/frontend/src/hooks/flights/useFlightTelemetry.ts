@@ -37,7 +37,10 @@ export function useFlightTelemetry(flightId: string, enabled = true) {
     enabled: Boolean(flightId) && enabled,
     staleTime: 1000 * 60 * 60,
     refetchInterval: (query) =>
-      query.state.data?.enrichment_status === 'pending' ? 2000 : false,
+      query.state.data?.has_osv &&
+      query.state.data.enrichment_status !== 'ready'
+        ? 2000
+        : false,
   });
 }
 

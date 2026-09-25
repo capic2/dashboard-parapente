@@ -146,7 +146,10 @@ export function GoproOverlaySyncPreview({
   const queryClient = useQueryClient();
   const youtubeId = youtubeUrls.map(getYoutubeVideoId).find(Boolean) ?? null;
   const isYoutubeCalibration = Boolean(youtubeId);
-  const preview = useGoproOverlayPreview(flightId, !isYoutubeCalibration);
+  // Keep the preview query enabled for YouTube calibration: when the durable
+  // enriched GPX is missing, the backend uses this request to start its
+  // generation and then polls until it is ready.
+  const preview = useGoproOverlayPreview(flightId, true);
   const flightTelemetry = useFlightTelemetry(flightId, isYoutubeCalibration);
   const generatePreview = useGenerateGoproPreview(flightId);
   const generateMerge = useGenerateGoproMerge(flightId);
@@ -392,10 +395,15 @@ export function GoproOverlaySyncPreview({
     await onOffsetSave(nextOffset);
   };
 
+  const isYoutubeTelemetryPending =
+    isYoutubeCalibration &&
+    (flightTelemetry.isPending ||
+      (flightTelemetry.data?.has_osv === true &&
+        flightTelemetry.data.enrichment_status !== 'ready'));
   if (
-    isYoutubeCalibration
-      ? flightTelemetry.isPending
-      : preview.isPending || preview.data?.gpx?.enrichment_status === 'pending'
+    isYoutubeTelemetryPending ||
+    (!isYoutubeCalibration &&
+      (preview.isPending || preview.data?.gpx?.enrichment_status === 'pending'))
   ) {
     return (
       <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
