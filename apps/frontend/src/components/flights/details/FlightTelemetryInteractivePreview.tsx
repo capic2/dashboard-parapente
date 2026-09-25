@@ -45,7 +45,6 @@ export function FlightTelemetryInteractivePreview({
   const telemetry = useFlightTelemetry(flightId, true);
   const layout = useTelemetryLayout(flightId);
   const [cameraTime, setCameraTime] = useState(0);
-  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [youtubeExportError, setYoutubeExportError] = useState<string | null>(
     null
   );
@@ -129,6 +128,21 @@ export function FlightTelemetryInteractivePreview({
   } else if (youtubeExportStatusValue === 'completed') {
     youtubeExportProgressClass = 'bg-emerald-500';
   }
+  const launchYoutubeExport = async () => {
+    if (!youtubeUrl) return;
+
+    setYoutubeExportError(null);
+    try {
+      const { job_id } = await startExport.mutateAsync({
+        youtube_url: youtubeUrl,
+      });
+      setYoutubeExportJobId(job_id);
+    } catch (error) {
+      setYoutubeExportError(
+        await getApiErrorMessage(error, t('flights.youtubeOverlayExportError'))
+      );
+    }
+  };
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
       <div className="flex items-start gap-3 p-4 sm:p-5">
@@ -155,66 +169,24 @@ export function FlightTelemetryInteractivePreview({
           {youtubeUrl && (
             <Button
               variant="secondary"
+              isDisabled={startExport.isPending}
               className="shrink-0 rounded-lg border border-cyan-200 px-3 py-2 text-xs font-semibold text-cyan-700 dark:border-cyan-800 dark:text-cyan-300"
-              onPress={() => {
-                setYoutubeExportError(null);
-                setIsExportDialogOpen(true);
-              }}
+              onPress={launchYoutubeExport}
             >
-              {t('flights.youtubeOverlayExport')}
+              {startExport.isPending
+                ? t('common.loading')
+                : t('flights.youtubeOverlayExport')}
             </Button>
           )}
         </span>
       </div>
-      {isExportDialogOpen && youtubeUrl && (
-        <div className="border-t border-cyan-200 bg-cyan-50/70 p-4 dark:border-cyan-900 dark:bg-cyan-950/20 sm:px-5">
-          <p className="text-sm font-semibold text-slate-900 dark:text-white">
-            {t('flights.youtubeOverlayExportTitle')}
-          </p>
-          <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
-            {t('flights.youtubeOverlayExportDescription')}
-          </p>
-          <div className="mt-3 flex gap-2">
-            <Button
-              variant="secondary"
-              onPress={() => setIsExportDialogOpen(false)}
-            >
-              {t('common.cancel')}
-            </Button>
-            <Button
-              isDisabled={startExport.isPending}
-              onPress={async () => {
-                setYoutubeExportError(null);
-                try {
-                  const { job_id } = await startExport.mutateAsync({
-                    youtube_url: youtubeUrl,
-                  });
-                  setYoutubeExportJobId(job_id);
-                  setIsExportDialogOpen(false);
-                } catch (error) {
-                  setYoutubeExportError(
-                    await getApiErrorMessage(
-                      error,
-                      t('flights.youtubeOverlayExportError')
-                    )
-                  );
-                }
-              }}
-            >
-              {startExport.isPending
-                ? t('common.loading')
-                : t('flights.youtubeOverlayExportStart')}
-            </Button>
-          </div>
-          {(youtubeExportError || startExport.isError) && (
-            <p
-              className="mt-2 text-sm text-red-700 dark:text-red-300"
-              role="alert"
-            >
-              {youtubeExportError ?? t('flights.youtubeOverlayExportError')}
-            </p>
-          )}
-        </div>
+      {(youtubeExportError || startExport.isError) && (
+        <p
+          className="border-t border-red-200 bg-red-50/70 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/20 dark:text-red-300 sm:px-5"
+          role="alert"
+        >
+          {youtubeExportError ?? t('flights.youtubeOverlayExportError')}
+        </p>
       )}
       {youtubeExportJobId && (
         <div
