@@ -77,7 +77,7 @@ export function FlightTelemetryInteractivePreview({
   const isReady =
     telemetry.isSuccess &&
     layout.isSuccess &&
-    overlayPreview.isSuccess &&
+    (overlayPreview.isSuccess || validYoutubeUrls.length > 0) &&
     !isEnrichmentPending &&
     Boolean(telemetry.data?.points.length);
   const showUnavailable = !isLoading && !isEnrichmentPending && !isReady;
