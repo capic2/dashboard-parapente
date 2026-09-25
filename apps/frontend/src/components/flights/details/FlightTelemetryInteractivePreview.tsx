@@ -45,6 +45,41 @@ interface FlightTelemetryInteractivePreviewProps {
 const EMPTY_YOUTUBE_URLS: string[] = [];
 const YOUTUBE_EXPORT_STALL_THRESHOLD_MS = 5 * 60 * 1000;
 
+function youtubeExportJobStorageKey(flightId: string): string {
+  return `youtube-overlay-export-job:${flightId}`;
+}
+
+function readYoutubeExportJobId(flightId: string): string | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    return window.sessionStorage.getItem(youtubeExportJobStorageKey(flightId));
+  } catch {
+    return null;
+  }
+}
+
+function storeYoutubeExportJobId(flightId: string, jobId: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(youtubeExportJobStorageKey(flightId), jobId);
+  } catch {
+    // Keep the export usable when browser storage is unavailable.
+  }
+}
+
+function clearStoredYoutubeExportJobId(flightId: string, jobId: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const key = youtubeExportJobStorageKey(flightId);
+    if (window.sessionStorage.getItem(key) === jobId) {
+      window.sessionStorage.removeItem(key);
+    }
+  } catch {
+    // Keep the export usable when browser storage is unavailable.
+  }
+}
+
 function getTimestampMs(value?: string | null): number | null {
   if (!value) return null;
   const timestamp = parseApiUtcDate(value).getTime();
@@ -132,8 +167,8 @@ export function FlightTelemetryInteractivePreview({
   const [youtubeExportError, setYoutubeExportError] = useState<string | null>(
     null
   );
-  const [youtubeExportJobId, setYoutubeExportJobId] = useState<string | null>(
-    null
+  const [youtubeExportJobId, setYoutubeExportJobId] = useState(() =>
+    readYoutubeExportJobId(flightId)
   );
   const startExport = useStartYoutubeOverlayExport(flightId);
   const { status: youtubeExportStatus, error: youtubeExportStatusError } =
@@ -212,6 +247,26 @@ export function FlightTelemetryInteractivePreview({
     : undefined;
   const youtubeUrl = validYoutubeUrls[activeYoutubeIndex];
   const hasYoutubeCarousel = validYoutubeUrls.length > 1;
+  useEffect(() => {
+    setYoutubeExportJobId(readYoutubeExportJobId(flightId));
+  }, [flightId]);
+  useEffect(() => {
+    if (
+      youtubeExportJobId &&
+      ['completed', 'failed', 'cancelled'].includes(
+        youtubeExportStatus?.internal_status ??
+          youtubeExportStatus?.status ??
+          ''
+      )
+    ) {
+      clearStoredYoutubeExportJobId(flightId, youtubeExportJobId);
+    }
+  }, [
+    flightId,
+    youtubeExportJobId,
+    youtubeExportStatus?.internal_status,
+    youtubeExportStatus?.status,
+  ]);
   const selectYoutubeVideo = (index: number) => {
     if (validYoutubeUrls.length === 0) return;
     setSelectedYoutubeIndex(
@@ -297,6 +352,7 @@ export function FlightTelemetryInteractivePreview({
         youtube_url: youtubeUrl,
       });
       setYoutubeExportJobId(job_id);
+      storeYoutubeExportJobId(flightId, job_id);
     } catch (error) {
       setYoutubeExportError(
         await getApiErrorMessage(error, t('flights.youtubeOverlayExportError'))

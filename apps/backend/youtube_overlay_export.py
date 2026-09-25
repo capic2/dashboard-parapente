@@ -5,6 +5,7 @@ from __future__ import annotations
 import shutil
 import re
 import subprocess
+import tempfile
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -79,6 +80,8 @@ def _run(
 
 def download_youtube(url: str, directory: Path, progress: ProgressCallback) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
+    temp_directory = directory / "temp"
+    temp_directory.mkdir(parents=True, exist_ok=True)
     output = directory / "source.%(ext)s"
 
     def report_download_output(line: str) -> None:
@@ -89,22 +92,29 @@ def download_youtube(url: str, directory: Path, progress: ProgressCallback) -> P
             return
         progress(f"yt-dlp: {line}", None)
 
-    progress("Téléchargement YouTube démarré", 0)
-    _run(
-        [
-            "yt-dlp",
-            "--newline",
-            "--no-playlist",
-            "--format",
-            "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-            "--merge-output-format",
-            "mp4",
-            "--output",
-            str(output),
-            url,
-        ],
-        on_output=report_download_output,
-    )
+    try:
+        progress("Téléchargement YouTube démarré", 0)
+        _run(
+            [
+                "yt-dlp",
+                "--newline",
+                "--no-playlist",
+                "--format",
+                "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+                "--merge-output-format",
+                "mp4",
+                "--paths",
+                f"home:{directory}",
+                "--paths",
+                f"temp:{temp_directory}",
+                "--output",
+                output.name,
+                url,
+            ],
+            on_output=report_download_output,
+        )
+    finally:
+        shutil.rmtree(temp_directory, ignore_errors=True)
     files = sorted(directory.glob("source.*"))
     if not files:
         raise YoutubeExportError("YouTube n’a fourni aucun fichier vidéo exploitable")
@@ -247,20 +257,24 @@ def export_youtube_overlay(
     work_dir: Path,
     progress: ProgressCallback,
 ) -> None:
-    source = download_youtube(url, work_dir, progress)
-    overlay_path = render_saved_overlay(
-        overlay_job_id,
-        offset_seconds=offset_seconds,
-        output_directory=work_dir,
-        progress=progress,
-    )
-    compose_with_overlay(source, overlay_path, output_path, offset_seconds, progress)
-    if not output_path.is_file() or output_path.stat().st_size == 0:
-        raise YoutubeExportError("Le fichier MP4 final est vide")
+    try:
+        source = download_youtube(url, work_dir, progress)
+        overlay_path = render_saved_overlay(
+            overlay_job_id,
+            offset_seconds=offset_seconds,
+            output_directory=work_dir,
+            progress=progress,
+        )
+        compose_with_overlay(source, overlay_path, output_path, offset_seconds, progress)
+        if not output_path.is_file() or output_path.stat().st_size == 0:
+            raise YoutubeExportError("Le fichier MP4 final est vide")
+    except BaseException:
+        cleanup_work_dir(work_dir)
+        raise
 
 
 def new_work_dir(job_id: str) -> Path:
-    return Path(config.VIDEO_EXPORT_DIR) / ".youtube-exports" / job_id
+    return Path(tempfile.gettempdir()) / "youtube-exports" / job_id
 
 
 def output_path(job_id: str) -> Path:

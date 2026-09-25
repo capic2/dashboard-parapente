@@ -4,6 +4,7 @@ from io import StringIO
 from pathlib import Path
 
 import gopro_overlay_export
+import pytest
 import youtube_overlay_export
 
 
@@ -121,6 +122,72 @@ def test_export_youtube_overlay_renders_saved_overlay_before_composing(tmp_path,
         ("compose", (source, overlay, output, 25.8)),
     ]
     assert output.read_bytes() == b"final"
+
+
+@pytest.mark.parametrize(
+    "failure_stage",
+    ["download", "render", "cancel", "compose", "final_validation"],
+)
+def test_export_youtube_overlay_cleans_work_dir_after_failure(
+    failure_stage: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    work_dir = tmp_path / "work"
+    output = tmp_path / "final.mp4"
+    source = tmp_path / "source.mp4"
+    overlay = tmp_path / "overlay.webm"
+
+    def fake_download(
+        url: str,
+        directory: Path,
+        progress: youtube_overlay_export.ProgressCallback,
+    ) -> Path:
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "download.part").write_bytes(b"temporary")
+        if failure_stage == "download":
+            raise youtube_overlay_export.YoutubeExportError("download failed")
+        return source
+
+    def fake_render(
+        overlay_job_id: str,
+        *,
+        offset_seconds: float,
+        output_directory: Path,
+        progress: youtube_overlay_export.ProgressCallback,
+    ) -> Path:
+        (output_directory / "overlay.part").write_bytes(b"temporary")
+        if failure_stage == "render":
+            raise youtube_overlay_export.YoutubeExportError("render failed")
+        if failure_stage == "cancel":
+            raise youtube_overlay_export.YoutubeExportError("Export annulé")
+        return overlay
+
+    def fake_compose(
+        source_path: Path,
+        overlay_path: Path,
+        output_path: Path,
+        offset_seconds: float,
+        progress: youtube_overlay_export.ProgressCallback,
+    ) -> None:
+        if failure_stage == "compose":
+            raise youtube_overlay_export.YoutubeExportError("compose failed")
+        if failure_stage != "final_validation":
+            output_path.write_bytes(b"final")
+
+    monkeypatch.setattr(youtube_overlay_export, "download_youtube", fake_download)
+    monkeypatch.setattr(youtube_overlay_export, "render_saved_overlay", fake_render)
+    monkeypatch.setattr(youtube_overlay_export, "compose_with_overlay", fake_compose)
+
+    with pytest.raises(youtube_overlay_export.YoutubeExportError):
+        youtube_overlay_export.export_youtube_overlay(
+            url="https://www.youtube.com/watch?v=test",
+            overlay_job_id="saved-overlay-job",
+            output_path=output,
+            offset_seconds=0,
+            work_dir=work_dir,
+            progress=lambda message, percent: None,
+        )
+
+    assert not work_dir.exists()
 
 
 def test_render_saved_overlay_rebuilds_legacy_full_video_overlay(tmp_path, monkeypatch):
