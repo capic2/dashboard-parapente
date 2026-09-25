@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@dashboard-parapente/design-system';
@@ -6,13 +6,18 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleAlert,
+  Clock3,
   Edit3,
+  ListChecks,
   Wand2,
 } from 'lucide-react';
 import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { useFlightTelemetry } from '../../../hooks/flights/useFlightTelemetry';
 import { useTelemetryLayout } from '../../../hooks/flights/useTelemetryLayout';
-import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
+import {
+  formatEta,
+  useVideoExportStatus,
+} from '../../../hooks/flights/useVideoExportStatus';
 import {
   getApiErrorMessage,
   getApiUrlWithSearchParams,
@@ -38,6 +43,79 @@ interface FlightTelemetryInteractivePreviewProps {
 }
 
 const EMPTY_YOUTUBE_URLS: string[] = [];
+const YOUTUBE_EXPORT_STALL_THRESHOLD_MS = 5 * 60 * 1000;
+
+function getTimestampMs(value?: string | null): number | null {
+  if (!value) return null;
+  const timestamp = parseApiUtcDate(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function formatDuration(seconds: number | null): string {
+  if (seconds === null || !Number.isFinite(seconds) || seconds < 0) {
+    return '—';
+  }
+  const roundedSeconds = Math.floor(seconds);
+  if (roundedSeconds < 60) return `${roundedSeconds} s`;
+  const minutes = Math.floor(roundedSeconds / 60);
+  const remainingSeconds = roundedSeconds % 60;
+  if (minutes < 60) return `${minutes} min ${remainingSeconds} s`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours} h ${(minutes % 60).toString().padStart(2, '0')} min`;
+}
+
+function formatAge(seconds: number | null, language: string): string {
+  if (seconds === null || !Number.isFinite(seconds) || seconds < 0) {
+    return '—';
+  }
+  const formatter = new Intl.RelativeTimeFormat(language, {
+    numeric: 'always',
+    style: 'short',
+  });
+  if (seconds < 60) return formatter.format(-Math.floor(seconds), 'second');
+  return formatter.format(-Math.floor(seconds / 60), 'minute');
+}
+
+function getYoutubeExportPhase(
+  status: string | undefined,
+  message: string | null | undefined
+): { key: string; fallback: string } {
+  const value = `${status ?? ''} ${message ?? ''}`.toLocaleLowerCase();
+  if (status === 'queued') {
+    return {
+      key: 'flights.youtubeOverlayExportPhaseQueued',
+      fallback: 'En attente du worker',
+    };
+  }
+  if (status === 'completed') {
+    return {
+      key: 'flights.youtubeOverlayExportPhaseUpload',
+      fallback: 'Vidéo composée, upload YouTube en cours',
+    };
+  }
+  if (value.includes('télécharg') || value.includes('download')) {
+    return {
+      key: 'flights.youtubeOverlayExportPhaseDownload',
+      fallback: 'Téléchargement de la vidéo source',
+    };
+  }
+  if (value.includes('overlay')) {
+    return {
+      key: 'flights.youtubeOverlayExportPhaseOverlay',
+      fallback: 'Génération de l’overlay synchronisé',
+    };
+  }
+  if (value.includes('fusion') || value.includes('ffmpeg')) {
+    return {
+      key: 'flights.youtubeOverlayExportPhaseCompose',
+      fallback: 'Fusion de la vidéo et de l’overlay',
+    };
+  }
+  return {
+    key: 'flights.youtubeOverlayExportPhaseProcessing',
+    fallback: 'Traitement en cours',
+  };
+}
 
 export function FlightTelemetryInteractivePreview({
   flightId,
@@ -45,7 +123,7 @@ export function FlightTelemetryInteractivePreview({
   manualOffsetSeconds,
   youtubeUrls = EMPTY_YOUTUBE_URLS,
 }: FlightTelemetryInteractivePreviewProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const token = useAuthStore((state) => state.token);
   const overlayPreview = useGoproOverlayPreview(flightId, true);
   const telemetry = useFlightTelemetry(flightId, true);
@@ -60,6 +138,7 @@ export function FlightTelemetryInteractivePreview({
   const startExport = useStartYoutubeOverlayExport(flightId);
   const { status: youtubeExportStatus, error: youtubeExportStatusError } =
     useVideoExportStatus(youtubeExportJobId);
+  const [youtubeExportNow, setYoutubeExportNow] = useState(() => Date.now());
   const validYoutubeUrls = youtubeUrls.filter((url) => getYoutubeVideoId(url));
   const isYoutubeCalibration = validYoutubeUrls.length > 0;
   const [selectedYoutubeIndex, setSelectedYoutubeIndex] = useState(0);
@@ -146,6 +225,54 @@ export function FlightTelemetryInteractivePreview({
     0,
     Math.min(100, youtubeExportStatus?.progress ?? 0)
   );
+  useEffect(() => {
+    if (
+      !youtubeExportJobId ||
+      youtubeExportStatusValue === 'completed' ||
+      youtubeExportStatusValue === 'failed' ||
+      youtubeExportStatusValue === 'cancelled'
+    ) {
+      return;
+    }
+    const timer = window.setInterval(
+      () => setYoutubeExportNow(Date.now()),
+      1000
+    );
+    return () => window.clearInterval(timer);
+  }, [youtubeExportJobId, youtubeExportStatusValue]);
+  const exportStartedAt = getTimestampMs(
+    youtubeExportStatus?.started_at ?? youtubeExportStatus?.created_at
+  );
+  const exportFinishedAt = getTimestampMs(youtubeExportStatus?.completed_at);
+  const exportUpdatedAt = getTimestampMs(youtubeExportStatus?.updated_at);
+  const exportEndAt = exportFinishedAt ?? youtubeExportNow;
+  const exportElapsedSeconds = exportStartedAt
+    ? Math.max(0, (exportEndAt - exportStartedAt) / 1000)
+    : null;
+  const exportLastActivitySeconds = exportUpdatedAt
+    ? Math.max(0, (youtubeExportNow - exportUpdatedAt) / 1000)
+    : null;
+  const isYoutubeExportActive =
+    youtubeExportStatusValue === 'queued' ||
+    youtubeExportStatusValue === 'running' ||
+    youtubeExportStatusValue === 'processing' ||
+    youtubeExportStatusValue === 'initializing' ||
+    youtubeExportStatusValue === 'capturing' ||
+    youtubeExportStatusValue === 'encoding';
+  const isYoutubeExportStalled =
+    isYoutubeExportActive &&
+    exportLastActivitySeconds !== null &&
+    exportLastActivitySeconds * 1000 >= YOUTUBE_EXPORT_STALL_THRESHOLD_MS;
+  const youtubeExportPhase = getYoutubeExportPhase(
+    youtubeExportStatusValue,
+    youtubeExportStatus?.message
+  );
+  const youtubeExportLastLog =
+    (youtubeExportStatus?.log_tail?.length
+      ? youtubeExportStatus.log_tail[youtubeExportStatus.log_tail.length - 1]
+      : undefined) ?? youtubeExportStatus?.message;
+  const youtubeExportRecentLogs =
+    youtubeExportStatus?.log_tail?.slice(-3) ?? [];
   let youtubeExportStatusLabel =
     youtubeExportStatus?.message ?? t('flights.youtubeOverlayExportInProgress');
   if (youtubeExportStatusValue === 'completed') {
@@ -248,6 +375,102 @@ export function FlightTelemetryInteractivePreview({
                 ? t('flights.youtubeOverlayExportStatusError')
                 : youtubeExportStatusLabel)}
           </p>
+          <div
+            className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4"
+            aria-live="off"
+          >
+            <div className="rounded-lg border border-cyan-200/70 bg-white/60 px-2.5 py-2 dark:border-cyan-900/70 dark:bg-slate-950/20">
+              <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
+                <ListChecks className="h-3.5 w-3.5" aria-hidden="true" />
+                {t('flights.youtubeOverlayExportPhaseLabel', 'Étape')}
+              </div>
+              <div className="mt-1 font-semibold text-slate-800 dark:text-slate-100">
+                {t(youtubeExportPhase.key, youtubeExportPhase.fallback)}
+              </div>
+            </div>
+            <div className="rounded-lg border border-cyan-200/70 bg-white/60 px-2.5 py-2 dark:border-cyan-900/70 dark:bg-slate-950/20">
+              <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
+                <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+                {t('flights.youtubeOverlayExportElapsed', 'Durée')}
+              </div>
+              <div className="mt-1 font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+                {formatDuration(exportElapsedSeconds)}
+              </div>
+            </div>
+            <div className="rounded-lg border border-cyan-200/70 bg-white/60 px-2.5 py-2 dark:border-cyan-900/70 dark:bg-slate-950/20">
+              <div className="text-slate-500 dark:text-slate-400">
+                {t('flights.youtubeOverlayExportLastActivity', 'Activité')}
+              </div>
+              <div className="mt-1 font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+                {formatAge(exportLastActivitySeconds, i18n?.language ?? 'fr')}
+              </div>
+            </div>
+            <div className="rounded-lg border border-cyan-200/70 bg-white/60 px-2.5 py-2 dark:border-cyan-900/70 dark:bg-slate-950/20">
+              <div className="text-slate-500 dark:text-slate-400">
+                {t('flights.youtubeOverlayExportEta', 'Estimation')}
+              </div>
+              <div className="mt-1 font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+                {formatEta(youtubeExportStatus?.eta_seconds) ??
+                  t('flights.youtubeOverlayExportEtaUnknown', 'Non disponible')}
+              </div>
+            </div>
+          </div>
+          {youtubeExportStatus?.frames_captured != null &&
+            youtubeExportStatus.total_frames != null && (
+              <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+                {t(
+                  'flights.youtubeOverlayExportFrames',
+                  '{{captured}} / {{total}} images traitées',
+                  {
+                    captured: youtubeExportStatus.frames_captured,
+                    total: youtubeExportStatus.total_frames,
+                  }
+                )}
+              </p>
+            )}
+          {youtubeExportLastLog && (
+            <p className="mt-2 truncate text-xs text-slate-600 dark:text-slate-300">
+              <span className="font-semibold">
+                {t(
+                  'flights.youtubeOverlayExportLatestEvent',
+                  'Dernier événement'
+                )}
+                :
+              </span>{' '}
+              {youtubeExportLastLog}
+            </p>
+          )}
+          {youtubeExportRecentLogs.length > 1 && (
+            <details className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+              <summary className="cursor-pointer font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500">
+                {t(
+                  'flights.youtubeOverlayExportShowLogs',
+                  'Voir les derniers événements'
+                )}
+              </summary>
+              <ul className="mt-2 space-y-1 rounded-lg bg-white/60 p-2 font-mono dark:bg-slate-950/20">
+                {youtubeExportRecentLogs.map((log, index) => (
+                  <li key={`${log}-${index}`} className="break-words">
+                    {log}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          {isYoutubeExportStalled && (
+            <p className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+              {t(
+                'flights.youtubeOverlayExportStalled',
+                'Aucune mise à jour depuis {{minutes}} min. Le traitement est peut-être bloqué.',
+                {
+                  minutes: Math.max(
+                    1,
+                    Math.floor((exportLastActivitySeconds ?? 0) / 60)
+                  ),
+                }
+              )}
+            </p>
+          )}
         </div>
       )}
       <div className="border-t border-slate-200 p-4 dark:border-slate-700 sm:p-5">

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { GoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
@@ -28,6 +28,15 @@ const hooks = vi.hoisted(() => ({
     progress?: number;
     message?: string | null;
     error?: string | null;
+    internal_status?: string;
+    created_at?: string | null;
+    started_at?: string | null;
+    completed_at?: string | null;
+    updated_at?: string | null;
+    eta_seconds?: number;
+    frames_captured?: number;
+    total_frames?: number;
+    log_tail?: string[];
   } | null,
 }));
 
@@ -59,6 +68,7 @@ vi.mock('../../../hooks/flights/useTelemetryLayout', () => ({
 
 vi.mock('../../../hooks/flights/useVideoExportStatus', () => ({
   useVideoExportStatus: () => ({ status: hooks.exportStatus }),
+  formatEta: () => null,
 }));
 
 vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
@@ -408,5 +418,47 @@ describe('FlightTelemetryInteractivePreview', () => {
       'data-timeline-start',
       String(Date.UTC(2026, 8, 5, 16, 44, 53))
     );
+  });
+
+  it('shows the current phase, timing, and latest export events', async () => {
+    hooks.exportStatus = {
+      status: 'processing',
+      internal_status: 'running',
+      progress: 5,
+      message: 'Génération de l’overlay synchronisé: 5%',
+      created_at: new Date(Date.now() - 120_000).toISOString(),
+      started_at: new Date(Date.now() - 115_000).toISOString(),
+      updated_at: new Date(Date.now() - 2_000).toISOString(),
+      log_tail: [
+        'Préparation de l’export YouTube',
+        'Génération de l’overlay synchronisé: 5%',
+      ],
+    };
+
+    render(
+      <FlightTelemetryInteractivePreview
+        flightId="flight-1"
+        youtubeUrls={['https://www.youtube.com/watch?v=dQw4w9WgXcQ']}
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'flights.youtubeOverlayExport' })
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByText('flights.youtubeOverlayExportPhaseOverlay')
+      ).toBeInTheDocument()
+    );
+    expect(
+      screen.getByText('flights.youtubeOverlayExportElapsed')
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/Génération de l’overlay synchronisé: 5%/u).length
+    ).toBeGreaterThan(1);
+    expect(
+      screen.getByText('flights.youtubeOverlayExportShowLogs')
+    ).toBeInTheDocument();
   });
 });
