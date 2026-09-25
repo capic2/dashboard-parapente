@@ -37,7 +37,9 @@ type YoutubeUploadInput = YoutubeUploadSource & {
   privacy_status: 'private' | 'unlisted' | 'public';
 };
 
-const sourceFromInput = (input: YoutubeUploadInput): YoutubeUploadSource => {
+export const sourceFromInput = (
+  input: YoutubeUploadInput
+): YoutubeUploadSource => {
   if (input.source_type === 'pano') {
     return { source_type: 'pano' };
   }
@@ -47,10 +49,12 @@ const sourceFromInput = (input: YoutubeUploadInput): YoutubeUploadSource => {
       highlight_video_job_id: input.highlight_video_job_id,
     };
   }
-  return {
-    source_type: 'gopro_overlay',
-    gopro_overlay_job_id: input.gopro_overlay_job_id,
-  };
+  return input.source_type === 'gopro_overlay'
+    ? {
+        source_type: 'gopro_overlay',
+        gopro_overlay_job_id: input.gopro_overlay_job_id,
+      }
+    : { source_type: input.source_type };
 };
 
 export function useYoutubeStatus() {
