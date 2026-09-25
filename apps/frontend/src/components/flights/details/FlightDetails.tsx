@@ -942,7 +942,7 @@ export function FlightDetails({
           id="flight-overlay-workspace-panel"
           className="border-t border-cyan-200 dark:border-cyan-900"
         >
-          {hasGpx && hasVideo && hasGoproCameraVideo && (
+          {hasGpx && hasYoutubeVideo && (
             <FlightOverlayWorkspace
               flightId={flight.id}
               initialOffset={goproOverlayGpxOffset}
