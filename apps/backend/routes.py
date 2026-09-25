@@ -7446,6 +7446,20 @@ def get_flight_gopro_overlay_preview(
     # enrichment is complete. While the merge is running, expose no
     # coordinates at all.
     enrichment_status = _enriched_gpx_status(camera_path.parent) if osv_paths else "ready"
+    if enrichment_status == "missing" and osv_paths:
+        # A preview request is also the entry point used by the YouTube
+        # calibration UI. That UI does not have a rendered GoPro overlay to
+        # trigger the old manual merge action, so make the durable enriched
+        # GPX generation self-starting when the cache is absent.
+        background_tasks.add_task(
+            _prepare_enriched_gpx_in_background,
+            osv_paths,
+            gpx_path,
+            camera_path.parent,
+            video_duration=video_duration,
+            first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
+        )
+        enrichment_status = "pending"
     if enrichment_status == "ready" and osv_paths:
         gpx_path = enriched_gpx_path(camera_path.parent)
     if enrichment_status != "ready" and osv_paths:

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Response
 import pytest
 
 import routes
@@ -27,6 +27,9 @@ class _FakeDb:
 
     def query(self, *_args: object) -> _FakeQuery:
         return _FakeQuery(self.flight)
+
+    def close(self) -> None:
+        pass
 
 
 def test_flight_overlay_layer_job_returns_newest_transparent_overlay() -> None:
@@ -111,6 +114,63 @@ def test_flight_telemetry_does_not_wait_for_osv_merge_when_cache_is_missing(
     assert response.has_osv is True
     assert response.enrichment_status == "missing"
     assert response.points == []
+
+
+def test_gopro_preview_starts_missing_enriched_gpx_generation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    camera_path = tmp_path / "camera.mp4"
+    camera_path.touch()
+    gpx_path = tmp_path / "flight.gpx"
+    gpx_path.write_text(
+        '<gpx><trk><trkseg><trkpt lat="47.2" lon="6.0">'
+        "<time>2026-07-01T10:00:00Z</time></trkpt></trkseg></trk></gpx>",
+        encoding="utf-8",
+    )
+    osv_path = tmp_path / "camera.OSV"
+    osv_path.touch()
+    flight = SimpleNamespace(id="flight-1", gopro_overlay_gpx_offset=0.0)
+
+    class _BackgroundTasks:
+        def __init__(self) -> None:
+            self.calls: list[tuple[object, tuple[object, ...], dict[str, object]]] = []
+
+        def add_task(self, func: object, *args: object, **kwargs: object) -> None:
+            self.calls.append((func, args, kwargs))
+
+    background_tasks = _BackgroundTasks()
+    video_start = datetime(2026, 7, 1, 10, tzinfo=timezone.utc)
+    monkeypatch.setattr(
+        routes, "_flight_gopro_preview_inputs", lambda *_args: (camera_path, gpx_path)
+    )
+    monkeypatch.setattr(routes, "_matching_files_by_mtime", lambda *_args: [osv_path])
+    monkeypatch.setattr(routes, "_enriched_gpx_status", lambda *_args: "missing")
+    monkeypatch.setattr(routes, "probe_video_duration", lambda *_args: 120.0)
+    monkeypatch.setattr(routes, "first_gpx_timestamp", lambda *_args: video_start)
+    monkeypatch.setattr(routes, "gpx_duration_seconds", lambda *_args: 1.0)
+    monkeypatch.setattr(routes, "resolve_gopro_video_start_time", lambda *_args: video_start)
+    monkeypatch.setattr(routes, "align_video_start_time_to_gpx", lambda *_args: video_start)
+    monkeypatch.setattr(
+        routes.gopro_preview_proxy,
+        "get_preview_state",
+        lambda *_args: SimpleNamespace(
+            status="ready",
+            segments=[routes.gopro_preview_proxy.PreviewSegment(0.0, 0.0, 120.0)],
+            available_duration_seconds=120.0,
+            requested_duration_seconds=120.0,
+            error=None,
+        ),
+    )
+
+    response = routes.get_flight_gopro_overlay_preview(
+        "flight-1", Response(), background_tasks, _FakeDb(flight)
+    )
+
+    assert response.gpx.enrichment_status == "pending"
+    assert response.gpx.coordinates == []
+    assert len(background_tasks.calls) == 1
+    assert background_tasks.calls[0][0] is routes._prepare_enriched_gpx_in_background
+    assert background_tasks.calls[0][1][:3] == ([osv_path], gpx_path, tmp_path)
 
 
 def test_flight_telemetry_keeps_enriched_gpx_on_absolute_timeline(
