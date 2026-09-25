@@ -37,7 +37,9 @@ type YoutubeUploadInput = YoutubeUploadSource & {
   privacy_status: 'private' | 'unlisted' | 'public';
 };
 
-const sourceFromInput = (input: YoutubeUploadInput): YoutubeUploadSource => {
+export const sourceFromInput = (
+  input: YoutubeUploadInput
+): YoutubeUploadSource => {
   if (input.source_type === 'pano') {
     return { source_type: 'pano' };
   }
