@@ -69,6 +69,9 @@ export function FlightTelemetryInteractivePreview({
   const isEnrichmentPending =
     telemetry.data?.enrichment_status === 'pending' ||
     overlayPreview.data?.gpx?.enrichment_status === 'pending';
+  const isEnrichmentFailed =
+    telemetry.data?.enrichment_status === 'failed' ||
+    overlayPreview.data?.gpx?.enrichment_status === 'failed';
   const isLoading =
     telemetry.isPending ||
     overlayPreview.isPending ||
@@ -80,10 +83,13 @@ export function FlightTelemetryInteractivePreview({
     (overlayPreview.isSuccess || validYoutubeUrls.length > 0) &&
     !isEnrichmentPending &&
     Boolean(telemetry.data?.points.length);
-  const showUnavailable = !isLoading && !isEnrichmentPending && !isReady;
+  const showUnavailable =
+    !isLoading && !isEnrichmentPending && !isEnrichmentFailed && !isReady;
   let previewStatusMessage: string;
   if (isLoading || isEnrichmentPending) {
     previewStatusMessage = t('flights.overlayInteractivePreviewLoading');
+  } else if (isEnrichmentFailed) {
+    previewStatusMessage = t('flights.goproOverlayEnrichmentFailed');
   } else if (isReady) {
     previewStatusMessage = t('flights.overlayInteractivePreviewReady');
   } else {
@@ -245,6 +251,11 @@ export function FlightTelemetryInteractivePreview({
             aria-live="polite"
           >
             {t('flights.overlayInteractivePreviewLoading')}
+            {isEnrichmentPending && (
+              <span className="mt-1 block">
+                {t('flights.goproOverlayEnrichmentPending')}
+              </span>
+            )}
           </output>
         )}
         {!isLoading && isReady && (
@@ -325,6 +336,18 @@ export function FlightTelemetryInteractivePreview({
                 }
               />
             </div>
+          </div>
+        )}
+        {!isLoading && isEnrichmentFailed && (
+          <div
+            role="alert"
+            className="flex items-start gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950/30 dark:text-red-200"
+          >
+            <CircleAlert
+              className="mt-0.5 h-4 w-4 shrink-0"
+              aria-hidden="true"
+            />
+            <span>{t('flights.goproOverlayEnrichmentFailed')}</span>
           </div>
         )}
         {showUnavailable && (

@@ -5080,6 +5080,9 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
         source="gpx+osv" if osv_paths else "gpx",
         has_osv=bool(osv_paths),
         enrichment_status=enrichment_status,
+        enrichment_error=(
+            "Unable to generate enriched GPX" if enrichment_status == "failed" else None
+        ),
         start_time=start_time,
         end_time=end_time,
         duration_seconds=duration_seconds,
@@ -7134,13 +7137,27 @@ def _prepare_enriched_gpx_in_background(
             video_duration=video_duration,
             first_gpx_at=first_gpx_at,
         )
-    except (OSError, ValueError) as exc:
+        try:
+            _enriched_gpx_error_path(input_dir).unlink(missing_ok=True)
+        except OSError:
+            logger.warning("Unable to clear enriched GPX error marker in %s", input_dir)
+    except Exception as exc:
+        try:
+            _enriched_gpx_error_path(input_dir).touch()
+        except OSError:
+            logger.warning("Unable to persist enriched GPX error marker in %s", input_dir)
         logger.warning("Unable to prepare enriched GPX in background: %s", exc)
+
+
+def _enriched_gpx_error_path(input_dir: Path) -> Path:
+    return input_dir / "merged-gopro-overlay.error"
 
 
 def _enriched_gpx_status(input_dir: Path) -> str:
     if enriched_gpx_path(input_dir).is_file():
         return "ready"
+    if _enriched_gpx_error_path(input_dir).is_file():
+        return "failed"
     lock_path = input_dir / "merged-gopro-overlay.lock"
     try:
         with lock_path.open("a+") as lock_file:
@@ -7156,6 +7173,13 @@ def _enriched_gpx_status(input_dir: Path) -> str:
     except OSError:
         return "missing"
     return "missing"
+
+
+def _clear_enriched_gpx_error(input_dir: Path) -> None:
+    try:
+        _enriched_gpx_error_path(input_dir).unlink(missing_ok=True)
+    except OSError:
+        logger.warning("Unable to clear enriched GPX error marker in %s", input_dir)
 
 
 _INTERACTIVE_OVERLAY_FILENAME = "interactive-gopro-overlay.webm"
@@ -7383,6 +7407,9 @@ def start_flight_gopro_overlay_merge(
         return GoproOverlayEnrichmentResponse(status="ready")
 
     status = _enriched_gpx_status(camera_path.parent)
+    if status == "failed":
+        _clear_enriched_gpx_error(camera_path.parent)
+        status = "missing"
     if status == "ready":
         return GoproOverlayEnrichmentResponse(status="ready")
     if status == "pending":
@@ -7451,6 +7478,7 @@ def get_flight_gopro_overlay_preview(
         # calibration UI. That UI does not have a rendered GoPro overlay to
         # trigger the old manual merge action, so make the durable enriched
         # GPX generation self-starting when the cache is absent.
+        _clear_enriched_gpx_error(camera_path.parent)
         background_tasks.add_task(
             _prepare_enriched_gpx_in_background,
             osv_paths,
@@ -7516,6 +7544,9 @@ def get_flight_gopro_overlay_preview(
             "duration_seconds": gpx_duration,
             "coordinates": coordinates,
             "enrichment_status": enrichment_status,
+            "enrichment_error": (
+                "Unable to generate enriched GPX" if enrichment_status == "failed" else None
+            ),
         },
         alignment={
             "automatic_offset_seconds": automatic_offset,

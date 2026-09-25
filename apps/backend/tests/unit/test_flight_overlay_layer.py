@@ -173,6 +173,15 @@ def test_gopro_preview_starts_missing_enriched_gpx_generation(
     assert background_tasks.calls[0][1][:3] == ([osv_path], gpx_path, tmp_path)
 
 
+def test_enriched_gpx_failure_marker_is_terminal_until_retry(tmp_path: Path) -> None:
+    routes._enriched_gpx_error_path(tmp_path).touch()
+
+    assert routes._enriched_gpx_status(tmp_path) == "failed"
+
+    routes._clear_enriched_gpx_error(tmp_path)
+    assert routes._enriched_gpx_status(tmp_path) == "missing"
+
+
 def test_flight_telemetry_keeps_enriched_gpx_on_absolute_timeline(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

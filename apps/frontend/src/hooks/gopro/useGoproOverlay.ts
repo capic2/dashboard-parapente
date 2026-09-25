@@ -27,7 +27,8 @@ export type GoproOverlayPreview = {
     end_time: string;
     duration_seconds: number;
     coordinates: GeoPoint[];
-    enrichment_status?: 'missing' | 'pending' | 'ready';
+    enrichment_status?: 'missing' | 'pending' | 'ready' | 'failed';
+    enrichment_error?: string | null;
   };
   alignment: {
     automatic_offset_seconds: number;
@@ -124,9 +125,14 @@ export function useGenerateGoproMerge(flightId: string) {
         .post(`flights/${flightId}/gopro-overlay/merge`)
         .json<{ status: 'missing' | 'pending' | 'ready' }>(),
     onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: ['flights', flightId, 'gopro-overlay-preview'],
-      }),
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ['flights', flightId, 'gopro-overlay-preview'],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['flights', flightId, 'telemetry'],
+        }),
+      ]),
   });
 }
 

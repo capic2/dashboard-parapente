@@ -24,7 +24,8 @@ export interface FlightTelemetryData {
   points: FlightTelemetryPoint[];
   source: 'gpx' | 'gpx+osv';
   has_osv: boolean;
-  enrichment_status: 'missing' | 'ready' | 'pending';
+  enrichment_status: 'missing' | 'ready' | 'pending' | 'failed';
+  enrichment_error?: string | null;
   start_time: string | null;
   end_time: string | null;
   duration_seconds: number;
