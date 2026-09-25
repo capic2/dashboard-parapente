@@ -988,7 +988,7 @@ export function FlightDetails({
 
       <div className="min-w-0 space-y-4">
         {hasGpx && hasVideo && hasGoproCameraVideo && overlayWorkspacePanel}
-        {hasGpx && hasGoproCameraVideo && hasYoutubeVideo && (
+        {hasGpx && hasYoutubeVideo && (
           <FlightTelemetryInteractivePreview
             flightId={flight.id}
             hasFlightVideo={hasVideo}
