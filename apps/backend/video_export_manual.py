@@ -56,7 +56,7 @@ def _video_legacy_temp_images_dir() -> Path:
     return Path(config.VIDEO_LEGACY_TEMP_IMAGES_DIR)
 
 
-_LOG_TAIL_LINE_COUNT = 100
+_LOG_TAIL_LINE_COUNT = 200
 
 
 def _job_log_path(job_id: str) -> Path:
@@ -830,24 +830,36 @@ def _export_youtube_overlay_job(job_id: str) -> None:
 
     job = _get_job(job_id)
     if not job or not job.youtube_url or not job.overlay_job_id:
+        _log_job(job_id, "Export YouTube échoué: paramètres d’export incomplets")
         _update_job(job_id, status=_STATUS_FAILED, error="Paramètres d’export YouTube incomplets")
         return
     with SessionLocal() as db:
         overlay = db.get(GoproOverlayJob, job.overlay_job_id)
         overlay_path = Path(overlay.output_path) if overlay else None
     if overlay_path is None or not overlay_path.is_file():
+        _log_job(job_id, "Export YouTube échoué: la couche overlay n’est pas disponible")
         _update_job(job_id, status=_STATUS_FAILED, error="La couche overlay n’est pas disponible")
         return
 
     work_dir = new_work_dir(job_id)
     destination = output_path(job_id)
 
-    def progress(message: str) -> None:
+    def progress(message: str, download_percent: int | None = None) -> None:
         if _is_cancelled(job_id):
             raise YoutubeExportError("Export annulé")
-        _update_job(job_id, status=_STATUS_RUNNING, message=message, progress=50)
+        _log_job(job_id, message)
+        progress_percent = (
+            1 + round(download_percent * 49 / 100) if download_percent is not None else None
+        )
+        _update_job(
+            job_id,
+            status=_STATUS_RUNNING,
+            message=message,
+            **({"progress": progress_percent} if progress_percent is not None else {}),
+        )
 
     try:
+        _log_job(job_id, "Préparation de l’export YouTube")
         _update_job(
             job_id, status=_STATUS_RUNNING, message="Préparation de l’export YouTube", progress=1
         )
@@ -859,6 +871,7 @@ def _export_youtube_overlay_job(job_id: str) -> None:
             work_dir=work_dir,
             progress=progress,
         )
+        _log_job(job_id, "Export YouTube terminé")
         _update_job(
             job_id,
             status=_STATUS_COMPLETED,
@@ -867,10 +880,13 @@ def _export_youtube_overlay_job(job_id: str) -> None:
             video_path=str(destination),
         )
     except YoutubeExportError as exc:
+        _log_job(job_id, f"Export YouTube échoué: {exc}")
         _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
     except Exception as exc:
+        _log_job(job_id, f"Export YouTube échoué avec une erreur inattendue: {exc}")
         _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
     finally:
+        _log_job(job_id, "Nettoyage des fichiers temporaires YouTube")
         cleanup_work_dir(work_dir)
         _clear_job_cancel_requested(job_id)
 
