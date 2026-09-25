@@ -11,6 +11,7 @@ import { getApiUrlWithSearchParams } from '../../../lib/api';
 import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
 import { useFlightTelemetry } from '../../../hooks/flights/useFlightTelemetry';
+import type { GeoPoint } from '../../../types/flight';
 import {
   telemetryAtTimestamp,
   telemetryTimestampAtVideoTime,
@@ -156,7 +157,8 @@ export function GoproOverlaySyncPreview({
   const automaticallyRequestedTarget = useRef<string | null>(null);
   const [videoTime, setVideoTime] = useState(0);
   const cameraRef = useRef<HTMLVideoElement>(null);
-  const youtubeHostRef = useRef<HTMLDivElement>(null);
+  const [youtubeHostElement, setYoutubeHostElement] =
+    useState<HTMLDivElement | null>(null);
   const youtubeRef = useRef<YoutubePlayer | null>(null);
   const [youtubeReady, setYoutubeReady] = useState(false);
   const [youtubeFailed, setYoutubeFailed] = useState(false);
@@ -212,8 +214,21 @@ export function GoproOverlaySyncPreview({
     setDisplayOffset(manualOffset);
   }, [manualOffset]);
 
-  const gpxCoordinates = isYoutubeCalibration
-    ? (flightTelemetry.data?.points ?? [])
+  const gpxCoordinates: GeoPoint[] = isYoutubeCalibration
+    ? (flightTelemetry.data?.points ?? []).map(
+        ({ speed_kmh, heart_rate, ...point }): GeoPoint => {
+          const normalizedPoint: GeoPoint = {
+            lat: point.lat,
+            lon: point.lon,
+            elevation: point.elevation,
+            timestamp: point.timestamp,
+            segment: point.segment,
+          };
+          if (speed_kmh != null) normalizedPoint.speed_kmh = speed_kmh;
+          if (heart_rate != null) normalizedPoint.heart_rate = heart_rate;
+          return normalizedPoint;
+        }
+      )
     : (preview.data?.gpx.coordinates ?? []);
   const gpxStartTimestamp = isYoutubeCalibration
     ? (gpxCoordinates[0]?.timestamp ??
@@ -258,6 +273,9 @@ export function GoproOverlaySyncPreview({
   );
   const isGenerating = preview.data?.video.preview_status === 'generating';
   const isMergeMissing = preview.data?.gpx?.enrichment_status === 'missing';
+  const isEnrichmentFailed =
+    flightTelemetry.data?.enrichment_status === 'failed' ||
+    preview.data?.gpx?.enrichment_status === 'failed';
   const requestedDurationCoversSource =
     requestedMinutes * 120 >=
     (preview.data?.video.preview_target_end_seconds ?? Infinity);
@@ -318,13 +336,13 @@ export function GoproOverlaySyncPreview({
   };
 
   useEffect(() => {
-    if (!youtubeId || youtubeFailed || !youtubeHostRef.current) return;
+    if (!youtubeId || youtubeFailed || !youtubeHostElement) return;
     let cancelled = false;
     void loadYoutubeApi()
       .then((api) => {
-        if (cancelled || !youtubeHostRef.current) return;
+        if (cancelled || !youtubeHostElement) return;
         const host = document.createElement('div');
-        youtubeHostRef.current.replaceChildren(host);
+        youtubeHostElement.replaceChildren(host);
         youtubeRef.current = new api.Player(host, {
           height: '100%',
           width: '100%',
@@ -356,7 +374,12 @@ export function GoproOverlaySyncPreview({
       youtubeRef.current = null;
       setYoutubeReady(false);
     };
-  }, [youtubeFailed, youtubeId, preview.data?.video.preview_status]);
+  }, [
+    preview.data?.video.preview_status,
+    youtubeFailed,
+    youtubeHostElement,
+    youtubeId,
+  ]);
 
   useEffect(() => {
     if (!youtubeId || !youtubeReady) return;
@@ -399,7 +422,31 @@ export function GoproOverlaySyncPreview({
     isYoutubeCalibration &&
     (flightTelemetry.isPending ||
       (flightTelemetry.data?.has_osv === true &&
-        flightTelemetry.data.enrichment_status !== 'ready'));
+        (flightTelemetry.data.enrichment_status === 'missing' ||
+          flightTelemetry.data.enrichment_status === 'pending')));
+  if (isEnrichmentFailed) {
+    return (
+      <div
+        role="alert"
+        className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200"
+      >
+        <p className="mb-3">{t('flights.goproOverlayEnrichmentFailed')}</p>
+        <button
+          type="button"
+          className="rounded-md bg-sky-600 px-3 py-2 font-medium text-white transition-colors hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={generateMerge.isPending}
+          onClick={() => void generateMerge.mutateAsync()}
+        >
+          {generateMerge.isPending
+            ? t('flights.goproOverlayMergeGenerating')
+            : t('flights.goproOverlayEnrichmentRetry')}
+        </button>
+        {generateMerge.isError && (
+          <p className="mt-3">{t('flights.goproOverlayPreviewError')}</p>
+        )}
+      </div>
+    );
+  }
   if (
     isYoutubeTelemetryPending ||
     (!isYoutubeCalibration &&
@@ -407,7 +454,7 @@ export function GoproOverlaySyncPreview({
   ) {
     return (
       <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-        {t('flights.goproOverlayPreviewLoading')}
+        {t('flights.goproOverlayEnrichmentPending')}
       </div>
     );
   }
@@ -450,7 +497,7 @@ export function GoproOverlaySyncPreview({
               className="aspect-video w-full"
               aria-label={t('flights.goproOverlayCameraPreview')}
             >
-              <div ref={youtubeHostRef} className="h-full w-full" />
+              <div ref={setYoutubeHostElement} className="h-full w-full" />
             </div>
           ) : (
             <video
