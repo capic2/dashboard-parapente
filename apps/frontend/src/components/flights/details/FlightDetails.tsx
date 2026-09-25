@@ -45,6 +45,7 @@ import {
 } from '../../../hooks/flights/useHighlightVideos';
 import { useToast } from '../../../hooks/useToast';
 import { api, getApiErrorMessage } from '../../../lib/api';
+import { getYoutubeVideoId } from '../../../lib/youtube';
 import {
   hasFlightGoproOverlay,
   hasFlightVideo,
@@ -147,6 +148,9 @@ export function FlightDetails({
 
   const hasGpx = Boolean(flight.gpx_file_path);
   const hasVideo = hasFlightVideo(flight);
+  const hasYoutubeVideo = (flight.youtube_urls ?? []).some((url) =>
+    getYoutubeVideoId(url)
+  );
   const hasPanoVideo = flight.pano_video_file_exists === true;
   const hasGoproCameraVideo = flight.gopro_camera_file_exists === true;
   const hasGoproOverlayOffset = flight.gopro_overlay_gpx_offset != null;
@@ -984,7 +988,7 @@ export function FlightDetails({
 
       <div className="min-w-0 space-y-4">
         {hasGpx && hasVideo && hasGoproCameraVideo && overlayWorkspacePanel}
-        {hasGpx && hasGoproCameraVideo && (
+        {hasGpx && hasGoproCameraVideo && hasYoutubeVideo && (
           <FlightTelemetryInteractivePreview
             flightId={flight.id}
             hasFlightVideo={hasVideo}
