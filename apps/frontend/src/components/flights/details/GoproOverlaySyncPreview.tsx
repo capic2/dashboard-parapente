@@ -15,12 +15,57 @@ import {
   telemetryTimestampAtVideoTime,
 } from './goproSyncTelemetry';
 import type { GoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
+import { getYoutubeVideoId } from '../../../lib/youtube';
+
+interface YoutubePlayer {
+  destroy: () => void;
+  getCurrentTime: () => number;
+  getDuration: () => number;
+  seekTo: (seconds: number, allowSeekAhead: boolean) => void;
+}
+interface YoutubeApi {
+  Player: new (
+    element: HTMLElement,
+    options: Record<string, unknown>
+  ) => YoutubePlayer;
+}
+let youtubeApiPromise: Promise<YoutubeApi> | null = null;
+function loadYoutubeApi(): Promise<YoutubeApi> {
+  if (window.YT) return Promise.resolve(window.YT);
+  if (youtubeApiPromise) return youtubeApiPromise;
+  youtubeApiPromise = new Promise<YoutubeApi>((resolve, reject) => {
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      'script[src="https://www.youtube.com/iframe_api"]'
+    );
+    const previousCallback = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      previousCallback?.();
+      if (window.YT) resolve(window.YT);
+      else reject(new Error('YouTube API did not initialize'));
+    };
+    if (!existingScript) {
+      const script = document.createElement('script');
+      script.src = 'https://www.youtube.com/iframe_api';
+      script.async = true;
+      script.onerror = () => reject(new Error('YouTube API failed to load'));
+      document.head.appendChild(script);
+    }
+  });
+  return youtubeApiPromise;
+}
+declare global {
+  interface Window {
+    YT?: YoutubeApi;
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
 
 interface GoproOverlaySyncPreviewProps {
   flightId: string;
   offset: string;
   onOffsetChange: (offset: string) => void;
   onOffsetSave: (offset: string) => Promise<void>;
+  youtubeUrls?: string[];
 }
 
 type GpxAlignmentTarget = 'start' | 'end';
@@ -93,6 +138,7 @@ export function GoproOverlaySyncPreview({
   offset,
   onOffsetChange,
   onOffsetSave,
+  youtubeUrls = [],
 }: GoproOverlaySyncPreviewProps) {
   const { t } = useTranslation();
   const token = useAuthStore((state) => state.token);
@@ -103,6 +149,12 @@ export function GoproOverlaySyncPreview({
   const automaticallyRequestedTarget = useRef<string | null>(null);
   const [videoTime, setVideoTime] = useState(0);
   const cameraRef = useRef<HTMLVideoElement>(null);
+  const youtubeHostRef = useRef<HTMLDivElement>(null);
+  const youtubeRef = useRef<YoutubePlayer | null>(null);
+  const youtubeId = youtubeUrls.map(getYoutubeVideoId).find(Boolean) ?? null;
+  const [youtubeReady, setYoutubeReady] = useState(false);
+  const [youtubeFailed, setYoutubeFailed] = useState(false);
+  const [youtubeDuration, setYoutubeDuration] = useState(0);
   const [requestedMinutes, setRequestedMinutes] = useState(3);
   const [alignmentTarget, setAlignmentTarget] =
     useState<GpxAlignmentTarget>('start');
@@ -112,7 +164,9 @@ export function GoproOverlaySyncPreview({
   const automaticOffset = preview.data?.alignment.automatic_offset_seconds ?? 0;
   const gpxDuration = preview.data?.gpx.duration_seconds ?? 0;
   const previewSegments = preview.data?.video.preview_segments ?? [];
-  const sourceVideoTime = sourceTimeAtPreviewTime(videoTime, previewSegments);
+  const sourceVideoTime = youtubeId
+    ? videoTime
+    : sourceTimeAtPreviewTime(videoTime, previewSegments);
   const previewEndTime = previewSegments.length
     ? Math.max(
         ...previewSegments.map(
@@ -227,15 +281,75 @@ export function GoproOverlaySyncPreview({
   };
 
   const seekToPreviewBoundary = (time: number) => {
-    if (cameraRef.current) {
+    if (youtubeId && !youtubeFailed) {
+      youtubeRef.current?.seekTo(time, true);
+    } else if (cameraRef.current) {
       cameraRef.current.currentTime = time;
     }
     setVideoTime(time);
   };
 
+  useEffect(() => {
+    if (!youtubeId || youtubeFailed || !youtubeHostRef.current) return;
+    let cancelled = false;
+    void loadYoutubeApi()
+      .then((api) => {
+        if (cancelled || !youtubeHostRef.current) return;
+        const host = document.createElement('div');
+        youtubeHostRef.current.replaceChildren(host);
+        youtubeRef.current = new api.Player(host, {
+          height: '100%',
+          width: '100%',
+          videoId: youtubeId,
+          playerVars: {
+            controls: 1,
+            playsinline: 1,
+            origin: window.location.origin,
+          },
+          events: {
+            onReady: () => {
+              setYoutubeReady(true);
+              setYoutubeDuration(youtubeRef.current?.getDuration() ?? 0);
+            },
+            onError: () => {
+              setYoutubeReady(false);
+              setYoutubeFailed(true);
+            },
+          },
+        });
+      })
+      .catch(() => {
+        setYoutubeReady(false);
+        setYoutubeFailed(true);
+      });
+    return () => {
+      cancelled = true;
+      youtubeRef.current?.destroy();
+      youtubeRef.current = null;
+      setYoutubeReady(false);
+    };
+  }, [youtubeFailed, youtubeId, preview.data?.video.preview_status]);
+
+  useEffect(() => {
+    if (!youtubeId || !youtubeReady) return;
+    let frame = 0;
+    const update = () => {
+      setVideoTime(youtubeRef.current?.getCurrentTime() ?? 0);
+      frame = requestAnimationFrame(update);
+    };
+    frame = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(frame);
+  }, [youtubeId, youtubeReady]);
+
   const selectAlignmentTarget = (target: GpxAlignmentTarget) => {
     setAlignmentTarget(target);
-    seekToPreviewBoundary(target === 'start' ? 0 : endPreviewStartTime);
+    seekToPreviewBoundary(
+      target === 'start'
+        ? 0
+        : youtubeId && youtubeDuration > 0
+          ? youtubeDuration
+          : endPreviewStartTime
+    );
   };
 
   const alignGpxAtCurrentVideoTime = async () => {
@@ -294,27 +408,38 @@ export function GoproOverlaySyncPreview({
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(17rem,1fr)]">
       <div>
         <div className="overflow-hidden rounded-xl bg-black shadow-sm">
-          <video
-            ref={cameraRef}
-            src={videoUrl}
-            controls
-            playsInline
-            preload="metadata"
-            className="aspect-video w-full"
-            aria-label={t('flights.goproOverlayCameraPreview')}
-            onTimeUpdate={(event) =>
-              setVideoTime(event.currentTarget.currentTime)
-            }
-            onSeeked={(event) => setVideoTime(event.currentTarget.currentTime)}
-            onLoadedMetadata={(event) => {
-              event.currentTarget.currentTime = Math.min(
-                videoTime,
-                event.currentTarget.duration || videoTime
-              );
-            }}
-          >
-            <track kind="captions" />
-          </video>
+          {youtubeId && !youtubeFailed ? (
+            <div
+              className="aspect-video w-full"
+              aria-label={t('flights.goproOverlayCameraPreview')}
+            >
+              <div ref={youtubeHostRef} className="h-full w-full" />
+            </div>
+          ) : (
+            <video
+              ref={cameraRef}
+              src={videoUrl}
+              controls
+              playsInline
+              preload="metadata"
+              className="aspect-video w-full"
+              aria-label={t('flights.goproOverlayCameraPreview')}
+              onTimeUpdate={(event) =>
+                setVideoTime(event.currentTarget.currentTime)
+              }
+              onSeeked={(event) =>
+                setVideoTime(event.currentTarget.currentTime)
+              }
+              onLoadedMetadata={(event) => {
+                event.currentTarget.currentTime = Math.min(
+                  videoTime,
+                  event.currentTarget.duration || videoTime
+                );
+              }}
+            >
+              <track kind="captions" />
+            </video>
+          )}
           <div className="flex items-center justify-between px-3 py-2 font-mono text-xs text-gray-200">
             <span>{t('flights.goproOverlayVideoTime')}</span>
             <span>{formatSeconds(sourceVideoTime)}</span>
