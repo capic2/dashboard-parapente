@@ -32,11 +32,13 @@ export type VideoExportStatusPayload = {
 type HookState = {
   status: VideoExportStatusPayload | null;
   isConnected: boolean;
+  error: Error | null;
 };
 
 const initialState: HookState = {
   status: null,
   isConnected: false,
+  error: null,
 };
 
 const TERMINAL_STATUSES = new Set(['cancelled', 'completed', 'failed']);
@@ -177,6 +179,7 @@ export function useVideoExportStatus(
       setState({
         status,
         isConnected: true,
+        error: null,
       });
     };
 
@@ -184,6 +187,7 @@ export function useVideoExportStatus(
       setState((previous) => ({
         ...previous,
         isConnected: false,
+        error: new Error('Video export status stream disconnected'),
       }));
     };
 
@@ -202,6 +206,7 @@ export function useVideoExportStatus(
     return {
       status: polledStatus.data ?? null,
       isConnected: polledStatus.isSuccess,
+      error: polledStatus.error ?? null,
     };
   }
 

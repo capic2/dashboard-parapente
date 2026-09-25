@@ -58,7 +58,7 @@ export function FlightTelemetryInteractivePreview({
     null
   );
   const startExport = useStartYoutubeOverlayExport(flightId);
-  const { status: youtubeExportStatus } =
+  const { status: youtubeExportStatus, error: youtubeExportStatusError } =
     useVideoExportStatus(youtubeExportJobId);
   const validYoutubeUrls = youtubeUrls.filter((url) => getYoutubeVideoId(url));
   const [selectedYoutubeIndex, setSelectedYoutubeIndex] = useState(0);
@@ -230,7 +230,10 @@ export function FlightTelemetryInteractivePreview({
             max={100}
           />
           <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">
-            {youtubeExportStatus?.error ?? youtubeExportStatusLabel}
+            {youtubeExportStatus?.error ??
+              (youtubeExportStatusError
+                ? t('flights.youtubeOverlayExportStatusError')
+                : youtubeExportStatusLabel)}
           </p>
         </div>
       )}

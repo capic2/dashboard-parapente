@@ -1075,6 +1075,7 @@
     "youtubeOverlayExportCompleted": "Export completed",
     "youtubeOverlayExportFailed": "Export failed",
     "youtubeOverlayExportCancelled": "Export cancelled",
+    "youtubeOverlayExportStatusError": "Unable to retrieve the export status. The job may have failed.",
     "youtubeVideosHint": "Add one or more YouTube links associated with this flight.",
     "addYoutubeVideo": "Add a video",
     "youtubeVideoLabel": "YouTube link {{count}}",

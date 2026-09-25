@@ -1079,6 +1079,7 @@
     "youtubeOverlayExportCompleted": "Export terminé",
     "youtubeOverlayExportFailed": "Échec de l’export",
     "youtubeOverlayExportCancelled": "Export annulé",
+    "youtubeOverlayExportStatusError": "Impossible de récupérer l’état de l’export. Le job a peut-être échoué.",
     "youtubeVideosHint": "Ajoutez un ou plusieurs liens YouTube associés à ce vol.",
     "addYoutubeVideo": "Ajouter une vidéo",
     "youtubeVideoLabel": "Lien YouTube {{count}}",
