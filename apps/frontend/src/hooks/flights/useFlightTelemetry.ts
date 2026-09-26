@@ -37,6 +37,7 @@ export function useFlightTelemetry(flightId: string, enabled = true) {
     queryFn: () => api.get(`flights/${flightId}/telemetry`).json(),
     enabled: Boolean(flightId) && enabled,
     staleTime: 1000 * 60 * 60,
+    refetchOnWindowFocus: false,
     refetchInterval: (query) =>
       query.state.data?.has_osv &&
       query.state.data.enrichment_status !== 'ready'

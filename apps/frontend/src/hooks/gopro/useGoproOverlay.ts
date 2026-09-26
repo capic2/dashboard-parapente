@@ -88,6 +88,7 @@ export function useGoproOverlayPreview(flightId: string, enabled: boolean) {
         .get(`flights/${flightId}/gopro-overlay/preview`)
         .json<GoproOverlayPreview>(),
     enabled,
+    refetchOnWindowFocus: false,
     refetchInterval: (query) => {
       const data = query.state.data;
       if (data?.gpx?.enrichment_status === 'pending') return 2000;
