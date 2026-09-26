@@ -37,6 +37,21 @@ function resultSummary(result: BackgroundOperation['result']) {
     .slice(0, 4);
 }
 
+function operationProgress(operation: BackgroundOperation) {
+  if (
+    operation.source_kind === 'video_export' &&
+    typeof operation.current_step_progress === 'number' &&
+    Number.isFinite(operation.current_step_progress)
+  ) {
+    return Math.max(
+      0,
+      Math.min(100, Math.round(operation.current_step_progress))
+    );
+  }
+
+  return operation.progress;
+}
+
 export function OperationCenter() {
   const { t } = useTranslation();
   const [notificationPermission, setNotificationPermission] =
@@ -150,6 +165,7 @@ export function OperationCenter() {
                     operation.title_key,
                     operation.operation_type
                   );
+                  const progress = operationProgress(operation);
                   const isCancelling =
                     cancel.isPending &&
                     cancel.variables === operation.operation_id;
@@ -176,9 +192,7 @@ export function OperationCenter() {
                             {title}
                           </span>
                           <span className="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400">
-                            {operation.progress == null
-                              ? '—'
-                              : `${operation.progress}%`}
+                            {progress == null ? '—' : `${progress}%`}
                           </span>
                         </div>
                         <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
@@ -194,7 +208,7 @@ export function OperationCenter() {
                                 ))}
                         </p>
                         <div className="mt-2">
-                          <OperationProgressBar progress={operation.progress} />
+                          <OperationProgressBar progress={progress} />
                         </div>
                       </AriaButton>
                       {operation.can_cancel && (
