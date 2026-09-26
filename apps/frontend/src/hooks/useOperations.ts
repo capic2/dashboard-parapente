@@ -80,6 +80,18 @@ export function useMarkOperationRead() {
   });
 }
 
+export function useDeleteOperation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (operationId: string) => {
+      await api.delete(`operations/${operationId}`);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: operationsQueryKey });
+    },
+  });
+}
+
 export function useCancelOperation() {
   const queryClient = useQueryClient();
   return useMutation({

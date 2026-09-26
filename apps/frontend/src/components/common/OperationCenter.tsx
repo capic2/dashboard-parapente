@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Bell, CheckCircle2, Square, XCircle } from 'lucide-react';
+import { Bell, CheckCircle2, Square, Trash2, XCircle } from 'lucide-react';
 import {
   Button as AriaButton,
   Dialog,
@@ -13,6 +13,7 @@ import {
 import type { BackgroundOperation } from '@dashboard-parapente/shared-types';
 import {
   useCancelOperation,
+  useDeleteOperation,
   useMarkOperationRead,
   useOperations,
   useRetryOperation,
@@ -62,6 +63,7 @@ export function OperationCenter() {
   const { data: operations = [] } = useOperations();
   const markRead = useMarkOperationRead();
   const cancel = useCancelOperation();
+  const deleteOperation = useDeleteOperation();
   const retry = useRetryOperation();
   const toast = useToast();
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -99,6 +101,17 @@ export function OperationCenter() {
     } catch {
       toast.error(
         t('operations.cancelError', 'Impossible de stopper le traitement')
+      );
+    }
+  }
+
+  async function removeOperation(operation: BackgroundOperation) {
+    try {
+      await deleteOperation.mutateAsync(operation.operation_id);
+      toast.success(t('operations.deleteSuccess', 'Traitement supprimé'));
+    } catch {
+      toast.error(
+        t('operations.deleteError', 'Impossible de supprimer le traitement')
       );
     }
   }
@@ -156,6 +169,12 @@ export function OperationCenter() {
                   const isCancelling =
                     cancel.isPending &&
                     cancel.variables === operation.operation_id;
+                  const canDelete =
+                    operation.status === 'completed' ||
+                    operation.status === 'failed';
+                  const isDeleting =
+                    deleteOperation.isPending &&
+                    deleteOperation.variables === operation.operation_id;
 
                   return (
                     <div
@@ -201,6 +220,17 @@ export function OperationCenter() {
                           className="inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center rounded-md border border-red-200 text-red-700 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-wait disabled:opacity-60 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"
                         >
                           <Square className="h-4 w-4" aria-hidden="true" />
+                        </AriaButton>
+                      )}
+                      {canDelete && (
+                        <AriaButton
+                          onPress={() => void removeOperation(operation)}
+                          isDisabled={isDeleting}
+                          aria-label={`${t('operations.delete', 'Supprimer')} ${title}`}
+                          title={t('operations.delete', 'Supprimer')}
+                          className="inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center rounded-md border border-slate-300 text-slate-600 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-wait disabled:opacity-60 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
                         </AriaButton>
                       )}
                     </div>
