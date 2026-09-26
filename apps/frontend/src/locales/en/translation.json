@@ -1900,6 +1900,8 @@
     "enableNotifications": "Enable notifications",
     "timeline": "Treatment progress",
     "cancel": "Cancel",
+    "cancelSuccess": "Treatment stopped",
+    "cancelError": "Unable to stop the treatment",
     "genericError": "The treatment failed",
     "videoExport": "Video export",
     "goproOverlay": "GoPro overlay generation",
