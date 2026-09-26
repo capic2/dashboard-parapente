@@ -228,7 +228,9 @@ class TestVideoExportStartEndpoint:
             )
 
         assert response.status_code == 202
-        assert response.json() == {"job_id": "youtube-export-1", "status": "queued"}
+        assert response.json()["job_id"] == "youtube-export-1"
+        assert response.json()["status"] == "queued"
+        assert response.json()["operation_id"]
         assert mock_start.call_args.kwargs["overlay_job_id"] == "saved-legacy-overlay"
         assert mock_start.call_args.kwargs["overlay_offset_seconds"] == 12.5
 
@@ -962,8 +964,8 @@ class TestVideoExportJobsEndpoint:
         assert jobs[0]["flight_id"] == sample_flight.id
         assert jobs[0]["status"] == "uploading"
         assert jobs[0]["progress"] == 42
-        assert jobs[0]["mode"] == "youtube"
-        assert jobs[0]["can_cancel"] is True
+        assert jobs[0]["mode"] == "youtube_upload"
+        assert jobs[0]["can_cancel"] is False
 
     def test_export_status_passthrough_keeps_render_method(self, client: TestClient):
         with patch(

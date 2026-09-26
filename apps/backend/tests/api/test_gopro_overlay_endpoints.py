@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta
 from io import BytesIO, StringIO
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -33,6 +33,50 @@ from models import Flight, GoproOverlayJob
 from models import VideoExportJob
 
 API_PREFIX = "/api"
+
+
+def _successful_osv_merge_process(command, *, output: str = ""):
+    Path(command[-1]).write_text("<gpx>merged</gpx>")
+    process = Mock()
+    process.stdout = StringIO(output)
+    process.poll.return_value = 0
+    process.wait.return_value = 0
+    return process
+
+
+def _write_usable_gpx(path: Path) -> Path:
+    path.write_text(
+        '<gpx><trk><trkseg><trkpt lat="45" lon="5">'
+        "<time>2026-08-08T09:30:43Z</time></trkpt>"
+        '<trkpt lat="45.1" lon="5.1"><time>2026-08-08T09:31:43Z</time>'
+        "</trkpt></trkseg></trk></gpx>"
+    )
+    return path
+
+
+@pytest.fixture
+def ready_gopro_overlay_layer(db_session, sample_flight):
+    """Seed the completed calibration layer required by media composition."""
+    sample_flight.gopro_overlay_gpx_offset = 0.0
+    db_session.add(
+        GoproOverlayJob(
+            id="completed-overlay-layer",
+            flight_id=sample_flight.id,
+            status="completed",
+            progress=100,
+            message="Overlay layer ready",
+            video_path="/data/camera.mp4",
+            gpx_path="/data/track.gpx",
+            layout_id="parapente-1080",
+            layout_label="Parapente 1920x1080",
+            layout_path="/data/layout.xml",
+            output_path="/data/telemetry-overlay.webm",
+            temp_output_path="/data/telemetry-overlay.part.webm",
+            output_filename="telemetry-overlay.webm",
+            command_json=json.dumps({"overlay_only": True}),
+        )
+    )
+    db_session.commit()
 
 
 def test_probe_video_start_time_reads_quicktime_creation_date(tmp_path, monkeypatch) -> None:
@@ -711,6 +755,7 @@ def test_gopro_overlay_job_access_status_accepts_job_token(client: TestClient):
     assert response.json()["job_id"] == "job-gopro"
 
 
+@pytest.mark.usefixtures("ready_gopro_overlay_layer")
 def test_create_flight_gopro_overlay_job_uses_flight_files(
     client: TestClient,
     db_session,
@@ -807,6 +852,7 @@ def test_create_flight_gopro_overlay_job_rejects_unsupported_output_resolution(
     assert response.status_code == 422
 
 
+@pytest.mark.usefixtures("ready_gopro_overlay_layer")
 def test_create_flight_gopro_overlay_job_resolves_paragliding_root_paths(
     client: TestClient,
     db_session,
@@ -877,6 +923,7 @@ def test_create_flight_gopro_overlay_job_resolves_paragliding_root_paths(
     assert create_job.call_args.kwargs["flight_id"] == sample_flight.id
 
 
+@pytest.mark.usefixtures("ready_gopro_overlay_layer")
 def test_create_flight_gopro_overlay_job_uses_auto_flight_directory_files(
     client: TestClient,
     db_session,
@@ -942,6 +989,7 @@ def test_create_flight_gopro_overlay_job_uses_auto_flight_directory_files(
     assert create_job.call_args.kwargs["output_resolution"] == "4k"
 
 
+@pytest.mark.usefixtures("ready_gopro_overlay_layer")
 def test_create_flight_gopro_overlay_job_requires_auto_zepp_gpx(
     client: TestClient,
     db_session,
@@ -970,6 +1018,7 @@ def test_create_flight_gopro_overlay_job_requires_auto_zepp_gpx(
     assert response.json()["detail"] == "Flight has no GPX file"
 
 
+@pytest.mark.usefixtures("ready_gopro_overlay_layer")
 def test_create_flight_gopro_overlay_job_uses_daily_departure_index(
     client: TestClient,
     db_session,
@@ -1027,6 +1076,7 @@ def test_create_flight_gopro_overlay_job_uses_daily_departure_index(
     assert create_job.call_args.kwargs["output_resolution"] == "4k"
 
 
+@pytest.mark.usefixtures("ready_gopro_overlay_layer")
 def test_create_flight_gopro_overlay_job_uses_explicit_4k_output_resolution(
     client: TestClient,
     db_session,
@@ -1092,6 +1142,7 @@ def test_create_flight_gopro_overlay_job_uses_explicit_4k_output_resolution(
     assert create_job.call_args.kwargs["output_resolution"] == "4k"
 
 
+@pytest.mark.usefixtures("ready_gopro_overlay_layer")
 def test_create_flight_gopro_overlay_job_merges_all_auto_osv_files(
     client: TestClient,
     db_session,
@@ -1144,6 +1195,7 @@ def test_create_flight_gopro_overlay_job_merges_all_auto_osv_files(
     assert create_job.call_args.kwargs["gpx_path"] == gpx_path
 
 
+@pytest.mark.usefixtures("ready_gopro_overlay_layer")
 def test_create_flight_gopro_overlay_job_uses_merged_uploaded_gpx_when_osv_exists(
     client: TestClient,
     db_session,
@@ -1252,16 +1304,14 @@ def test_worker_merge_osv_files_with_gpx_uses_configured_timeout(
     monkeypatch.setattr(config, "GOPRO_OVERLAY_ROOT", str(gopro_root))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS", 456)
 
-    class Result:
-        returncode = 0
-        stderr = ""
-        stdout = ""
-
-    def fake_run(command, **kwargs):
-        Path(command[-1]).write_text("<gpx>merged</gpx>")
-        return Result()
-
-    with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run) as run:
+    with (
+        patch(
+            "gopro_overlay_export.subprocess.Popen",
+            side_effect=lambda command, **_: _successful_osv_merge_process(command),
+        ) as popen,
+        patch("gopro_overlay_export.select.select", return_value=([], [], [])),
+        patch("gopro_overlay_export.time.monotonic", side_effect=[0, 0, 455]),
+    ):
         result = gopro_overlay_export._merge_osv_files_with_gpx(
             [osv_path],
             source_gpx,
@@ -1270,7 +1320,10 @@ def test_worker_merge_osv_files_with_gpx_uses_configured_timeout(
 
     assert result == merged_gpx_path
     assert merged_gpx_path.read_text() == "<gpx>merged</gpx>"
-    assert run.call_args.kwargs["timeout"] == 456
+    command = popen.call_args.args[0]
+    assert command[command.index("--exiftool-timeout") + 1] == str(
+        config.GOPRO_OVERLAY_OSV_EXIFTOOL_TIMEOUT_SECONDS
+    )
 
 
 def test_worker_merge_osv_files_with_gpx_streams_progress(
@@ -1419,16 +1472,16 @@ def test_worker_merge_osv_files_with_gpx_writes_log_steps(
     osv_path.write_bytes(b"osv")
     monkeypatch.setattr(config, "GOPRO_OVERLAY_ROOT", str(gopro_root))
 
-    class Result:
-        returncode = 0
-        stderr = ""
-        stdout = "GPX points total: 408\nPoints GPX filtered: 408\n"
-
-    def fake_run(command, **kwargs):
-        Path(command[-1]).write_text("<gpx>merged</gpx>")
-        return Result()
-
-    with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run):
+    with (
+        patch(
+            "gopro_overlay_export.subprocess.Popen",
+            side_effect=lambda command, **_: _successful_osv_merge_process(
+                command,
+                output="GPX points total: 408\nPoints GPX filtered: 408\n",
+            ),
+        ),
+        patch("gopro_overlay_export.select.select", return_value=([True], [], [])),
+    ):
         result = gopro_overlay_export._merge_osv_files_with_gpx(
             [osv_path],
             source_gpx,
@@ -1471,16 +1524,13 @@ def test_worker_merge_osv_files_with_gpx_uses_relative_sync_and_camera_duration(
         lambda _: gopro_overlay_export._parse_utc_datetime("2026-03-15T10:00:00Z"),
     )
 
-    class Result:
-        returncode = 0
-        stderr = ""
-        stdout = ""
-
-    def fake_run(command, **_kwargs):
-        Path(command[-1]).write_text("<gpx>merged</gpx>")
-        return Result()
-
-    with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run) as run:
+    with (
+        patch(
+            "gopro_overlay_export.subprocess.Popen",
+            side_effect=lambda command, **_: _successful_osv_merge_process(command),
+        ) as popen,
+        patch("gopro_overlay_export.select.select", return_value=([], [], [])),
+    ):
         result = gopro_overlay_export._merge_osv_files_with_gpx(
             [osv_path],
             source_gpx,
@@ -1490,8 +1540,8 @@ def test_worker_merge_osv_files_with_gpx_uses_relative_sync_and_camera_duration(
 
     assert result == merged_gpx_path
     assert merged_gpx_path.read_text() == "<gpx>merged</gpx>"
-    command = run.call_args.args[0]
-    assert command[command.index("--sync") + 1] == "gpx-start"
+    command = popen.call_args.args[0]
+    assert command[command.index("--sync") + 1] == "absolute"
     assert command[command.index("--video-duration") + 1] == "421.483"
     assert "--first-gpx-at" not in command
 
@@ -1525,16 +1575,13 @@ def test_worker_merge_osv_files_with_gpx_keeps_source_gpx_when_video_starts_afte
         lambda _: gopro_overlay_export._parse_utc_datetime("2026-06-13T09:20:34Z"),
     )
 
-    class Result:
-        returncode = 0
-        stderr = ""
-        stdout = ""
-
-    def fake_run(command, **_kwargs):
-        Path(command[-1]).write_text("<gpx>merged</gpx>")
-        return Result()
-
-    with patch("gopro_overlay_export.subprocess.run", side_effect=fake_run) as run:
+    with (
+        patch(
+            "gopro_overlay_export.subprocess.Popen",
+            side_effect=lambda command, **_: _successful_osv_merge_process(command),
+        ) as popen,
+        patch("gopro_overlay_export.select.select", return_value=([], [], [])),
+    ):
         result = gopro_overlay_export._merge_osv_files_with_gpx(
             [osv_path],
             source_gpx,
@@ -1542,8 +1589,8 @@ def test_worker_merge_osv_files_with_gpx_keeps_source_gpx_when_video_starts_afte
         )
 
     assert result == merged_gpx_path
-    command = run.call_args.args[0]
-    assert command[command.index("--sync") + 1] == "gpx-start"
+    command = popen.call_args.args[0]
+    assert command[command.index("--sync") + 1] == "absolute"
     assert "--first-gpx-at" not in command
     assert Path(command[-2]) == source_gpx
 
@@ -1836,6 +1883,7 @@ def test_gopro_overlay_output_resolution_cleans_scaled_file_on_wrong_scaled_size
     assert output_path.read_bytes() == b"small"
 
 
+@pytest.mark.usefixtures("ready_gopro_overlay_layer")
 def test_create_flight_gopro_overlay_job_rejects_paths_outside_paragliding_root(
     client: TestClient,
     db_session,
@@ -1867,6 +1915,7 @@ def test_create_flight_gopro_overlay_job_rejects_paths_outside_paragliding_root(
     assert response.json()["detail"] == "GoPro overlay path must be inside the paragliding root"
 
 
+@pytest.mark.usefixtures("ready_gopro_overlay_layer")
 def test_create_flight_gopro_overlay_job_rejects_output_dir_outside_paragliding_root(
     client: TestClient,
     db_session,
@@ -1892,6 +1941,7 @@ def test_create_flight_gopro_overlay_job_rejects_output_dir_outside_paragliding_
     assert response.json()["detail"] == "GoPro overlay path must be inside the paragliding root"
 
 
+@pytest.mark.usefixtures("ready_gopro_overlay_layer")
 def test_create_flight_gopro_overlay_job_requires_gpx_when_no_upload(
     client: TestClient,
     db_session,
@@ -1917,6 +1967,7 @@ def test_create_flight_gopro_overlay_job_requires_gpx_when_no_upload(
     assert response.json()["detail"] == "Flight has no GPX file"
 
 
+@pytest.mark.usefixtures("ready_gopro_overlay_layer")
 def test_create_flight_gopro_overlay_job_uses_uploaded_gpx_over_fallback(
     client: TestClient,
     db_session,
@@ -1963,6 +2014,7 @@ def test_create_flight_gopro_overlay_job_uses_uploaded_gpx_over_fallback(
     assert create_job.call_args.kwargs["fallback_gpx_path"] == gpx_path
 
 
+@pytest.mark.usefixtures("ready_gopro_overlay_layer")
 def test_create_flight_gopro_overlay_job_resolves_relative_paths(
     client: TestClient,
     db_session,
@@ -2009,6 +2061,7 @@ def test_create_flight_gopro_overlay_job_resolves_relative_paths(
     assert create_job.call_args.kwargs["fallback_gpx_path"] == gpx_path
 
 
+@pytest.mark.usefixtures("ready_gopro_overlay_layer")
 def test_create_flight_gopro_overlay_job_accepts_provided_pip_without_generated_video(
     client: TestClient,
     db_session,
@@ -2339,6 +2392,8 @@ def test_delete_last_overlay_preserves_flight_gpx_offset(
     monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
     flight_id = "flight-last-overlay-offset"
     output_path = tmp_path / "flight-overlay.mp4"
+    layout_path = tmp_path / "temp" / "gopro-overlay" / "overlay-only" / "layout.xml"
+    layout_path.parent.mkdir(parents=True)
     output_path.write_bytes(b"overlay")
 
     session = test_db()
@@ -2364,7 +2419,7 @@ def test_delete_last_overlay_preserves_flight_gpx_offset(
                 gpx_path=str(tmp_path / "track.gpx"),
                 layout_id="parapente",
                 layout_label="Parapente",
-                layout_path=str(tmp_path / "layout.xml"),
+                layout_path=str(layout_path),
                 output_path=str(output_path),
                 temp_output_path=str(output_path.with_suffix(".part.mp4")),
                 output_filename=output_path.name,
@@ -3428,7 +3483,7 @@ def test_create_gopro_overlay_job_from_paths_defers_input_copy_to_worker_prepara
         output_filename="overlay.mp4",
     )
 
-    work_dir = tmp_path / ".gopro-overlay-work" / job["job_id"]
+    work_dir = gopro_overlay_export._path_job_work_dir(video_path, job["job_id"])
     assert Path(job["video_path"]) == video_path
     assert Path(job["gpx_path"]) == gpx_path
     assert Path(job["output_path"]) == tmp_path / "overlay.mp4"
@@ -3565,7 +3620,22 @@ def test_worker_preparation_uses_source_layout_unless_explicitly_requested(
     monkeypatch.setattr(config, "GOPRO_OVERLAY_LAYOUT_DIR", str(layout_dir))
     monkeypatch.setattr(config, "GOPRO_OVERLAY_MAX_AUTO_LAYOUT_WIDTH", 1920)
     monkeypatch.setattr(config, "GOPRO_OVERLAY_MAX_AUTO_LAYOUT_HEIGHT", 1080)
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "_layout_path",
+        lambda layout: layout_dir / layout.path,
+    )
     monkeypatch.setattr(gopro_overlay_export, "probe_video_resolution", lambda _: source_resolution)
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "_prepare_pip_video_for_overlay",
+        lambda _job_id, _video, _gpx, pip, _work_dir, **_kwargs: pip,
+    )
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "_prepare_pip_video_for_overlay",
+        lambda _job_id, _video, _gpx, pip, _work_dir, **_kwargs: pip,
+    )
     monkeypatch.setattr(gopro_overlay_export, "SessionLocal", test_db)
 
     job = create_gopro_overlay_job_from_paths(
@@ -3624,22 +3694,26 @@ def test_worker_preparation_merges_osv_files_before_rendering(
         layout_id="parapente-1080",
         output_filename="overlay.mp4",
     )
-    work_dir = tmp_path / ".gopro-overlay-work" / job["job_id"]
-    merged_gpx_path = work_dir / "merged-gopro-overlay.gpx"
     queued_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"], include_command=True)
     assert queued_job is not None
 
+    def merge_osv_files(osv_paths, source_gpx, staging_dir, **kwargs):
+        return _write_usable_gpx(staging_dir / "merged-gopro-overlay.gpx")
+
     with patch(
         "gopro_overlay_export._merge_osv_files_with_gpx",
-        return_value=merged_gpx_path,
+        side_effect=merge_osv_files,
     ) as merge_osv:
         prepared = gopro_overlay_export._prepare_queued_job(job["job_id"], queued_job)
 
     assert prepared is not None
     assert merge_osv.call_args.args[0] == [first_osv, second_osv]
-    assert merge_osv.call_args.args[1].name == "gpx-" + job["job_id"] + ".gpx"
-    assert merge_osv.call_args.args[2] == work_dir
-    assert prepared["command"]["render_gpx_path"] == str(merged_gpx_path)
+    assert merge_osv.call_args.args[1] == gpx_path
+    assert merge_osv.call_args.args[2].parent == video_path.parent
+    assert merge_osv.call_args.args[2].name.startswith(".merged-gopro-overlay-")
+    assert prepared["command"]["render_gpx_path"] == str(
+        gopro_overlay_export.enriched_gpx_path(video_path.parent)
+    )
 
 
 def test_worker_preparation_uses_exact_video_size_for_non_standard_source(
@@ -4168,9 +4242,10 @@ def test_run_job_preserves_manual_offset_on_the_osv_timeline(
 
     def fake_merge(osv_paths, gpx_path, input_dir, **kwargs):
         merge_calls.append((osv_paths, gpx_path, input_dir, kwargs))
-        return gpx_path
+        return _write_usable_gpx(input_dir / "merged-gopro-overlay.gpx")
 
     monkeypatch.setattr(gopro_overlay_export, "_merge_osv_files_with_gpx", fake_merge)
+    rendered_gpx_starts = []
 
     job = create_gopro_overlay_job_from_paths(
         video_path=video_path,
@@ -4180,12 +4255,15 @@ def test_run_job_preserves_manual_offset_on_the_osv_timeline(
         output_filename="overlay.mp4",
         gpx_offset=gpx_offset,
     )
-    work_dir = tmp_path / ".gopro-overlay-work" / job["job_id"]
+    work_dir = gopro_overlay_export._path_job_work_dir(video_path, job["job_id"])
 
     class FakeProcess:
         def __init__(self, command: list[str]):
             self.command = command
             self.stdout = None
+            rendered_gpx_starts.append(
+                gopro_overlay_export.first_gpx_timestamp(Path(command[command.index("--gpx") + 1]))
+            )
 
         def wait(self) -> int:
             Path(self.command[-1]).write_bytes(b"video")
@@ -4209,9 +4287,20 @@ def test_run_job_preserves_manual_offset_on_the_osv_timeline(
     assert Path(command[-1]) == Path(job["temp_output_path"])
     assert len(merge_calls) == 1
     assert merge_calls[0][0] == [osv_path]
-    assert merge_calls[0][3]["gpx_offset"] == gpx_offset
-    assert merge_calls[0][3]["first_gpx_at"] == expected_first_gpx_at
+    assert merge_calls[0][3]["gpx_offset"] == 0.0
+    assert merge_calls[0][3]["first_gpx_at"] == 10.0
     assert merge_calls[0][3]["video_duration"] == 421.483
+    rendered_gpx_start = rendered_gpx_starts[0]
+    assert rendered_gpx_start is not None
+    camera_start = gopro_overlay_export._parse_utc_datetime("2026-08-08T09:30:33Z")
+    assert (
+        gopro_overlay_export._first_gpx_at_for_camera_timeline(
+            rendered_gpx_start,
+            camera_start,
+            0.0,
+        )
+        == expected_first_gpx_at
+    )
     persisted_job = gopro_overlay_export.get_gopro_overlay_job(job["job_id"], include_command=True)
     assert persisted_job["status"] == "completed"
     assert persisted_job["gpx_offset"] == gpx_offset
@@ -4258,6 +4347,7 @@ def test_run_job_passes_manual_gpx_offset_to_pip_preparation(
         },
     )
     monkeypatch.setattr(gopro_overlay_export, "_ffmpeg_can_use_vaapi_device", lambda *_: True)
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: None)
     pip_calls: list[dict] = []
 
     def fake_prepare_pip(*_args, **kwargs):
@@ -4328,7 +4418,7 @@ def test_run_job_cleans_temp_files_after_process_failure(
         layout_id="parapente-1080",
         output_filename="overlay.mp4",
     )
-    work_dir = tmp_path / ".gopro-overlay-work" / job["job_id"]
+    work_dir = gopro_overlay_export._path_job_work_dir(video_path, job["job_id"])
 
     class FailedProcess:
         def __init__(self, command: list[str]):
@@ -4590,6 +4680,9 @@ def test_run_job_passes_configured_overlay_gpu_args(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "VIDEO_ACCELERATOR", "nvidia")
     monkeypatch.setattr(gopro_overlay_export, "select_video_accelerator", lambda _: "nvidia")
     monkeypatch.setattr(gopro_overlay_export, "ffmpeg_supports_cuda_overlay", lambda: True)
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: None)
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: None)
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: None)
     monkeypatch.setattr(
         gopro_overlay_export,
         "check_gopro_overlay_dependencies",
@@ -4625,7 +4718,7 @@ def test_run_job_passes_configured_overlay_gpu_args(monkeypatch, tmp_path):
         assert "--double-buffer" not in fallback_command
         fallback_job = gopro_overlay_export.get_gopro_overlay_job(job_id, include_command=True)
         assert fallback_job is not None
-        assert fallback_job["command"]["output_resolution"] == "4k"
+        assert fallback_job["render_method"] == "cpu"
     finally:
         gopro_overlay_export._JOBS.pop(job_id, None)
         gopro_overlay_export._PROCESSES.pop(job_id, None)
@@ -4664,6 +4757,7 @@ def test_run_job_falls_back_to_cpu_when_render_device_missing(
         },
     )
     monkeypatch.setattr(gopro_overlay_export, "_ffmpeg_can_use_vaapi_device", lambda *_: False)
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: None)
 
     class FailedProcess:
         stdout: list[str] = []
@@ -4721,6 +4815,7 @@ def test_run_job_marks_unexpected_start_error_failed(caplog, monkeypatch):
         },
     )
     monkeypatch.setattr(gopro_overlay_export, "_ffmpeg_can_use_vaapi_device", lambda *_: True)
+    monkeypatch.setattr(gopro_overlay_export, "probe_video_duration", lambda _: None)
     try:
         with (
             caplog.at_level(logging.ERROR),

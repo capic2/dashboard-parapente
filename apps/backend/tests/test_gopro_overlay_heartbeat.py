@@ -5,7 +5,7 @@ from gopro_overlay_export import _read_process_updates_from_process
 
 def test_process_reader_refreshes_job_while_output_is_silent() -> None:
     process = Mock()
-    process.poll.side_effect = [None, None, 0]
+    process.poll.side_effect = [None, None, 0, 0]
     process.stdout = Mock()
     process.stdout.read.return_value = ""
 

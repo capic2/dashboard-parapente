@@ -5,7 +5,40 @@ from pathlib import Path
 
 import gopro_overlay_export
 import pytest
+import yaml
 import youtube_overlay_export
+
+
+def test_new_work_dir_uses_shared_video_export_storage(tmp_path, monkeypatch):
+    monkeypatch.setattr(youtube_overlay_export.config, "VIDEO_EXPORT_DIR", str(tmp_path))
+
+    assert youtube_overlay_export.new_work_dir("job-id") == (
+        tmp_path / ".youtube-exports" / "job-id"
+    )
+
+
+def test_youtube_overlay_pipeline_services_share_parapente_storage():
+    compose_path = Path(__file__).resolve().parents[4] / "docker-compose.yml"
+    services = yaml.safe_load(compose_path.read_text())["services"]
+    pipeline_services = (
+        "backend",
+        "backend-worker",
+        "gopro-overlay-worker",
+        "youtube-upload-worker",
+    )
+    shared_sources = set()
+
+    for service_name in pipeline_services:
+        mounts = [
+            str(volume).rsplit(":", 1)[0]
+            for volume in services[service_name]["volumes"]
+            if str(volume).rsplit(":", 1)[-1] == "/app/parapente"
+        ]
+
+        assert len(mounts) == 1, f"{service_name} must mount /app/parapente exactly once"
+        shared_sources.add(mounts[0])
+
+    assert len(shared_sources) == 1
 
 
 def test_iter_process_output_supports_progress_carriage_returns():
