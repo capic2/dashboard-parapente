@@ -7,7 +7,7 @@ def test_process_reader_refreshes_job_while_output_is_silent() -> None:
     process = Mock()
     process.poll.side_effect = [None, None, 0, 0]
     process.stdout = Mock()
-    process.stdout.read.return_value = ""
+    process.stdout.read1.return_value = ""
 
     with (
         patch("gopro_overlay_export._is_job_cancelled", return_value=False),
@@ -18,3 +18,15 @@ def test_process_reader_refreshes_job_while_output_is_silent() -> None:
         list(_read_process_updates_from_process(process, "job-id"))
 
     update_job.assert_called_once_with("job-id")
+
+
+def test_process_reader_uses_read_when_stream_has_no_read1() -> None:
+    process = Mock()
+    process.poll.return_value = 0
+    process.stdout = Mock(spec=["read"])
+    process.stdout.read.side_effect = ["first line\nsecond", " line\rthird\n", ""]
+
+    updates = list(_read_process_updates_from_process(process, "job-id"))
+
+    assert updates == ["first line", "second line", "third"]
+    assert process.stdout.read.call_count == 3

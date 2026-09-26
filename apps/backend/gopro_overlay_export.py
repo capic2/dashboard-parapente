@@ -150,6 +150,8 @@ _WORKER_THREAD: threading.Thread | None = None
 _WORKER_STOP = threading.Event()
 _WORKER_LOCK = threading.Lock()
 _JOB_HEARTBEAT_INTERVAL_SECONDS = 30.0
+_PROCESS_OUTPUT_READ_SIZE = 64 * 1024
+_PROCESS_CANCEL_CHECK_INTERVAL_SECONDS = 1.0
 
 
 def _utc_now() -> str:
@@ -921,15 +923,18 @@ def _read_process_updates_from_process(
     if not stream:
         return
 
-    current = ""
+    current: list[str] = []
     last_heartbeat = time.monotonic()
+    last_cancel_check = last_heartbeat - _PROCESS_CANCEL_CHECK_INTERVAL_SECONDS
     while True:
         if process.poll() is None:
-            if _is_job_cancelled(job_id):
-                process.terminate()
-                return
-
             now = time.monotonic()
+            if now - last_cancel_check >= _PROCESS_CANCEL_CHECK_INTERVAL_SECONDS:
+                if _is_job_cancelled(job_id):
+                    process.terminate()
+                    return
+                last_cancel_check = now
+
             if now - last_heartbeat >= _JOB_HEARTBEAT_INTERVAL_SECONDS:
                 _update_job(job_id)
                 last_heartbeat = now
@@ -938,20 +943,25 @@ def _read_process_updates_from_process(
             if not ready:
                 continue
 
-        char = stream.read(1)
-        if not char:
+        read_chunk = getattr(stream, "read1", stream.read)
+        chunk = read_chunk(_PROCESS_OUTPUT_READ_SIZE)
+        if not chunk:
             if process.poll() is None:
+                time.sleep(_PROCESS_CANCEL_CHECK_INTERVAL_SECONDS)
                 continue
             break
-        if char in {"\n", "\r"}:
-            if current.strip():
-                yield current.strip()
-            current = ""
-            continue
-        current += char
+        for char in chunk:
+            if char in {"\n", "\r"}:
+                line = "".join(current).strip()
+                if line:
+                    yield line
+                current.clear()
+            else:
+                current.append(char)
 
-    if current.strip():
-        yield current.strip()
+    line = "".join(current).strip()
+    if line:
+        yield line
 
 
 def _background_process_command(command: list[str]) -> list[str]:
