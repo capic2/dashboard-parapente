@@ -8084,7 +8084,10 @@ def get_flight_gopro_overlay_preview(
     preview_state = gopro_preview_proxy.get_preview_state(camera_path, preview_target_end)
     preview_segments = list(preview_state.segments)
     if preview_state.available_duration_seconds <= 0 or not preview_segments:
-        preview_segments = [gopro_preview_proxy.PreviewSegment(0.0, 0.0, video_duration)]
+        preview_segments = gopro_preview_proxy.preview_segments(
+            preview_target_end,
+            config.GOPRO_PREVIEW_DEFAULT_SECONDS,
+        )
     return GoproOverlayPreview(
         video={
             "duration_seconds": video_duration,

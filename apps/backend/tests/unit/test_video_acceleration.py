@@ -42,7 +42,7 @@ def test_gpu_runtime_status_parses_live_nvidia_smi_output() -> None:
     }
     command = run.call_args.args[0]
     assert command[0] == "nvidia-smi"
-    assert "utilization.gpu" in command[2]
+    assert "utilization.gpu" in command[1]
 
 
 def test_gpu_runtime_status_reports_unavailable_when_nvidia_smi_fails() -> None:

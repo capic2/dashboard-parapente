@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import shutil
 import re
+import shutil
 import subprocess
-import tempfile
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -229,7 +228,7 @@ def export_youtube_overlay(
 
 
 def new_work_dir(job_id: str) -> Path:
-    return Path(tempfile.gettempdir()) / "youtube-exports" / job_id
+    return Path(config.VIDEO_EXPORT_DIR) / ".youtube-exports" / job_id
 
 
 def output_path(job_id: str) -> Path:

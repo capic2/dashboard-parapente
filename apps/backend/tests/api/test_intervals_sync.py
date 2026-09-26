@@ -1,8 +1,10 @@
+import json
 from datetime import date, datetime
 from unittest.mock import AsyncMock, patch
 
 import config
 from intervals_icu import ExternalActivity, IntervalsAuthenticationError
+from models import BackgroundOperation
 
 
 def activity() -> ExternalActivity:
@@ -51,7 +53,7 @@ def test_preview_reports_missing_api_key(client, monkeypatch):
     assert "API_KEY" in response.json()["detail"]
 
 
-def test_sync_maps_intervals_authentication_failure(client):
+def test_sync_maps_intervals_authentication_failure(client, db_session):
     provider = AsyncMock()
     provider.list_activities.side_effect = IntervalsAuthenticationError("bad key")
     with (
@@ -62,7 +64,11 @@ def test_sync_maps_intervals_authentication_failure(client):
             "/api/flights/sync-intervals",
             json={"date_from": "2026-07-01", "date_to": "2026-07-02"},
         )
-    assert response.status_code == 502
+    assert response.status_code == 202
+    operation = db_session.get(BackgroundOperation, response.json()["operation_id"])
+    assert operation is not None
+    assert operation.status == "failed"
+    assert "bad key" in (operation.error_detail or "")
 
 
 def test_sync_requires_a_configured_activity_type(client, monkeypatch):
@@ -76,7 +82,7 @@ def test_sync_requires_a_configured_activity_type(client, monkeypatch):
     assert response.status_code == 409
 
 
-def test_sync_rejects_concurrent_import(client):
+def test_sync_rejects_concurrent_import(client, db_session):
     with (
         patch.object(config, "INTERVALS_ICU_ACTIVITY_TYPES", ["Other"]),
         patch("intervals_sync._acquire_shared_lock", new=AsyncMock(return_value=(None, ""))),
@@ -86,10 +92,14 @@ def test_sync_rejects_concurrent_import(client):
             json={"date_from": "2026-07-01", "date_to": "2026-07-02"},
         )
 
-    assert response.status_code == 409
+    assert response.status_code == 202
+    operation = db_session.get(BackgroundOperation, response.json()["operation_id"])
+    assert operation is not None
+    assert operation.status == "failed"
+    assert "already running" in (operation.error_detail or "")
 
 
-def test_sync_returns_the_frontend_contract(client):
+def test_sync_returns_an_operation_and_stores_the_import_result(client, db_session):
     provider = AsyncMock()
     provider.list_activities.return_value = [activity()]
     result = {
@@ -120,8 +130,13 @@ def test_sync_returns_the_frontend_contract(client):
             json={"date_from": "2026-07-01", "date_to": "2026-07-02"},
         )
 
-    assert response.status_code == 200
-    assert response.json() == {"success": True, **result}
+    assert response.status_code == 202
+    assert response.json()["status"] == "queued"
+    assert response.json()["detail_url"].endswith(response.json()["operation_id"])
+    operation = db_session.get(BackgroundOperation, response.json()["operation_id"])
+    assert operation is not None
+    assert operation.status == "completed"
+    assert json.loads(operation.result_json or "{}") == {"success": True, **result}
 
 
 def test_sync_imports_only_selected_activities(client):
@@ -154,7 +169,7 @@ def test_sync_imports_only_selected_activities(client):
             },
         )
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     importer.assert_awaited_once()
     assert [item.id for item in importer.await_args.args[3]] == ["i456"]
 

@@ -307,7 +307,7 @@ def test_highlight_gpx_reuses_regular_overlay_osv_calibration(tmp_path: Path) ->
 def test_highlight_gpx_reuses_existing_overlay_calibration(tmp_path: Path) -> None:
     source = tmp_path / "pano.mp4"
     gpx = tmp_path / "external.gpx"
-    cached = tmp_path / ".gopro-overlay-work" / "overlay-job" / "merged-gopro-overlay.gpx"
+    cached = tmp_path / "temp" / "gopro-overlay" / "overlay-job" / "merged-gopro-overlay.gpx"
     output_dir = tmp_path / "highlights"
     source.touch()
     gpx.touch()
