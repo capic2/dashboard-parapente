@@ -11,7 +11,6 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import config
-from video_acceleration import h264_encode_args, select_video_accelerator
 
 
 class YoutubeExportError(RuntimeError):
@@ -210,11 +209,6 @@ def compose_with_overlay(
     progress("Fusion de la vidéo YouTube et de l’overlay démarrée", 50)
     output.parent.mkdir(parents=True, exist_ok=True)
     offset = max(0.0, float(offset_seconds))
-    accelerator = select_video_accelerator(config.VIDEO_ACCELERATOR)
-    if config.VIDEO_ACCELERATOR == "nvidia" and accelerator == "cpu":
-        progress("NVENC indisponible, encodage CPU de secours", None)
-    else:
-        progress(f"Encodeur vidéo sélectionné: {accelerator}", None)
 
     def report_ffmpeg_output(line: str) -> None:
         progress(f"ffmpeg: {line}", None)
@@ -235,13 +229,16 @@ def compose_with_overlay(
             "[v]",
             "-map",
             "0:a?",
-            *h264_encode_args(
-                accelerator,
-                quality="18",
-                cpu_preset="medium",
-                include_audio=True,
-                audio_codec="aac",
-            ),
+            "-c:v",
+            "libx264",
+            "-preset",
+            "medium",
+            "-crf",
+            "18",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
             "-movflags",
             "+faststart",
             str(output),
