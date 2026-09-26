@@ -36,6 +36,21 @@ function resultSummary(result: BackgroundOperation['result']) {
     .slice(0, 4);
 }
 
+function operationProgress(operation: BackgroundOperation) {
+  if (
+    operation.source_kind === 'video_export' &&
+    typeof operation.current_step_progress === 'number' &&
+    Number.isFinite(operation.current_step_progress)
+  ) {
+    return Math.max(
+      0,
+      Math.min(100, Math.round(operation.current_step_progress))
+    );
+  }
+
+  return operation.progress;
+}
+
 export function OperationCenter() {
   const { t } = useTranslation();
   const [notificationPermission, setNotificationPermission] =
@@ -49,6 +64,7 @@ export function OperationCenter() {
   const cancel = useCancelOperation();
   const retry = useRetryOperation();
   const toast = useToast();
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [selected, setSelected] = useState<BackgroundOperation | null>(null);
   const displayableOperations = useMemo(
     () => operations.filter((operation) => operation.status !== 'cancelled'),
@@ -67,6 +83,7 @@ export function OperationCenter() {
   );
 
   function openOperation(operation: BackgroundOperation) {
+    setIsPopoverOpen(false);
     setSelected(operation);
     if (operation.unread) void markRead.mutateAsync(operation.operation_id);
   }
@@ -88,7 +105,7 @@ export function OperationCenter() {
 
   return (
     <>
-      <DialogTrigger>
+      <DialogTrigger isOpen={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
         <AriaButton
           className="relative inline-flex min-h-9 min-w-9 cursor-pointer items-center justify-center rounded-md bg-gray-200 px-2 text-gray-700 transition-colors hover:bg-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
           aria-label={t('operations.openCenter', 'Ouvrir les traitements')}
@@ -135,6 +152,7 @@ export function OperationCenter() {
                     operation.title_key,
                     operation.operation_type
                   );
+                  const progress = operationProgress(operation);
                   const isCancelling =
                     cancel.isPending &&
                     cancel.variables === operation.operation_id;
@@ -155,9 +173,7 @@ export function OperationCenter() {
                             {title}
                           </span>
                           <span className="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400">
-                            {operation.progress == null
-                              ? '—'
-                              : `${operation.progress}%`}
+                            {progress == null ? '—' : `${progress}%`}
                           </span>
                         </div>
                         <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
@@ -173,7 +189,7 @@ export function OperationCenter() {
                                 ))}
                         </p>
                         <div className="mt-2">
-                          <OperationProgressBar progress={operation.progress} />
+                          <OperationProgressBar progress={progress} />
                         </div>
                       </AriaButton>
                       {operation.can_cancel && (
