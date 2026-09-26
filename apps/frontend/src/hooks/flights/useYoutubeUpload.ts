@@ -44,6 +44,8 @@ export type YoutubeUploadSource =
   | { source_type: 'pano' }
   | { source_type: 'highlight'; highlight_video_job_id: string };
 
+export type TemporaryFlightMediaSource = 'camera' | 'pano';
+
 type YoutubeUploadInput = YoutubeUploadSource & {
   title: string;
   description: string;
@@ -132,6 +134,36 @@ export function useYoutubeVideoAssociations(flightId: string) {
       const data = await api.get(`flights/${flightId}/youtube-videos`).json();
       return YoutubeVideoAssociationsSchema.parse(data);
     },
+  });
+}
+
+export function useYoutubeSourcePublicationStatus(
+  flightId: string,
+  source: YoutubeUploadSource,
+  youtubeUrls: string[]
+) {
+  const upload = useYoutubeUpload(flightId, source);
+  const associations = useYoutubeVideoAssociations(flightId);
+  const isPublished = Boolean(
+    upload.data?.status === 'completed' &&
+    upload.data.youtube_url &&
+    youtubeUrls.includes(upload.data.youtube_url) &&
+    associations.data?.find(
+      (association) => association.url === upload.data?.youtube_url
+    )?.exists_on_youtube === true
+  );
+
+  return { upload, isPublished };
+}
+
+export function useDeleteFlightTemporaryMedia(flightId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (sourceType: TemporaryFlightMediaSource) => {
+      await api.delete(`flights/${flightId}/temporary-media/${sourceType}`);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['flights'] }),
   });
 }
 

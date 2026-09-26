@@ -297,6 +297,14 @@ vi.mock('../../../hooks/flights/useHighlightVideos', () => ({
 
 vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
   useYoutubeUpload: () => ({ data: youtubeUploadMock.current }),
+  useYoutubeSourcePublicationStatus: () => ({
+    upload: { data: youtubeUploadMock.current },
+    isPublished: false,
+  }),
+  useDeleteFlightTemporaryMedia: () => ({
+    isPending: false,
+    mutateAsync: vi.fn(),
+  }),
   useStartYoutubeOverlayExport: () => ({
     isPending: false,
     isError: false,
