@@ -12,11 +12,10 @@ import {
   ModalOverlay,
   Popover,
 } from 'react-aria-components';
-import { Bell, MonitorCog, Moon, Sun } from 'lucide-react';
+import { MonitorCog, Moon, Sun } from 'lucide-react';
 import { Button } from '@dashboard-parapente/design-system';
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore, type ThemePreference } from '../../stores/themeStore';
-import { requestJobNotificationPermission } from '../../hooks/useJobNotifications';
 import { appTitle } from '../../lib/appEnvironment';
 import { OperationCenter } from './OperationCenter';
 
@@ -98,10 +97,6 @@ export default function Header() {
     setThemePreference(next);
   }
 
-  async function enableJobNotifications() {
-    await requestJobNotificationPermission();
-  }
-
   const ActiveThemeIcon = themeIcons[themePreference];
   const themeTooltip = `${t('settings.languageTheme.theme')} : ${t(
     `settings.languageTheme.${themePreference}`
@@ -117,20 +112,6 @@ export default function Header() {
       <nav className="hidden sm:flex gap-2 flex-wrap items-center">
         {navLinks(linkClass)}
         {isAuthenticated && <OperationCenter />}
-        {isAuthenticated &&
-          typeof window !== 'undefined' &&
-          'Notification' in window && (
-            <AriaButton
-              onPress={enableJobNotifications}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100 text-sm font-medium transition-all hover:bg-gray-300 dark:hover:bg-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
-              aria-label={t(
-                'header.enableNotifications',
-                'Activer les notifications de jobs'
-              )}
-            >
-              <Bell className="h-4 w-4" aria-hidden="true" />
-            </AriaButton>
-          )}
         <MenuTrigger>
           <AriaButton
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100 text-sm font-medium transition-all hover:bg-gray-300 dark:hover:bg-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
@@ -284,25 +265,6 @@ export default function Header() {
                           <OperationCenter />
                         </div>
                       )}
-                      {isAuthenticated &&
-                        typeof window !== 'undefined' &&
-                        'Notification' in window && (
-                          <AriaButton
-                            onPress={() => {
-                              void enableJobNotifications();
-                              close();
-                            }}
-                            className={drawerLinkClass}
-                          >
-                            <span className="flex items-center gap-2">
-                              <Bell className="h-5 w-5" aria-hidden="true" />
-                              {t(
-                                'header.enableNotifications',
-                                'Activer les notifications de jobs'
-                              )}
-                            </span>
-                          </AriaButton>
-                        )}
                     </nav>
                     <div className="p-4 border-t border-gray-200 dark:border-gray-700">
                       {isAuthenticated ? (

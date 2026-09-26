@@ -17,6 +17,7 @@ import {
   useOperations,
   useRetryOperation,
 } from '../../hooks/useOperations';
+import { requestJobNotificationPermission } from '../../hooks/useJobNotifications';
 import { OperationProgressBar, OperationTimeline } from './OperationTimeline';
 
 function statusColor(status: BackgroundOperation['status']) {
@@ -36,6 +37,12 @@ function resultSummary(result: BackgroundOperation['result']) {
 
 export function OperationCenter() {
   const { t } = useTranslation();
+  const [notificationPermission, setNotificationPermission] =
+    useState<NotificationPermission | null>(() =>
+      typeof window !== 'undefined' && 'Notification' in window
+        ? Notification.permission
+        : null
+    );
   const { data: operations = [] } = useOperations();
   const markRead = useMarkOperationRead();
   const cancel = useCancelOperation();
@@ -60,6 +67,10 @@ export function OperationCenter() {
   function openOperation(operation: BackgroundOperation) {
     setSelected(operation);
     if (operation.unread) void markRead.mutateAsync(operation.operation_id);
+  }
+
+  async function enableJobNotifications() {
+    setNotificationPermission(await requestJobNotificationPermission());
   }
 
   return (
@@ -89,6 +100,17 @@ export function OperationCenter() {
                 {activeCount} {t('operations.active', 'en cours')}
               </span>
             </div>
+            {notificationPermission === 'default' && (
+              <AriaButton
+                onPress={() => void enableJobNotifications()}
+                className="mb-3 flex min-h-11 w-full cursor-pointer items-center justify-start rounded-lg border border-slate-200 px-3 py-2 text-left text-sm font-medium text-sky-700 transition-colors hover:border-sky-300 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:text-sky-300 dark:hover:border-sky-700 dark:hover:bg-slate-800"
+              >
+                {t(
+                  'operations.enableNotifications',
+                  'Activer les notifications'
+                )}
+              </AriaButton>
+            )}
             {visibleOperations.length === 0 ? (
               <p className="py-4 text-center text-sm text-slate-500 dark:text-slate-400">
                 {t('operations.empty', 'Aucun traitement récent')}

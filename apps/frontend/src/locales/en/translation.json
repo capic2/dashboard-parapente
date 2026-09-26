@@ -12,8 +12,7 @@
     "logout": "Logout",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
-    "menu": "Menu",
-    "enableNotifications": "Enable job notifications"
+    "menu": "Menu"
   },
   "notifications": {
     "jobCompleted": "Job completed",
@@ -1898,6 +1897,7 @@
     "active": "active",
     "empty": "No recent treatments",
     "openCenter": "Open treatments",
+    "enableNotifications": "Enable notifications",
     "timeline": "Treatment progress",
     "cancel": "Cancel",
     "genericError": "The treatment failed",
