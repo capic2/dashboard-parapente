@@ -6,6 +6,7 @@ import time
 from collections import deque
 from datetime import datetime
 from types import SimpleNamespace
+from typing import Any
 from urllib.error import URLError
 
 import pytest
@@ -1128,6 +1129,57 @@ def test_stale_worker_update_does_not_overwrite_cancelled_job(test_db, monkeypat
         assert job.progress == 42
         assert job.message == "Export cancelled by user"
         assert job.cancelled_at == cancelled_at
+
+
+def test_youtube_overlay_worker_does_not_update_flight_cesium_video(
+    test_db: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job_id = "job-youtube-overlay-does-not-replace-cesium"
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+    video_export_manual._JOB_UPDATE_DB.pop(job_id, None)
+
+    with test_db() as db_session:
+        db_session.add(
+            Flight(
+                id="flight-youtube-overlay-state",
+                flight_date=datetime.utcnow().date(),
+                video_export_job_id="existing-cesium-job",
+                video_export_status="completed",
+                video_file_path="/exports/cesium-flight.mp4",
+            )
+        )
+        db_session.add(
+            VideoExportJob(
+                id=job_id,
+                flight_id="flight-youtube-overlay-state",
+                status="queued",
+                mode="youtube_overlay",
+                quality="1080p",
+                fps=30,
+                speed=1,
+                progress=0,
+                message="queued",
+                frontend_url="",
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+        )
+        db_session.commit()
+
+    updated_job = video_export_manual._update_job(
+        job_id,
+        status="running",
+        progress=25,
+        message="Downloading YouTube source",
+    )
+
+    assert updated_job is not None
+    with test_db() as db_session:
+        flight = db_session.get(Flight, "flight-youtube-overlay-state")
+        assert flight is not None
+        assert flight.video_export_job_id == "existing-cesium-job"
+        assert flight.video_export_status == "completed"
+        assert flight.video_file_path == "/exports/cesium-flight.mp4"
 
 
 def test_resume_waits_for_started_rq_job_without_local_cancel_flag(test_db, tmp_path, monkeypatch):
