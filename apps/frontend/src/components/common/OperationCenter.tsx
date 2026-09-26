@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Bell, CheckCircle2, XCircle } from 'lucide-react';
+import { Bell, CheckCircle2, Square, XCircle } from 'lucide-react';
 import {
   Button as AriaButton,
   Dialog,
@@ -18,6 +18,7 @@ import {
   useRetryOperation,
 } from '../../hooks/useOperations';
 import { requestJobNotificationPermission } from '../../hooks/useJobNotifications';
+import { useToast } from '../../hooks/useToast';
 import { OperationProgressBar, OperationTimeline } from './OperationTimeline';
 
 function statusColor(status: BackgroundOperation['status']) {
@@ -47,6 +48,7 @@ export function OperationCenter() {
   const markRead = useMarkOperationRead();
   const cancel = useCancelOperation();
   const retry = useRetryOperation();
+  const toast = useToast();
   const [selected, setSelected] = useState<BackgroundOperation | null>(null);
   const displayableOperations = useMemo(
     () => operations.filter((operation) => operation.status !== 'cancelled'),
@@ -71,6 +73,17 @@ export function OperationCenter() {
 
   async function enableJobNotifications() {
     setNotificationPermission(await requestJobNotificationPermission());
+  }
+
+  async function cancelOperation(operation: BackgroundOperation) {
+    try {
+      await cancel.mutateAsync(operation.operation_id);
+      toast.success(t('operations.cancelSuccess', 'Traitement stoppé'));
+    } catch {
+      toast.error(
+        t('operations.cancelError', 'Impossible de stopper le traitement')
+      );
+    }
   }
 
   return (
@@ -117,41 +130,66 @@ export function OperationCenter() {
               </p>
             ) : (
               <div className="max-h-[min(32rem,70vh)] space-y-2 overflow-y-auto">
-                {visibleOperations.map((operation) => (
-                  <AriaButton
-                    key={operation.operation_id}
-                    onPress={() => openOperation(operation)}
-                    className={`w-full cursor-pointer rounded-lg border p-3 text-left transition-colors hover:border-sky-300 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:hover:border-sky-700 dark:hover:bg-slate-800 ${operation.unread ? 'border-sky-200 bg-sky-50/60 dark:border-sky-800 dark:bg-sky-950/20' : 'border-slate-200 dark:border-slate-700'}`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span
-                        className={`truncate text-sm font-medium ${statusColor(operation.status)}`}
+                {visibleOperations.map((operation) => {
+                  const title = t(
+                    operation.title_key,
+                    operation.operation_type
+                  );
+                  const isCancelling =
+                    cancel.isPending &&
+                    cancel.variables === operation.operation_id;
+
+                  return (
+                    <div
+                      key={operation.operation_id}
+                      className={`flex items-start gap-2 rounded-lg border p-3 transition-colors ${operation.unread ? 'border-sky-200 bg-sky-50/60 dark:border-sky-800 dark:bg-sky-950/20' : 'border-slate-200 dark:border-slate-700'}`}
+                    >
+                      <AriaButton
+                        onPress={() => openOperation(operation)}
+                        className="min-w-0 flex-1 cursor-pointer rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
                       >
-                        {t(operation.title_key, operation.operation_type)}
-                      </span>
-                      <span className="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400">
-                        {operation.progress == null
-                          ? '—'
-                          : `${operation.progress}%`}
-                      </span>
+                        <div className="flex items-center justify-between gap-2">
+                          <span
+                            className={`truncate text-sm font-medium ${statusColor(operation.status)}`}
+                          >
+                            {title}
+                          </span>
+                          <span className="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400">
+                            {operation.progress == null
+                              ? '—'
+                              : `${operation.progress}%`}
+                          </span>
+                        </div>
+                        <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
+                          {operation.current_step_detail ||
+                            (operation.current_step_key
+                              ? t(
+                                  `operations.steps.${operation.current_step_key}`,
+                                  operation.current_step_key
+                                )
+                              : t(
+                                  `operations.status.${operation.status}`,
+                                  operation.status
+                                ))}
+                        </p>
+                        <div className="mt-2">
+                          <OperationProgressBar progress={operation.progress} />
+                        </div>
+                      </AriaButton>
+                      {operation.can_cancel && (
+                        <AriaButton
+                          onPress={() => void cancelOperation(operation)}
+                          isDisabled={isCancelling}
+                          aria-label={`${t('operations.cancel', 'Stopper')} ${title}`}
+                          title={t('operations.cancel', 'Stopper')}
+                          className="inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center rounded-md border border-red-200 text-red-700 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-wait disabled:opacity-60 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"
+                        >
+                          <Square className="h-4 w-4" aria-hidden="true" />
+                        </AriaButton>
+                      )}
                     </div>
-                    <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
-                      {operation.current_step_detail ||
-                        (operation.current_step_key
-                          ? t(
-                              `operations.steps.${operation.current_step_key}`,
-                              operation.current_step_key
-                            )
-                          : t(
-                              `operations.status.${operation.status}`,
-                              operation.status
-                            ))}
-                    </p>
-                    <div className="mt-2">
-                      <OperationProgressBar progress={operation.progress} />
-                    </div>
-                  </AriaButton>
-                ))}
+                  );
+                })}
               </div>
             )}
           </Dialog>

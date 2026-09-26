@@ -1905,6 +1905,8 @@
     "enableNotifications": "Activer les notifications",
     "timeline": "Progression du traitement",
     "cancel": "Annuler",
+    "cancelSuccess": "Traitement stoppé",
+    "cancelError": "Impossible de stopper le traitement",
     "genericError": "Le traitement a échoué",
     "videoExport": "Export vidéo",
     "goproOverlay": "Génération de l’overlay GoPro",
