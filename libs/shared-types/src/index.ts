@@ -64,6 +64,7 @@ export type LandingAssociation = z.infer<typeof LandingAssociationSchema>;
 
 export const GoproOverlayJobSchema = z.object({
   job_id: z.string(),
+  operation_id: z.string().nullable().optional(),
   flight_id: z.string().nullish(),
   status: z.enum([
     'queued',
