@@ -567,7 +567,11 @@ def _update_job(
             should_update_flight = popped_update_db
         else:
             should_update_flight = _get_job_update_db_flag(job_id, True)
-        if should_update_flight:
+        # YouTube overlay exports share this job table but must never replace
+        # the flight's Cesium export state. The per-process update flag is not
+        # available to a separate RQ worker, so enforce this from persisted job
+        # metadata as well.
+        if should_update_flight and job.mode != "youtube_overlay":
             _update_flight_from_job(db, job)
         db.commit()
 
