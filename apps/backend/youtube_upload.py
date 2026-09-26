@@ -651,16 +651,17 @@ def create_youtube_overlay_upload_job(
     return job
 
 
-def enqueue_youtube_overlay_upload(job_id: str, source_path: Path) -> YoutubeUploadJob:
+def enqueue_youtube_overlay_upload(job_id: str, source_path: Path) -> None:
     """Attach the generated file to a preparing job and enqueue the upload."""
+    upload_job_id = job_id
     with SessionLocal() as db:
-        job = db.get(YoutubeUploadJob, job_id)
+        job = db.get(YoutubeUploadJob, upload_job_id)
         if job is None or job.source_type != "youtube_overlay":
             raise RuntimeError("YouTube overlay upload job not found")
         updated = (
             db.query(YoutubeUploadJob)
             .filter(
-                YoutubeUploadJob.id == job_id,
+                YoutubeUploadJob.id == upload_job_id,
                 YoutubeUploadJob.status == _PREPARING_STATUS,
             )
             .update(
@@ -676,12 +677,11 @@ def enqueue_youtube_overlay_upload(job_id: str, source_path: Path) -> YoutubeUpl
             raise RuntimeError("YouTube overlay upload job is no longer preparing")
         db.commit()
     try:
-        enqueue_youtube_upload(job.id)
+        enqueue_youtube_upload(upload_job_id)
     except Exception as exc:
-        fail_youtube_overlay_upload(job.id, str(exc))
+        fail_youtube_overlay_upload(upload_job_id, str(exc))
         _delete_generated_overlay_source(source_path)
         raise
-    return job
 
 
 def fail_youtube_overlay_upload(job_id: str, error: str) -> None:

@@ -128,6 +128,11 @@ def test_youtube_overlay_upload_job_waits_for_generated_source(
 
     enqueued: list[str] = []
     monkeypatch.setattr(youtube_upload, "enqueue_youtube_upload", enqueued.append)
+
+    def close_test_session(_self: object, *_args: object) -> bool:
+        db_session.expunge_all()
+        return False
+
     monkeypatch.setattr(
         youtube_upload,
         "SessionLocal",
@@ -136,16 +141,18 @@ def test_youtube_overlay_upload_job_waits_for_generated_source(
             (),
             {
                 "__enter__": lambda self: db_session,
-                "__exit__": lambda self, *_args: False,
+                "__exit__": close_test_session,
             },
         )(),
     )
+    upload_job_id = job.id
     youtube_upload.enqueue_youtube_overlay_upload(job.id, generated_video)
 
-    db_session.refresh(job)
-    assert job.source_path == str(generated_video)
-    assert job.status == "queued"
-    assert enqueued == [job.id]
+    queued_job = db_session.get(YoutubeUploadJob, upload_job_id)
+    assert queued_job is not None
+    assert queued_job.source_path == str(generated_video)
+    assert queued_job.status == "queued"
+    assert enqueued == [upload_job_id]
 
 
 def test_generated_youtube_overlay_cleanup_is_limited_to_export_storage(
