@@ -37,6 +37,7 @@ export function useTelemetryLayout(flightId?: string) {
             : 'telemetry-layouts/default'
         )
         .json<TelemetryLayoutResponse>(),
+    refetchOnWindowFocus: false,
     select: (response) => ({
       ...response,
       layout: parseTelemetryLayoutXml(response.xml_content),
