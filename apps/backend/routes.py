@@ -1294,6 +1294,22 @@ def mark_background_operation_read(
     return BackgroundOperation.model_validate(operation_payload(operation))
 
 
+@router.delete("/operations/{operation_id}", status_code=204, response_class=Response)
+def delete_background_operation(
+    operation_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    operation = get_user_operation(db, operation_id, user.id)
+    if operation is None:
+        raise HTTPException(status_code=404, detail="Operation not found")
+    if operation.status in OPERATION_ACTIVE_STATUSES:
+        raise HTTPException(status_code=409, detail="Active operation cannot be deleted")
+    db.delete(operation)
+    db.commit()
+    return Response(status_code=204)
+
+
 @router.post("/operations/{operation_id}/cancel", response_model=BackgroundOperation)
 def cancel_background_operation(
     operation_id: str,

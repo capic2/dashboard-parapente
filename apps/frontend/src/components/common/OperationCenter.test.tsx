@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BackgroundOperation } from '@dashboard-parapente/shared-types';
@@ -7,6 +7,7 @@ import { OperationCenter } from './OperationCenter';
 const operationMocks = vi.hoisted(() => ({
   useOperations: vi.fn(),
   useCancelOperation: vi.fn(),
+  useDeleteOperation: vi.fn(),
   useMarkOperationRead: vi.fn(),
   useRetryOperation: vi.fn(),
 }));
@@ -74,6 +75,11 @@ describe('OperationCenter', () => {
       ],
     });
     operationMocks.useCancelOperation.mockReturnValue({ mutateAsync: vi.fn() });
+    operationMocks.useDeleteOperation.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+      variables: undefined,
+    });
     operationMocks.useMarkOperationRead.mockReturnValue({
       mutateAsync: vi.fn(),
     });
@@ -89,5 +95,25 @@ describe('OperationCenter', () => {
     expect(
       screen.getByRole('button', { name: 'Ouvrir les traitements' }).textContent
     ).toContain('1');
+  });
+
+  it('removes completed jobs from the operation center', () => {
+    const deleteOperation = vi.fn().mockResolvedValue(undefined);
+    operationMocks.useOperations.mockReturnValue({
+      data: [makeOperation('terminé', 'completed', false)],
+    });
+    operationMocks.useDeleteOperation.mockReturnValue({
+      mutateAsync: deleteOperation,
+      isPending: false,
+      variables: undefined,
+    });
+
+    render(<OperationCenter />);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Supprimer Export terminé' })
+    );
+
+    expect(deleteOperation).toHaveBeenCalledWith('terminé');
   });
 });
