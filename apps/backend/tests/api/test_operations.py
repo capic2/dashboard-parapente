@@ -43,6 +43,43 @@ def test_operation_detail_is_scoped_to_authenticated_user(client, db_session):
     assert response.status_code == 404
 
 
+def test_delete_removes_terminal_operation(client, db_session):
+    db_session.add(_operation(operation_id="completed-operation", status="completed"))
+    db_session.commit()
+
+    response = client.delete("/api/operations/completed-operation")
+
+    assert response.status_code == 204
+    assert response.content == b""
+    assert db_session.get(BackgroundOperation, "completed-operation") is None
+
+
+def test_delete_rejects_active_operation(client, db_session):
+    db_session.add(_operation(operation_id="active-operation", status="running"))
+    db_session.commit()
+
+    response = client.delete("/api/operations/active-operation")
+
+    assert response.status_code == 409
+    assert db_session.get(BackgroundOperation, "active-operation") is not None
+
+
+def test_delete_operation_is_scoped_to_authenticated_user(client, db_session):
+    db_session.add(
+        _operation(
+            operation_id="foreign-operation",
+            user_id=2,
+            status="completed",
+        )
+    )
+    db_session.commit()
+
+    response = client.delete("/api/operations/foreign-operation")
+
+    assert response.status_code == 404
+    assert db_session.get(BackgroundOperation, "foreign-operation") is not None
+
+
 def test_cancel_rejects_terminal_operation(client, db_session):
     db_session.add(
         _operation(
