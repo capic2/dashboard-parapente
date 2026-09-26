@@ -17,6 +17,7 @@ const {
   useYoutubeStatus,
   useYoutubeUpload,
   useYoutubeVideoAssociations,
+  useYoutubeSourcePublicationStatus,
 } = vi.hoisted(() => ({
   cancelUpload: vi.fn(),
   startUpload: vi.fn(),
@@ -28,6 +29,7 @@ const {
   useYoutubeStatus: vi.fn(),
   useYoutubeUpload: vi.fn(),
   useYoutubeVideoAssociations: vi.fn(),
+  useYoutubeSourcePublicationStatus: vi.fn(),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -59,6 +61,7 @@ vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
   useYoutubeStatus,
   useYoutubeUpload,
   useYoutubeVideoAssociations,
+  useYoutubeSourcePublicationStatus,
   youtubeVideoAssociationsQueryKey: (flightId: string) => [
     'youtube-video-associations',
     flightId,
@@ -83,6 +86,22 @@ describe('FlightYoutubeUploadControls', () => {
       isLoading: false,
     });
     useYoutubeVideoAssociations.mockReturnValue({ data: [] });
+    useYoutubeSourcePublicationStatus.mockImplementation(
+      (flightId: string, source: unknown, youtubeUrls: string[]) => {
+        const upload = useYoutubeUpload(flightId, source);
+        const youtubeUrl = upload.data?.youtube_url;
+        const isPublished = Boolean(
+          upload.data?.status === 'completed' &&
+          youtubeUrl &&
+          youtubeUrls.includes(youtubeUrl) &&
+          useYoutubeVideoAssociations(flightId).data?.find(
+            (association: { url: string; exists_on_youtube?: boolean }) =>
+              association.url === youtubeUrl
+          )?.exists_on_youtube === true
+        );
+        return { upload, isPublished };
+      }
+    );
     useStartYoutubeUpload.mockReturnValue({
       mutateAsync: startUpload,
       isPending: false,

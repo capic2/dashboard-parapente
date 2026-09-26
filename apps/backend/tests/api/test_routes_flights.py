@@ -13,7 +13,7 @@ from unittest.mock import patch
 import config
 from fastapi.testclient import TestClient
 from flight_tracks import calculate_track_stats, normalize_track
-from models import Flight, GoproOverlayJob, HighlightVideoJob, Site
+from models import Flight, GoproOverlayJob, HighlightVideoJob, Site, YoutubeUploadJob
 from sqlalchemy.orm import Session
 from video_thumbnail import VideoThumbnailError
 
@@ -1942,3 +1942,142 @@ class TestHealthCheck:
         assert "status" in data
         assert data["status"] == "ok"
         assert "message" in data
+
+
+class TestDeleteFlightTemporaryMedia:
+    @staticmethod
+    def _completed_upload(
+        db_session: Session,
+        flight: Flight,
+        *,
+        source_type: str,
+        youtube_video_id: str = "dQw4w9WgXcQ",
+    ) -> None:
+        youtube_url = f"https://www.youtube.com/watch?v={youtube_video_id}"
+        flight.youtube_urls = [youtube_url]
+        db_session.add(
+            YoutubeUploadJob(
+                id=f"youtube-{source_type}-{flight.id}",
+                flight_id=flight.id,
+                user_id=1,
+                source_type=source_type,
+                status="completed",
+                progress=100,
+                title="Uploaded source",
+                description="",
+                privacy_status="unlisted",
+                youtube_video_id=youtube_video_id,
+                youtube_url=youtube_url,
+            )
+        )
+        db_session.commit()
+
+    def test_delete_is_rejected_before_youtube_publication(
+        self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+        pano_path = tmp_path / "20260315" / "01" / "pano.mp4"
+        pano_path.parent.mkdir(parents=True)
+        pano_path.write_bytes(b"pano")
+        flight = Flight(
+            id="flight-temp-pano-unpublished",
+            flight_date=date(2026, 3, 15),
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/pano")
+
+        assert response.status_code == 409
+        assert pano_path.read_bytes() == b"pano"
+
+    def test_delete_is_rejected_when_youtube_no_longer_has_the_video(
+        self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+        monkeypatch.setattr(
+            "routes.youtube_video_availability",
+            lambda grouped: {
+                video_id: False for video_ids in grouped.values() for video_id in video_ids
+            },
+        )
+        pano_path = tmp_path / "20260315" / "01" / "pano.mp4"
+        pano_path.parent.mkdir(parents=True)
+        pano_path.write_bytes(b"pano")
+        flight = Flight(
+            id="flight-temp-pano-unavailable",
+            flight_date=date(2026, 3, 15),
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.flush()
+        self._completed_upload(db_session, flight, source_type="pano")
+
+        response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/pano")
+
+        assert response.status_code == 409
+        assert pano_path.read_bytes() == b"pano"
+
+    def test_delete_pano_removes_only_the_local_file_and_clears_its_path(
+        self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+        monkeypatch.setattr(
+            "routes.youtube_video_availability",
+            lambda grouped: {
+                video_id: True for video_ids in grouped.values() for video_id in video_ids
+            },
+        )
+        pano_path = tmp_path / "20260315" / "01" / "pano.mp4"
+        pano_path.parent.mkdir(parents=True)
+        pano_path.write_bytes(b"pano")
+        camera_path = pano_path.parent / "camera.mp4"
+        camera_path.write_bytes(b"camera")
+        flight = Flight(
+            id="flight-temp-pano-published",
+            flight_date=date(2026, 3, 15),
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.flush()
+        self._completed_upload(db_session, flight, source_type="pano")
+
+        response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/pano")
+
+        assert response.status_code == 204
+        assert not pano_path.exists()
+        assert camera_path.read_bytes() == b"camera"
+        db_session.refresh(flight)
+        assert flight.pano_video_file_path is None
+
+    def test_delete_camera_removes_only_camera_source(
+        self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+        monkeypatch.setattr(
+            "routes.youtube_video_availability",
+            lambda grouped: {
+                video_id: True for video_ids in grouped.values() for video_id in video_ids
+            },
+        )
+        source_dir = tmp_path / "20260315" / "01"
+        source_dir.mkdir(parents=True)
+        camera_path = source_dir / "camera.mp4"
+        camera_path.write_bytes(b"camera")
+        pano_path = source_dir / "pano.mp4"
+        pano_path.write_bytes(b"pano")
+        flight = Flight(
+            id="flight-temp-camera-published",
+            flight_date=date(2026, 3, 15),
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.flush()
+        self._completed_upload(db_session, flight, source_type="camera")
+
+        response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/camera")
+
+        assert response.status_code == 204
+        assert not camera_path.exists()
+        assert pano_path.read_bytes() == b"pano"
