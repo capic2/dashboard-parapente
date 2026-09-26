@@ -55,33 +55,9 @@ def test_download_youtube_reports_download_percentage(tmp_path, monkeypatch):
     ]
 
 
-def test_compose_with_overlay_keeps_ffmpeg_output_in_progress_events(tmp_path, monkeypatch):
-    events: list[tuple[str, int | None]] = []
-
-    def fake_run(command, *, cwd=None, on_output=None):
-        assert on_output is not None
-        on_output("frame=42 fps=30 time=00:00:01.40")
-
-    monkeypatch.setattr(youtube_overlay_export, "_run", fake_run)
-
-    youtube_overlay_export.compose_with_overlay(
-        source=tmp_path / "source.mp4",
-        overlay=tmp_path / "overlay.mov",
-        output=tmp_path / "final.mp4",
-        offset_seconds=0,
-        progress=lambda message, percent: events.append((message, percent)),
-    )
-
-    assert events == [
-        ("Fusion de la vidéo YouTube et de l’overlay démarrée", 50),
-        ("ffmpeg: frame=42 fps=30 time=00:00:01.40", None),
-        ("Fusion terminée: final.mp4", 99),
-    ]
-
-
-def test_export_youtube_overlay_renders_saved_overlay_before_composing(tmp_path, monkeypatch):
+def test_export_youtube_overlay_renders_saved_overlay_directly_onto_source(tmp_path, monkeypatch):
     source = tmp_path / "source.mp4"
-    overlay = tmp_path / "overlay.webm"
+    overlay = tmp_path / "rendered.mp4"
     output = tmp_path / "final.mp4"
     source.write_bytes(b"source")
     overlay.write_bytes(b"overlay")
@@ -92,21 +68,24 @@ def test_export_youtube_overlay_renders_saved_overlay_before_composing(tmp_path,
         "download_youtube",
         lambda url, directory, progress: source,
     )
-    monkeypatch.setattr(
-        youtube_overlay_export,
-        "render_saved_overlay",
-        lambda overlay_job_id, offset_seconds, output_directory, progress: (
-            calls.append(("render", (overlay_job_id, offset_seconds, output_directory))) or overlay
-        ),
-    )
-    monkeypatch.setattr(
-        youtube_overlay_export,
-        "compose_with_overlay",
-        lambda source, overlay, output, offset_seconds, progress: (
-            calls.append(("compose", (source, overlay, output, offset_seconds)))
-            or output.write_bytes(b"final")
-        ),
-    )
+
+    def fake_render(
+        overlay_job_id,
+        source_video_path,
+        *,
+        offset_seconds,
+        output_directory,
+        progress,
+    ):
+        calls.append(
+            (
+                "render",
+                (overlay_job_id, source_video_path, offset_seconds, output_directory),
+            )
+        )
+        return overlay
+
+    monkeypatch.setattr(youtube_overlay_export, "render_saved_overlay", fake_render)
 
     youtube_overlay_export.export_youtube_overlay(
         url="https://www.youtube.com/watch?v=test",
@@ -118,15 +97,14 @@ def test_export_youtube_overlay_renders_saved_overlay_before_composing(tmp_path,
     )
 
     assert calls == [
-        ("render", ("saved-overlay-job", 25.8, tmp_path / "work")),
-        ("compose", (source, overlay, output, 25.8)),
+        ("render", ("saved-overlay-job", source, 25.8, tmp_path / "work")),
     ]
-    assert output.read_bytes() == b"final"
+    assert output.read_bytes() == b"overlay"
 
 
 @pytest.mark.parametrize(
     "failure_stage",
-    ["download", "render", "cancel", "compose", "final_validation"],
+    ["download", "render", "cancel", "final_validation"],
 )
 def test_export_youtube_overlay_cleans_work_dir_after_failure(
     failure_stage: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -149,6 +127,7 @@ def test_export_youtube_overlay_cleans_work_dir_after_failure(
 
     def fake_render(
         overlay_job_id: str,
+        source_video_path: Path,
         *,
         offset_seconds: float,
         output_directory: Path,
@@ -159,23 +138,11 @@ def test_export_youtube_overlay_cleans_work_dir_after_failure(
             raise youtube_overlay_export.YoutubeExportError("render failed")
         if failure_stage == "cancel":
             raise youtube_overlay_export.YoutubeExportError("Export annulé")
+        overlay.write_bytes(b"" if failure_stage == "final_validation" else b"rendered")
         return overlay
-
-    def fake_compose(
-        source_path: Path,
-        overlay_path: Path,
-        output_path: Path,
-        offset_seconds: float,
-        progress: youtube_overlay_export.ProgressCallback,
-    ) -> None:
-        if failure_stage == "compose":
-            raise youtube_overlay_export.YoutubeExportError("compose failed")
-        if failure_stage != "final_validation":
-            output_path.write_bytes(b"final")
 
     monkeypatch.setattr(youtube_overlay_export, "download_youtube", fake_download)
     monkeypatch.setattr(youtube_overlay_export, "render_saved_overlay", fake_render)
-    monkeypatch.setattr(youtube_overlay_export, "compose_with_overlay", fake_compose)
 
     with pytest.raises(youtube_overlay_export.YoutubeExportError):
         youtube_overlay_export.export_youtube_overlay(
@@ -191,10 +158,12 @@ def test_export_youtube_overlay_cleans_work_dir_after_failure(
 
 
 def test_render_saved_overlay_rebuilds_legacy_full_video_overlay(tmp_path, monkeypatch):
-    source = tmp_path / "camera.mp4"
+    camera = tmp_path / "camera.mp4"
+    source = tmp_path / "source.mp4"
     merged_gpx = tmp_path / "merged.gpx"
-    output = tmp_path / "youtube-overlay-saved-job.webm"
-    source.write_bytes(b"camera")
+    output = tmp_path / "youtube-overlay-saved-job.mp4"
+    camera.write_bytes(b"camera")
+    source.write_bytes(b"youtube")
     merged_gpx.write_text("<gpx />")
     create_args = {}
     states = iter(
@@ -214,7 +183,7 @@ def test_render_saved_overlay_rebuilds_legacy_full_video_overlay(tmp_path, monke
         if job_id == "saved-job":
             return {
                 "job_id": "saved-job",
-                "video_path": str(source),
+                "video_path": str(camera),
                 "gpx_path": str(tmp_path / "stale.gpx"),
                 "layout_id": "parapente-3840",
                 "pip_path": None,
@@ -222,6 +191,7 @@ def test_render_saved_overlay_rebuilds_legacy_full_video_overlay(tmp_path, monke
                 "command": {
                     "overlay_only": False,
                     "render_gpx_path": str(merged_gpx),
+                    "gpx_offset": 25.8,
                 },
             }
         state = next(states)
@@ -243,6 +213,7 @@ def test_render_saved_overlay_rebuilds_legacy_full_video_overlay(tmp_path, monke
 
     result = youtube_overlay_export.render_saved_overlay(
         "saved-job",
+        source,
         offset_seconds=25.8,
         output_directory=tmp_path / "work",
         progress=lambda message, percent: None,
@@ -254,10 +225,10 @@ def test_render_saved_overlay_rebuilds_legacy_full_video_overlay(tmp_path, monke
         "gpx_path": merged_gpx,
         "pip_path": None,
         "layout_id": "parapente-3840",
-        "output_filename": "youtube-overlay-saved-job.webm",
+        "output_filename": "youtube-overlay-saved-job.mp4",
         "output_resolution": "source",
         "output_dir": str(tmp_path / "work"),
-        "gpx_offset": 25.8,
+        "gpx_offset": 0.0,
         "flight_id": None,
-        "overlay_only": True,
+        "overlay_only": False,
     }

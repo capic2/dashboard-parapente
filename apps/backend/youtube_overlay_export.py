@@ -124,12 +124,13 @@ def download_youtube(url: str, directory: Path, progress: ProgressCallback) -> P
 
 def render_saved_overlay(
     overlay_job_id: str,
+    source_video_path: Path,
     *,
     offset_seconds: float,
     output_directory: Path,
     progress: ProgressCallback,
 ) -> Path:
-    """Render the saved overlay as a temporary transparent layer for YouTube."""
+    """Render the saved telemetry directly onto the downloaded YouTube video."""
     from gopro_overlay_export import (
         create_gopro_overlay_job_from_paths,
         get_gopro_overlay_job,
@@ -142,34 +143,35 @@ def render_saved_overlay(
     saved_command = saved_job.get("command")
     if not isinstance(saved_command, dict):
         saved_command = {}
-    if saved_command.get("overlay_only") is True:
-        saved_output = Path(str(saved_job.get("output_path") or ""))
-        if saved_output.is_file():
-            return saved_output
-
-    video_path = Path(str(saved_job.get("video_path") or ""))
     render_gpx_path = Path(str(saved_command.get("render_gpx_path") or ""))
     saved_gpx_path = Path(str(saved_job.get("gpx_path") or ""))
-    gpx_path = render_gpx_path if render_gpx_path.is_file() else saved_gpx_path
+    has_prepared_gpx = render_gpx_path.is_file()
+    gpx_path = render_gpx_path if has_prepared_gpx else saved_gpx_path
     pip_value = saved_job.get("pip_path")
     pip_path = Path(str(pip_value)) if pip_value else None
-    if not video_path.is_file() or not gpx_path.is_file():
+    if not source_video_path.is_file() or not gpx_path.is_file():
         raise YoutubeExportError("Les sources de l’overlay enregistré sont indisponibles")
     if pip_path and not pip_path.is_file():
         pip_path = None
 
-    progress("Génération temporaire de l’overlay synchronisé", None)
+    # A prepared render GPX already contains the saved manual offset. Apply
+    # only the difference if the export calibration changed after that render.
+    saved_gpx_offset = float(saved_command.get("gpx_offset") or saved_job.get("gpx_offset") or 0.0)
+    gpx_offset = (
+        float(offset_seconds) - saved_gpx_offset if has_prepared_gpx else float(offset_seconds)
+    )
+    progress("Fusion de la vidéo YouTube et de l’overlay démarrée", 50)
     internal_job = create_gopro_overlay_job_from_paths(
-        video_path=video_path,
+        video_path=source_video_path,
         gpx_path=gpx_path,
         pip_path=pip_path,
         layout_id=saved_job.get("layout_id"),
-        output_filename=f"youtube-overlay-{overlay_job_id}.webm",
+        output_filename=f"youtube-overlay-{overlay_job_id}.mp4",
         output_resolution="source",
         output_dir=str(output_directory),
-        gpx_offset=float(offset_seconds),
+        gpx_offset=gpx_offset,
         flight_id=None,
-        overlay_only=True,
+        overlay_only=False,
     )
     internal_job_id = str(internal_job["job_id"])
     deadline = time.monotonic() + config.GOPRO_OVERLAY_JOB_TIMEOUT_SECONDS
@@ -182,7 +184,7 @@ def render_saved_overlay(
         if status == "completed":
             output = Path(str(current_job.get("output_path") or ""))
             if output.is_file():
-                progress("Overlay synchronisé prêt", None)
+                progress(f"Fusion terminée: {output.name}", 99)
                 return output
             raise YoutubeExportError("Le rendu temporaire de l’overlay est vide")
         if status in _OVERLAY_TERMINAL_STATUSES:
@@ -199,55 +201,6 @@ def render_saved_overlay(
         time.sleep(1)
 
 
-def compose_with_overlay(
-    source: Path,
-    overlay: Path,
-    output: Path,
-    offset_seconds: float,
-    progress: ProgressCallback,
-) -> None:
-    progress("Fusion de la vidéo YouTube et de l’overlay démarrée", 50)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    offset = max(0.0, float(offset_seconds))
-
-    def report_ffmpeg_output(line: str) -> None:
-        progress(f"ffmpeg: {line}", None)
-
-    _run(
-        [
-            "ffmpeg",
-            "-y",
-            "-i",
-            str(source),
-            "-itsoffset",
-            str(offset),
-            "-i",
-            str(overlay),
-            "-filter_complex",
-            "[1:v][0:v]scale2ref[ov][base];[base][ov]overlay=0:0:format=auto[v]",
-            "-map",
-            "[v]",
-            "-map",
-            "0:a?",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "medium",
-            "-crf",
-            "18",
-            "-pix_fmt",
-            "yuv420p",
-            "-c:a",
-            "aac",
-            "-movflags",
-            "+faststart",
-            str(output),
-        ],
-        on_output=report_ffmpeg_output,
-    )
-    progress(f"Fusion terminée: {output.name}", 99)
-
-
 def export_youtube_overlay(
     *,
     url: str,
@@ -259,13 +212,15 @@ def export_youtube_overlay(
 ) -> None:
     try:
         source = download_youtube(url, work_dir, progress)
-        overlay_path = render_saved_overlay(
+        rendered_video = render_saved_overlay(
             overlay_job_id,
+            source,
             offset_seconds=offset_seconds,
             output_directory=work_dir,
             progress=progress,
         )
-        compose_with_overlay(source, overlay_path, output_path, offset_seconds, progress)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(rendered_video, output_path)
         if not output_path.is_file() or output_path.stat().st_size == 0:
             raise YoutubeExportError("Le fichier MP4 final est vide")
     except BaseException:
