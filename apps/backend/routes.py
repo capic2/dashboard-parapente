@@ -70,6 +70,7 @@ from flight_summaries import (
 from flight_storage import (
     ensure_flight_directory,
     flight_sequence_number,
+    flight_storage_root,
     pano_video_path,
     pano_video_paths,
     write_flight_text_file,
@@ -5737,6 +5738,70 @@ def stream_flight_pano(flight_id: str, db: Session = Depends(get_db)) -> FileRes
         filename=pano_path.name,
         content_disposition_type="inline",
     )
+
+
+@router.delete(
+    "/flights/{flight_id}/temporary-media/{source_type}",
+    status_code=204,
+)
+def delete_flight_temporary_media(
+    flight_id: str,
+    source_type: Literal["camera", "pano"],
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    flight = db.get(Flight, flight_id)
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+
+    completed_uploads = (
+        db.query(YoutubeUploadJob)
+        .filter(
+            YoutubeUploadJob.flight_id == flight.id,
+            YoutubeUploadJob.user_id == user.id,
+            YoutubeUploadJob.source_type == source_type,
+            YoutubeUploadJob.status == "completed",
+            YoutubeUploadJob.youtube_url.in_(flight.youtube_urls or []),
+            YoutubeUploadJob.youtube_video_id.is_not(None),
+        )
+        .all()
+    )
+    video_ids = {
+        job.youtube_video_id for job in completed_uploads if job.youtube_video_id is not None
+    }
+    availability = youtube_video_availability({user.id: video_ids}) if video_ids else {}
+    if not any(availability.get(video_id) is True for video_id in video_ids):
+        raise HTTPException(
+            status_code=409,
+            detail="Publish this source to YouTube before deleting its local file",
+        )
+
+    if source_type == "camera":
+        media_path = _flight_gopro_camera_path(db, flight)
+    else:
+        pano_path = _resolve_flight_file_path(str(pano_video_path(db, flight)))
+        if pano_path is None or pano_path.is_symlink() or not pano_path.is_file():
+            raise HTTPException(status_code=404, detail="Pano video not found")
+        resolved_pano_path = pano_path.resolve()
+        storage_root = flight_storage_root().resolve()
+        if storage_root not in resolved_pano_path.parents:
+            raise HTTPException(status_code=409, detail="Pano video is outside flight storage")
+        media_path = resolved_pano_path
+
+    try:
+        media_path.unlink()
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Temporary video not found") from exc
+    except OSError as exc:
+        logger.exception(
+            "Unable to delete temporary %s video for flight %s", source_type, flight.id
+        )
+        raise HTTPException(status_code=500, detail="Unable to delete temporary video") from exc
+
+    if source_type == "pano":
+        flight.pano_video_file_path = None
+        db.commit()
+    return Response(status_code=204)
 
 
 def _highlight_job_payload(job: HighlightVideoJob) -> HighlightVideoJobResponse:

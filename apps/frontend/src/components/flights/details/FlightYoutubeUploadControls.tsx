@@ -8,9 +8,9 @@ import {
   useCancelYoutubeUpload,
   useStartYoutubeUpload,
   useYoutubeAuthorizationUrl,
+  useYoutubeSourcePublicationStatus,
   useYoutubeStatus,
   useYoutubeUpload,
-  useYoutubeVideoAssociations,
   youtubeVideoAssociationsQueryKey,
   type YoutubeUploadSource,
 } from '../../../hooks/flights/useYoutubeUpload';
@@ -70,9 +70,12 @@ export function FlightYoutubeUploadControls({
   const toast = useToast();
   const queryClient = useQueryClient();
   const connection = useYoutubeStatus();
-  const upload = useYoutubeUpload(flight.id, source);
   const activeUpload = useYoutubeUpload(flight.id);
-  const associations = useYoutubeVideoAssociations(flight.id);
+  const { upload, isPublished } = useYoutubeSourcePublicationStatus(
+    flight.id,
+    source,
+    flight.youtube_urls ?? []
+  );
   const startUpload = useStartYoutubeUpload(flight.id);
   const cancelUpload = useCancelYoutubeUpload(flight.id);
   const authorizationUrl = useYoutubeAuthorizationUrl();
@@ -94,15 +97,6 @@ export function FlightYoutubeUploadControls({
     upload.data?.status === 'preparing' ||
     upload.data?.status === 'queued' ||
     upload.data?.status === 'uploading';
-  const isPublished = Boolean(
-    upload.data?.status === 'completed' &&
-    upload.data.youtube_url &&
-    flight.youtube_urls?.includes(upload.data.youtube_url) &&
-    associations.data?.find(
-      (association) => association.url === upload.data?.youtube_url
-    )?.exists_on_youtube === true
-  );
-
   useEffect(() => {
     if (
       previousStatus.current &&
