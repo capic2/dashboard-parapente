@@ -9,6 +9,7 @@ import {
   Clock3,
   Edit3,
   ListChecks,
+  LoaderCircle,
   Wand2,
 } from 'lucide-react';
 import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
@@ -314,6 +315,7 @@ export function FlightTelemetryInteractivePreview({
     youtubeExportStatusValue === 'initializing' ||
     youtubeExportStatusValue === 'capturing' ||
     youtubeExportStatusValue === 'encoding';
+  const isYoutubeExportBusy = startExport.isPending || isYoutubeExportActive;
   const isYoutubeExportStalled =
     isYoutubeExportActive &&
     exportLastActivitySeconds !== null &&
@@ -384,13 +386,24 @@ export function FlightTelemetryInteractivePreview({
           </Link>
           {youtubeUrl && (
             <Button
-              variant="secondary"
-              isDisabled={startExport.isPending}
-              className="shrink-0 rounded-lg border border-cyan-200 px-3 py-2 text-xs font-semibold text-cyan-700 dark:border-cyan-800 dark:text-cyan-300"
+              variant={isYoutubeExportBusy ? 'cyan' : 'secondary'}
+              isDisabled={isYoutubeExportBusy}
+              aria-busy={isYoutubeExportBusy}
+              className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+                isYoutubeExportBusy
+                  ? 'border-cyan-400 disabled:opacity-100 dark:border-cyan-500'
+                  : 'border-cyan-200 text-cyan-700 dark:border-cyan-800 dark:text-cyan-300'
+              }`}
               onPress={launchYoutubeExport}
             >
-              {startExport.isPending
-                ? t('common.loading')
+              {isYoutubeExportBusy && (
+                <LoaderCircle
+                  className="h-3.5 w-3.5 motion-safe:animate-spin"
+                  aria-hidden="true"
+                />
+              )}
+              {isYoutubeExportBusy
+                ? t('flights.youtubeOverlayExportInProgress')
                 : t('flights.youtubeOverlayExport')}
             </Button>
           )}
