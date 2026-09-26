@@ -12,8 +12,7 @@
     "logout": "Déconnexion",
     "openMenu": "Ouvrir le menu",
     "closeMenu": "Fermer le menu",
-    "menu": "Menu",
-    "enableNotifications": "Activer les notifications de jobs"
+    "menu": "Menu"
   },
   "notifications": {
     "jobCompleted": "Job terminé",
@@ -1903,6 +1902,7 @@
     "active": "en cours",
     "empty": "Aucun traitement récent",
     "openCenter": "Ouvrir les traitements",
+    "enableNotifications": "Activer les notifications",
     "timeline": "Progression du traitement",
     "cancel": "Annuler",
     "genericError": "Le traitement a échoué",
