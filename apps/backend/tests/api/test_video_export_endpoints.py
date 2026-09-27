@@ -84,15 +84,32 @@ class TestHighlightExportLifecycleRules:
             }
         )
 
-    def test_youtube_upload_never_exposes_highlight_lifecycle_actions(self):
-        job = {
-            "mode": "youtube_upload",
-            "job_id": "youtube-1",
-            "flight_id": "flight-1",
-            "status": "running",
-        }
-        assert not _video_export_can_cancel(job)
-        assert not _video_export_can_delete(job)
+    def test_active_youtube_uploads_can_be_cancelled_but_not_deleted(self):
+        for status in ("preparing", "queued", "uploading"):
+            job = {
+                "mode": "youtube_upload",
+                "job_id": "youtube-1",
+                "flight_id": "flight-1",
+                "status": status,
+            }
+            assert _video_export_can_cancel(job)
+            assert not _video_export_can_delete(job)
+
+        assert not _video_export_can_cancel(
+            {
+                "mode": "youtube_upload",
+                "job_id": "youtube-1",
+                "flight_id": "flight-1",
+                "status": "completed",
+            }
+        )
+        assert not _video_export_can_cancel(
+            {
+                "mode": "youtube_upload",
+                "job_id": "youtube-1",
+                "status": "uploading",
+            }
+        )
 
 
 API_PREFIX = "/api"
@@ -965,7 +982,7 @@ class TestVideoExportJobsEndpoint:
         assert jobs[0]["status"] == "uploading"
         assert jobs[0]["progress"] == 42
         assert jobs[0]["mode"] == "youtube_upload"
-        assert jobs[0]["can_cancel"] is False
+        assert jobs[0]["can_cancel"] is True
 
     def test_export_status_passthrough_keeps_render_method(self, client: TestClient):
         with patch(
