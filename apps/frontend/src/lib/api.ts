@@ -113,10 +113,13 @@ export async function getApiErrorMessage(error: unknown, fallback: string) {
       return payload.detail;
     }
   } catch {
-    // Keep the user-facing fallback when the response is not JSON.
+    // Keep the fallback and HTTP status when the response is not JSON.
   }
 
-  return fallback;
+  const status = response.statusText
+    ? `${response.status} ${response.statusText}`
+    : `${response.status}`;
+  return `${fallback} (HTTP ${status})`;
 }
 
 // Apply persisted timeout on load and react to changes
