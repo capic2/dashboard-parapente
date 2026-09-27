@@ -834,6 +834,7 @@ def _export_youtube_overlay_job(job_id: str) -> None:
         new_work_dir,
         output_path,
     )
+    from youtube_upload import download_cookies_for_upload_job
 
     job = _get_job(job_id)
     if not job or not job.youtube_url or not job.overlay_job_id:
@@ -864,6 +865,7 @@ def _export_youtube_overlay_job(job_id: str) -> None:
         _update_job(
             job_id, status=_STATUS_RUNNING, message="Préparation de l’export YouTube", progress=1
         )
+        download_cookies = download_cookies_for_upload_job(job.youtube_upload_job_id)
         export_youtube_overlay(
             url=job.youtube_url,
             overlay_job_id=job.overlay_job_id,
@@ -871,6 +873,7 @@ def _export_youtube_overlay_job(job_id: str) -> None:
             offset_seconds=float(job.overlay_offset_seconds or 0),
             work_dir=work_dir,
             progress=progress,
+            cookies=download_cookies,
         )
         if _is_cancelled(job_id):
             raise YoutubeExportError("Export annulé")

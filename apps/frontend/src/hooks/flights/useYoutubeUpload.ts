@@ -81,6 +81,18 @@ export function useYoutubeStatus() {
   });
 }
 
+export function useUploadYoutubeDownloadCookies() {
+  return useMutation({
+    mutationFn: (file: File) => {
+      const body = new FormData();
+      body.append('file', file);
+      return api
+        .put('youtube/download-cookies', { body })
+        .json<{ configured: boolean }>();
+    },
+  });
+}
+
 const youtubeUploadQueryKey = (
   flightId: string,
   source?: YoutubeUploadSource

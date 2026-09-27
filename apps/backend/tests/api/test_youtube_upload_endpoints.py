@@ -209,6 +209,70 @@ def test_youtube_status_requires_reauthorization_for_legacy_upload_scope(
     assert response.json() == {"configured": True, "connected": False}
 
 
+def test_upload_youtube_download_cookies_stores_filtered_encrypted_cookies(
+    client: TestClient, db_session: Session
+) -> None:
+    credential = YoutubeCredential(
+        user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token")
+    )
+    db_session.add(credential)
+    db_session.commit()
+    cookies = (
+        "# Netscape HTTP Cookie File\n"
+        ".youtube.com\tTRUE\t/\tTRUE\t0\tSID\tyoutube-session\n"
+        ".google.com\tTRUE\t/\tTRUE\t0\tSAPISID\tgoogle-session\n"
+        ".example.com\tTRUE\t/\tTRUE\t0\tOTHER\tunrelated-cookie\n"
+    )
+
+    response = client.put(
+        f"{API_PREFIX}/youtube/download-cookies",
+        files={"file": ("cookies.txt", cookies, "text/plain")},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"configured": True}
+    db_session.refresh(credential)
+    assert credential.download_cookies_encrypted != cookies
+    assert youtube_upload.decrypt_secret(credential.download_cookies_encrypted) == (
+        "# Netscape HTTP Cookie File\n"
+        ".youtube.com\tTRUE\t/\tTRUE\t0\tSID\tyoutube-session\n"
+        ".google.com\tTRUE\t/\tTRUE\t0\tSAPISID\tgoogle-session\n"
+    )
+
+
+def test_upload_youtube_download_cookies_rejects_invalid_file(
+    client: TestClient, db_session: Session
+) -> None:
+    db_session.add(
+        YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
+    )
+    db_session.commit()
+
+    response = client.put(
+        f"{API_PREFIX}/youtube/download-cookies",
+        files={"file": ("cookies.txt", "not a Netscape cookie file", "text/plain")},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Choose a cookies.txt file in Netscape format"
+
+
+def test_upload_youtube_download_cookies_rejects_disconnected_user(client: TestClient) -> None:
+    response = client.put(
+        f"{API_PREFIX}/youtube/download-cookies",
+        files={
+            "file": (
+                "cookies.txt",
+                "# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tTRUE\t0\tSID\tvalue\n",
+                "text/plain",
+            )
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Connect YouTube before uploading cookies"
+
+
 def test_youtube_auth_url_contains_signed_current_user_state(client, monkeypatch):
     _configure_youtube(monkeypatch)
 
