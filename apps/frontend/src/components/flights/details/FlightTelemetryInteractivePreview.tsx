@@ -377,7 +377,13 @@ export function FlightTelemetryInteractivePreview({
   const youtubeDownloadNeedsCookies = [
     youtubeExportError,
     youtubeExportStatus?.error,
-  ].some((error) => error?.toLocaleLowerCase().includes('sign in to confirm'));
+  ].some((error) => {
+    const normalizedError = error?.toLowerCase() ?? '';
+    return (
+      normalizedError.includes('sign in to confirm') ||
+      normalizedError.includes('http error 403: forbidden')
+    );
+  });
   const handleYoutubeCookieFile = async (
     event: ChangeEvent<HTMLInputElement>
   ) => {
