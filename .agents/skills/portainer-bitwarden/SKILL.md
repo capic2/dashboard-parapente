@@ -12,9 +12,10 @@ Use this skill whenever the user asks to inspect the production Portainer deploy
 - Synchronize Bitwarden before searching: `mcp__bitwarden__sync`.
 - Use the exact Bitwarden item named `portainer`. Do not substitute `portainer2`, `.env pour portainer`, or an IP-address item.
 - The item URI is `https://portainer.capic.ignorelist.com`.
-- Read the API token from the item's login password (`mcp__bitwarden__get` with `object: "item"`). Never print, quote, log, or save the token in files.
+- Read the API token from the exact item's **Notes** field (Bitwarden's additional information), using `mcp__bitwarden__get` with `object: "item"`. Do not use the login password field. Keep the token in memory or an environment variable only; never print, quote, log, or save it in files.
 - Authenticate Portainer API calls with `X-API-Key: <token>`.
 - The Portainer local Docker endpoint is endpoint ID `2`; verify this with `GET /api/endpoints` before using it.
+- If Portainer returns `401`, sync Bitwarden again and verify that the token came from Notes on the exact `portainer` item. Retry once; if it still fails, stop and report the authentication blocker without trying another item or credential.
 
 Example read-only API shape (the token stays in the environment and TLS verification remains enabled):
 
