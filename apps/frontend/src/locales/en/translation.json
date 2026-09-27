@@ -1069,7 +1069,7 @@
     "youtubeOverlayExportRights": "I have the rights required to download and reuse this video.",
     "youtubeOverlayExportStart": "Start export",
     "youtubeOverlayExportError": "Unable to start the YouTube export.",
-    "youtubeCookiesRequired": "YouTube requires a session to download this video.",
+    "youtubeCookiesRequired": "YouTube refused to download this video. A recent session cookie may help.",
     "youtubeCookiesInstructions": "Export a cookies.txt file from a browser signed in to YouTube, then upload it here. Only Google and YouTube cookies are kept, encrypted on the server, and can be replaced when they expire.",
     "youtubeCookiesHelpLink": "How to export cookies",
     "youtubeCookiesFileLabel": "YouTube cookies file",
