@@ -260,6 +260,28 @@ def is_connected(db: Session, user_id: int) -> bool:
     return credential is not None and _OAUTH_SCOPE in credential.oauth_scope.split()
 
 
+def store_download_cookies(db: Session, *, user_id: int, cookies: str) -> None:
+    credential = db.get(YoutubeCredential, user_id)
+    if credential is None:
+        raise YoutubeOAuthError("Connect YouTube before adding download cookies")
+    credential.download_cookies_encrypted = encrypt_secret(cookies)
+    credential.updated_at = datetime.utcnow()
+    db.commit()
+
+
+def download_cookies_for_upload_job(upload_job_id: str | None) -> str | None:
+    if not upload_job_id:
+        return None
+    with SessionLocal() as db:
+        upload_job = db.get(YoutubeUploadJob, upload_job_id)
+        if upload_job is None:
+            return None
+        credential = db.get(YoutubeCredential, upload_job.user_id)
+        if credential is None or not credential.download_cookies_encrypted:
+            return None
+        return decrypt_secret(credential.download_cookies_encrypted)
+
+
 def disconnect(db: Session, user_id: int) -> None:
     credential = db.get(YoutubeCredential, user_id)
     if credential is not None:

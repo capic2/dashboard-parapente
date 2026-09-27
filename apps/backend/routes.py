@@ -238,6 +238,7 @@ from youtube_upload import (
     job_payload as youtube_upload_job_payload,
     latest_job as latest_youtube_upload_job,
     remove_youtube_video,
+    store_download_cookies as store_youtube_download_cookies,
     migrate_flight_playlists,
     youtube_video_availability,
     youtube_video_associations,
@@ -1411,6 +1412,62 @@ def get_youtube_status(
         "configured": is_youtube_configured(),
         "connected": is_youtube_connected(db, user.id),
     }
+
+
+_MAX_YOUTUBE_COOKIE_FILE_BYTES = 5 * 1024 * 1024
+
+
+def _validate_youtube_cookie_file(content: bytes) -> str:
+    if not content:
+        raise HTTPException(status_code=422, detail="The cookie file is empty")
+    if len(content) > _MAX_YOUTUBE_COOKIE_FILE_BYTES:
+        raise HTTPException(status_code=413, detail="The cookie file exceeds 5 MiB")
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=422, detail="The cookie file must be UTF-8 text") from exc
+
+    first_line = next((line.strip() for line in text.splitlines() if line.strip()), "")
+    if first_line not in {"# Netscape HTTP Cookie File", "# HTTP Cookie File"}:
+        raise HTTPException(
+            status_code=422,
+            detail="Choose a cookies.txt file in Netscape format",
+        )
+
+    retained_lines = [first_line]
+    has_youtube_cookie = False
+    for line in text.splitlines():
+        if not line or line.startswith("#") and not line.startswith("#HttpOnly_"):
+            continue
+        columns = line.split("\t")
+        if len(columns) < 7:
+            continue
+        domain = columns[0].removeprefix("#HttpOnly_").lstrip(".").lower()
+        is_youtube_domain = domain == "youtube.com" or domain.endswith(".youtube.com")
+        is_google_domain = domain == "google.com" or domain.endswith(".google.com")
+        if is_youtube_domain or is_google_domain:
+            retained_lines.append(line)
+        if is_youtube_domain and columns[5] and columns[6]:
+            has_youtube_cookie = True
+    if not has_youtube_cookie:
+        raise HTTPException(
+            status_code=422,
+            detail="The cookie file contains no YouTube cookies",
+        )
+    return "\n".join(retained_lines) + "\n"
+
+
+@router.put("/youtube/download-cookies")
+async def upload_youtube_download_cookies(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, bool]:
+    if not is_youtube_connected(db, user.id):
+        raise HTTPException(status_code=409, detail="Connect YouTube before uploading cookies")
+    cookies = _validate_youtube_cookie_file(await file.read(_MAX_YOUTUBE_COOKIE_FILE_BYTES + 1))
+    store_youtube_download_cookies(db, user_id=user.id, cookies=cookies)
+    return {"configured": True}
 
 
 @router.post("/youtube/auth-url")

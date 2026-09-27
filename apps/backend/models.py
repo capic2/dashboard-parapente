@@ -35,12 +35,13 @@ class User(Base):
 
 
 class YoutubeCredential(Base):
-    """Encrypted OAuth refresh token for one application user."""
+    """Encrypted YouTube credentials for one application user."""
 
     __tablename__ = "youtube_credentials"
 
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     refresh_token_encrypted = Column(Text, nullable=False)
+    download_cookies_encrypted = Column(Text, nullable=True)
     oauth_scope = Column(
         Text,
         nullable=False,

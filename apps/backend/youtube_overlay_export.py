@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
+import tempfile
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -77,11 +78,29 @@ def _run(
         raise
 
 
-def download_youtube(url: str, directory: Path, progress: ProgressCallback) -> Path:
+def download_youtube(
+    url: str,
+    directory: Path,
+    progress: ProgressCallback,
+    *,
+    cookies: str | None = None,
+) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     temp_directory = directory / "temp"
     temp_directory.mkdir(parents=True, exist_ok=True)
     output = directory / "source.%(ext)s"
+    cookie_path: Path | None = None
+
+    if cookies:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            prefix=".youtube-cookies-",
+            suffix=".txt",
+            delete=False,
+        ) as cookie_file:
+            cookie_file.write(cookies)
+            cookie_path = Path(cookie_file.name)
 
     def report_download_output(line: str) -> None:
         match = _DOWNLOAD_PROGRESS_RE.search(line)
@@ -93,26 +112,28 @@ def download_youtube(url: str, directory: Path, progress: ProgressCallback) -> P
 
     try:
         progress("Téléchargement YouTube démarré", 0)
-        _run(
-            [
-                "yt-dlp",
-                "--newline",
-                "--no-playlist",
-                "--format",
-                "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-                "--merge-output-format",
-                "mp4",
-                "--paths",
-                f"home:{directory}",
-                "--paths",
-                f"temp:{temp_directory}",
-                "--output",
-                output.name,
-                url,
-            ],
-            on_output=report_download_output,
-        )
+        command = [
+            "yt-dlp",
+            "--newline",
+            "--no-playlist",
+            "--format",
+            "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+            "--merge-output-format",
+            "mp4",
+            "--paths",
+            f"home:{directory}",
+            "--paths",
+            f"temp:{temp_directory}",
+            "--output",
+            output.name,
+        ]
+        if cookie_path is not None:
+            command.extend(["--cookies", str(cookie_path)])
+        command.append(url)
+        _run(command, on_output=report_download_output)
     finally:
+        if cookie_path is not None:
+            cookie_path.unlink(missing_ok=True)
         shutil.rmtree(temp_directory, ignore_errors=True)
     files = sorted(directory.glob("source.*"))
     if not files:
@@ -208,9 +229,13 @@ def export_youtube_overlay(
     offset_seconds: float,
     work_dir: Path,
     progress: ProgressCallback,
+    cookies: str | None = None,
 ) -> None:
     try:
-        source = download_youtube(url, work_dir, progress)
+        if cookies:
+            source = download_youtube(url, work_dir, progress, cookies=cookies)
+        else:
+            source = download_youtube(url, work_dir, progress)
         rendered_video = render_saved_overlay(
             overlay_job_id,
             source,

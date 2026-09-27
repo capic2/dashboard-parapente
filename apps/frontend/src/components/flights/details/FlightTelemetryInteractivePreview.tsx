@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@dashboard-parapente/design-system';
@@ -10,6 +11,7 @@ import {
   Edit3,
   ListChecks,
   LoaderCircle,
+  Upload,
   Wand2,
 } from 'lucide-react';
 import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
@@ -34,7 +36,10 @@ import {
 } from './flightTelemetryLayout';
 import { sourceTimeAtPreviewTime } from './GoproOverlaySyncPreview';
 import { getYoutubeVideoId } from '../../../lib/youtube';
-import { useStartYoutubeOverlayExport } from '../../../hooks/flights/useYoutubeUpload';
+import {
+  useStartYoutubeOverlayExport,
+  useUploadYoutubeDownloadCookies,
+} from '../../../hooks/flights/useYoutubeUpload';
 
 interface FlightTelemetryInteractivePreviewProps {
   flightId: string;
@@ -172,6 +177,14 @@ export function FlightTelemetryInteractivePreview({
     readYoutubeExportJobId(flightId)
   );
   const startExport = useStartYoutubeOverlayExport(flightId);
+  const uploadCookies = useUploadYoutubeDownloadCookies();
+  const cookieFileInput = useRef<HTMLInputElement>(null);
+  const [cookieUploadMessage, setCookieUploadMessage] = useState<string | null>(
+    null
+  );
+  const [cookieUploadError, setCookieUploadError] = useState<string | null>(
+    null
+  );
   const { status: youtubeExportStatus, error: youtubeExportStatusError } =
     useVideoExportStatus(youtubeExportJobId);
   const [youtubeExportNow, setYoutubeExportNow] = useState(() => Date.now());
@@ -361,6 +374,30 @@ export function FlightTelemetryInteractivePreview({
       );
     }
   };
+  const youtubeDownloadNeedsCookies = [
+    youtubeExportError,
+    youtubeExportStatus?.error,
+  ].some((error) => error?.toLocaleLowerCase().includes('sign in to confirm'));
+  const handleYoutubeCookieFile = async (
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    setCookieUploadMessage(null);
+    setCookieUploadError(null);
+    try {
+      await uploadCookies.mutateAsync(file);
+      setCookieUploadMessage(t('flights.youtubeCookiesSaved'));
+    } catch (error) {
+      setCookieUploadError(
+        await getApiErrorMessage(error, t('flights.youtubeCookiesUploadError'))
+      );
+    } finally {
+      input.value = '';
+    }
+  };
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
       <div className="flex items-start gap-3 p-4 sm:p-5">
@@ -416,6 +453,63 @@ export function FlightTelemetryInteractivePreview({
         >
           {youtubeExportError ?? t('flights.youtubeOverlayExportError')}
         </p>
+      )}
+      {youtubeDownloadNeedsCookies && (
+        <div className="border-t border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900 dark:bg-amber-950/20 sm:px-5">
+          <p className="text-sm font-semibold text-amber-950 dark:text-amber-100">
+            {t('flights.youtubeCookiesRequired')}
+          </p>
+          <p className="mt-1 text-sm text-amber-900 dark:text-amber-200">
+            {t('flights.youtubeCookiesInstructions')}{' '}
+            <a
+              href="https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies"
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold underline underline-offset-2"
+            >
+              {t('flights.youtubeCookiesHelpLink')}
+            </a>
+          </p>
+          <input
+            ref={cookieFileInput}
+            type="file"
+            accept=".txt,text/plain"
+            className="sr-only"
+            aria-label={t('flights.youtubeCookiesFileLabel')}
+            onChange={(event) => void handleYoutubeCookieFile(event)}
+          />
+          <Button
+            variant="outline"
+            className="mt-3"
+            isDisabled={uploadCookies.isPending}
+            onPress={() => cookieFileInput.current?.click()}
+          >
+            {uploadCookies.isPending ? (
+              <LoaderCircle
+                className="h-4 w-4 motion-safe:animate-spin"
+                aria-hidden="true"
+              />
+            ) : (
+              <Upload className="h-4 w-4" aria-hidden="true" />
+            )}
+            {uploadCookies.isPending
+              ? t('flights.youtubeCookiesUploading')
+              : t('flights.youtubeCookiesUpload')}
+          </Button>
+          {cookieUploadMessage && (
+            <output className="mt-2 block text-sm text-emerald-800 dark:text-emerald-200">
+              {cookieUploadMessage}
+            </output>
+          )}
+          {cookieUploadError && (
+            <p
+              className="mt-2 text-sm text-red-700 dark:text-red-300"
+              role="alert"
+            >
+              {cookieUploadError}
+            </p>
+          )}
+        </div>
       )}
       {youtubeExportJobId && (
         <div
