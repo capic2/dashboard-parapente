@@ -52,7 +52,7 @@ catalog:
   ky: ^2.0.0
   lint-staged: ^17.0.0
   lucide-react: ^1.7.0
-  msw: ^2.13.6
+  msw: ^3.0.0
   msw-storybook-addon: ^3.0.0
   nx: ^23.0.0
   oxfmt: ^0.71.0
