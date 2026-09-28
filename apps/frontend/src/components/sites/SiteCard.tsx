@@ -49,6 +49,11 @@ export const SiteCard: React.FC<SiteCardProps> = ({
 
   const typeBadge = getTypeBadge();
   const siteDisplayName = getSiteDisplayName(site);
+  const hasCoordinates =
+    Number.isFinite(site.latitude) && Number.isFinite(site.longitude);
+  const googleMapsUrl = new URL('https://www.google.com/maps/search/');
+  googleMapsUrl.searchParams.set('api', '1');
+  googleMapsUrl.searchParams.set('query', `${site.latitude},${site.longitude}`);
 
   return (
     <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-sky-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-sky-700">
@@ -74,15 +79,40 @@ export const SiteCard: React.FC<SiteCardProps> = ({
       {/* Info Grid */}
       <div className="space-y-2 mb-4 flex-1">
         {/* GPS Coordinates */}
-        {site.latitude && site.longitude && (
+        {hasCoordinates && (
           <div className="flex items-start gap-2 text-sm">
             <MapPin
               className="mt-0.5 h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400"
               aria-hidden="true"
             />
-            <span className="text-gray-800 dark:text-gray-100">
-              {site.latitude.toFixed(4)}°N, {site.longitude.toFixed(4)}°E
-            </span>
+            <a
+              href={googleMapsUrl.toString()}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${t('sites.openInGoogleMaps')}: ${siteDisplayName}`}
+              onClick={(event) => {
+                const isUnmodifiedPrimaryClick =
+                  event.button === 0 &&
+                  !event.metaKey &&
+                  !event.ctrlKey &&
+                  !event.shiftKey &&
+                  !event.altKey;
+
+                if (
+                  isUnmodifiedPrimaryClick &&
+                  window.matchMedia('(max-width: 639px)').matches
+                ) {
+                  event.preventDefault();
+                  window.location.assign(googleMapsUrl.toString());
+                }
+              }}
+              className="text-gray-800 underline decoration-transparent underline-offset-2 hover:decoration-current focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-gray-100"
+            >
+              {Math.abs(site.latitude).toFixed(4)}°
+              {site.latitude >= 0 ? 'N' : 'S'},{' '}
+              {Math.abs(site.longitude).toFixed(4)}°
+              {site.longitude >= 0 ? 'E' : 'W'}
+            </a>
             {site.elevation_m && (
               <span className="text-gray-600 dark:text-gray-300 ml-2">
                 ({site.elevation_m}m)

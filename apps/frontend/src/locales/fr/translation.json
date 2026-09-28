@@ -578,6 +578,7 @@
     "landing": "Atterrissage",
     "code": "Code:",
     "orientation": "Orientation:",
+    "openInGoogleMaps": "Ouvrir dans Google Maps",
     "editSite": "Éditer le site",
     "viewFlights": "Voir les vols",
     "locationUnknown": "Sans localité",
