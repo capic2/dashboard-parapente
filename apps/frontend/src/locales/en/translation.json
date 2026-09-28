@@ -578,6 +578,7 @@
     "landing": "Landing",
     "code": "Code:",
     "orientation": "Orientation:",
+    "openInGoogleMaps": "Open in Google Maps",
     "editSite": "Edit site",
     "viewFlights": "View flights",
     "locationUnknown": "No locality",

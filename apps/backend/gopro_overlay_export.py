@@ -612,6 +612,7 @@ def _job_preparation_metadata(
     gpx_offset: float = 0.0,
     overlay_only: bool = False,
     overlay_size: tuple[int, int] | None = None,
+    video_start_override: datetime | None = None,
 ) -> dict[str, Any]:
     metadata = {
         "prepare_overlay_inputs": True,
@@ -623,6 +624,8 @@ def _job_preparation_metadata(
     }
     if overlay_size:
         metadata["overlay_size"] = list(overlay_size)
+    if video_start_override is not None:
+        metadata["video_start_override"] = video_start_override.isoformat()
     return metadata
 
 
@@ -1724,6 +1727,11 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         source_gpx_path = gpx_path
         pip_path = Path(str(job["pip_path"])) if job.get("pip_path") else None
         command_metadata = dict(metadata)
+        if pip_path is not None:
+            # Keep the original input path separately from the prepared PIP,
+            # which lives in this job's temporary work directory and is
+            # removed after the overlay render completes.
+            command_metadata["source_pip_path"] = str(pip_path)
         render_gpx_path = gpx_path
 
         if metadata.get("pin_inputs"):
@@ -1739,7 +1747,12 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         gpx_offset = _gpx_offset_from_command_metadata(command_metadata)
         embedded_video_start = probe_video_start_time(video_path)
         gpx_start = first_gpx_timestamp(render_gpx_path)
-        alignment_video_start = resolve_gopro_video_start_time(video_path, gpx_start)
+        video_start_override = _parse_utc_datetime(metadata.get("video_start_override"))
+        alignment_video_start = (
+            video_start_override
+            if video_start_override is not None
+            else resolve_gopro_video_start_time(video_path, gpx_start)
+        )
         aligned_video_start = align_video_start_time_to_gpx(alignment_video_start, gpx_start)
         automatic_offset = (
             (gpx_start - aligned_video_start).total_seconds()
@@ -2354,6 +2367,7 @@ def create_gopro_overlay_job_from_paths(
     flight_id: str | None = None,
     overlay_only: bool = False,
     overlay_size: tuple[int, int] | None = None,
+    video_start_override: datetime | None = None,
 ) -> dict[str, Any]:
     _validate_file_extension(video_path, _VIDEO_EXTENSIONS)
     _validate_file_extension(gpx_path, _GPX_EXTENSIONS)
@@ -2380,6 +2394,7 @@ def create_gopro_overlay_job_from_paths(
                 flight_id=flight_id,
                 overlay_only=overlay_only,
                 overlay_size=overlay_size,
+                video_start_override=video_start_override,
             )
     except Exception:
         shutil.rmtree(work_dir, ignore_errors=True)
@@ -2401,6 +2416,7 @@ def _create_gopro_overlay_job_from_paths(
     flight_id: str | None = None,
     overlay_only: bool = False,
     overlay_size: tuple[int, int] | None = None,
+    video_start_override: datetime | None = None,
 ) -> dict[str, Any]:
     if output_resolution not in _OUTPUT_RESOLUTIONS:
         raise ValueError("Unknown output resolution")
@@ -2431,6 +2447,7 @@ def _create_gopro_overlay_job_from_paths(
         gpx_offset=gpx_offset,
         overlay_only=overlay_only,
         overlay_size=overlay_size,
+        video_start_override=video_start_override,
     )
 
     now = _utc_now_dt()
