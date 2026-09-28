@@ -39,6 +39,8 @@ import { getYoutubeVideoId } from '../../../lib/youtube';
 import {
   useStartYoutubeOverlayExport,
   useUploadYoutubeDownloadCookies,
+  useYoutubeUpload,
+  useYoutubeVideoAssociations,
 } from '../../../hooks/flights/useYoutubeUpload';
 
 interface FlightTelemetryInteractivePreviewProps {
@@ -178,6 +180,10 @@ export function FlightTelemetryInteractivePreview({
   );
   const startExport = useStartYoutubeOverlayExport(flightId);
   const uploadCookies = useUploadYoutubeDownloadCookies();
+  const youtubeOverlayUpload = useYoutubeUpload(flightId, {
+    source_type: 'youtube_overlay',
+  });
+  const youtubeVideoAssociations = useYoutubeVideoAssociations(flightId);
   const cookieFileInput = useRef<HTMLInputElement>(null);
   const [cookieUploadMessage, setCookieUploadMessage] = useState<string | null>(
     null
@@ -190,6 +196,17 @@ export function FlightTelemetryInteractivePreview({
   const [youtubeExportNow, setYoutubeExportNow] = useState(() => Date.now());
   const validYoutubeUrls = youtubeUrls.filter((url) => getYoutubeVideoId(url));
   const isYoutubeCalibration = validYoutubeUrls.length > 0;
+  const publishedOverlayUrl = youtubeOverlayUpload.data?.youtube_url;
+  const isYoutubeOverlayPublished = Boolean(
+    youtubeOverlayUpload.data?.status === 'completed' &&
+    publishedOverlayUrl &&
+    youtubeUrls.includes(publishedOverlayUrl) &&
+    youtubeVideoAssociations.data?.some(
+      (association) =>
+        association.url === publishedOverlayUrl &&
+        association.exists_on_youtube === true
+    )
+  );
   const [selectedYoutubeIndex, setSelectedYoutubeIndex] = useState(0);
   const activeYoutubeIndex = Math.min(
     selectedYoutubeIndex,
@@ -329,6 +346,15 @@ export function FlightTelemetryInteractivePreview({
     youtubeExportStatusValue === 'capturing' ||
     youtubeExportStatusValue === 'encoding';
   const isYoutubeExportBusy = startExport.isPending || isYoutubeExportActive;
+  const shouldShowYoutubeExportProgress = Boolean(
+    youtubeExportJobId &&
+    (!isYoutubeOverlayPublished ||
+      isYoutubeExportActive ||
+      youtubeExportStatusValue === 'failed' ||
+      youtubeExportStatusValue === 'cancelled' ||
+      startExport.isPending ||
+      youtubeOverlayUpload.isFetching)
+  );
   const isYoutubeExportStalled =
     isYoutubeExportActive &&
     exportLastActivitySeconds !== null &&
@@ -517,7 +543,7 @@ export function FlightTelemetryInteractivePreview({
           )}
         </div>
       )}
-      {youtubeExportJobId && (
+      {shouldShowYoutubeExportProgress && (
         <div
           className="border-t border-cyan-200 bg-cyan-50/70 p-4 dark:border-cyan-900 dark:bg-cyan-950/20 sm:px-5"
           aria-live="polite"

@@ -44,6 +44,10 @@ export type YoutubeUploadSource =
   | { source_type: 'pano' }
   | { source_type: 'highlight'; highlight_video_job_id: string };
 
+type YoutubeUploadSourceFilter =
+  | YoutubeUploadSource
+  | { source_type: 'youtube_overlay' };
+
 export type TemporaryFlightMediaSource = 'camera' | 'pano';
 
 type YoutubeUploadInput = YoutubeUploadSource & {
@@ -95,12 +99,12 @@ export function useUploadYoutubeDownloadCookies() {
 
 const youtubeUploadQueryKey = (
   flightId: string,
-  source?: YoutubeUploadSource
+  source?: YoutubeUploadSourceFilter
 ) => ['youtube-upload', flightId, source ?? 'latest'];
 
 export function useYoutubeUpload(
   flightId: string,
-  source?: YoutubeUploadSource
+  source?: YoutubeUploadSourceFilter
 ) {
   const queryClient = useQueryClient();
   const query = useQuery({
