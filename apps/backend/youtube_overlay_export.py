@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 import time
 from collections.abc import Callable, Iterator
+from datetime import timedelta
 from pathlib import Path
 
 import config
@@ -153,6 +154,7 @@ def render_saved_overlay(
     """Render the saved telemetry directly onto the downloaded YouTube video."""
     from gopro_overlay_export import (
         create_gopro_overlay_job_from_paths,
+        first_gpx_timestamp,
         get_gopro_overlay_job,
     )
 
@@ -167,16 +169,31 @@ def render_saved_overlay(
     saved_gpx_path = Path(str(saved_job.get("gpx_path") or ""))
     has_prepared_gpx = render_gpx_path.is_file()
     gpx_path = render_gpx_path if has_prepared_gpx else saved_gpx_path
-    pip_value = saved_job.get("pip_path")
-    pip_path = Path(str(pip_value)) if pip_value else None
+    pip_values = [saved_command.get("source_pip_path"), saved_job.get("pip_path")]
+    pip_path = next(
+        (Path(str(value)) for value in pip_values if value and Path(str(value)).is_file()),
+        None,
+    )
+    had_saved_pip = any(pip_values)
+    if pip_path is None and had_saved_pip:
+        # Older completed jobs only retained the prepared path, which was
+        # removed with the temporary work directory. Their source camera video
+        # is durable and can still serve as the PIP input.
+        source_camera = Path(str(saved_job.get("video_path") or ""))
+        if source_camera.is_file():
+            pip_path = source_camera
+    saved_gpx_offset = float(saved_command.get("gpx_offset") or saved_job.get("gpx_offset") or 0.0)
+    source_timeline_start = (
+        first_gpx_timestamp(saved_gpx_path)
+        if saved_gpx_path.is_file()
+        else first_gpx_timestamp(gpx_path)
+    )
+    if source_timeline_start is not None and not saved_gpx_path.is_file() and has_prepared_gpx:
+        source_timeline_start -= timedelta(seconds=saved_gpx_offset)
     if not source_video_path.is_file() or not gpx_path.is_file():
         raise YoutubeExportError("Les sources de l’overlay enregistré sont indisponibles")
-    if pip_path and not pip_path.is_file():
-        pip_path = None
-
     # A prepared render GPX already contains the saved manual offset. Apply
     # only the difference if the export calibration changed after that render.
-    saved_gpx_offset = float(saved_command.get("gpx_offset") or saved_job.get("gpx_offset") or 0.0)
     gpx_offset = (
         float(offset_seconds) - saved_gpx_offset if has_prepared_gpx else float(offset_seconds)
     )
@@ -192,6 +209,7 @@ def render_saved_overlay(
         gpx_offset=gpx_offset,
         flight_id=None,
         overlay_only=False,
+        video_start_override=source_timeline_start,
     )
     internal_job_id = str(internal_job["job_id"])
     deadline = time.monotonic() + config.GOPRO_OVERLAY_JOB_TIMEOUT_SECONDS

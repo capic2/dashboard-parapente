@@ -1,5 +1,6 @@
 """Tests for the YouTube source + telemetry overlay export helpers."""
 
+from datetime import datetime, timedelta, timezone
 from io import StringIO
 from pathlib import Path
 
@@ -190,14 +191,29 @@ def test_export_youtube_overlay_cleans_work_dir_after_failure(
     assert not work_dir.exists()
 
 
-def test_render_saved_overlay_rebuilds_legacy_full_video_overlay(tmp_path, monkeypatch):
+@pytest.mark.parametrize("gpx_mode", ["saved", "prepared_only"])
+def test_render_saved_overlay_preserves_manual_timeline_and_pip(gpx_mode, tmp_path, monkeypatch):
     camera = tmp_path / "camera.mp4"
     source = tmp_path / "source.mp4"
+    saved_gpx = tmp_path / "saved.gpx"
     merged_gpx = tmp_path / "merged.gpx"
+    missing_pip = tmp_path / "removed-prepared-pip.mp4"
     output = tmp_path / "youtube-overlay-saved-job.mp4"
     camera.write_bytes(b"camera")
     source.write_bytes(b"youtube")
-    merged_gpx.write_text("<gpx />")
+    gpx_start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    saved_gpx.write_text(
+        '<gpx><trk><trkseg><trkpt lat="0" lon="0"><time>'
+        f"{gpx_start.isoformat().replace('+00:00', 'Z')}"
+        "</time></trkpt></trkseg></trk></gpx>"
+    )
+    merged_start = gpx_start + timedelta(milliseconds=25_800)
+    merged_gpx.write_text(
+        '<gpx><trk><trkseg><trkpt lat="0" lon="0"><time>'
+        f"{merged_start.isoformat().replace('+00:00', 'Z')}"
+        "</time></trkpt></trkseg></trk></gpx>"
+    )
+    saved_gpx_path = saved_gpx if gpx_mode == "saved" else tmp_path / "missing.gpx"
     create_args = {}
     states = iter(
         [
@@ -217,14 +233,15 @@ def test_render_saved_overlay_rebuilds_legacy_full_video_overlay(tmp_path, monke
             return {
                 "job_id": "saved-job",
                 "video_path": str(camera),
-                "gpx_path": str(tmp_path / "stale.gpx"),
+                "gpx_path": str(saved_gpx_path),
                 "layout_id": "parapente-3840",
-                "pip_path": None,
+                "pip_path": str(missing_pip),
                 "output_path": str(tmp_path / "legacy.mp4"),
                 "command": {
                     "overlay_only": False,
                     "render_gpx_path": str(merged_gpx),
                     "gpx_offset": 25.8,
+                    "source_pip_path": str(missing_pip),
                 },
             }
         state = next(states)
@@ -256,7 +273,7 @@ def test_render_saved_overlay_rebuilds_legacy_full_video_overlay(tmp_path, monke
     assert create_args == {
         "video_path": source,
         "gpx_path": merged_gpx,
-        "pip_path": None,
+        "pip_path": camera,
         "layout_id": "parapente-3840",
         "output_filename": "youtube-overlay-saved-job.mp4",
         "output_resolution": "source",
@@ -264,4 +281,5 @@ def test_render_saved_overlay_rebuilds_legacy_full_video_overlay(tmp_path, monke
         "gpx_offset": 0.0,
         "flight_id": None,
         "overlay_only": False,
+        "video_start_override": gpx_start,
     }
