@@ -39,6 +39,7 @@ import { getYoutubeVideoId } from '../../../lib/youtube';
 import {
   useStartYoutubeOverlayExport,
   useUploadYoutubeDownloadCookies,
+  useYoutubeVideoAssociations,
 } from '../../../hooks/flights/useYoutubeUpload';
 
 interface FlightTelemetryInteractivePreviewProps {
@@ -177,6 +178,7 @@ export function FlightTelemetryInteractivePreview({
     readYoutubeExportJobId(flightId)
   );
   const startExport = useStartYoutubeOverlayExport(flightId);
+  const youtubeAssociations = useYoutubeVideoAssociations(flightId);
   const uploadCookies = useUploadYoutubeDownloadCookies();
   const cookieFileInput = useRef<HTMLInputElement>(null);
   const [cookieUploadMessage, setCookieUploadMessage] = useState<string | null>(
@@ -260,6 +262,14 @@ export function FlightTelemetryInteractivePreview({
       }
     : undefined;
   const youtubeUrl = validYoutubeUrls[activeYoutubeIndex];
+  const isYoutubeVideoAlreadyPublished = Boolean(
+    youtubeAssociations.data?.some(
+      (association) =>
+        association.url === youtubeUrl &&
+        association.can_delete_from_youtube &&
+        association.exists_on_youtube === true
+    )
+  );
   const hasYoutubeCarousel = validYoutubeUrls.length > 1;
   useEffect(() => {
     setYoutubeExportJobId(readYoutubeExportJobId(flightId));
@@ -430,7 +440,7 @@ export function FlightTelemetryInteractivePreview({
           {youtubeUrl && (
             <Button
               variant={isYoutubeExportBusy ? 'cyan' : 'secondary'}
-              isDisabled={isYoutubeExportBusy}
+              isDisabled={isYoutubeExportBusy || isYoutubeVideoAlreadyPublished}
               aria-busy={isYoutubeExportBusy}
               className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
                 isYoutubeExportBusy
@@ -447,7 +457,9 @@ export function FlightTelemetryInteractivePreview({
               )}
               {isYoutubeExportBusy
                 ? t('flights.youtubeOverlayExportInProgress')
-                : t('flights.youtubeOverlayExport')}
+                : isYoutubeVideoAlreadyPublished
+                  ? t('flights.youtubeUploadPublished')
+                  : t('flights.youtubeOverlayExport')}
             </Button>
           )}
         </span>
