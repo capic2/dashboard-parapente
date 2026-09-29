@@ -230,6 +230,7 @@
     "bestSpotFor": "Best spot for {{date}}",
     "bestSpotRadius": "Spot radius",
     "bestSpotRadiusValue": "{{radius}} km",
+    "locationUnavailableForBestSpot": "Allow location access to find spots around your position.",
     "bestSpot": {
       "reasonCodes": {
         "windDecollageCul": "tailwind at takeoff"
