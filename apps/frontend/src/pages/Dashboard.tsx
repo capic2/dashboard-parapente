@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueries } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
@@ -36,15 +37,16 @@ export default function Dashboard() {
     0,
     nearbyLocation,
     radiusKm,
-    !currentLocation.isLoading
+    !currentLocation.isLoading && Boolean(nearbyLocation)
   );
   const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(
     0,
     24,
     nearbyLocation,
     radiusKm,
-    !currentLocation.isLoading
+    !currentLocation.isLoading && Boolean(nearbyLocation)
   );
+  const [today] = useState(() => new Date());
   const todayLabel = new Intl.DateTimeFormat(
     i18n.language.startsWith('en') ? 'en-US' : 'fr-FR',
     {
@@ -52,7 +54,7 @@ export default function Dashboard() {
       day: 'numeric',
       month: 'long',
     }
-  ).format(new Date());
+  ).format(today);
 
   // Fetch current weather for all sites (day 0), auto-refresh every hour
   const weatherQueries = useQueries({
@@ -177,6 +179,10 @@ export default function Dashboard() {
           selectedDayIndex={0}
           radiusKm={radiusKm}
           onRadiusChange={setRadiusKm}
+          locationUnavailable={
+            !currentLocation.isLoading && !currentLocation.location
+          }
+          onRetryLocation={currentLocation.requestLocation}
         />
 
         <AllSitesConditions

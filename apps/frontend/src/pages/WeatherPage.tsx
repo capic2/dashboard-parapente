@@ -270,14 +270,14 @@ export default function WeatherPage() {
     selectedDayIndex,
     nearbyLocation,
     radiusKm,
-    !currentLocation.isLoading
+    !currentLocation.isLoading && Boolean(nearbyLocation)
   );
   const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(
     selectedDayIndex,
     24,
     nearbyLocation,
     radiusKm,
-    !currentLocation.isLoading
+    !currentLocation.isLoading && Boolean(nearbyLocation)
   );
   const selectedSite = sites.find((site) => site.id === selectedSiteId);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -522,6 +522,10 @@ export default function WeatherPage() {
       selectedDayIndex={selectedDayIndex}
       radiusKm={radiusKm}
       onRadiusChange={setRadiusKm}
+      locationUnavailable={
+        !currentLocation.isLoading && !currentLocation.location
+      }
+      onRetryLocation={currentLocation.requestLocation}
     />
   );
 
