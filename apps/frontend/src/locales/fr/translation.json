@@ -230,6 +230,7 @@
     "bestSpotFor": "Meilleur spot pour {{date}}",
     "bestSpotRadius": "Rayon des spots",
     "bestSpotRadiusValue": "{{radius}} km",
+    "locationUnavailableForBestSpot": "Autorisez la géolocalisation pour chercher les spots autour de votre position.",
     "bestSpot": {
       "reasonCodes": {
         "windDecollageCul": "vent de cul au décollage"
