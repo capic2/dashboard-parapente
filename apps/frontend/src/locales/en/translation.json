@@ -1706,7 +1706,7 @@
     "setAsMain": "Set as main",
     "addLanding": "Add a landing",
     "chooseSite": "Choose a site...",
-    "notesOptional": "Notes (optional)",
+    "notesOptional": "Comment (locality added automatically)",
     "adding": "Adding...",
     "delete": "Delete"
   },

@@ -1711,7 +1711,7 @@
     "setAsMain": "Définir comme principal",
     "addLanding": "Ajouter un atterrissage",
     "chooseSite": "Choisir un site...",
-    "notesOptional": "Notes (optionnel)",
+    "notesOptional": "Commentaire (localité ajoutée automatiquement)",
     "adding": "Ajout...",
     "delete": "Supprimer"
   },
