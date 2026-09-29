@@ -76,8 +76,11 @@ export function OperationCenter() {
     (operation) =>
       operation.status === 'queued' || operation.status === 'running'
   ).length;
-  const unreadCount = displayableOperations.filter(
-    (operation) => operation.unread
+  const notificationCount = displayableOperations.filter(
+    (operation) =>
+      operation.unread ||
+      operation.status === 'queued' ||
+      operation.status === 'running'
   ).length;
   const visibleOperations = useMemo(
     () => displayableOperations.slice(0, 8),
@@ -124,9 +127,9 @@ export function OperationCenter() {
           aria-label={t('operations.openCenter', 'Ouvrir les traitements')}
         >
           <Bell className="h-4 w-4" aria-hidden="true" />
-          {(activeCount > 0 || unreadCount > 0) && (
+          {notificationCount > 0 && (
             <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-600 px-1 text-[10px] font-bold text-white">
-              {activeCount + unreadCount}
+              {notificationCount}
             </span>
           )}
         </AriaButton>
