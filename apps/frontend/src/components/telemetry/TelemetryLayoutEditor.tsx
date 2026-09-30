@@ -46,6 +46,7 @@ import {
   useFlightTelemetry,
   type FlightTelemetryData,
 } from '../../hooks/flights/useFlightTelemetry';
+import { useWeatherSources } from '../../hooks/weather/useWeatherSources';
 import { useToast } from '../../hooks/useToast';
 import { getApiErrorMessage } from '../../lib/api';
 import {
@@ -159,6 +160,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const toast = useToast();
   const layoutQuery = useTelemetryLayout(flightId);
   const telemetryQuery = useFlightTelemetry(flightId ?? '', Boolean(flightId));
+  const weatherSourcesQuery = useWeatherSources(true);
   const saveLayout = useSaveTelemetryLayout(flightId);
   const resetLayout = useResetTelemetryLayout(flightId ?? '');
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -1809,24 +1811,61 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       />
                     </label>
                   ) : selected.type === 'pip' ? (
-                    <label className="block text-sm">
-                      <span className="mb-1 block text-slate-600 dark:text-slate-300">
-                        {t('telemetryLayout.pipAction')}
-                      </span>
-                      <select
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                        value={selected.action}
-                        onChange={(event) =>
-                          updateItem(selected.id, {
-                            action: event.target.value as 'switch_video',
-                          })
-                        }
-                      >
-                        <option value="switch_video">
-                          {t('telemetryLayout.actionSwitchVideo')}
-                        </option>
-                      </select>
-                    </label>
+                    <div className="space-y-3">
+                      <label className="block text-sm">
+                        <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                          {t('telemetryLayout.weatherSource')}
+                        </span>
+                        <select
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                          value={selected.weatherSource ?? ''}
+                          onChange={(event) =>
+                            updateItem(selected.id, {
+                              weatherSource: event.target.value || undefined,
+                            })
+                          }
+                        >
+                          <option value="">
+                            {t('telemetryLayout.defaultWeatherSource')}
+                          </option>
+                          {selected.weatherSource &&
+                            !weatherSourcesQuery.data?.some(
+                              (source) =>
+                                source.source_name === selected.weatherSource
+                            ) && (
+                              <option value={selected.weatherSource}>
+                                {selected.weatherSource}
+                              </option>
+                            )}
+                          {weatherSourcesQuery.data?.map((source) => (
+                            <option
+                              key={source.source_name}
+                              value={source.source_name}
+                            >
+                              {source.display_name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block text-sm">
+                        <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                          {t('telemetryLayout.pipAction')}
+                        </span>
+                        <select
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                          value={selected.action}
+                          onChange={(event) =>
+                            updateItem(selected.id, {
+                              action: event.target.value as 'switch_video',
+                            })
+                          }
+                        >
+                          <option value="switch_video">
+                            {t('telemetryLayout.actionSwitchVideo')}
+                          </option>
+                        </select>
+                      </label>
+                    </div>
                   ) : (
                     <label className="block text-sm">
                       <span className="mb-1 block text-slate-600 dark:text-slate-300">

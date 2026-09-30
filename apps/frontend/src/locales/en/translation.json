@@ -1902,6 +1902,8 @@
     "addPip": "Add video PiP",
     "pip": "Video PiP",
     "pipAction": "PiP action",
+    "weatherSource": "Weather source",
+    "defaultWeatherSource": "Default source",
     "actionSwitchVideo": "Switch video on click",
     "icon": "Icon",
     "text": "Text",

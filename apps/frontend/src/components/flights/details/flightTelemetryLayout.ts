@@ -74,6 +74,7 @@ export interface FlightTelemetryTextLayout extends FlightTelemetryLayoutItemBase
 export interface FlightTelemetryPipLayout extends FlightTelemetryLayoutItemBase {
   type: 'pip';
   action: TelemetryPipAction;
+  weatherSource?: string;
 }
 
 export type FlightTelemetryLayoutItem =
@@ -464,6 +465,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
       };
     }
     if (type === 'pip') {
+      const weatherSource = element.getAttribute('weather-source');
       return {
         ...common,
         ...grouping,
@@ -475,6 +477,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
         )
           ? (element.getAttribute('action') as TelemetryPipAction)
           : 'switch_video',
+        ...(weatherSource ? { weatherSource } : {}),
       };
     }
     return {
@@ -564,12 +567,17 @@ export function serializeTelemetryLayoutXml(
           ? ` align="${item.textAlign}"`
           : '';
       const pipAction = item.type === 'pip' ? ` action="${item.action}"` : '';
+      const pipWeatherSource =
+        item.type === 'pip' && item.weatherSource
+          ? ` weather-source="${escapeXml(item.weatherSource)}"`
+          : '';
       const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility}${unitVisibility}${fontSize}${clickAction}${longPressAction}${variant}${valueAlign}${textAlign} x="${(item.x / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" y="${(item.y / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" width="${(item.width / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" height="${(item.height / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" visible="${item.visible ? 'true' : 'false'}"`;
       if (item.type === 'icon') return `<icon ${common} name="${item.icon}" />`;
       if (item.type === 'text') {
         return `<text ${common} content="${escapeXml(item.content)}" />`;
       }
-      if (item.type === 'pip') return `<pip ${common}${pipAction} />`;
+      if (item.type === 'pip')
+        return `<pip ${common}${pipAction}${pipWeatherSource} />`;
       return `<widget ${common} metric="${item.metric}" />`;
     })
     .join('')}</telemetry-layout>`;
@@ -593,7 +601,7 @@ function withBackground(
 
 function escapeXml(value: string) {
   return value.replace(
-    /[<>&']/g,
+    /[<>&'"]/g,
     (character) =>
       ({
         '<': '&lt;',
