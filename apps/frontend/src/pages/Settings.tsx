@@ -17,6 +17,7 @@ import {
   useDeleteWeatherSource,
 } from '../hooks/weather/useWeatherSources';
 import { WeatherSourceCard } from '../components/settings/WeatherSourceCard';
+import { SportstrackliveSettingsCard } from '../components/settings/SportstrackliveSettingsCard';
 import type { WeatherSource } from '../types/weatherSources';
 import {
   DEFAULT_APP_SETTINGS,
@@ -50,7 +51,12 @@ interface ApiSite {
   updated_at?: string;
 }
 
-type SettingsTabKey = 'general' | 'sites' | 'weather' | 'data';
+type SettingsTabKey =
+  | 'general'
+  | 'sites'
+  | 'weather'
+  | 'sportstracklive'
+  | 'data';
 
 type SettingsIconName =
   | 'bell'
@@ -61,6 +67,7 @@ type SettingsIconName =
   | 'ruler'
   | 'settings'
   | 'sliders'
+  | 'upload'
   | 'weather';
 
 function SettingsIcon({ name }: { name: SettingsIconName }) {
@@ -85,6 +92,7 @@ function SettingsIcon({ name }: { name: SettingsIconName }) {
     sliders: (
       <path d="M4 6h10m4 0h2M4 12h2m4 0h10M4 18h10m4 0h2M14 4v4M8 10v4m8 2v4" />
     ),
+    upload: <path d="M12 16V4m0 0L7 9m5-5 5 5M5 14v5h14v-5" />,
     weather: (
       <path d="M17.5 18H8a5 5 0 1 1 1.2-9.9A6 6 0 0 1 20 11.7 3.5 3.5 0 0 1 17.5 18Z" />
     ),
@@ -1192,7 +1200,9 @@ export default function Settings() {
       >
         {/* Tabs Navigation */}
         <TabList className="mb-4 grid-cols-2 sm:flex">
-          {(['general', 'sites', 'weather', 'data'] as const).map((tabKey) => (
+          {(
+            ['general', 'sites', 'weather', 'sportstracklive', 'data'] as const
+          ).map((tabKey) => (
             <Tab key={tabKey} id={tabKey} className="flex-1">
               {tabKey === 'general' && (
                 <span className="inline-flex items-center justify-center gap-2">
@@ -1210,6 +1220,12 @@ export default function Settings() {
                 <span className="inline-flex items-center justify-center gap-2">
                   <SettingsIcon name="weather" />
                   {t('settings.tabs.weatherSources')}
+                </span>
+              )}
+              {tabKey === 'sportstracklive' && (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <SettingsIcon name="upload" />
+                  {t('settings.tabs.sportstracklive')}
                 </span>
               )}
               {tabKey === 'data' && (
@@ -1548,6 +1564,10 @@ export default function Settings() {
           {/* WEATHER SOURCES TAB */}
           <TabPanel id="weather" className="outline-none">
             <WeatherSourcesTab />
+          </TabPanel>
+
+          <TabPanel id="sportstracklive" className="outline-none">
+            <SportstrackliveSettingsCard />
           </TabPanel>
 
           {/* DATA TAB */}

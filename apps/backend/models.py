@@ -51,6 +51,18 @@ class YoutubeCredential(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 
+class SportstrackLiveCredential(Base):
+    """Encrypted SportsTrackLive upload key and per-user auto-upload preference."""
+
+    __tablename__ = "sportstracklive_credentials"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    upload_key_encrypted = Column(Text, nullable=False)
+    auto_upload = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
 class AppSetting(Base):
     """Key-value store for application settings configurable from the UI"""
 
@@ -260,6 +272,11 @@ class Flight(Base):
     gopro_overlay_status = Column(String, nullable=True)
     gopro_overlay_file_path = Column(String, nullable=True)
     gopro_overlay_gpx_offset = Column(Float, nullable=False, default=0.0)
+    sportstracklive_status = Column(String, nullable=True)
+    sportstracklive_track_id = Column(Integer, nullable=True)
+    sportstracklive_error = Column(Text, nullable=True)
+    sportstracklive_upload_started_at = Column(DateTime, nullable=True)
+    sportstracklive_uploaded_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

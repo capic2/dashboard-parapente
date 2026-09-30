@@ -4,7 +4,8 @@ from unittest.mock import AsyncMock, patch
 
 import config
 from intervals_icu import ExternalActivity, IntervalsAuthenticationError
-from models import BackgroundOperation
+from models import BackgroundOperation, Flight, SportstrackLiveCredential
+from youtube_upload import encrypt_secret
 
 
 def activity() -> ExternalActivity:
@@ -172,6 +173,60 @@ def test_sync_imports_only_selected_activities(client):
     assert response.status_code == 202
     importer.assert_awaited_once()
     assert [item.id for item in importer.await_args.args[3]] == ["i456"]
+
+
+def test_sync_queues_new_flight_upload_after_interval_import(
+    client, db_session, arguel_site, monkeypatch
+):
+    db_session.add(
+        SportstrackLiveCredential(
+            user_id=1,
+            upload_key_encrypted=encrypt_secret("test-upload-key"),
+            auto_upload=True,
+        )
+    )
+    db_session.commit()
+    monkeypatch.setattr(config, "SPORTSTRACKLIVE_SECRET_KEY", "test-app-secret")
+    provider = AsyncMock()
+    provider.list_activities.return_value = [activity()]
+
+    async def import_flight(db, *_args, **_kwargs):
+        db.add(
+            Flight(
+                id="flight-intervals-new",
+                name="Intervals flight",
+                flight_date=date(2026, 7, 1),
+                site_id=arguel_site.id,
+                external_provider="intervals_icu",
+                external_activity_id="i123",
+                gpx_file_path="private/intervals-flight.gpx",
+            )
+        )
+        db.commit()
+        return {
+            "imported": 1,
+            "updated": 0,
+            "skipped": 0,
+            "failed": 0,
+            "flights": [{"id": "flight-intervals-new"}],
+        }
+
+    with (
+        patch("routes._intervals_client", return_value=provider),
+        patch.object(config, "INTERVALS_ICU_ACTIVITY_TYPES", ["HangGliding"]),
+        patch("external_flight_import.import_external_activities", new=import_flight),
+        patch("routes.launch_sportstracklive_upload_worker") as launch_upload,
+    ):
+        response = client.post(
+            "/api/flights/sync-intervals",
+            json={"date_from": "2026-07-01", "date_to": "2026-07-02"},
+        )
+
+    assert response.status_code == 202
+    flight = db_session.get(Flight, "flight-intervals-new")
+    assert flight is not None
+    assert flight.sportstracklive_status == "queued"
+    launch_upload.assert_called_once_with("flight-intervals-new", 1)
 
 
 def test_status_never_exposes_api_key(client, monkeypatch):
