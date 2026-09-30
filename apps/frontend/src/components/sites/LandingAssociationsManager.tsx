@@ -13,6 +13,27 @@ interface LandingAssociationsManagerProps {
   takeoffSiteId: string;
 }
 
+function prefixLocality(
+  notes: string,
+  locality?: string | null
+): string | undefined {
+  const trimmedNotes = notes.trim();
+  const trimmedLocality = locality?.trim();
+
+  if (!trimmedNotes) return undefined;
+  if (!trimmedLocality) return trimmedNotes;
+
+  const prefix = `${trimmedLocality} - `;
+  if (
+    trimmedNotes.slice(0, prefix.length).toLocaleLowerCase() ===
+    prefix.toLocaleLowerCase()
+  ) {
+    return trimmedNotes;
+  }
+
+  return `${trimmedLocality} - ${trimmedNotes}`;
+}
+
 export default function LandingAssociationsManager({
   takeoffSiteId,
 }: LandingAssociationsManagerProps) {
@@ -38,12 +59,15 @@ export default function LandingAssociationsManager({
 
   const handleAdd = () => {
     if (!selectedLandingId) return;
+    const selectedLanding = availableLandings.find(
+      (site) => site.id === selectedLandingId
+    );
     addMutation.mutate(
       {
         siteId: takeoffSiteId,
         data: {
           landing_site_id: selectedLandingId,
-          notes: newNotes || undefined,
+          notes: prefixLocality(newNotes, selectedLanding?.region),
         },
       },
       {

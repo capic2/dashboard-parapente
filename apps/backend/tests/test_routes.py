@@ -2,9 +2,9 @@
 Test API routes (integration tests)
 """
 
-from datetime import datetime
+from datetime import date, datetime
 
-from models import Flight, ParaglidingSpot, Site
+from models import Flight, ParaglidingSpot, Site, SiteLandingAssociation
 
 
 class TestSpotsEndpoints:
@@ -37,6 +37,51 @@ class TestSpotsEndpoints:
         data = response.json()
         assert len(data["sites"]) == 1
         assert data["sites"][0]["name"] == "Arguel"
+
+    def test_get_spots_counts_flights_at_associated_landing(self, client, db_session):
+        takeoff = Site(
+            id="site-takeoff",
+            name="Saint-Hilaire",
+            latitude=45.3,
+            longitude=5.9,
+            usage_type="takeoff",
+        )
+        landing = Site(
+            id="site-landing",
+            name="LZ Lumbin",
+            latitude=45.3,
+            longitude=5.9,
+            usage_type="landing",
+        )
+        db_session.add_all([takeoff, landing])
+        db_session.flush()
+        db_session.add(
+            SiteLandingAssociation(
+                id="association-takeoff-landing",
+                takeoff_site_id=takeoff.id,
+                landing_site_id=landing.id,
+            )
+        )
+        db_session.add_all(
+            [
+                Flight(
+                    id=f"flight-{index}",
+                    name=f"Flight {index}",
+                    flight_date=date(2026, 3, index),
+                    departure_time=datetime(2026, 3, index, 12),
+                    site_id=takeoff.id,
+                )
+                for index in (1, 2)
+            ]
+        )
+        db_session.commit()
+
+        response = client.get("/api/spots")
+
+        assert response.status_code == 200
+        sites = {site["id"]: site for site in response.json()["sites"]}
+        assert sites[takeoff.id]["flight_count"] == 2
+        assert sites[landing.id]["flight_count"] == 2
 
     def test_get_spot_by_id(self, client, db_session):
         """Get a specific spot"""

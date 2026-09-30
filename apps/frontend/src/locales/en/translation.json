@@ -230,6 +230,7 @@
     "bestSpotFor": "Best spot for {{date}}",
     "bestSpotRadius": "Spot radius",
     "bestSpotRadiusValue": "{{radius}} km",
+    "locationUnavailableForBestSpot": "Allow location access to find spots around your position.",
     "bestSpot": {
       "reasonCodes": {
         "windDecollageCul": "tailwind at takeoff"
@@ -1719,7 +1720,7 @@
     "setAsMain": "Set as main",
     "addLanding": "Add a landing",
     "chooseSite": "Choose a site...",
-    "notesOptional": "Notes (optional)",
+    "notesOptional": "Comment (locality added automatically)",
     "adding": "Adding...",
     "delete": "Delete"
   },

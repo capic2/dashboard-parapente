@@ -230,6 +230,7 @@
     "bestSpotFor": "Meilleur spot pour {{date}}",
     "bestSpotRadius": "Rayon des spots",
     "bestSpotRadiusValue": "{{radius}} km",
+    "locationUnavailableForBestSpot": "Autorisez la géolocalisation pour chercher les spots autour de votre position.",
     "bestSpot": {
       "reasonCodes": {
         "windDecollageCul": "vent de cul au décollage"
@@ -1724,7 +1725,7 @@
     "setAsMain": "Définir comme principal",
     "addLanding": "Ajouter un atterrissage",
     "chooseSite": "Choisir un site...",
-    "notesOptional": "Notes (optionnel)",
+    "notesOptional": "Commentaire (localité ajoutée automatiquement)",
     "adding": "Ajout...",
     "delete": "Supprimer"
   },

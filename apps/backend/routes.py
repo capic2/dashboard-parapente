@@ -2488,14 +2488,22 @@ async def suggest_site_practical_info_endpoint(
 @public_router.get("/spots", response_model=SpotsResponse)
 def get_spots(db: Session = Depends(get_db)):
     """Get all user-managed paragliding spots with flight counts"""
-    from sqlalchemy import func
+    # Count flights at takeoff sites and at their associated landing sites.
+    # UNION removes duplicate site/flight pairs if a flight is linked both ways.
+    site_flights = (
+        db.query(Flight.site_id.label("site_id"), Flight.id.label("flight_id"))
+        .union(
+            db.query(
+                SiteLandingAssociation.landing_site_id.label("site_id"),
+                Flight.id.label("flight_id"),
+            ).join(Flight, Flight.site_id == SiteLandingAssociation.takeoff_site_id)
+        )
+        .subquery()
+    )
 
-    from models import Flight
-
-    # Query sites with flight count
     sites_with_counts = (
-        db.query(Site, func.count(Flight.id).label("flight_count"))
-        .outerjoin(Flight, Site.id == Flight.site_id)
+        db.query(Site, func.count(site_flights.c.flight_id).label("flight_count"))
+        .outerjoin(site_flights, Site.id == site_flights.c.site_id)
         .group_by(Site.id)
         .all()
     )
