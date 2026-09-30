@@ -1614,7 +1614,20 @@
     "selectedSite": "Selected",
     "noExistingSiteFound": "No existing site found in this radius. Increase the radius or use manual entry.",
     "duplicateSite": "{{name}} is already in the list.",
-    "searchSourceDescription": "Added from site search ({{source}})"
+    "searchSourceDescription": "Added from site search ({{source}})",
+    "suggestPracticalInfo": "Search for suggestions",
+    "searchingSuggestions": "Searching the web…",
+    "suggestionsNeedCoordinates": "Enter the site name and coordinates to search.",
+    "suggestionsReady": "Suggestions are ready. Review the results and sources, then add only the ones you want to keep.",
+    "noSuggestions": "No reliable new information found for the empty fields.",
+    "suggestionsError": "Could not search for information about this site.",
+    "suggestionSources": "Sources checked",
+    "groundedSearchResult": "Search result",
+    "unverifiedSearchResult": "Gemini response not fully verified",
+    "unverifiedSearchResultHelp": "Only suggestions linked to a source can be added to the fields.",
+    "searchSuggestionsTitle": "Google Search Suggestions",
+    "addSuggestion": "Add this suggestion",
+    "suggestionAdded": "Suggestion added to the field. You can still edit it."
   },
   "intervals": {
     "title": "Import from Intervals.icu",

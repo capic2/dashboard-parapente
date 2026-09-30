@@ -1619,7 +1619,20 @@
     "selectedSite": "Sélectionné",
     "noExistingSiteFound": "Aucun site existant trouvé dans ce rayon. Augmentez le rayon ou utilisez la saisie manuelle.",
     "duplicateSite": "{{name}} est déjà dans la liste.",
-    "searchSourceDescription": "Ajouté depuis la recherche de site ({{source}})"
+    "searchSourceDescription": "Ajouté depuis la recherche de site ({{source}})",
+    "suggestPracticalInfo": "Rechercher des suggestions",
+    "searchingSuggestions": "Recherche sur le web…",
+    "suggestionsNeedCoordinates": "Renseigne le nom et les coordonnées du site pour lancer la recherche.",
+    "suggestionsReady": "Suggestions prêtes : vérifie les résultats et leurs sources, puis ajoute seulement ceux que tu veux garder.",
+    "noSuggestions": "Aucune nouvelle information fiable trouvée pour les champs vides.",
+    "suggestionsError": "Impossible de rechercher des informations pour ce site.",
+    "suggestionSources": "Sources consultées",
+    "groundedSearchResult": "Résultat de la recherche",
+    "unverifiedSearchResult": "Réponse Gemini non entièrement vérifiée",
+    "unverifiedSearchResultHelp": "Seules les propositions reliées à une source peuvent être ajoutées aux champs.",
+    "searchSuggestionsTitle": "Suggestions de recherche Google",
+    "addSuggestion": "Ajouter cette suggestion",
+    "suggestionAdded": "Suggestion ajoutée au champ. Tu peux encore la modifier."
   },
   "intervals": {
     "title": "Importer depuis Intervals.icu",
