@@ -58,6 +58,7 @@ from deployment_drain import (
     job_admission,
 )
 from emagram_freshness import get_emagram_cutoff_utc
+from flight_file_paths import resolve_flight_file_path as _resolve_flight_file_path
 from flight_decision import build_flight_decision, normalize_objective
 from flight_naming import format_automatic_flight_name
 from flight_summaries import (
@@ -123,6 +124,15 @@ from models import (
     TelemetryLayout,
 )
 from telemetry_layouts import DEFAULT_TELEMETRY_LAYOUT_XML, validate_telemetry_layout_xml
+from sportstracklive import (
+    connection_settings as sportstracklive_connection_settings,
+    launch_automatic_upload_worker as launch_sportstracklive_upload_worker,
+    mark_automatic_upload_queued as mark_sportstracklive_upload_queued,
+    queue_automatic_upload as queue_sportstracklive_upload,
+    remove_connection_settings as remove_sportstracklive_connection_settings,
+    save_connection_settings as save_sportstracklive_connection_settings,
+    upload_flight as send_flight_to_sportstracklive,
+)
 from para_index import analyze_hourly_slots, calculate_para_index, format_slots_summary
 from schemas import (
     AzbaAirspaceResponse,
@@ -328,16 +338,6 @@ def _mark_flight_export_processing(db: Session, flight: Flight, job_id: str):
     flight.video_file_path = None
     db.commit()
     db.refresh(flight)
-
-
-def _resolve_flight_file_path(file_path: str | None) -> Path | None:
-    if not file_path:
-        return None
-
-    path = Path(file_path)
-    if path.is_absolute() or path.exists():
-        return path
-    return Path(__file__).parent / path
 
 
 def _flight_video_file_exists(flight: Flight) -> bool:
@@ -876,6 +876,11 @@ class VideoExportJobsResponse(BaseModel):
     total_pages: int
     status_counts: dict[str, int] = Field(default_factory=dict)
     type_counts: dict[str, int] = Field(default_factory=dict)
+
+
+class SportstrackLiveSettingsUpdate(BaseModel):
+    upload_key: str | None = None
+    auto_upload: bool = False
 
 
 def _get_video_export_jobs_payload(
@@ -5154,7 +5159,9 @@ async def preview_intervals_activities(
     )
 
 
-async def _run_intervals_sync_operation(operation_id: str, payload: dict[str, Any]) -> None:
+async def _run_intervals_sync_operation(
+    operation_id: str, payload: dict[str, Any], user_id: int
+) -> None:
     from external_flight_import import import_external_activities
     from intervals_sync import _acquire_shared_lock, _release_shared_lock, _renew_shared_lock
 
@@ -5172,6 +5179,7 @@ async def _run_intervals_sync_operation(operation_id: str, payload: dict[str, An
     token = ""
     stop_renewal = asyncio.Event()
     renewal_task = None
+    queued_sportstracklive_flight_ids: list[str] = []
     try:
         request = IntervalsSyncRequest.model_validate(payload)
         reporter.start()
@@ -5194,6 +5202,15 @@ async def _run_intervals_sync_operation(operation_id: str, payload: dict[str, An
             activities = [
                 activity for activity in activities if activity.id in selected_activity_ids
             ]
+        existing_activity_ids = {
+            row[0]
+            for row in db.query(Flight.external_activity_id)
+            .filter(
+                Flight.external_provider == "intervals_icu",
+                Flight.external_activity_id.in_([activity.id for activity in activities]),
+            )
+            .all()
+        }
         reporter.complete_step("fetch_activities", f"{len(activities)} activité(s) trouvée(s)")
         reporter.start_step("import_flights")
         result = await import_external_activities(
@@ -5203,6 +5220,20 @@ async def _run_intervals_sync_operation(operation_id: str, payload: dict[str, An
             activities,
             should_stop=lock_lost.is_set,
         )
+        for activity in activities:
+            if activity.id in existing_activity_ids:
+                continue
+            flight = (
+                db.query(Flight)
+                .filter(
+                    Flight.external_provider == "intervals_icu",
+                    Flight.external_activity_id == activity.id,
+                )
+                .first()
+            )
+            if flight is not None and flight.gpx_file_path:
+                if mark_sportstracklive_upload_queued(db, flight, user_id):
+                    queued_sportstracklive_flight_ids.append(flight.id)
         reporter.complete_step("import_flights")
         reporter.start_step("finalize")
         reporter.complete_step("finalize")
@@ -5219,6 +5250,8 @@ async def _run_intervals_sync_operation(operation_id: str, payload: dict[str, An
             await renewal_task
         await _release_shared_lock(redis, token)
         db.close()
+        for flight_id in queued_sportstracklive_flight_ids:
+            launch_sportstracklive_upload_worker(flight_id, user_id)
 
 
 @router.post("/flights/sync-intervals", response_model=BackgroundOperationStart, status_code=202)
@@ -5250,6 +5283,7 @@ async def sync_intervals_activities(
         _run_intervals_sync_operation,
         operation.id,
         request.model_dump(mode="json"),
+        user.id,
     )
     return _operation_start_payload(operation)
 
@@ -5316,6 +5350,10 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "gopro_overlay_file_path": gopro_overlay["file_path"],
         "gopro_overlay_file_exists": gopro_overlay["file_exists"],
         "gopro_overlay_gpx_offset": flight.gopro_overlay_gpx_offset,
+        "sportstracklive_status": flight.sportstracklive_status,
+        "sportstracklive_track_id": flight.sportstracklive_track_id,
+        "sportstracklive_error": flight.sportstracklive_error,
+        "sportstracklive_uploaded_at": to_api_utc(flight.sportstracklive_uploaded_at),
         "gopro_overlays": _flight_gopro_overlay_jobs(flight),
         "created_at": to_api_utc(flight.created_at),
         "updated_at": to_api_utc(flight.updated_at),
@@ -5752,6 +5790,20 @@ def download_flight_gpx(flight_id: str, db: Session = Depends(get_db)):
         f"{flight.title.replace(' ', '_') if flight.title else 'flight'}_{flight.flight_date}.gpx"
     )
     return FileResponse(path=gpx_path, media_type="application/gpx+xml", filename=filename)
+
+
+@router.post("/flights/{flight_id}/sportstracklive-upload")
+def upload_flight_to_sportstracklive(
+    flight_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    if flight.sportstracklive_status == "uploaded":
+        raise HTTPException(status_code=409, detail="Ce vol est déjà envoyé à SportsTrackLive.")
+    return send_flight_to_sportstracklive(db, flight, user.id)
 
 
 @router.get("/flights/{flight_id}/video")
@@ -6268,7 +6320,11 @@ def create_flight(flight_data: FlightCreate, db: Session = Depends(get_db)):
 
 @router.post("/flights/{flight_id}/upload-gpx")
 async def upload_gpx_to_flight(
-    flight_id: str, gpx_file: UploadFile = File(...), db: Session = Depends(get_db)
+    background_tasks: BackgroundTasks,
+    flight_id: str,
+    gpx_file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Upload un fichier GPX pour un vol existant
@@ -6289,6 +6345,12 @@ async def upload_gpx_to_flight(
 
         # Keep the upload successful even if historical/statistical data is malformed.
         flight.gpx_file_path = str(file_path)
+        # A replacement GPX is a new track; allow it to be sent again.
+        flight.sportstracklive_status = None
+        flight.sportstracklive_track_id = None
+        flight.sportstracklive_error = None
+        flight.sportstracklive_upload_started_at = None
+        flight.sportstracklive_uploaded_at = None
         flight.max_climb_rate_ms = None
         flight.max_sink_rate_ms = None
         flight.updated_at = datetime.utcnow()
@@ -6312,6 +6374,8 @@ async def upload_gpx_to_flight(
 
         db.commit()
         db.refresh(flight)
+
+        queue_sportstracklive_upload(db, flight, user.id, background_tasks)
 
         logger.info("Added GPX file to flight %s", flight_id)
 
@@ -6340,7 +6404,11 @@ async def upload_gpx_to_flight(
 
 @router.post("/flights/create-from-gpx")
 async def create_flight_from_gpx(
-    gpx_file: UploadFile = File(...), site_id: str | None = None, db: Session = Depends(get_db)
+    background_tasks: BackgroundTasks,
+    gpx_file: UploadFile = File(...),
+    site_id: str | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Créer un nouveau vol depuis un fichier GPX ou IGC
@@ -6454,6 +6522,8 @@ async def create_flight_from_gpx(
         # 7. Enregistrer en base
         db.commit()
         db.refresh(flight)
+
+        queue_sportstracklive_upload(db, flight, user.id, background_tasks)
 
         logger.info(
             f" Created new flight from {file_type.upper()}: {flight.name} (ID: {flight_id})"
@@ -10176,6 +10246,47 @@ def get_app_settings(db: Session = Depends(get_db)):
     from app_settings import get_all_settings
 
     return get_all_settings(db)
+
+
+@router.get("/settings/sportstracklive")
+def get_sportstracklive_settings(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return sportstracklive_connection_settings(db, user.id)
+
+
+@router.put("/settings/sportstracklive")
+def update_sportstracklive_settings(
+    settings: SportstrackLiveSettingsUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    upload_key = (settings.upload_key or "").strip() or None
+    if settings.upload_key is not None and upload_key is None:
+        raise HTTPException(status_code=400, detail="La clé d'envoi ne peut pas être vide.")
+    if len(upload_key or "") > 512:
+        raise HTTPException(status_code=400, detail="La clé d'envoi est trop longue.")
+    if settings.auto_upload and not config.SPORTSTRACKLIVE_SECRET_KEY:
+        raise HTTPException(
+            status_code=400,
+            detail="Configurez d'abord BACKEND_SPORTSTRACKLIVE_SECRET_KEY côté serveur.",
+        )
+    return save_sportstracklive_connection_settings(
+        db,
+        user.id,
+        upload_key=upload_key,
+        auto_upload=settings.auto_upload,
+    )
+
+
+@router.delete("/settings/sportstracklive", status_code=204, response_class=Response)
+def delete_sportstracklive_settings(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    remove_sportstracklive_connection_settings(db, user.id)
+    return Response(status_code=204)
 
 
 @router.put("/settings")

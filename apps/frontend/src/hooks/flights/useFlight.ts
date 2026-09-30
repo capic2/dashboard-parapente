@@ -59,7 +59,9 @@ export const flightQueryOptions = (
     refetchInterval: (query) => {
       const data = query.state.data as Flight | undefined;
       return isExportInProgress(data?.video_export_status) ||
-        isGoproOverlayInProgress(data?.gopro_overlay_status)
+        isGoproOverlayInProgress(data?.gopro_overlay_status) ||
+        data?.sportstracklive_status === 'queued' ||
+        data?.sportstracklive_status === 'uploading'
         ? 10000
         : false;
     },

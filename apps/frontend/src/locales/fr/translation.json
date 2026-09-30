@@ -597,6 +597,7 @@
       "general": "Général",
       "favoriteSites": "Sites Favoris",
       "weatherSources": "Sources Météo",
+      "sportstracklive": "SportsTrackLive",
       "data": "Données"
     },
     "units": {
@@ -703,6 +704,24 @@
       "actionsAria": "Actions sur la source météo",
       "testSourceAria": "Tester la source {{name}}",
       "deleteSourceAria": "Supprimer la source {{name}}"
+    },
+    "sportstracklive": {
+      "title": "Connexion SportsTrackLive",
+      "description": "Enregistrez votre clé d'envoi pour transférer vos traces de vol vers SportsTrackLive.",
+      "uploadKey": "Clé d'envoi personnelle",
+      "keyAlreadySet": "Clé déjà enregistrée; laissez vide pour la conserver",
+      "keyPlaceholder": "Collez votre clé d'envoi SportsTrackLive",
+      "uploadKeyHelp": "Vous la trouverez dans votre profil SportsTrackLive, sous Options diverses → Access key for third-party activity uploads.",
+      "applicationSecretConfigured": "La clé secrète d'application est configurée sur le serveur.",
+      "applicationSecretMissing": "La clé secrète d'application manque sur le serveur. Demandez-la à SportsTrackLive puis configurez BACKEND_SPORTSTRACKLIVE_SECRET_KEY dans l'environnement du backend.",
+      "autoUpload": "Envoyer automatiquement les nouveaux GPX",
+      "autoUploadHelp": "Les vols avec une trace GPX sont envoyés après leur import ou l'ajout d'un GPX.",
+      "saved": "Connexion SportsTrackLive enregistrée",
+      "saveError": "Impossible d'enregistrer la connexion SportsTrackLive",
+      "removed": "Clé SportsTrackLive supprimée",
+      "removeError": "Impossible de supprimer la clé SportsTrackLive",
+      "disconnect": "Supprimer la clé",
+      "loadError": "Impossible de charger la configuration SportsTrackLive"
     },
     "data": {
       "backupTitle": "Sauvegarde & Restauration",
@@ -1028,6 +1047,12 @@
     "deleteError": "Échec de la suppression : {{error}}",
     "gpxAddedSuccess": "GPX ajouté avec succès",
     "gpxUploadError": "Échec de l'upload : {{error}}",
+    "sportstrackliveUpload": "Envoyer sur SportsTrackLive",
+    "sportstrackliveUploadInProgress": "Envoi en cours…",
+    "sportstrackliveUploadDone": "Envoyé sur SportsTrackLive",
+    "sportstrackliveUploadRetry": "Réessayer l'envoi",
+    "sportstrackliveUploadSuccess": "Vol envoyé sur SportsTrackLive",
+    "sportstrackliveUploadError": "Échec de l'envoi sur SportsTrackLive",
     "flightName": "Nom du vol (identifiant)",
     "flightNamePlaceholder": "Ex: Arguel 14-08 21h08",
     "flightTitle": "Titre du vol",
