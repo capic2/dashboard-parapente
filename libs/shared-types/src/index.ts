@@ -151,6 +151,12 @@ export const FlightSchema = z
     conditions_feedback: z.string().nullish(),
     decision_snapshot: z.string().nullish(),
     gpx_file_path: z.string().nullish(),
+    sportstracklive_status: z
+      .enum(['queued', 'uploading', 'uploaded', 'failed'])
+      .nullish(),
+    sportstracklive_track_id: z.number().nullish(),
+    sportstracklive_error: z.string().nullish(),
+    sportstracklive_uploaded_at: z.string().nullish(),
     gpx_metrics_excluded: z.boolean().optional(),
     gpx_max_altitude_m: z.number().nullish(),
     gpx_elevation_gain_m: z.number().nullish(),

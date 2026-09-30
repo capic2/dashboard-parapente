@@ -66,6 +66,7 @@ import { FlightNotesSection } from './FlightNotesSection';
 import { FlightPilotContextSection } from './FlightPilotContextSection';
 import { FlightReplayCard } from './FlightReplayCard';
 import { FlightStatsGrid } from './FlightStatsGrid';
+import { FlightSportstrackliveUploadButton } from './FlightSportstrackliveUploadButton';
 import { FlightYoutubeVideos } from './FlightYoutubeVideos';
 import { GoproOverlayJobStack } from './GoproOverlayJobStack';
 import { FlightOverlayWorkspace } from './FlightOverlayWorkspace';
@@ -862,6 +863,13 @@ export function FlightDetails({
                 <FileUp className="h-4 w-4" aria-hidden="true" />
                 {gpxUploadLabel}
               </Button>
+              {hasGpx && (
+                <FlightSportstrackliveUploadButton
+                  flightId={flight.id}
+                  status={flight.sportstracklive_status}
+                  error={flight.sportstracklive_error}
+                />
+              )}
             </div>
           </div>
 

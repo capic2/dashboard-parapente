@@ -256,6 +256,7 @@ YOUTUBE_CLIENT_ID = os.getenv("BACKEND_YOUTUBE_CLIENT_ID")
 YOUTUBE_CLIENT_SECRET = os.getenv("BACKEND_YOUTUBE_CLIENT_SECRET")
 YOUTUBE_REDIRECT_URI = os.getenv("BACKEND_YOUTUBE_REDIRECT_URI")
 YOUTUBE_UPLOAD_CHUNK_SIZE = _youtube_upload_chunk_size()
+SPORTSTRACKLIVE_SECRET_KEY = os.getenv("BACKEND_SPORTSTRACKLIVE_SECRET_KEY")
 
 # ============================================================================
 # LOGGING
