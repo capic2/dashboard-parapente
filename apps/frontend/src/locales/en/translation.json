@@ -1007,6 +1007,8 @@
     "registeredForSite_other": "{{count}} flights for this site",
     "searchPlaceholder": "Search by title, site or date...",
     "gpxFilter": "Filter by GPX status",
+    "tagFilter": "Filter by tag",
+    "allTags": "All tags",
     "allGpxStatuses": "All GPX statuses",
     "withGpx": "With GPX",
     "withoutGpx": "Without GPX",

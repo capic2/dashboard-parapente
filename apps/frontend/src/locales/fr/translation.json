@@ -1011,6 +1011,8 @@
     "registeredForSite_other": "{{count}} vols pour ce site",
     "searchPlaceholder": "Rechercher par titre, site ou date...",
     "gpxFilter": "Filtrer par statut GPX",
+    "tagFilter": "Filtrer par tag",
+    "allTags": "Tous les tags",
     "allGpxStatuses": "Tous les GPX",
     "withGpx": "Avec GPX",
     "withoutGpx": "Sans GPX",

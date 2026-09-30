@@ -10,6 +10,7 @@ import {
   type ActiveFlightMediaJob,
   type FlightSummary,
 } from '@dashboard-parapente/shared-types';
+import { z } from 'zod';
 import { api } from '../../lib/api';
 import { getStaleTime } from '../../lib/cacheConfig';
 import type { FlightsSearch } from '../../routes/-flightSearch';
@@ -29,6 +30,7 @@ export function serializeFlightSummariesQuery(
   if (cursor) searchParams.cursor = cursor;
   if (search.q) searchParams.q = search.q;
   if (search.siteId) searchParams.site_id = search.siteId;
+  if (search.tag) searchParams.tag = search.tag;
   return searchParams;
 }
 
@@ -146,4 +148,15 @@ export function useFlightSummaries(search: FlightsSearch) {
 
 export function useActiveFlightMediaJobs() {
   return useQuery(activeFlightMediaJobsQueryOptions());
+}
+
+export function useFlightTags() {
+  return useQuery({
+    queryKey: ['flights', 'tags'],
+    queryFn: async () => {
+      const data = await api.get('flights/tags').json();
+      return z.array(z.string()).parse(data);
+    },
+    staleTime: getStaleTime(1000 * 60 * 10),
+  });
 }
