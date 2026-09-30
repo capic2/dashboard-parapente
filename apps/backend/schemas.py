@@ -458,6 +458,36 @@ class SiteUpdate(BaseModel):
         return orientation
 
 
+class SitePracticalInfoSuggestionRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=160)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    region: str | None = Field(default=None, max_length=120)
+    country: str | None = Field(default=None, min_length=2, max_length=2)
+    usage_type: Literal["takeoff", "landing", "both"] = "both"
+
+
+class SitePracticalInfoSuggestionFields(BaseModel):
+    access: str = ""
+    rules: str = ""
+    webcam: str = ""
+    contact: str = ""
+    hazards: str = ""
+
+
+class SitePracticalInfoSuggestionSource(BaseModel):
+    title: str
+    url: str
+
+
+class SitePracticalInfoSuggestionResponse(BaseModel):
+    suggestions: SitePracticalInfoSuggestionFields
+    sources: list[SitePracticalInfoSuggestionSource]
+    grounded_result: str
+    grounded_result_is_verified: bool
+    search_suggestions_html: str
+
+
 class Site(SiteBase):
     id: str
     rating: int | None = None  # 0-6 rating from official spots
