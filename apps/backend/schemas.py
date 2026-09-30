@@ -804,6 +804,8 @@ class FlightSummary(BaseModel):
     distance_km: float | None = None
     elevation_gain_m: int | None = None
     has_gpx: bool
+    sportstracklive_status: str | None = None
+    sportstracklive_track_id: int | None = None
     video_export_job_id: str | None = None
     video_export_status: str | None = None
     video_export_progress: int | None = None

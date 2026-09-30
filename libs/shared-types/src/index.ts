@@ -226,6 +226,11 @@ export const FlightSummarySchema = z.object({
   distance_km: z.number().nullable(),
   elevation_gain_m: z.number().nullable(),
   has_gpx: z.boolean(),
+  sportstracklive_status: z
+    .enum(['queued', 'uploading', 'uploaded', 'failed'])
+    .nullable()
+    .optional(),
+  sportstracklive_track_id: z.number().nullable().optional(),
   has_video: z.boolean(),
   has_camera: z.boolean(),
   has_youtube_video: z.boolean(),

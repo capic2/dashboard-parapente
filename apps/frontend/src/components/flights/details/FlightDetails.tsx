@@ -64,6 +64,7 @@ import { FlightMediaBadges } from './FlightMediaBadges';
 import { HighlightVideoJobCard } from './HighlightVideoJobCard';
 import { FlightNotesSection } from './FlightNotesSection';
 import { FlightPilotContextSection } from './FlightPilotContextSection';
+import { FlightSportstrackliveCard } from './FlightSportstrackliveCard';
 import { FlightReplayCard } from './FlightReplayCard';
 import { FlightStatsGrid } from './FlightStatsGrid';
 import { FlightSportstrackliveUploadButton } from './FlightSportstrackliveUploadButton';
@@ -842,6 +843,15 @@ export function FlightDetails({
           </div>
 
           <FlightStatsGrid flight={flight} sites={sites} />
+
+          {flight.sportstracklive_status === 'uploaded' &&
+            flight.sportstracklive_track_id != null && (
+              <div className="mb-4">
+                <FlightSportstrackliveCard
+                  trackId={flight.sportstracklive_track_id}
+                />
+              </div>
+            )}
 
           <div className="border-t border-gray-200 pt-3 dark:border-gray-700">
             <div className="flex flex-wrap gap-2">
