@@ -179,6 +179,8 @@ from schemas import (
 from schemas import Site as SiteSchema
 from schemas import (
     SiteCreate,
+    SitePracticalInfoSuggestionRequest,
+    SitePracticalInfoSuggestionResponse,
     SiteUpdate,
     SpotsResponse,
     VideoExportTempCleanupResponse,
@@ -2466,6 +2468,23 @@ async def get_spot_weather(
 # ============================================================================
 
 
+@router.post(
+    "/sites/practical-info/suggestions",
+    response_model=SitePracticalInfoSuggestionResponse,
+)
+async def suggest_site_practical_info_endpoint(
+    request: SitePracticalInfoSuggestionRequest,
+) -> SitePracticalInfoSuggestionResponse:
+    """Return web-grounded suggestions for private practical site notes."""
+    from site_practical_info import suggest_site_practical_info
+
+    try:
+        response = await suggest_site_practical_info(request.model_dump())
+        return SitePracticalInfoSuggestionResponse.model_validate(response)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @public_router.get("/spots", response_model=SpotsResponse)
 def get_spots(db: Session = Depends(get_db)):
     """Get all user-managed paragliding spots with flight counts"""
@@ -2544,6 +2563,7 @@ async def create_site(site_data: SiteCreate, db: Session = Depends(get_db)):
         country=site_data.country or "FR",
         usage_type=site_data.usage_type or "both",
         orientation=site_data.orientation,
+        practical_info=site_data.practical_info,
         site_type="user_spot",  # Mark as user-created
     )
 
