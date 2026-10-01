@@ -66,7 +66,6 @@ from flight_summaries import (
     FlightSortBy,
     InvalidFlightSummaryCursor,
     SortOrder,
-    list_flight_tags,
     list_flight_summaries,
 )
 from flight_storage import (
@@ -4640,7 +4639,6 @@ def get_flight_summaries(
     q: str | None = Query(default=None, max_length=200),
     site_id: str | None = None,
     gpx_status: FlightGpxStatus = "all",
-    tag: str | None = Query(default=None, max_length=100),
     sort_by: FlightSortBy = "flight_date",
     sort_order: SortOrder = "desc",
     db: Session = Depends(get_db),
@@ -4653,17 +4651,11 @@ def get_flight_summaries(
             q=q,
             site_id=site_id,
             gpx_status=gpx_status,
-            tag=tag,
             sort_by=sort_by,
             sort_order=sort_order,
         )
     except InvalidFlightSummaryCursor as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@router.get("/flights/tags", response_model=list[str])
-def get_flight_tags(db: Session = Depends(get_db)) -> list[str]:
-    return list_flight_tags(db)
 
 
 @router.get("/flights")

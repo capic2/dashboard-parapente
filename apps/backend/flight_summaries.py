@@ -7,7 +7,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from sqlalchemy import String, and_, case, cast, exists, func, or_, select
+from sqlalchemy import String, and_, cast, exists, func, or_, select
 from sqlalchemy.orm import Query, Session, aliased
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -187,7 +187,6 @@ def _cursor_context(
     q: str | None,
     site_id: str | None,
     gpx_status: FlightGpxStatus,
-    tag: str | None,
     sort_by: FlightSortBy,
     sort_order: SortOrder,
 ) -> dict[str, Any]:
@@ -199,8 +198,6 @@ def _cursor_context(
         "sort_by": sort_by,
         "sort_order": sort_order,
     }
-    if tag:
-        context["tag"] = tag
     return context
 
 
@@ -280,25 +277,6 @@ def _apply_filters(
         query = query.filter(Flight.gpx_file_path.isnot(None), Flight.gpx_file_path != "")
     elif gpx_status == "missing":
         query = query.filter(or_(Flight.gpx_file_path.is_(None), Flight.gpx_file_path == ""))
-    if tag:
-        valid_tags_json = case(
-            (func.json_valid(Flight.tags_json), Flight.tags_json),
-            else_="[]",
-        )
-        flight_tags = (
-            func.json_each(valid_tags_json).table_valued("value", "type").alias("flight_tags")
-        )
-        query = query.filter(
-            exists(
-                select(1)
-                .select_from(flight_tags)
-                .where(
-                    func.json_type(valid_tags_json) == "array",
-                    flight_tags.c.type == "text",
-                    func.trim(flight_tags.c.value, " \t\n\r\v\f") == tag,
-                )
-            )
-        )
     if q:
         escaped_q = (
             _fold_search_term(q).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
@@ -323,27 +301,21 @@ def list_flight_summaries(
     q: str | None,
     site_id: str | None,
     gpx_status: FlightGpxStatus,
-    tag: str | None,
     sort_by: FlightSortBy,
     sort_order: SortOrder,
 ) -> FlightSummariesResponse:
     normalized_q = q.strip().lower() if q and q.strip() else None
-    normalized_tag = (tag.strip(" \t\n\r\v\f") or None) if tag else None
     context = _cursor_context(
         q=normalized_q,
         site_id=site_id,
         gpx_status=gpx_status,
-        tag=normalized_tag,
         sort_by=sort_by,
         sort_order=sort_order,
     )
     cursor_values = None
     if cursor:
         payload = _decode_cursor(cursor)
-        if (
-            payload.get("tag") != normalized_tag
-            or {key: payload.get(key) for key in context} != context
-        ):
+        if {key: payload.get(key) for key in context} != context:
             raise InvalidFlightSummaryCursor("Cursor does not match the current query")
         raw_values = payload.get("values")
         if not isinstance(raw_values, list):
@@ -355,7 +327,6 @@ def list_flight_summaries(
         q=normalized_q,
         site_id=site_id,
         gpx_status=gpx_status,
-        tag=normalized_tag,
     )
     total = base_query.with_entities(func.count(Flight.id)).scalar() or 0
 
@@ -424,7 +395,6 @@ def list_flight_summaries(
         Site.region.label("site_region"),
         Flight.name,
         Flight.title,
-        Flight.tags_json,
         Flight.flight_date,
         Flight.departure_time,
         Flight.created_at,
@@ -508,7 +478,6 @@ def list_flight_summaries(
             site_region=row.site_region,
             name=row.name,
             title=row.title,
-            tags=_parse_flight_tags(row.tags_json),
             flight_date=row.flight_date,
             departure_time=row.departure_time,
             duration_minutes=row.duration_minutes,
@@ -560,26 +529,3 @@ def list_flight_summaries(
             {**context, "values": [_serialize_cursor_value(value) for value in values]}
         )
     return FlightSummariesResponse(flights=flights, total=total, next_cursor=next_cursor)
-
-
-def _parse_flight_tags(value: str | None) -> list[str]:
-    try:
-        tags = json.loads(value or "[]")
-    except (TypeError, json.JSONDecodeError):
-        return []
-    if not isinstance(tags, list):
-        return []
-    return list(
-        dict.fromkeys(
-            tag.strip(" \t\n\r\v\f")
-            for tag in tags
-            if isinstance(tag, str) and tag.strip(" \t\n\r\v\f")
-        )
-    )
-
-
-def list_flight_tags(db: Session) -> list[str]:
-    tags = {
-        tag for (value,) in db.query(Flight.tags_json).all() for tag in _parse_flight_tags(value)
-    }
-    return sorted(tags, key=str.casefold)
