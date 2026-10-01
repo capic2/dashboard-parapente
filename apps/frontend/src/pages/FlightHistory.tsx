@@ -140,6 +140,10 @@ const FLIGHT_BADGE_FILTERS = [
 ] as const;
 
 type FlightBadgeFilter = (typeof FLIGHT_BADGE_FILTERS)[number]['id'];
+type BadgeFilterSelection = {
+  included: FlightBadgeFilter[];
+  excluded: FlightBadgeFilter[];
+};
 
 function flightHasBadgeFilter(
   flight: FlightSummary,
@@ -195,9 +199,8 @@ export default function FlightHistory() {
   const routeSearch = useSearch({ strict: false }) as FlightsRouteSearch;
   const search = normalizeFlightsSearch(routeSearch);
   const summariesQuery = useFlightSummaries(search);
-  const [selectedBadgeFilters, setSelectedBadgeFilters] = useState<
-    FlightBadgeFilter[]
-  >([]);
+  const [selectedBadgeFilters, setSelectedBadgeFilters] =
+    useState<BadgeFilterSelection>({ included: [], excluded: [] });
   const activeJobsQuery = useActiveFlightMediaJobs();
   const flights = useMemo(
     () =>
@@ -208,20 +211,27 @@ export default function FlightHistory() {
     [summariesQuery.data, activeJobsQuery.data]
   );
   const filteredFlights = useMemo(() => {
-    if (selectedBadgeFilters.length === 0) return flights;
-    return flights.filter((flight) =>
-      selectedBadgeFilters.some((filter) =>
-        flightHasBadgeFilter(flight, filter)
-      )
-    );
+    const { included, excluded } = selectedBadgeFilters;
+    if (included.length === 0 && excluded.length === 0) return flights;
+    return flights.filter((flight) => {
+      const matchesIncluded =
+        included.length === 0 ||
+        included.some((filter) => flightHasBadgeFilter(flight, filter));
+      const matchesExcluded = excluded.every(
+        (filter) => !flightHasBadgeFilter(flight, filter)
+      );
+      return matchesIncluded && matchesExcluded;
+    });
   }, [flights, selectedBadgeFilters]);
+  const activeBadgeFilterCount =
+    selectedBadgeFilters.included.length + selectedBadgeFilters.excluded.length;
   const totalFlights = summariesQuery.data?.pages[0]?.total ?? 0;
   const { fetchNextPage, hasNextPage, isFetchingNextPage } = summariesQuery;
   let flightCountLabel = t('flights.registered', { count: totalFlights });
   if (search.siteId) {
     flightCountLabel = t('flights.registeredForSite', { count: totalFlights });
   }
-  if (selectedBadgeFilters.length > 0) {
+  if (activeBadgeFilterCount > 0) {
     flightCountLabel = t('flights.filteredFlightCount', {
       count: filteredFlights.length,
       total: totalFlights,
@@ -229,15 +239,10 @@ export default function FlightHistory() {
   }
 
   useEffect(() => {
-    if (selectedBadgeFilters.length > 0 && hasNextPage && !isFetchingNextPage) {
+    if (activeBadgeFilterCount > 0 && hasNextPage && !isFetchingNextPage) {
       void fetchNextPage();
     }
-  }, [
-    selectedBadgeFilters.length,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  ]);
+  }, [activeBadgeFilterCount, fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   const isMobile = useIsMobile();
 
@@ -355,7 +360,7 @@ export default function FlightHistory() {
         isLoadingMore={isFetchingNextPage}
         onLoadMore={() => void fetchNextPage()}
         emptyMessage={
-          selectedBadgeFilters.length > 0
+          activeBadgeFilterCount > 0
             ? t('flights.noFlightsWithBadges')
             : t('flights.noFlights')
         }
@@ -450,11 +455,21 @@ export default function FlightHistory() {
   }, [filteredFlights]);
 
   const toggleBadgeFilter = (filter: FlightBadgeFilter) => {
-    setSelectedBadgeFilters((current) =>
-      current.includes(filter)
-        ? current.filter((selected) => selected !== filter)
-        : [...current, filter]
-    );
+    setSelectedBadgeFilters((current) => {
+      if (current.included.includes(filter)) {
+        return {
+          included: current.included.filter((selected) => selected !== filter),
+          excluded: [...current.excluded, filter],
+        };
+      }
+      if (current.excluded.includes(filter)) {
+        return {
+          ...current,
+          excluded: current.excluded.filter((selected) => selected !== filter),
+        };
+      }
+      return { ...current, included: [...current.included, filter] };
+    });
   };
 
   const handleDeselectAll = useCallback(() => {
@@ -611,35 +626,64 @@ export default function FlightHistory() {
                   </legend>
                   <div className="flex flex-wrap gap-1.5">
                     {FLIGHT_BADGE_FILTERS.map((filter) => {
-                      const isSelected = selectedBadgeFilters.includes(
+                      const isIncluded = selectedBadgeFilters.included.includes(
                         filter.id
                       );
+                      const isExcluded = selectedBadgeFilters.excluded.includes(
+                        filter.id
+                      );
+                      const isSelected = isIncluded || isExcluded;
+                      let stateClassName =
+                        'border-slate-300 bg-white text-slate-700 hover:border-sky-400 hover:bg-sky-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700';
+                      let accessibleStateKey = 'flights.tagNotSelected';
+                      if (isIncluded) {
+                        stateClassName =
+                          'border-sky-600 bg-sky-600 text-white dark:border-sky-400 dark:bg-sky-400 dark:text-slate-950';
+                        accessibleStateKey = 'flights.tagIncluded';
+                      }
+                      if (isExcluded) {
+                        stateClassName =
+                          'border-rose-600 bg-rose-600 text-white dark:border-rose-400 dark:bg-rose-400 dark:text-slate-950';
+                        accessibleStateKey = 'flights.tagExcluded';
+                      }
                       return (
                         <button
                           key={filter.id}
                           type="button"
                           aria-pressed={isSelected}
+                          aria-label={t(accessibleStateKey, {
+                            tag: t(filter.label),
+                          })}
                           onClick={() => toggleBadgeFilter(filter.id)}
-                          className={`min-h-9 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
-                            isSelected
-                              ? 'border-sky-600 bg-sky-600 text-white dark:border-sky-400 dark:bg-sky-400 dark:text-slate-950'
-                              : 'border-slate-300 bg-white text-slate-700 hover:border-sky-400 hover:bg-sky-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
-                          }`}
+                          className={`min-h-9 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${stateClassName}`}
                         >
+                          {isExcluded && (
+                            <span aria-hidden="true" className="mr-1 font-bold">
+                              −
+                            </span>
+                          )}
                           {t(filter.label)}
                         </button>
                       );
                     })}
-                    {selectedBadgeFilters.length > 0 && (
+                    {activeBadgeFilterCount > 0 && (
                       <button
                         type="button"
-                        onClick={() => setSelectedBadgeFilters([])}
+                        onClick={() =>
+                          setSelectedBadgeFilters({
+                            included: [],
+                            excluded: [],
+                          })
+                        }
                         className="min-h-9 rounded-full px-3 py-1 text-xs font-medium text-sky-700 underline underline-offset-2 hover:text-sky-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-sky-300 dark:hover:text-sky-100"
                       >
                         {t('flights.allTags')}
                       </button>
                     )}
                   </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {t('flights.tagFilterInstructions')}
+                  </p>
                 </fieldset>
                 <div className="flex justify-end">
                   <Button
