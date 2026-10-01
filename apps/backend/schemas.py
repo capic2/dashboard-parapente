@@ -797,6 +797,7 @@ class FlightSummary(BaseModel):
     site_region: str | None = None
     name: str | None = None
     title: str | None = None
+    tags: list[str] = Field(default_factory=list)
     flight_date: date
     departure_time: datetime | None = None
     duration_minutes: int | None = None

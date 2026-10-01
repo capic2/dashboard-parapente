@@ -5,6 +5,7 @@ import {
   mergeActiveMediaJobs,
   useActiveFlightMediaJobs,
   useFlightSummaries,
+  useFlightTags,
 } from '../hooks/flights/useFlightSummaries';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Site } from '../types';
@@ -133,6 +134,7 @@ export default function FlightHistory() {
   const routeSearch = useSearch({ strict: false }) as FlightsRouteSearch;
   const search = normalizeFlightsSearch(routeSearch);
   const summariesQuery = useFlightSummaries(search);
+  const tagsQuery = useFlightTags();
   const activeJobsQuery = useActiveFlightMediaJobs();
   const flights = useMemo(
     () =>
@@ -524,6 +526,27 @@ export default function FlightHistory() {
                     {t('flights.select')}
                   </Button>
                 </div>
+                <select
+                  value={search.tag ?? ''}
+                  onChange={(event) =>
+                    void navigateWithSearch({
+                      ...search,
+                      tag: event.target.value || undefined,
+                    })
+                  }
+                  aria-label={t('flights.tagFilter')}
+                  className="min-h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                >
+                  <option value="">{t('flights.allTags')}</option>
+                  {search.tag && !tagsQuery.data?.includes(search.tag) ? (
+                    <option value={search.tag}>{search.tag}</option>
+                  ) : null}
+                  {(tagsQuery.data ?? []).map((tag) => (
+                    <option key={tag} value={tag}>
+                      {tag}
+                    </option>
+                  ))}
+                </select>
               </div>
             ) : (
               <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-800 dark:bg-sky-950/30">
