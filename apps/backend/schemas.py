@@ -570,7 +570,6 @@ class FlightBase(BaseModel):
     distance_km: float | None = None
     elevation_gain_m: int | None = None
     notes: str | None = None
-    tags: list[str] = Field(default_factory=list)
     conditions_feedback: str | None = None
     decision_snapshot: str | None = None
 
@@ -702,6 +701,8 @@ class YoutubeUploadCreate(BaseModel):
 
 class YoutubeOverlayExportCreate(BaseModel):
     youtube_url: str = Field(min_length=1)
+    pip_youtube_url: str | None = Field(default=None, min_length=1)
+    pip_apply_offset: bool = True
 
 
 class YoutubeUploadJobResponse(BaseModel):

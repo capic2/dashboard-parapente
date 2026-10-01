@@ -76,6 +76,7 @@ export interface FlightTelemetryPipLayout extends FlightTelemetryLayoutItemBase 
   type: 'pip';
   action: TelemetryPipAction;
   source?: TelemetryPipVideoSource;
+  applyOffset?: boolean;
 }
 
 export type FlightTelemetryLayoutItem =
@@ -479,6 +480,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
           ? (element.getAttribute('action') as TelemetryPipAction)
           : 'switch_video',
         ...(source === 'camera' || source === 'flight' ? { source } : {}),
+        applyOffset: element.getAttribute('apply-offset') !== 'false',
       };
     }
     return {
@@ -567,7 +569,10 @@ export function serializeTelemetryLayoutXml(
         item.type === 'text' && item.textAlign
           ? ` align="${item.textAlign}"`
           : '';
-      const pipAction = item.type === 'pip' ? ` action="${item.action}"` : '';
+      const pipAction =
+        item.type === 'pip'
+          ? ` action="${item.action}" apply-offset="${item.applyOffset !== false}"`
+          : '';
       const pipSource =
         item.type === 'pip' && item.source ? ` source="${item.source}"` : '';
       const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility}${unitVisibility}${fontSize}${clickAction}${longPressAction}${variant}${valueAlign}${textAlign} x="${(item.x / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" y="${(item.y / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" width="${(item.width / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" height="${(item.height / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" visible="${item.visible ? 'true' : 'false'}"`;

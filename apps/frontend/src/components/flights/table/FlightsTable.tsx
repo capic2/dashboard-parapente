@@ -25,6 +25,7 @@ interface FlightsTableProps {
   hasMoreFlights?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
+  emptyMessage?: string;
 }
 
 export function FlightsTable({
@@ -40,6 +41,7 @@ export function FlightsTable({
   hasMoreFlights = false,
   isLoadingMore = false,
   onLoadMore,
+  emptyMessage,
 }: FlightsTableProps) {
   const { t } = useTranslation();
   const { table } = useFlightsTable({
@@ -110,7 +112,7 @@ export function FlightsTable({
       table={table}
       renderItem={renderFlightCard}
       sortableColumns={sortableColumns}
-      emptyMessage={t('flights.noFlights')}
+      emptyMessage={emptyMessage ?? t('flights.noFlights')}
       ariaLabel={t('flights.listAriaLabel')}
       isVirtualized
       className="flex flex-col"

@@ -208,6 +208,7 @@ export function FlightTelemetryInteractivePreview({
     )
   );
   const [selectedYoutubeIndex, setSelectedYoutubeIndex] = useState(0);
+  const [selectedPipYoutubeUrl, setSelectedPipYoutubeUrl] = useState('');
   const activeYoutubeIndex = Math.min(
     selectedYoutubeIndex,
     Math.max(validYoutubeUrls.length - 1, 0)
@@ -276,7 +277,15 @@ export function FlightTelemetryInteractivePreview({
         height: pipLayout.height / TELEMETRY_CANVAS_HEIGHT,
       }
     : undefined;
+  const pipOffsetSeconds =
+    pipLayout?.applyOffset === false ? 0 : calibrationOffsetSeconds;
   const youtubeUrl = validYoutubeUrls[activeYoutubeIndex];
+  const pipYoutubeOptions = validYoutubeUrls.filter(
+    (url) => url !== youtubeUrl
+  );
+  const youtubePipUrl = pipYoutubeOptions.includes(selectedPipYoutubeUrl)
+    ? selectedPipYoutubeUrl
+    : undefined;
   const isYoutubeVideoAlreadyPublished = Boolean(
     youtubeAssociations.data?.some(
       (association) =>
@@ -399,6 +408,8 @@ export function FlightTelemetryInteractivePreview({
     try {
       const { job_id } = await startExport.mutateAsync({
         youtube_url: youtubeUrl,
+        pip_apply_offset: pipLayout?.applyOffset !== false,
+        ...(youtubePipUrl ? { pip_youtube_url: youtubePipUrl } : {}),
       });
       setYoutubeExportJobId(job_id);
       storeYoutubeExportJobId(flightId, job_id);
@@ -723,6 +734,31 @@ export function FlightTelemetryInteractivePreview({
                 </button>
               </div>
             )}
+            {pipLayout?.visible && pipYoutubeOptions.length > 0 && (
+              <label className="mb-3 block max-w-sm text-sm">
+                <span className="mb-1 block font-medium text-slate-700 dark:text-slate-200">
+                  {t('flights.overlayPipVideoLabel')}
+                </span>
+                <select
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  value={youtubePipUrl ?? ''}
+                  onChange={(event) =>
+                    setSelectedPipYoutubeUrl(event.target.value)
+                  }
+                >
+                  <option value="">
+                    {t('flights.overlayPipVideoDefault')}
+                  </option>
+                  {pipYoutubeOptions.map((url) => (
+                    <option key={url} value={url}>
+                      {t('flights.overlayPipVideoYoutube', {
+                        index: validYoutubeUrls.indexOf(url) + 1,
+                      })}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <div className="min-w-0 flex-1">
               <FlightOverlayPlayer
                 key={youtubeUrl ?? 'camera-only'}
@@ -746,10 +782,10 @@ export function FlightTelemetryInteractivePreview({
                     : undefined
                 }
                 youtubeUrl={youtubeUrl}
+                youtubePipUrl={youtubePipUrl}
                 syncOffsetSeconds={calibrationOffsetSeconds}
-                getFlightTime={(cameraTime) =>
-                  cameraTime - calibrationOffsetSeconds
-                }
+                pipOffsetSeconds={pipOffsetSeconds}
+                getFlightTime={(cameraTime) => cameraTime - pipOffsetSeconds}
                 cameraLabel={t('flights.goproOverlayCameraPreview')}
                 flightLabel={t('flights.goproOverlayFlightVideo')}
                 pipLayout={playerPipLayout}

@@ -150,6 +150,8 @@ def render_saved_overlay(
     offset_seconds: float,
     output_directory: Path,
     progress: ProgressCallback,
+    pip_video_path: Path | None = None,
+    pip_apply_offset: bool = True,
 ) -> Path:
     """Render the saved telemetry directly onto the downloaded YouTube video."""
     from gopro_overlay_export import (
@@ -170,7 +172,7 @@ def render_saved_overlay(
     has_prepared_gpx = render_gpx_path.is_file()
     gpx_path = render_gpx_path if has_prepared_gpx else saved_gpx_path
     pip_values = [saved_command.get("source_pip_path"), saved_job.get("pip_path")]
-    pip_path = next(
+    pip_path = pip_video_path or next(
         (Path(str(value)) for value in pip_values if value and Path(str(value)).is_file()),
         None,
     )
@@ -210,6 +212,7 @@ def render_saved_overlay(
         flight_id=None,
         overlay_only=False,
         video_start_override=source_timeline_start,
+        pip_offset_seconds=gpx_offset if pip_apply_offset else 0.0,
     )
     internal_job_id = str(internal_job["job_id"])
     deadline = time.monotonic() + config.GOPRO_OVERLAY_JOB_TIMEOUT_SECONDS
@@ -248,18 +251,30 @@ def export_youtube_overlay(
     work_dir: Path,
     progress: ProgressCallback,
     cookies: str | None = None,
+    pip_url: str | None = None,
+    pip_apply_offset: bool = True,
 ) -> None:
     try:
         if cookies:
             source = download_youtube(url, work_dir, progress, cookies=cookies)
         else:
             source = download_youtube(url, work_dir, progress)
+        pip_source = None
+        if pip_url:
+            pip_directory = work_dir / "youtube-pip"
+            pip_source = (
+                download_youtube(pip_url, pip_directory, progress, cookies=cookies)
+                if cookies
+                else download_youtube(pip_url, pip_directory, progress)
+            )
         rendered_video = render_saved_overlay(
             overlay_job_id,
             source,
             offset_seconds=offset_seconds,
             output_directory=work_dir,
             progress=progress,
+            pip_video_path=pip_source,
+            pip_apply_offset=pip_apply_offset,
         )
         output_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(rendered_video, output_path)

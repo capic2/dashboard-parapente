@@ -537,6 +537,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       type: 'pip',
       name: 'PiP vidéo',
       action: 'switch_video',
+      applyOffset: true,
       x: 38.4,
       y: 842.4,
       width: 345.6,
@@ -1853,6 +1854,19 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                             {t('telemetryLayout.actionSwitchVideo')}
                           </option>
                         </select>
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                        <input
+                          type="checkbox"
+                          checked={selected.applyOffset !== false}
+                          onChange={(event) =>
+                            updateItem(selected.id, {
+                              applyOffset: event.target.checked,
+                            })
+                          }
+                          className="cursor-pointer rounded border-slate-300 text-sky-600 focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-600"
+                        />
+                        {t('telemetryLayout.pipApplyOffset')}
                       </label>
                     </div>
                   ) : (
