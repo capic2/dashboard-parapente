@@ -1147,6 +1147,7 @@
     "youtubeRemovalDissociate": "Dissociate only",
     "youtubeRemovalDeletePermanently": "Delete permanently from YouTube",
     "youtubeVideoTitle": "Flight YouTube video {{count}}",
+    "playYoutubeVideo": "Play flight YouTube video {{count}}",
     "openOnYoutube": "Open on YouTube",
     "youtubeConnect": "Connect YouTube",
     "youtubeConnectionError": "Unable to start the YouTube connection",

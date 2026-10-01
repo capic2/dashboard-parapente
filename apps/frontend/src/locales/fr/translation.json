@@ -1151,6 +1151,7 @@
     "youtubeRemovalDissociate": "Dissocier uniquement",
     "youtubeRemovalDeletePermanently": "Supprimer définitivement de YouTube",
     "youtubeVideoTitle": "Vidéo YouTube du vol {{count}}",
+    "playYoutubeVideo": "Lire la vidéo YouTube du vol {{count}}",
     "openOnYoutube": "Ouvrir sur YouTube",
     "youtubeConnect": "Connecter YouTube",
     "youtubeConnectionError": "Impossible de démarrer la connexion à YouTube",
