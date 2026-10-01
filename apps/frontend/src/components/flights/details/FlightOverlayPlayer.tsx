@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Maximize2, Minimize2, Pause, Play } from 'lucide-react';
-import type { FlightTelemetryPipLayout } from './flightTelemetryLayout';
+import type {
+  FlightTelemetryPipLayout,
+  TelemetryPipVideoSource,
+} from './flightTelemetryLayout';
 import { getYoutubeVideoId } from '../../../lib/youtube';
 
 interface YoutubePlayer {
@@ -96,6 +99,7 @@ interface FlightOverlayPlayerProps {
   seekRequest?: { id: number; time: number } | null;
   overlayContent?: ReactNode;
   pipLayout?: FlightTelemetryPipLayout;
+  pipSource?: TelemetryPipVideoSource;
 }
 
 function clamp(value: number, maximum: number) {
@@ -123,6 +127,7 @@ export function FlightOverlayPlayer({
   seekRequest,
   overlayContent,
   pipLayout,
+  pipSource,
 }: FlightOverlayPlayerProps) {
   const { t } = useTranslation();
   const cameraRef = useRef<HTMLVideoElement>(null);
@@ -136,10 +141,14 @@ export function FlightOverlayPlayer({
   // When a YouTube video is available it is the flat primary view; otherwise
   // fall back to the generated flight video. Calibration keeps camera-first.
   const [layout, setLayout] = useState<FlightOverlayLayout>(
-    mode === 'calibration' || youtubeUrl || !flightUrl
+    mode === 'calibration' ||
+      (mode === 'interactive' &&
+        (pipSource === 'flight' || (pipSource === 'camera' && !flightUrl))) ||
+      (!pipSource && (youtubeUrl || !flightUrl))
       ? 'camera-main'
       : 'flight-main'
   );
+  const hasFlightUrl = Boolean(flightUrl);
   const [cameraCurrentTime, setCameraCurrentTime] = useState(0);
   const [cameraDuration, setCameraDuration] = useState(0);
   const [cameraIsPlaying, setCameraIsPlaying] = useState(false);
@@ -150,6 +159,13 @@ export function FlightOverlayPlayer({
   const masterIsYoutube = Boolean(youtubeId) && !youtubeFailed;
 
   seekRequestRef.current = seekRequest;
+
+  useEffect(() => {
+    if (mode !== 'interactive' || !pipSource) return;
+    setLayout(
+      pipSource === 'camera' && hasFlightUrl ? 'flight-main' : 'camera-main'
+    );
+  }, [hasFlightUrl, mode, pipSource]);
 
   useEffect(() => {
     if (!seekRequest) {

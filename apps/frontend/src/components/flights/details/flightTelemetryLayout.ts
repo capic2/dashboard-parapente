@@ -2,6 +2,7 @@ import { METRIC_KEYS, type MetricKey } from './telemetryMetrics';
 
 export type TelemetryInteractionAction = 'none' | 'cycle_metric';
 export type TelemetryPipAction = 'switch_video';
+export type TelemetryPipVideoSource = 'camera' | 'flight';
 export type TelemetryWidgetVariant =
   | 'value'
   | 'speedometer'
@@ -74,7 +75,7 @@ export interface FlightTelemetryTextLayout extends FlightTelemetryLayoutItemBase
 export interface FlightTelemetryPipLayout extends FlightTelemetryLayoutItemBase {
   type: 'pip';
   action: TelemetryPipAction;
-  weatherSource?: string;
+  source?: TelemetryPipVideoSource;
 }
 
 export type FlightTelemetryLayoutItem =
@@ -465,7 +466,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
       };
     }
     if (type === 'pip') {
-      const weatherSource = element.getAttribute('weather-source');
+      const source = element.getAttribute('source');
       return {
         ...common,
         ...grouping,
@@ -477,7 +478,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
         )
           ? (element.getAttribute('action') as TelemetryPipAction)
           : 'switch_video',
-        ...(weatherSource ? { weatherSource } : {}),
+        ...(source === 'camera' || source === 'flight' ? { source } : {}),
       };
     }
     return {
@@ -567,17 +568,15 @@ export function serializeTelemetryLayoutXml(
           ? ` align="${item.textAlign}"`
           : '';
       const pipAction = item.type === 'pip' ? ` action="${item.action}"` : '';
-      const pipWeatherSource =
-        item.type === 'pip' && item.weatherSource
-          ? ` weather-source="${escapeXml(item.weatherSource)}"`
-          : '';
+      const pipSource =
+        item.type === 'pip' && item.source ? ` source="${item.source}"` : '';
       const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility}${unitVisibility}${fontSize}${clickAction}${longPressAction}${variant}${valueAlign}${textAlign} x="${(item.x / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" y="${(item.y / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" width="${(item.width / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" height="${(item.height / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" visible="${item.visible ? 'true' : 'false'}"`;
       if (item.type === 'icon') return `<icon ${common} name="${item.icon}" />`;
       if (item.type === 'text') {
         return `<text ${common} content="${escapeXml(item.content)}" />`;
       }
       if (item.type === 'pip')
-        return `<pip ${common}${pipAction}${pipWeatherSource} />`;
+        return `<pip ${common}${pipAction}${pipSource} />`;
       return `<widget ${common} metric="${item.metric}" />`;
     })
     .join('')}</telemetry-layout>`;
