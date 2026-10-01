@@ -702,6 +702,8 @@ class YoutubeUploadCreate(BaseModel):
 
 class YoutubeOverlayExportCreate(BaseModel):
     youtube_url: str = Field(min_length=1)
+    pip_youtube_url: str | None = Field(default=None, min_length=1)
+    pip_apply_offset: bool = True
 
 
 class YoutubeUploadJobResponse(BaseModel):

@@ -537,6 +537,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       type: 'pip',
       name: 'PiP vidéo',
       action: 'switch_video',
+      applyOffset: true,
       x: 38.4,
       y: 842.4,
       width: 345.6,
@@ -1809,24 +1810,39 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       />
                     </label>
                   ) : selected.type === 'pip' ? (
-                    <label className="block text-sm">
-                      <span className="mb-1 block text-slate-600 dark:text-slate-300">
-                        {t('telemetryLayout.pipAction')}
-                      </span>
-                      <select
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                        value={selected.action}
-                        onChange={(event) =>
-                          updateItem(selected.id, {
-                            action: event.target.value as 'switch_video',
-                          })
-                        }
-                      >
-                        <option value="switch_video">
-                          {t('telemetryLayout.actionSwitchVideo')}
-                        </option>
-                      </select>
-                    </label>
+                    <div className="space-y-3">
+                      <label className="block text-sm">
+                        <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                          {t('telemetryLayout.pipAction')}
+                        </span>
+                        <select
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                          value={selected.action}
+                          onChange={(event) =>
+                            updateItem(selected.id, {
+                              action: event.target.value as 'switch_video',
+                            })
+                          }
+                        >
+                          <option value="switch_video">
+                            {t('telemetryLayout.actionSwitchVideo')}
+                          </option>
+                        </select>
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                        <input
+                          type="checkbox"
+                          checked={selected.applyOffset !== false}
+                          onChange={(event) =>
+                            updateItem(selected.id, {
+                              applyOffset: event.target.checked,
+                            })
+                          }
+                          className="cursor-pointer rounded border-slate-300 text-sky-600 focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-600"
+                        />
+                        {t('telemetryLayout.pipApplyOffset')}
+                      </label>
+                    </div>
                   ) : (
                     <label className="block text-sm">
                       <span className="mb-1 block text-slate-600 dark:text-slate-300">
