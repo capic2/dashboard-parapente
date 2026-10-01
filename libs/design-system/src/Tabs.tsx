@@ -61,7 +61,7 @@ export function TabPanel({ className, ...props }: TabPanelProps) {
       {...props}
       className={composeRenderProps(className, (className) =>
         twMerge(
-          'outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-800',
+          'data-[inert]:hidden outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-800',
           className
         )
       )}
