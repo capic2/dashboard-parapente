@@ -186,7 +186,11 @@ export function useDeleteFlightTemporaryMedia(flightId: string) {
 export function useStartYoutubeOverlayExport(flightId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { youtube_url: string }) =>
+    mutationFn: (input: {
+      youtube_url: string;
+      pip_youtube_url?: string;
+      pip_apply_offset?: boolean;
+    }) =>
       api
         .post(`flights/${flightId}/youtube-overlay-export`, { json: input })
         .json<{ job_id: string; status: string }>(),
