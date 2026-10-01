@@ -219,7 +219,6 @@ export const FlightSummarySchema = z.object({
   site_region: z.string().nullable(),
   name: z.string().nullable(),
   title: z.string().nullable(),
-  tags: z.array(z.string()).default([]),
   flight_date: z.string(),
   departure_time: z.string().nullable(),
   duration_minutes: z.number().nullable(),
