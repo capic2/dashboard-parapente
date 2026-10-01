@@ -22,15 +22,9 @@ const optionalSearchQuery = z.preprocess(
   z.string().max(200).optional()
 );
 
-const optionalTagFilter = z.preprocess((value) => {
-  if (typeof value !== 'string') return undefined;
-  return value.replace(/^[ \t\n\r\v\f]+|[ \t\n\r\v\f]+$/gu, '') || undefined;
-}, z.string().max(100).optional().catch(undefined));
-
 export const flightsSearchSchema = z.object({
   q: optionalSearchQuery,
   siteId: optionalTrimmedString,
-  tag: optionalTagFilter,
   gpx: flightGpxStatusSchema.catch('all').default('all'),
   sort: flightSortBySchema.catch('flight_date').default('flight_date'),
   order: flightSortOrderSchema.catch('desc').default('desc'),
@@ -57,7 +51,6 @@ export function serializeFlightsSearch(
   return {
     q: search.q || undefined,
     siteId: search.siteId || undefined,
-    tag: search.tag || undefined,
     gpx: search.gpx === 'all' ? undefined : search.gpx,
     sort: search.sort === 'flight_date' ? undefined : search.sort,
     order: search.order === 'desc' ? undefined : search.order,

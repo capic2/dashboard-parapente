@@ -570,7 +570,6 @@ class FlightBase(BaseModel):
     distance_km: float | None = None
     elevation_gain_m: int | None = None
     notes: str | None = None
-    tags: list[str] = Field(default_factory=list)
     conditions_feedback: str | None = None
     decision_snapshot: str | None = None
 

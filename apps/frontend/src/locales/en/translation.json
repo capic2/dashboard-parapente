@@ -1009,6 +1009,8 @@
     "gpxFilter": "Filter by GPX status",
     "tagFilter": "Filter by tag",
     "allTags": "All tags",
+    "noFlightsWithBadges": "No flights match the selected tags",
+    "filteredFlightCount": "{{count}} of {{total}} flights",
     "allGpxStatuses": "All GPX statuses",
     "withGpx": "With GPX",
     "withoutGpx": "Without GPX",
