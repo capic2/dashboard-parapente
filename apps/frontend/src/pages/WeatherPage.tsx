@@ -85,6 +85,31 @@ const formatLocalDate = (date: Date) => {
 const getLocalDayStart = (date: Date) =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
+const getDistanceKm = (
+  from: { latitude: number; longitude: number },
+  to: { latitude: number; longitude: number }
+): number | null => {
+  if (
+    !Number.isFinite(from.latitude) ||
+    !Number.isFinite(from.longitude) ||
+    !Number.isFinite(to.latitude) ||
+    !Number.isFinite(to.longitude)
+  ) {
+    return null;
+  }
+
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  const latitudeDifference = radians(to.latitude - from.latitude);
+  const longitudeDifference = radians(to.longitude - from.longitude);
+  const haversine =
+    Math.sin(latitudeDifference / 2) ** 2 +
+    Math.cos(radians(from.latitude)) *
+      Math.cos(radians(to.latitude)) *
+      Math.sin(longitudeDifference / 2) ** 2;
+
+  return 6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+};
+
 const getForecastDaySearch = (dayIndex: number) => {
   if (dayIndex <= 0) return undefined;
   const date = getLocalDayStart(new Date());
@@ -251,11 +276,25 @@ export default function WeatherPage() {
     const matchedFavorites = sites.filter((site) => favoriteSet.has(site.id));
     return matchedFavorites.length > 0 ? matchedFavorites : sites;
   }, [favoriteSiteIds, sites]);
+  const nearbyFavoriteSites = useMemo(() => {
+    const location = currentLocation.location;
+    if (!location) return favoriteSites;
+
+    return [...favoriteSites].sort((first, second) => {
+      const firstDistance = getDistanceKm(location, first);
+      const secondDistance = getDistanceKm(location, second);
+
+      if (firstDistance === null) return secondDistance === null ? 0 : 1;
+      if (secondDistance === null) return -1;
+      return firstDistance - secondDistance;
+    });
+  }, [currentLocation.location, favoriteSites]);
   const routeSiteExists = sites.some((site) => site.id === routeSiteId);
   const selectedSiteId =
     (routeSiteExists ? routeSiteId : undefined) ??
-    favoriteSites[0]?.id ??
-    sites[0]?.id ??
+    (currentLocation.isLoading
+      ? undefined
+      : (nearbyFavoriteSites[0]?.id ?? sites[0]?.id)) ??
     '';
   const { data: dailySummary } = useDailySummary(
     !selectedSearchTarget && selectedSiteId ? selectedSiteId : undefined
@@ -502,7 +541,7 @@ export default function WeatherPage() {
       selectedDayLabel={selectedDayLabel}
       selectionTab={selectionTab}
       allSites={sites}
-      sites={favoriteSites}
+      sites={nearbyFavoriteSites}
       selectedSearchTarget={selectedSearchTarget}
       selectedSiteId={selectedSiteId}
       selectedDayIndex={selectedDayIndex}
@@ -539,7 +578,7 @@ export default function WeatherPage() {
     ) : undefined;
 
   const mobileEmptyPanel =
-    !selectedSearchTarget && !selectedSiteId ? (
+    !currentLocation.isLoading && !selectedSearchTarget && !selectedSiteId ? (
       <WeatherEmptyState />
     ) : undefined;
 
@@ -669,7 +708,9 @@ export default function WeatherPage() {
 
         {bestSpotSuggestion}
 
-        {!selectedSearchTarget && !selectedSiteId && <WeatherEmptyState />}
+        {!currentLocation.isLoading &&
+          !selectedSearchTarget &&
+          !selectedSiteId && <WeatherEmptyState />}
 
         {selectedSearchTarget && (
           <WeatherSearchResultPanel
