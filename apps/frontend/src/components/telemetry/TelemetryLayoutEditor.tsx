@@ -1813,10 +1813,36 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                     <div className="space-y-3">
                       <label className="block text-sm">
                         <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                          {t('telemetryLayout.videoSource')}
+                        </span>
+                        <select
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                          value={selected.source ?? ''}
+                          onChange={(event) =>
+                            updateItem(selected.id, {
+                              source: event.target.value
+                                ? (event.target.value as 'camera' | 'flight')
+                                : undefined,
+                            })
+                          }
+                        >
+                          <option value="">
+                            {t('telemetryLayout.automaticVideoSource')}
+                          </option>
+                          <option value="flight">
+                            {t('telemetryLayout.flightVideoSource')}
+                          </option>
+                          <option value="camera">
+                            {t('telemetryLayout.cameraVideoSource')}
+                          </option>
+                        </select>
+                      </label>
+                      <label className="block text-sm">
+                        <span className="mb-1 block text-slate-600 dark:text-slate-300">
                           {t('telemetryLayout.pipAction')}
                         </span>
                         <select
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                           value={selected.action}
                           onChange={(event) =>
                             updateItem(selected.id, {

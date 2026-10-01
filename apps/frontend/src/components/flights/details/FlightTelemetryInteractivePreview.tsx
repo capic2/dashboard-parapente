@@ -789,6 +789,7 @@ export function FlightTelemetryInteractivePreview({
                 cameraLabel={t('flights.goproOverlayCameraPreview')}
                 flightLabel={t('flights.goproOverlayFlightVideo')}
                 pipLayout={playerPipLayout}
+                pipSource={pipLayout?.source}
                 onTimeChange={(cameraTime) =>
                   setCameraTime(
                     youtubeUrl
