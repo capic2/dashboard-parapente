@@ -120,6 +120,12 @@ def test_summaries_filter_search_sort_and_hide_paths(client, db_session, arguel_
     assert body["flights"][1]["has_youtube_video"] is False
 
 
+def test_summaries_default_query_does_not_require_a_tag(client: TestClient) -> None:
+    response = client.get(API_URL)
+    assert response.status_code == 200
+    assert response.json() == {"flights": [], "total": 0, "next_cursor": None}
+
+
 def test_summaries_report_panorama_file(client, db_session, monkeypatch, tmp_path):
     monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
     flight = Flight(

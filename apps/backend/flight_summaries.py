@@ -327,6 +327,7 @@ def list_flight_summaries(
         q=normalized_q,
         site_id=site_id,
         gpx_status=gpx_status,
+        tag=None,
     )
     total = base_query.with_entities(func.count(Flight.id)).scalar() or 0
 
