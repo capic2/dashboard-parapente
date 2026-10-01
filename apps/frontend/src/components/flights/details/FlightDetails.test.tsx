@@ -249,6 +249,7 @@ vi.mock('react-i18next', () => ({
           'flights.goproOverlayProcessingBadge': 'Overlay progress',
           'flights.youtubeVideos': 'YouTube videos',
           'flights.youtubeVideoTitle': 'Flight YouTube video',
+          'flights.playYoutubeVideo': 'Play flight YouTube video {{count}}',
           'flights.openOnYoutube': 'Open on YouTube',
           'flights.removeYoutubeAssociation': 'Remove association',
           'flights.youtubeAssociationRemoving': 'Removing association',
@@ -275,6 +276,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
   useQuery: () => ({ data: null }),
+  useMutation: () => ({ isPending: false, mutateAsync: vi.fn() }),
 }));
 
 vi.mock('../../../hooks/flights/useFlights', () => ({
@@ -539,6 +541,14 @@ describe('FlightDetails GoPro overlay action', () => {
     );
 
     openTab('Media');
+
+    expect(screen.queryAllByTitle('Flight YouTube video')).toHaveLength(0);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Play flight YouTube video 1' })
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Play flight YouTube video 2' })
+    );
 
     const players = screen.getAllByTitle('Flight YouTube video');
     expect(players).toHaveLength(2);
