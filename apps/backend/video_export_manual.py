@@ -874,6 +874,8 @@ def _export_youtube_overlay_job(job_id: str) -> None:
             work_dir=work_dir,
             progress=progress,
             cookies=download_cookies,
+            pip_url=job.pip_youtube_url,
+            pip_apply_offset=job.pip_apply_offset,
         )
         if _is_cancelled(job_id):
             raise YoutubeExportError("Export annulé")
@@ -1810,6 +1812,8 @@ def _enqueue_video_export_job(
     auth_token: str | None = None,
     source_type: str = "flight",
     youtube_url: str | None = None,
+    pip_youtube_url: str | None = None,
+    pip_apply_offset: bool = True,
     overlay_job_id: str | None = None,
     overlay_offset_seconds: float | None = None,
     youtube_upload_job_id: str | None = None,
@@ -1844,6 +1848,8 @@ def _enqueue_video_export_job(
                 created_at=now,
                 source_type=source_type,
                 youtube_url=youtube_url,
+                pip_youtube_url=pip_youtube_url,
+                pip_apply_offset=pip_apply_offset,
                 overlay_job_id=overlay_job_id,
                 overlay_offset_seconds=overlay_offset_seconds,
                 youtube_upload_job_id=youtube_upload_job_id,
@@ -1877,6 +1883,8 @@ def start_youtube_overlay_export(
     overlay_job_id: str,
     overlay_offset_seconds: float,
     youtube_user_id: int,
+    pip_youtube_url: str | None = None,
+    pip_apply_offset: bool = True,
     auth_token: str | None = None,
 ) -> str:
     """Queue a YouTube overlay export followed by automatic YouTube publication."""
@@ -1908,6 +1916,8 @@ def start_youtube_overlay_export(
             auth_token=auth_token,
             source_type="youtube",
             youtube_url=youtube_url,
+            pip_youtube_url=pip_youtube_url,
+            pip_apply_offset=pip_apply_offset,
             overlay_job_id=overlay_job_id,
             overlay_offset_seconds=overlay_offset_seconds,
             youtube_upload_job_id=upload_job.id,

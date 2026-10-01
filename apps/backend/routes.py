@@ -8014,6 +8014,17 @@ def create_youtube_overlay_export(
         raise HTTPException(
             status_code=400, detail="YouTube video is not associated with this flight"
         )
+    if payload.pip_youtube_url is not None:
+        if payload.pip_youtube_url not in (flight.youtube_urls or []):
+            raise HTTPException(
+                status_code=400,
+                detail="PiP YouTube video is not associated with this flight",
+            )
+        if payload.pip_youtube_url == payload.youtube_url:
+            raise HTTPException(
+                status_code=400,
+                detail="PiP YouTube video must differ from the main video",
+            )
     if not is_youtube_configured():
         raise HTTPException(status_code=503, detail="YouTube upload is not configured")
     if not is_youtube_connected(db, user.id):
@@ -8026,6 +8037,8 @@ def create_youtube_overlay_export(
         job_id = start_youtube_overlay_export(
             flight_id=flight_id,
             youtube_url=payload.youtube_url,
+            pip_youtube_url=payload.pip_youtube_url,
+            pip_apply_offset=payload.pip_apply_offset,
             overlay_job_id=overlay_job.id,
             overlay_offset_seconds=offset,
             youtube_user_id=user.id,

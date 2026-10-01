@@ -9,6 +9,7 @@ interface YoutubePlayer {
   getCurrentTime: () => number;
   getDuration: () => number;
   getPlayerState: () => number;
+  mute: () => void;
   pauseVideo: () => void;
   playVideo: () => void;
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
@@ -29,17 +30,21 @@ interface YoutubeApi {
 let youtubeApiPromise: Promise<YoutubeApi> | null = null;
 
 function loadYoutubeApi(): Promise<YoutubeApi> {
-  if (window.YT) return Promise.resolve(window.YT);
+  const youtubeWindow = window as Window & {
+    YT?: YoutubeApi;
+    onYouTubeIframeAPIReady?: () => void;
+  };
+  if (youtubeWindow.YT) return Promise.resolve(youtubeWindow.YT);
   if (youtubeApiPromise) return youtubeApiPromise;
 
   youtubeApiPromise = new Promise<YoutubeApi>((resolve, reject) => {
     const existingScript = document.querySelector<HTMLScriptElement>(
       'script[src="https://www.youtube.com/iframe_api"]'
     );
-    const previousCallback = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
+    const previousCallback = youtubeWindow.onYouTubeIframeAPIReady;
+    youtubeWindow.onYouTubeIframeAPIReady = () => {
       previousCallback?.();
-      if (window.YT) resolve(window.YT);
+      if (youtubeWindow.YT) resolve(youtubeWindow.YT);
       else reject(new Error('YouTube API did not initialize'));
     };
 
@@ -53,13 +58,6 @@ function loadYoutubeApi(): Promise<YoutubeApi> {
   });
 
   return youtubeApiPromise;
-}
-
-declare global {
-  interface Window {
-    YT?: YoutubeApi;
-    onYouTubeIframeAPIReady?: () => void;
-  }
 }
 
 export type FlightOverlayLayout =
@@ -82,6 +80,7 @@ interface FlightOverlayPlayerProps {
   mode: 'calibration' | 'interactive';
   cameraUrl: string;
   youtubeUrl?: string;
+  youtubePipUrl?: string;
   flightUrl?: string;
   overlayUrl?: string;
   cameraLabel: string;
@@ -89,6 +88,7 @@ interface FlightOverlayPlayerProps {
   overlayStatus?: 'missing' | 'generating' | 'ready' | 'failed';
   overlayError?: string | null;
   syncOffsetSeconds?: number;
+  pipOffsetSeconds?: number;
   getFlightTime?: (cameraTime: number) => number;
   getCameraTime?: (flightTime: number) => number;
   getOverlayTime?: (cameraTime: number) => number;
@@ -109,6 +109,7 @@ export function FlightOverlayPlayer({
   mode,
   cameraUrl,
   youtubeUrl,
+  youtubePipUrl,
   flightUrl,
   overlayUrl,
   cameraLabel,
@@ -116,6 +117,7 @@ export function FlightOverlayPlayer({
   overlayStatus,
   overlayError,
   syncOffsetSeconds = 0,
+  pipOffsetSeconds = syncOffsetSeconds,
   getFlightTime,
   getCameraTime,
   getOverlayTime,
@@ -128,6 +130,11 @@ export function FlightOverlayPlayer({
   const cameraRef = useRef<HTMLVideoElement>(null);
   const youtubeRef = useRef<YoutubePlayer | null>(null);
   const youtubeHostRef = useRef<HTMLDivElement>(null);
+  const youtubePipRef = useRef<YoutubePlayer | null>(null);
+  const youtubePipHostRef = useRef<HTMLDivElement>(null);
+  const pipSyncTickRef = useRef(0);
+  const lastPipSeekTickRef = useRef(-30);
+  const lastPipPlayTickRef = useRef(-30);
   const seekRequestRef = useRef(seekRequest);
   const flightRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLVideoElement>(null);
@@ -143,12 +150,17 @@ export function FlightOverlayPlayer({
   const [cameraCurrentTime, setCameraCurrentTime] = useState(0);
   const [cameraDuration, setCameraDuration] = useState(0);
   const [cameraIsPlaying, setCameraIsPlaying] = useState(false);
+  const cameraCurrentTimeRef = useRef(cameraCurrentTime);
+  const cameraIsPlayingRef = useRef(cameraIsPlaying);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [youtubeReady, setYoutubeReady] = useState(false);
   const [youtubeFailed, setYoutubeFailed] = useState(false);
   const youtubeId = youtubeUrl ? getYoutubeVideoId(youtubeUrl) : null;
   const masterIsYoutube = Boolean(youtubeId) && !youtubeFailed;
+  const isInteractive = mode === 'interactive';
 
+  cameraCurrentTimeRef.current = cameraCurrentTime;
+  cameraIsPlayingRef.current = cameraIsPlaying;
   seekRequestRef.current = seekRequest;
 
   useEffect(() => {
@@ -168,6 +180,31 @@ export function FlightOverlayPlayer({
       ? (youtubeRef.current?.getCurrentTime() ?? 0)
       : (camera?.currentTime ?? 0);
     if (!camera && !masterIsYoutube) return;
+    const pipYoutube = youtubePipRef.current;
+    if (pipYoutube) {
+      const pipSyncTick = ++pipSyncTickRef.current;
+      const desiredPipTime = Math.max(0, currentTime - pipOffsetSeconds);
+      const currentPipTime = pipYoutube.getCurrentTime();
+      const pipState = pipYoutube.getPlayerState();
+      if (
+        pipState !== 3 &&
+        Math.abs(desiredPipTime - currentPipTime) > 0.75 &&
+        pipSyncTick - lastPipSeekTickRef.current >= 30
+      ) {
+        pipYoutube.seekTo(desiredPipTime, true);
+        lastPipSeekTickRef.current = pipSyncTick;
+      }
+      if (
+        cameraIsPlaying &&
+        [-1, 2, 5].includes(pipState) &&
+        pipSyncTick - lastPipPlayTickRef.current >= 30
+      ) {
+        pipYoutube.playVideo();
+        lastPipPlayTickRef.current = pipSyncTick;
+      } else if (!cameraIsPlaying && pipState === 1) {
+        pipYoutube.pauseVideo();
+      }
+    }
     const flight = flightRef.current;
     const flightTime =
       getFlightTime?.(currentTime) ?? currentTime - syncOffsetSeconds;
@@ -206,7 +243,7 @@ export function FlightOverlayPlayer({
     // the new mapping immediately so the GPX/video image does not stay at the
     // previous position until the next media event.
     syncMediaRef.current?.();
-  }, [syncOffsetSeconds]);
+  }, [pipOffsetSeconds, syncOffsetSeconds]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -295,6 +332,7 @@ export function FlightOverlayPlayer({
               // aligned for the rest of playback.
               syncMediaRef.current?.(true);
             } else {
+              youtubePipRef.current?.pauseVideo();
               flightRef.current?.pause();
               overlayRef.current?.pause();
             }
@@ -314,8 +352,57 @@ export function FlightOverlayPlayer({
     };
   }, [youtubeId]);
 
+  const youtubePipId = youtubePipUrl ? getYoutubeVideoId(youtubePipUrl) : null;
+  useEffect(() => {
+    if (
+      !isInteractive ||
+      !youtubePipId ||
+      youtubePipId === youtubeId ||
+      !youtubePipHostRef.current
+    ) {
+      return;
+    }
+    const pipContainer = youtubePipHostRef.current;
+    let cancelled = false;
+    let playerHost: HTMLDivElement | null = null;
+    const load = async () => {
+      const api = await loadYoutubeApi();
+      if (cancelled || !pipContainer) return;
+      playerHost = document.createElement('div');
+      pipContainer.replaceChildren(playerHost);
+      youtubePipRef.current = new api.Player(playerHost, {
+        height: '100%',
+        width: '100%',
+        videoId: youtubePipId,
+        playerVars: {
+          controls: 0,
+          fs: 0,
+          playsinline: 1,
+          origin: window.location.origin,
+        },
+        events: {
+          onReady: () => {
+            youtubePipRef.current?.mute();
+            youtubePipRef.current?.seekTo(cameraCurrentTimeRef.current, true);
+            if (cameraIsPlayingRef.current) {
+              youtubePipRef.current?.playVideo();
+            }
+          },
+        },
+      });
+    };
+    void load().catch(() => undefined);
+    return () => {
+      cancelled = true;
+      youtubePipRef.current?.destroy();
+      youtubePipRef.current = null;
+      playerHost?.remove();
+    };
+  }, [isInteractive, youtubeId, youtubePipId]);
+
   const handlePause = () => {
     setCameraIsPlaying(false);
+    youtubePipRef.current?.pauseVideo();
     flightRef.current?.pause();
     overlayRef.current?.pause();
   };
@@ -368,7 +455,6 @@ export function FlightOverlayPlayer({
 
   const cameraIsMain = layout === 'camera-main';
   const flightIsMain = layout === 'flight-main';
-  const isInteractive = mode === 'interactive';
   const hasFlightVideo = Boolean(flightUrl);
   const pipStyle = pipLayout
     ? {
@@ -458,7 +544,7 @@ export function FlightOverlayPlayer({
             </span>
           </div>
         )}
-        {isInteractive && hasFlightVideo && (
+        {isInteractive && hasFlightVideo && !youtubePipId && (
           <video
             ref={flightRef}
             src={flightUrl}
@@ -482,6 +568,15 @@ export function FlightOverlayPlayer({
           >
             <track kind="captions" />
           </video>
+        )}
+        {isInteractive && youtubePipId && youtubePipId !== youtubeId && (
+          <div
+            className="absolute z-20 overflow-hidden rounded-lg border-2 border-white/80 bg-black shadow-xl"
+            style={pipStyle}
+            aria-label={flightLabel}
+          >
+            <div ref={youtubePipHostRef} className="h-full w-full" />
+          </div>
         )}
         {overlayUrl && (
           <video
