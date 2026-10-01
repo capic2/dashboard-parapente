@@ -1903,6 +1903,7 @@
     "pip": "Video PiP",
     "pipAction": "PiP action",
     "videoSource": "Video source",
+    "automaticVideoSource": "Automatic",
     "flightVideoSource": "Flight video",
     "cameraVideoSource": "Camera video",
     "actionSwitchVideo": "Switch video on click",

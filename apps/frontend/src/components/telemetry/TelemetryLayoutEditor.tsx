@@ -1816,13 +1816,18 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                         </span>
                         <select
                           className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                          value={selected.source ?? 'flight'}
+                          value={selected.source ?? ''}
                           onChange={(event) =>
                             updateItem(selected.id, {
-                              source: event.target.value as 'camera' | 'flight',
+                              source: event.target.value
+                                ? (event.target.value as 'camera' | 'flight')
+                                : undefined,
                             })
                           }
                         >
+                          <option value="">
+                            {t('telemetryLayout.automaticVideoSource')}
+                          </option>
                           <option value="flight">
                             {t('telemetryLayout.flightVideoSource')}
                           </option>

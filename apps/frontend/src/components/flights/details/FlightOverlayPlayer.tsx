@@ -149,6 +149,7 @@ export function FlightOverlayPlayer({
       : 'flight-main'
   );
   const hasFlightUrl = Boolean(flightUrl);
+  const hasYoutubeUrl = Boolean(youtubeUrl);
   const [cameraCurrentTime, setCameraCurrentTime] = useState(0);
   const [cameraDuration, setCameraDuration] = useState(0);
   const [cameraIsPlaying, setCameraIsPlaying] = useState(false);
@@ -161,11 +162,15 @@ export function FlightOverlayPlayer({
   seekRequestRef.current = seekRequest;
 
   useEffect(() => {
-    if (mode !== 'interactive' || !pipSource) return;
-    setLayout(
-      pipSource === 'camera' && hasFlightUrl ? 'flight-main' : 'camera-main'
-    );
-  }, [hasFlightUrl, mode, pipSource]);
+    if (mode !== 'interactive') return;
+    if (pipSource) {
+      setLayout(
+        pipSource === 'camera' && hasFlightUrl ? 'flight-main' : 'camera-main'
+      );
+      return;
+    }
+    setLayout(hasYoutubeUrl || !hasFlightUrl ? 'camera-main' : 'flight-main');
+  }, [hasFlightUrl, hasYoutubeUrl, mode, pipSource]);
 
   useEffect(() => {
     if (!seekRequest) {
