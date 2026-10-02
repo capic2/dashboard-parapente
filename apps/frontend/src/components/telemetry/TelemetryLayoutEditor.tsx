@@ -1408,7 +1408,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                           return;
                         setSelectedIds([item.id]);
                       }}
-                      className={`absolute flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border px-3 py-2 text-left text-white shadow-lg ${item.transparent === false ? 'bg-slate-950/85' : 'bg-transparent'} ${item.visible ? '' : 'opacity-35'} ${isSelected ? 'border-sky-400 ring-2 ring-sky-400/40' : item.border === true ? 'border-white/20' : 'border-transparent'}`}
+                      className={`absolute flex min-h-0 min-w-0 touch-none flex-col overflow-hidden rounded-lg border px-3 py-2 text-left text-white shadow-lg ${item.transparent === false ? 'bg-slate-950/85' : 'bg-transparent'} ${item.visible ? '' : 'opacity-35'} ${isSelected ? 'border-sky-400 ring-2 ring-sky-400/40' : item.border === true ? 'border-white/20' : 'border-transparent'}`}
                       style={{
                         left: `${item.x}px`,
                         top: `${item.y}px`,
