@@ -48,6 +48,7 @@ Reponds UNIQUEMENT avec ce JSON valide, sans markdown:
   "force_thermique_indices": ["<indice visible utilise pour estimer la force>"],
   "heures_volables": "<ex: 12h-18h>",
   "score_volabilite": <0-100>,
+  "sources_agreement": "high|medium|low",
   "conseils_vol": "<conseils courts MAX 50 mots>",
   "alertes_securite": ["<alerte courte>"],
   "details_analyse": "<analyse courte MAX 100 mots>",
@@ -110,6 +111,11 @@ Contraintes obligatoires pour force_thermique_ms:
 - Si l'echelle ou les courbes ne permettent pas d'estimer la force, mets force_thermique_ms a 0.0, force_thermique_confiance a "low", et explique l'incertitude dans force_thermique_indices et details_analyse.
 - Une belle hauteur de plafond ne suffit pas a conclure a des thermiques forts. Separe toujours plafond, declenchement, force et risque.
 - Chaque valeur de force_thermique_ms doit etre justifiee par au moins un indice concret dans force_thermique_indices.
+
+Contraintes obligatoires pour sources_agreement:
+- Compare les éléments lisibles de chaque source : stabilité, plafond/base nuageuse, force thermique et vent en altitude.
+- "high" signifie que les sources concordent sur les facteurs principaux; "medium" qu'elles concordent globalement avec un écart notable; "low" qu'elles se contredisent ou qu'il n'y a pas assez de sources lisibles pour conclure.
+- Mentionne les écarts concrets entre sources dans details_analyse et les observations propres à chaque source dans explication_analyse.par_source. Ne masque pas une contradiction par une moyenne.
 
 Contraintes obligatoires pour annotations_image:
 - Produis au maximum 6 annotations par source, uniquement sur les points importants pour comprendre les conditions de vol et apprendre a lire l'emagramme.
