@@ -181,7 +181,7 @@ describe('FlightYoutubeUploadControls', () => {
       expect(startUpload).toHaveBeenCalledWith({
         source_type: 'gopro_overlay',
         gopro_overlay_job_id: 'overlay-4k',
-        title: 'Vol test',
+        title: 'Vol test - vol',
         description: '',
         privacy_status: 'unlisted',
       })
@@ -213,10 +213,39 @@ describe('FlightYoutubeUploadControls', () => {
     await waitFor(() =>
       expect(startUpload).toHaveBeenCalledWith({
         source_type: 'pano',
-        title: 'Vol test pano',
+        title: 'Vol test - pilote',
         description: '',
         privacy_status: 'unlisted',
       })
+    );
+  });
+
+  it('names a camera upload with the face role', async () => {
+    useYoutubeUpload.mockReturnValue({ data: null, isLoading: false });
+    const queryClient = new QueryClient();
+    const flight = {
+      id: 'flight-1',
+      flight_date: '2026-08-19',
+      name: 'Vol test',
+    } as Flight;
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FlightYoutubeUploadControls
+          flight={flight}
+          source={{ source_type: 'camera' }}
+        />
+      </QueryClientProvider>
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Publier sur YouTube' })
+    );
+    fireEvent.click(screen.getByRole('button', { name: "Lancer l'envoi" }));
+
+    await waitFor(() =>
+      expect(startUpload).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Vol test - face' })
+      )
     );
   });
 
@@ -247,7 +276,7 @@ describe('FlightYoutubeUploadControls', () => {
 
     await waitFor(() =>
       expect(startUpload).toHaveBeenCalledWith(
-        expect.objectContaining({ title: 'x'.repeat(100) })
+        expect.objectContaining({ title: `${'x'.repeat(94)} - vol` })
       )
     );
   });

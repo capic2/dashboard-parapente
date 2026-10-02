@@ -32,34 +32,15 @@ function getDefaultYoutubeTitle(
 ): string {
   const baseTitle =
     flight.name ?? flight.title ?? `Vol du ${flight.flight_date}`;
-  let suffix = ' pano';
-  if (source.source_type === 'highlight') {
-    suffix = ' meilleurs moments';
-  } else if (source.source_type === 'camera') {
-    suffix = ' caméra';
-  } else if (source.source_type === 'video') {
-    suffix = ' vidéo';
-  }
-  const needsPanoSuffix =
-    source.source_type === 'pano' && !/\bpano\b/iu.test(baseTitle);
-  const needsHighlightSuffix =
-    source.source_type === 'highlight' &&
-    !/meilleurs moments/iu.test(baseTitle);
-  const needsVideoSuffix =
-    source.source_type === 'video' && !/vidéo/iu.test(baseTitle);
-  const needsCameraSuffix =
-    source.source_type === 'camera' && !/caméra/iu.test(baseTitle);
-
-  if (
-    !needsPanoSuffix &&
-    !needsHighlightSuffix &&
-    !needsVideoSuffix &&
-    !needsCameraSuffix
-  ) {
-    return baseTitle.slice(0, YOUTUBE_TITLE_MAX_LENGTH);
-  }
-
-  return `${baseTitle.slice(0, YOUTUBE_TITLE_MAX_LENGTH - suffix.length).trimEnd()}${suffix}`;
+  const role =
+    source.source_type === 'camera'
+      ? 'face'
+      : source.source_type === 'pano'
+        ? 'pilote'
+        : 'vol';
+  const suffix = ` - ${role}`;
+  const titleWithoutRole = baseTitle.replace(/\s*-\s*(face|pilote|vol)$/iu, '');
+  return `${titleWithoutRole.slice(0, YOUTUBE_TITLE_MAX_LENGTH - suffix.length).trimEnd()}${suffix}`;
 }
 
 export function FlightYoutubeUploadControls({

@@ -724,6 +724,7 @@ class YoutubeVideoAssociation(BaseModel):
     video_id: str = Field(pattern=YOUTUBE_VIDEO_ID_PATTERN.pattern)
     can_delete_from_youtube: bool
     exists_on_youtube: bool | None = None
+    title: str | None = None
 
 
 class YoutubeVideoRemoveRequest(BaseModel):
