@@ -123,6 +123,7 @@ export const YoutubeVideoAssociationSchema = z.object({
   video_id: z.string().min(1),
   can_delete_from_youtube: z.boolean(),
   exists_on_youtube: z.boolean().nullish(),
+  title: z.string().nullish(),
 });
 
 export const YoutubeVideoAssociationsSchema = z.array(

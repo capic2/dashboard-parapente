@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
+  DEFAULT_TELEMETRY_PIP_VIDEO_SOURCE,
+  TELEMETRY_PIP_VIDEO_SOURCES,
   alignTelemetryLayoutItems,
+  getYoutubeVideoRoleFromTitle,
   parseTelemetryLayoutXml,
   serializeTelemetryLayoutXml,
 } from './flightTelemetryLayout';
@@ -258,6 +261,8 @@ describe('flight telemetry layout XML', () => {
         type: 'pip' as const,
         name: 'Caméra embarquée',
         action: 'switch_video' as const,
+        source: 'file:face' as const,
+        applyOffset: true,
         x: 0.02,
         y: 0.78,
         width: 0.18,
@@ -269,6 +274,45 @@ describe('flight telemetry layout XML', () => {
     expect(
       parseTelemetryLayoutXml(serializeTelemetryLayoutXml(layout))
     ).toEqual(layout);
+  });
+
+  it('offers six explicit PiP sources without an automatic choice', () => {
+    expect(TELEMETRY_PIP_VIDEO_SOURCES).toEqual([
+      'youtube:face',
+      'youtube:pilote',
+      'youtube:vol',
+      'file:face',
+      'file:pilote',
+      'file:vol',
+    ]);
+    expect(DEFAULT_TELEMETRY_PIP_VIDEO_SOURCE).toBe('file:vol');
+  });
+
+  it('migrates old automatic and camera source layouts to explicit sources', () => {
+    const parsed = parseTelemetryLayoutXml(
+      '<telemetry-layout><pip id="pip-auto" action="switch_video" x="0" y="0" width="0.2" height="0.2" visible="true"/><pip id="pip-camera" action="switch_video" source="camera" x="0.2" y="0" width="0.2" height="0.2" visible="true"/></telemetry-layout>'
+    );
+
+    expect(parsed).toEqual([
+      expect.objectContaining({
+        id: 'pip-auto',
+        source: 'file:vol',
+      }),
+      expect.objectContaining({
+        id: 'pip-camera',
+        source: 'file:face',
+      }),
+    ]);
+  });
+
+  it.each([
+    ['Vol du 02/10/2026 - face', 'face'],
+    ['Vol du 02/10/2026 - Pilote', 'pilote'],
+    ['Vol du 02/10/2026 - PILOTE', 'pilote'],
+    ['Vol du 02/10/2026 — vol', 'vol'],
+    ['Vol du 02/10/2026', undefined],
+  ])('recognizes YouTube title %s as role %s', (title, role) => {
+    expect(getYoutubeVideoRoleFromTitle(title)).toBe(role);
   });
 
   it.each([

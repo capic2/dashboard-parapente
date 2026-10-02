@@ -60,11 +60,14 @@ import {
   serializeTelemetryLayoutXml,
   alignTelemetryLayoutItems,
   getTelemetryLayoutGroupBounds,
+  DEFAULT_TELEMETRY_PIP_VIDEO_SOURCE,
+  TELEMETRY_PIP_VIDEO_SOURCES,
   TELEMETRY_CANVAS_HEIGHT,
   TELEMETRY_CANVAS_WIDTH,
   type FlightTelemetryIconLayout,
   type FlightTelemetryLayoutItem,
   type FlightTelemetryPipLayout,
+  type TelemetryPipVideoSource,
   type FlightTelemetryTextLayout,
   type TelemetryAlignmentDirection,
   type TelemetryWidgetVariant,
@@ -537,6 +540,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       type: 'pip',
       name: 'PiP vidéo',
       action: 'switch_video',
+      source: DEFAULT_TELEMETRY_PIP_VIDEO_SOURCE,
       applyOffset: true,
       x: 38.4,
       y: 842.4,
@@ -1817,24 +1821,26 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                         </span>
                         <select
                           className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                          value={selected.source ?? ''}
+                          value={
+                            selected.source ??
+                            DEFAULT_TELEMETRY_PIP_VIDEO_SOURCE
+                          }
                           onChange={(event) =>
                             updateItem(selected.id, {
-                              source: event.target.value
-                                ? (event.target.value as 'camera' | 'flight')
-                                : undefined,
+                              source: event.target
+                                .value as TelemetryPipVideoSource,
                             })
                           }
                         >
-                          <option value="">
-                            {t('telemetryLayout.automaticVideoSource')}
-                          </option>
-                          <option value="flight">
-                            {t('telemetryLayout.flightVideoSource')}
-                          </option>
-                          <option value="camera">
-                            {t('telemetryLayout.cameraVideoSource')}
-                          </option>
+                          {TELEMETRY_PIP_VIDEO_SOURCES.map((source) => {
+                            const [sourceType, role] = source.split(':');
+                            const translationKey = `${sourceType}${role[0].toUpperCase()}${role.slice(1)}`;
+                            return (
+                              <option key={source} value={source}>
+                                {t(`telemetryLayout.${translationKey}`)}
+                              </option>
+                            );
+                          })}
                         </select>
                       </label>
                       <label className="block text-sm">

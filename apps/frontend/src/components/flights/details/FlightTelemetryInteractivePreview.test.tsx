@@ -23,6 +23,10 @@ const hooks = vi.hoisted(() => ({
     isPending: true,
     isSuccess: false,
   },
+  youtubeAssociations: [] as {
+    url: string;
+    title?: string | null;
+  }[],
   exportStatus: null as {
     status: string;
     progress?: number;
@@ -72,6 +76,9 @@ vi.mock('../../../hooks/flights/useVideoExportStatus', () => ({
 }));
 
 vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
+  useYoutubeVideoAssociations: () => ({ data: hooks.youtubeAssociations }),
+  useUploadYoutubeDownloadCookies: () => ({ mutateAsync: vi.fn() }),
+  useYoutubeUpload: () => ({ data: null }),
   useStartYoutubeOverlayExport: () => ({
     isPending: false,
     isError: false,
@@ -90,13 +97,26 @@ vi.mock('./FlightOverlayPlayer', () => ({
   FlightOverlayPlayer: ({
     onTimeChange,
     overlayContent,
-    pipLayout,
+    pips,
     syncOffsetSeconds,
+    pipOffsetSeconds,
+    youtubeUrl,
   }: {
     onTimeChange?: (time: number) => void;
     overlayContent?: React.ReactNode;
-    pipLayout?: { x: number; y: number; width: number; height: number };
+    pips?: {
+      id: string;
+      source?: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      youtubeUrl?: string;
+      videoUrl?: string;
+    }[];
     syncOffsetSeconds?: number;
+    pipOffsetSeconds?: number;
+    youtubeUrl?: string;
   }) => (
     <>
       <button
@@ -105,14 +125,22 @@ vi.mock('./FlightOverlayPlayer', () => ({
         aria-label="mock overlay player"
         onClick={() => onTimeChange?.(180)}
       />
-      <div
-        data-testid="player-pip-layout"
-        data-x={pipLayout?.x}
-        data-y={pipLayout?.y}
-        data-width={pipLayout?.width}
-        data-height={pipLayout?.height}
-      />
+      {pips?.map((pip) => (
+        <div
+          key={pip.id}
+          data-testid={`player-pip-${pip.id}`}
+          data-source={pip.source}
+          data-x={pip.x}
+          data-y={pip.y}
+          data-width={pip.width}
+          data-height={pip.height}
+          data-youtube-url={pip.youtubeUrl}
+          data-video-url={pip.videoUrl}
+        />
+      ))}
       <div data-testid="player-sync-offset" data-offset={syncOffsetSeconds} />
+      <div data-testid="player-pip-offset" data-offset={pipOffsetSeconds} />
+      <div data-testid="player-youtube-main" data-url={youtubeUrl} />
       {overlayContent}
     </>
   ),
@@ -219,7 +247,34 @@ describe('FlightTelemetryInteractivePreview', () => {
     hooks.telemetry.isSuccess = true;
     hooks.layout.isPending = false;
     hooks.layout.isSuccess = true;
-    hooks.layout.data = { layout: [] };
+    hooks.layout.data = {
+      layout: [
+        {
+          id: 'no-offset-pip',
+          type: 'pip',
+          action: 'switch_video',
+          source: 'file:face',
+          applyOffset: false,
+          x: 100,
+          y: 100,
+          width: 300,
+          height: 180,
+          visible: true,
+        },
+        {
+          id: 'offset-pip',
+          type: 'pip',
+          action: 'switch_video',
+          source: 'file:vol',
+          applyOffset: true,
+          x: 500,
+          y: 100,
+          width: 300,
+          height: 180,
+          visible: true,
+        },
+      ],
+    };
 
     render(<FlightTelemetryInteractivePreview flightId="flight-1" />);
 
@@ -231,6 +286,10 @@ describe('FlightTelemetryInteractivePreview', () => {
     expect(
       screen.getByTestId('telemetry-overlay').getAttribute('data-offset')
     ).toBe('30.9');
+    expect(screen.getByTestId('player-pip-offset')).toHaveAttribute(
+      'data-offset',
+      '30.9'
+    );
     expect(
       screen
         .getByTestId('telemetry-overlay')
@@ -284,22 +343,110 @@ describe('FlightTelemetryInteractivePreview', () => {
 
     render(<FlightTelemetryInteractivePreview flightId="flight-1" />);
 
-    expect(screen.getByTestId('player-pip-layout')).toHaveAttribute(
+    expect(screen.getByTestId('player-pip-video-pip')).toHaveAttribute(
       'data-x',
       '0.02'
     );
-    expect(screen.getByTestId('player-pip-layout')).toHaveAttribute(
+    expect(screen.getByTestId('player-pip-video-pip')).toHaveAttribute(
       'data-y',
       '0.78'
     );
     expect(
-      Number(screen.getByTestId('player-pip-layout').getAttribute('data-width'))
+      Number(
+        screen.getByTestId('player-pip-video-pip').getAttribute('data-width')
+      )
     ).toBeCloseTo(0.18);
     expect(
       Number(
-        screen.getByTestId('player-pip-layout').getAttribute('data-height')
+        screen.getByTestId('player-pip-video-pip').getAttribute('data-height')
       )
     ).toBeCloseTo(0.18);
+  });
+
+  it('matches the PiP YouTube source to the video title suffix', () => {
+    hooks.overlayPreview.data = {
+      video: { preview_segments: [] },
+      alignment: { automatic_offset_seconds: 0, manual_offset_seconds: 0 },
+      gpx: { coordinates: [] },
+    } as unknown as GoproOverlayPreview;
+    hooks.overlayPreview.isPending = false;
+    hooks.overlayPreview.isSuccess = true;
+    hooks.telemetry.data = {
+      points: [
+        {
+          timestamp: 0,
+          lat: 0,
+          lon: 0,
+          elevation: 0,
+          segment: 0,
+        },
+      ],
+      source: 'gpx',
+      has_osv: false,
+      enrichment_status: 'ready',
+      start_time: null,
+      end_time: null,
+      duration_seconds: 0,
+    };
+    hooks.telemetry.isPending = false;
+    hooks.telemetry.isSuccess = true;
+    hooks.layout.isPending = false;
+    hooks.layout.isSuccess = true;
+    hooks.layout.data = {
+      layout: [
+        {
+          id: 'video-pip',
+          type: 'pip',
+          action: 'switch_video',
+          source: 'youtube:face',
+          x: 38.4,
+          y: 842.4,
+          width: 345.6,
+          height: 194.4,
+          visible: true,
+        },
+        {
+          id: 'pilot-pip',
+          type: 'pip',
+          action: 'switch_video',
+          source: 'youtube:pilote',
+          x: 600,
+          y: 300,
+          width: 345.6,
+          height: 194.4,
+          visible: true,
+        },
+      ],
+    };
+    const faceUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+    const pilotUrl = 'https://www.youtube.com/watch?v=aqz-KE-bpKQ';
+    hooks.youtubeAssociations = [
+      { url: faceUrl, title: 'Vol du 02/10/2026 - face' },
+      { url: pilotUrl, title: 'Vol du 02/10/2026 - pilote' },
+    ];
+
+    render(
+      <FlightTelemetryInteractivePreview
+        flightId="flight-1"
+        youtubeUrls={[faceUrl, pilotUrl]}
+      />
+    );
+
+    expect(screen.getByTestId('player-pip-video-pip')).not.toHaveAttribute(
+      'data-youtube-url'
+    );
+    expect(screen.getByTestId('player-pip-pilot-pip')).toHaveAttribute(
+      'data-youtube-url',
+      pilotUrl
+    );
+    expect(screen.getByTestId('player-youtube-main')).toHaveAttribute(
+      'data-url',
+      faceUrl
+    );
+    expect(screen.getByTestId('player-pip-video-pip')).toHaveAttribute(
+      'data-source',
+      'youtube:face'
+    );
   });
 
   it('uses the saved flight offset immediately when the preview query is stale', () => {
@@ -434,16 +581,16 @@ describe('FlightTelemetryInteractivePreview', () => {
         'Génération de l’overlay synchronisé: 5%',
       ],
     };
+    window.sessionStorage.setItem(
+      'youtube-overlay-export-job:flight-1',
+      'active-export-job'
+    );
 
     render(
       <FlightTelemetryInteractivePreview
         flightId="flight-1"
         youtubeUrls={['https://www.youtube.com/watch?v=dQw4w9WgXcQ']}
       />
-    );
-
-    fireEvent.click(
-      screen.getByRole('button', { name: 'flights.youtubeOverlayExport' })
     );
 
     await waitFor(() =>
@@ -460,5 +607,6 @@ describe('FlightTelemetryInteractivePreview', () => {
     expect(
       screen.getByText('flights.youtubeOverlayExportShowLogs')
     ).toBeInTheDocument();
+    window.sessionStorage.removeItem('youtube-overlay-export-job:flight-1');
   });
 });
