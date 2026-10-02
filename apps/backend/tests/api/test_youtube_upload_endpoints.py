@@ -56,10 +56,61 @@ def test_existing_youtube_video_ids_returns_only_remote_matches(monkeypatch) -> 
 
     assert result == {"dQw4w9WgXcQ"}
     assert requests[0]["params"] == {
-        "part": "id",
+        "part": "id,snippet",
         "id": "9bZkp7q19f0,dQw4w9WgXcQ",
     }
     assert requests[0]["headers"] == {"Authorization": "Bearer token-1"}
+
+
+def test_youtube_video_metadata_includes_the_remote_video_title(monkeypatch) -> None:
+    monkeypatch.setattr(youtube_upload, "_access_token", lambda _user_id: "token")
+
+    def get_videos(url: str, **kwargs: Any) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "items": [
+                    {
+                        "id": "dQw4w9WgXcQ",
+                        "snippet": {"title": "Vol du 02/10/2026 - face"},
+                    }
+                ]
+            },
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr(youtube_upload.httpx, "get", get_videos)
+
+    assert youtube_upload.youtube_video_metadata({1: {"dQw4w9WgXcQ", "9bZkp7q19f0"}}) == {
+        "dQw4w9WgXcQ": {
+            "exists": True,
+            "title": "Vol du 02/10/2026 - face",
+        },
+        "9bZkp7q19f0": {"exists": False, "title": None},
+    }
+
+
+def test_youtube_video_metadata_ignores_invalid_snippets_and_continues_batch(monkeypatch) -> None:
+    monkeypatch.setattr(youtube_upload, "_access_token", lambda _user_id: "token")
+
+    def get_videos(url: str, **kwargs: Any) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "items": [
+                    {"id": "dQw4w9WgXcQ", "snippet": None},
+                    {"id": "9bZkp7q19f0", "snippet": {"title": "Vol du 02/10/2026 - pilote"}},
+                ]
+            },
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr(youtube_upload.httpx, "get", get_videos)
+
+    assert youtube_upload.youtube_video_metadata({1: {"dQw4w9WgXcQ", "9bZkp7q19f0"}}) == {
+        "dQw4w9WgXcQ": {"exists": True, "title": None},
+        "9bZkp7q19f0": {"exists": True, "title": "Vol du 02/10/2026 - pilote"},
+    }
 
 
 def test_existing_youtube_video_ids_tolerates_token_refresh_failure(monkeypatch) -> None:
@@ -892,14 +943,29 @@ def test_youtube_video_metadata_marks_only_current_users_completed_upload_as_del
         )
     )
     db_session.commit()
+
+    metadata_queries: list[dict[int, set[str]]] = []
+
+    def youtube_metadata(video_ids_by_user: dict[int, set[str]]) -> dict[str, dict[str, Any]]:
+        metadata_queries.append(
+            {owner_id: set(video_ids) for owner_id, video_ids in video_ids_by_user.items()}
+        )
+        return {
+            "dQw4w9WgXcQ": {
+                "exists": True,
+                "title": "Vol du 02/10/2026 - face",
+            }
+        }
+
     monkeypatch.setattr(
         youtube_upload,
-        "youtube_video_availability",
-        lambda _video_ids_by_user: {"dQw4w9WgXcQ": True},
+        "youtube_video_metadata",
+        youtube_metadata,
     )
 
     response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/youtube-videos")
 
+    assert metadata_queries == [{1: {"dQw4w9WgXcQ"}}]
     assert response.status_code == 200
     assert response.json() == [
         {
@@ -907,18 +973,21 @@ def test_youtube_video_metadata_marks_only_current_users_completed_upload_as_del
             "video_id": "dQw4w9WgXcQ",
             "can_delete_from_youtube": True,
             "exists_on_youtube": True,
+            "title": "Vol du 02/10/2026 - face",
         },
         {
             "url": "https://www.youtube.com/watch?v=abcdefghijk",
             "video_id": "abcdefghijk",
             "can_delete_from_youtube": False,
             "exists_on_youtube": None,
+            "title": None,
         },
         {
             "url": "https://www.youtube.com/watch?v=Zyxwvutsr_1",
             "video_id": "Zyxwvutsr_1",
             "can_delete_from_youtube": False,
             "exists_on_youtube": None,
+            "title": None,
         },
     ]
 
@@ -940,6 +1009,7 @@ def test_youtube_video_metadata_disables_remote_deletion_when_disconnected(
             "video_id": "dQw4w9WgXcQ",
             "can_delete_from_youtube": False,
             "exists_on_youtube": None,
+            "title": "Uploaded video",
         }
     ]
 
@@ -962,8 +1032,8 @@ def test_youtube_video_metadata_reports_a_video_deleted_directly_from_youtube(
     db_session.commit()
     monkeypatch.setattr(
         youtube_upload,
-        "youtube_video_availability",
-        lambda _video_ids_by_user: {"dQw4w9WgXcQ": False},
+        "youtube_video_metadata",
+        lambda _video_ids_by_user: {"dQw4w9WgXcQ": {"exists": False, "title": None}},
     )
 
     response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/youtube-videos")
@@ -975,6 +1045,7 @@ def test_youtube_video_metadata_reports_a_video_deleted_directly_from_youtube(
             "video_id": "dQw4w9WgXcQ",
             "can_delete_from_youtube": True,
             "exists_on_youtube": False,
+            "title": "Uploaded video",
         }
     ]
 

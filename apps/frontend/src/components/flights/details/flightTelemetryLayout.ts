@@ -2,7 +2,34 @@ import { METRIC_KEYS, type MetricKey } from './telemetryMetrics';
 
 export type TelemetryInteractionAction = 'none' | 'cycle_metric';
 export type TelemetryPipAction = 'switch_video';
-export type TelemetryPipVideoSource = 'camera' | 'flight';
+export type TelemetryPipVideoRole = 'face' | 'pilote' | 'vol';
+export type TelemetryPipVideoSource =
+  | `youtube:${TelemetryPipVideoRole}`
+  | `file:${TelemetryPipVideoRole}`;
+export const TELEMETRY_PIP_VIDEO_SOURCES: TelemetryPipVideoSource[] = [
+  'youtube:face',
+  'youtube:pilote',
+  'youtube:vol',
+  'file:face',
+  'file:pilote',
+  'file:vol',
+];
+export const DEFAULT_TELEMETRY_PIP_VIDEO_SOURCE: TelemetryPipVideoSource =
+  'file:vol';
+
+export function getYoutubePipVideoRole(
+  source?: TelemetryPipVideoSource
+): TelemetryPipVideoRole | undefined {
+  if (!source?.startsWith('youtube:')) return undefined;
+  return source.slice('youtube:'.length) as TelemetryPipVideoRole;
+}
+
+export function getYoutubeVideoRoleFromTitle(
+  title?: string | null
+): TelemetryPipVideoRole | undefined {
+  const match = title?.trim().match(/[-–—]\s*(face|pilote|vol)$/iu);
+  return match?.[1]?.toLowerCase() as TelemetryPipVideoRole | undefined;
+}
 export type TelemetryWidgetVariant =
   | 'value'
   | 'speedometer'
@@ -467,7 +494,17 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
       };
     }
     if (type === 'pip') {
-      const source = element.getAttribute('source');
+      const rawSource = element.getAttribute('source');
+      const source: TelemetryPipVideoSource =
+        rawSource === 'camera'
+          ? 'file:face'
+          : rawSource === 'flight'
+            ? 'file:vol'
+            : TELEMETRY_PIP_VIDEO_SOURCES.includes(
+                  rawSource as TelemetryPipVideoSource
+                )
+              ? (rawSource as TelemetryPipVideoSource)
+              : DEFAULT_TELEMETRY_PIP_VIDEO_SOURCE;
       return {
         ...common,
         ...grouping,
@@ -479,7 +516,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
         )
           ? (element.getAttribute('action') as TelemetryPipAction)
           : 'switch_video',
-        ...(source === 'camera' || source === 'flight' ? { source } : {}),
+        source,
         applyOffset: element.getAttribute('apply-offset') !== 'false',
       };
     }

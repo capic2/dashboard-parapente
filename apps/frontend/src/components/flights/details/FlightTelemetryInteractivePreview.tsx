@@ -32,6 +32,8 @@ import { FlightTelemetryOverlay } from './FlightTelemetryOverlay';
 import {
   TELEMETRY_CANVAS_HEIGHT,
   TELEMETRY_CANVAS_WIDTH,
+  getYoutubePipVideoRole,
+  getYoutubeVideoRoleFromTitle,
   type FlightTelemetryPipLayout,
 } from './flightTelemetryLayout';
 import { sourceTimeAtPreviewTime } from './GoproOverlaySyncPreview';
@@ -46,6 +48,7 @@ import {
 interface FlightTelemetryInteractivePreviewProps {
   flightId: string;
   hasFlightVideo?: boolean;
+  hasPanoVideo?: boolean;
   manualOffsetSeconds?: number;
   youtubeUrls?: string[];
 }
@@ -163,6 +166,7 @@ function getYoutubeExportPhase(
 export function FlightTelemetryInteractivePreview({
   flightId,
   hasFlightVideo = true,
+  hasPanoVideo = false,
   manualOffsetSeconds,
   youtubeUrls = EMPTY_YOUTUBE_URLS,
 }: FlightTelemetryInteractivePreviewProps) {
@@ -208,11 +212,6 @@ export function FlightTelemetryInteractivePreview({
     )
   );
   const [selectedYoutubeIndex, setSelectedYoutubeIndex] = useState(0);
-  const [selectedPipYoutubeUrl, setSelectedPipYoutubeUrl] = useState('');
-  const activeYoutubeIndex = Math.min(
-    selectedYoutubeIndex,
-    Math.max(validYoutubeUrls.length - 1, 0)
-  );
   const isEnrichmentPending =
     telemetry.data?.enrichment_status === 'pending' ||
     overlayPreview.data?.gpx?.enrichment_status === 'pending';
@@ -265,27 +264,87 @@ export function FlightTelemetryInteractivePreview({
         ? parseApiUtcDate(overlayPreview.data.gpx.start_time).getTime()
         : telemetry.data?.points[0]?.timestamp));
   const previewSegments = overlayPreview.data?.video.preview_segments ?? [];
-  const pipLayout = layout.data?.layout.find(
-    (item): item is FlightTelemetryPipLayout => item.type === 'pip'
+  const pipLayouts = (layout.data?.layout ?? []).filter(
+    (item): item is FlightTelemetryPipLayout =>
+      item.type === 'pip' && item.visible
   );
-  const playerPipLayout = pipLayout
-    ? {
-        ...pipLayout,
-        x: pipLayout.x / TELEMETRY_CANVAS_WIDTH,
-        y: pipLayout.y / TELEMETRY_CANVAS_HEIGHT,
-        width: pipLayout.width / TELEMETRY_CANVAS_WIDTH,
-        height: pipLayout.height / TELEMETRY_CANVAS_HEIGHT,
-      }
-    : undefined;
-  const pipOffsetSeconds =
-    pipLayout?.applyOffset === false ? 0 : calibrationOffsetSeconds;
-  const youtubeUrl = validYoutubeUrls[activeYoutubeIndex];
-  const pipYoutubeOptions = validYoutubeUrls.filter(
-    (url) => url !== youtubeUrl
+  const youtubeUrlForRole = (
+    role: ReturnType<typeof getYoutubePipVideoRole>
+  ) =>
+    role
+      ? (youtubeAssociations.data ?? []).find(
+          (association) =>
+            validYoutubeUrls.includes(association.url) &&
+            getYoutubeVideoRoleFromTitle(association.title) === role
+        )?.url
+      : undefined;
+  const cameraUrl = getApiUrlWithSearchParams(
+    `flights/${flightId}/gopro-camera/preview`,
+    {
+      access_token: token,
+      target_end_seconds: String(
+        overlayPreview.data?.video.preview_target_end_seconds ?? ''
+      ),
+      version: `${overlayPreview.data?.video.preview_target_end_seconds}-${overlayPreview.data?.video.preview_available_duration_seconds}`,
+    }
   );
-  const youtubePipUrl = pipYoutubeOptions.includes(selectedPipYoutubeUrl)
-    ? selectedPipYoutubeUrl
+  const flightUrl = hasFlightVideo
+    ? getApiUrlWithSearchParams(`flights/${flightId}/video`, {
+        access_token: token,
+      })
     : undefined;
+  const panoUrl = hasPanoVideo
+    ? getApiUrlWithSearchParams(`flights/${flightId}/pano`, {
+        access_token: token,
+      })
+    : undefined;
+  const playerPips = pipLayouts.map((pip) => {
+    const role = getYoutubePipVideoRole(pip.source);
+    const youtubePipUrl = role ? youtubeUrlForRole(role) : undefined;
+    let videoUrl: string | undefined;
+    if (pip.source === 'file:face') videoUrl = cameraUrl;
+    else if (pip.source === 'file:pilote') videoUrl = panoUrl;
+    else if (pip.source === 'file:vol') videoUrl = flightUrl;
+
+    let label = t('flights.goproOverlayFlightVideo');
+    if (role === 'face' || pip.source === 'file:face') {
+      label = t('flights.goproOverlayCameraPreview');
+    } else if (role === 'pilote' || pip.source === 'file:pilote') {
+      label = t('flights.panoBadge');
+    }
+    return {
+      ...pip,
+      x: pip.x / TELEMETRY_CANVAS_WIDTH,
+      y: pip.y / TELEMETRY_CANVAS_HEIGHT,
+      width: pip.width / TELEMETRY_CANVAS_WIDTH,
+      height: pip.height / TELEMETRY_CANVAS_HEIGHT,
+      videoUrl,
+      youtubeUrl: youtubePipUrl,
+      label,
+    };
+  });
+  const assignedYoutubePipUrls = new Set(
+    playerPips.flatMap((pip) => (pip.youtubeUrl ? [pip.youtubeUrl] : []))
+  );
+  const unassignedYoutubeUrls = validYoutubeUrls.filter(
+    (url) => !assignedYoutubePipUrls.has(url)
+  );
+  const youtubeMainUrls = unassignedYoutubeUrls.length
+    ? unassignedYoutubeUrls
+    : validYoutubeUrls;
+  const activeYoutubeIndex = youtubeMainUrls.length
+    ? selectedYoutubeIndex % youtubeMainUrls.length
+    : 0;
+  const youtubeUrl = youtubeMainUrls[activeYoutubeIndex];
+  const playablePips = playerPips.map((pip) => {
+    if (!youtubeUrl || pip.youtubeUrl !== youtubeUrl) return pip;
+    return Object.assign({}, pip, { youtubeUrl: undefined });
+  });
+  const exportPip =
+    playablePips.find((pip) => pip.youtubeUrl) ?? playablePips[0];
+  const pipLayout = exportPip;
+  const youtubePipUrl = exportPip?.youtubeUrl;
+  const pipOffsetSeconds = calibrationOffsetSeconds;
   const isYoutubeVideoAlreadyPublished = Boolean(
     youtubeAssociations.data?.some(
       (association) =>
@@ -294,7 +353,7 @@ export function FlightTelemetryInteractivePreview({
         association.exists_on_youtube === true
     )
   );
-  const hasYoutubeCarousel = validYoutubeUrls.length > 1;
+  const hasYoutubeCarousel = youtubeMainUrls.length > 1;
   useEffect(() => {
     setYoutubeExportJobId(readYoutubeExportJobId(flightId));
   }, [flightId]);
@@ -316,9 +375,9 @@ export function FlightTelemetryInteractivePreview({
     youtubeExportStatus?.status,
   ]);
   const selectYoutubeVideo = (index: number) => {
-    if (validYoutubeUrls.length === 0) return;
+    if (youtubeMainUrls.length === 0) return;
     setSelectedYoutubeIndex(
-      (index + validYoutubeUrls.length) % validYoutubeUrls.length
+      (index + youtubeMainUrls.length) % youtubeMainUrls.length
     );
     setCameraTime(0);
   };
@@ -721,7 +780,7 @@ export function FlightTelemetryInteractivePreview({
                 <span className="min-w-0 text-center text-sm font-semibold text-slate-700 dark:text-slate-200">
                   {t('flights.overlayVideoPosition', {
                     current: activeYoutubeIndex + 1,
-                    total: validYoutubeUrls.length,
+                    total: youtubeMainUrls.length,
                   })}
                 </span>
                 <button
@@ -734,62 +793,21 @@ export function FlightTelemetryInteractivePreview({
                 </button>
               </div>
             )}
-            {pipLayout?.visible && pipYoutubeOptions.length > 0 && (
-              <label className="mb-3 block max-w-sm text-sm">
-                <span className="mb-1 block font-medium text-slate-700 dark:text-slate-200">
-                  {t('flights.overlayPipVideoLabel')}
-                </span>
-                <select
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                  value={youtubePipUrl ?? ''}
-                  onChange={(event) =>
-                    setSelectedPipYoutubeUrl(event.target.value)
-                  }
-                >
-                  <option value="">
-                    {t('flights.overlayPipVideoDefault')}
-                  </option>
-                  {pipYoutubeOptions.map((url) => (
-                    <option key={url} value={url}>
-                      {t('flights.overlayPipVideoYoutube', {
-                        index: validYoutubeUrls.indexOf(url) + 1,
-                      })}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
             <div className="min-w-0 flex-1">
               <FlightOverlayPlayer
                 key={youtubeUrl ?? 'camera-only'}
                 mode="interactive"
-                cameraUrl={getApiUrlWithSearchParams(
-                  `flights/${flightId}/gopro-camera/preview`,
-                  {
-                    access_token: token,
-                    target_end_seconds: String(
-                      overlayPreview.data?.video.preview_target_end_seconds ??
-                        ''
-                    ),
-                    version: `${overlayPreview.data?.video.preview_target_end_seconds}-${overlayPreview.data?.video.preview_available_duration_seconds}`,
-                  }
-                )}
-                flightUrl={
-                  hasFlightVideo
-                    ? getApiUrlWithSearchParams(`flights/${flightId}/video`, {
-                        access_token: token,
-                      })
-                    : undefined
-                }
+                cameraUrl={cameraUrl}
+                flightUrl={flightUrl}
                 youtubeUrl={youtubeUrl}
-                youtubePipUrl={youtubePipUrl}
                 syncOffsetSeconds={calibrationOffsetSeconds}
                 pipOffsetSeconds={pipOffsetSeconds}
-                getFlightTime={(cameraTime) => cameraTime - pipOffsetSeconds}
+                getFlightTime={(cameraTime) =>
+                  cameraTime - calibrationOffsetSeconds
+                }
                 cameraLabel={t('flights.goproOverlayCameraPreview')}
                 flightLabel={t('flights.goproOverlayFlightVideo')}
-                pipLayout={playerPipLayout}
-                pipSource={pipLayout?.source}
+                pips={playablePips}
                 onTimeChange={(cameraTime) =>
                   setCameraTime(
                     youtubeUrl
