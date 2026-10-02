@@ -20,30 +20,16 @@ jobs:
   main:
     name: main
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      NX_NO_CLOUD: true
 
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
-      # NX Local Cache: fallback when NX Cloud credits are exhausted
-      # This cache is also used for Renovate PRs to conserve NX Cloud credits
-      # Cache strategy:
-      #   - Primary: OS + pnpm-lock hash + git SHA (exact match)
-      #   - Fallback 1: OS + pnpm-lock hash (recent builds with same deps)
-      #   - Fallback 2: OS only (any recent build)
-      - name: 💾 Setup NX Cache (local fallback)
-        uses: actions/cache@v6
-        with:
-          path: .nx/cache
-          key: nx-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ github.sha }}
-          restore-keys: |
-            nx-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-
-            nx-${{ runner.os }}-
 
       - name: 📦 Setup pnpm
         uses: pnpm/action-setup@v6
@@ -88,108 +74,16 @@ jobs:
       - name: 🔍 Check unused code (knip)
         run: pnpm knip
 
-      - name: 🔍 Derive SHAs for Nx affected
-        uses: nrwl/nx-set-shas@v5
-        with:
-          main-branch-name: 'main'
-
-      # NX Cloud strategy:
-      # - Default: NX Cloud ENABLED
-      # - If 'skip-nx-cloud' label present: use local cache only
-      # - If credits exhausted at runtime: auto-add label + auto-retry with local cache
-      # - Renovate PRs always have 'skip-nx-cloud' (configured in renovate.json)
-      - name: 🎛️ Configure NX Cloud execution
-        run: |
-          if [[ "${{ github.event_name }}" == "push" ]]; then
-            echo "IS_AUTOMERGE=false" >> $GITHUB_ENV
-            echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
-            echo "Push to main: using local cache"
-          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name' 2>/dev/null || echo "")
-            if echo "$LABELS" | grep -qx "automerge"; then
-              echo "IS_AUTOMERGE=true" >> $GITHUB_ENV
-              echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
-              echo "Automerge: NX Cloud disabled for a full uncached validation"
-            elif echo "$LABELS" | grep -qx "skip-nx-cloud"; then
-              echo "IS_AUTOMERGE=false" >> $GITHUB_ENV
-              echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
-              echo "NX Cloud DISABLED (skip-nx-cloud label)"
-            else
-              echo "IS_AUTOMERGE=false" >> $GITHUB_ENV
-              echo "NX_NO_CLOUD=false" >> $GITHUB_ENV
-              echo "NX Cloud ENABLED"
-            fi
-          else
-            echo "IS_AUTOMERGE=false" >> $GITHUB_ENV
-            echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
-          fi
+      - name: 🔨 Run full validation without task cache
+        run: pnpm exec nx run-many -t build,lint,type-check,test --all --parallel=5 --exclude=e2e --skip-nx-cache
         env:
-          GH_TOKEN: ${{ github.token }}
-
-      - name: 🔨 Verify production frontend build
-        run: pnpm exec nx build frontend --configuration=production
-        env:
-          NX_NO_CLOUD: true
+          NODE_OPTIONS: --preserve-symlinks
+          TESTING: true
+          BACKEND_DATABASE_URL: sqlite:///./test.db
+          BACKEND_WEATHERAPI_KEY: test_key
+          BACKEND_METEOBLUE_API_KEY: test_key
+          BACKEND_JWT_SECRET: ci-test-secret-not-for-production
           VITE_CESIUM_ION_TOKEN: ${{ secrets.VITE_CESIUM_ION_TOKEN }}
-
-      - name: 🔨 Run affected (build, lint, type-check, test)
-        id: nx_tasks
-        run: |
-          run_nx() {
-            local output
-            output=$(pnpm exec "$@" 2>&1) || {
-              echo "$output"
-              if echo "$output" | grep -qE "(Workspace is unable to be authorized|exceeding the FREE plan|Workspace is disabled)"; then
-                echo "NX_CLOUD_EXHAUSTED=true" >> $GITHUB_ENV
-                return 1
-              fi
-              return 1
-            }
-            echo "$output"
-          }
-
-          if [[ "$IS_AUTOMERGE" == "true" ]]; then
-            run_nx nx run-many -t build,lint,type-check,test --all --parallel=5 --exclude=e2e --skip-nx-cache
-          else
-            run_nx nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e
-          fi
-        continue-on-error: true
-        env:
-          NODE_OPTIONS: --preserve-symlinks
-          TESTING: true
-          BACKEND_DATABASE_URL: sqlite:///./test.db
-          BACKEND_WEATHERAPI_KEY: test_key
-          BACKEND_METEOBLUE_API_KEY: test_key
-          BACKEND_JWT_SECRET: ci-test-secret-not-for-production
-
-      - name: 💡 Handle NX Cloud credits exhaustion
-        if: steps.nx_tasks.outcome == 'failure' && env.NX_CLOUD_EXHAUSTED == 'true'
-        run: |
-          echo "NX Cloud credits exhausted - retrying with local cache"
-          echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
-
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels \
-              -f "labels[]=nx-cloud-no-credit" -f "labels[]=skip-nx-cloud" || true
-          fi
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      - name: 🔄 Retry with local cache
-        if: steps.nx_tasks.outcome == 'failure' && env.NX_CLOUD_EXHAUSTED == 'true'
-        run: pnpm exec nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e
-        env:
-          NODE_OPTIONS: --preserve-symlinks
-          NX_NO_CLOUD: true
-          TESTING: true
-          BACKEND_DATABASE_URL: sqlite:///./test.db
-          BACKEND_WEATHERAPI_KEY: test_key
-          BACKEND_METEOBLUE_API_KEY: test_key
-          BACKEND_JWT_SECRET: ci-test-secret-not-for-production
-
-      - name: ❌ Fail if non-NX-Cloud error
-        if: steps.nx_tasks.outcome == 'failure' && env.NX_CLOUD_EXHAUSTED != 'true'
-        run: exit 1
 
       - name: 📊 Upload frontend coverage
         if: always() && env.CODECOV_TOKEN != ''
