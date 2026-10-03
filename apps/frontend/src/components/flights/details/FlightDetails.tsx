@@ -11,6 +11,7 @@ import {
   Modal,
 } from '@dashboard-parapente/design-system';
 import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
+import type { FlightVideoMarker } from '@dashboard-parapente/shared-types';
 import type { GoproOverlayJob } from '@dashboard-parapente/shared-types';
 import type { YoutubeVideoAssociation } from '@dashboard-parapente/shared-types';
 import {
@@ -72,6 +73,7 @@ import { FlightYoutubeVideos } from './FlightYoutubeVideos';
 import { GoproOverlayJobStack } from './GoproOverlayJobStack';
 import { FlightOverlayWorkspace } from './FlightOverlayWorkspace';
 import { FlightTelemetryInteractivePreview } from './FlightTelemetryInteractivePreview';
+import { flightQueryOptions } from '../../../hooks/flights/useFlight';
 
 interface FlightDetailsProps {
   flight: Flight;
@@ -285,6 +287,22 @@ export function FlightDetails({
   const handleCancelEdit = () => {
     completedEditYoutubeRemovalIdsRef.current.clear();
     setEditingMode(false);
+  };
+
+  const handleAddVideoMarker = async (
+    marker: Omit<FlightVideoMarker, 'id'>
+  ) => {
+    const queryOptions = flightQueryOptions(flight.id);
+    const latestFlight =
+      queryClient.getQueryData<Flight>(queryOptions.queryKey) ?? flight;
+    const nextMarkers = [
+      ...(latestFlight.video_markers ?? []),
+      { ...marker, id: crypto.randomUUID() },
+    ];
+    const updatedFlight = await updateFlight.mutateAsync({
+      video_markers: nextMarkers,
+    });
+    queryClient.setQueryData(queryOptions.queryKey, updatedFlight);
   };
 
   const handleStartEdit = () => {
@@ -1021,6 +1039,9 @@ export function FlightDetails({
             hasPanoVideo={hasPanoVideo}
             manualOffsetSeconds={Number(goproOverlayPreviewOffset)}
             youtubeUrls={flight.youtube_urls ?? []}
+            videoMarkers={flight.video_markers ?? []}
+            onAddVideoMarker={handleAddVideoMarker}
+            isSavingVideoMarker={updateFlight.isPending}
           />
         )}
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
