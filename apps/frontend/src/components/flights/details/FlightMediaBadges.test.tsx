@@ -44,7 +44,7 @@ vi.mock('./FlightTemporaryMediaCard', () => ({
   FlightTemporaryMediaCard: ({
     sourceType,
   }: {
-    sourceType: 'camera' | 'pano';
+    sourceType: 'camera' | 'pano' | 'face' | 'pilote';
   }) => <div data-testid={`temporary-${sourceType}`} />,
 }));
 
@@ -52,7 +52,12 @@ import { FlightMediaBadges } from './FlightMediaBadges';
 
 const flight = { id: 'flight-1' } as Flight;
 
-function renderMedia(hasGoproCameraVideo: boolean, hasPanoVideo: boolean) {
+function renderMedia(
+  hasPanoVideo: boolean,
+  hasFaceVideo: boolean,
+  hasPiloteVideo: boolean,
+  hasGoproCameraVideo = false
+) {
   return render(
     <FlightMediaBadges
       flightId="flight-1"
@@ -60,6 +65,8 @@ function renderMedia(hasGoproCameraVideo: boolean, hasPanoVideo: boolean) {
       hasVideo={false}
       hasPanoVideo={hasPanoVideo}
       hasGoproCameraVideo={hasGoproCameraVideo}
+      hasFaceVideo={hasFaceVideo}
+      hasPiloteVideo={hasPiloteVideo}
       flight={flight}
       hasPersistedGoproOverlay={false}
       hasCompletedGoproOverlayJob={false}
@@ -78,18 +85,20 @@ function renderMedia(hasGoproCameraVideo: boolean, hasPanoVideo: boolean) {
 }
 
 describe('FlightMediaBadges temporary sources', () => {
-  it('groups available camera and pano cards into the temporary sources section', () => {
-    renderMedia(true, true);
+  it('keeps the GoPro camera and lists available pano, face and pilote sources', () => {
+    renderMedia(true, true, true, true);
 
     expect(
       screen.getByRole('heading', { name: 'Temporary sources to publish' })
     ).toBeInTheDocument();
-    expect(screen.getByTestId('temporary-camera')).toBeInTheDocument();
     expect(screen.getByTestId('temporary-pano')).toBeInTheDocument();
+    expect(screen.getByTestId('temporary-face')).toBeInTheDocument();
+    expect(screen.getByTestId('temporary-pilote')).toBeInTheDocument();
+    expect(screen.getByTestId('temporary-camera')).toBeInTheDocument();
   });
 
   it('hides the temporary sources section when neither file is available', () => {
-    renderMedia(false, false);
+    renderMedia(false, false, false);
 
     expect(
       screen.queryByRole('heading', { name: 'Temporary sources to publish' })

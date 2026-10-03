@@ -26,7 +26,7 @@ from spatialmedia import metadata_utils
 
 import config
 from database import SessionLocal
-from flight_storage import flight_sequence_number, pano_video_path
+from flight_storage import flight_sequence_number, pano_video_path, temporary_video_path
 from models import (
     Flight,
     GoproOverlayJob,
@@ -997,6 +997,11 @@ def _source_video_path(db: Session, job: YoutubeUploadJob) -> Path:
         if flight is None:
             raise RuntimeError("Flight is no longer available")
         return pano_video_path(db, flight)
+    if job.source_type in {"face", "pilote"}:
+        flight = db.get(Flight, job.flight_id)
+        if flight is None:
+            raise RuntimeError("Flight is no longer available")
+        return temporary_video_path(db, flight, job.source_type)
     if job.source_type != "gopro_overlay":
         if job.source_type != "highlight":
             raise RuntimeError("YouTube upload has an unsupported video source")
