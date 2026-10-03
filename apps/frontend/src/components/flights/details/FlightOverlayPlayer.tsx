@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -78,6 +79,7 @@ export interface FlightOverlayPip extends FlightTelemetryPipLayout {
 }
 
 const EMPTY_PIPS: FlightOverlayPip[] = [];
+const CONTROLS_HIDE_DELAY_MS = 2500;
 
 // The GoPro layout is authored on a 3840x2160 canvas. Keep the interactive
 // PiP in that same coordinate system instead of tying it to arbitrary Tailwind
@@ -166,6 +168,10 @@ export function FlightOverlayPlayer({
   const [cameraCurrentTime, setCameraCurrentTime] = useState(0);
   const [cameraDuration, setCameraDuration] = useState(0);
   const [cameraIsPlaying, setCameraIsPlaying] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const controlsHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
   const cameraCurrentTimeRef = useRef(cameraCurrentTime);
   const cameraIsPlayingRef = useRef(cameraIsPlaying);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -179,6 +185,71 @@ export function FlightOverlayPlayer({
   cameraCurrentTimeRef.current = cameraCurrentTime;
   cameraIsPlayingRef.current = cameraIsPlaying;
   seekRequestRef.current = seekRequest;
+
+  const clearControlsHideTimeout = useCallback(() => {
+    if (controlsHideTimeoutRef.current) {
+      clearTimeout(controlsHideTimeoutRef.current);
+      controlsHideTimeoutRef.current = null;
+    }
+  }, []);
+
+  const scheduleControlsHide = useCallback(() => {
+    clearControlsHideTimeout();
+    controlsHideTimeoutRef.current = setTimeout(() => {
+      setControlsVisible(false);
+      controlsHideTimeoutRef.current = null;
+    }, CONTROLS_HIDE_DELAY_MS);
+  }, [clearControlsHideTimeout]);
+
+  const handlePlayerActivity = useCallback(() => {
+    setControlsVisible(true);
+    if (cameraIsPlayingRef.current) scheduleControlsHide();
+    else clearControlsHideTimeout();
+  }, [clearControlsHideTimeout, scheduleControlsHide]);
+
+  const handlePlayerFocus = useCallback(() => {
+    setControlsVisible(true);
+    if (cameraIsPlayingRef.current) scheduleControlsHide();
+    else clearControlsHideTimeout();
+  }, [clearControlsHideTimeout, scheduleControlsHide]);
+
+  const handlePlayerBlur = useCallback(() => {
+    if (cameraIsPlayingRef.current) scheduleControlsHide();
+  }, [scheduleControlsHide]);
+
+  useEffect(() => {
+    if (isInteractive && cameraIsPlaying) scheduleControlsHide();
+    else clearControlsHideTimeout();
+
+    return clearControlsHideTimeout;
+  }, [
+    cameraIsPlaying,
+    clearControlsHideTimeout,
+    isInteractive,
+    scheduleControlsHide,
+  ]);
+
+  useEffect(() => {
+    const handlePointerActivity = (event: PointerEvent) => {
+      if (playerRef.current?.contains(event.target as Node)) {
+        handlePlayerActivity();
+      }
+    };
+    const handleKeyActivity = (event: KeyboardEvent) => {
+      if (playerRef.current?.contains(event.target as Node)) {
+        handlePlayerActivity();
+      }
+    };
+
+    document.addEventListener('pointermove', handlePointerActivity);
+    document.addEventListener('pointerdown', handlePointerActivity);
+    document.addEventListener('keydown', handleKeyActivity);
+    return () => {
+      document.removeEventListener('pointermove', handlePointerActivity);
+      document.removeEventListener('pointerdown', handlePointerActivity);
+      document.removeEventListener('keydown', handleKeyActivity);
+    };
+  }, [handlePlayerActivity]);
 
   useEffect(() => {
     if (mode === 'interactive') setActivePipId(null);
@@ -318,6 +389,7 @@ export function FlightOverlayPlayer({
   };
 
   const handlePlay = () => {
+    setControlsVisible(true);
     setCameraIsPlaying(true);
     syncMedia();
     playMedia(flightRef.current);
@@ -366,6 +438,7 @@ export function FlightOverlayPlayer({
             if (duration > 0) setCameraDuration(duration);
             const playing = data === 1;
             setCameraIsPlaying(playing);
+            if (!playing) setControlsVisible(true);
             if (playing) {
               playMedia(flightRef.current);
               pipVideosRef.current.forEach(playMedia);
@@ -464,6 +537,7 @@ export function FlightOverlayPlayer({
   }, [isInteractive, pipYoutubeSignature, youtubeId]);
 
   const handlePause = () => {
+    setControlsVisible(true);
     setCameraIsPlaying(false);
     youtubePipPlayersRef.current.forEach((player) => player.pauseVideo());
     flightRef.current?.pause();
@@ -562,7 +636,9 @@ export function FlightOverlayPlayer({
   return (
     <div
       ref={playerRef}
-      className="group relative overflow-hidden rounded-xl bg-black shadow-sm [&:fullscreen]:flex [&:fullscreen]:flex-col [&:fullscreen]:overflow-y-auto [&:fullscreen]:rounded-none"
+      className="relative overflow-hidden rounded-xl bg-black shadow-sm [&:fullscreen]:flex [&:fullscreen]:flex-col [&:fullscreen]:overflow-y-auto [&:fullscreen]:rounded-none"
+      onFocusCapture={handlePlayerFocus}
+      onBlurCapture={handlePlayerBlur}
     >
       <div
         data-testid="flight-overlay-media-stage"
@@ -570,7 +646,7 @@ export function FlightOverlayPlayer({
       >
         {masterIsYoutube ? (
           <div
-            className={masterMediaClassName}
+            className={`${masterMediaClassName} ${isInteractive ? 'pointer-events-none' : ''}`}
             style={masterMediaStyle}
             aria-label={cameraLabel}
           >
@@ -756,7 +832,7 @@ export function FlightOverlayPlayer({
         {isInteractive && (
           <div
             data-testid="flight-overlay-controls"
-            className="pointer-events-none absolute inset-x-0 bottom-0 z-40 bg-gradient-to-t from-slate-950 via-slate-950/95 to-slate-950/0 px-3 pb-3 pt-12 text-white opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100 sm:px-4 sm:pb-4"
+            className={`pointer-events-none absolute inset-x-0 bottom-0 z-40 bg-gradient-to-t from-slate-950 via-slate-950/95 to-slate-950/0 px-3 pb-3 pt-12 text-white transition-opacity duration-200 sm:px-4 sm:pb-4 ${controlsVisible ? 'pointer-events-auto opacity-100' : 'opacity-0'}`}
           >
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <button
