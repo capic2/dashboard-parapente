@@ -1,6 +1,7 @@
 // Core domain types
 // Re-export types from Zod schemas to ensure consistency between validation and types
 import type { Key } from 'react-aria-components';
+import type { FlightVideoMarker } from '@dashboard-parapente/shared-types';
 
 export type {
   Site,
@@ -8,7 +9,6 @@ export type {
   FlightVideoMarker,
   FlightStats,
   FlightRecords,
-  FlightVideoMarker,
   DailySummary,
 } from '@dashboard-parapente/shared-types';
 
