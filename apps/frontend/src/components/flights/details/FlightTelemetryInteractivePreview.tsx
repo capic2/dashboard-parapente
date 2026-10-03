@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
+import type { FlightVideoMarker } from '@dashboard-parapente/shared-types';
 import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@dashboard-parapente/design-system';
@@ -51,9 +52,13 @@ interface FlightTelemetryInteractivePreviewProps {
   hasPanoVideo?: boolean;
   manualOffsetSeconds?: number;
   youtubeUrls?: string[];
+  videoMarkers?: FlightVideoMarker[];
+  onAddVideoMarker?: (marker: Omit<FlightVideoMarker, 'id'>) => Promise<void>;
+  isSavingVideoMarker?: boolean;
 }
 
 const EMPTY_YOUTUBE_URLS: string[] = [];
+const EMPTY_VIDEO_MARKERS: FlightVideoMarker[] = [];
 const YOUTUBE_EXPORT_STALL_THRESHOLD_MS = 5 * 60 * 1000;
 
 function youtubeExportJobStorageKey(flightId: string): string {
@@ -169,6 +174,9 @@ export function FlightTelemetryInteractivePreview({
   hasPanoVideo = false,
   manualOffsetSeconds,
   youtubeUrls = EMPTY_YOUTUBE_URLS,
+  videoMarkers = EMPTY_VIDEO_MARKERS,
+  onAddVideoMarker,
+  isSavingVideoMarker = false,
 }: FlightTelemetryInteractivePreviewProps) {
   const { t, i18n } = useTranslation();
   const token = useAuthStore((state) => state.token);
@@ -336,6 +344,10 @@ export function FlightTelemetryInteractivePreview({
     ? selectedYoutubeIndex % youtubeMainUrls.length
     : 0;
   const youtubeUrl = youtubeMainUrls[activeYoutubeIndex];
+  const activeYoutubeVideoId = getYoutubeVideoId(youtubeUrl ?? '');
+  const activeVideoMarkers = videoMarkers.filter(
+    (marker) => marker.youtube_video_id === activeYoutubeVideoId
+  );
   const playablePips = playerPips.map((pip) => {
     if (!youtubeUrl || pip.youtubeUrl !== youtubeUrl) return pip;
     return Object.assign({}, pip, { youtubeUrl: undefined });
@@ -800,6 +812,9 @@ export function FlightTelemetryInteractivePreview({
                 cameraUrl={cameraUrl}
                 flightUrl={flightUrl}
                 youtubeUrl={youtubeUrl}
+                videoMarkers={activeVideoMarkers}
+                onAddVideoMarker={onAddVideoMarker}
+                isSavingVideoMarker={isSavingVideoMarker}
                 syncOffsetSeconds={calibrationOffsetSeconds}
                 pipOffsetSeconds={pipOffsetSeconds}
                 getFlightTime={(cameraTime) =>
