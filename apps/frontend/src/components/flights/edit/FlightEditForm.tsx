@@ -11,10 +11,15 @@ import {
   TextArea,
 } from 'react-aria-components';
 import { Select, Button } from '@dashboard-parapente/design-system';
-import type { YoutubeVideoAssociation } from '@dashboard-parapente/shared-types';
+import type {
+  FlightVideoMarker,
+  YoutubeVideoAssociation,
+} from '@dashboard-parapente/shared-types';
 import type { Key } from 'react-aria-components';
 import type { Flight, FlightFormData, Site } from '../../../types';
 import { getSiteDisplayName } from '../../../lib/siteDisplay';
+import { getYoutubeVideoId } from '../../../lib/youtube';
+import { FlightVideoMarkersEditor } from './FlightVideoMarkersEditor';
 import { Plus, Trash2 } from 'lucide-react';
 import { YoutubeAssociationRemovalModal } from '../YoutubeAssociationRemovalModal';
 
@@ -106,6 +111,10 @@ export function FlightEditForm({
   const nextYoutubeRowId = useRef(0);
   const [youtubeRows, setYoutubeRows] =
     useState<YoutubeUrlRow[]>(initialYoutubeRows);
+  const initialVideoMarkers = flight.video_markers ?? [];
+  const [videoMarkers, setVideoMarkers] =
+    useState<FlightVideoMarker[]>(initialVideoMarkers);
+  const [videoMarkerTimesValid, setVideoMarkerTimesValid] = useState(true);
   const [pendingYoutubeRemovals, setPendingYoutubeRemovals] = useState<
     PendingYoutubeRemoval[]
   >([]);
@@ -132,8 +141,17 @@ export function FlightEditForm({
       gpx_metrics_excluded: flight.gpx_metrics_excluded ?? false,
     },
     onSubmit: async ({ value }) => {
+      if (!videoMarkerTimesValid) return;
       const removedUrls = new Set(
-        pendingYoutubeRemovals.map((removal) => removal.url)
+        pendingYoutubeRemovals.map((removal) => removal.url.trim())
+      );
+      const youtubeUrls = youtubeRows
+        .map((row) => row.value.trim())
+        .filter((url) => Boolean(url) && !removedUrls.has(url));
+      const submittedVideoIds = new Set(
+        youtubeUrls
+          .map((url) => getYoutubeVideoId(url))
+          .filter((videoId): videoId is string => videoId !== null)
       );
       await onSubmit({
         values: {
@@ -149,9 +167,10 @@ export function FlightEditForm({
           max_speed_kmh: value.max_speed_kmh,
           notes: value.notes,
           gpx_metrics_excluded: value.gpx_metrics_excluded,
-          youtube_urls: youtubeRows
-            .map((row) => row.value.trim())
-            .filter((url) => Boolean(url) && !removedUrls.has(url)),
+          youtube_urls: youtubeUrls,
+          video_markers: videoMarkers.filter((marker) =>
+            submittedVideoIds.has(marker.youtube_video_id)
+          ),
         },
         pendingYoutubeRemovals,
       });
@@ -161,6 +180,8 @@ export function FlightEditForm({
   const handleCancel = () => {
     form.reset();
     setYoutubeRows(initialYoutubeRows);
+    setVideoMarkers(initialVideoMarkers);
+    setVideoMarkerTimesValid(true);
     setPendingYoutubeRemovals([]);
     setRemovalRow(null);
     onCancel();
@@ -499,6 +520,13 @@ export function FlightEditForm({
           ))}
         </div>
       </div>
+
+      <FlightVideoMarkersEditor
+        youtubeUrls={youtubeRows.map((row) => row.value)}
+        value={videoMarkers}
+        onChange={setVideoMarkers}
+        onValidityChange={setVideoMarkerTimesValid}
+      />
 
       {/* Notes */}
       <div>

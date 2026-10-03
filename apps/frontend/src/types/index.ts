@@ -5,8 +5,10 @@ import type { Key } from 'react-aria-components';
 export type {
   Site,
   Flight,
+  FlightVideoMarker,
   FlightStats,
   FlightRecords,
+  FlightVideoMarker,
   DailySummary,
 } from '@dashboard-parapente/shared-types';
 
@@ -125,6 +127,7 @@ export interface FlightFormData {
   description?: string;
   external_url?: string;
   youtube_urls?: string[];
+  video_markers?: FlightVideoMarker[];
   tags?: string[];
   conditions_feedback?: string | null;
   decision_snapshot?: string | null;
