@@ -471,6 +471,68 @@ def test_start_youtube_upload_rejects_missing_panorama(
     assert response.json()["detail"] == "Panorama video is not available"
 
 
+@pytest.mark.parametrize("source_type", ["face", "pilote"])
+def test_start_youtube_upload_accepts_face_and_pilote_sources(
+    source_type: str,
+    client: TestClient,
+    db_session: Session,
+    sample_flight: Flight,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _configure_youtube(monkeypatch)
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    video_path = (
+        tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01" / f"{source_type}.mp4"
+    )
+    video_path.parent.mkdir(parents=True)
+    video_path.write_bytes(source_type.encode())
+    db_session.add(
+        YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
+    )
+    db_session.commit()
+    enqueued: list[str] = []
+    monkeypatch.setattr("routes.enqueue_youtube_upload", enqueued.append)
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload",
+        json={"source_type": source_type, "title": f"Vol - {source_type}"},
+    )
+
+    assert response.status_code == 202
+    payload = response.json()
+    assert payload["source_type"] == source_type
+    job = db_session.get(YoutubeUploadJob, payload["job_id"])
+    assert job is not None
+    assert job.source_type == source_type
+    assert enqueued == [job.id]
+
+
+@pytest.mark.parametrize("source_type", ["face", "pilote"])
+def test_start_youtube_upload_rejects_missing_face_and_pilote_sources(
+    source_type: str,
+    client: TestClient,
+    db_session: Session,
+    sample_flight: Flight,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _configure_youtube(monkeypatch)
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    db_session.add(
+        YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
+    )
+    db_session.commit()
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload",
+        json={"source_type": source_type, "title": source_type},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == f"{source_type.title()} video is not available"
+
+
 def test_get_youtube_upload_includes_recent_job_logs(
     client, db_session, sample_flight, tmp_path, monkeypatch
 ):
@@ -548,6 +610,37 @@ def test_worker_resolves_panorama_from_the_flight_directory(
     db_session.commit()
 
     assert youtube_upload._source_video_path(db_session, job) == pano_path
+
+
+@pytest.mark.parametrize("source_type", ["face", "pilote"])
+def test_worker_resolves_face_and_pilote_from_the_flight_directory(
+    source_type: str,
+    db_session: Session,
+    sample_flight: Flight,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    pano_path = tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01" / "pano.mp4"
+    pano_path.parent.mkdir(parents=True)
+    pano_path.write_bytes(b"panorama")
+    video_path = pano_path.with_name(f"{source_type}.mp4")
+    video_path.write_bytes(source_type.encode())
+    job = YoutubeUploadJob(
+        id=f"youtube-{source_type}-source",
+        flight_id=sample_flight.id,
+        user_id=1,
+        source_type=source_type,
+        status="queued",
+        progress=0,
+        title=source_type.title(),
+        description="",
+        privacy_status="private",
+    )
+    db_session.add(job)
+    db_session.commit()
+
+    assert youtube_upload._source_video_path(db_session, job) == video_path
 
 
 def test_worker_injects_spherical_metadata_for_panorama_uploads(tmp_path, monkeypatch) -> None:

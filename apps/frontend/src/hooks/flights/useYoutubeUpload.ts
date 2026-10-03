@@ -19,6 +19,8 @@ export interface YoutubeUploadJob {
     | 'camera'
     | 'video'
     | 'pano'
+    | 'face'
+    | 'pilote'
     | 'highlight'
     | 'youtube_overlay';
   gopro_overlay_job_id?: string | null;
@@ -42,13 +44,15 @@ export type YoutubeUploadSource =
   | { source_type: 'camera' }
   | { source_type: 'video' }
   | { source_type: 'pano' }
+  | { source_type: 'face' }
+  | { source_type: 'pilote' }
   | { source_type: 'highlight'; highlight_video_job_id: string };
 
 type YoutubeUploadSourceFilter =
   | YoutubeUploadSource
   | { source_type: 'youtube_overlay' };
 
-export type TemporaryFlightMediaSource = 'camera' | 'pano';
+export type TemporaryFlightMediaSource = 'camera' | 'pano' | 'face' | 'pilote';
 
 type YoutubeUploadInput = YoutubeUploadSource & {
   title: string;
@@ -59,8 +63,12 @@ type YoutubeUploadInput = YoutubeUploadSource & {
 export const sourceFromInput = (
   input: YoutubeUploadInput
 ): YoutubeUploadSource => {
-  if (input.source_type === 'pano') {
-    return { source_type: 'pano' };
+  if (
+    input.source_type === 'pano' ||
+    input.source_type === 'face' ||
+    input.source_type === 'pilote'
+  ) {
+    return { source_type: input.source_type };
   }
   if (input.source_type === 'highlight') {
     return {

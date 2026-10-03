@@ -11,6 +11,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import config
+import pytest
 from fastapi.testclient import TestClient
 from flight_tracks import calculate_track_stats, normalize_track
 from models import Flight, GoproOverlayJob, HighlightVideoJob, Site, YoutubeUploadJob
@@ -51,6 +52,51 @@ class TestFlightsListEndpoint:
         data = response.json()
         assert "flights" in data
         assert len(data["flights"]) == 3
+
+    def test_get_flights_reports_temporary_video_availability_independently(
+        self,
+        client: TestClient,
+        db_session: Session,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+        flights = [
+            Flight(
+                id="flight-face-video-presence",
+                name="Face video presence",
+                flight_date=date(2026, 3, 15),
+            ),
+            Flight(
+                id="flight-pilote-video-presence",
+                name="Pilote video presence",
+                flight_date=date(2026, 3, 15),
+            ),
+        ]
+        db_session.add_all(flights)
+        db_session.commit()
+        face_dir = tmp_path / "20260315" / "01"
+        pilote_dir = tmp_path / "20260315" / "02"
+        face_dir.mkdir(parents=True)
+        pilote_dir.mkdir(parents=True)
+        (face_dir / "face.mp4").write_bytes(b"face")
+        (pilote_dir / "pilote.mp4").write_bytes(b"pilote")
+
+        response = client.get(f"{API_PREFIX}/flights")
+
+        assert response.status_code == 200
+        returned = {item["id"]: item for item in response.json()["flights"]}
+        assert returned[flights[0].id]["face_video_file_exists"] is True
+        assert returned[flights[0].id]["pilote_video_file_exists"] is False
+        assert returned[flights[1].id]["face_video_file_exists"] is False
+        assert returned[flights[1].id]["pilote_video_file_exists"] is True
+
+        face_detail = client.get(f"{API_PREFIX}/flights/{flights[0].id}")
+        pilote_detail = client.get(f"{API_PREFIX}/flights/{flights[1].id}")
+        assert face_detail.json()["face_video_file_exists"] is True
+        assert face_detail.json()["pilote_video_file_exists"] is False
+        assert pilote_detail.json()["face_video_file_exists"] is False
+        assert pilote_detail.json()["pilote_video_file_exists"] is True
 
     def test_get_flights_returns_video_overlays_but_excludes_overlay_layer(
         self, client, db_session, arguel_site
@@ -552,6 +598,68 @@ class TestFlightsListEndpoint:
         response = client.get(f"{API_PREFIX}/flights/{flight.id}/pano/thumbnail")
         assert response.status_code == 404
         assert response.json()["detail"] == "No Pano video available for this flight"
+
+    def test_get_face_and_pilote_thumbnails(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        flight_dir = tmp_path / "20260315" / "01"
+        flight_dir.mkdir(parents=True)
+        pano_path = flight_dir / "pano.mp4"
+        pano_path.write_bytes(b"pano")
+        face_path = flight_dir / "face.mp4"
+        face_path.write_bytes(b"face")
+        pilote_path = flight_dir / "pilote.mp4"
+        pilote_path.write_bytes(b"pilote")
+        flight = Flight(
+            id="flight-face-pilote-thumbnails",
+            name="Face and pilote thumbnails",
+            flight_date=date(2026, 3, 15),
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.commit()
+        thumbnail_path = tmp_path / "temporary-thumbnail.jpg"
+        thumbnail_path.write_bytes(b"jpeg")
+
+        with patch("routes.get_video_thumbnail", return_value=thumbnail_path) as get_thumbnail:
+            face_response = client.get(
+                f"{API_PREFIX}/flights/{flight.id}/temporary-media/face/thumbnail"
+            )
+            pilote_response = client.get(
+                f"{API_PREFIX}/flights/{flight.id}/temporary-media/pilote/thumbnail"
+            )
+
+        assert face_response.status_code == 200
+        assert pilote_response.status_code == 200
+        assert face_response.content == b"jpeg"
+        assert pilote_response.content == b"jpeg"
+        assert get_thumbnail.call_args_list == [((face_path,),), ((pilote_path,),)]
+
+    def test_streams_face_and_pilote_videos(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        flight_dir = tmp_path / "20260315" / "01"
+        flight_dir.mkdir(parents=True)
+        pano_path = flight_dir / "pano.mp4"
+        pano_path.write_bytes(b"pano")
+        (flight_dir / "face.mp4").write_bytes(b"face")
+        (flight_dir / "pilote.mp4").write_bytes(b"pilote")
+        flight = Flight(
+            id="flight-face-pilote-streams",
+            name="Face and pilote streams",
+            flight_date=date(2026, 3, 15),
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        face_response = client.get(f"{API_PREFIX}/flights/{flight.id}/temporary-media/face")
+        pilote_response = client.get(f"{API_PREFIX}/flights/{flight.id}/temporary-media/pilote")
+
+        assert face_response.status_code == 200
+        assert face_response.content == b"face"
+        assert pilote_response.status_code == 200
+        assert pilote_response.content == b"pilote"
 
     def test_stream_flight_pano(self, client, db_session, tmp_path):
         pano_path = tmp_path / "pano.mp4"
@@ -2081,3 +2189,49 @@ class TestDeleteFlightTemporaryMedia:
         assert response.status_code == 204
         assert not camera_path.exists()
         assert pano_path.read_bytes() == b"pano"
+
+    def test_delete_face_and_pilote_removes_only_selected_flight_files(
+        self,
+        client: TestClient,
+        db_session: Session,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+        monkeypatch.setattr(
+            "routes.youtube_video_availability",
+            lambda grouped: {
+                video_id: True for video_ids in grouped.values() for video_id in video_ids
+            },
+        )
+        flight_dir = tmp_path / "20260315" / "01"
+        flight_dir.mkdir(parents=True)
+        pano_path = flight_dir / "pano.mp4"
+        face_path = flight_dir / "face.mp4"
+        pilote_path = flight_dir / "pilote.mp4"
+        camera_path = flight_dir / "camera.mp4"
+        for path in (pano_path, face_path, pilote_path, camera_path):
+            path.write_bytes(path.stem.encode())
+        flight = Flight(
+            id="flight-face-pilote-delete",
+            flight_date=date(2026, 3, 15),
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.flush()
+        self._completed_upload(
+            db_session, flight, source_type="face", youtube_video_id="dQw4w9WgXcQ"
+        )
+        self._completed_upload(
+            db_session, flight, source_type="pilote", youtube_video_id="dQw4w9WgXcQ"
+        )
+
+        face_response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/face")
+        pilote_response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/pilote")
+
+        assert face_response.status_code == 204
+        assert pilote_response.status_code == 204
+        assert not face_path.exists()
+        assert not pilote_path.exists()
+        assert pano_path.read_bytes() == b"pano"
+        assert camera_path.read_bytes() == b"camera"

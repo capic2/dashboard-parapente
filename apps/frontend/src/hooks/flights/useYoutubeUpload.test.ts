@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { sourceFromInput } from './useYoutubeUpload';
 
 describe('sourceFromInput', () => {
-  it.each(['camera', 'video', 'pano'] as const)(
+  it.each(['camera', 'video', 'pano', 'face', 'pilote'] as const)(
     'preserves the %s source for the upload query key',
     (source_type) => {
       expect(

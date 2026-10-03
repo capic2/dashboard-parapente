@@ -65,6 +65,8 @@ const fullFlight: Flight = {
 const flightWithMediaThumbnails: Flight = {
   ...fullFlight,
   pano_video_file_exists: true,
+  face_video_file_exists: true,
+  pilote_video_file_exists: true,
   gopro_overlay_file_exists: true,
   gopro_overlays: [
     {
@@ -176,6 +178,18 @@ const defaultHandlers = [
   http.get('*/api/flights/:id/pano/thumbnail', () =>
     HttpResponse.text(
       '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="p" x2="1"><stop stop-color="#4c1d95"/><stop offset="1" stop-color="#c4b5fd"/></linearGradient></defs><rect width="640" height="360" fill="url(#p)"/><circle cx="320" cy="180" r="110" fill="none" stroke="white" stroke-width="8"/><path d="M50 270 210 130 320 230 460 105 610 270" fill="none" stroke="white" stroke-width="12"/></svg>',
+      { headers: { 'Content-Type': 'image/svg+xml' } }
+    )
+  ),
+  http.get('*/api/flights/:id/temporary-media/face/thumbnail', () =>
+    HttpResponse.text(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#0f766e"/><circle cx="320" cy="130" r="70" fill="#fcd34d"/><path d="M160 360c12-98 58-145 160-145s148 47 160 145" fill="#f8fafc"/></svg>',
+      { headers: { 'Content-Type': 'image/svg+xml' } }
+    )
+  ),
+  http.get('*/api/flights/:id/temporary-media/pilote/thumbnail', () =>
+    HttpResponse.text(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#1e3a8a"/><path d="M0 290 170 130 280 220 420 90 640 270V360H0Z" fill="#bae6fd"/><circle cx="505" cy="70" r="28" fill="#fef3c7"/></svg>',
       { headers: { 'Content-Type': 'image/svg+xml' } }
     )
   ),
