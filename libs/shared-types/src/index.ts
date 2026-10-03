@@ -130,6 +130,25 @@ export const YoutubeVideoAssociationsSchema = z.array(
   YoutubeVideoAssociationSchema
 );
 
+export const FlightVideoMarkerSchema = z
+  .object({
+    id: z.string().min(1).max(100),
+    youtube_video_id: z.string().regex(/^[A-Za-z0-9_-]{11}$/u),
+    kind: z.enum(['takeoff', 'landing', 'interest']),
+    timestamp_seconds: z.number().int().nonnegative().max(86400),
+    title: z.string().max(100).default(''),
+    include_in_youtube_chapters: z.boolean().default(true),
+  })
+  .superRefine((marker, context) => {
+    if (marker.kind === 'interest' && !marker.title.trim()) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Interest markers must have a title',
+        path: ['title'],
+      });
+    }
+  });
+
 export const FlightSchema = z
   .object({
     id: z.string(),
@@ -163,6 +182,7 @@ export const FlightSchema = z
     gpx_elevation_gain_m: z.number().nullish(),
     external_url: z.string().nullish(),
     youtube_urls: z.array(z.string()).optional(),
+    video_markers: z.array(FlightVideoMarkerSchema).optional(),
     video_export_job_id: z.string().nullish(),
     video_export_status: z
       .enum([
@@ -876,6 +896,7 @@ export const CreateSiteSchema = SiteUpdateSchema.omit({
 export type Site = z.infer<typeof SiteSchema>;
 export type SiteUpdate = z.infer<typeof SiteUpdateSchema>;
 export type CreateSiteData = z.infer<typeof CreateSiteSchema>;
+export type FlightVideoMarker = z.infer<typeof FlightVideoMarkerSchema>;
 export type Flight = z.infer<typeof FlightSchema>;
 export type HighlightVideoJob = z.infer<typeof HighlightVideoJobSchema>;
 export type GoproOverlayJob = z.infer<typeof GoproOverlayJobSchema>;

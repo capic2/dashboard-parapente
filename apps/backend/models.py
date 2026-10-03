@@ -262,6 +262,7 @@ class Flight(Base):
     max_sink_rate_ms = Column(Float)
     external_url = Column(String)
     youtube_urls_json = Column("youtube_urls", Text, nullable=False, default="[]")
+    video_markers_json = Column("video_markers", Text, nullable=False, default="[]")
     # Video export fields
     video_export_job_id = Column(String, nullable=True)  # Background job ID for video conversion
     video_export_status = Column(String, nullable=True)  # "processing", "completed", "failed"
@@ -320,6 +321,19 @@ class Flight(Base):
     @youtube_urls.setter
     def youtube_urls(self, value: list[str] | None) -> None:
         self.youtube_urls_json = json.dumps(value or [])
+
+    @property
+    def video_markers(self) -> list[dict[str, object]]:
+        """Return saved video markers for this flight."""
+        try:
+            value = json.loads(self.video_markers_json or "[]")
+        except (TypeError, json.JSONDecodeError):
+            return []
+        return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+
+    @video_markers.setter
+    def video_markers(self, value: list[dict[str, object]] | None) -> None:
+        self.video_markers_json = json.dumps(value or [])
 
     @property
     def tags(self) -> list[str]:

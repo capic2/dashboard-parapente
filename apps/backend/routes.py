@@ -153,6 +153,7 @@ from schemas import (
     FlightRecordsResponse,
     FlightSummariesResponse,
     FlightUpdate,
+    youtube_video_id_from_url,
     GoproOverlayCancelResponse,
     GoproOverlayDependencies,
     GoproOverlayJob,
@@ -5357,6 +5358,7 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "gpx_elevation_gain_m": flight.gpx_elevation_gain_m,
         "external_url": flight.external_url,
         "youtube_urls": flight.youtube_urls,
+        "video_markers": flight.video_markers,
         "video_export_job_id": flight.video_export_job_id,
         "video_export_status": video_export["status"],
         "video_export_progress": video_export["progress"],
@@ -5445,6 +5447,23 @@ async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session =
 
     # 3. Update only provided fields (exclude_unset skips None values)
     update_data = flight_data.dict(exclude_unset=True)
+
+    if update_data.get("video_markers") is not None:
+        urls = update_data.get("youtube_urls", flight.youtube_urls) or []
+        associated_video_ids: set[str] = set()
+        for url in urls:
+            try:
+                associated_video_ids.add(youtube_video_id_from_url(url))
+            except ValueError:
+                continue
+        if any(
+            marker["youtube_video_id"] not in associated_video_ids
+            for marker in update_data["video_markers"]
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail="Each video marker must reference a YouTube video associated with the flight",
+            )
 
     gpx_metrics_excluded = update_data.get("gpx_metrics_excluded")
     if (

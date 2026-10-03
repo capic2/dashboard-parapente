@@ -597,6 +597,21 @@ class FlightCreate(FlightBase):
         return value
 
 
+class FlightVideoMarker(BaseModel):
+    id: str = Field(min_length=1, max_length=100)
+    youtube_video_id: str = Field(pattern=r"^[A-Za-z0-9_-]{11}$")
+    kind: Literal["takeoff", "landing", "interest"]
+    timestamp_seconds: int = Field(ge=0, le=86400)
+    title: str = Field(default="", max_length=100)
+    include_in_youtube_chapters: bool = True
+
+    @model_validator(mode="after")
+    def interest_marker_has_title(self) -> "FlightVideoMarker":
+        if self.kind == "interest" and not self.title.strip():
+            raise ValueError("Interest markers must have a title")
+        return self
+
+
 class FlightUpdate(BaseModel):
     """Schema for updating flight details - all fields optional for PATCH"""
 
@@ -614,6 +629,7 @@ class FlightUpdate(BaseModel):
     description: str | None = None
     external_url: str | None = None
     youtube_urls: list[str] | None = None
+    video_markers: list[FlightVideoMarker] | None = None
     tags: list[str] | None = None
     conditions_feedback: str | None = None
     decision_snapshot: str | None = None
@@ -623,6 +639,16 @@ class FlightUpdate(BaseModel):
     @validator("youtube_urls")
     def valid_youtube_urls(cls, value):
         return normalize_youtube_urls(value) if value is not None else None
+
+    @model_validator(mode="after")
+    def unique_video_marker_ids(self) -> "FlightUpdate":
+        if self.video_markers is not None:
+            marker_ids = [marker.id for marker in self.video_markers]
+            if len(marker_ids) != len(set(marker_ids)):
+                raise ValueError("Video marker IDs must be unique")
+            if len(self.video_markers) > 100:
+                raise ValueError("A flight cannot have more than 100 video markers")
+        return self
 
     @validator("duration_minutes", "max_altitude_m", "elevation_gain_m")
     def positive_values(cls, v):
@@ -760,6 +786,7 @@ class Flight(FlightBase):
     gpx_metrics_excluded: bool = False
     external_url: str | None = None
     youtube_urls: list[str] = Field(default_factory=list)
+    video_markers: list[FlightVideoMarker] = Field(default_factory=list)
     video_export_job_id: str | None = None
     video_export_status: str | None = None  # "processing", "completed", "failed"
     video_export_progress: int | None = None
