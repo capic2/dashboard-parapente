@@ -1852,17 +1852,18 @@
     },
     "intervals": {
       "title": "Intervals.icu synchronization",
-      "description": "Operational status for manual import.",
+      "description": "Check whether an API key is set and which activity types are allowed for import from Intervals.icu.",
       "status": "Status",
-      "statusDetail": "Configuration reported by the server",
+      "statusDetail": "An API key is set on the server.",
+      "statusNotConfiguredDetail": "Set BACKEND_INTERVALS_ICU_API_KEY in the server environment to enable imports.",
       "notConfigured": "Not configured",
       "configured": "Configured",
       "activityTypes": "Monitored activity types",
       "typeCount": "{{count}} type(s)",
       "activityTypesDetail": "Types the manual import currently accepts",
-      "noActivityTypes": "No activity type is configured. An activity must be discovered first.",
-      "apiKeyEnvOnly": "The API key is managed only in the server environment and is never displayed here.",
-      "statusError": "Unable to load the Intervals.icu status.",
+      "noActivityTypes": "No activity types are allowed for import. To find a Zepp activity’s type, open Flights → More flight actions → Import from Intervals.icu and preview an activity. Add its type to BACKEND_INTERVALS_ICU_ACTIVITY_TYPES in the server environment.",
+      "apiKeyEnvOnly": "The API key is never shown here.",
+      "statusError": "Unable to load the Intervals.icu status. Refresh the page to try again.",
       "overviewDetail": "{{count}} monitored activity types"
     },
     "deployment": {

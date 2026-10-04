@@ -347,13 +347,7 @@ function IntervalsStatusSection() {
   const statusLabel = status?.configured
     ? t('infrastructure.intervals.configured')
     : t('infrastructure.intervals.notConfigured');
-  const statusTone: 'green' | 'amber' | 'red' | 'gray' = status?.configured
-    ? 'green'
-    : 'red';
-  const statusClassName = status?.configured
-    ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-    : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
-
+  const statusTone: 'green' | 'gray' = status?.configured ? 'green' : 'gray';
   return (
     <div className="space-y-4">
       <div>
@@ -384,7 +378,11 @@ function IntervalsStatusSection() {
             <InfrastructureStatCard
               label={t('infrastructure.intervals.status')}
               value={statusLabel}
-              detail={t('infrastructure.intervals.statusDetail')}
+              detail={
+                status.configured
+                  ? t('infrastructure.intervals.statusDetail')
+                  : t('infrastructure.intervals.statusNotConfiguredDetail')
+              }
               tone={statusTone}
             />
             <InfrastructureStatCard
@@ -397,16 +395,9 @@ function IntervalsStatusSection() {
             />
           </div>
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                {t('infrastructure.intervals.activityTypes')}
-              </h4>
-              <span
-                className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusClassName}`}
-              >
-                {statusLabel}
-              </span>
-            </div>
+            <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+              {t('infrastructure.intervals.activityTypes')}
+            </h4>
             {status.activity_types.length > 0 ? (
               <div className="mt-3 flex flex-wrap gap-2">
                 {status.activity_types.map((type) => (
@@ -899,8 +890,6 @@ export default function InfrastructurePage() {
       'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300';
     intervalsBadgeLabel = t('infrastructure.intervals.configured');
   } else if (intervalsStatus) {
-    intervalsBadgeClassName =
-      'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200';
     intervalsBadgeLabel = t('infrastructure.intervals.notConfigured');
   }
 
