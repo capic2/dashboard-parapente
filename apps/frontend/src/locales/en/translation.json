@@ -319,7 +319,11 @@
       "source": "Source",
       "emptyTitle": "Choose weather",
       "emptyDescription": "Add a favorite site or search for a city to display the hour-by-hour details.",
-      "selectedSearchResult": "Selected search result"
+      "selectedSearchResult": "Selected search result",
+      "advancedTitle": "Landings and advanced analysis",
+      "advancedSummary": "Additional details about the selected site",
+      "otherSitesTitle": "Explore other sites",
+      "otherSitesSummary": "Suggestions based on weather and the selected radius"
     },
     "mobile": {
       "badge": "Mobile weather",
@@ -415,9 +419,10 @@
     }
   },
   "flightDecision": {
-    "title": "Flight decision",
-    "loadError": "Unable to calculate the flight decision.",
-    "scoreObjectif": "Objective score",
+    "title": "Weather assessment",
+    "loadError": "Unable to load the weather assessment.",
+    "scoreObjectif": "Score for objective",
+    "scoreNote": "Weather index · not a probability",
     "bestWindow": "Best window",
     "leastUnfavorable": "Least unfavorable moment",
     "noWindow": "No window",
@@ -431,8 +436,8 @@
     },
     "summary": {
       "favorable": {
-        "title": "Favorable window identified",
-        "message": "A usable window stands out for the selected objective. Still check risks and local conditions before deciding."
+        "title": "Favorable window for the selected objective",
+        "message": "The forecast matches the criteria for “{{objective}}”. This estimate does not know your personal skill level: check conditions on site as well."
       },
       "vigilance": {
         "title": "Flight possible with caution",
@@ -452,17 +457,17 @@
       }
     },
     "objective": {
-      "active": "Objective: {{objective}}",
+      "active": "Assessment: {{objective}}",
       "tranquille": "Calm",
       "progression": "Progression",
       "thermique": "Thermal"
     },
     "context": {
       "title": "Weather context",
-      "description": "A city or ad hoc search gives weather context. Select a takeoff to get a complete flight decision with orientation and landings."
+      "description": "A city search provides weather context. Select a takeoff to see an assessment that includes its orientation and associated landing sites."
     },
     "confidence": {
-      "title": "Confidence",
+      "title": "Forecast confidence",
       "high": "High",
       "medium": "Medium",
       "low": "Low",
