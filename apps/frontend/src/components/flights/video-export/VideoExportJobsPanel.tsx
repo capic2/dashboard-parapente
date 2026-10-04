@@ -292,7 +292,7 @@ function isJobInTypeFilter(job: VideoExportJob, filter: TypeFilter) {
   );
 }
 
-function SegmentedFilter<T extends string>({
+function SelectFilter<T extends string>({
   label,
   options,
   value,
@@ -304,41 +304,22 @@ function SegmentedFilter<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div className="min-w-0 flex-1 space-y-2">
-      <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+    <label className="flex min-w-0 flex-1 flex-col gap-2 text-xs font-semibold text-gray-700 dark:text-gray-200">
+      <span className="uppercase tracking-wide text-gray-500 dark:text-gray-400">
         {label}
-      </div>
-      <div className="grid overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-900/50 sm:flex">
-        {options.map((option) => {
-          const isSelected = value === option.id;
-
-          return (
-            <button
-              key={option.id}
-              type="button"
-              aria-pressed={isSelected}
-              className={`flex min-h-10 cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 sm:flex-1 sm:justify-center ${
-                isSelected
-                  ? 'bg-white text-sky-700 shadow-sm ring-1 ring-sky-200 dark:bg-sky-950/70 dark:text-sky-200 dark:ring-sky-800'
-                  : 'text-gray-600 hover:bg-white/80 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white'
-              }`}
-              onClick={() => onChange(option.id)}
-            >
-              <span className="truncate">{option.label}</span>
-              <span
-                className={`rounded-md px-1.5 py-0.5 text-xs font-semibold ${
-                  isSelected
-                    ? 'bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-200'
-                    : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-                }`}
-              >
-                {option.count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
+      </span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.currentTarget.value as T)}
+        className="min-h-11 w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-800 shadow-sm outline-none transition-colors focus-visible:border-sky-500 focus-visible:ring-2 focus-visible:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+      >
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label} ({option.count})
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -483,10 +464,15 @@ function getLastLogMetrics(job: VideoExportJob) {
 }
 
 function FpsCell({ job }: { job: VideoExportJob }) {
+  const { t, i18n } = useTranslation();
+  const formatFps = (value: number) =>
+    new Intl.NumberFormat(i18n.resolvedLanguage ?? i18n.language, {
+      maximumFractionDigits: 1,
+    }).format(value);
   if (!isActiveJob(job)) {
     return (
       <span className="whitespace-nowrap font-mono text-xs text-gray-500 dark:text-gray-400">
-        0.0 fps
+        {formatFps(0)} {t('videoJobs.table.fpsUnit', 'images/s')}
       </span>
     );
   }
@@ -494,10 +480,48 @@ function FpsCell({ job }: { job: VideoExportJob }) {
   const fps = loggedFps ?? job.fps_actual;
   return typeof fps === 'number' && Number.isFinite(fps) ? (
     <span className="whitespace-nowrap font-mono text-xs text-gray-700 dark:text-gray-200">
-      {fps.toFixed(1)} fps
+      {formatFps(fps)} {t('videoJobs.table.fpsUnit', 'images/s')}
     </span>
   ) : (
     <span>-</span>
+  );
+}
+
+function JobTechnicalDetails({ job }: { job: VideoExportJob }) {
+  const { t } = useTranslation();
+
+  return (
+    <details className="min-w-32 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs dark:border-gray-700 dark:bg-gray-900/50">
+      <summary className="cursor-pointer font-medium text-gray-700 outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-gray-200">
+        {t('videoJobs.table.technicalDetails', 'Détails techniques')}
+      </summary>
+      <dl className="mt-3 grid min-w-40 grid-cols-2 gap-x-4 gap-y-2">
+        <div>
+          <dt className="text-gray-600 dark:text-gray-300">
+            {t('videoJobs.table.method', 'Méthode de rendu')}
+          </dt>
+          <dd className="mt-1 font-semibold text-gray-800 dark:text-gray-100">
+            <JobRenderMethodBadge job={job} />
+          </dd>
+        </div>
+        <div>
+          <dt className="text-gray-600 dark:text-gray-300">
+            {t('videoJobs.table.frames', 'Images traitées')}
+          </dt>
+          <dd className="mt-1 font-semibold text-gray-800 dark:text-gray-100">
+            <FramesCell job={job} />
+          </dd>
+        </div>
+        <div>
+          <dt className="text-gray-600 dark:text-gray-300">
+            {t('videoJobs.table.fps', 'Vitesse (images/s)')}
+          </dt>
+          <dd className="mt-1 font-semibold text-gray-800 dark:text-gray-100">
+            <FpsCell job={job} />
+          </dd>
+        </div>
+      </dl>
+    </details>
   );
 }
 
@@ -640,7 +664,7 @@ export function VideoExportJobsPanel({
     jobs.filter((job) => job.status === 'cancelled').length;
   let gpuStatusLabel = t(
     'videoJobs.gpu.unavailable',
-    'GPU NVIDIA indisponible'
+    'Accélération NVIDIA non détectée'
   );
   if (isGpuStatusLoading) {
     gpuStatusLabel = t('videoJobs.gpu.checking', 'Vérification du GPU…');
@@ -649,7 +673,10 @@ export function VideoExportJobsPanel({
   }
   const gpuStatusClassName = gpuStatus?.available
     ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-900/20 dark:text-green-200'
-    : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-200';
+    : 'border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300';
+  const gpuDescriptionClassName = gpuStatus?.available
+    ? 'text-green-800 dark:text-green-200'
+    : 'text-gray-600 dark:text-gray-400';
   const jobsInSelectedType = useMemo(
     () => jobs.filter((job) => isJobInTypeFilter(job, typeFilter)),
     [jobs, typeFilter]
@@ -993,11 +1020,6 @@ export function VideoExportJobsPanel({
         cell: ({ row }) => <JobTypeBadge job={row.original} />,
         sortingFn: 'alphanumeric',
       }),
-      columnHelper.accessor('render_method', {
-        header: t('videoJobs.table.method', 'Méthode'),
-        cell: ({ row }) => <JobRenderMethodBadge job={row.original} />,
-        sortingFn: 'alphanumeric',
-      }),
       columnHelper.accessor((job) => getProgress(job), {
         id: 'progress',
         header: t('videoJobs.table.progress', 'Progression'),
@@ -1011,14 +1033,9 @@ export function VideoExportJobsPanel({
         sortingFn: 'basic',
       }),
       columnHelper.display({
-        id: 'frames',
-        header: t('videoJobs.table.frames', 'Frames'),
-        cell: ({ row }) => <FramesCell job={row.original} />,
-      }),
-      columnHelper.display({
-        id: 'fps',
-        header: t('videoJobs.table.fps', 'Frame / seconde'),
-        cell: ({ row }) => <FpsCell job={row.original} />,
+        id: 'technicalDetails',
+        header: t('videoJobs.table.details', 'Détails'),
+        cell: ({ row }) => <JobTechnicalDetails job={row.original} />,
       }),
       columnHelper.display({
         id: 'eta',
@@ -1145,13 +1162,19 @@ export function VideoExportJobsPanel({
             <span className="ml-2 opacity-70">
               {t('videoJobs.gpu.live', 'mis à jour automatiquement')}
             </span>
+            <p className={`mt-1 ${gpuDescriptionClassName}`}>
+              {t(
+                'videoJobs.gpu.description',
+                'Ce statut concerne l’accélération NVIDIA. Le mode CPU reste disponible.'
+              )}
+            </p>
           </div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Button
             onClick={handleCleanupTempFiles}
             isDisabled={cleanupTempFiles.isPending}
-            className="cursor-pointer rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 dark:bg-amber-900/40 dark:text-amber-200 dark:hover:bg-amber-900/60 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
+            className="cursor-pointer rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 disabled:cursor-not-allowed disabled:bg-amber-200 disabled:text-amber-900 dark:bg-amber-900/40 dark:text-amber-200 dark:hover:bg-amber-900/60 dark:disabled:bg-amber-900 dark:disabled:text-amber-100"
           >
             {cleanupTempFiles.isPending
               ? t('videoJobs.cleaningTempFiles', 'Nettoyage...')
@@ -1195,13 +1218,13 @@ export function VideoExportJobsPanel({
       {!isLoading && !isError && hasJobs && (
         <div className="space-y-4 border-t border-gray-100 bg-gray-50/70 p-4 dark:border-gray-700 dark:bg-gray-900/20">
           <div className="flex flex-col gap-4 xl:flex-row">
-            <SegmentedFilter
+            <SelectFilter
               label={t('videoJobs.filterLabels.type', 'Type')}
               options={typeFilterOptions}
               value={typeFilter}
               onChange={setTypeFilter}
             />
-            <SegmentedFilter
+            <SelectFilter
               label={t('videoJobs.filterLabels.status', 'Statut')}
               options={statusFilterOptions}
               value={statusFilter}
@@ -1331,41 +1354,16 @@ export function VideoExportJobsPanel({
                     </div>
                   </div>
 
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-                    <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-900/50">
-                      <div className="text-gray-500 dark:text-gray-400">
-                        {t('videoJobs.table.method', 'Méthode')}
-                      </div>
-                      <div className="mt-0.5 font-semibold text-gray-800 dark:text-gray-100">
-                        {job.render_method?.toUpperCase() || '-'}
-                      </div>
-                    </div>
-                    <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-900/50">
-                      <div className="text-gray-500 dark:text-gray-400">
-                        {t('videoJobs.table.frames', 'Frames')}
-                      </div>
-                      <div className="mt-0.5 font-mono font-semibold text-gray-800 dark:text-gray-100">
-                        <FramesCell job={job} />
-                      </div>
-                    </div>
-                    <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-900/50">
-                      <div className="text-gray-500 dark:text-gray-400">
-                        {t('videoJobs.table.fps', 'Frame / seconde')}
-                      </div>
-                      <div className="mt-0.5 font-semibold text-gray-800 dark:text-gray-100">
-                        <FpsCell job={job} />
-                      </div>
-                    </div>
-                    <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-900/50">
-                      <div className="text-gray-500 dark:text-gray-400">
-                        {t('videoJobs.table.eta', 'Temps restant')}
-                      </div>
-                      <div className="mt-0.5 font-semibold text-gray-800 dark:text-gray-100">
-                        {formatDuration(
-                          getLastLogMetrics(job).etaSeconds ?? job.eta_seconds
-                        )}
-                      </div>
-                    </div>
+                  <p className="mt-3 text-xs text-gray-600 dark:text-gray-300">
+                    <span className="font-medium">
+                      {t('videoJobs.table.eta', 'Temps restant')} :{' '}
+                    </span>
+                    {formatDuration(
+                      getLastLogMetrics(job).etaSeconds ?? job.eta_seconds
+                    )}
+                  </p>
+                  <div className="mt-3">
+                    <JobTechnicalDetails job={job} />
                   </div>
                 </article>
               );
