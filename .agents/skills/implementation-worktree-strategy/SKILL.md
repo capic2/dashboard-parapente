@@ -1,6 +1,6 @@
 ---
 name: implementation-worktree-strategy
-description: Enforces the Git start-of-work strategy for repository code changes by checking the current branch, fetching `origin/main`, and deciding whether to stay on the current branch or create a worktree from `origin/main`. Use when the user asks to implémenter, ajouter, corriger, refactorer, modifier du code, faire une feature, faire une implémentation, changer le frontend, changer le backend, or otherwise requests a code change, especially when worktrees must be created in `.codenomad/worktree` with names prefixed by `wt-`.
+description: Enforces the Git start-of-work strategy for repository code changes by checking the current branch, fetching `origin/main`, and deciding whether to stay on the current branch or create a worktree from `origin/main`. Use when the user asks to implémenter, ajouter, corriger, refactorer, modifier du code, faire une feature, faire une implémentation, changer le frontend, changer le backend, or otherwise requests a code change. Prefer Codex-managed worktrees, with names prefixed by `wt-`.
 ---
 
 # Implementation Worktree Strategy
@@ -16,7 +16,7 @@ Before any implementation task:
 5. If no, stay on the current branch.
 6. When a worktree is created, check dependency readiness locally. Use the `worktree-bootstrap` subagent only when installation is missing/unusable and parallel setup would materially reduce wait time.
 
-Create worktrees in `.codenomad/worktree` with names starting with `wt-`.
+When the Codex app worktree tool is available, create worktrees with that tool and use a name starting with `wt-`. For CLI-only sessions without the tool, create worktrees in `.codex/worktree`.
 Whenever a worktree is created, immediately name the current AI session with the exact worktree name.
 
 ## Analysis Baseline
@@ -61,7 +61,7 @@ Ask:
 If yes:
 
 - Fetch `origin/main`.
-- Create a worktree from `origin/main` in `.codenomad/worktree`.
+- Create a worktree from `origin/main` using the Codex app worktree tool, or in `.codex/worktree` for CLI-only sessions.
 - Use a name like `wt-<task-label>`.
 - Name the current AI session with the exact worktree name.
 - Run the local readiness check; launch `worktree-bootstrap` only for missing/unusable dependencies when parallel setup is explicitly useful.
@@ -76,7 +76,7 @@ If no:
 
 Before creating any worktree, run `git fetch origin main`.
 
-Create the worktree and branch from `origin/main`, not from local `main`: `git worktree add -b wt-<task-label> .codenomad/worktree/wt-<task-label> origin/main`.
+Create the worktree and branch from `origin/main`, not from local `main`. In the Codex app, use the managed worktree tool with `origin/main` as the ref. In CLI-only sessions, use: `git worktree add -b wt-<task-label> .codex/worktree/wt-<task-label> origin/main`.
 
 Never create an implementation worktree from stale local `main` unless the repository has no remote, and report that limitation.
 

@@ -12,7 +12,7 @@ fi
 is_forbidden_deploy_path() {
   path="$1"
   case "$path" in
-    .codenomad|.codenomad/*|*/.codenomad|*/.codenomad/*|.agents|.agents/*|*/.agents|*/.agents/*|.opencode|.opencode/*|*/.opencode|*/.opencode/*)
+    .codenomad|.codenomad/*|*/.codenomad|*/.codenomad/*|.agents|.agents/*|*/.agents|*/.agents/*)
       return 0
       ;;
   esac
