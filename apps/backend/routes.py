@@ -61,6 +61,7 @@ from deployment_drain import (
 from emagram_freshness import get_emagram_cutoff_utc
 from flight_file_paths import resolve_flight_file_path as _resolve_flight_file_path
 from flight_decision import build_flight_decision, normalize_objective
+from flight_duration import calculate_real_flight_duration_minutes
 from flight_naming import format_automatic_flight_name
 from flight_summaries import (
     FlightGpxStatus,
@@ -154,6 +155,7 @@ from schemas import (
     FlightDecisionResponse,
     FlightRecordsResponse,
     FlightSummariesResponse,
+    Flight as FlightSchema,
     FlightUpdate,
     youtube_video_id_from_url,
     GoproOverlayCancelResponse,
@@ -4746,7 +4748,11 @@ def get_flights(
             "description": flight.description,
             "flight_date": flight.flight_date.isoformat() if flight.flight_date else None,
             "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
-            "duration_minutes": flight.duration_minutes,
+            "duration_minutes": (
+                flight.real_duration_minutes
+                if flight.real_duration_minutes is not None
+                else flight.duration_minutes
+            ),
             "max_altitude_m": flight.max_altitude_m,
             "max_speed_kmh": flight.max_speed_kmh,
             "distance_km": flight.distance_km,
@@ -4848,7 +4854,11 @@ def get_flight_stats(
 
     # Calculate totals
     total_flights = len(flights)
-    total_minutes = sum(f.duration_minutes or 0 for f in flights)
+    total_minutes = sum(
+        (f.real_duration_minutes if f.real_duration_minutes is not None else f.duration_minutes)
+        or 0
+        for f in flights
+    )
     total_hours = round(total_minutes / 60, 1)
     total_distance = sum(f.distance_km or 0 for f in flights)
     total_elevation_gain = sum(f.elevation_gain_m or 0 for f in flights)
@@ -4932,7 +4942,14 @@ def get_flight_records(
         return FlightRecordsResponse(**empty_records)
 
     # Filter out None values and find records
-    flights_with_duration = [f for f in flights if f.duration_minutes is not None]
+    def effective_duration(flight: Flight) -> int | None:
+        return (
+            flight.real_duration_minutes
+            if flight.real_duration_minutes is not None
+            else flight.duration_minutes
+        )
+
+    flights_with_duration = [f for f in flights if effective_duration(f) is not None]
     flights_with_altitude = [f for f in flights if f.max_altitude_m is not None]
     flights_with_distance = [f for f in flights if f.distance_km is not None]
     flights_with_speed = [f for f in flights if f.max_speed_kmh is not None and f.max_speed_kmh > 0]
@@ -4970,7 +4987,7 @@ def get_flight_records(
 
     # Find records
     longest = (
-        max(flights_with_duration, key=lambda f: f.duration_minutes)
+        max(flights_with_duration, key=lambda f: effective_duration(f) or 0)
         if flights_with_duration
         else None
     )
@@ -5104,7 +5121,9 @@ def get_flight_records(
     )
 
     return FlightRecordsResponse(
-        longest_duration=format_record(longest, "duration_minutes", flights_with_duration),
+        longest_duration=format_computed_flight_record(
+            longest, effective_duration(longest) if longest else None, flights_with_duration
+        ),
         highest_altitude=format_record(highest, "max_altitude_m", flights_with_altitude),
         longest_distance=format_record(farthest, "distance_km", flights_with_distance),
         max_speed=format_record(fastest, "max_speed_kmh", flights_with_speed),
@@ -5364,7 +5383,11 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "description": flight.description,
         "flight_date": flight.flight_date.isoformat() if flight.flight_date else None,
         "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
-        "duration_minutes": flight.duration_minutes,
+        "duration_minutes": (
+            flight.real_duration_minutes
+            if flight.real_duration_minutes is not None
+            else flight.duration_minutes
+        ),
         "max_altitude_m": flight.max_altitude_m,
         "max_speed_kmh": flight.max_speed_kmh,
         "distance_km": flight.distance_km,
@@ -5509,6 +5532,22 @@ async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session =
     for field, value in update_data.items():
         setattr(flight, field, value)
 
+    if "video_markers" in update_data or "youtube_urls" in update_data:
+        associated_video_ids: set[str] = set()
+        for url in flight.youtube_urls:
+            try:
+                associated_video_ids.add(youtube_video_id_from_url(url))
+            except ValueError:
+                continue
+        associated_markers = [
+            marker
+            for marker in flight.video_markers
+            if marker.get("youtube_video_id") in associated_video_ids
+        ]
+        if associated_markers != flight.video_markers:
+            flight.video_markers = associated_markers
+        flight.real_duration_minutes = calculate_real_flight_duration_minutes(associated_markers)
+
     # 4. updated_at is handled automatically by SQLAlchemy
 
     try:
@@ -5517,7 +5556,17 @@ async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session =
         logger.info(f" Updated flight {flight_id}: {list(update_data.keys())}")
 
         # Return in the format expected by frontend (ApiResponseSchema)
-        return {"data": flight, "status": "success", "message": "Flight updated successfully"}
+        response_flight = FlightSchema.model_validate(flight).model_dump(mode="json")
+        response_flight["duration_minutes"] = (
+            flight.real_duration_minutes
+            if flight.real_duration_minutes is not None
+            else flight.duration_minutes
+        )
+        return {
+            "data": response_flight,
+            "status": "success",
+            "message": "Flight updated successfully",
+        }
     except Exception as e:
         db.rollback()
         logger.error(f"Failed to update flight {flight_id}: {e}", exc_info=True)

@@ -13,5 +13,6 @@
         "reason": "Agent: slate is the default text color; indigo backgrounds and text are hover-scoped state styles, confirmed by inspecting both icon-only controls."
       }
     ]
-  }
+  },
+  "buildPath": "comp"
 }
