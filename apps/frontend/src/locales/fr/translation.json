@@ -319,7 +319,11 @@
       "source": "Source",
       "emptyTitle": "Choisissez une météo",
       "emptyDescription": "Ajoutez un site favori ou recherchez une ville pour afficher le détail heure par heure.",
-      "selectedSearchResult": "Résultat de recherche sélectionné"
+      "selectedSearchResult": "Résultat de recherche sélectionné",
+      "advancedTitle": "Atterrissages et analyse avancée",
+      "advancedSummary": "Détails complémentaires sur le site sélectionné",
+      "otherSitesTitle": "Explorer d’autres sites",
+      "otherSitesSummary": "Suggestions selon la météo et le rayon choisi"
     },
     "mobile": {
       "badge": "Météo mobile",
@@ -415,9 +419,10 @@
     }
   },
   "flightDecision": {
-    "title": "Décision de vol",
-    "loadError": "Impossible de calculer la décision de vol.",
-    "scoreObjectif": "Score objectif",
+    "title": "Évaluation météo",
+    "loadError": "Impossible de charger l’évaluation météo.",
+    "scoreObjectif": "Score météo pour cet objectif",
+    "scoreNote": "Indice météo · pas une probabilité",
     "bestWindow": "Meilleur créneau",
     "leastUnfavorable": "Moment le moins défavorable",
     "noWindow": "Aucun créneau",
@@ -431,8 +436,8 @@
     },
     "summary": {
       "favorable": {
-        "title": "Créneau favorable identifié",
-        "message": "Un créneau exploitable ressort pour l'objectif choisi. Vérifiez quand même les risques et le terrain avant de décider."
+        "title": "Créneau favorable pour l’objectif choisi",
+        "message": "Les prévisions correspondent aux critères de l’objectif « {{objective}} ». Cette estimation ne connaît pas votre niveau personnel ; vérifiez aussi les conditions sur place."
       },
       "vigilance": {
         "title": "Vol possible avec vigilance",
@@ -452,17 +457,17 @@
       }
     },
     "objective": {
-      "active": "Objectif : {{objective}}",
+      "active": "Évaluation : {{objective}}",
       "tranquille": "Tranquille",
       "progression": "Progression",
       "thermique": "Thermique"
     },
     "context": {
       "title": "Contexte météo",
-      "description": "Une ville ou une recherche ponctuelle donne un contexte météo. Sélectionnez un décollage pour obtenir une décision de vol complète avec orientation et atterrissages."
+      "description": "Une ville ou une recherche ponctuelle donne un contexte météo. Sélectionnez un décollage pour afficher une évaluation qui tient compte de son orientation et des atterrissages associés."
     },
     "confidence": {
-      "title": "Confiance",
+      "title": "Fiabilité météo",
       "high": "Élevée",
       "medium": "Moyenne",
       "low": "Faible",

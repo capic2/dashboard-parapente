@@ -104,10 +104,19 @@ export default function FlightDecisionCockpit({
   const VerdictIcon = visual.Icon;
   const window = decision.best_window ?? decision.least_unfavorable_window;
   const topRisks = decision.risks.slice(0, 3);
+  const summaryMessage =
+    decision.summary.level === 'favorable'
+      ? t('flightDecision.summary.favorable.message', {
+          objective: t(`flightDecision.objective.${decision.objective}`),
+        })
+      : translate(
+          decision.summary.message_key,
+          decision.summary.message_params
+        );
 
   return (
     <section className={`${weatherCardClassName} overflow-hidden`}>
-      <div className="border-l-4 border-l-sky-600 p-4 sm:p-5">
+      <div className="p-4 sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <p className={weatherSectionTitleClassName}>
@@ -132,21 +141,20 @@ export default function FlightDecisionCockpit({
               {t(decision.summary.title_key)}
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-              {translate(
-                decision.summary.message_key,
-                decision.summary.message_params
-              )}
+              {summaryMessage}
             </p>
           </div>
 
-          <div className="rounded-3xl bg-gradient-to-br from-sky-600 to-cyan-600 p-4 text-white shadow-lg shadow-sky-900/20 lg:min-w-44">
-            <span className="text-xs font-bold uppercase tracking-[0.18em] text-sky-100">
+          <div className="shrink-0 rounded-2xl border border-sky-200 bg-sky-50 p-3 text-sky-950 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100 lg:min-w-40">
+            <span className="text-xs font-bold uppercase tracking-wide text-sky-900 dark:text-sky-100">
               {t('flightDecision.scoreObjectif')}
             </span>
-            <strong className="mt-1 block text-5xl font-black leading-none">
+            <strong className="mt-1 block text-3xl font-black leading-none tabular-nums">
               {decision.summary.score_objectif}
             </strong>
-            <span className="text-sm font-bold text-sky-100">/100</span>
+            <span className="mt-1 block text-xs font-semibold text-sky-800 dark:text-sky-200">
+              {t('flightDecision.scoreNote')}
+            </span>
           </div>
         </div>
 
@@ -155,11 +163,15 @@ export default function FlightDecisionCockpit({
             <Button
               key={nextObjective}
               type="button"
+              aria-pressed={activeObjective === nextObjective}
+              variant={
+                activeObjective === nextObjective ? 'primary' : 'secondary'
+              }
               onClick={() => onObjectiveChange(nextObjective)}
               className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs font-black transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
                 activeObjective === nextObjective
-                  ? 'border-sky-600 bg-sky-600 text-white'
-                  : 'border-slate-200 bg-white text-slate-700 hover:border-sky-400 hover:bg-sky-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-sky-950/30'
+                  ? 'border-sky-600'
+                  : 'border-slate-200 hover:border-sky-400 dark:border-slate-700'
               }`}
             >
               <Target className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />
