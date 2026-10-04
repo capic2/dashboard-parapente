@@ -2,7 +2,6 @@ import { Suspense, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from '@tanstack/react-router';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { Switch } from 'react-aria-components';
 import {
   Button,
   Tab,
@@ -145,7 +144,9 @@ function SavedStatus({ isVisible }: { isVisible: boolean }) {
   const { t } = useTranslation();
 
   return (
-    <div
+    <output
+      aria-live="polite"
+      aria-atomic="true"
       className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition-opacity duration-200 ${
         isVisible
           ? 'border-emerald-200 bg-emerald-50 text-emerald-700 opacity-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
@@ -154,7 +155,7 @@ function SavedStatus({ isVisible }: { isVisible: boolean }) {
     >
       <SettingsIcon name={isVisible ? 'check' : 'settings'} />
       <span>{isVisible ? t('settings.saved') : t('settings.autoSave')}</span>
-    </div>
+    </output>
   );
 }
 
@@ -1251,10 +1252,10 @@ export default function Settings() {
               description={t('settings.units.description')}
             >
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <fieldset className="min-w-0">
+                  <legend className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     {t('settings.units.distance')}
-                  </label>
+                  </legend>
                   <div className="flex flex-wrap gap-2 sm:gap-4">
                     <Button
                       onClick={() =>
@@ -1289,12 +1290,12 @@ export default function Settings() {
                       {t('settings.units.miles')}
                     </Button>
                   </div>
-                </div>
+                </fieldset>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <fieldset className="min-w-0">
+                  <legend className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     {t('settings.units.altitude')}
-                  </label>
+                  </legend>
                   <div className="flex flex-wrap gap-2 sm:gap-4">
                     <Button
                       onClick={() =>
@@ -1329,12 +1330,12 @@ export default function Settings() {
                       {t('settings.units.feet')}
                     </Button>
                   </div>
-                </div>
+                </fieldset>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <fieldset className="min-w-0">
+                  <legend className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     {t('settings.units.speed')}
-                  </label>
+                  </legend>
                   <div className="flex flex-wrap gap-2 sm:gap-4">
                     <Button
                       onClick={() =>
@@ -1369,7 +1370,7 @@ export default function Settings() {
                       mph
                     </Button>
                   </div>
-                </div>
+                </fieldset>
               </div>
             </SettingsCard>
 
@@ -1380,10 +1381,10 @@ export default function Settings() {
               description={t('settings.languageTheme.description')}
             >
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <fieldset className="min-w-0">
+                  <legend className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     {t('settings.languageTheme.language')}
-                  </label>
+                  </legend>
                   <div className="flex flex-wrap gap-2 sm:gap-4">
                     <Button
                       onClick={() => {
@@ -1412,12 +1413,15 @@ export default function Settings() {
                       English
                     </Button>
                   </div>
-                </div>
+                </fieldset>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <fieldset className="min-w-0">
+                  <legend className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     {t('settings.languageTheme.theme')}
-                  </label>
+                  </legend>
+                  <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                    {t('settings.languageTheme.themeHelp')}
+                  </p>
                   <div className="flex flex-wrap gap-2 sm:gap-4">
                     {(['light', 'dark', 'auto'] as const).map((theme) => (
                       <Button
@@ -1437,7 +1441,7 @@ export default function Settings() {
                       </Button>
                     ))}
                   </div>
-                </div>
+                </fieldset>
               </div>
             </SettingsCard>
 
@@ -1449,94 +1453,43 @@ export default function Settings() {
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                  <span>
+                  <div>
                     <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       {t('settings.notifications.weatherAlerts')}
                     </span>
                     <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
                       {t('settings.notifications.weatherAlertsHelp')}
                     </span>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                    {t('settings.notifications.unavailable')}
                   </span>
-                  <Switch
-                    aria-label={t('settings.notifications.weatherAlerts')}
-                    isSelected={settings.notifications.weather}
-                    onChange={(isSelected: boolean) =>
-                      updateSettings((prev) => ({
-                        ...prev,
-                        notifications: {
-                          ...prev.notifications,
-                          weather: isSelected,
-                        },
-                      }))
-                    }
-                    className="group"
-                  >
-                    <div className="relative inline-flex items-center cursor-pointer">
-                      <div className="w-11 h-6 bg-gray-300 group-focus-visible:outline-none group-focus-visible:ring-2 group-focus-visible:ring-sky-300 rounded-full group-data-[selected]:bg-sky-600 transition-colors">
-                        <div className="absolute top-[2px] left-[2px] bg-white border-gray-300 border rounded-full h-5 w-5 transition-transform group-data-[selected]:translate-x-full"></div>
-                      </div>
-                    </div>
-                  </Switch>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                  <span>
+                  <div>
                     <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       {t('settings.notifications.newFlights')}
                     </span>
                     <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
                       {t('settings.notifications.newFlightsHelp')}
                     </span>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                    {t('settings.notifications.unavailable')}
                   </span>
-                  <Switch
-                    aria-label={t('settings.notifications.newFlights')}
-                    isSelected={settings.notifications.flights}
-                    onChange={(isSelected: boolean) =>
-                      updateSettings((prev) => ({
-                        ...prev,
-                        notifications: {
-                          ...prev.notifications,
-                          flights: isSelected,
-                        },
-                      }))
-                    }
-                    className="group"
-                  >
-                    <div className="relative inline-flex items-center cursor-pointer">
-                      <div className="w-11 h-6 bg-gray-300 group-focus-visible:outline-none group-focus-visible:ring-2 group-focus-visible:ring-sky-300 rounded-full group-data-[selected]:bg-sky-600 transition-colors">
-                        <div className="absolute top-[2px] left-[2px] bg-white border-gray-300 border rounded-full h-5 w-5 transition-transform group-data-[selected]:translate-x-full"></div>
-                      </div>
-                    </div>
-                  </Switch>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                  <span>
+                  <div>
                     <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       {t('settings.notifications.customAlerts')}
                     </span>
                     <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
                       {t('settings.notifications.customAlertsHelp')}
                     </span>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                    {t('settings.notifications.unavailable')}
                   </span>
-                  <Switch
-                    aria-label={t('settings.notifications.customAlerts')}
-                    isSelected={settings.notifications.alerts}
-                    onChange={(isSelected: boolean) =>
-                      updateSettings((prev) => ({
-                        ...prev,
-                        notifications: {
-                          ...prev.notifications,
-                          alerts: isSelected,
-                        },
-                      }))
-                    }
-                    className="group"
-                  >
-                    <div className="relative inline-flex items-center cursor-pointer">
-                      <div className="w-11 h-6 bg-gray-300 group-focus-visible:outline-none group-focus-visible:ring-2 group-focus-visible:ring-sky-300 rounded-full group-data-[selected]:bg-sky-600 transition-colors">
-                        <div className="absolute top-[2px] left-[2px] bg-white border-gray-300 border rounded-full h-5 w-5 transition-transform group-data-[selected]:translate-x-full"></div>
-                      </div>
-                    </div>
-                  </Switch>
                 </div>
               </div>
             </SettingsCard>
