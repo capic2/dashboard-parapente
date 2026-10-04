@@ -1895,17 +1895,18 @@
     },
     "intervals": {
       "title": "Synchronisation Intervals.icu",
-      "description": "État opérationnel de l'import manuel.",
+      "description": "Vérifiez si la clé API est renseignée et quels types d’activité sont autorisés pour l’import depuis Intervals.icu.",
       "status": "Statut",
-      "statusDetail": "Configuration fournie par le serveur",
+      "statusDetail": "Une clé API est renseignée côté serveur.",
+      "statusNotConfiguredDetail": "Ajoutez BACKEND_INTERVALS_ICU_API_KEY à l’environnement du serveur pour activer l’import.",
       "notConfigured": "Non configuré",
       "configured": "Configuré",
       "activityTypes": "Types d'activité surveillés",
       "typeCount": "{{count}} type(s)",
       "activityTypesDetail": "Types acceptés par l'import manuel",
-      "noActivityTypes": "Aucun type configuré. Une activité doit d'abord être découverte.",
-      "apiKeyEnvOnly": "La clé API est gérée uniquement dans l'environnement du serveur et n'est jamais affichée ici.",
-      "statusError": "Impossible de charger le statut Intervals.icu.",
+      "noActivityTypes": "Aucun type d’activité n’est autorisé pour l’import. Pour connaître le type d’une activité Zepp, ouvrez Vols → Plus d’actions sur les vols → Importer depuis Intervals.icu, puis prévisualisez une activité. Ajoutez son type à BACKEND_INTERVALS_ICU_ACTIVITY_TYPES dans l’environnement du serveur.",
+      "apiKeyEnvOnly": "La clé API n’est jamais affichée ici.",
+      "statusError": "Impossible de récupérer le statut Intervals.icu. Actualisez la page pour réessayer.",
       "overviewDetail": "{{count}} types d'activité surveillés"
     },
     "deployment": {
