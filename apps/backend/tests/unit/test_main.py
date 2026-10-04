@@ -50,7 +50,18 @@ def test_root_route_serves_frontend_index_when_built(client, tmp_path, monkeypat
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
+    assert response.headers["cache-control"] == "no-cache, must-revalidate"
     assert "frontend" in response.text
+
+
+def test_hashed_frontend_assets_are_immutable():
+    import main
+    from fastapi.responses import Response
+
+    response = Response(content="export const loaded = true", media_type="text/javascript")
+    main._set_frontend_cache_headers("/assets/weather.lazy-Abc12345.js", response)
+
+    assert response.headers["cache-control"] == "public, max-age=31536000, immutable"
 
 
 @pytest.mark.asyncio

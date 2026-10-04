@@ -57,7 +57,7 @@ resolve_from_portainer_volume() {
 }
 
 configure_compose_cmd() {
-  compose_files="-f docker-compose.yml"
+  compose_files="-f docker-compose.yml -f docker-compose.production.yml"
   if [ "$NVIDIA_GPU_ENABLED" = "true" ] && [ -f docker-compose.gpu.yml ]; then
     compose_files="$compose_files -f docker-compose.gpu.yml"
     echo "Using GPU compose override"
@@ -118,13 +118,13 @@ verify_gpu_prerequisites() {
   if ! docker info --format '{{json .Runtimes}}' | grep -q '"nvidia"'; then
     echo "NVIDIA runtime is not registered in Docker; falling back to CPU deployment"
     export NVIDIA_GPU_ENABLED=false BACKEND_VIDEO_ACCELERATOR=cpu
-    compose_files="-f docker-compose.yml"
+    compose_files="-f docker-compose.yml -f docker-compose.production.yml"
     return 0
   fi
   if ! docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi -L; then
     echo "NVIDIA GPU preflight failed; falling back to CPU deployment"
     export NVIDIA_GPU_ENABLED=false BACKEND_VIDEO_ACCELERATOR=cpu
-    compose_files="-f docker-compose.yml"
+    compose_files="-f docker-compose.yml -f docker-compose.production.yml"
     return 0
   fi
 }
@@ -292,6 +292,29 @@ download_gpu_compose_override() {
   esac
 }
 
+download_production_compose_override() {
+  production_url="https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.production.yml"
+  if ! production_status=$(curl --silent --show-error --location \
+    --output docker-compose.production.yml.tmp \
+    --write-out '%{http_code}' \
+    "$production_url"); then
+    rm -f docker-compose.production.yml.tmp
+    echo "Failed to download production compose override"
+    return 1
+  fi
+
+  case "$production_status" in
+    200)
+      mv docker-compose.production.yml.tmp docker-compose.production.yml
+      ;;
+    *)
+      rm -f docker-compose.production.yml.tmp
+      echo "Production compose override download returned HTTP $production_status"
+      return 1
+      ;;
+  esac
+}
+
 deploy_from_compose_path() {
   path="$1"
 
@@ -310,6 +333,7 @@ deploy_from_compose_path() {
   echo "Updating production compose file from $REPO_SLUG@$TARGET_SHA"
   curl -fsSL "https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.yml" -o docker-compose.yml.tmp
   mv docker-compose.yml.tmp docker-compose.yml
+  download_production_compose_override
   download_gpu_compose_override
 
   configure_compose_cmd
@@ -364,6 +388,24 @@ deploy_from_portainer_volume() {
       curl -fsSL "https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.yml" -o docker-compose.yml.tmp
       mv docker-compose.yml.tmp docker-compose.yml
 
+      production_url="https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.production.yml"
+      if ! production_status=$(curl --silent --show-error --location \
+        --output docker-compose.production.yml.tmp \
+        --write-out "%{http_code}" \
+        "$production_url"); then
+        rm -f docker-compose.production.yml.tmp
+        echo "Failed to download production compose override"
+        exit 1
+      fi
+      case "$production_status" in
+        200) mv docker-compose.production.yml.tmp docker-compose.production.yml ;;
+        *)
+          rm -f docker-compose.production.yml.tmp
+          echo "Production compose override download returned HTTP $production_status"
+          exit 1
+          ;;
+      esac
+
       if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
         gpu_url="https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.gpu.yml"
         if ! gpu_status=$(curl --silent --show-error --location \
@@ -392,7 +434,7 @@ deploy_from_portainer_volume() {
         echo "NVIDIA GPU deployment disabled; using CPU compose"
       fi
 
-      compose_files="-f docker-compose.yml"
+      compose_files="-f docker-compose.yml -f docker-compose.production.yml"
       if [ "$NVIDIA_GPU_ENABLED" = "true" ] && [ -f docker-compose.gpu.yml ]; then
         compose_files="$compose_files -f docker-compose.gpu.yml"
       fi
@@ -410,12 +452,12 @@ deploy_from_portainer_volume() {
         if ! docker info --format "{{json .Runtimes}}" | grep -q "\"nvidia\""; then
           echo "NVIDIA runtime is not registered in Docker; falling back to CPU deployment"
           export NVIDIA_GPU_ENABLED=false BACKEND_VIDEO_ACCELERATOR=cpu
-          compose_files="-f docker-compose.yml"
+          compose_files="-f docker-compose.yml -f docker-compose.production.yml"
         fi
         if [ "$NVIDIA_GPU_ENABLED" = "true" ] && ! docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi -L; then
           echo "NVIDIA GPU preflight failed; falling back to CPU deployment"
           export NVIDIA_GPU_ENABLED=false BACKEND_VIDEO_ACCELERATOR=cpu
-          compose_files="-f docker-compose.yml"
+          compose_files="-f docker-compose.yml -f docker-compose.production.yml"
         fi
       fi
 
