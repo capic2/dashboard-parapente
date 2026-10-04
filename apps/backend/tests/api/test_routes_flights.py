@@ -1407,6 +1407,59 @@ class TestUpdateFlightEndpoint:
         db_session.refresh(sample_flight)
         assert sample_flight.notes == "Great thermal conditions!"
 
+    def test_takeoff_and_landing_markers_set_effective_flight_duration(
+        self, client, db_session, sample_flight
+    ):
+        video_id = "dQw4w9WgXcQ"
+        response = client.patch(
+            f"{API_PREFIX}/flights/{sample_flight.id}",
+            json={
+                "youtube_urls": [f"https://youtu.be/{video_id}"],
+                "video_markers": [
+                    {
+                        "id": "takeoff-marker",
+                        "youtube_video_id": video_id,
+                        "kind": "takeoff",
+                        "timestamp_seconds": 120,
+                    },
+                    {
+                        "id": "landing-marker",
+                        "youtube_video_id": video_id,
+                        "kind": "landing",
+                        "timestamp_seconds": 7320,
+                    },
+                ],
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json()["data"]["duration_minutes"] == 120
+        db_session.refresh(sample_flight)
+        assert sample_flight.duration_minutes == 60
+        assert sample_flight.real_duration_minutes == 120
+
+        flight_response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}")
+        assert flight_response.status_code == 200
+        assert flight_response.json()["duration_minutes"] == 120
+
+        stats_response = client.get(f"{API_PREFIX}/flights/stats")
+        assert stats_response.status_code == 200
+        assert stats_response.json()["total_duration_minutes"] == 120
+
+        records_response = client.get(f"{API_PREFIX}/flights/records")
+        assert records_response.status_code == 200
+        assert records_response.json()["longest_duration"]["value"] == 120
+
+        url_update_response = client.patch(
+            f"{API_PREFIX}/flights/{sample_flight.id}",
+            json={"youtube_urls": ["https://youtu.be/9bZkp7q19f0"]},
+        )
+        assert url_update_response.status_code == 200
+        assert url_update_response.json()["data"]["duration_minutes"] == 60
+        db_session.refresh(sample_flight)
+        assert sample_flight.real_duration_minutes is None
+        assert sample_flight.video_markers == []
+
     def test_update_flight_youtube_urls_normalizes_and_deduplicates(
         self, client, db_session, sample_flight
     ):
