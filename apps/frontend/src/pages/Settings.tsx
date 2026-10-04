@@ -1,7 +1,15 @@
-import { Suspense, useState, useEffect } from 'react';
+import {
+  Suspense,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from '@tanstack/react-router';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
+import { Input, Label, TextField } from 'react-aria-components';
+import { Search } from 'lucide-react';
 import {
   Button,
   Tab,
@@ -36,6 +44,30 @@ import {
 } from '../hooks/settings/useAppSettings';
 import { getSiteDisplayName } from '../lib/siteDisplay';
 import { Route, settingsTabs, type SettingsTabKey } from '../routes/settings';
+
+// Site interface as returned by API
+interface ApiSite {
+  id: string;
+  name: string;
+  region?: string | null;
+  latitude?: number;
+  longitude?: number;
+  elevation_m?: number;
+  description?: string;
+  orientation?: string;
+  difficulty_level?: string;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+function normalizeSiteSearch(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/gu, '')
+    .toLowerCase()
+    .trim();
+}
 
 type SettingsIconName =
   | 'bell'
@@ -155,6 +187,21 @@ function SitesTab({
 }) {
   const { t } = useTranslation();
   const { data: sites } = useSuspenseQuery(sitesQueryOptions());
+  const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const siteList = sites as unknown as ApiSite[];
+  const normalizedSearchQuery = normalizeSiteSearch(deferredSearchQuery);
+  const filteredSites = useMemo(
+    () =>
+      siteList.filter((site) => {
+        if (!normalizedSearchQuery) return true;
+
+        return [site.name, site.region ?? ''].some((value) =>
+          normalizeSiteSearch(value).includes(normalizedSearchQuery)
+        );
+      }),
+    [normalizedSearchQuery, siteList]
+  );
   const favoriteCount = settings.favoriteSites.length;
 
   return (
@@ -166,57 +213,95 @@ function SitesTab({
       })}
     >
       {sites.length === 0 ? (
-        <p className="text-gray-600 dark:text-gray-300 text-center py-8">
-          {t('settings.favorites.noSites')}
-        </p>
-      ) : (
-        <div className="space-y-3">
-          {sites.map((site) => (
-            <div
-              key={site.id}
-              className={`flex flex-col gap-3 rounded-xl border p-4 transition-colors sm:flex-row sm:items-center sm:justify-between ${
-                settings.favoriteSites.includes(site.id)
-                  ? 'border-sky-300 bg-sky-50 dark:border-sky-700 dark:bg-sky-900/20'
-                  : 'border-gray-200 bg-gray-50 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600'
-              }`}
-            >
-              <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 dark:text-white">
-                  {getSiteDisplayName(site)}
-                </h3>
-                {site.latitude && site.longitude && site.elevation_m && (
-                  <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                    {site.latitude.toFixed(4)}, {site.longitude.toFixed(4)} ·{' '}
-                    {site.elevation_m}m
-                  </div>
-                )}
-                {site.description && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {site.description}
-                  </p>
-                )}
-              </div>
-              <Button
-                onClick={() => toggleFavorite(site.id)}
-                aria-pressed={settings.favoriteSites.includes(site.id)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors sm:ml-4 ${
-                  settings.favoriteSites.includes(site.id)
-                    ? 'bg-sky-600 text-white hover:bg-sky-700'
-                    : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                }`}
-              >
-                {settings.favoriteSites.includes(site.id)
-                  ? t('settings.favorites.favorite')
-                  : t('settings.favorites.add')}
-              </Button>
-            </div>
-          ))}
+        <div className="py-8 text-center">
+          <p className="font-semibold text-gray-800 dark:text-gray-100">
+            {t('settings.favorites.noSites')}
+          </p>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+            {t('settings.favorites.noSitesDescription')}
+          </p>
+          <Link
+            to="/sites"
+            className="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg bg-sky-600 px-4 py-2 font-medium text-white transition-colors hover:bg-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-800"
+          >
+            {t('settings.favorites.manageSites')}
+          </Link>
         </div>
+      ) : (
+        <>
+          <TextField
+            value={searchQuery}
+            onChange={setSearchQuery}
+            className="mb-4 flex max-w-xl flex-col gap-1"
+          >
+            <Label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+              {t('settings.favorites.searchLabel')}
+            </Label>
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                aria-hidden="true"
+              />
+              <Input
+                type="search"
+                placeholder={t('settings.favorites.searchPlaceholder')}
+                className="min-h-11 w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              />
+            </div>
+          </TextField>
+          {filteredSites.length === 0 ? (
+            <output className="block py-6 text-center text-gray-600 dark:text-gray-300">
+              {t('settings.favorites.noSearchResults', {
+                query: deferredSearchQuery.trim(),
+              })}
+            </output>
+          ) : (
+            <div className="space-y-3">
+              {filteredSites.map((site: ApiSite) => (
+                <div
+                  key={site.id}
+                  className={`flex flex-col gap-3 rounded-xl border p-4 transition-colors sm:flex-row sm:items-center sm:justify-between ${
+                    settings.favoriteSites.includes(site.id)
+                      ? 'border-sky-300 bg-sky-50 dark:border-sky-700 dark:bg-sky-900/20'
+                      : 'border-gray-200 bg-gray-50 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600'
+                  }`}
+                >
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 dark:text-white">
+                      {getSiteDisplayName(site)}
+                    </h3>
+                    {site.latitude && site.longitude && site.elevation_m && (
+                      <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                        {site.latitude.toFixed(4)}, {site.longitude.toFixed(4)}
+                        {' · '}
+                        {site.elevation_m}m
+                      </div>
+                    )}
+                    {site.description && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {site.description}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    onClick={() => toggleFavorite(site.id)}
+                    aria-pressed={settings.favoriteSites.includes(site.id)}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors sm:ml-4 ${
+                      settings.favoriteSites.includes(site.id)
+                        ? 'bg-sky-600 text-white hover:bg-sky-700'
+                        : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {settings.favoriteSites.includes(site.id)
+                      ? t('settings.favorites.favorite')
+                      : t('settings.favorites.add')}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
-      <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-200">
-        <strong>{t('settings.favorites.tip')}</strong>{' '}
-        {t('settings.favorites.tipText')}
-      </div>
     </SettingsCard>
   );
 }
@@ -1033,7 +1118,8 @@ export default function Settings() {
   const setSettings = useAppSettingsStore((state) => state.setSettings);
   const resetSettings = useAppSettingsStore((state) => state.resetSettings);
   const [saved, setSaved] = useState(false);
-  const activeTab: SettingsTabKey = tab ?? 'general';
+  const activeTab: SettingsTabKey =
+    tab === 'weather' ? 'sites' : (tab ?? 'general');
 
   useEffect(() => {
     void i18n.changeLanguage(settings.language);
@@ -1212,13 +1298,7 @@ export default function Settings() {
               {tabKey === 'sites' && (
                 <span className="inline-flex items-center justify-center gap-2">
                   <SettingsIcon name="mapPin" />
-                  {t('settings.tabs.favoriteSites')}
-                </span>
-              )}
-              {tabKey === 'weather' && (
-                <span className="inline-flex items-center justify-center gap-2">
-                  <SettingsIcon name="weather" />
-                  {t('settings.tabs.weatherSources')}
+                  {t('settings.tabs.sitesAndWeather')}
                 </span>
               )}
               {tabKey === 'sportstracklive' && (
@@ -1496,25 +1576,48 @@ export default function Settings() {
 
           {/* SITES TAB */}
           <TabPanel id="sites" className="outline-none">
-            <Suspense
-              fallback={
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md animate-pulse space-y-3">
-                  {[...Array(4)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-16 bg-gray-200 dark:bg-gray-600 rounded-lg"
-                    ></div>
-                  ))}
-                </div>
-              }
+            <Tabs
+              selectedKey={tab === 'weather' ? 'weather' : 'sites'}
+              onSelectionChange={(key) => {
+                void navigate({
+                  search: (previous) => ({
+                    ...previous,
+                    tab: key === 'weather' ? 'weather' : 'sites',
+                  }),
+                });
+              }}
+              className="space-y-4"
             >
-              <SitesTab settings={settings} toggleFavorite={toggleFavorite} />
-            </Suspense>
-          </TabPanel>
-
-          {/* WEATHER SOURCES TAB */}
-          <TabPanel id="weather" className="outline-none">
-            <WeatherSourcesTab />
+              <TabList
+                aria-label={t('settings.tabs.siteConfiguration')}
+                className="mb-4 flex flex-wrap"
+              >
+                <Tab id="sites">{t('settings.tabs.favoriteSites')}</Tab>
+                <Tab id="weather">{t('settings.tabs.weatherSources')}</Tab>
+              </TabList>
+              <TabPanel id="sites" className="outline-none">
+                <Suspense
+                  fallback={
+                    <div className="space-y-3 rounded-xl bg-white p-6 shadow-md dark:bg-gray-800">
+                      {[...Array(4)].map((_, i) => (
+                        <div
+                          key={i}
+                          className="h-16 rounded-lg bg-gray-200 dark:bg-gray-600"
+                        />
+                      ))}
+                    </div>
+                  }
+                >
+                  <SitesTab
+                    settings={settings}
+                    toggleFavorite={toggleFavorite}
+                  />
+                </Suspense>
+              </TabPanel>
+              <TabPanel id="weather" className="outline-none">
+                <WeatherSourcesTab />
+              </TabPanel>
+            </Tabs>
           </TabPanel>
 
           <TabPanel id="sportstracklive" className="outline-none">

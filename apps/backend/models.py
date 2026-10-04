@@ -486,6 +486,7 @@ class YoutubeUploadJob(Base):
     )
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     source_type = Column(String(32), nullable=False, default="gopro_overlay", index=True)
+    active_source_key = Column(String(256), nullable=True)
     gopro_overlay_job_id = Column(String, nullable=True, index=True)
     highlight_video_job_id = Column(String, nullable=True, index=True)
     source_path = Column(String, nullable=True)
@@ -504,14 +505,6 @@ class YoutubeUploadJob(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     flight = relationship("Flight", back_populates="youtube_upload_jobs")
-
-
-Index(
-    "uq_youtube_upload_jobs_active_flight",
-    YoutubeUploadJob.flight_id,
-    unique=True,
-    sqlite_where=text("status IN ('queued', 'uploading')"),
-)
 
 
 class BackgroundOperation(Base):
@@ -562,10 +555,13 @@ Index(
 )
 
 Index(
-    "uq_youtube_upload_jobs_preparing_or_active_flight",
+    "uq_youtube_upload_jobs_active_source",
     YoutubeUploadJob.flight_id,
+    YoutubeUploadJob.active_source_key,
     unique=True,
-    sqlite_where=text("status IN ('preparing', 'queued', 'uploading')"),
+    sqlite_where=text(
+        "active_source_key IS NOT NULL AND status IN ('preparing', 'queued', 'uploading')"
+    ),
 )
 
 

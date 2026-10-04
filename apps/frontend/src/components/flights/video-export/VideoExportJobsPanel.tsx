@@ -718,7 +718,10 @@ export function VideoExportJobsPanel({
                 jobId: job.job_id,
               });
             } else if (isYoutubeJob(job) && job.flight_id) {
-              await cancelYoutubeUpload.mutateAsync(job.flight_id);
+              await cancelYoutubeUpload.mutateAsync({
+                targetFlightId: job.flight_id,
+                jobId: job.job_id,
+              });
             } else {
               await cancelJob.mutateAsync(job.job_id);
             }

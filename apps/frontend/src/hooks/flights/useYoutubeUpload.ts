@@ -265,12 +265,14 @@ export function useStartYoutubeUpload(flightId: string) {
 export function useCancelYoutubeUpload(flightId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (targetFlightId?: string) =>
+    mutationFn: (target: { targetFlightId?: string; jobId: string }) =>
       api
-        .delete(`flights/${targetFlightId ?? flightId}/youtube-upload`)
+        .delete(`flights/${target.targetFlightId ?? flightId}/youtube-upload`, {
+          searchParams: { job_id: target.jobId },
+        })
         .json<YoutubeUploadJob>(),
-    onSuccess: (job, targetFlightId) => {
-      const resolvedFlightId = targetFlightId ?? flightId;
+    onSuccess: (job, target) => {
+      const resolvedFlightId = target.targetFlightId ?? flightId;
       queryClient.setQueryData(youtubeUploadQueryKey(resolvedFlightId), job);
       void queryClient.invalidateQueries({
         queryKey: ['video-export-jobs'],

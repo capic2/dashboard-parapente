@@ -2,6 +2,7 @@ import os
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from unittest.mock import Mock
 from urllib.parse import parse_qs, urlparse
 
 import config
@@ -670,7 +671,11 @@ def test_worker_injects_spherical_metadata_for_panorama_uploads(tmp_path, monkey
     monkeypatch.setattr(
         youtube_upload.metadata_utils,
         "parse_metadata",
-        lambda _path, _console: parsed_metadata,
+        lambda path, _console: (
+            youtube_upload.metadata_utils.ParsedMetadata()
+            if Path(path) == source_path
+            else parsed_metadata
+        ),
     )
 
     upload_path = youtube_upload._prepare_upload_video(
@@ -690,6 +695,45 @@ def test_worker_injects_spherical_metadata_for_panorama_uploads(tmp_path, monkey
     assert progress_updates == [1, 10]
     assert any("Preparing panorama for YouTube" in message for message in log_messages)
     assert any("Panorama preparation complete" in message for message in log_messages)
+
+
+def test_worker_reuses_panorama_with_spherical_metadata(tmp_path, monkeypatch) -> None:
+    source_path = tmp_path / "pano.mp4"
+    source_path.write_bytes(b"spherical panorama")
+    monkeypatch.setattr(config, "VIDEO_EXPORT_DIR", str(tmp_path / "exports"))
+    progress_updates: list[int] = []
+    log_messages: list[str] = []
+    parsed_metadata = youtube_upload.metadata_utils.ParsedMetadata()
+    parsed_metadata.video["Track 0"] = {
+        "Spherical": "true",
+        "ProjectionType": "equirectangular",
+    }
+    inject_metadata = Mock()
+    monkeypatch.setattr(youtube_upload.metadata_utils, "inject_metadata", inject_metadata)
+    monkeypatch.setattr(
+        youtube_upload.metadata_utils,
+        "parse_metadata",
+        lambda _path, _console: parsed_metadata,
+    )
+    monkeypatch.setattr(
+        youtube_upload,
+        "_log_job",
+        lambda _job_id, message: log_messages.append(message),
+    )
+
+    upload_path = youtube_upload._prepare_upload_video(
+        "youtube-pano-ready",
+        "pano",
+        source_path,
+        progress_callback=lambda progress: progress_updates.append(progress),
+    )
+
+    assert upload_path == source_path
+    assert upload_path.read_bytes() == b"spherical panorama"
+    assert not youtube_upload._panorama_upload_path("youtube-pano-ready").exists()
+    inject_metadata.assert_not_called()
+    assert progress_updates == [youtube_upload._PANORAMA_PREPARATION_PROGRESS_MAX]
+    assert any("already has verified 360° metadata" in message for message in log_messages)
 
 
 def test_worker_rejects_unverified_spherical_metadata(tmp_path, monkeypatch) -> None:

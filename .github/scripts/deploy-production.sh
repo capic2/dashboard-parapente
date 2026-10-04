@@ -84,7 +84,6 @@ print_backend_diagnostics() {
     parapente-backend \
     parapente-backend-worker \
     parapente-highlight-video-worker \
-    parapente-youtube-upload-worker \
     parapente-gopro-overlay-worker \
     parapente-gopro-preview-worker \
     parapente-redis; do
@@ -101,7 +100,12 @@ print_backend_diagnostics() {
   echo "Recent backend logs"
   docker logs --tail 200 parapente-backend 2>&1 || true
   echo "Recent YouTube upload worker logs"
-  docker logs --tail 200 parapente-youtube-upload-worker 2>&1 || true
+  for container_name in $(docker ps -a \
+    --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" \
+    --filter "label=com.docker.compose.service=youtube-upload-worker" \
+    --format '{{.Names}}'); do
+    docker logs --tail 200 "$container_name" 2>&1 || true
+  done
   echo "Recent GoPro overlay worker logs"
   docker logs --tail 200 parapente-gopro-overlay-worker 2>&1 || true
   echo "Recent GoPro preview worker logs"
@@ -133,14 +137,29 @@ verify_workers_started() {
   attempts=1
   while [ "$attempts" -le "$LOCAL_VERIFY_MAX_ATTEMPTS" ]; do
     failed=0
-    for container_name in parapente-backend parapente-backend-worker parapente-highlight-video-worker parapente-youtube-upload-worker parapente-gopro-overlay-worker parapente-gopro-preview-worker parapente-redis; do
+    for container_name in parapente-backend parapente-backend-worker parapente-highlight-video-worker parapente-gopro-overlay-worker parapente-gopro-preview-worker parapente-redis; do
       state=$(docker inspect --format '{{.State.Status}}' "$container_name" 2>/dev/null || true)
       health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_name" 2>/dev/null || true)
       if [ "$state" != "running" ] || [ "$health" != "healthy" ]; then
         failed=1
       fi
     done
-    for worker_log in parapente-backend-worker parapente-highlight-video-worker parapente-gopro-overlay-worker parapente-gopro-preview-worker parapente-youtube-upload-worker; do
+    youtube_workers=$(docker ps -a \
+      --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" \
+      --filter "label=com.docker.compose.service=youtube-upload-worker" \
+      --format '{{.Names}}')
+    youtube_worker_count=$(printf '%s\n' "$youtube_workers" | sed '/^$/d' | wc -l)
+    if [ "$youtube_worker_count" -ne 3 ]; then
+      failed=1
+    fi
+    for worker_name in $youtube_workers; do
+      state=$(docker inspect --format '{{.State.Status}}' "$worker_name" 2>/dev/null || true)
+      health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$worker_name" 2>/dev/null || true)
+      if [ "$state" != "running" ] || [ "$health" != "healthy" ] || ! docker logs "$worker_name" 2>&1 | grep -q "Starting YouTube upload RQ worker"; then
+        failed=1
+      fi
+    done
+    for worker_log in parapente-backend-worker parapente-highlight-video-worker parapente-gopro-overlay-worker parapente-gopro-preview-worker; do
       if ! docker logs "$worker_log" 2>&1 | grep -q "Listening on"; then
         failed=1
       fi
@@ -347,7 +366,7 @@ deploy_from_compose_path() {
   # Redis is not part of the backend image update. Keep it running
   # so deployments do not pull and recreate the stateful service.
   if ! compose_cmd pull backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker gopro-preview-worker database-backup ||
-    ! compose_cmd up -d --remove-orphans backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker gopro-preview-worker database-backup redis; then
+    ! compose_cmd up -d --remove-orphans --scale youtube-upload-worker=3 backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker gopro-preview-worker database-backup redis; then
     print_backend_diagnostics
     return 1
   fi
@@ -466,19 +485,31 @@ deploy_from_portainer_volume() {
       # Redis is not part of the backend image update. Keep it running
       # so deployments do not pull and recreate the stateful service.
       compose_cmd pull backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker gopro-preview-worker database-backup
-      compose_cmd up -d --remove-orphans backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker gopro-preview-worker database-backup redis
+      compose_cmd up -d --remove-orphans --scale youtube-upload-worker=3 backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker gopro-preview-worker database-backup redis
       readiness_attempt=1
       readiness_ok=0
       while [ "$readiness_attempt" -le "$LOCAL_VERIFY_MAX_ATTEMPTS" ]; do
         readiness_failed=0
-        for container_name in parapente-backend parapente-backend-worker parapente-highlight-video-worker parapente-youtube-upload-worker parapente-gopro-overlay-worker parapente-gopro-preview-worker parapente-redis; do
+        for container_name in parapente-backend parapente-backend-worker parapente-highlight-video-worker parapente-gopro-overlay-worker parapente-gopro-preview-worker parapente-redis; do
           state=$(docker inspect --format "{{.State.Status}}" "$container_name" 2>/dev/null || true)
           health=$(docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" "$container_name" 2>/dev/null || true)
           if [ "$state" != "running" ] || [ "$health" != "healthy" ]; then
             readiness_failed=1
           fi
         done
-        for worker_log in parapente-backend-worker parapente-highlight-video-worker parapente-gopro-overlay-worker parapente-gopro-preview-worker parapente-youtube-upload-worker; do
+        youtube_workers=$(docker ps -a --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" --filter "label=com.docker.compose.service=youtube-upload-worker" --format '{{.Names}}')
+        youtube_worker_count=$(printf '%s\n' "$youtube_workers" | sed '/^$/d' | wc -l)
+        if [ "$youtube_worker_count" -ne 3 ]; then
+          readiness_failed=1
+        fi
+        for worker_name in $youtube_workers; do
+          state=$(docker inspect --format "{{.State.Status}}" "$worker_name" 2>/dev/null || true)
+          health=$(docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" "$worker_name" 2>/dev/null || true)
+          if [ "$state" != "running" ] || [ "$health" != "healthy" ] || ! docker logs "$worker_name" 2>&1 | grep -q "Starting YouTube upload RQ worker"; then
+            readiness_failed=1
+          fi
+        done
+        for worker_log in parapente-backend-worker parapente-highlight-video-worker parapente-gopro-overlay-worker parapente-gopro-preview-worker; do
           if ! docker logs "$worker_log" 2>&1 | grep -q "Listening on"; then
             readiness_failed=1
           fi

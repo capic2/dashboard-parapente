@@ -10,7 +10,6 @@ import {
   useYoutubeAuthorizationUrl,
   useYoutubeSourcePublicationStatus,
   useYoutubeStatus,
-  useYoutubeUpload,
   youtubeVideoAssociationsQueryKey,
   type YoutubeUploadSource,
 } from '../../../hooks/flights/useYoutubeUpload';
@@ -58,7 +57,6 @@ export function FlightYoutubeUploadControls({
   const toast = useToast();
   const queryClient = useQueryClient();
   const connection = useYoutubeStatus();
-  const activeUpload = useYoutubeUpload(flight.id);
   const { upload, isPublished } = useYoutubeSourcePublicationStatus(
     flight.id,
     source,
@@ -77,10 +75,6 @@ export function FlightYoutubeUploadControls({
   );
   const [privacyStatus, setPrivacyStatus] = useState<PrivacyStatus>('unlisted');
 
-  const hasActiveUpload =
-    activeUpload.data?.status === 'preparing' ||
-    activeUpload.data?.status === 'queued' ||
-    activeUpload.data?.status === 'uploading';
   const isActive =
     upload.data?.status === 'preparing' ||
     upload.data?.status === 'queued' ||
@@ -149,8 +143,13 @@ export function FlightYoutubeUploadControls({
   };
 
   const handleCancel = async () => {
+    const jobId = upload.data?.job_id;
+    if (!jobId) return;
     try {
-      await cancelUpload.mutateAsync();
+      await cancelUpload.mutateAsync({
+        targetFlightId: flight.id,
+        jobId,
+      });
       toast.success(t('flights.youtubeUploadCancelled'));
     } catch (error) {
       toast.error(
@@ -180,8 +179,6 @@ export function FlightYoutubeUploadControls({
     buttonTitle = t('flights.youtubeUploadStopTitle');
   } else if (isPublished) {
     buttonTitle = t('flights.youtubeUploadPublished');
-  } else if (hasActiveUpload) {
-    buttonTitle = t('flights.youtubeUploadOtherOverlayInProgress');
   }
 
   return (
@@ -194,7 +191,6 @@ export function FlightYoutubeUploadControls({
           connection.isLoading ||
           upload.isLoading ||
           isPublished ||
-          (hasActiveUpload && !isActive) ||
           authorizationUrl.isPending ||
           cancelUpload.isPending
         }
