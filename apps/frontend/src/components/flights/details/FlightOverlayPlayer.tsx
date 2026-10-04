@@ -200,6 +200,7 @@ export function FlightOverlayPlayer({
   );
   const cameraCurrentTimeRef = useRef(cameraCurrentTime);
   const cameraIsPlayingRef = useRef(cameraIsPlaying);
+  const playbackRequestedRef = useRef(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [youtubeReady, setYoutubeReady] = useState(false);
   const [youtubeFailed, setYoutubeFailed] = useState(false);
@@ -216,6 +217,10 @@ export function FlightOverlayPlayer({
   const youtubeId = youtubeUrl ? getYoutubeVideoId(youtubeUrl) : null;
   const masterIsYoutube = Boolean(youtubeId) && !youtubeFailed;
   const isInteractive = mode === 'interactive';
+  const hasPlaybackIntent = useCallback(
+    () => !isInteractive || playbackRequestedRef.current,
+    [isInteractive]
+  );
   const sortedVideoMarkers = isInteractive
     ? videoMarkers
         .filter((marker) => marker.youtube_video_id === youtubeId)
@@ -381,6 +386,7 @@ export function FlightOverlayPlayer({
           lastPipSeekTickRef.current.set(pip.id, pipSyncTick);
         }
         if (
+          hasPlaybackIntent() &&
           cameraIsPlaying &&
           [-1, 2, 5].includes(pipState) &&
           pipSyncTick - (lastPipPlayTickRef.current.get(pip.id) ?? -30) >= 30
@@ -404,8 +410,14 @@ export function FlightOverlayPlayer({
       ) {
         pipVideo.currentTime = clamp(desiredVideoTime, pipVideo.duration);
       }
-      if (pipVideo && cameraIsPlaying && pipVideo.paused) playMedia(pipVideo);
-      else if (pipVideo && !cameraIsPlaying && !pipVideo.paused)
+      if (
+        pipVideo &&
+        hasPlaybackIntent() &&
+        cameraIsPlaying &&
+        pipVideo.paused
+      ) {
+        playMedia(pipVideo);
+      } else if (pipVideo && !cameraIsPlaying && !pipVideo.paused)
         pipVideo.pause();
     });
     const flight = flightRef.current;
@@ -427,7 +439,7 @@ export function FlightOverlayPlayer({
     if (overlay && Math.abs(overlay.currentTime - overlayTime) > 0.08) {
       overlay.currentTime = clamp(overlayTime, overlay.duration);
     }
-    if (cameraIsPlaying && overlay?.paused) {
+    if (hasPlaybackIntent() && cameraIsPlaying && overlay?.paused) {
       // The camera is the master clock. Browsers can leave a secondary muted
       // WebM paused when it finishes loading or after a seek, so retry it on
       // the next synchronization tick instead of letting the layer freeze.
@@ -500,6 +512,7 @@ export function FlightOverlayPlayer({
         width: '100%',
         videoId: youtubeId,
         playerVars: {
+          ...(isInteractive ? { autoplay: 0 } : {}),
           controls: 0,
           // YouTube chooses the best quality available for the viewing
           // conditions; its iframe API no longer supports forcing quality.
@@ -531,9 +544,11 @@ export function FlightOverlayPlayer({
             setCameraIsPlaying(playing);
             if (!playing) setControlsVisible(true);
             if (playing) {
-              playMedia(flightRef.current);
-              pipVideosRef.current.forEach(playMedia);
-              playMedia(overlayRef.current);
+              if (hasPlaybackIntent()) {
+                playMedia(flightRef.current);
+                pipVideosRef.current.forEach(playMedia);
+                playMedia(overlayRef.current);
+              }
               // Apply the GPX/video offset immediately when YouTube becomes
               // the master clock; the animation frame loop then keeps it
               // aligned for the rest of playback.
@@ -560,7 +575,7 @@ export function FlightOverlayPlayer({
       youtubeRef.current?.destroy();
       youtubeRef.current = null;
     };
-  }, [youtubeId]);
+  }, [hasPlaybackIntent, isInteractive, youtubeId]);
 
   const pipYoutubeSignature = pips
     .map(
@@ -590,6 +605,7 @@ export function FlightOverlayPlayer({
           width: '100%',
           videoId,
           playerVars: {
+            autoplay: 0,
             controls: 0,
             fs: 0,
             playsinline: 1,
@@ -598,6 +614,7 @@ export function FlightOverlayPlayer({
           events: {
             onReady: () => {
               player.mute();
+              player.pauseVideo();
               const currentPip = pipsRef.current.find(
                 ({ id }) => id === pip.id
               );
@@ -609,7 +626,9 @@ export function FlightOverlayPlayer({
                 Math.max(0, cameraCurrentTimeRef.current - offset),
                 true
               );
-              if (cameraIsPlayingRef.current) player.playVideo();
+              if (playbackRequestedRef.current && cameraIsPlayingRef.current) {
+                player.playVideo();
+              }
             },
           },
         });
@@ -629,6 +648,7 @@ export function FlightOverlayPlayer({
 
   const handlePause = () => {
     setControlsVisible(true);
+    playbackRequestedRef.current = false;
     setCameraIsPlaying(false);
     youtubePipPlayersRef.current.forEach((player) => player.pauseVideo());
     flightRef.current?.pause();
@@ -641,7 +661,7 @@ export function FlightOverlayPlayer({
     // The browser preview may finish converting after the camera started.
     // Retry playback at that point so the transparent layer cannot remain
     // silently paused after its source becomes playable.
-    if (cameraRef.current && !cameraRef.current.paused) {
+    if (hasPlaybackIntent() && cameraRef.current && !cameraRef.current.paused) {
       playMedia(overlayRef.current);
     }
   };
@@ -660,15 +680,21 @@ export function FlightOverlayPlayer({
   const handleTogglePlay = () => {
     if (masterIsYoutube) {
       if (!youtubeRef.current || !youtubeReady) return;
-      if (youtubeRef.current.getPlayerState() === 1)
+      if (youtubeRef.current.getPlayerState() === 1) {
+        playbackRequestedRef.current = false;
         youtubeRef.current.pauseVideo();
-      else youtubeRef.current.playVideo();
+      } else {
+        playbackRequestedRef.current = true;
+        youtubeRef.current.playVideo();
+      }
       return;
     }
     if (!cameraRef.current) return;
     if (cameraRef.current.paused) {
+      playbackRequestedRef.current = true;
       void cameraRef.current.play();
     } else {
+      playbackRequestedRef.current = false;
       cameraRef.current.pause();
     }
   };
