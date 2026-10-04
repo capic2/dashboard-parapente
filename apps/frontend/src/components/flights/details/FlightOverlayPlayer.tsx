@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Maximize2, Minimize2, Pause, Play, Plus } from 'lucide-react';
+import { Maximize2, Minimize2, Pause, Play } from 'lucide-react';
 import type { FlightVideoMarker } from '@dashboard-parapente/shared-types';
 import type {
   FlightTelemetryPipLayout,
@@ -134,8 +134,6 @@ interface FlightOverlayPlayerProps {
   overlayContent?: ReactNode;
   pips?: FlightOverlayPip[];
   videoMarkers?: FlightVideoMarker[];
-  onAddVideoMarker?: (marker: Omit<FlightVideoMarker, 'id'>) => Promise<void>;
-  isSavingVideoMarker?: boolean;
 }
 
 function clamp(value: number, maximum: number) {
@@ -184,8 +182,6 @@ export function FlightOverlayPlayer({
   overlayContent,
   pips = EMPTY_PIPS,
   videoMarkers = EMPTY_VIDEO_MARKERS,
-  onAddVideoMarker,
-  isSavingVideoMarker = false,
 }: FlightOverlayPlayerProps) {
   const { t } = useTranslation();
   const cameraRef = useRef<HTMLVideoElement>(null);
@@ -230,15 +226,6 @@ export function FlightOverlayPlayer({
   const [youtubeReady, setYoutubeReady] = useState(false);
   const [youtubeFailed, setYoutubeFailed] = useState(false);
   const [activePipId, setActivePipId] = useState<string | null>(null);
-  const [isAddingVideoMarker, setIsAddingVideoMarker] = useState(false);
-  const isAddingVideoMarkerRef = useRef(false);
-  const [newVideoMarkerKind, setNewVideoMarkerKind] =
-    useState<FlightVideoMarker['kind']>('takeoff');
-  const [newVideoMarkerTitle, setNewVideoMarkerTitle] = useState('');
-  const [newVideoMarkerTime, setNewVideoMarkerTime] = useState<number | null>(
-    null
-  );
-  const [videoMarkerSaveError, setVideoMarkerSaveError] = useState(false);
   const youtubeId = youtubeUrl ? getYoutubeVideoId(youtubeUrl) : null;
   const masterIsYoutube = Boolean(youtubeId) && !youtubeFailed;
   const canSeekVideoMarkers = Boolean(
@@ -285,50 +272,8 @@ export function FlightOverlayPlayer({
     interest: t('flights.videoMarkerKindInterest'),
   };
 
-  const openVideoMarkerForm = () => {
-    if (!youtubeId || !onAddVideoMarker || !youtubeReady || !masterIsYoutube) {
-      return;
-    }
-    const playerTime = cameraIsPlayingRef.current
-      ? youtubeRef.current?.getCurrentTime()
-      : cameraCurrentTimeRef.current;
-    const currentTime = playerTime ?? cameraCurrentTimeRef.current;
-    setNewVideoMarkerTime(
-      Math.min(86400, Math.max(0, Math.floor(currentTime)))
-    );
-    setNewVideoMarkerKind('takeoff');
-    setNewVideoMarkerTitle('');
-    setVideoMarkerSaveError(false);
-    isAddingVideoMarkerRef.current = true;
-    setIsAddingVideoMarker(true);
-    setControlsVisible(true);
-    clearControlsHideTimeout();
-  };
-
-  const saveVideoMarker = async () => {
-    if (!youtubeId || !onAddVideoMarker || newVideoMarkerTime === null) return;
-    const title = newVideoMarkerTitle.trim();
-    if (newVideoMarkerKind === 'interest' && !title) return;
-    setVideoMarkerSaveError(false);
-    try {
-      await onAddVideoMarker({
-        youtube_video_id: youtubeId,
-        kind: newVideoMarkerKind,
-        timestamp_seconds: newVideoMarkerTime,
-        title: newVideoMarkerKind === 'interest' ? title : '',
-        include_in_youtube_chapters: true,
-      });
-      isAddingVideoMarkerRef.current = false;
-      setIsAddingVideoMarker(false);
-      if (cameraIsPlayingRef.current) scheduleControlsHide();
-    } catch {
-      setVideoMarkerSaveError(true);
-    }
-  };
-
   cameraCurrentTimeRef.current = cameraCurrentTime;
   cameraIsPlayingRef.current = cameraIsPlaying;
-  isAddingVideoMarkerRef.current = isAddingVideoMarker;
   seekRequestRef.current = seekRequest;
 
   const clearControlsHideTimeout = useCallback(() => {
@@ -339,7 +284,6 @@ export function FlightOverlayPlayer({
   }, []);
 
   const scheduleControlsHide = useCallback(() => {
-    if (isAddingVideoMarkerRef.current) return;
     clearControlsHideTimeout();
     controlsHideTimeoutRef.current = setTimeout(() => {
       setControlsVisible(false);
@@ -1211,98 +1155,6 @@ export function FlightOverlayPlayer({
                 )}
               </button>
             </div>
-            {onAddVideoMarker && (
-              <div className="mt-2">
-                {!isAddingVideoMarker ? (
-                  <button
-                    type="button"
-                    onClick={openVideoMarkerForm}
-                    disabled={!youtubeId || !youtubeReady || !masterIsYoutube}
-                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-white/20 bg-slate-800/90 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                    {t('flights.overlayAddVideoMarker')}
-                  </button>
-                ) : (
-                  <div className="flex flex-wrap items-end gap-2 rounded-lg border border-white/15 bg-slate-900/95 p-2.5">
-                    <label className="flex min-w-36 flex-col gap-1 text-xs text-slate-300">
-                      {t('flights.videoMarkerKindLabel')}
-                      <select
-                        value={newVideoMarkerKind}
-                        onChange={(event) =>
-                          setNewVideoMarkerKind(
-                            event.target.value as FlightVideoMarker['kind']
-                          )
-                        }
-                        className="h-8 rounded-md border border-white/20 bg-slate-800 px-2 text-sm text-white"
-                      >
-                        <option value="takeoff">
-                          {videoMarkerLabels.takeoff}
-                        </option>
-                        <option value="landing">
-                          {videoMarkerLabels.landing}
-                        </option>
-                        <option value="interest">
-                          {videoMarkerLabels.interest}
-                        </option>
-                      </select>
-                    </label>
-                    {newVideoMarkerKind === 'interest' && (
-                      <label className="flex min-w-44 flex-1 flex-col gap-1 text-xs text-slate-300">
-                        {t('flights.videoMarkerTitleLabel')}
-                        <input
-                          value={newVideoMarkerTitle}
-                          onChange={(event) =>
-                            setNewVideoMarkerTitle(event.target.value)
-                          }
-                          maxLength={100}
-                          className="h-8 rounded-md border border-white/20 bg-slate-800 px-2 text-sm text-white placeholder:text-slate-500"
-                        />
-                      </label>
-                    )}
-                    <span className="flex h-8 items-center gap-1 text-xs text-slate-300">
-                      {t('flights.videoMarkerTimeLabel')}:
-                      <time className="font-mono text-sky-200">
-                        {newVideoMarkerTime === null
-                          ? '—'
-                          : formatVideoMarkerTime(newVideoMarkerTime)}
-                      </time>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => void saveVideoMarker()}
-                      disabled={
-                        isSavingVideoMarker ||
-                        (newVideoMarkerKind === 'interest' &&
-                          !newVideoMarkerTitle.trim())
-                      }
-                      className="h-8 cursor-pointer rounded-md bg-sky-600 px-3 text-xs font-semibold text-white hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {isSavingVideoMarker
-                        ? t('flights.videoMarkerSaving')
-                        : t('flights.videoMarkerSave')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        isAddingVideoMarkerRef.current = false;
-                        setIsAddingVideoMarker(false);
-                        if (cameraIsPlayingRef.current) scheduleControlsHide();
-                      }}
-                      disabled={isSavingVideoMarker}
-                      className="h-8 cursor-pointer rounded-md border border-white/20 px-3 text-xs text-slate-200 hover:bg-white/10 disabled:opacity-50"
-                    >
-                      {t('flights.cancel')}
-                    </button>
-                    {videoMarkerSaveError && (
-                      <p role="alert" className="w-full text-xs text-red-300">
-                        {t('flights.videoMarkerSaveError')}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
             {sortedVideoMarkers.length > 0 && (
               <ul
                 className="mt-2 m-0 flex max-w-full list-none gap-2 overflow-x-auto p-0 pb-1"
