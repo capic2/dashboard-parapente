@@ -34,6 +34,7 @@ import {
   type AppSettings as BackendAppSettings,
 } from '../hooks/settings/useAppSettings';
 import { getSiteDisplayName } from '../lib/siteDisplay';
+import { Route, settingsTabs, type SettingsTabKey } from '../routes/settings';
 
 // Site interface as returned by API
 interface ApiSite {
@@ -50,13 +51,6 @@ interface ApiSite {
   created_at?: string;
   updated_at?: string;
 }
-
-type SettingsTabKey =
-  | 'general'
-  | 'sites'
-  | 'weather'
-  | 'sportstracklive'
-  | 'data';
 
 type SettingsIconName =
   | 'bell'
@@ -1034,13 +1028,15 @@ function PerformanceSection() {
 
 export default function Settings() {
   const { t, i18n } = useTranslation();
+  const { tab } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const { preference: themePreference, setPreference: setThemePreference } =
     useThemeStore();
   const settings = useAppSettingsStore((state) => state.settings);
   const setSettings = useAppSettingsStore((state) => state.setSettings);
   const resetSettings = useAppSettingsStore((state) => state.resetSettings);
   const [saved, setSaved] = useState(false);
-  const [activeTab, setActiveTab] = useState<SettingsTabKey>('general');
+  const activeTab: SettingsTabKey = tab ?? 'general';
 
   useEffect(() => {
     void i18n.changeLanguage(settings.language);
@@ -1195,14 +1191,20 @@ export default function Settings() {
 
       <Tabs
         selectedKey={activeTab}
-        onSelectionChange={(key) => setActiveTab(key as SettingsTabKey)}
+        onSelectionChange={(key) => {
+          const selectedTab = key as SettingsTabKey;
+          void navigate({
+            search: (previous) => ({
+              ...previous,
+              tab: selectedTab === 'general' ? undefined : selectedTab,
+            }),
+          });
+        }}
         className="space-y-4"
       >
         {/* Tabs Navigation */}
         <TabList className="mb-4 grid-cols-2 sm:flex">
-          {(
-            ['general', 'sites', 'weather', 'sportstracklive', 'data'] as const
-          ).map((tabKey) => (
+          {settingsTabs.map((tabKey) => (
             <Tab key={tabKey} id={tabKey} className="flex-1">
               {tabKey === 'general' && (
                 <span className="inline-flex items-center justify-center gap-2">
