@@ -649,12 +649,17 @@
     },
     "favorites": {
       "title": "Gérer vos Sites Favoris",
-      "description": "{{count}} site(s) favori(s) utilisés en priorité dans la météo et les sélecteurs.",
+      "description_zero": "Aucun site favori n’est encore sélectionné.",
+      "description_one": "{{count}} site favori utilisé en priorité dans la météo et les sélecteurs.",
+      "description_other": "{{count}} sites favoris utilisés en priorité dans la météo et les sélecteurs.",
       "noSites": "Aucun site disponible",
+      "noSitesDescription": "Ajoutez d’abord un site pour pouvoir le mettre en favori.",
+      "manageSites": "Gérer les sites",
+      "searchLabel": "Rechercher un site",
+      "searchPlaceholder": "Nom ou localité",
+      "noSearchResults": "Aucun site ne correspond à « {{query}} ».",
       "favorite": "Favori",
-      "add": "Ajouter",
-      "tip": "Astuce :",
-      "tipText": "Les sites favoris apparaîtront en priorité dans les sélecteurs"
+      "add": "Ajouter"
     },
     "weatherSources": {
       "title": "Gestion des Sources Météo",
