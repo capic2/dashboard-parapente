@@ -224,22 +224,6 @@ export function FlightsTable({
           ) : (
             <div className="space-y-2">
               {dayGroups.map(([date, dayFlights]) => {
-                if (dayFlights.length === 1) {
-                  const flight = dayFlights[0];
-                  return (
-                    <Flight
-                      key={flight.id}
-                      flight={flight}
-                      isActive={selectedFlightId === flight.id}
-                      isSelected={false}
-                      selectionMode={false}
-                      isListOption={false}
-                      onSelectFlight={onSelectFlight}
-                      onDeleteFlight={onDeleteFlight}
-                    />
-                  );
-                }
-
                 const isExpanded = expandedDays.has(date);
                 const groupId = `flights-on-${date}`;
                 const siteNames = [
