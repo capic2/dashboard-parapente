@@ -64,6 +64,26 @@ def test_hashed_frontend_assets_are_immutable():
     assert response.headers["cache-control"] == "public, max-age=31536000, immutable"
 
 
+def test_unhashed_frontend_paths_keep_default_cache_headers():
+    import main
+    from fastapi.responses import Response
+
+    response = Response(content="missing asset", media_type="text/javascript")
+    main._set_frontend_cache_headers("/assets/weather.js", response)
+
+    assert "cache-control" not in response.headers
+
+
+def test_frontend_error_responses_are_not_cached_as_successful_assets():
+    import main
+    from fastapi.responses import Response
+
+    response = Response(content="asset unavailable", media_type="text/javascript", status_code=502)
+    main._set_frontend_cache_headers("/assets/weather.lazy-Abc12345.js", response)
+
+    assert "cache-control" not in response.headers
+
+
 @pytest.mark.asyncio
 async def test_initial_cache_warmup_runs_scheduled_fetch():
     """Startup cache warmup should populate Redis through the scheduler fetch."""
