@@ -134,6 +134,10 @@ export function FlightDetails({
   const [videoMarkersDraft, setVideoMarkersDraft] = useState(
     flight.video_markers ?? []
   );
+  const [currentYoutubePosition, setCurrentYoutubePosition] = useState<{
+    videoId: string;
+    seconds: number;
+  } | null>(null);
   const persistedVideoMarkersKey = JSON.stringify(flight.video_markers ?? []);
   const persistedVideoMarkers = useMemo(
     () => JSON.parse(persistedVideoMarkersKey) as FlightVideoMarker[],
@@ -1079,6 +1083,7 @@ export function FlightDetails({
               <FlightVideoMarkersEditor
                 youtubeUrls={flight.youtube_urls ?? []}
                 value={videoMarkersDraft}
+                currentYoutubePosition={currentYoutubePosition}
                 onChange={setVideoMarkersDraft}
                 onValidityChange={setVideoMarkerTimesValid}
               />
@@ -1149,6 +1154,14 @@ export function FlightDetails({
             manualOffsetSeconds={Number(goproOverlayPreviewOffset)}
             youtubeUrls={flight.youtube_urls ?? []}
             videoMarkers={flight.video_markers ?? []}
+            onCurrentYoutubePositionChange={(position) =>
+              setCurrentYoutubePosition((current) =>
+                current?.videoId === position?.videoId &&
+                current?.seconds === position?.seconds
+                  ? current
+                  : position
+              )
+            }
           />
         )}
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">

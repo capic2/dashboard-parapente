@@ -7,6 +7,7 @@ import { getYoutubeVideoId } from '../../../lib/youtube';
 interface Props {
   youtubeUrls: string[];
   value: FlightVideoMarker[];
+  currentYoutubePosition: { videoId: string; seconds: number } | null;
   onChange: (markers: FlightVideoMarker[]) => void;
   onValidityChange: (isValid: boolean) => void;
 }
@@ -39,10 +40,15 @@ function parseTime(value: string): number | null {
 export function FlightVideoMarkersEditor({
   youtubeUrls,
   value,
+  currentYoutubePosition,
   onChange,
   onValidityChange,
 }: Props) {
   const { t } = useTranslation();
+  const [newMarkerKind, setNewMarkerKind] =
+    useState<FlightVideoMarker['kind']>('takeoff');
+  const [newMarkerTitle, setNewMarkerTitle] = useState('');
+  const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
   const [times, setTimes] = useState<Record<string, string>>({});
   const [invalidIds, setInvalidIds] = useState<string[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -54,22 +60,37 @@ export function FlightVideoMarkersEditor({
       : [];
   });
 
-  const addMarker = (kind: FlightVideoMarker['kind']) => {
-    if (!videos[0]) return;
+  let markerVideoId = videos[0]?.id;
+  if (videos.some((video) => video.id === currentYoutubePosition?.videoId)) {
+    markerVideoId = currentYoutubePosition?.videoId;
+  }
+  if (videos.some((video) => video.id === selectedVideoId)) {
+    markerVideoId = selectedVideoId ?? markerVideoId;
+  }
+  const markerTimestamp =
+    markerVideoId === currentYoutubePosition?.videoId
+      ? currentYoutubePosition.seconds
+      : null;
+
+  const addMarker = () => {
+    if (
+      !markerVideoId ||
+      markerTimestamp === null ||
+      (newMarkerKind === 'interest' && !newMarkerTitle.trim())
+    )
+      return;
     onChange([
       ...value,
       {
         id: crypto.randomUUID(),
-        youtube_video_id: videos[0].id,
-        kind,
-        timestamp_seconds: 0,
-        title:
-          kind === 'interest'
-            ? t('flights.videoMarkerInterestDefaultTitle')
-            : '',
+        youtube_video_id: markerVideoId,
+        kind: newMarkerKind,
+        timestamp_seconds: markerTimestamp,
+        title: newMarkerKind === 'interest' ? newMarkerTitle.trim() : '',
         include_in_youtube_chapters: true,
       },
     ]);
+    setNewMarkerTitle('');
   };
 
   const removeMarker = (id: string) => {
@@ -166,6 +187,76 @@ export function FlightVideoMarkersEditor({
         </p>
       ) : (
         <>
+          <div className="mb-3 flex flex-wrap items-end gap-2 rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
+            <label className="min-w-36 flex-1 text-xs font-medium text-gray-700 dark:text-gray-300">
+              {t('flights.videoMarkerKindLabel')}
+              <select
+                className="mt-1 block min-h-10 w-full rounded-md border border-gray-300 bg-white px-2 text-sm dark:border-gray-600 dark:bg-gray-700"
+                value={newMarkerKind}
+                onChange={(event) =>
+                  setNewMarkerKind(
+                    event.target.value as FlightVideoMarker['kind']
+                  )
+                }
+              >
+                <option value="takeoff">
+                  {t('flights.videoMarkerKindTakeoff')}
+                </option>
+                <option value="landing">
+                  {t('flights.videoMarkerKindLanding')}
+                </option>
+                <option value="interest">
+                  {t('flights.videoMarkerKindInterest')}
+                </option>
+              </select>
+            </label>
+            {videos.length > 1 && (
+              <label className="min-w-36 flex-1 text-xs font-medium text-gray-700 dark:text-gray-300">
+                {t('flights.videoMarkerVideoLabel')}
+                <select
+                  className="mt-1 block min-h-10 w-full rounded-md border border-gray-300 bg-white px-2 text-sm dark:border-gray-600 dark:bg-gray-700"
+                  value={markerVideoId}
+                  onChange={(event) => setSelectedVideoId(event.target.value)}
+                >
+                  {videos.map((video) => (
+                    <option key={video.id} value={video.id}>
+                      {video.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {newMarkerKind === 'interest' && (
+              <label className="min-w-44 flex-1 text-xs font-medium text-gray-700 dark:text-gray-300">
+                {t('flights.videoMarkerTitleLabel')}
+                <input
+                  type="text"
+                  maxLength={100}
+                  required
+                  value={newMarkerTitle}
+                  onChange={(event) => setNewMarkerTitle(event.target.value)}
+                  className="mt-1 block min-h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm dark:border-gray-600 dark:bg-gray-700"
+                />
+              </label>
+            )}
+            <span className="min-h-10 self-end py-2 text-xs text-gray-600 dark:text-gray-300">
+              {t('flights.videoMarkerCurrentTime', {
+                time:
+                  markerTimestamp === null ? '—' : formatTime(markerTimestamp),
+              })}
+            </span>
+            <Button
+              variant="primary"
+              className="min-h-10 rounded-lg px-3 py-2 text-sm"
+              isDisabled={
+                markerTimestamp === null ||
+                (newMarkerKind === 'interest' && !newMarkerTitle.trim())
+              }
+              onPress={addMarker}
+            >
+              {t('flights.videoMarkerAdd')}
+            </Button>
+          </div>
           <div className="space-y-3">
             {value.map((marker, index) => {
               const missingVideo = !videos.some(
@@ -288,29 +379,6 @@ export function FlightVideoMarkersEditor({
                 </div>
               );
             })}
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button
-              variant="ghost"
-              className="min-h-10 rounded-lg px-3 py-2 text-sm"
-              onPress={() => addMarker('takeoff')}
-            >
-              {t('flights.videoMarkerAddTakeoff')}
-            </Button>
-            <Button
-              variant="ghost"
-              className="min-h-10 rounded-lg px-3 py-2 text-sm"
-              onPress={() => addMarker('landing')}
-            >
-              {t('flights.videoMarkerAddLanding')}
-            </Button>
-            <Button
-              variant="ghost"
-              className="min-h-10 rounded-lg px-3 py-2 text-sm"
-              onPress={() => addMarker('interest')}
-            >
-              {t('flights.videoMarkerAddInterest')}
-            </Button>
           </div>
           {invalidIds.length > 0 && (
             <p
