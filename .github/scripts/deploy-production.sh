@@ -141,6 +141,7 @@ verify_workers_started() {
       state=$(docker inspect --format '{{.State.Status}}' "$container_name" 2>/dev/null || true)
       health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_name" 2>/dev/null || true)
       if [ "$state" != "running" ] || [ "$health" != "healthy" ]; then
+        echo "Readiness check failed for $container_name: state=${state:-missing} health=${health:-missing}"
         failed=1
       fi
     done
@@ -150,25 +151,32 @@ verify_workers_started() {
       --format '{{.Names}}')
     youtube_worker_count=$(printf '%s\n' "$youtube_workers" | sed '/^$/d' | wc -l)
     if [ "$youtube_worker_count" -ne 3 ]; then
+      echo "Readiness check found $youtube_worker_count YouTube upload workers; expected 3"
       failed=1
     fi
     for worker_name in $youtube_workers; do
       state=$(docker inspect --format '{{.State.Status}}' "$worker_name" 2>/dev/null || true)
       health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$worker_name" 2>/dev/null || true)
-      if [ "$state" != "running" ] || [ "$health" != "healthy" ] || ! docker logs "$worker_name" 2>&1 | grep -q "Starting YouTube upload RQ worker"; then
+      if [ "$state" != "running" ] || [ "$health" != "healthy" ]; then
+        echo "Readiness check failed for $worker_name: state=${state:-missing} health=${health:-missing}"
+        failed=1
+      fi
+      if ! docker logs "$worker_name" 2>&1 | grep -q "Starting YouTube upload RQ worker"; then
+        echo "Readiness check found no YouTube worker startup marker in $worker_name logs"
         failed=1
       fi
     done
     for worker_log in parapente-backend-worker parapente-highlight-video-worker parapente-gopro-overlay-worker parapente-gopro-preview-worker; do
       if ! docker logs "$worker_log" 2>&1 | grep -q "Listening on"; then
+        echo "Readiness check found no RQ listening marker in $worker_log logs"
         failed=1
       fi
     done
     if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
-      gpu_devices=$(docker inspect --format '{{json .HostConfig.DeviceRequests}}' parapente-gopro-overlay-worker 2>/dev/null || true)
+      gpu_driver=$(docker inspect --format '{{range .HostConfig.DeviceRequests}}{{.Driver}}{{end}}' parapente-gopro-overlay-worker 2>/dev/null || true)
       gpu_accelerator=$(docker inspect --format "{{range .Config.Env}}{{println .}}{{end}}" parapente-gopro-overlay-worker 2>/dev/null | grep "^BACKEND_VIDEO_ACCELERATOR=" || true)
-      if ! echo "$gpu_devices" | grep -q "\"Driver\":\"nvidia\"" || [ "$gpu_accelerator" != "BACKEND_VIDEO_ACCELERATOR=nvidia" ]; then
-        echo "GoPro worker was started without the requested NVIDIA device"
+      if [ "$gpu_driver" != "nvidia" ] || [ "$gpu_accelerator" != "BACKEND_VIDEO_ACCELERATOR=nvidia" ]; then
+        echo "GoPro worker GPU readiness failed: driver=${gpu_driver:-missing} accelerator_configured=$([ "$gpu_accelerator" = "BACKEND_VIDEO_ACCELERATOR=nvidia" ] && echo yes || echo no)"
         failed=1
       fi
     fi
@@ -494,29 +502,39 @@ deploy_from_portainer_volume() {
           state=$(docker inspect --format "{{.State.Status}}" "$container_name" 2>/dev/null || true)
           health=$(docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" "$container_name" 2>/dev/null || true)
           if [ "$state" != "running" ] || [ "$health" != "healthy" ]; then
+            echo "Readiness check failed for $container_name: state=${state:-missing} health=${health:-missing}"
             readiness_failed=1
           fi
         done
         youtube_workers=$(docker ps -a --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" --filter "label=com.docker.compose.service=youtube-upload-worker" --format '{{.Names}}')
         youtube_worker_count=$(printf '%s\n' "$youtube_workers" | sed '/^$/d' | wc -l)
         if [ "$youtube_worker_count" -ne 3 ]; then
+          echo "Readiness check found $youtube_worker_count YouTube upload workers; expected 3"
           readiness_failed=1
         fi
         for worker_name in $youtube_workers; do
           state=$(docker inspect --format "{{.State.Status}}" "$worker_name" 2>/dev/null || true)
           health=$(docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" "$worker_name" 2>/dev/null || true)
-          if [ "$state" != "running" ] || [ "$health" != "healthy" ] || ! docker logs "$worker_name" 2>&1 | grep -q "Starting YouTube upload RQ worker"; then
+          if [ "$state" != "running" ] || [ "$health" != "healthy" ]; then
+            echo "Readiness check failed for $worker_name: state=${state:-missing} health=${health:-missing}"
+            readiness_failed=1
+          fi
+          if ! docker logs "$worker_name" 2>&1 | grep -q "Starting YouTube upload RQ worker"; then
+            echo "Readiness check found no YouTube worker startup marker in $worker_name logs"
             readiness_failed=1
           fi
         done
         for worker_log in parapente-backend-worker parapente-highlight-video-worker parapente-gopro-overlay-worker parapente-gopro-preview-worker; do
           if ! docker logs "$worker_log" 2>&1 | grep -q "Listening on"; then
+            echo "Readiness check found no RQ listening marker in $worker_log logs"
             readiness_failed=1
           fi
         done
         if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
-          gpu_devices=$(docker inspect --format "{{json .HostConfig.DeviceRequests}}" parapente-gopro-overlay-worker 2>/dev/null || true)
-          if ! echo "$gpu_devices" | grep -q "\"Driver\":\"nvidia\""; then
+          gpu_driver=$(docker inspect --format "{{range .HostConfig.DeviceRequests}}{{.Driver}}{{end}}" parapente-gopro-overlay-worker 2>/dev/null || true)
+          gpu_accelerator=$(docker inspect --format "{{range .Config.Env}}{{println .}}{{end}}" parapente-gopro-overlay-worker 2>/dev/null | grep "^BACKEND_VIDEO_ACCELERATOR=" || true)
+          if [ "$gpu_driver" != "nvidia" ] || [ "$gpu_accelerator" != "BACKEND_VIDEO_ACCELERATOR=nvidia" ]; then
+            echo "GoPro worker GPU readiness failed: driver=${gpu_driver:-missing} accelerator_configured=$([ "$gpu_accelerator" = "BACKEND_VIDEO_ACCELERATOR=nvidia" ] && echo yes || echo no)"
             readiness_failed=1
           fi
         fi
