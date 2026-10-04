@@ -134,6 +134,10 @@ export function FlightDetails({
   const [videoMarkersDraft, setVideoMarkersDraft] = useState(
     flight.video_markers ?? []
   );
+  const [currentYoutubePosition, setCurrentYoutubePosition] = useState<{
+    videoId: string;
+    seconds: number;
+  } | null>(null);
   const persistedVideoMarkersKey = JSON.stringify(flight.video_markers ?? []);
   const persistedVideoMarkers = useMemo(
     () => JSON.parse(persistedVideoMarkersKey) as FlightVideoMarker[],
@@ -1101,6 +1105,7 @@ export function FlightDetails({
               <FlightVideoMarkersEditor
                 youtubeUrls={flight.youtube_urls ?? []}
                 value={videoMarkersDraft}
+                currentYoutubePosition={currentYoutubePosition}
                 onChange={setVideoMarkersDraft}
                 onValidityChange={setVideoMarkerTimesValid}
               />
@@ -1173,6 +1178,14 @@ export function FlightDetails({
             videoMarkers={flight.video_markers ?? []}
             onAddVideoMarker={
               isSavingVideoMarkers ? undefined : handleAddVideoMarker
+            }
+            onCurrentYoutubePositionChange={(position) =>
+              setCurrentYoutubePosition((current) =>
+                current?.videoId === position?.videoId &&
+                current?.seconds === position?.seconds
+                  ? current
+                  : position
+              )
             }
             isSavingVideoMarker={updateFlight.isPending || isSavingVideoMarkers}
           />
