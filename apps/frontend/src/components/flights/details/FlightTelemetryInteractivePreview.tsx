@@ -49,7 +49,7 @@ import {
 interface FlightTelemetryInteractivePreviewProps {
   flightId: string;
   hasFlightVideo?: boolean;
-  hasPanoVideo?: boolean;
+  hasFaceVideo?: boolean;
   manualOffsetSeconds?: number;
   youtubeUrls?: string[];
   videoMarkers?: FlightVideoMarker[];
@@ -171,7 +171,7 @@ function getYoutubeExportPhase(
 export function FlightTelemetryInteractivePreview({
   flightId,
   hasFlightVideo = true,
-  hasPanoVideo = false,
+  hasFaceVideo = false,
   manualOffsetSeconds,
   youtubeUrls = EMPTY_YOUTUBE_URLS,
   videoMarkers = EMPTY_VIDEO_MARKERS,
@@ -301,8 +301,8 @@ export function FlightTelemetryInteractivePreview({
         access_token: token,
       })
     : undefined;
-  const panoUrl = hasPanoVideo
-    ? getApiUrlWithSearchParams(`flights/${flightId}/pano`, {
+  const faceUrl = hasFaceVideo
+    ? getApiUrlWithSearchParams(`flights/${flightId}/temporary-media/face`, {
         access_token: token,
       })
     : undefined;
@@ -310,15 +310,19 @@ export function FlightTelemetryInteractivePreview({
     const role = getYoutubePipVideoRole(pip.source);
     const youtubePipUrl = role ? youtubeUrlForRole(role) : undefined;
     let videoUrl: string | undefined;
-    if (pip.source === 'file:face') videoUrl = cameraUrl;
-    else if (pip.source === 'file:pilote') videoUrl = panoUrl;
-    else if (pip.source === 'file:vol') videoUrl = flightUrl;
+    if (pip.source === 'file:face' || pip.source === 'file:pilote') {
+      videoUrl = faceUrl;
+    } else if (pip.source === 'file:vol') videoUrl = flightUrl;
 
     let label = t('flights.goproOverlayFlightVideo');
-    if (role === 'face' || pip.source === 'file:face') {
-      label = t('flights.goproOverlayCameraPreview');
-    } else if (role === 'pilote' || pip.source === 'file:pilote') {
-      label = t('flights.panoBadge');
+    if (
+      role === 'face' ||
+      pip.source === 'file:face' ||
+      pip.source === 'file:pilote'
+    ) {
+      label = t('flights.faceBadge');
+    } else if (role === 'pilote') {
+      label = t('flights.piloteBadge');
     }
     return {
       ...pip,
