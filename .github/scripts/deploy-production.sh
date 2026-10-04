@@ -145,21 +145,26 @@ verify_workers_started() {
         failed=1
       fi
     done
-    youtube_workers=$(compose_cmd ps --all --format '{{.Name}}' youtube-upload-worker)
-    youtube_worker_count=$(printf '%s\n' "$youtube_workers" | sed '/^$/d' | awk 'END { print NR + 0 }')
+    youtube_worker_ids=$(compose_cmd ps --all --quiet youtube-upload-worker)
+    if [ -n "$youtube_worker_ids" ]; then
+      youtube_worker_count=$(printf "%s\n" "$youtube_worker_ids" | wc -l)
+    else
+      youtube_worker_count=0
+    fi
     if [ "$youtube_worker_count" -ne 3 ]; then
       echo "Readiness check found $youtube_worker_count YouTube upload workers; expected 3"
       failed=1
     fi
-    for worker_name in $youtube_workers; do
-      state=$(docker inspect --format '{{.State.Status}}' "$worker_name" 2>/dev/null || true)
-      health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$worker_name" 2>/dev/null || true)
+    for worker_id in $youtube_worker_ids; do
+      worker_name=$(docker inspect --format "{{.Name}}" "$worker_id" 2>/dev/null | sed "s#^/##" || true)
+      state=$(docker inspect --format '{{.State.Status}}' "$worker_id" 2>/dev/null || true)
+      health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$worker_id" 2>/dev/null || true)
       if [ "$state" != "running" ] || [ "$health" != "healthy" ]; then
-        echo "Readiness check failed for $worker_name: state=${state:-missing} health=${health:-missing}"
+        echo "Readiness check failed for ${worker_name:-YouTube worker}: state=${state:-missing} health=${health:-missing}"
         failed=1
       fi
-      if ! docker logs "$worker_name" 2>&1 | grep -q "Starting YouTube upload RQ worker"; then
-        echo "Readiness check found no YouTube worker startup marker in $worker_name logs"
+      if ! docker logs "$worker_id" 2>&1 | grep -q "Starting YouTube upload RQ worker"; then
+        echo "Readiness check found no YouTube worker startup marker in ${worker_name:-YouTube worker} logs"
         failed=1
       fi
     done
@@ -503,21 +508,26 @@ deploy_from_portainer_volume() {
             readiness_failed=1
           fi
         done
-        youtube_workers=$(compose_cmd ps --all --format '{{.Name}}' youtube-upload-worker)
-        youtube_worker_count=$(printf '%s\n' "$youtube_workers" | sed '/^$/d' | awk 'END { print NR + 0 }')
+        youtube_worker_ids=$(compose_cmd ps --all --quiet youtube-upload-worker)
+        if [ -n "$youtube_worker_ids" ]; then
+          youtube_worker_count=$(printf "%s\n" "$youtube_worker_ids" | wc -l)
+        else
+          youtube_worker_count=0
+        fi
         if [ "$youtube_worker_count" -ne 3 ]; then
           echo "Readiness check found $youtube_worker_count YouTube upload workers; expected 3"
           readiness_failed=1
         fi
-        for worker_name in $youtube_workers; do
-          state=$(docker inspect --format "{{.State.Status}}" "$worker_name" 2>/dev/null || true)
-          health=$(docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" "$worker_name" 2>/dev/null || true)
+        for worker_id in $youtube_worker_ids; do
+          worker_name=$(docker inspect --format "{{.Name}}" "$worker_id" 2>/dev/null | sed "s#^/##" || true)
+          state=$(docker inspect --format "{{.State.Status}}" "$worker_id" 2>/dev/null || true)
+          health=$(docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" "$worker_id" 2>/dev/null || true)
           if [ "$state" != "running" ] || [ "$health" != "healthy" ]; then
-            echo "Readiness check failed for $worker_name: state=${state:-missing} health=${health:-missing}"
+            echo "Readiness check failed for ${worker_name:-YouTube worker}: state=${state:-missing} health=${health:-missing}"
             readiness_failed=1
           fi
-          if ! docker logs "$worker_name" 2>&1 | grep -q "Starting YouTube upload RQ worker"; then
-            echo "Readiness check found no YouTube worker startup marker in $worker_name logs"
+          if ! docker logs "$worker_id" 2>&1 | grep -q "Starting YouTube upload RQ worker"; then
+            echo "Readiness check found no YouTube worker startup marker in ${worker_name:-YouTube worker} logs"
             readiness_failed=1
           fi
         done
