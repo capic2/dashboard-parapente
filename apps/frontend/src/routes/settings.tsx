@@ -4,17 +4,21 @@ import { requireAuth } from '../lib/authGuard';
 export const settingsTabs = [
   'general',
   'sites',
-  'weather',
   'sportstracklive',
   'data',
 ] as const;
 
 export type SettingsTabKey = (typeof settingsTabs)[number];
+type SettingsSearchTabKey = SettingsTabKey | 'weather';
+const settingsSearchTabs: readonly SettingsSearchTabKey[] = [
+  ...settingsTabs,
+  'weather',
+];
 
 export function validateSettingsSearch(search: Record<string, unknown>) {
   return {
-    tab: settingsTabs.includes(search.tab as SettingsTabKey)
-      ? (search.tab as SettingsTabKey)
+    tab: settingsSearchTabs.includes(search.tab as SettingsSearchTabKey)
+      ? (search.tab as SettingsSearchTabKey)
       : undefined,
   };
 }

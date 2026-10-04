@@ -1037,7 +1037,8 @@ export default function Settings() {
   const setSettings = useAppSettingsStore((state) => state.setSettings);
   const resetSettings = useAppSettingsStore((state) => state.resetSettings);
   const [saved, setSaved] = useState(false);
-  const activeTab: SettingsTabKey = tab ?? 'general';
+  const activeTab: SettingsTabKey =
+    tab === 'weather' ? 'sites' : (tab ?? 'general');
 
   useEffect(() => {
     void i18n.changeLanguage(settings.language);
@@ -1216,13 +1217,7 @@ export default function Settings() {
               {tabKey === 'sites' && (
                 <span className="inline-flex items-center justify-center gap-2">
                   <SettingsIcon name="mapPin" />
-                  {t('settings.tabs.favoriteSites')}
-                </span>
-              )}
-              {tabKey === 'weather' && (
-                <span className="inline-flex items-center justify-center gap-2">
-                  <SettingsIcon name="weather" />
-                  {t('settings.tabs.weatherSources')}
+                  {t('settings.tabs.sitesAndWeather')}
                 </span>
               )}
               {tabKey === 'sportstracklive' && (
@@ -1500,25 +1495,48 @@ export default function Settings() {
 
           {/* SITES TAB */}
           <TabPanel id="sites" className="outline-none">
-            <Suspense
-              fallback={
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md animate-pulse space-y-3">
-                  {[...Array(4)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-16 bg-gray-200 dark:bg-gray-600 rounded-lg"
-                    ></div>
-                  ))}
-                </div>
-              }
+            <Tabs
+              selectedKey={tab === 'weather' ? 'weather' : 'sites'}
+              onSelectionChange={(key) => {
+                void navigate({
+                  search: (previous) => ({
+                    ...previous,
+                    tab: key === 'weather' ? 'weather' : 'sites',
+                  }),
+                });
+              }}
+              className="space-y-4"
             >
-              <SitesTab settings={settings} toggleFavorite={toggleFavorite} />
-            </Suspense>
-          </TabPanel>
-
-          {/* WEATHER SOURCES TAB */}
-          <TabPanel id="weather" className="outline-none">
-            <WeatherSourcesTab />
+              <TabList
+                aria-label={t('settings.tabs.siteConfiguration')}
+                className="mb-4 flex flex-wrap"
+              >
+                <Tab id="sites">{t('settings.tabs.favoriteSites')}</Tab>
+                <Tab id="weather">{t('settings.tabs.weatherSources')}</Tab>
+              </TabList>
+              <TabPanel id="sites" className="outline-none">
+                <Suspense
+                  fallback={
+                    <div className="space-y-3 rounded-xl bg-white p-6 shadow-md dark:bg-gray-800">
+                      {[...Array(4)].map((_, i) => (
+                        <div
+                          key={i}
+                          className="h-16 rounded-lg bg-gray-200 dark:bg-gray-600"
+                        />
+                      ))}
+                    </div>
+                  }
+                >
+                  <SitesTab
+                    settings={settings}
+                    toggleFavorite={toggleFavorite}
+                  />
+                </Suspense>
+              </TabPanel>
+              <TabPanel id="weather" className="outline-none">
+                <WeatherSourcesTab />
+              </TabPanel>
+            </Tabs>
           </TabPanel>
 
           <TabPanel id="sportstracklive" className="outline-none">

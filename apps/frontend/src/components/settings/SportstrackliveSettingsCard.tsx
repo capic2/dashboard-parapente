@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Switch } from 'react-aria-components';
+import { Upload } from 'lucide-react';
 import { Button } from '@dashboard-parapente/design-system';
 import {
   useRemoveSportstrackliveSettings,
@@ -18,6 +19,7 @@ export function SportstrackliveSettingsCard() {
   const remove = useRemoveSportstrackliveSettings();
   const [uploadKey, setUploadKey] = useState('');
   const [autoUpload, setAutoUpload] = useState(false);
+  const [isConfirmingRemove, setIsConfirmingRemove] = useState(false);
 
   useEffect(() => {
     if (query.data) setAutoUpload(query.data.auto_upload);
@@ -43,6 +45,7 @@ export function SportstrackliveSettingsCard() {
       await remove.mutateAsync();
       setUploadKey('');
       setAutoUpload(false);
+      setIsConfirmingRemove(false);
       toast.success(t('settings.sportstracklive.removed'));
     } catch (error) {
       toast.error(
@@ -56,28 +59,48 @@ export function SportstrackliveSettingsCard() {
 
   return (
     <section className="rounded-2xl border border-sky-100 bg-white p-5 shadow-md shadow-sky-100/50 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/20 sm:p-6">
-      <div className="mb-5">
-        <h2 className="text-lg font-bold text-gray-950 dark:text-white">
-          {t('settings.sportstracklive.title')}
-        </h2>
-        <p className="mt-1 text-sm leading-5 text-gray-600 dark:text-gray-300">
-          {t('settings.sportstracklive.description')}
-        </p>
+      <div className="mb-5 flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+          <Upload className="h-5 w-5" aria-hidden="true" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-lg font-bold text-gray-950 dark:text-white">
+            {t('settings.sportstracklive.title')}
+          </h2>
+          <p className="mt-1 text-sm leading-5 text-gray-600 dark:text-gray-300">
+            {t('settings.sportstracklive.description')}
+          </p>
+        </div>
       </div>
 
       {(() => {
         if (query.isLoading) {
           return (
-            <p className="text-sm text-gray-600 dark:text-gray-300">
-              {t('common.loading')}
-            </p>
+            <output
+              aria-live="polite"
+              className="text-sm text-gray-600 dark:text-gray-300"
+            >
+              {t('settings.sportstracklive.loading')}
+            </output>
           );
         }
         if (query.isError || !query.data) {
           return (
-            <p role="alert" className="text-sm text-red-700 dark:text-red-300">
-              {t('settings.sportstracklive.loadError')}
-            </p>
+            <div
+              role="alert"
+              className="flex flex-wrap items-center gap-3 text-sm text-red-700 dark:text-red-300"
+            >
+              <span>{t('settings.sportstracklive.loadError')}</span>
+              <Button
+                variant="outline"
+                onPress={() => void query.refetch()}
+                isDisabled={query.isFetching}
+              >
+                {query.isFetching
+                  ? t('settings.sportstracklive.loading')
+                  : t('settings.sportstracklive.retry')}
+              </Button>
+            </div>
           );
         }
         return (
@@ -103,7 +126,9 @@ export function SportstrackliveSettingsCard() {
               </span>
             </label>
 
-            <div
+            <output
+              aria-live="polite"
+              aria-atomic="true"
               className={`rounded-xl border p-3 text-sm ${
                 query.data?.application_secret_configured
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200'
@@ -113,7 +138,7 @@ export function SportstrackliveSettingsCard() {
               {query.data?.application_secret_configured
                 ? t('settings.sportstracklive.applicationSecretConfigured')
                 : t('settings.sportstracklive.applicationSecretMissing')}
-            </div>
+            </output>
 
             <Switch
               isSelected={autoUpload}
@@ -138,23 +163,62 @@ export function SportstrackliveSettingsCard() {
               </span>
             </Switch>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 onPress={() => void handleSave()}
                 isDisabled={save.isPending}
               >
-                {save.isPending ? t('common.loading') : t('common.save')}
+                {save.isPending
+                  ? t('settings.sportstracklive.saving')
+                  : t('settings.sportstracklive.saveSettings')}
               </Button>
               {query.data?.upload_key_configured && (
                 <Button
-                  variant="outline"
-                  onPress={() => void handleRemove()}
+                  variant="danger"
+                  onPress={() => setIsConfirmingRemove(true)}
                   isDisabled={remove.isPending}
                 >
                   {t('settings.sportstracklive.disconnect')}
                 </Button>
               )}
+              {remove.isPending && (
+                <output
+                  aria-live="polite"
+                  aria-atomic="true"
+                  className="text-sm text-gray-600 dark:text-gray-300"
+                >
+                  {t('settings.sportstracklive.removing')}
+                </output>
+              )}
             </div>
+            {isConfirmingRemove && (
+              <fieldset className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100">
+                <legend className="sr-only">
+                  {t('settings.sportstracklive.removeConfirmationTitle')}
+                </legend>
+                <p>{t('settings.sportstracklive.removeConfirmation')}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    onPress={() => void handleRemove()}
+                    isDisabled={remove.isPending}
+                  >
+                    {t('settings.sportstracklive.confirmRemove')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onPress={() => setIsConfirmingRemove(false)}
+                    isDisabled={remove.isPending}
+                  >
+                    {t('common.cancel')}
+                  </Button>
+                </div>
+              </fieldset>
+            )}
+            {save.isPending && (
+              <output aria-live="polite" aria-atomic="true" className="sr-only">
+                {t('settings.sportstracklive.saving')}
+              </output>
+            )}
           </div>
         );
       })()}
