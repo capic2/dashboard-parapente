@@ -36,6 +36,7 @@ import {
   getYoutubePipVideoRole,
   getYoutubeVideoRoleFromTitle,
   type FlightTelemetryPipLayout,
+  type TelemetryPipVideoRole,
 } from './flightTelemetryLayout';
 import { sourceTimeAtPreviewTime } from './GoproOverlaySyncPreview';
 import { getYoutubeVideoId } from '../../../lib/youtube';
@@ -366,6 +367,19 @@ export function FlightTelemetryInteractivePreview({
     ? selectedYoutubeIndex % youtubeMainUrls.length
     : 0;
   const youtubeUrl = youtubeMainUrls[activeYoutubeIndex];
+  const activeYoutubeRole = youtubeUrl
+    ? getYoutubeVideoRoleFromTitle(
+        youtubeAssociations.data?.find(
+          (association) => association.url === youtubeUrl
+        )?.title
+      )
+    : undefined;
+  let mainVideoRole: TelemetryPipVideoRole;
+  if (mainVideoSource === 'auto') {
+    mainVideoRole = youtubeUrl ? (activeYoutubeRole ?? 'face') : 'vol';
+  } else {
+    mainVideoRole = mainVideoSource.split(':')[1] as TelemetryPipVideoRole;
+  }
   const explicitMainFileUrl =
     mainVideoSource === 'file:face'
       ? faceUrl
@@ -856,6 +870,7 @@ export function FlightTelemetryInteractivePreview({
                 cameraUrl={mainCameraUrl}
                 flightUrl={flightUrl}
                 youtubeUrl={youtubeUrl}
+                mainVideoRole={mainVideoRole}
                 videoMarkers={activeVideoMarkers}
                 onAddVideoMarker={onAddVideoMarker}
                 isSavingVideoMarker={isSavingVideoMarker}
