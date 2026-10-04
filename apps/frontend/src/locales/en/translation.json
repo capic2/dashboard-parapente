@@ -612,6 +612,8 @@
       "general": "General",
       "favoriteSites": "Favorite Sites",
       "weatherSources": "Weather Sources",
+      "sitesAndWeather": "Sites & Weather",
+      "siteConfiguration": "Site and weather settings",
       "sportstracklive": "SportsTrackLive",
       "data": "Data"
     },
@@ -649,12 +651,17 @@
     },
     "favorites": {
       "title": "Manage your Favorite Sites",
-      "description": "{{count}} favorite site(s) used first in weather and selectors.",
+      "description_zero": "No favorite sites are selected yet.",
+      "description_one": "{{count}} favorite site used first in weather and selectors.",
+      "description_other": "{{count}} favorite sites used first in weather and selectors.",
       "noSites": "No sites available",
+      "noSitesDescription": "Add a site first to mark it as a favorite.",
+      "manageSites": "Manage sites",
+      "searchLabel": "Search sites",
+      "searchPlaceholder": "Name or locality",
+      "noSearchResults": "No sites match “{{query}}”.",
       "favorite": "Favorite",
-      "add": "Add",
-      "tip": "Tip:",
-      "tipText": "Favorite sites will appear first in selectors"
+      "add": "Add"
     },
     "weatherSources": {
       "title": "Weather Sources Management",
@@ -729,16 +736,24 @@
       "keyAlreadySet": "Key already saved; leave empty to keep it",
       "keyPlaceholder": "Paste your SportsTrackLive upload key",
       "uploadKeyHelp": "Find it in your SportsTrackLive profile under Miscellaneous options → Access key for third-party activity uploads.",
-      "applicationSecretConfigured": "The application secret is configured on the server.",
-      "applicationSecretMissing": "The application secret is missing on the server. Request it from SportsTrackLive, then set BACKEND_SPORTSTRACKLIVE_SECRET_KEY in the backend environment.",
+      "applicationSecretConfigured": "Uploads to SportsTrackLive are available.",
+      "applicationSecretMissing": "Manual and automatic uploads to SportsTrackLive are unavailable on this dashboard. Your personal key will stay saved. Contact the person who manages this dashboard to enable uploads.",
       "autoUpload": "Automatically upload new GPX tracks",
       "autoUploadHelp": "Flights with a GPX track are uploaded after importing the flight or adding a GPX file.",
       "saved": "SportsTrackLive connection saved",
+      "saveSettings": "Save SportsTrackLive settings",
+      "saving": "Saving SportsTrackLive settings…",
       "saveError": "Unable to save the SportsTrackLive connection",
       "removed": "SportsTrackLive key removed",
+      "removing": "Removing key…",
       "removeError": "Unable to remove the SportsTrackLive key",
       "disconnect": "Remove key",
-      "loadError": "Unable to load SportsTrackLive settings"
+      "removeConfirmationTitle": "Confirm key removal",
+      "removeConfirmation": "Removing this key stops future manual and automatic uploads. To send again, save a new key and turn automatic uploads back on if you want them.",
+      "confirmRemove": "Remove my key",
+      "loadError": "Could not load your SportsTrackLive settings.",
+      "loading": "Loading SportsTrackLive settings…",
+      "retry": "Try again"
     },
     "data": {
       "backupTitle": "Preferences backup",
