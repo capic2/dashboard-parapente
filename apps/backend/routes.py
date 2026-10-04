@@ -157,7 +157,6 @@ from schemas import (
     FlightSummariesResponse,
     Flight as FlightSchema,
     FlightUpdate,
-    youtube_video_id_from_url,
     GoproOverlayCancelResponse,
     GoproOverlayDependencies,
     GoproOverlayJob,
@@ -5522,23 +5521,6 @@ async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session =
     # 3. Update only provided fields (exclude_unset skips None values)
     update_data = flight_data.dict(exclude_unset=True)
 
-    if update_data.get("video_markers") is not None:
-        urls = update_data.get("youtube_urls", flight.youtube_urls) or []
-        associated_video_ids: set[str] = set()
-        for url in urls:
-            try:
-                associated_video_ids.add(youtube_video_id_from_url(url))
-            except ValueError:
-                continue
-        if any(
-            marker["youtube_video_id"] not in associated_video_ids
-            for marker in update_data["video_markers"]
-        ):
-            raise HTTPException(
-                status_code=422,
-                detail="Each video marker must reference a YouTube video associated with the flight",
-            )
-
     gpx_metrics_excluded = update_data.get("gpx_metrics_excluded")
     if (
         gpx_metrics_excluded is not None
@@ -5561,20 +5543,7 @@ async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session =
         setattr(flight, field, value)
 
     if "video_markers" in update_data or "youtube_urls" in update_data:
-        associated_video_ids: set[str] = set()
-        for url in flight.youtube_urls:
-            try:
-                associated_video_ids.add(youtube_video_id_from_url(url))
-            except ValueError:
-                continue
-        associated_markers = [
-            marker
-            for marker in flight.video_markers
-            if marker.get("youtube_video_id") in associated_video_ids
-        ]
-        if associated_markers != flight.video_markers:
-            flight.video_markers = associated_markers
-        flight.real_duration_minutes = calculate_real_flight_duration_minutes(associated_markers)
+        flight.real_duration_minutes = calculate_real_flight_duration_minutes(flight.video_markers)
 
     # 4. updated_at is handled automatically by SQLAlchemy
 

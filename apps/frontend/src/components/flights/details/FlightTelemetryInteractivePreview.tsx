@@ -402,10 +402,9 @@ export function FlightTelemetryInteractivePreview({
     : mainVideoSource.endsWith(':pilote')
       ? t('flights.piloteBadge')
       : t('flights.goproOverlayFlightVideo');
-  const activeYoutubeVideoId = getYoutubeVideoId(youtubeUrl ?? '');
-  const activeVideoMarkers = videoMarkers.filter(
-    (marker) => marker.youtube_video_id === activeYoutubeVideoId
-  );
+  // Flight markers share one source-video timeline across associated videos.
+  // The existing overlay offset continues to align the GPX track separately.
+  const activeVideoMarkers = videoMarkers;
   const playablePips = playerPips.map((pip) => {
     if (!youtubeUrl || pip.youtubeUrl !== youtubeUrl) return pip;
     return Object.assign({}, pip, { youtubeUrl: undefined });

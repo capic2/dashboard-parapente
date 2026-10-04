@@ -133,11 +133,9 @@ export const YoutubeVideoAssociationsSchema = z.array(
 export const FlightVideoMarkerSchema = z
   .object({
     id: z.string().min(1).max(100),
-    youtube_video_id: z.string().regex(/^[A-Za-z0-9_-]{11}$/u),
     kind: z.enum(['takeoff', 'landing', 'interest']),
     timestamp_seconds: z.number().int().nonnegative().max(86400),
     title: z.string().max(100).default(''),
-    include_in_youtube_chapters: z.boolean().default(true),
   })
   .superRefine((marker, context) => {
     if (marker.kind === 'interest' && !marker.title.trim()) {

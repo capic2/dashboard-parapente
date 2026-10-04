@@ -1419,13 +1419,11 @@ class TestUpdateFlightEndpoint:
                 "video_markers": [
                     {
                         "id": "takeoff-marker",
-                        "youtube_video_id": video_id,
                         "kind": "takeoff",
                         "timestamp_seconds": 120,
                     },
                     {
                         "id": "landing-marker",
-                        "youtube_video_id": video_id,
                         "kind": "landing",
                         "timestamp_seconds": 7320,
                     },
@@ -1456,10 +1454,10 @@ class TestUpdateFlightEndpoint:
             json={"youtube_urls": ["https://youtu.be/9bZkp7q19f0"]},
         )
         assert url_update_response.status_code == 200
-        assert url_update_response.json()["data"]["duration_minutes"] == 60
+        assert url_update_response.json()["data"]["duration_minutes"] == 120
         db_session.refresh(sample_flight)
-        assert sample_flight.real_duration_minutes is None
-        assert sample_flight.video_markers == []
+        assert sample_flight.real_duration_minutes == 120
+        assert len(sample_flight.video_markers) == 2
 
     def test_update_flight_youtube_urls_normalizes_and_deduplicates(
         self, client, db_session, sample_flight
