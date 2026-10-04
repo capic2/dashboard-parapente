@@ -68,6 +68,7 @@ import {
   type FlightTelemetryLayoutItem,
   type FlightTelemetryPipLayout,
   type TelemetryPipVideoSource,
+  type TelemetryMainVideoSource,
   type FlightTelemetryTextLayout,
   type TelemetryAlignmentDirection,
   type TelemetryWidgetVariant,
@@ -173,6 +174,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const layoutHistory = useRef<FlightTelemetryLayoutItem[][]>([]);
   const [canUndo, setCanUndo] = useState(false);
   const [backgroundImage, setBackgroundImage] = useState<string>();
+  const [mainVideoSource, setMainVideoSource] =
+    useState<TelemetryMainVideoSource>('auto');
   const [localTelemetry, setLocalTelemetry] = useState<FlightTelemetryData>();
   const [gpxFileName, setGpxFileName] = useState<string>();
   const [gpxError, setGpxError] = useState(false);
@@ -240,6 +243,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       layoutHistory.current = [];
       setCanUndo(false);
       setLayoutState(layoutQuery.data.layout);
+      setMainVideoSource(layoutQuery.data.layout.mainVideoSource ?? 'auto');
       setSelectedIds(
         layoutQuery.data.layout[0]?.id ? [layoutQuery.data.layout[0].id] : []
       );
@@ -351,6 +355,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       setCanUndo(false);
       setLayoutState(importedLayout);
       setBackgroundImage(importedLayout.backgroundImage);
+      setMainVideoSource(importedLayout.mainVideoSource ?? 'auto');
       setSelectedIds(importedLayout[0]?.id ? [importedLayout[0].id] : []);
       setSaveError(undefined);
       toast.success(t('telemetryLayout.importSuccess'));
@@ -396,7 +401,11 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
 
     try {
       setSaveError(undefined);
-      await saveLayout.mutateAsync({ layout, backgroundImage });
+      await saveLayout.mutateAsync({
+        layout,
+        backgroundImage,
+        mainVideoSource,
+      });
       setBackgroundImage(backgroundImage);
       toast.success(t('telemetryLayout.saveSuccess'));
     } catch (error) {
@@ -953,7 +962,12 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     };
     xmlDocument.backgroundImage = backgroundImage;
     const blob = new Blob(
-      [serializeTelemetryLayoutXml(xmlDocument, { backgroundImage })],
+      [
+        serializeTelemetryLayoutXml(xmlDocument, {
+          backgroundImage,
+          mainVideoSource,
+        }),
+      ],
       { type: 'application/xml' }
     );
     const url = URL.createObjectURL(blob);
@@ -1297,6 +1311,29 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           {saveError}
         </p>
       )}
+      <label className="flex max-w-md flex-col gap-1 text-sm">
+        <span className="font-medium text-slate-700 dark:text-slate-200">
+          {t('telemetryLayout.mainVideoSource')}
+        </span>
+        <select
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+          value={mainVideoSource}
+          onChange={(event) =>
+            setMainVideoSource(event.target.value as TelemetryMainVideoSource)
+          }
+        >
+          <option value="auto">{t('telemetryLayout.mainVideoAuto')}</option>
+          {TELEMETRY_PIP_VIDEO_SOURCES.map((source) => {
+            const [sourceType, role] = source.split(':');
+            const translationKey = `${sourceType}${role[0].toUpperCase()}${role.slice(1)}`;
+            return (
+              <option key={source} value={source}>
+                {t(`telemetryLayout.${translationKey}`)}
+              </option>
+            );
+          })}
+        </select>
+      </label>
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
         <div className="min-w-0 rounded-2xl border border-slate-700 bg-slate-950 p-3 shadow-xl">
           <div className="max-w-full overflow-auto">

@@ -209,7 +209,9 @@ export function FlightTelemetryInteractivePreview({
     useVideoExportStatus(youtubeExportJobId);
   const [youtubeExportNow, setYoutubeExportNow] = useState(() => Date.now());
   const validYoutubeUrls = youtubeUrls.filter((url) => getYoutubeVideoId(url));
-  const isYoutubeCalibration = validYoutubeUrls.length > 0;
+  const mainVideoSource = layout.data?.layout.mainVideoSource ?? 'auto';
+  const isYoutubeCalibration =
+    !mainVideoSource.startsWith('file:') && validYoutubeUrls.length > 0;
   const publishedOverlayUrl = youtubeOverlayUpload.data?.youtube_url;
   const isYoutubeOverlayPublished = Boolean(
     youtubeOverlayUpload.data?.status === 'completed' &&
@@ -233,10 +235,16 @@ export function FlightTelemetryInteractivePreview({
     overlayPreview.isPending ||
     layout.isPending ||
     isEnrichmentPending;
+  const isSelectedLocalMainAvailable =
+    (mainVideoSource === 'file:face' && hasFaceVideo) ||
+    (mainVideoSource === 'file:pilote' && hasPiloteVideo) ||
+    (mainVideoSource === 'file:vol' && hasFlightVideo);
   const isReady =
     telemetry.isSuccess &&
     layout.isSuccess &&
-    (overlayPreview.isSuccess || validYoutubeUrls.length > 0) &&
+    (overlayPreview.isSuccess ||
+      validYoutubeUrls.length > 0 ||
+      isSelectedLocalMainAvailable) &&
     !isEnrichmentPending &&
     Boolean(telemetry.data?.points.length);
   const showUnavailable =
@@ -344,13 +352,46 @@ export function FlightTelemetryInteractivePreview({
   const unassignedYoutubeUrls = validYoutubeUrls.filter(
     (url) => !assignedYoutubePipUrls.has(url)
   );
-  const youtubeMainUrls = unassignedYoutubeUrls.length
-    ? unassignedYoutubeUrls
-    : validYoutubeUrls;
+  const mainYoutubeRole = mainVideoSource.startsWith('youtube:')
+    ? (mainVideoSource.slice('youtube:'.length) as ReturnType<
+        typeof getYoutubePipVideoRole
+      >)
+    : undefined;
+  const explicitMainYoutubeUrl = youtubeUrlForRole(mainYoutubeRole);
+  const youtubeMainUrls =
+    mainVideoSource === 'auto'
+      ? unassignedYoutubeUrls.length
+        ? unassignedYoutubeUrls
+        : validYoutubeUrls
+      : mainYoutubeRole && explicitMainYoutubeUrl
+        ? [explicitMainYoutubeUrl]
+        : [];
   const activeYoutubeIndex = youtubeMainUrls.length
     ? selectedYoutubeIndex % youtubeMainUrls.length
     : 0;
   const youtubeUrl = youtubeMainUrls[activeYoutubeIndex];
+  const explicitMainFileUrl =
+    mainVideoSource === 'file:face'
+      ? faceUrl
+      : mainVideoSource === 'file:pilote'
+        ? piloteUrl
+        : mainVideoSource === 'file:vol'
+          ? flightUrl
+          : undefined;
+  const isExplicitFileMain = mainVideoSource.startsWith('file:');
+  const mainCameraUrl = isExplicitFileMain
+    ? (explicitMainFileUrl ?? '')
+    : mainVideoSource.startsWith('youtube:') && !youtubeUrl
+      ? ''
+      : cameraUrl;
+  const isMainSourceUnavailable =
+    mainVideoSource !== 'auto' &&
+    (isExplicitFileMain ? !explicitMainFileUrl : !youtubeUrl);
+  const mainVideoLabel = mainVideoSource.endsWith(':face')
+    ? t('flights.faceBadge')
+    : mainVideoSource.endsWith(':pilote')
+      ? t('flights.piloteBadge')
+      : t('flights.goproOverlayFlightVideo');
   const activeYoutubeVideoId = getYoutubeVideoId(youtubeUrl ?? '');
   const activeVideoMarkers = videoMarkers.filter(
     (marker) => marker.youtube_video_id === activeYoutubeVideoId
@@ -814,9 +855,9 @@ export function FlightTelemetryInteractivePreview({
             )}
             <div className="min-w-0 flex-1">
               <FlightOverlayPlayer
-                key={youtubeUrl ?? 'camera-only'}
+                key={youtubeUrl ?? mainCameraUrl ?? 'camera-only'}
                 mode="interactive"
-                cameraUrl={cameraUrl}
+                cameraUrl={mainCameraUrl}
                 flightUrl={flightUrl}
                 youtubeUrl={youtubeUrl}
                 videoMarkers={activeVideoMarkers}
@@ -827,24 +868,34 @@ export function FlightTelemetryInteractivePreview({
                 getFlightTime={(cameraTime) =>
                   cameraTime - calibrationOffsetSeconds
                 }
-                cameraLabel={t('flights.goproOverlayCameraPreview')}
+                cameraLabel={
+                  mainVideoSource === 'auto'
+                    ? t('flights.goproOverlayCameraPreview')
+                    : mainVideoLabel
+                }
                 flightLabel={t('flights.goproOverlayFlightVideo')}
                 pips={playablePips}
                 onTimeChange={(cameraTime) =>
                   setCameraTime(
-                    youtubeUrl
+                    youtubeUrl || isExplicitFileMain
                       ? cameraTime
                       : sourceTimeAtPreviewTime(cameraTime, previewSegments)
                   )
                 }
                 overlayContent={
-                  <FlightTelemetryOverlay
-                    data={telemetry.data}
-                    videoTimeSeconds={cameraTime}
-                    offsetSeconds={calibrationOffsetSeconds}
-                    timelineStartTimestamp={telemetryStartTimestamp}
-                    layout={layout.data?.layout}
-                  />
+                  isMainSourceUnavailable ? (
+                    <div className="pointer-events-none flex h-full items-center justify-center p-6 text-center text-sm font-medium text-white">
+                      {t('telemetryLayout.mainVideoUnavailable')}
+                    </div>
+                  ) : (
+                    <FlightTelemetryOverlay
+                      data={telemetry.data}
+                      videoTimeSeconds={cameraTime}
+                      offsetSeconds={calibrationOffsetSeconds}
+                      timelineStartTimestamp={telemetryStartTimestamp}
+                      layout={layout.data?.layout}
+                    />
+                  )
                 }
               />
             </div>
