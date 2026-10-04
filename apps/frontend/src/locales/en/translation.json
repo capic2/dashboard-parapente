@@ -1225,8 +1225,6 @@
     "videoMarkerCopyError": "Unable to copy. Select and copy the text above.",
     "overlayVideoMarkersLabel": "Markers for this video",
     "overlayVideoMarkerAt": "{{title}} at {{time}}",
-    "overlayAddVideoMarker": "Add marker at current time",
-    "videoMarkerSave": "Save marker",
     "videoMarkersSave": "Save markers",
     "videoMarkerSaving": "Saving…",
     "videoMarkerSaveError": "Unable to save this marker. Try again.",

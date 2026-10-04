@@ -334,28 +334,6 @@ export function FlightDetails({
     setEditingMode(false);
   };
 
-  const handleAddVideoMarker = async (
-    marker: Omit<FlightVideoMarker, 'id'>
-  ) => {
-    if (isSavingVideoMarkers) return;
-    const requestedFlightId = flight.id;
-    const queryOptions = flightQueryOptions(requestedFlightId);
-    const latestFlight =
-      queryClient.getQueryData<Flight>(queryOptions.queryKey) ?? flight;
-    const addedMarker = { ...marker, id: crypto.randomUUID() };
-    const nextMarkers = [...(latestFlight.video_markers ?? []), addedMarker];
-    const updatedFlight = await updateFlight.mutateAsync({
-      video_markers: nextMarkers,
-    });
-    queryClient.setQueryData(queryOptions.queryKey, updatedFlight);
-    if (activeFlightIdRef.current !== requestedFlightId) return;
-    setVideoMarkersDraft((currentMarkers) =>
-      currentMarkers.some((current) => current.id === addedMarker.id)
-        ? currentMarkers
-        : [...currentMarkers, addedMarker]
-    );
-  };
-
   const handleSaveVideoMarkers = async () => {
     if (!videoMarkerTimesValid || isSavingVideoMarkers) return;
     const requestedFlightId = flight.id;
@@ -1176,9 +1154,6 @@ export function FlightDetails({
             manualOffsetSeconds={Number(goproOverlayPreviewOffset)}
             youtubeUrls={flight.youtube_urls ?? []}
             videoMarkers={flight.video_markers ?? []}
-            onAddVideoMarker={
-              isSavingVideoMarkers ? undefined : handleAddVideoMarker
-            }
             onCurrentYoutubePositionChange={(position) =>
               setCurrentYoutubePosition((current) =>
                 current?.videoId === position?.videoId &&
@@ -1187,7 +1162,6 @@ export function FlightDetails({
                   : position
               )
             }
-            isSavingVideoMarker={updateFlight.isPending || isSavingVideoMarkers}
           />
         )}
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">

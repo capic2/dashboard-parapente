@@ -55,11 +55,9 @@ interface FlightTelemetryInteractivePreviewProps {
   manualOffsetSeconds?: number;
   youtubeUrls?: string[];
   videoMarkers?: FlightVideoMarker[];
-  onAddVideoMarker?: (marker: Omit<FlightVideoMarker, 'id'>) => Promise<void>;
   onCurrentYoutubePositionChange?: (
     position: { videoId: string; seconds: number } | null
   ) => void;
-  isSavingVideoMarker?: boolean;
 }
 
 const EMPTY_YOUTUBE_URLS: string[] = [];
@@ -181,9 +179,7 @@ export function FlightTelemetryInteractivePreview({
   manualOffsetSeconds,
   youtubeUrls = EMPTY_YOUTUBE_URLS,
   videoMarkers = EMPTY_VIDEO_MARKERS,
-  onAddVideoMarker,
   onCurrentYoutubePositionChange,
-  isSavingVideoMarker = false,
 }: FlightTelemetryInteractivePreviewProps) {
   const { t, i18n } = useTranslation();
   const token = useAuthStore((state) => state.token);
@@ -876,8 +872,6 @@ export function FlightTelemetryInteractivePreview({
                 youtubeUrl={youtubeUrl}
                 mainVideoRole={mainVideoRole}
                 videoMarkers={activeVideoMarkers}
-                onAddVideoMarker={onAddVideoMarker}
-                isSavingVideoMarker={isSavingVideoMarker}
                 syncOffsetSeconds={calibrationOffsetSeconds}
                 pipOffsetSeconds={pipOffsetSeconds}
                 getFlightTime={(cameraTime) =>
