@@ -547,11 +547,16 @@ export function FlightOverlayPlayer({
     }
   };
 
+  const playYoutubePips = () => {
+    youtubePipPlayersRef.current.forEach((player) => player.playVideo());
+  };
+
   const handlePlay = () => {
     setControlsVisible(true);
     setHasStartedMainPlayback(true);
     setCameraIsPlaying(true);
     syncMedia();
+    playYoutubePips();
     playMedia(flightRef.current);
     pipVideosRef.current.forEach(playMedia);
     playMedia(overlayRef.current);
@@ -638,6 +643,10 @@ export function FlightOverlayPlayer({
             }
           },
           onError: () => {
+            playbackRequestedRef.current = false;
+            youtubePipPlayersRef.current.forEach((player) =>
+              player.pauseVideo()
+            );
             setYoutubeReady(false);
             setYoutubeFailed(true);
           },
@@ -700,7 +709,7 @@ export function FlightOverlayPlayer({
                 videoId,
                 Math.max(0, cameraCurrentTimeRef.current - offset)
               );
-              if (playbackRequestedRef.current && cameraIsPlayingRef.current) {
+              if (playbackRequestedRef.current) {
                 player.playVideo();
               }
             },
@@ -759,6 +768,7 @@ export function FlightOverlayPlayer({
         youtubeRef.current.pauseVideo();
       } else {
         playbackRequestedRef.current = true;
+        playYoutubePips();
         youtubeRef.current.playVideo();
       }
       return;
