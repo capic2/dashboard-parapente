@@ -221,6 +221,9 @@ export function FlightOverlayPlayer({
   const [videoMarkerSaveError, setVideoMarkerSaveError] = useState(false);
   const youtubeId = youtubeUrl ? getYoutubeVideoId(youtubeUrl) : null;
   const masterIsYoutube = Boolean(youtubeId) && !youtubeFailed;
+  const canSeekVideoMarkers = Boolean(
+    youtubeId && youtubeReady && masterIsYoutube
+  );
   const isInteractive = mode === 'interactive';
   const hasPlaybackIntent = useCallback(
     () => !isInteractive || playbackRequestedRef.current,
@@ -1055,20 +1058,29 @@ export function FlightOverlayPlayer({
           </div>
         )}
         {activeVideoMarkers.length > 0 && (
-          <output
-            className="pointer-events-none absolute left-3 top-3 z-40 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-2"
+          <div
+            className="absolute left-3 top-3 z-40 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-2"
             aria-live="polite"
-            aria-atomic="true"
           >
             {activeVideoMarkers.map((marker) => (
-              <span
+              <button
                 key={marker.id}
-                className="rounded-lg border border-white/20 bg-slate-950/90 px-3 py-2 text-sm font-semibold text-white shadow-lg backdrop-blur-sm"
+                type="button"
+                className="cursor-pointer rounded-lg border border-white/20 bg-slate-950/90 px-3 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={!canSeekVideoMarkers}
+                aria-label={t('flights.overlayVideoMarkerAt', {
+                  title: getVideoMarkerTitle(marker, videoMarkerLabels),
+                  time: formatVideoMarkerTime(marker.timestamp_seconds),
+                })}
+                onClick={() => {
+                  if (youtubeId)
+                    cueYoutubeAt(youtubeId, marker.timestamp_seconds);
+                }}
               >
                 {getVideoMarkerTitle(marker, videoMarkerLabels)}
-              </span>
+              </button>
             ))}
-          </output>
+          </div>
         )}
         {overlayStatus === 'generating' && (
           <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-slate-950/45">
@@ -1258,20 +1270,27 @@ export function FlightOverlayPlayer({
                 aria-label={t('flights.overlayVideoMarkersLabel')}
               >
                 {sortedVideoMarkers.map((marker) => (
-                  <li
-                    key={marker.id}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-slate-800/90 px-2.5 py-1 text-xs text-slate-100"
-                    title={t('flights.overlayVideoMarkerAt', {
-                      title: getVideoMarkerTitle(marker, videoMarkerLabels),
-                      time: formatVideoMarkerTime(marker.timestamp_seconds),
-                    })}
-                  >
-                    <time className="font-mono text-sky-200">
-                      {formatVideoMarkerTime(marker.timestamp_seconds)}
-                    </time>
-                    <span>
-                      {getVideoMarkerTitle(marker, videoMarkerLabels)}
-                    </span>
+                  <li key={marker.id} className="shrink-0">
+                    <button
+                      type="button"
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-white/15 bg-slate-800/90 px-2.5 py-1 text-xs text-slate-100 transition-colors hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={!canSeekVideoMarkers}
+                      aria-label={t('flights.overlayVideoMarkerAt', {
+                        title: getVideoMarkerTitle(marker, videoMarkerLabels),
+                        time: formatVideoMarkerTime(marker.timestamp_seconds),
+                      })}
+                      onClick={() => {
+                        if (youtubeId)
+                          cueYoutubeAt(youtubeId, marker.timestamp_seconds);
+                      }}
+                    >
+                      <time className="font-mono text-sky-200">
+                        {formatVideoMarkerTime(marker.timestamp_seconds)}
+                      </time>
+                      <span>
+                        {getVideoMarkerTitle(marker, videoMarkerLabels)}
+                      </span>
+                    </button>
                   </li>
                 ))}
               </ul>
