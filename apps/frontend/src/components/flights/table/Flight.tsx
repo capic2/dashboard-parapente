@@ -29,11 +29,12 @@ interface FlightProps {
   isActive: boolean;
   isSelected: boolean;
   selectionMode: boolean;
+  isListOption?: boolean;
   onSelectFlight: (flight: FlightSummary) => void;
   onDeleteFlight: (flight: FlightSummary) => void;
 }
 
-function formatFlightDate(date: string, language: string) {
+export function formatFlightDate(date: string, language: string) {
   const [year, month, day] = date.split('-');
   const localDate = new Date(Number(year), Number(month) - 1, Number(day));
 
@@ -57,6 +58,7 @@ export function Flight({
   isActive,
   isSelected,
   selectionMode,
+  isListOption = true,
   onSelectFlight,
   onDeleteFlight,
 }: FlightProps) {
@@ -169,8 +171,8 @@ export function Flight({
   return (
     <Card
       // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
-      role="option"
-      aria-selected={isHighlighted}
+      role={isListOption ? 'option' : 'button'}
+      aria-selected={isListOption ? isHighlighted : undefined}
       tabIndex={0}
       data-testid={`flight-row-${flight.id}`}
       selected={isHighlighted}
