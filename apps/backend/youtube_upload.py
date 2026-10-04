@@ -1132,7 +1132,7 @@ def _prepare_upload_video(
     source_path: Path,
     progress_callback: Callable[[int], Any] | None = None,
 ) -> Path:
-    """Return a YouTube-ready source, injecting 360 metadata for panoramas."""
+    """Return a YouTube-ready source, reusing valid panorama metadata when present."""
     if source_type != "pano":
         return source_path
 
@@ -1141,6 +1141,12 @@ def _prepare_upload_video(
         if _has_spherical_panorama_metadata(upload_path):
             return upload_path
         upload_path.unlink()
+
+    if _has_spherical_panorama_metadata(source_path):
+        if progress_callback is not None:
+            progress_callback(_PANORAMA_PREPARATION_PROGRESS_MAX)
+        _log_job(job_id, "Source panorama already has verified 360° metadata")
+        return source_path
 
     upload_path.parent.mkdir(parents=True, exist_ok=True)
     partial_path = upload_path.with_suffix(".part.mp4")
@@ -1264,6 +1270,7 @@ def process_youtube_upload(job_id: str) -> None:
         source_size = video_path.stat().st_size
         if source_size <= 0:
             raise RuntimeError("Source video is empty")
+        source_video_path = video_path
         video_path = _prepare_upload_video(
             job_id,
             source_type,
@@ -1271,7 +1278,8 @@ def process_youtube_upload(job_id: str) -> None:
             progress_callback=lambda progress: _update_active_job(job_id, progress=progress),
         )
         if source_type == "pano":
-            prepared_video_path = video_path
+            if video_path != source_video_path:
+                prepared_video_path = video_path
             _log_job(job_id, "Panorama metadata ready for interactive 360° playback")
         total_size = video_path.stat().st_size
         if total_size <= 0:
