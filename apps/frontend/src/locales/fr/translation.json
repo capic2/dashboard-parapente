@@ -1221,8 +1221,6 @@
     "videoMarkerRemoveShort": "Supprimer",
     "overlayVideoMarkersLabel": "Repères de cette vidéo",
     "overlayVideoMarkerAt": "{{title}} à {{time}}",
-    "overlayAddVideoMarker": "Ajouter un repère à cet instant",
-    "videoMarkerSave": "Enregistrer le repère",
     "videoMarkersSave": "Enregistrer les repères",
     "videoMarkerSaving": "Enregistrement…",
     "videoMarkerSaveError": "Impossible d’enregistrer ce repère. Réessayez.",

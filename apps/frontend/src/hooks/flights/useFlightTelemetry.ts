@@ -122,6 +122,11 @@ export function interpolateTelemetryAtVideoTime(
   const duration = next.timestamp - previous.timestamp;
   const ratio =
     duration > 0 ? (targetTimestamp - previous.timestamp) / duration : 0;
+  const recordedSpeed = interpolateOptional(
+    previous.speed_kmh,
+    next.speed_kmh,
+    ratio
+  );
   return {
     timestamp: targetTimestamp,
     lat: previous.lat + (next.lat - previous.lat) * ratio,
@@ -129,9 +134,10 @@ export function interpolateTelemetryAtVideoTime(
     elevation:
       previous.elevation + (next.elevation - previous.elevation) * ratio,
     segment: previous.segment,
-    // Match the calibration preview: derive speed from the two GPX samples
-    // when interpolating instead of requiring a recorded speed field.
-    speed_kmh: telemetrySpeedKmhBetween(previous, next),
+    speed_kmh:
+      recordedSpeed != null && Number.isFinite(recordedSpeed)
+        ? recordedSpeed
+        : telemetrySpeedKmhBetween(previous, next),
     vario_ms: interpolateOptional(previous.vario_ms, next.vario_ms, ratio),
     heading_deg: interpolateHeading(
       previous.heading_deg,
