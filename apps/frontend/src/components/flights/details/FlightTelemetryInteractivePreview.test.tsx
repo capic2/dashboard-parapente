@@ -509,7 +509,7 @@ describe('FlightTelemetryInteractivePreview', () => {
     );
   });
 
-  it('uses only the manual offset for a YouTube dynamic overlay', () => {
+  it('uses the combined calibration offset and GPX origin for a YouTube dynamic overlay', () => {
     hooks.overlayPreview.data = {
       video: { preview_segments: [] },
       alignment: {
@@ -517,7 +517,9 @@ describe('FlightTelemetryInteractivePreview', () => {
         manual_offset_seconds: 5.9,
         effective_offset_seconds: -150.1,
       },
-      gpx: { coordinates: [] },
+      gpx: {
+        coordinates: [{ timestamp: Date.UTC(2026, 8, 5, 16, 40, 53) }],
+      },
     } as unknown as GoproOverlayPreview;
     hooks.overlayPreview.isPending = false;
     hooks.overlayPreview.isSuccess = true;
@@ -555,15 +557,15 @@ describe('FlightTelemetryInteractivePreview', () => {
     fireEvent.click(screen.getByTestId('overlay-player'));
     expect(screen.getByTestId('telemetry-overlay')).toHaveAttribute(
       'data-offset',
-      '5.9'
+      '-150.1'
     );
     expect(screen.getByTestId('player-sync-offset')).toHaveAttribute(
       'data-offset',
-      '5.9'
+      '-150.1'
     );
     expect(screen.getByTestId('telemetry-overlay')).toHaveAttribute(
       'data-timeline-start',
-      String(Date.UTC(2026, 8, 5, 16, 44, 53))
+      String(Date.UTC(2026, 8, 5, 16, 40, 53))
     );
   });
 

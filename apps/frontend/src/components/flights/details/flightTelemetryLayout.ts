@@ -6,6 +6,7 @@ export type TelemetryPipVideoRole = 'face' | 'pilote' | 'vol';
 export type TelemetryPipVideoSource =
   | `youtube:${TelemetryPipVideoRole}`
   | `file:${TelemetryPipVideoRole}`;
+export type TelemetryMainVideoSource = 'auto' | TelemetryPipVideoSource;
 export const TELEMETRY_PIP_VIDEO_SOURCES: TelemetryPipVideoSource[] = [
   'youtube:face',
   'youtube:pilote',
@@ -44,6 +45,7 @@ export type TelemetryValueAlignment = 'left' | 'center' | 'right';
 
 export type TelemetryLayout = FlightTelemetryLayoutItem[] & {
   backgroundImage?: string;
+  mainVideoSource?: TelemetryMainVideoSource;
 };
 
 export const TELEMETRY_CANVAS_WIDTH = 1920;
@@ -323,7 +325,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
     document.querySelector('parsererror') ||
     document.documentElement.tagName !== 'telemetry-layout'
   ) {
-    return withBackground(
+    return withLayoutMetadata(
       DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget) => ({ ...widget }))
     );
   }
@@ -340,7 +342,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
       )
   );
   if (items.length < 1)
-    return withBackground(
+    return withLayoutMetadata(
       DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget) => ({ ...widget }))
     );
   const parsed = items.map((element, index) => {
@@ -532,15 +534,19 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
       metric: METRIC_KEYS.includes(metric) ? metric : fallback.metric,
     };
   });
-  return withBackground(
+  return withLayoutMetadata(
     parsed,
-    document.documentElement.getAttribute('background-image') ?? undefined
+    document.documentElement.getAttribute('background-image') ?? undefined,
+    document.documentElement.getAttribute('main-video-source') ?? undefined
   );
 }
 
 export function serializeTelemetryLayoutXml(
   layout: readonly FlightTelemetryLayoutItem[],
-  options?: { backgroundImage?: string }
+  options?: {
+    backgroundImage?: string;
+    mainVideoSource?: TelemetryMainVideoSource;
+  }
 ) {
   const groups = Array.from(
     new Map(
@@ -560,7 +566,14 @@ export function serializeTelemetryLayoutXml(
   const background = backgroundImage
     ? ` background-image="${escapeXml(backgroundImage)}"`
     : '';
-  const root = `<telemetry-layout version="1" width="1920" height="1080"${background}>${groups}${layout
+  const mainVideoSource = options
+    ? options.mainVideoSource
+    : (layout as TelemetryLayout).mainVideoSource;
+  const mainSource =
+    mainVideoSource && mainVideoSource !== 'auto'
+      ? ` main-video-source="${escapeXml(mainVideoSource)}"`
+      : '';
+  const root = `<telemetry-layout version="1" width="1920" height="1080"${background}${mainSource}>${groups}${layout
     .map((item) => {
       const name = item.name ? ` label="${escapeXml(item.name)}"` : '';
       const group = item.groupId ? ` group="${escapeXml(item.groupId)}"` : '';
@@ -627,12 +640,23 @@ export function serializeTelemetryLayoutXml(
   );
 }
 
-function withBackground(
+function withLayoutMetadata(
   items: FlightTelemetryLayoutItem[],
-  backgroundImage?: string
+  backgroundImage?: string,
+  rawMainVideoSource?: string
 ): TelemetryLayout {
   Object.defineProperty(items, 'backgroundImage', {
     value: backgroundImage,
+    enumerable: false,
+    configurable: true,
+    writable: true,
+  });
+  Object.defineProperty(items, 'mainVideoSource', {
+    value: TELEMETRY_PIP_VIDEO_SOURCES.includes(
+      rawMainVideoSource as TelemetryPipVideoSource
+    )
+      ? rawMainVideoSource
+      : 'auto',
     enumerable: false,
     configurable: true,
     writable: true,

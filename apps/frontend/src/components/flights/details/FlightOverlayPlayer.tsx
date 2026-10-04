@@ -9,7 +9,10 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Maximize2, Minimize2, Pause, Play, Plus } from 'lucide-react';
 import type { FlightVideoMarker } from '@dashboard-parapente/shared-types';
-import type { FlightTelemetryPipLayout } from './flightTelemetryLayout';
+import type {
+  FlightTelemetryPipLayout,
+  TelemetryPipVideoRole,
+} from './flightTelemetryLayout';
 import { getYoutubeVideoId } from '../../../lib/youtube';
 
 interface YoutubePlayer {
@@ -80,6 +83,21 @@ export interface FlightOverlayPip extends FlightTelemetryPipLayout {
   label: string;
 }
 
+function pipSyncOffsetSeconds(
+  pip: FlightOverlayPip,
+  mainVideoRole: TelemetryPipVideoRole,
+  offsetSeconds: number
+): number {
+  if (pip.applyOffset === false) return 0;
+  const pipVideoRole = pip.source?.split(':')[1] as
+    | TelemetryPipVideoRole
+    | undefined;
+  if (!pipVideoRole || pipVideoRole === mainVideoRole) return 0;
+  if (pipVideoRole === 'vol') return offsetSeconds;
+  if (mainVideoRole === 'vol') return -offsetSeconds;
+  return 0;
+}
+
 const EMPTY_PIPS: FlightOverlayPip[] = [];
 const EMPTY_VIDEO_MARKERS: FlightVideoMarker[] = [];
 const CONTROLS_HIDE_DELAY_MS = 2500;
@@ -107,6 +125,7 @@ interface FlightOverlayPlayerProps {
   overlayError?: string | null;
   syncOffsetSeconds?: number;
   pipOffsetSeconds?: number;
+  mainVideoRole?: TelemetryPipVideoRole;
   getFlightTime?: (cameraTime: number) => number;
   getCameraTime?: (flightTime: number) => number;
   getOverlayTime?: (cameraTime: number) => number;
@@ -156,6 +175,7 @@ export function FlightOverlayPlayer({
   overlayError,
   syncOffsetSeconds = 0,
   pipOffsetSeconds = syncOffsetSeconds,
+  mainVideoRole = 'face',
   getFlightTime,
   getCameraTime,
   getOverlayTime,
@@ -415,7 +435,12 @@ export function FlightOverlayPlayer({
     if (!camera && !masterIsYoutube) return;
     const pipSyncTick = ++pipSyncTickRef.current;
     pips.forEach((pip) => {
-      const pipOffset = pip.applyOffset === false ? 0 : pipOffsetSeconds;
+      let pipOffset = pipOffsetSeconds;
+      if (isInteractive) {
+        pipOffset = pipSyncOffsetSeconds(pip, mainVideoRole, pipOffsetSeconds);
+      } else if (pip.applyOffset === false) {
+        pipOffset = 0;
+      }
       const desiredPipTime = Math.max(0, currentTime - pipOffset);
       const pipYoutube = youtubePipPlayersRef.current.get(pip.id);
       if (pipYoutube) {
@@ -456,7 +481,9 @@ export function FlightOverlayPlayer({
       const pipVideo = pipVideosRef.current.get(pip.id);
       const desiredVideoTime = Math.max(
         0,
-        pip.source === 'file:vol' && pip.applyOffset !== false
+        pip.source === 'file:vol' &&
+          pip.applyOffset !== false &&
+          (!isInteractive || mainVideoRole !== 'vol')
           ? (getFlightTime?.(currentTime) ?? currentTime - pipOffset)
           : currentTime - pipOffset
       );
@@ -555,6 +582,7 @@ export function FlightOverlayPlayer({
   const handlePlay = () => {
     setControlsVisible(true);
     setHasStartedMainPlayback(true);
+    cameraIsPlayingRef.current = true;
     setCameraIsPlaying(true);
     syncMedia();
     playPips();
@@ -617,23 +645,26 @@ export function FlightOverlayPlayer({
             if (playing) youtubeCuedTimeRef.current = null;
             if (playing && isInteractive && !playbackRequestedRef.current) {
               youtubeRef.current?.pauseVideo();
+              cameraIsPlayingRef.current = false;
               setCameraIsPlaying(false);
               return;
             }
             if (playing) setHasStartedMainPlayback(true);
+            cameraIsPlayingRef.current = playing;
             setCameraIsPlaying(playing);
             if (!playing) setControlsVisible(true);
             if (playing) {
               if (hasPlaybackIntent()) {
+                syncMediaRef.current?.(true);
+                if (isInteractive) playPips();
                 playMedia(flightRef.current);
                 pipVideosRef.current.forEach(playMedia);
                 playMedia(overlayRef.current);
+              } else {
+                syncMediaRef.current?.(true);
               }
-              // Apply the GPX/video offset immediately when YouTube becomes
-              // the master clock; the animation frame loop then keeps it
-              // aligned for the rest of playback.
-              syncMediaRef.current?.(true);
             } else {
+              cameraIsPlayingRef.current = false;
               youtubePipPlayersRef.current.forEach((player) =>
                 player.pauseVideo()
               );
@@ -702,15 +733,24 @@ export function FlightOverlayPlayer({
               const currentPip = pipsRef.current.find(
                 ({ id }) => id === pip.id
               );
-              const offset =
-                currentPip?.applyOffset === false
-                  ? 0
-                  : pipOffsetSecondsRef.current;
+              let offset = 0;
+              if (currentPip && isInteractive) {
+                offset = pipSyncOffsetSeconds(
+                  currentPip,
+                  mainVideoRole,
+                  pipOffsetSecondsRef.current
+                );
+              } else if (currentPip?.applyOffset !== false) {
+                offset = pipOffsetSecondsRef.current;
+              }
               player.cueVideoById(
                 videoId,
                 Math.max(0, cameraCurrentTimeRef.current - offset)
               );
-              if (playbackRequestedRef.current) {
+              if (
+                playbackRequestedRef.current &&
+                (!isInteractive || cameraIsPlayingRef.current)
+              ) {
                 player.playVideo();
               }
             },
@@ -728,11 +768,12 @@ export function FlightOverlayPlayer({
         youtubePipHosts.get(id)?.replaceChildren();
       });
     };
-  }, [isInteractive, pipYoutubeSignature, youtubeId]);
+  }, [isInteractive, mainVideoRole, pipYoutubeSignature, youtubeId]);
 
   const handlePause = () => {
     setControlsVisible(true);
     playbackRequestedRef.current = false;
+    cameraIsPlayingRef.current = false;
     setCameraIsPlaying(false);
     youtubePipPlayersRef.current.forEach((player) => player.pauseVideo());
     flightRef.current?.pause();
@@ -770,7 +811,6 @@ export function FlightOverlayPlayer({
       } else {
         playbackRequestedRef.current = true;
         syncMediaRef.current?.();
-        playPips();
         youtubeRef.current.playVideo();
       }
       return;
@@ -779,7 +819,6 @@ export function FlightOverlayPlayer({
     if (cameraRef.current.paused) {
       playbackRequestedRef.current = true;
       syncMediaRef.current?.();
-      playPips();
       void cameraRef.current.play();
     } else {
       playbackRequestedRef.current = false;
