@@ -1,0 +1,12 @@
+services:
+  backend:
+    networks:
+      parapente-network: {}
+      proxy-network:
+        aliases:
+          - ${CONTAINER_PREFIX:-parapente}-backend
+
+networks:
+  proxy-network:
+    external: true
+    name: ${PROXY_DOCKER_NETWORK:-apps_default}
