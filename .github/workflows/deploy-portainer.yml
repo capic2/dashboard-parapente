@@ -441,17 +441,33 @@ jobs:
             exit 1
           fi
 
-          response=$(curl --show-error --silent --fail-with-body \
-            --connect-timeout 5 --max-time 20 \
-            --request POST \
-            --header "Authorization: Bearer $DRAIN_API_TOKEN" \
-            "$DRAIN_BASE_URL/$DEPLOYMENT_ID/deploying")
+          max_attempts=6
+          attempt=1
+          while [ "$attempt" -le "$max_attempts" ]; do
+            if response=$(curl --show-error --silent --fail-with-body \
+              --connect-timeout 5 --max-time 20 \
+              --request POST \
+              --header "Authorization: Bearer $DRAIN_API_TOKEN" \
+              "$DRAIN_BASE_URL/$DEPLOYMENT_ID/deploying"); then
+              if phase=$(python -c 'import json, sys; data=json.load(sys.stdin); phase=data["phase"]; ready=data["ready_for_deployment"]; active=data["active_jobs"]; admissions=data["admissions_in_progress"]; assert phase == "deploying" and type(ready) is bool and type(active) is int and active >= 0 and type(admissions) is int and admissions >= 0; print(phase)' <<< "$response" 2>/dev/null); then
+                echo "Deployment drain phase: $phase"
+                exit 0
+              fi
+              echo "Mark-deploying attempt $attempt/$max_attempts returned malformed JSON"
+            else
+              curl_status=$?
+              echo "Mark-deploying attempt $attempt/$max_attempts failed (curl exit $curl_status); retrying when attempts remain"
+            fi
 
-          if ! phase=$(python -c 'import json, sys; data=json.load(sys.stdin); phase=data["phase"]; ready=data["ready_for_deployment"]; active=data["active_jobs"]; admissions=data["admissions_in_progress"]; assert phase == "deploying" and type(ready) is bool and type(active) is int and active >= 0 and type(admissions) is int and admissions >= 0; print(phase)' <<< "$response" 2>/dev/null); then
-            echo "Mark-deploying response returned malformed JSON"
-            exit 1
-          fi
-          echo "Deployment drain phase: $phase"
+            if [ "$attempt" -lt "$max_attempts" ]; then
+              sleep_seconds=$((attempt * 5))
+              sleep "$sleep_seconds"
+            fi
+            attempt=$((attempt + 1))
+          done
+
+          echo "Failed to mark production deployment drain as deploying after $max_attempts attempts"
+          exit 1
 
       - name: Deploy on production server
         id: trigger_deploy
