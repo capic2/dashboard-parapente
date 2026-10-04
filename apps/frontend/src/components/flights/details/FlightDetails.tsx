@@ -1,5 +1,5 @@
 import type { ChangeEvent } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -73,6 +73,7 @@ import { FlightYoutubeVideos } from './FlightYoutubeVideos';
 import { GoproOverlayJobStack } from './GoproOverlayJobStack';
 import { FlightOverlayWorkspace } from './FlightOverlayWorkspace';
 import { FlightTelemetryInteractivePreview } from './FlightTelemetryInteractivePreview';
+import { FlightVideoMarkersEditor } from '../edit/FlightVideoMarkersEditor';
 import { flightQueryOptions } from '../../../hooks/flights/useFlight';
 import type { FlightDetailsTab } from '../../../routes/-flightSearch';
 
@@ -130,6 +131,20 @@ export function FlightDetails({
   const [isOverlayWorkspaceExpanded, setIsOverlayWorkspaceExpanded] = useState(
     !hasSavedOverlaySynchronization
   );
+  const [videoMarkersDraft, setVideoMarkersDraft] = useState(
+    flight.video_markers ?? []
+  );
+  const persistedVideoMarkersKey = JSON.stringify(flight.video_markers ?? []);
+  const persistedVideoMarkers = useMemo(
+    () => JSON.parse(persistedVideoMarkersKey) as FlightVideoMarker[],
+    [persistedVideoMarkersKey]
+  );
+  const lastPersistedVideoMarkersRef = useRef({
+    flightId: flight.id,
+    key: persistedVideoMarkersKey,
+  });
+  const [videoMarkerTimesValid, setVideoMarkerTimesValid] = useState(true);
+  const [isSavingVideoMarkers, setIsSavingVideoMarkers] = useState(false);
   const [isGoproOverlayDialogOpen, setIsGoproOverlayDialogOpen] =
     useState(false);
   const [goproOverlayJobId, setGoproOverlayJobId] = useState<string | null>(
@@ -257,19 +272,33 @@ export function FlightDetails({
     values,
     pendingYoutubeRemovals,
   }: FlightEditSubmission) => {
+    const requestedFlightId = flight.id;
+    const markerDraftAtRequestKey = JSON.stringify(videoMarkersDraft);
+    const markerDraftWasClean =
+      markerDraftAtRequestKey === persistedVideoMarkersKey;
     const remainingRemovals = pendingYoutubeRemovals.filter(
       (removal) =>
         !completedEditYoutubeRemovalIdsRef.current.has(removal.videoId)
     );
 
     try {
-      await updateFlight.mutateAsync({
+      const updatedFlight = await updateFlight.mutateAsync({
         ...values,
         youtube_urls: [
           ...(values.youtube_urls ?? []),
           ...remainingRemovals.map((removal) => removal.url),
         ],
       });
+      if (
+        activeFlightIdRef.current === requestedFlightId &&
+        markerDraftWasClean
+      ) {
+        setVideoMarkersDraft((currentMarkers) =>
+          JSON.stringify(currentMarkers) === markerDraftAtRequestKey
+            ? (updatedFlight.video_markers ?? [])
+            : currentMarkers
+        );
+      }
     } catch (error) {
       toast.error(await getApiErrorMessage(error, t('flights.updateError')));
       throw error;
@@ -304,17 +333,53 @@ export function FlightDetails({
   const handleAddVideoMarker = async (
     marker: Omit<FlightVideoMarker, 'id'>
   ) => {
-    const queryOptions = flightQueryOptions(flight.id);
+    const requestedFlightId = flight.id;
+    const queryOptions = flightQueryOptions(requestedFlightId);
     const latestFlight =
       queryClient.getQueryData<Flight>(queryOptions.queryKey) ?? flight;
-    const nextMarkers = [
-      ...(latestFlight.video_markers ?? []),
-      { ...marker, id: crypto.randomUUID() },
-    ];
+    const addedMarker = { ...marker, id: crypto.randomUUID() };
+    const nextMarkers = [...(latestFlight.video_markers ?? []), addedMarker];
     const updatedFlight = await updateFlight.mutateAsync({
       video_markers: nextMarkers,
     });
     queryClient.setQueryData(queryOptions.queryKey, updatedFlight);
+    if (activeFlightIdRef.current !== requestedFlightId) return;
+    setVideoMarkersDraft((currentMarkers) =>
+      currentMarkers.some((current) => current.id === addedMarker.id)
+        ? currentMarkers
+        : [...currentMarkers, addedMarker]
+    );
+  };
+
+  const handleSaveVideoMarkers = async () => {
+    if (!videoMarkerTimesValid || isSavingVideoMarkers) return;
+    const requestedFlightId = flight.id;
+    const markersAtRequest = videoMarkersDraft;
+    const markersAtRequestKey = JSON.stringify(markersAtRequest);
+    setIsSavingVideoMarkers(true);
+    try {
+      const updatedFlight = await updateFlight.mutateAsync({
+        video_markers: markersAtRequest,
+      });
+      queryClient.setQueryData(
+        flightQueryOptions(requestedFlightId).queryKey,
+        updatedFlight
+      );
+      if (activeFlightIdRef.current === requestedFlightId) {
+        setVideoMarkersDraft((currentMarkers) =>
+          JSON.stringify(currentMarkers) === markersAtRequestKey
+            ? (updatedFlight.video_markers ?? [])
+            : currentMarkers
+        );
+        toast.success(t('flights.updateSuccess'));
+      }
+    } catch (error) {
+      toast.error(
+        await getApiErrorMessage(error, t('flights.videoMarkerSaveError'))
+      );
+    } finally {
+      setIsSavingVideoMarkers(false);
+    }
   };
 
   const handleStartEdit = () => {
@@ -959,6 +1024,32 @@ export function FlightDetails({
   useEffect(() => {
     setIsOverlayWorkspaceExpanded(!hasSavedOverlaySynchronization);
   }, [hasSavedOverlaySynchronization]);
+  useEffect(() => {
+    const previous = lastPersistedVideoMarkersRef.current;
+    const flightChanged = previous.flightId !== flight.id;
+    const draftWasClean = JSON.stringify(videoMarkersDraft) === previous.key;
+
+    if (flightChanged || draftWasClean) {
+      setVideoMarkersDraft(persistedVideoMarkers);
+      if (flightChanged || videoMarkerTimesValid) {
+        setVideoMarkerTimesValid(true);
+      }
+    }
+
+    lastPersistedVideoMarkersRef.current = {
+      flightId: flight.id,
+      key: persistedVideoMarkersKey,
+    };
+  }, [
+    flight.id,
+    persistedVideoMarkers,
+    persistedVideoMarkersKey,
+    videoMarkerTimesValid,
+    videoMarkersDraft,
+  ]);
+  useLayoutEffect(() => {
+    activeFlightIdRef.current = flight.id;
+  }, [flight.id]);
 
   const overlayWorkspacePanel = (
     <section className="overflow-hidden rounded-2xl border border-cyan-200 bg-cyan-50/50 shadow-sm dark:border-cyan-900 dark:bg-cyan-950/20">
@@ -1004,6 +1095,33 @@ export function FlightDetails({
               showHeader={false}
             />
           )}
+          {hasYoutubeVideo && (
+            <div className="border-t border-cyan-200 p-4 dark:border-cyan-900">
+              <FlightVideoMarkersEditor
+                youtubeUrls={flight.youtube_urls ?? []}
+                value={videoMarkersDraft}
+                onChange={setVideoMarkersDraft}
+                onValidityChange={setVideoMarkerTimesValid}
+              />
+              <div className="mt-4 flex justify-end">
+                <Button
+                  variant="primary"
+                  className="min-h-10 rounded-lg px-4 py-2 text-sm"
+                  isDisabled={
+                    !videoMarkerTimesValid ||
+                    isSavingVideoMarkers ||
+                    JSON.stringify(videoMarkersDraft) ===
+                      JSON.stringify(flight.video_markers ?? [])
+                  }
+                  onPress={() => void handleSaveVideoMarkers()}
+                >
+                  {isSavingVideoMarkers
+                    ? t('flights.videoMarkerSaving')
+                    : t('flights.videoMarkersSave')}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </section>
@@ -1041,8 +1159,7 @@ export function FlightDetails({
       </header>
 
       <div className="min-w-0 space-y-4">
-        {hasGpx &&
-          ((hasVideo && hasGoproCameraVideo) || hasYoutubeVideo) &&
+        {(hasYoutubeVideo || (hasGpx && hasVideo && hasGoproCameraVideo)) &&
           overlayWorkspacePanel}
         {hasGpx && hasYoutubeVideo && (
           <FlightTelemetryInteractivePreview
