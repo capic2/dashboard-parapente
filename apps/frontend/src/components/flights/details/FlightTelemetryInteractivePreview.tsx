@@ -50,6 +50,7 @@ interface FlightTelemetryInteractivePreviewProps {
   flightId: string;
   hasFlightVideo?: boolean;
   hasFaceVideo?: boolean;
+  hasPiloteVideo?: boolean;
   manualOffsetSeconds?: number;
   youtubeUrls?: string[];
   videoMarkers?: FlightVideoMarker[];
@@ -172,6 +173,7 @@ export function FlightTelemetryInteractivePreview({
   flightId,
   hasFlightVideo = true,
   hasFaceVideo = false,
+  hasPiloteVideo = false,
   manualOffsetSeconds,
   youtubeUrls = EMPTY_YOUTUBE_URLS,
   videoMarkers = EMPTY_VIDEO_MARKERS,
@@ -306,22 +308,23 @@ export function FlightTelemetryInteractivePreview({
         access_token: token,
       })
     : undefined;
+  const piloteUrl = hasPiloteVideo
+    ? getApiUrlWithSearchParams(`flights/${flightId}/temporary-media/pilote`, {
+        access_token: token,
+      })
+    : undefined;
   const playerPips = pipLayouts.map((pip) => {
     const role = getYoutubePipVideoRole(pip.source);
     const youtubePipUrl = role ? youtubeUrlForRole(role) : undefined;
     let videoUrl: string | undefined;
-    if (pip.source === 'file:face' || pip.source === 'file:pilote') {
-      videoUrl = faceUrl;
-    } else if (pip.source === 'file:vol') videoUrl = flightUrl;
+    if (pip.source === 'file:face') videoUrl = faceUrl;
+    else if (pip.source === 'file:pilote') videoUrl = piloteUrl;
+    else if (pip.source === 'file:vol') videoUrl = flightUrl;
 
     let label = t('flights.goproOverlayFlightVideo');
-    if (
-      role === 'face' ||
-      pip.source === 'file:face' ||
-      pip.source === 'file:pilote'
-    ) {
+    if (role === 'face' || pip.source === 'file:face') {
       label = t('flights.faceBadge');
-    } else if (role === 'pilote') {
+    } else if (role === 'pilote' || pip.source === 'file:pilote') {
       label = t('flights.piloteBadge');
     }
     return {
