@@ -151,6 +151,49 @@ def _oauth_error_detail(response: httpx.Response) -> str:
     return f"HTTP {response.status_code}"
 
 
+def _youtube_upload_error_detail(response: httpx.Response) -> str:
+    """Return a concise, sanitized reason for a rejected YouTube upload request."""
+    try:
+        payload = response.json()
+    except (ValueError, TypeError):
+        payload = None
+
+    detail = f"YouTube rejected the upload metadata ({response.status_code})"
+    if not isinstance(payload, dict):
+        return detail
+
+    error = payload.get("error")
+    if not isinstance(error, dict):
+        return detail
+
+    reasons: list[str] = []
+    errors = error.get("errors")
+    if isinstance(errors, list):
+        for item in errors[:2]:
+            if not isinstance(item, dict):
+                continue
+            reason = item.get("reason")
+            if isinstance(reason, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", reason):
+                reasons.append(reason)
+
+    message = error.get("message")
+    safe_message = ""
+    if isinstance(message, str):
+        safe_message = re.sub(r"\s+", " ", message).strip()
+        safe_message = re.sub(r"https?://\S+", "[redacted-url]", safe_message)
+        safe_message = re.sub(
+            r"(?i)\b(access_token|refresh_token|client_secret|token)\s*[=:]\s*\S+",
+            r"\1=[redacted]",
+            safe_message,
+        )[:500]
+
+    if reasons:
+        detail += f"; reason: {', '.join(reasons)}"
+    if safe_message:
+        detail += f"; message: {safe_message}"
+    return detail
+
+
 def _clear_invalid_youtube_authorization(user_id: int, encrypted_refresh_token: str) -> None:
     with SessionLocal() as db:
         credential = db.get(YoutubeCredential, user_id)
@@ -884,7 +927,7 @@ def _start_session(job: YoutubeUploadJob, video_path: Path, access_token: str) -
         timeout=30,
     )
     if response.is_error:
-        raise RuntimeError(f"YouTube rejected the upload metadata ({response.status_code})")
+        raise RuntimeError(_youtube_upload_error_detail(response))
     session_url = response.headers.get("location")
     parsed = urlparse(session_url or "")
     if parsed.scheme != "https" or parsed.hostname != "www.googleapis.com":
