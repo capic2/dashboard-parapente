@@ -213,6 +213,8 @@ def _ordering(sort_by: FlightSortBy) -> list[ColumnElement[Any]]:
         return [Flight.flight_date, Flight.departure_time, Flight.created_at, Flight.id]
     if sort_by == "site_name":
         return [func.lower(Site.name), Flight.id]
+    if sort_by == "duration_minutes":
+        return [func.coalesce(Flight.real_duration_minutes, Flight.duration_minutes), Flight.id]
     return [getattr(Flight, sort_by), Flight.id]
 
 
@@ -408,7 +410,9 @@ def list_flight_summaries(
         Flight.flight_date,
         Flight.departure_time,
         Flight.created_at,
-        Flight.duration_minutes,
+        func.coalesce(Flight.real_duration_minutes, Flight.duration_minutes).label(
+            "duration_minutes"
+        ),
         Flight.max_altitude_m,
         Flight.distance_km,
         Flight.elevation_gain_m,
