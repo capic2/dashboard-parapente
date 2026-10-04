@@ -341,8 +341,9 @@ services:
 
   youtube-upload-worker:
     image: ${CI_BACKEND_IMAGE:-ghcr.io/capic2/dashboard-parapente/backend:main}
-    container_name: ${CONTAINER_PREFIX:-parapente}-youtube-upload-worker
     restart: unless-stopped
+    deploy:
+      replicas: 3
     command: ['python', 'youtube_upload_worker.py']
     labels:
       project: dashboard-parapente
