@@ -74,6 +74,7 @@ from flight_storage import (
     flight_storage_root,
     pano_video_path,
     pano_video_paths,
+    temporary_video_path,
     write_flight_text_file,
 )
 from flight_tracks import (
@@ -1596,7 +1597,17 @@ def remove_flight_youtube_video(
 def get_flight_youtube_upload(
     flight_id: str,
     source_type: (
-        Literal["gopro_overlay", "camera", "video", "pano", "highlight", "youtube_overlay"] | None
+        Literal[
+            "gopro_overlay",
+            "camera",
+            "video",
+            "pano",
+            "face",
+            "pilote",
+            "highlight",
+            "youtube_overlay",
+        ]
+        | None
     ) = None,
     gopro_overlay_job_id: str | None = None,
     highlight_video_job_id: str | None = None,
@@ -1657,10 +1668,13 @@ def start_flight_youtube_upload(
         video_path = Path(highlight.output_path)
         if not video_path.is_file():
             raise HTTPException(status_code=409, detail="Best-moments video is not available")
-    elif payload.source_type == "pano":
-        video_path = pano_video_path(db, flight)
-        if not video_path.is_file():
-            raise HTTPException(status_code=409, detail="Panorama video is not available")
+    elif payload.source_type in {"pano", "face", "pilote"}:
+        video_path = temporary_video_path(db, flight, payload.source_type)
+        if not _directory_file_exists(video_path):
+            source_label = {"pano": "Panorama", "face": "Face", "pilote": "Pilote"}[
+                payload.source_type
+            ]
+            raise HTTPException(status_code=409, detail=f"{source_label} video is not available")
     elif payload.source_type == "camera":
         video_path = _flight_gopro_camera_path(db, flight)
     else:
@@ -4745,6 +4759,12 @@ def get_flights(
             "video_file_path": flight.video_file_path,
             "video_file_exists": _flight_video_file_exists(flight),
             "pano_video_file_exists": _directory_file_exists(pano_paths[flight.id]),
+            "face_video_file_exists": _directory_file_exists(
+                pano_paths[flight.id].with_name("face.mp4")
+            ),
+            "pilote_video_file_exists": _directory_file_exists(
+                pano_paths[flight.id].with_name("pilote.mp4")
+            ),
             "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
             "gopro_overlay_job_id": flight.gopro_overlay_job_id,
             "gopro_overlay_status": gopro_overlay["status"],
@@ -5365,6 +5385,8 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "video_file_path": flight.video_file_path,
         "video_file_exists": _flight_video_file_exists(flight),
         "pano_video_file_exists": _directory_file_exists(pano_path),
+        "face_video_file_exists": _directory_file_exists(pano_path.with_name("face.mp4")),
+        "pilote_video_file_exists": _directory_file_exists(pano_path.with_name("pilote.mp4")),
         "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
         "gopro_overlay_job_id": flight.gopro_overlay_job_id,
         "gopro_overlay_status": gopro_overlay["status"],
@@ -5923,7 +5945,7 @@ def stream_flight_pano(flight_id: str, db: Session = Depends(get_db)) -> FileRes
 )
 def delete_flight_temporary_media(
     flight_id: str,
-    source_type: Literal["camera", "pano"],
+    source_type: Literal["camera", "pano", "face", "pilote"],
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Response:
@@ -5956,14 +5978,17 @@ def delete_flight_temporary_media(
     if source_type == "camera":
         media_path = _flight_gopro_camera_path(db, flight)
     else:
-        pano_path = _resolve_flight_file_path(str(pano_video_path(db, flight)))
-        if pano_path is None or pano_path.is_symlink() or not pano_path.is_file():
-            raise HTTPException(status_code=404, detail="Pano video not found")
-        resolved_pano_path = pano_path.resolve()
+        source_path = _resolve_flight_file_path(str(temporary_video_path(db, flight, source_type)))
+        if source_path is None or source_path.is_symlink() or not source_path.is_file():
+            raise HTTPException(status_code=404, detail=f"{source_type.title()} video not found")
+        resolved_source_path = source_path.resolve()
         storage_root = flight_storage_root().resolve()
-        if storage_root not in resolved_pano_path.parents:
-            raise HTTPException(status_code=409, detail="Pano video is outside flight storage")
-        media_path = resolved_pano_path
+        if storage_root not in resolved_source_path.parents:
+            raise HTTPException(
+                status_code=409,
+                detail=f"{source_type.title()} video is outside flight storage",
+            )
+        media_path = resolved_source_path
 
     try:
         media_path.unlink()
@@ -5979,6 +6004,41 @@ def delete_flight_temporary_media(
         flight.pano_video_file_path = None
         db.commit()
     return Response(status_code=204)
+
+
+@router.get("/flights/{flight_id}/temporary-media/{source_type}/thumbnail")
+def get_flight_temporary_media_thumbnail(
+    flight_id: str,
+    source_type: Literal["face", "pilote"],
+    db: Session = Depends(get_db),
+) -> FileResponse:
+    flight = db.get(Flight, flight_id)
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    media_path = temporary_video_path(db, flight, source_type)
+    if not _directory_file_exists(media_path):
+        raise HTTPException(status_code=404, detail=f"{source_type.title()} video not found")
+    return _video_thumbnail_response(media_path)
+
+
+@router.get("/flights/{flight_id}/temporary-media/{source_type}")
+def stream_flight_temporary_media(
+    flight_id: str,
+    source_type: Literal["face", "pilote"],
+    db: Session = Depends(get_db),
+) -> FileResponse:
+    flight = db.get(Flight, flight_id)
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    media_path = temporary_video_path(db, flight, source_type)
+    if not _directory_file_exists(media_path):
+        raise HTTPException(status_code=404, detail=f"{source_type.title()} video not found")
+    return FileResponse(
+        path=media_path,
+        media_type="video/mp4",
+        filename=media_path.name,
+        content_disposition_type="inline",
+    )
 
 
 def _highlight_job_payload(job: HighlightVideoJob) -> HighlightVideoJobResponse:
@@ -6346,6 +6406,8 @@ def create_flight(flight_data: FlightCreate, db: Session = Depends(get_db)):
         "video_file_path": None,
         "video_file_exists": False,
         "pano_video_file_exists": False,
+        "face_video_file_exists": False,
+        "pilote_video_file_exists": False,
         "gopro_camera_file_exists": False,
         "gopro_overlay_job_id": None,
         "gopro_overlay_status": None,

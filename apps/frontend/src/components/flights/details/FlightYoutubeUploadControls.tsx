@@ -20,6 +20,7 @@ import { getApiErrorMessage } from '../../../lib/api';
 interface FlightYoutubeUploadControlsProps {
   flight: Flight;
   source: YoutubeUploadSource;
+  compact?: boolean;
 }
 
 type PrivacyStatus = 'private' | 'unlisted' | 'public';
@@ -32,20 +33,26 @@ function getDefaultYoutubeTitle(
 ): string {
   const baseTitle =
     flight.name ?? flight.title ?? `Vol du ${flight.flight_date}`;
-  const role =
-    source.source_type === 'camera'
-      ? 'face'
-      : source.source_type === 'pano'
-        ? 'pilote'
-        : 'vol';
+  let role = 'vol';
+  if (source.source_type === 'camera' || source.source_type === 'face') {
+    role = 'face';
+  } else if (source.source_type === 'pano') {
+    role = 'pano';
+  } else if (source.source_type === 'pilote') {
+    role = 'pilote';
+  }
   const suffix = ` - ${role}`;
-  const titleWithoutRole = baseTitle.replace(/\s*-\s*(face|pilote|vol)$/iu, '');
+  const titleWithoutRole = baseTitle.replace(
+    /\s*-\s*(face|pilote|pano|vol)$/iu,
+    ''
+  );
   return `${titleWithoutRole.slice(0, YOUTUBE_TITLE_MAX_LENGTH - suffix.length).trimEnd()}${suffix}`;
 }
 
 export function FlightYoutubeUploadControls({
   flight,
   source,
+  compact = false,
 }: FlightYoutubeUploadControlsProps) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -181,7 +188,7 @@ export function FlightYoutubeUploadControls({
     <>
       <Button
         variant="outline"
-        className="min-h-10 w-full rounded-lg border-red-200 px-3 py-2 text-sm text-red-700 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"
+        className={`min-h-10 w-full rounded-lg border-red-200 px-3 py-2 text-sm text-red-700 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30 ${compact ? 'sm:w-auto' : ''}`}
         onPress={() => void (isActive ? handleCancel() : handlePrimaryAction())}
         isDisabled={
           connection.isLoading ||

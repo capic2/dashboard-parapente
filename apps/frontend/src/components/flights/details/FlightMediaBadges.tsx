@@ -25,6 +25,8 @@ interface FlightMediaBadgesProps {
   hasVideo: boolean;
   hasPanoVideo: boolean;
   hasGoproCameraVideo: boolean;
+  hasFaceVideo: boolean;
+  hasPiloteVideo: boolean;
   flight: Flight;
   hasPersistedGoproOverlay: boolean;
   hasCompletedGoproOverlayJob: boolean;
@@ -45,6 +47,8 @@ export function FlightMediaBadges({
   hasVideo,
   hasPanoVideo,
   hasGoproCameraVideo,
+  hasFaceVideo,
+  hasPiloteVideo,
   flight,
   hasPersistedGoproOverlay,
   hasCompletedGoproOverlayJob,
@@ -244,7 +248,10 @@ export function FlightMediaBadges({
             </div>
           </div>
         </div>
-        {(hasGoproCameraVideo || hasPanoVideo) && (
+        {(hasGoproCameraVideo ||
+          hasPanoVideo ||
+          hasFaceVideo ||
+          hasPiloteVideo) && (
           <section
             aria-labelledby="flight-temporary-sources-title"
             className="order-3 col-span-full rounded-xl border border-amber-200 bg-amber-50/50 p-3 dark:border-amber-900 dark:bg-amber-950/10 sm:p-4"
@@ -261,12 +268,18 @@ export function FlightMediaBadges({
                 {t('flights.temporarySourcesTitle')}
               </h4>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
               {hasGoproCameraVideo && (
                 <FlightTemporaryMediaCard flight={flight} sourceType="camera" />
               )}
               {hasPanoVideo && (
                 <FlightTemporaryMediaCard flight={flight} sourceType="pano" />
+              )}
+              {hasFaceVideo && (
+                <FlightTemporaryMediaCard flight={flight} sourceType="face" />
+              )}
+              {hasPiloteVideo && (
+                <FlightTemporaryMediaCard flight={flight} sourceType="pilote" />
               )}
             </div>
           </section>

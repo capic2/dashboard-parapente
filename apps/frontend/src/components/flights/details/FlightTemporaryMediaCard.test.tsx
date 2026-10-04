@@ -47,10 +47,15 @@ vi.mock('@dashboard-parapente/design-system', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { progress?: number; title?: string }) => {
+    t: (
+      key: string,
+      options?: { progress?: number; title?: string; role?: string }
+    ) => {
       const translations: Record<string, string> = {
         'flights.cameraBadge': 'Camera',
         'flights.panoBadge': 'Pano',
+        'flights.faceBadge': 'Face',
+        'flights.piloteBadge': 'Pilot',
         'flights.temporarySourceBadge': 'Temporary file',
         'flights.temporarySourceReady': 'Ready to publish on YouTube',
         'flights.temporarySourcePublished': 'Publication confirmed on YouTube',
@@ -67,6 +72,7 @@ vi.mock('react-i18next', () => ({
         'flights.temporarySourceDeleteError': 'Unable to delete local file',
         'flights.cameraThumbnailAlt': 'Camera thumbnail',
         'flights.panoThumbnailAlt': 'Pano thumbnail',
+        'flights.temporaryVideoThumbnailAlt': `${options?.role ?? ''} video thumbnail`,
       };
       return translations[key] ?? key;
     },
@@ -117,10 +123,10 @@ describe('FlightTemporaryMediaCard', () => {
     toastErrorMock.mockReset();
   });
 
-  it('shows a temporary source ready for YouTube without offering deletion', () => {
+  it('shows the source role, ready state, and YouTube action without offering deletion', () => {
     render(<FlightTemporaryMediaCard flight={flight} sourceType="pano" />);
 
-    expect(screen.getByText('Temporary file')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Pano' })).toBeInTheDocument();
     expect(screen.getByText('Ready to publish on YouTube')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Publish to YouTube' })
@@ -142,6 +148,27 @@ describe('FlightTemporaryMediaCard', () => {
     publicationMock.upload = { data: { status: 'failed' } };
     rerender(<FlightTemporaryMediaCard flight={flight} sourceType="camera" />);
     expect(screen.getByText('YouTube upload failed')).toBeInTheDocument();
+  });
+
+  it('shows the upload failure reason inline', () => {
+    publicationMock.upload = {
+      data: { status: 'failed', error: 'YouTube quota exceeded' },
+    };
+
+    render(<FlightTemporaryMediaCard flight={flight} sourceType="face" />);
+
+    expect(screen.getByText('YouTube quota exceeded')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['face', 'Face'],
+    ['pilote', 'Pilot'],
+  ] as const)('labels the %s source with its role', (sourceType, title) => {
+    render(
+      <FlightTemporaryMediaCard flight={flight} sourceType={sourceType} />
+    );
+
+    expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
   });
 
   it('requires confirmation and keeps the YouTube video when deleting a published source', () => {

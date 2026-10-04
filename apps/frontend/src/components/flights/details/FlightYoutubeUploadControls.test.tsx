@@ -41,6 +41,7 @@ vi.mock('react-i18next', () => ({
           "Arrêter l'envoi en cours vers YouTube",
         'flights.youtubeUploadCancelled': "L'envoi vers YouTube a été arrêté.",
         'flights.youtubeUpload': 'Publier sur YouTube',
+        'flights.youtubeUploadRetry': 'Réessayer',
         'flights.youtubeUploadConfirm': "Lancer l'envoi",
         'flights.youtubeUploadPublished': 'Déjà publiée',
       };
@@ -188,7 +189,35 @@ describe('FlightYoutubeUploadControls', () => {
     );
   });
 
-  it('starts an upload from the panorama video', async () => {
+  it('offers an immediate retry after an upload failure', () => {
+    useYoutubeUpload.mockReturnValue({
+      data: { status: 'failed', error: 'YouTube quota exceeded' },
+      isLoading: false,
+    });
+    const queryClient = new QueryClient();
+    const flight = {
+      id: 'flight-1',
+      flight_date: '2026-08-19',
+      name: 'Vol test',
+    } as Flight;
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FlightYoutubeUploadControls
+          flight={flight}
+          source={{ source_type: 'face' }}
+        />
+      </QueryClientProvider>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
+
+    expect(
+      screen.getByRole('dialog', { name: 'flights.youtubeUploadDialogTitle' })
+    ).toBeInTheDocument();
+  });
+
+  it('starts an upload from the panorama video with the pano role', async () => {
     useYoutubeUpload.mockReturnValue({ data: null, isLoading: false });
     const queryClient = new QueryClient();
     const flight = {
@@ -213,7 +242,7 @@ describe('FlightYoutubeUploadControls', () => {
     await waitFor(() =>
       expect(startUpload).toHaveBeenCalledWith({
         source_type: 'pano',
-        title: 'Vol test - pilote',
+        title: 'Vol test - pano',
         description: '',
         privacy_status: 'unlisted',
       })
@@ -248,6 +277,42 @@ describe('FlightYoutubeUploadControls', () => {
       )
     );
   });
+
+  it.each([
+    ['pano', 'pano'],
+    ['face', 'face'],
+    ['pilote', 'pilote'],
+  ] as const)(
+    'names a %s upload with the %s role',
+    async (sourceType, role) => {
+      useYoutubeUpload.mockReturnValue({ data: null, isLoading: false });
+      const queryClient = new QueryClient();
+      const flight = {
+        id: 'flight-1',
+        flight_date: '2026-08-19',
+        name: 'Vol test',
+      } as Flight;
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <FlightYoutubeUploadControls
+            flight={flight}
+            source={{ source_type: sourceType }}
+          />
+        </QueryClientProvider>
+      );
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Publier sur YouTube' })
+      );
+      fireEvent.click(screen.getByRole('button', { name: "Lancer l'envoi" }));
+
+      await waitFor(() =>
+        expect(startUpload).toHaveBeenCalledWith(
+          expect.objectContaining({ title: `Vol test - ${role}` })
+        )
+      );
+    }
+  );
 
   it('limits the default title to the YouTube maximum length', async () => {
     useYoutubeUpload.mockReturnValue({ data: null, isLoading: false });

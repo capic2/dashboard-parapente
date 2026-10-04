@@ -159,6 +159,8 @@ export function FlightDetails({
     getYoutubeVideoId(url)
   );
   const hasPanoVideo = flight.pano_video_file_exists === true;
+  const hasFaceVideo = flight.face_video_file_exists === true;
+  const hasPiloteVideo = flight.pilote_video_file_exists === true;
   const hasGoproCameraVideo = flight.gopro_camera_file_exists === true;
   const hasGoproOverlayOffset = flight.gopro_overlay_gpx_offset != null;
   const hasPersistedGoproOverlay = hasFlightGoproOverlay(flight);
@@ -1015,9 +1017,9 @@ export function FlightDetails({
 
   const mediaPanel = (
     <div className="space-y-4">
-      <header className="overflow-hidden rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-cyan-50 p-4 shadow-sm dark:border-indigo-900 dark:from-indigo-950/60 dark:via-gray-900 dark:to-cyan-950/40 sm:p-5">
+      <header className="overflow-hidden rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm dark:border-sky-900 dark:bg-slate-900 sm:p-5">
         <div className="flex items-start gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm dark:bg-indigo-500">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-700 text-white shadow-sm dark:bg-sky-600">
             <Images className="h-5 w-5" aria-hidden="true" />
           </span>
           <div>
@@ -1088,6 +1090,8 @@ export function FlightDetails({
           hasVideo={hasVideo}
           hasPanoVideo={hasPanoVideo}
           hasGoproCameraVideo={hasGoproCameraVideo}
+          hasFaceVideo={hasFaceVideo}
+          hasPiloteVideo={hasPiloteVideo}
           hasPersistedGoproOverlay={hasPersistedGoproOverlay}
           hasCompletedGoproOverlayJob={visibleGoproOverlays.some(
             (overlay) => overlay.status === 'completed'

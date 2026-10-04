@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@dashboard-parapente/design-system';
-import { Camera, CircleAlert, Clock3, Orbit, Trash2 } from 'lucide-react';
+import { CircleAlert, Trash2 } from 'lucide-react';
 import type { Flight } from '../../../types';
 import {
   useDeleteFlightTemporaryMedia,
@@ -37,8 +37,25 @@ export function FlightTemporaryMediaCard({
     upload.data?.status === 'queued' ||
     upload.data?.status === 'uploading';
   const isCamera = sourceType === 'camera';
-  const title = t(isCamera ? 'flights.cameraBadge' : 'flights.panoBadge');
-  const mediaPath = isCamera ? 'gopro-camera' : 'pano';
+  const titleKey = {
+    camera: 'flights.cameraBadge',
+    pano: 'flights.panoBadge',
+    face: 'flights.faceBadge',
+    pilote: 'flights.piloteBadge',
+  }[sourceType];
+  let mediaPath = `temporary-media/${sourceType}`;
+  if (isCamera) {
+    mediaPath = 'gopro-camera';
+  } else if (sourceType === 'pano') {
+    mediaPath = 'pano';
+  }
+  let thumbnailAltKey = 'flights.temporaryVideoThumbnailAlt';
+  if (isCamera) {
+    thumbnailAltKey = 'flights.cameraThumbnailAlt';
+  } else if (sourceType === 'pano') {
+    thumbnailAltKey = 'flights.panoThumbnailAlt';
+  }
+  const title = t(titleKey);
 
   let publicationStatus = t('flights.temporarySourceReady');
   let publicationStatusStyle =
@@ -73,47 +90,49 @@ export function FlightTemporaryMediaCard({
 
   return (
     <>
-      <article className="overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm dark:border-amber-900 dark:bg-slate-900/60">
-        <FlightMediaThumbnail
-          path={`/flights/${flight.id}/${mediaPath}/thumbnail`}
-          videoPath={`/flights/${flight.id}/${mediaPath}`}
-          alt={t(
-            isCamera ? 'flights.cameraThumbnailAlt' : 'flights.panoThumbnailAlt'
-          )}
-        />
-        <div className="space-y-3 p-3">
-          <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
-              {isCamera ? (
-                <Camera className="h-5 w-5" aria-hidden="true" />
-              ) : (
-                <Orbit className="h-5 w-5" aria-hidden="true" />
-              )}
-            </span>
-            <div className="min-w-0 flex-1">
-              <h4 className="font-semibold text-slate-950 dark:text-white">
-                {title}
-              </h4>
-              <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                <Clock3 className="h-3 w-3" aria-hidden="true" />
-                {t('flights.temporarySourceBadge')}
-              </span>
-            </div>
-          </div>
-
+      <article className="grid grid-cols-[5rem_minmax(0,1fr)] gap-3 rounded-xl border border-amber-200 bg-white p-3 dark:border-amber-900 dark:bg-slate-900/60 sm:grid-cols-[7rem_minmax(0,1fr)_auto] sm:items-center sm:gap-4">
+        <div className="row-span-2 overflow-hidden rounded-lg sm:row-span-1">
+          <FlightMediaThumbnail
+            path={`/flights/${flight.id}/${mediaPath}/thumbnail`}
+            videoPath={`/flights/${flight.id}/${mediaPath}`}
+            alt={t(thumbnailAltKey, { role: title })}
+          />
+        </div>
+        <div className="min-w-0 self-center">
+          <h4 className="font-semibold text-slate-950 dark:text-white">
+            {title}
+          </h4>
           <p
-            className={`flex min-h-8 items-center rounded-lg border px-2.5 py-1.5 text-xs font-semibold ${publicationStatusStyle}`}
+            className={`mt-1 inline-flex min-h-7 items-center rounded-md border px-2 py-1 text-xs font-semibold ${publicationStatusStyle}`}
             aria-live={isUploading ? 'polite' : undefined}
           >
             {publicationStatus}
           </p>
-
-          <FlightYoutubeUploadControls flight={flight} source={source} />
+          {upload.data?.status === 'failed' && upload.data.error && (
+            <output
+              aria-live="polite"
+              title={upload.data.error}
+              className="mt-1 flex items-start gap-1.5 break-words text-xs leading-5 text-red-800 dark:text-red-200"
+            >
+              <CircleAlert
+                className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                aria-hidden="true"
+              />
+              <span className="line-clamp-2 min-w-0">{upload.data.error}</span>
+            </output>
+          )}
+        </div>
+        <div className="col-span-2 grid gap-2 sm:col-span-1 sm:flex sm:flex-col">
+          <FlightYoutubeUploadControls
+            flight={flight}
+            source={source}
+            compact
+          />
 
           {isPublished && (
             <Button
               variant="danger"
-              className="min-h-10 w-full rounded-lg px-3 py-2 text-sm"
+              className="min-h-10 w-full rounded-lg px-3 py-2 text-sm sm:w-auto"
               onPress={() => setIsConfirmOpen(true)}
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
