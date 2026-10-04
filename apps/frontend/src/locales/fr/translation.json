@@ -606,8 +606,8 @@
     "title": "Paramètres",
     "subtitle": "Configuration de votre dashboard parapente",
     "description": "Les préférences sont appliquées immédiatement aux pages concernées et conservées dans ce navigateur.",
-    "autoSave": "Auto-save",
-    "saved": "Appliqué",
+    "autoSave": "Enregistré dans ce navigateur",
+    "saved": "Préférence enregistrée",
     "tabs": {
       "general": "Général",
       "favoriteSites": "Sites Favoris",
@@ -631,13 +631,15 @@
       "description": "Adaptez l'interface à votre langue et à votre préférence d'affichage.",
       "language": "Langue",
       "theme": "Thème",
+      "themeHelp": "Le thème système suit le réglage de votre appareil.",
       "light": "Clair",
       "dark": "Sombre",
-      "auto": "Auto"
+      "auto": "Système"
     },
     "notifications": {
       "title": "Notifications",
-      "description": "Préférences stockées pour les futures notifications. Aucun envoi externe n'est déclenché ici.",
+      "description": "L’envoi de notifications n’est pas disponible actuellement. Ces options sont désactivées.",
+      "unavailable": "Non disponible",
       "weatherAlerts": "Alertes météo",
       "weatherAlertsHelp": "Prépare les alertes liées aux conditions météo.",
       "newFlights": "Nouveaux vols",

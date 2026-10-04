@@ -606,8 +606,8 @@
     "title": "Settings",
     "subtitle": "Configure your paragliding dashboard",
     "description": "Preferences are applied immediately to the relevant pages and kept in this browser.",
-    "autoSave": "Auto-save",
-    "saved": "Applied",
+    "autoSave": "Saved in this browser",
+    "saved": "Preference saved",
     "tabs": {
       "general": "General",
       "favoriteSites": "Favorite Sites",
@@ -631,13 +631,15 @@
       "description": "Adapt the interface to your language and display preference.",
       "language": "Language",
       "theme": "Theme",
+      "themeHelp": "System theme follows your device setting.",
       "light": "Light",
       "dark": "Dark",
-      "auto": "Auto"
+      "auto": "System"
     },
     "notifications": {
       "title": "Notifications",
-      "description": "Stored preferences for future notifications. No external delivery is triggered here.",
+      "description": "Notification delivery is not currently available. These options are disabled.",
+      "unavailable": "Unavailable",
       "weatherAlerts": "Weather alerts",
       "weatherAlertsHelp": "Prepares alerts tied to weather conditions.",
       "newFlights": "New flights",
