@@ -649,12 +649,17 @@
     },
     "favorites": {
       "title": "Manage your Favorite Sites",
-      "description": "{{count}} favorite site(s) used first in weather and selectors.",
+      "description_zero": "No favorite sites are selected yet.",
+      "description_one": "{{count}} favorite site used first in weather and selectors.",
+      "description_other": "{{count}} favorite sites used first in weather and selectors.",
       "noSites": "No sites available",
+      "noSitesDescription": "Add a site first to mark it as a favorite.",
+      "manageSites": "Manage sites",
+      "searchLabel": "Search sites",
+      "searchPlaceholder": "Name or locality",
+      "noSearchResults": "No sites match “{{query}}”.",
       "favorite": "Favorite",
-      "add": "Add",
-      "tip": "Tip:",
-      "tipText": "Favorite sites will appear first in selectors"
+      "add": "Add"
     },
     "weatherSources": {
       "title": "Weather Sources Management",
