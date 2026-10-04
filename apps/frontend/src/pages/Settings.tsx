@@ -3,6 +3,7 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -173,6 +174,110 @@ function SavedStatus({ isVisible }: { isVisible: boolean }) {
       <span>{isVisible ? t('settings.saved') : t('settings.autoSave')}</span>
     </output>
   );
+}
+
+type SettingsBackupCache = {
+  freshnessLevel?: FreshnessLevel;
+  autoRefreshWeather?: boolean;
+  httpTimeout?: HttpTimeout;
+};
+
+type SettingsBackup = {
+  settings: AppSettings;
+  cacheSettings?: SettingsBackupCache;
+};
+
+type SettingsBackupPreview = SettingsBackup & { fileName: string };
+
+type DataFeedback = {
+  scope: 'export' | 'import' | 'reset';
+  kind: 'loading' | 'ready' | 'success' | 'error';
+  message: string;
+};
+
+function getDataFeedbackClassName(kind: DataFeedback['kind']): string {
+  switch (kind) {
+    case 'error':
+      return 'bg-red-50 text-red-800 dark:bg-red-950/40 dark:text-red-200';
+    case 'success':
+      return 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200';
+    default:
+      return 'bg-sky-50 text-sky-800 dark:bg-sky-950/40 dark:text-sky-200';
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isValidAppSettings(value: unknown): value is AppSettings {
+  if (
+    !isRecord(value) ||
+    !isRecord(value.units) ||
+    !isRecord(value.notifications)
+  ) {
+    return false;
+  }
+
+  return (
+    (value.units.distance === 'km' || value.units.distance === 'miles') &&
+    (value.units.altitude === 'm' || value.units.altitude === 'ft') &&
+    (value.units.speed === 'kmh' || value.units.speed === 'mph') &&
+    (value.language === 'fr' || value.language === 'en') &&
+    (value.theme === 'light' ||
+      value.theme === 'dark' ||
+      value.theme === 'auto') &&
+    typeof value.notifications.weather === 'boolean' &&
+    typeof value.notifications.flights === 'boolean' &&
+    typeof value.notifications.alerts === 'boolean' &&
+    Array.isArray(value.favoriteSites) &&
+    value.favoriteSites.every((siteId) => typeof siteId === 'string')
+  );
+}
+
+function parseSettingsBackup(value: unknown): SettingsBackup | null {
+  if (!isRecord(value) || !isValidAppSettings(value.settings)) return null;
+
+  if (value.cacheSettings === undefined) {
+    return { settings: value.settings };
+  }
+
+  if (!isRecord(value.cacheSettings)) return null;
+
+  const { freshnessLevel, autoRefreshWeather, httpTimeout } =
+    value.cacheSettings;
+  const allowedFreshness: readonly FreshnessLevel[] = [
+    'realtime',
+    'normal',
+    'economy',
+  ];
+  const allowedTimeouts: readonly HttpTimeout[] = [15000, 30000, 60000];
+
+  if (
+    (freshnessLevel !== undefined &&
+      !allowedFreshness.includes(freshnessLevel as FreshnessLevel)) ||
+    (autoRefreshWeather !== undefined &&
+      typeof autoRefreshWeather !== 'boolean') ||
+    (httpTimeout !== undefined &&
+      !allowedTimeouts.includes(httpTimeout as HttpTimeout))
+  ) {
+    return null;
+  }
+
+  return {
+    settings: value.settings,
+    cacheSettings: {
+      ...(freshnessLevel !== undefined && {
+        freshnessLevel: freshnessLevel as FreshnessLevel,
+      }),
+      ...(autoRefreshWeather !== undefined && {
+        autoRefreshWeather: autoRefreshWeather as boolean,
+      }),
+      ...(httpTimeout !== undefined && {
+        httpTimeout: httpTimeout as HttpTimeout,
+      }),
+    },
+  };
 }
 
 // Sites Favorites Tab Component
@@ -385,11 +490,11 @@ function WeatherSourcesTab() {
                 {stats.global_success_rate.toFixed(0)}%
               </div>
             </div>
-            <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-              <div className="text-xs text-purple-600 dark:text-purple-400 font-semibold mb-1">
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+              <div className="text-xs text-slate-600 dark:text-slate-400 font-semibold mb-1">
                 {t('settings.weatherSources.avgTime')}
               </div>
-              <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
                 {stats.global_avg_response_time_ms
                   ? `${stats.global_avg_response_time_ms}ms`
                   : '-'}
@@ -1106,6 +1211,12 @@ export default function Settings() {
   const setSettings = useAppSettingsStore((state) => state.setSettings);
   const resetSettings = useAppSettingsStore((state) => state.resetSettings);
   const [saved, setSaved] = useState(false);
+  const [importPreview, setImportPreview] =
+    useState<SettingsBackupPreview | null>(null);
+  const [dataFeedback, setDataFeedback] = useState<DataFeedback | null>(null);
+  const [isResetConfirmationOpen, setIsResetConfirmationOpen] = useState(false);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+  const importRequestRef = useRef(0);
   const activeTab: SettingsTabKey =
     tab === 'weather' ? 'sites' : (tab ?? 'general');
 
@@ -1135,7 +1246,7 @@ export default function Settings() {
     }));
   };
 
-  // Export data
+  // Export local preferences and browser cache settings only.
   const exportData = () => {
     const cacheSettings = useCacheSettingsStore.getState();
     const data = {
@@ -1154,73 +1265,96 @@ export default function Settings() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `paragliding-settings-${new Date().toISOString().split('T')[0]}.json`;
+    const fileName = `paragliding-settings-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
+    setDataFeedback({
+      scope: 'export',
+      kind: 'success',
+      message: t('settings.data.exportSuccess', { fileName }),
+    });
   };
 
-  // Import data
-  const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const readImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const requestId = ++importRequestRef.current;
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = '';
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const imported = JSON.parse(e.target?.result as string);
-        if (imported.settings) {
-          updateSettings(imported.settings as AppSettings);
-        }
-        if (imported.cacheSettings) {
-          const { setFreshnessLevel, setAutoRefreshWeather, setHttpTimeout } =
-            useCacheSettingsStore.getState();
-          const allowedFreshness: readonly FreshnessLevel[] = [
-            'realtime',
-            'normal',
-            'economy',
-          ];
-          const allowedTimeouts: readonly HttpTimeout[] = [15000, 30000, 60000];
+    setImportPreview(null);
+    setDataFeedback({
+      scope: 'import',
+      kind: 'loading',
+      message: t('settings.data.importReading'),
+    });
 
-          if (
-            allowedFreshness.includes(
-              imported.cacheSettings.freshnessLevel as FreshnessLevel
-            )
-          ) {
-            setFreshnessLevel(
-              imported.cacheSettings.freshnessLevel as FreshnessLevel
-            );
-          }
-          if (imported.cacheSettings.autoRefreshWeather !== undefined)
-            setAutoRefreshWeather(imported.cacheSettings.autoRefreshWeather);
-          if (
-            allowedTimeouts.includes(
-              imported.cacheSettings.httpTimeout as HttpTimeout
-            )
-          ) {
-            setHttpTimeout(imported.cacheSettings.httpTimeout as HttpTimeout);
-          }
-        }
-        alert(t('settings.data.importSuccess'));
-      } catch {
-        alert(t('settings.data.importError'));
-      }
-    };
-    reader.readAsText(file);
+    try {
+      const fileContents = await file.text();
+      if (requestId !== importRequestRef.current) return;
+
+      const parsed = parseSettingsBackup(JSON.parse(fileContents));
+      if (!parsed) throw new Error('Invalid settings backup');
+
+      setImportPreview({ ...parsed, fileName: file.name });
+      setDataFeedback({
+        scope: 'import',
+        kind: 'ready',
+        message: t('settings.data.importReady'),
+      });
+    } catch {
+      if (requestId !== importRequestRef.current) return;
+
+      setDataFeedback({
+        scope: 'import',
+        kind: 'error',
+        message: t('settings.data.importError'),
+      });
+    }
   };
 
-  // Clear all data
-  const clearData = () => {
-    if (window.confirm(t('settings.data.resetConfirm'))) {
-      resetSettings();
-      // Reset cache settings to defaults
-      const { setFreshnessLevel, setAutoRefreshWeather, setHttpTimeout } =
-        useCacheSettingsStore.getState();
-      setFreshnessLevel('normal');
-      setAutoRefreshWeather(true);
-      setHttpTimeout(30000);
-      setThemePreference(DEFAULT_APP_SETTINGS.theme);
-      alert(t('settings.data.resetSuccess'));
+  const applyImport = () => {
+    if (!importPreview) return;
+
+    importRequestRef.current += 1;
+    updateSettings(importPreview.settings);
+    setThemePreference(importPreview.settings.theme);
+    const cacheStore = useCacheSettingsStore.getState();
+    if (importPreview.cacheSettings?.freshnessLevel) {
+      cacheStore.setFreshnessLevel(importPreview.cacheSettings.freshnessLevel);
     }
+    if (importPreview.cacheSettings?.autoRefreshWeather !== undefined) {
+      cacheStore.setAutoRefreshWeather(
+        importPreview.cacheSettings.autoRefreshWeather
+      );
+    }
+    if (importPreview.cacheSettings?.httpTimeout) {
+      cacheStore.setHttpTimeout(importPreview.cacheSettings.httpTimeout);
+    }
+
+    setImportPreview(null);
+    setDataFeedback({
+      scope: 'import',
+      kind: 'success',
+      message: t('settings.data.importSuccess'),
+    });
+  };
+
+  const resetPreferences = () => {
+    importRequestRef.current += 1;
+    resetSettings();
+    const cacheStore = useCacheSettingsStore.getState();
+    cacheStore.setFreshnessLevel('normal');
+    cacheStore.setAutoRefreshWeather(true);
+    cacheStore.setHttpTimeout(30000);
+    setThemePreference(DEFAULT_APP_SETTINGS.theme);
+    setIsResetConfirmationOpen(false);
+    setDataFeedback({
+      scope: 'reset',
+      kind: 'success',
+      message: t('settings.data.resetSuccess'),
+    });
   };
 
   return (
@@ -1628,19 +1762,87 @@ export default function Settings() {
                   >
                     {t('settings.data.export')}
                   </Button>
-                  <label className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all flex items-center justify-center gap-2 cursor-pointer">
+                  <Button
+                    onClick={() => {
+                      importRequestRef.current += 1;
+                      setIsResetConfirmationOpen(false);
+                      importFileInputRef.current?.click();
+                    }}
+                    className="w-full px-6 py-3 rounded-lg border border-gray-300 bg-gray-100 font-semibold text-gray-800 transition-colors hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 flex items-center justify-center gap-2"
+                  >
                     {t('settings.data.import')}
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={importData}
-                      className="hidden"
-                    />
-                  </label>
+                  </Button>
+                  <input
+                    ref={importFileInputRef}
+                    type="file"
+                    accept=".json,application/json"
+                    onChange={readImportFile}
+                    className="sr-only"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                  />
                 </div>
                 <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-sm text-yellow-800 dark:text-yellow-200">
                   {t('settings.data.importWarning')}
                 </div>
+                {(dataFeedback?.scope === 'import' ||
+                  dataFeedback?.scope === 'export') && (
+                  <p
+                    className={`mt-4 rounded-lg p-3 text-sm ${getDataFeedbackClassName(dataFeedback.kind)}`}
+                    role={dataFeedback.kind === 'error' ? 'alert' : 'status'}
+                    aria-live={
+                      dataFeedback.kind === 'error' ? 'assertive' : 'polite'
+                    }
+                  >
+                    {dataFeedback.message}
+                  </p>
+                )}
+                {importPreview && (
+                  <section
+                    className="mt-4 rounded-xl border border-sky-200 bg-sky-50/70 p-4 dark:border-sky-800 dark:bg-sky-950/30"
+                    aria-labelledby="settings-import-preview-title"
+                  >
+                    <h3
+                      id="settings-import-preview-title"
+                      className="font-semibold text-slate-950 dark:text-white"
+                    >
+                      {t('settings.data.importPreviewTitle')}
+                    </h3>
+                    <p className="mt-1 break-all text-sm text-slate-700 dark:text-slate-200">
+                      {importPreview.fileName}
+                    </p>
+                    <p className="mt-3 text-sm text-slate-700 dark:text-slate-200">
+                      {t('settings.data.importPreviewDescription')}
+                    </p>
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">
+                      <li>{t('settings.data.importPreviewPreferences')}</li>
+                      {importPreview.cacheSettings && (
+                        <li>{t('settings.data.importPreviewCache')}</li>
+                      )}
+                    </ul>
+                    <p className="mt-3 text-sm text-slate-700 dark:text-slate-200">
+                      {t('settings.data.importPreviewExclusions')}
+                    </p>
+                    <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                      <Button
+                        onClick={() => {
+                          importRequestRef.current += 1;
+                          setImportPreview(null);
+                          setDataFeedback(null);
+                        }}
+                        className="min-h-11 px-4 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                      >
+                        {t('settings.data.importCancel')}
+                      </Button>
+                      <Button
+                        onClick={applyImport}
+                        className="min-h-11 bg-sky-600 px-4 py-2 text-white hover:bg-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
+                      >
+                        {t('settings.data.importApply')}
+                      </Button>
+                    </div>
+                  </section>
+                )}
               </SettingsCard>
 
               {/* Clear Data Section */}
@@ -1650,7 +1852,12 @@ export default function Settings() {
                 description={t('settings.data.resetDescription')}
               >
                 <Button
-                  onClick={clearData}
+                  onClick={() => {
+                    importRequestRef.current += 1;
+                    setDataFeedback(null);
+                    setImportPreview(null);
+                    setIsResetConfirmationOpen(true);
+                  }}
                   className="w-full px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all"
                 >
                   {t('settings.data.resetAll')}
@@ -1658,18 +1865,41 @@ export default function Settings() {
                 <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-sm text-red-800 dark:text-red-200">
                   {t('settings.data.resetWarning')}
                 </div>
-              </SettingsCard>
-
-              {/* User Profile Placeholder */}
-              <SettingsCard icon="bell" title={t('settings.profile.title')}>
-                <div className="p-8 bg-gray-50 dark:bg-gray-900 rounded-lg text-center">
-                  <p className="text-gray-600 dark:text-gray-300 mb-2">
-                    {t('settings.profile.wip')}
-                  </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {t('settings.profile.wipDetails')}
-                  </p>
-                </div>
+                {isResetConfirmationOpen && (
+                  <fieldset className="mt-4 rounded-xl border border-red-200 bg-red-50/70 p-4 dark:border-red-900 dark:bg-red-950/30">
+                    <legend className="font-semibold text-red-950 dark:text-red-100">
+                      {t('settings.data.resetConfirmTitle')}
+                    </legend>
+                    <p className="mt-1 text-sm text-red-900 dark:text-red-200">
+                      {t('settings.data.resetConfirmDescription')}
+                    </p>
+                    <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                      <Button
+                        onClick={() => {
+                          importRequestRef.current += 1;
+                          setIsResetConfirmationOpen(false);
+                        }}
+                        className="min-h-11 px-4 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                      >
+                        {t('settings.data.resetConfirmCancel')}
+                      </Button>
+                      <Button
+                        onClick={resetPreferences}
+                        className="min-h-11 bg-red-600 px-4 py-2 text-white hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                      >
+                        {t('settings.data.resetConfirmAction')}
+                      </Button>
+                    </div>
+                  </fieldset>
+                )}
+                {dataFeedback?.scope === 'reset' && (
+                  <output
+                    className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
+                    aria-live="polite"
+                  >
+                    {dataFeedback.message}
+                  </output>
+                )}
               </SettingsCard>
             </div>
           </TabPanel>
