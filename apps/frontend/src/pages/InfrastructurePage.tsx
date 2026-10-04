@@ -25,6 +25,7 @@ import {
   TabPanel,
   Tabs,
 } from '@dashboard-parapente/design-system';
+import { useToast } from '../hooks/useToast';
 import {
   useCacheOverview,
   useCacheKeyDetail,
@@ -143,7 +144,9 @@ function DeploymentStatusBanner() {
   );
 }
 
-function formatTtl(ttl: number): string {
+function formatTtl(ttl: number, t: (key: string) => string): string {
+  if (ttl === -1) return t('cache.ttlNoExpiry');
+  if (ttl === -2) return t('cache.ttlKeyMissing');
   if (ttl < 0) return '—';
   if (ttl === 0) return '0s';
   const h = Math.floor(ttl / 3600);
@@ -159,11 +162,52 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KB`;
 }
 
-function CacheKeyCell({ value }: { value: string }) {
+function CacheKeyCell({
+  value,
+  ttl,
+  size,
+}: {
+  value: string;
+  ttl: number;
+  size: number;
+}) {
+  const { t } = useTranslation();
+  const toast = useToast();
+
+  const copyKey = async () => {
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('Clipboard API unavailable');
+      }
+      await navigator.clipboard.writeText(value);
+      toast.success(t('cache.copySuccess'));
+    } catch {
+      toast.error(t('cache.copyError'));
+    }
+  };
+
   return (
-    <span className="font-mono text-xs text-gray-700 dark:text-gray-300 truncate block max-w-xs">
-      {value}
-    </span>
+    <div className="flex min-w-0 items-center gap-2">
+      <div className="min-w-0">
+        <span
+          title={value}
+          className="block max-w-xs truncate font-mono text-xs text-gray-700 dark:text-gray-300"
+        >
+          {value}
+        </span>
+        <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400 sm:hidden">
+          {t('cache.ttl')}: {formatTtl(ttl, t)} · {t('cache.size')}:{' '}
+          {formatSize(size)}
+        </span>
+      </div>
+      <Button
+        onPress={() => void copyKey()}
+        aria-label={t('cache.copyKey')}
+        className="shrink-0 rounded px-2 py-1 text-xs text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-gray-700"
+      >
+        {t('cache.copy')}
+      </Button>
+    </div>
   );
 }
 
@@ -178,9 +222,11 @@ function ResolvedCell({ resolved }: { resolved: CacheKeyInfo['resolved'] }) {
 }
 
 function TtlCell({ value }: { value: number }) {
+  const { t } = useTranslation();
+
   return (
     <span className="text-xs text-gray-600 dark:text-gray-400">
-      {formatTtl(value)}
+      {formatTtl(value, t)}
     </span>
   );
 }
@@ -239,7 +285,13 @@ function buildCacheColumns({
   return [
     columnHelper.accessor('key', {
       header: t('cache.key'),
-      cell: (info) => <CacheKeyCell value={info.getValue()} />,
+      cell: (info) => (
+        <CacheKeyCell
+          value={info.getValue()}
+          ttl={info.row.original.ttl}
+          size={info.row.original.size}
+        />
+      ),
     }),
     columnHelper.accessor('resolved', {
       header: t('cache.resolved'),
@@ -449,7 +501,8 @@ function CacheSection({
   onAutoRefreshChange: (autoRefresh: boolean) => void;
   onSearchFilterChange: (searchFilter: string) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
   const deferredSearchFilter = useDeferredValue(searchFilter);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -457,16 +510,40 @@ function CacheSection({
     null
   );
 
-  const { data: overview, refetch } = useCacheOverview(
-    autoRefresh ? 5000 : undefined
-  );
+  const {
+    data: overview,
+    refetch,
+    isFetching,
+    isError: hasOverviewError,
+    dataUpdatedAt,
+  } = useCacheOverview(autoRefresh ? 5000 : undefined);
   const { data: keyDetail } = useCacheKeyDetail(selectedKey);
   const deleteMutation = useDeleteCacheKey();
+  const visibleAppCacheKeyCount = Object.entries(overview.groups)
+    .filter(([prefix]) =>
+      ['weather:', 'best_spot:', 'emagram:'].some((appPrefix) =>
+        prefix.startsWith(appPrefix)
+      )
+    )
+    .reduce((count, [, group]) => count + group.count, 0);
+
+  const deleteCacheKeys = (pattern: string) => {
+    deleteMutation.mutate(pattern, {
+      onSuccess: ({ success, keys_deleted: count }) => {
+        if (!success) {
+          toast.error(t('cache.deleteError'));
+          return;
+        }
+        toast.success(t('cache.deleteSuccess', { count }));
+      },
+      onError: () => toast.error(t('cache.deleteError')),
+    });
+  };
 
   const filteredGroups = useMemo(() => {
-    if (!deferredSearchFilter) return overview.groups;
+    const normalizedSearch = deferredSearchFilter.trim().toLowerCase();
+    if (!normalizedSearch) return overview.groups;
 
-    const lower = deferredSearchFilter.toLowerCase();
     const result: typeof overview.groups = {};
     for (const [prefix, group] of Object.entries(overview.groups)) {
       const filteredKeys = group.keys.filter((k) => {
@@ -478,7 +555,7 @@ function CacheSection({
 
         return values
           .map((value) => String(value).toLowerCase())
-          .some((value) => value.includes(lower));
+          .some((value) => value.includes(normalizedSearch));
       });
       if (filteredKeys.length > 0) {
         result[prefix] = { count: filteredKeys.length, keys: filteredKeys };
@@ -507,18 +584,32 @@ function CacheSection({
   );
 
   const handleDeleteKey = (key: string) => {
-    requestConfirm(t('cache.confirmDelete'), () => deleteMutation.mutate(key));
+    requestConfirm(t('cache.confirmDelete', { key }), () =>
+      deleteCacheKeys(key)
+    );
   };
 
-  const handleClearPattern = (pattern: string) => {
-    requestConfirm(t('cache.confirmClearPattern', { pattern }), () =>
-      deleteMutation.mutate(pattern)
+  const handleClearPattern = (pattern: string, count: number) => {
+    requestConfirm(
+      t(
+        overview.truncated
+          ? 'cache.confirmClearPatternTruncated'
+          : 'cache.confirmClearPattern',
+        { pattern, count }
+      ),
+      () => deleteCacheKeys(pattern)
     );
   };
 
   const handleClearAll = () => {
-    requestConfirm(t('cache.confirmClearAll'), () =>
-      deleteMutation.mutate('*')
+    requestConfirm(
+      t(
+        overview.truncated
+          ? 'cache.confirmClearAppCacheTruncated'
+          : 'cache.confirmClearAppCache',
+        { count: visibleAppCacheKeyCount }
+      ),
+      () => deleteCacheKeys('*')
     );
   };
 
@@ -534,34 +625,6 @@ function CacheSection({
             'Inspecte les clés actives, leur TTL et les groupes les plus volumineux.'
           )}
         </p>
-      </div>
-
-      {/* Stats bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md text-center">
-          <div className="text-3xl font-bold text-sky-600 dark:text-sky-400">
-            {overview.total_keys}
-          </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            {t('cache.totalKeys')}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md text-center">
-          <div className="text-3xl font-bold text-sky-600 dark:text-sky-400">
-            {overview.memory_usage ?? '—'}
-          </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            {t('cache.memoryUsage')}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md text-center">
-          <div className="text-3xl font-bold text-sky-600 dark:text-sky-400">
-            {Object.keys(overview.groups).length}
-          </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            {t('cache.groups')}
-          </div>
-        </div>
       </div>
 
       {/* Truncated warning */}
@@ -609,9 +672,10 @@ function CacheSection({
         </Checkbox>
         <Button
           onPress={() => refetch()}
+          isDisabled={isFetching}
           className="min-h-11 px-4 py-2.5 sm:min-h-0 sm:px-3 sm:py-1.5 rounded-md bg-sky-600 text-white text-sm hover:bg-sky-700 transition-colors cursor-pointer"
         >
-          {t('cache.refresh')}
+          {t(isFetching ? 'cache.refreshing' : 'cache.refresh')}
         </Button>
         <TextField
           value={searchFilter}
@@ -633,10 +697,46 @@ function CacheSection({
         </Button>
       </div>
 
+      {dataUpdatedAt > 0 && (
+        <output
+          aria-live="polite"
+          className="text-xs text-gray-500 dark:text-gray-400"
+        >
+          {t('cache.lastUpdated', {
+            date: new Intl.DateTimeFormat(i18n.language, {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            }).format(dataUpdatedAt),
+          })}
+        </output>
+      )}
+      {hasOverviewError && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200"
+        >
+          {t('cache.refreshError')}
+        </div>
+      )}
+
       {/* Groups */}
       {Object.keys(filteredGroups).length === 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center text-gray-500 dark:text-gray-400">
-          {t('cache.noKeys')}
+          {deferredSearchFilter.trim() ? (
+            <div className="space-y-3">
+              <p>
+                {t('cache.noSearchResults', { search: deferredSearchFilter })}
+              </p>
+              <Button
+                onPress={() => onSearchFilterChange('')}
+                className="rounded-md px-3 py-2 text-sm text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-gray-700"
+              >
+                {t('cache.clearFilter')}
+              </Button>
+            </div>
+          ) : (
+            t(overview.total_keys === 0 ? 'cache.noKeys' : 'cache.noListedKeys')
+          )}
         </div>
       ) : (
         <div className="space-y-3">
@@ -649,7 +749,12 @@ function CacheSection({
                 group={group}
                 isExpanded={expandedGroups.has(prefix)}
                 onToggle={() => toggleGroup(prefix)}
-                onClearPattern={() => handleClearPattern(`${prefix}:*`)}
+                onClearPattern={() =>
+                  handleClearPattern(
+                    `${prefix}:*`,
+                    overview.groups[prefix]?.count ?? group.count
+                  )
+                }
                 onViewKey={(key) => setSelectedKey(key)}
                 onDeleteKey={handleDeleteKey}
                 isPending={deleteMutation.isPending}
@@ -691,7 +796,7 @@ function CacheSection({
                   {t('cache.ttl')}
                 </span>
                 <p className="text-gray-800 dark:text-gray-200">
-                  {formatTtl(keyDetail.ttl)}
+                  {formatTtl(keyDetail.ttl, t)}
                 </p>
               </div>
               <div>
@@ -703,21 +808,6 @@ function CacheSection({
                 </p>
               </div>
             </div>
-            {keyDetail.type === 'json' &&
-              typeof keyDetail.value === 'object' &&
-              keyDetail.value !== null &&
-              'cached_at' in (keyDetail.value as Record<string, unknown>) && (
-                <div className="text-sm">
-                  <span className="text-gray-500 dark:text-gray-400">
-                    {t('cache.cachedAt')}:{' '}
-                  </span>
-                  <span className="text-gray-800 dark:text-gray-200">
-                    {String(
-                      (keyDetail.value as Record<string, unknown>).cached_at
-                    )}
-                  </span>
-                </div>
-              )}
             <pre className="bg-gray-100 dark:bg-gray-900 rounded-lg p-4 text-xs font-mono overflow-auto max-h-[60vh] text-gray-800 dark:text-gray-200">
               {JSON.stringify(keyDetail.value, null, 2)}
             </pre>
@@ -735,7 +825,7 @@ function CacheSection({
       >
         {pendingConfirm && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-700 dark:text-gray-300">
+            <p className="break-words text-sm text-gray-700 dark:text-gray-300">
               {pendingConfirm.message}
             </p>
             <div className="flex justify-end gap-3">
@@ -870,12 +960,12 @@ function InfrastructureOverview() {
         <InfrastructureStatCard
           label={t('cache.memoryUsage')}
           value={cacheOverview.memory_usage ?? '—'}
-          detail={
-            cacheOverview.truncated
-              ? t('cache.truncatedWarning')
-              : t('cache.noResolution')
-          }
-          tone={cacheOverview.truncated ? 'amber' : 'gray'}
+          detail={t(
+            cacheOverview.memory_usage
+              ? 'cache.memoryUsageDetail'
+              : 'cache.memoryUnavailable'
+          )}
+          tone={cacheOverview.memory_usage ? 'sky' : 'gray'}
         />
       </div>
     </section>
