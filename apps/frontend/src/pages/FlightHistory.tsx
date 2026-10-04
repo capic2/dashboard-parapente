@@ -47,6 +47,7 @@ import { isGoproOverlayInProgress } from '../lib/flightMediaState';
 import {
   normalizeFlightsSearch,
   serializeFlightsSearch,
+  type FlightDetailsTab,
   type FlightsSearch,
   type FlightsRouteSearch,
 } from '../routes/-flightSearch';
@@ -277,6 +278,8 @@ export default function FlightHistory() {
             key={selectedFlightId}
             flight={selectedFlight}
             sites={sites}
+            activeTab={routeSearch.tab ?? 'infos'}
+            onActiveTabChange={handleActiveTabChange}
             onShowCreateSiteModal={() => setShowCreateSiteModal(true)}
             mobileMode
             onCloseMobile={handleCloseMobileDetail}
@@ -289,6 +292,8 @@ export default function FlightHistory() {
           key={selectedFlightId}
           flight={selectedFlight}
           sites={sites}
+          activeTab={routeSearch.tab ?? 'infos'}
+          onActiveTabChange={handleActiveTabChange}
           onShowCreateSiteModal={() => setShowCreateSiteModal(true)}
         />
       );
@@ -390,17 +395,39 @@ export default function FlightHistory() {
         return navigate({
           to: '/flights/$flightId',
           params: { flightId },
-          search: serializeFlightsSearch(nextSearch),
+          search: {
+            ...serializeFlightsSearch(nextSearch),
+            tab: routeSearch.tab,
+          },
           replace: true,
         });
       }
       return navigate({
         to: '/flights',
-        search: serializeFlightsSearch(nextSearch),
+        search: { ...serializeFlightsSearch(nextSearch), tab: routeSearch.tab },
         replace: true,
       });
     },
-    [navigate, selectedFlightId]
+    [navigate, routeSearch.tab, selectedFlightId]
+  );
+
+  const handleActiveTabChange = useCallback(
+    (tab: FlightDetailsTab) => {
+      const nextSearch = {
+        ...serializeFlightsSearch(search),
+        tab: tab === 'infos' ? undefined : tab,
+      };
+      if (selectedFlightId) {
+        void navigate({
+          to: '/flights/$flightId',
+          params: { flightId: selectedFlightId },
+          search: nextSearch,
+        });
+        return;
+      }
+      void navigate({ to: '/flights', search: nextSearch });
+    },
+    [navigate, search, selectedFlightId]
   );
 
   const handleSearchQueryChange = (query: string) => {
@@ -413,17 +440,17 @@ export default function FlightHistory() {
         void navigate({
           to: '/flights/$flightId',
           params: { flightId },
-          search: serializeFlightsSearch(search),
+          search: { ...serializeFlightsSearch(search), tab: routeSearch.tab },
         });
         return;
       }
 
       void navigate({
         to: '/flights',
-        search: serializeFlightsSearch(search),
+        search: { ...serializeFlightsSearch(search), tab: routeSearch.tab },
       });
     },
-    [navigate, search]
+    [navigate, routeSearch.tab, search]
   );
 
   const handleSelectFlight = useCallback(
