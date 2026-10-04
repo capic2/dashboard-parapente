@@ -195,6 +195,7 @@ export function FlightOverlayPlayer({
   const [cameraCurrentTime, setCameraCurrentTime] = useState(0);
   const [cameraDuration, setCameraDuration] = useState(0);
   const [cameraIsPlaying, setCameraIsPlaying] = useState(false);
+  const [hasStartedMainPlayback, setHasStartedMainPlayback] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const controlsHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
@@ -545,6 +546,7 @@ export function FlightOverlayPlayer({
 
   const handlePlay = () => {
     setControlsVisible(true);
+    setHasStartedMainPlayback(true);
     setCameraIsPlaying(true);
     syncMedia();
     playMedia(flightRef.current);
@@ -556,6 +558,7 @@ export function FlightOverlayPlayer({
     if (!youtubeId || !youtubeHostRef.current) return;
     youtubeCuedTimeRef.current = null;
     setYoutubeReady(false);
+    setHasStartedMainPlayback(false);
     let cancelled = false;
     const load = async () => {
       const api = await loadYoutubeApi();
@@ -609,6 +612,7 @@ export function FlightOverlayPlayer({
               setCameraIsPlaying(false);
               return;
             }
+            if (playing) setHasStartedMainPlayback(true);
             setCameraIsPlaying(playing);
             if (!playing) setControlsVisible(true);
             if (playing) {
@@ -868,14 +872,30 @@ export function FlightOverlayPlayer({
         {isInteractive && masterIsYoutube && !activePip && (
           <button
             type="button"
-            className="absolute inset-0 z-10 cursor-pointer bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-400"
+            className="absolute inset-0 z-10 flex cursor-pointer items-center justify-center bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-400"
             aria-label={
               cameraIsPlaying
                 ? t('flights.goproOverlayPause')
                 : t('flights.goproOverlayPlay')
             }
             onClick={handleTogglePlay}
-          />
+          >
+            {!hasStartedMainPlayback && youtubeId && (
+              <>
+                <img
+                  src={`https://i.ytimg.com/vi/${youtubeId}/mqdefault.jpg`}
+                  alt=""
+                  className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+                />
+                <span className="pointer-events-none relative flex h-16 w-16 items-center justify-center rounded-full bg-sky-600 text-white shadow-lg">
+                  <Play
+                    className="ml-1 h-7 w-7 fill-current"
+                    aria-hidden="true"
+                  />
+                </span>
+              </>
+            )}
+          </button>
         )}
         {isInteractive && activePip && (
           <button
@@ -941,13 +961,22 @@ export function FlightOverlayPlayer({
                 aria-label={pip.label}
               >
                 {pip.youtubeUrl && youtubePipId ? (
-                  <div
-                    ref={(node) => {
-                      if (node) youtubePipHostsRef.current.set(pip.id, node);
-                      else youtubePipHostsRef.current.delete(pip.id);
-                    }}
-                    className="h-full w-full"
-                  />
+                  <>
+                    <div
+                      ref={(node) => {
+                        if (node) youtubePipHostsRef.current.set(pip.id, node);
+                        else youtubePipHostsRef.current.delete(pip.id);
+                      }}
+                      className="h-full w-full"
+                    />
+                    {!hasStartedMainPlayback && (
+                      <img
+                        src={`https://i.ytimg.com/vi/${youtubePipId}/mqdefault.jpg`}
+                        alt=""
+                        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+                      />
+                    )}
+                  </>
                 ) : pip.videoUrl ? (
                   <video
                     ref={(node) => {
