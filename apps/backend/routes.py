@@ -1,6 +1,7 @@
 import asyncio
 import fcntl
 import fnmatch
+import hashlib
 import hmac
 import json
 import logging
@@ -6589,6 +6590,43 @@ async def create_flight_from_gpx(
                 print(
                     f"🔍 DEBUG Date/Time - UTC: {departure_datetime_utc}, Local: {departure_time}, Name: {flight_name}"
                 )
+
+        # Include the track content in the generated name so that repeat
+        # uploads reuse the flight without merging distinct tracks at the
+        # same date and time.
+        track_identity = hashlib.sha256(file_content).hexdigest()[:16]
+        flight_name = f"{flight_name} [{track_identity}]"
+        existing_flight = (
+            db.query(Flight)
+            .filter(
+                Flight.site_id == site_id,
+                Flight.name.endswith(f"[{track_identity}]"),
+            )
+            .first()
+        )
+        if existing_flight:
+            return {
+                "success": True,
+                "flight_id": existing_flight.id,
+                "flight": {
+                    "id": existing_flight.id,
+                    "name": existing_flight.name,
+                    "title": existing_flight.title,
+                    "flight_date": existing_flight.flight_date.isoformat(),
+                    "departure_time": (
+                        existing_flight.departure_time.isoformat()
+                        if existing_flight.departure_time
+                        else None
+                    ),
+                    "duration_minutes": existing_flight.duration_minutes,
+                    "max_altitude_m": existing_flight.max_altitude_m,
+                    "distance_km": existing_flight.distance_km,
+                    "elevation_gain_m": existing_flight.elevation_gain_m,
+                    "max_speed_kmh": existing_flight.max_speed_kmh,
+                    "site_id": existing_flight.site_id,
+                    "gpx_file_path": existing_flight.gpx_file_path,
+                },
+            }
 
         flight = Flight(
             id=flight_id,
