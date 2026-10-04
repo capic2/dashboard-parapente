@@ -8,6 +8,7 @@ Coverage: GET, POST, PATCH, DELETE for flights.
 from datetime import date, datetime, timedelta
 import json
 from pathlib import Path
+import re
 from unittest.mock import patch
 
 import config
@@ -1718,6 +1719,103 @@ class TestCreateFlightFromGPX:
         assert flight is not None
         assert flight.max_climb_rate_ms == 1.0
         assert flight.max_sink_rate_ms == 0.77
+
+    def test_create_flight_from_gpx_reuses_flight_for_repeated_upload(
+        self, client, db_session, arguel_site, sample_gpx
+    ):
+        files = {"gpx_file": ("arguel.gpx", sample_gpx.encode(), "application/gpx+xml")}
+        data = {"site_id": "site-arguel"}
+        with (
+            patch("routes.write_flight_text_file", return_value=Path("private/track.gpx")),
+            patch("video_export_manual.trigger_auto_export"),
+        ):
+            first_response = client.post(
+                f"{API_PREFIX}/flights/create-from-gpx", files=files, data=data
+            )
+            second_response = client.post(
+                f"{API_PREFIX}/flights/create-from-gpx", files=files, data=data
+            )
+
+        assert first_response.status_code == 200
+        assert second_response.status_code == 200
+        assert second_response.json()["flight_id"] == first_response.json()["flight_id"]
+        assert db_session.query(Flight).count() == 1
+
+    def test_create_flight_from_gpx_keeps_distinct_tracks_with_same_start_time(
+        self, client, db_session, arguel_site, sample_gpx
+    ):
+        distinct_gpx = sample_gpx.replace('lat="47.22356"', 'lat="47.22357"', 1)
+        files = [
+            {"gpx_file": ("arguel.gpx", content.encode(), "application/gpx+xml")}
+            for content in (sample_gpx, distinct_gpx)
+        ]
+        data = {"site_id": "site-arguel"}
+        with (
+            patch("routes.write_flight_text_file", return_value=Path("private/track.gpx")),
+            patch("video_export_manual.trigger_auto_export"),
+        ):
+            responses = [
+                client.post(f"{API_PREFIX}/flights/create-from-gpx", files=upload, data=data)
+                for upload in files
+            ]
+
+        assert all(response.status_code == 200 for response in responses)
+        flights = [response.json()["flight"] for response in responses]
+        assert flights[0]["id"] != flights[1]["id"]
+        assert flights[0]["name"] != flights[1]["name"]
+        assert db_session.query(Flight).count() == 2
+
+    def test_create_flight_from_gpx_deduplicates_per_site(
+        self, client, db_session, arguel_site, chalais_site, sample_gpx
+    ):
+        files = {"gpx_file": ("arguel.gpx", sample_gpx.encode(), "application/gpx+xml")}
+        with (
+            patch("routes.write_flight_text_file", return_value=Path("private/track.gpx")),
+            patch("video_export_manual.trigger_auto_export"),
+        ):
+            arguel_response = client.post(
+                f"{API_PREFIX}/flights/create-from-gpx",
+                files=files,
+                params={"site_id": arguel_site.id},
+            )
+            chalais_response = client.post(
+                f"{API_PREFIX}/flights/create-from-gpx",
+                files=files,
+                params={"site_id": chalais_site.id},
+            )
+
+        assert arguel_response.status_code == 200
+        assert chalais_response.status_code == 200
+        assert arguel_response.json()["flight_id"] != chalais_response.json()["flight_id"]
+        assert db_session.query(Flight).count() == 2
+
+    def test_create_flight_from_timestamp_less_gpx_reuses_flight_on_later_date(
+        self, client, db_session, arguel_site, sample_gpx
+    ):
+        timestamp_less_gpx = re.sub(r"\s*<time>[^<]*</time>", "", sample_gpx)
+        files = {"gpx_file": ("arguel.gpx", timestamp_less_gpx.encode(), "application/gpx+xml")}
+        with (
+            patch("routes.write_flight_text_file", return_value=Path("private/track.gpx")),
+            patch("video_export_manual.trigger_auto_export"),
+            patch("routes.date") as mocked_date,
+        ):
+            mocked_date.today.return_value = date(2026, 3, 15)
+            first_response = client.post(
+                f"{API_PREFIX}/flights/create-from-gpx",
+                files=files,
+                data={"site_id": arguel_site.id},
+            )
+            mocked_date.today.return_value = date(2026, 3, 16)
+            second_response = client.post(
+                f"{API_PREFIX}/flights/create-from-gpx",
+                files=files,
+                data={"site_id": arguel_site.id},
+            )
+
+        assert first_response.status_code == 200
+        assert second_response.status_code == 200
+        assert second_response.json()["flight_id"] == first_response.json()["flight_id"]
+        assert db_session.query(Flight).count() == 1
 
     def test_create_flight_from_gpx_no_file(self, client, db_session, arguel_site):
         """POST /flights/create-from-gpx fails without file"""
