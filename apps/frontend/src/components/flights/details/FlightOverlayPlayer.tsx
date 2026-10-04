@@ -17,6 +17,7 @@ interface YoutubePlayer {
   getCurrentTime: () => number;
   getDuration: () => number;
   getPlayerState: () => number;
+  cueVideoById: (videoId: string, startSeconds?: number) => void;
   mute: () => void;
   pauseVideo: () => void;
   playVideo: () => void;
@@ -201,6 +202,9 @@ export function FlightOverlayPlayer({
   const cameraCurrentTimeRef = useRef(cameraCurrentTime);
   const cameraIsPlayingRef = useRef(cameraIsPlaying);
   const playbackRequestedRef = useRef(false);
+  const youtubeCuedTimeRef = useRef<number | null>(null);
+  const onTimeChangeRef = useRef(onTimeChange);
+  onTimeChangeRef.current = onTimeChange;
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [youtubeReady, setYoutubeReady] = useState(false);
   const [youtubeFailed, setYoutubeFailed] = useState(false);
@@ -221,6 +225,26 @@ export function FlightOverlayPlayer({
     () => !isInteractive || playbackRequestedRef.current,
     [isInteractive]
   );
+  const cueYoutubeAt = useCallback((videoId: string, time: number) => {
+    youtubeCuedTimeRef.current = time;
+    const player = youtubeRef.current;
+    const playerState = player?.getPlayerState();
+    if (
+      player &&
+      (playerState === -1 ||
+        (!playbackRequestedRef.current && [0, 5].includes(playerState)))
+    ) {
+      player.cueVideoById(videoId, time);
+    } else {
+      player?.seekTo(time, true);
+    }
+    cameraCurrentTimeRef.current = time;
+    syncMediaRef.current?.(true);
+    if (!syncMediaRef.current) {
+      setCameraCurrentTime(time);
+      onTimeChangeRef.current?.(time);
+    }
+  }, []);
   const sortedVideoMarkers = isInteractive
     ? videoMarkers
         .filter((marker) => marker.youtube_video_id === youtubeId)
@@ -241,7 +265,9 @@ export function FlightOverlayPlayer({
     if (!youtubeId || !onAddVideoMarker || !youtubeReady || !masterIsYoutube) {
       return;
     }
-    const playerTime = youtubeRef.current?.getCurrentTime();
+    const playerTime = cameraIsPlayingRef.current
+      ? youtubeRef.current?.getCurrentTime()
+      : cameraCurrentTimeRef.current;
     const currentTime = playerTime ?? cameraCurrentTimeRef.current;
     setNewVideoMarkerTime(
       Math.min(86400, Math.max(0, Math.floor(currentTime)))
@@ -357,16 +383,30 @@ export function FlightOverlayPlayer({
       return;
     }
     if (masterIsYoutube) {
-      youtubeRef.current?.seekTo(seekRequest.time, true);
+      if (!youtubeReady) return;
+      if (isInteractive && youtubeId && !playbackRequestedRef.current) {
+        cueYoutubeAt(youtubeId, seekRequest.time);
+      } else {
+        youtubeRef.current?.seekTo(seekRequest.time, true);
+      }
     } else if (cameraRef.current) {
       cameraRef.current.currentTime = seekRequest.time;
     }
-  }, [masterIsYoutube, seekRequest, youtubeReady]);
+  }, [
+    cueYoutubeAt,
+    isInteractive,
+    masterIsYoutube,
+    seekRequest,
+    youtubeId,
+    youtubeReady,
+  ]);
 
   const syncMedia = (notify = true) => {
     const camera = cameraRef.current;
     const currentTime = masterIsYoutube
-      ? (youtubeRef.current?.getCurrentTime() ?? 0)
+      ? (youtubeCuedTimeRef.current ??
+        youtubeRef.current?.getCurrentTime() ??
+        0)
       : (camera?.currentTime ?? 0);
     if (!camera && !masterIsYoutube) return;
     const pipSyncTick = ++pipSyncTickRef.current;
@@ -382,7 +422,19 @@ export function FlightOverlayPlayer({
           Math.abs(desiredPipTime - currentPipTime) > 0.75 &&
           pipSyncTick - (lastPipSeekTickRef.current.get(pip.id) ?? -30) >= 30
         ) {
-          pipYoutube.seekTo(desiredPipTime, true);
+          const pipVideoId = pip.youtubeUrl
+            ? getYoutubeVideoId(pip.youtubeUrl)
+            : null;
+          const pipPlaybackRequested = hasPlaybackIntent() && cameraIsPlaying;
+          if (
+            !pipPlaybackRequested &&
+            [-1, 0, 5].includes(pipState) &&
+            pipVideoId
+          ) {
+            pipYoutube.cueVideoById(pipVideoId, desiredPipTime);
+          } else {
+            pipYoutube.seekTo(desiredPipTime, true);
+          }
           lastPipSeekTickRef.current.set(pip.id, pipSyncTick);
         }
         if (
@@ -502,6 +554,8 @@ export function FlightOverlayPlayer({
 
   useEffect(() => {
     if (!youtubeId || !youtubeHostRef.current) return;
+    youtubeCuedTimeRef.current = null;
+    setYoutubeReady(false);
     let cancelled = false;
     const load = async () => {
       const api = await loadYoutubeApi();
@@ -529,8 +583,13 @@ export function FlightOverlayPlayer({
             const duration = youtubeRef.current?.getDuration() ?? 0;
             setCameraDuration(duration);
             setYoutubeReady(true);
-            if (seekRequestRef.current) {
-              youtubeRef.current?.seekTo(seekRequestRef.current.time, true);
+            const pendingSeek = seekRequestRef.current;
+            if (pendingSeek) {
+              if (isInteractive && youtubeId && !playbackRequestedRef.current) {
+                cueYoutubeAt(youtubeId, pendingSeek.time);
+              } else {
+                youtubeRef.current?.seekTo(pendingSeek.time, true);
+              }
             }
             syncMediaRef.current?.(true);
           },
@@ -540,7 +599,16 @@ export function FlightOverlayPlayer({
           onStateChange: ({ data }: { data: number }) => {
             const duration = youtubeRef.current?.getDuration() ?? 0;
             if (duration > 0) setCameraDuration(duration);
+            if (data === 0 && isInteractive) {
+              playbackRequestedRef.current = false;
+            }
             const playing = data === 1;
+            if (playing) youtubeCuedTimeRef.current = null;
+            if (playing && isInteractive && !playbackRequestedRef.current) {
+              youtubeRef.current?.pauseVideo();
+              setCameraIsPlaying(false);
+              return;
+            }
             setCameraIsPlaying(playing);
             if (!playing) setControlsVisible(true);
             if (playing) {
@@ -575,7 +643,7 @@ export function FlightOverlayPlayer({
       youtubeRef.current?.destroy();
       youtubeRef.current = null;
     };
-  }, [hasPlaybackIntent, isInteractive, youtubeId]);
+  }, [cueYoutubeAt, hasPlaybackIntent, isInteractive, youtubeId]);
 
   const pipYoutubeSignature = pips
     .map(
@@ -614,7 +682,6 @@ export function FlightOverlayPlayer({
           events: {
             onReady: () => {
               player.mute();
-              player.pauseVideo();
               const currentPip = pipsRef.current.find(
                 ({ id }) => id === pip.id
               );
@@ -622,9 +689,9 @@ export function FlightOverlayPlayer({
                 currentPip?.applyOffset === false
                   ? 0
                   : pipOffsetSecondsRef.current;
-              player.seekTo(
-                Math.max(0, cameraCurrentTimeRef.current - offset),
-                true
+              player.cueVideoById(
+                videoId,
+                Math.max(0, cameraCurrentTimeRef.current - offset)
               );
               if (playbackRequestedRef.current && cameraIsPlayingRef.current) {
                 player.playVideo();
@@ -797,6 +864,18 @@ export function FlightOverlayPlayer({
           >
             <track kind="captions" />
           </video>
+        )}
+        {isInteractive && masterIsYoutube && !activePip && (
+          <button
+            type="button"
+            className="absolute inset-0 z-10 cursor-pointer bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-400"
+            aria-label={
+              cameraIsPlaying
+                ? t('flights.goproOverlayPause')
+                : t('flights.goproOverlayPlay')
+            }
+            onClick={handleTogglePlay}
+          />
         )}
         {isInteractive && activePip && (
           <button
@@ -991,14 +1070,22 @@ export function FlightOverlayPlayer({
                 max={cameraDuration || 0}
                 step={0.01}
                 value={Math.min(cameraCurrentTime, cameraDuration || 0)}
-                onChange={(event) =>
-                  masterIsYoutube
-                    ? youtubeRef.current?.seekTo(
-                        Number(event.target.value),
-                        true
-                      )
-                    : handleTimelineChange(Number(event.target.value))
-                }
+                onChange={(event) => {
+                  const time = Number(event.target.value);
+                  if (masterIsYoutube) {
+                    if (
+                      isInteractive &&
+                      youtubeId &&
+                      !playbackRequestedRef.current
+                    ) {
+                      cueYoutubeAt(youtubeId, time);
+                    } else {
+                      youtubeRef.current?.seekTo(time, true);
+                    }
+                  } else {
+                    handleTimelineChange(time);
+                  }
+                }}
                 disabled={!cameraDuration}
                 className="min-w-[8rem] flex-1 cursor-pointer accent-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label={t('flights.goproOverlayTimeline')}
