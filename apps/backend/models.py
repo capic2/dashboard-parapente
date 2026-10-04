@@ -246,6 +246,7 @@ class Flight(Base):
     flight_date = Column(Date, nullable=False)
     departure_time = Column(DateTime, nullable=True)  # Datetime du premier trackpoint GPX
     duration_minutes = Column(Integer)
+    real_duration_minutes = Column(Integer, nullable=True)
     max_altitude_m = Column(Integer)
     max_speed_kmh = Column(Float)
     distance_km = Column(Float)
