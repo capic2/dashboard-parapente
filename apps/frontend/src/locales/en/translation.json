@@ -125,8 +125,8 @@
       "youtubeUpload": "YouTube upload"
     },
     "method": {
-      "cpu": "CPU",
-      "gpu": "GPU"
+      "cpu": "CPU (processor)",
+      "gpu": "GPU (graphics card)"
     },
     "table": {
       "method": "Method",
@@ -136,9 +136,19 @@
       "type": "Type",
       "progress": "Progress",
       "lastActivity": "Last activity",
-      "frames": "Frames",
-      "fps": "Frames per second",
-      "eta": "Time remaining"
+      "frames": "Frames processed",
+      "fps": "Speed (frames/s)",
+      "fpsUnit": "frames/s",
+      "eta": "Time remaining",
+      "details": "Details",
+      "technicalDetails": "Technical details"
+    },
+    "gpu": {
+      "unavailable": "NVIDIA acceleration not detected",
+      "checking": "Checking NVIDIA acceleration…",
+      "available": "NVIDIA acceleration available",
+      "live": "updated automatically",
+      "description": "This status describes NVIDIA acceleration availability. CPU processing remains available."
     },
     "resumeSuccess": "Generation resumed",
     "resumeError": "Unable to resume generation",
@@ -319,7 +329,11 @@
       "source": "Source",
       "emptyTitle": "Choose weather",
       "emptyDescription": "Add a favorite site or search for a city to display the hour-by-hour details.",
-      "selectedSearchResult": "Selected search result"
+      "selectedSearchResult": "Selected search result",
+      "advancedTitle": "Landings and advanced analysis",
+      "advancedSummary": "Additional details about the selected site",
+      "otherSitesTitle": "Explore other sites",
+      "otherSitesSummary": "Suggestions based on weather and the selected radius"
     },
     "mobile": {
       "badge": "Mobile weather",
@@ -415,9 +429,10 @@
     }
   },
   "flightDecision": {
-    "title": "Flight decision",
-    "loadError": "Unable to calculate the flight decision.",
-    "scoreObjectif": "Objective score",
+    "title": "Weather assessment",
+    "loadError": "Unable to load the weather assessment.",
+    "scoreObjectif": "Score for objective",
+    "scoreNote": "Weather index · not a probability",
     "bestWindow": "Best window",
     "leastUnfavorable": "Least unfavorable moment",
     "noWindow": "No window",
@@ -431,8 +446,8 @@
     },
     "summary": {
       "favorable": {
-        "title": "Favorable window identified",
-        "message": "A usable window stands out for the selected objective. Still check risks and local conditions before deciding."
+        "title": "Favorable window for the selected objective",
+        "message": "The forecast matches the criteria for “{{objective}}”. This estimate does not know your personal skill level: check conditions on site as well."
       },
       "vigilance": {
         "title": "Flight possible with caution",
@@ -452,17 +467,17 @@
       }
     },
     "objective": {
-      "active": "Objective: {{objective}}",
+      "active": "Assessment: {{objective}}",
       "tranquille": "Calm",
       "progression": "Progression",
       "thermique": "Thermal"
     },
     "context": {
       "title": "Weather context",
-      "description": "A city or ad hoc search gives weather context. Select a takeoff to get a complete flight decision with orientation and landings."
+      "description": "A city search provides weather context. Select a takeoff to see an assessment that includes its orientation and associated landing sites."
     },
     "confidence": {
-      "title": "Confidence",
+      "title": "Forecast confidence",
       "high": "High",
       "medium": "Medium",
       "low": "Low",
@@ -995,6 +1010,10 @@
     "gpxMissing": "GPX missing",
     "activeFlight": "Selected flight",
     "at": "at {{time}}",
+    "dayGroupCount_one": "{{count}} flight",
+    "dayGroupCount_other": "{{count}} flights",
+    "expandDayFlights": "Show flights from {{date}}",
+    "collapseDayFlights": "Hide flights from {{date}}",
     "noFlights": "No flights recorded",
     "listAriaLabel": "Flight list",
     "deleteAriaLabel": "Delete flight {{title}}",
@@ -1814,12 +1833,22 @@
     "size": "Size",
     "actions": "Actions",
     "view": "View",
+    "copy": "Copy",
+    "copyKey": "Copy cache key",
+    "copySuccess": "Cache key copied.",
+    "copyError": "Could not copy the cache key. Select it from the key details instead.",
     "deleteKey": "Delete",
     "clearPattern": "Clear Group",
-    "clearAll": "Clear All Cache",
-    "confirmDelete": "Are you sure you want to delete this key?",
-    "confirmClearPattern": "Delete all keys matching {{pattern}}?",
-    "confirmClearAll": "Are you sure you want to clear the entire cache?",
+    "clearAll": "Clear App Cache",
+    "confirmDelete": "Delete cache key {{key}}?",
+    "confirmClearPattern": "Delete {{count}} listed keys matching {{pattern}}?",
+    "confirmClearPatternTruncated": "Delete keys matching {{pattern}}? At least {{count}} matching keys are listed; the inventory is truncated, so more may be deleted.",
+    "confirmClearAppCache": "Delete the app cache under weather, best_spot, and emagram? The current overview lists {{count}} matching keys.",
+    "confirmClearAppCacheTruncated": "Delete the app cache under weather, best_spot, and emagram? At least {{count}} matching keys are listed; the inventory is truncated, so more may be deleted.",
+    "deleteSuccess_zero": "No cache keys were deleted.",
+    "deleteSuccess_one": "Deleted {{count}} cache key.",
+    "deleteSuccess_other": "Deleted {{count}} cache keys.",
+    "deleteError": "Could not delete the cache keys. Refresh the overview and try again.",
     "resolved": "Meaning",
     "noResolution": "No semantic resolution",
     "resolutionGeneric": "Unknown key type",
@@ -1829,13 +1858,22 @@
     "resolvedEmagram": "Emagram sounding for station {{station}} ({{date}})",
     "resolvedEmagramAnalysis": "Emagram analysis for site {{site}} ({{date}} {{hour}})",
     "latest": "latest",
-    "autoRefresh": "Auto-refresh",
+    "autoRefresh": "Auto-refresh (every 5 seconds)",
     "refresh": "Refresh",
+    "refreshing": "Refreshing…",
+    "lastUpdated": "Last updated {{date}}",
+    "refreshError": "The cache overview could not be refreshed. Try again; the displayed data may be out of date.",
     "noKeys": "No cache keys found",
+    "noListedKeys": "No keys are available to display.",
+    "noSearchResults": "No listed cache keys match “{{search}}”.",
+    "clearFilter": "Clear filter",
     "searchPlaceholder": "Filter keys...",
     "keyDetail": "Key Detail",
-    "cachedAt": "Cached At",
-    "truncatedWarning": "Display limited to the first 500 keys. The cache contains more entries."
+    "truncatedWarning": "Only the first 500 keys are listed. Search covers only listed keys; bulk deletion may also affect keys not shown.",
+    "memoryUsageDetail": "Memory reported by Redis",
+    "memoryUnavailable": "Redis did not return memory usage",
+    "ttlNoExpiry": "No expiry",
+    "ttlKeyMissing": "Key no longer exists"
   },
   "infrastructure": {
     "title": "Infrastructure",
@@ -1847,22 +1885,23 @@
       "cache": "Redis Cache"
     },
     "videoExports": {
-      "ready": "Queue",
+      "overview": "Overview",
       "description": "Track exports and clean up temporary files."
     },
     "intervals": {
       "title": "Intervals.icu synchronization",
-      "description": "Operational status for manual import.",
+      "description": "Check whether an API key is set and which activity types are allowed for import from Intervals.icu.",
       "status": "Status",
-      "statusDetail": "Configuration reported by the server",
+      "statusDetail": "An API key is set on the server.",
+      "statusNotConfiguredDetail": "Set BACKEND_INTERVALS_ICU_API_KEY in the server environment to enable imports.",
       "notConfigured": "Not configured",
       "configured": "Configured",
       "activityTypes": "Monitored activity types",
       "typeCount": "{{count}} type(s)",
       "activityTypesDetail": "Types the manual import currently accepts",
-      "noActivityTypes": "No activity type is configured. An activity must be discovered first.",
-      "apiKeyEnvOnly": "The API key is managed only in the server environment and is never displayed here.",
-      "statusError": "Unable to load the Intervals.icu status.",
+      "noActivityTypes": "No activity types are allowed for import. To find a Zepp activity’s type, open Flights → More flight actions → Import from Intervals.icu and preview an activity. Add its type to BACKEND_INTERVALS_ICU_ACTIVITY_TYPES in the server environment.",
+      "apiKeyEnvOnly": "The API key is never shown here.",
+      "statusError": "Unable to load the Intervals.icu status. Refresh the page to try again.",
       "overviewDetail": "{{count}} monitored activity types"
     },
     "deployment": {

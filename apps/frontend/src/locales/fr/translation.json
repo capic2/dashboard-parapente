@@ -125,8 +125,8 @@
       "youtubeUpload": "Upload YouTube"
     },
     "method": {
-      "cpu": "CPU",
-      "gpu": "GPU"
+      "cpu": "Processeur (CPU)",
+      "gpu": "Carte graphique (GPU)"
     },
     "table": {
       "method": "Méthode",
@@ -136,9 +136,19 @@
       "type": "Type",
       "progress": "Progression",
       "lastActivity": "Dernière activité",
-      "frames": "Images",
-      "fps": "Images par seconde",
-      "eta": "Temps restant"
+      "frames": "Images traitées",
+      "fps": "Vitesse (images/s)",
+      "fpsUnit": "images/s",
+      "eta": "Temps restant",
+      "details": "Détails",
+      "technicalDetails": "Détails techniques"
+    },
+    "gpu": {
+      "unavailable": "Accélération NVIDIA non détectée",
+      "checking": "Vérification de l’accélération NVIDIA…",
+      "available": "Accélération NVIDIA disponible",
+      "live": "mis à jour automatiquement",
+      "description": "Ce statut décrit la disponibilité de l’accélération NVIDIA. Le mode CPU reste disponible."
     },
     "resumeSuccess": "Génération relancée",
     "resumeError": "Impossible de relancer la génération",
@@ -319,7 +329,11 @@
       "source": "Source",
       "emptyTitle": "Choisissez une météo",
       "emptyDescription": "Ajoutez un site favori ou recherchez une ville pour afficher le détail heure par heure.",
-      "selectedSearchResult": "Résultat de recherche sélectionné"
+      "selectedSearchResult": "Résultat de recherche sélectionné",
+      "advancedTitle": "Atterrissages et analyse avancée",
+      "advancedSummary": "Détails complémentaires sur le site sélectionné",
+      "otherSitesTitle": "Explorer d’autres sites",
+      "otherSitesSummary": "Suggestions selon la météo et le rayon choisi"
     },
     "mobile": {
       "badge": "Météo mobile",
@@ -415,9 +429,10 @@
     }
   },
   "flightDecision": {
-    "title": "Décision de vol",
-    "loadError": "Impossible de calculer la décision de vol.",
-    "scoreObjectif": "Score objectif",
+    "title": "Évaluation météo",
+    "loadError": "Impossible de charger l’évaluation météo.",
+    "scoreObjectif": "Score météo pour cet objectif",
+    "scoreNote": "Indice météo · pas une probabilité",
     "bestWindow": "Meilleur créneau",
     "leastUnfavorable": "Moment le moins défavorable",
     "noWindow": "Aucun créneau",
@@ -431,8 +446,8 @@
     },
     "summary": {
       "favorable": {
-        "title": "Créneau favorable identifié",
-        "message": "Un créneau exploitable ressort pour l'objectif choisi. Vérifiez quand même les risques et le terrain avant de décider."
+        "title": "Créneau favorable pour l’objectif choisi",
+        "message": "Les prévisions correspondent aux critères de l’objectif « {{objective}} ». Cette estimation ne connaît pas votre niveau personnel ; vérifiez aussi les conditions sur place."
       },
       "vigilance": {
         "title": "Vol possible avec vigilance",
@@ -452,17 +467,17 @@
       }
     },
     "objective": {
-      "active": "Objectif : {{objective}}",
+      "active": "Évaluation : {{objective}}",
       "tranquille": "Tranquille",
       "progression": "Progression",
       "thermique": "Thermique"
     },
     "context": {
       "title": "Contexte météo",
-      "description": "Une ville ou une recherche ponctuelle donne un contexte météo. Sélectionnez un décollage pour obtenir une décision de vol complète avec orientation et atterrissages."
+      "description": "Une ville ou une recherche ponctuelle donne un contexte météo. Sélectionnez un décollage pour afficher une évaluation qui tient compte de son orientation et des atterrissages associés."
     },
     "confidence": {
-      "title": "Confiance",
+      "title": "Fiabilité météo",
       "high": "Élevée",
       "medium": "Moyenne",
       "low": "Faible",
@@ -999,6 +1014,10 @@
     "gpxMissing": "GPX manquant",
     "activeFlight": "Vol sélectionné",
     "at": "à {{time}}",
+    "dayGroupCount_one": "{{count}} vol",
+    "dayGroupCount_other": "{{count}} vols",
+    "expandDayFlights": "Afficher les vols du {{date}}",
+    "collapseDayFlights": "Masquer les vols du {{date}}",
     "noFlights": "Aucun vol enregistré",
     "listAriaLabel": "Liste des vols",
     "deleteAriaLabel": "Supprimer le vol {{title}}",
@@ -1819,12 +1838,22 @@
     "size": "Taille",
     "actions": "Actions",
     "view": "Voir",
+    "copy": "Copier",
+    "copyKey": "Copier la clé du cache",
+    "copySuccess": "Clé du cache copiée.",
+    "copyError": "Impossible de copier la clé. Vous pouvez la sélectionner dans le détail de la clé.",
     "deleteKey": "Supprimer",
     "clearPattern": "Vider le groupe",
-    "clearAll": "Vider tout le cache",
-    "confirmDelete": "Voulez-vous vraiment supprimer cette clé ?",
-    "confirmClearPattern": "Supprimer toutes les clés correspondant à {{pattern}} ?",
-    "confirmClearAll": "Voulez-vous vraiment vider tout le cache ?",
+    "clearAll": "Vider le cache applicatif",
+    "confirmDelete": "Supprimer la clé de cache {{key}} ?",
+    "confirmClearPattern": "Supprimer les {{count}} clés listées correspondant à {{pattern}} ?",
+    "confirmClearPatternTruncated": "Supprimer les clés correspondant à {{pattern}} ? Au moins {{count}} clés correspondantes sont listées ; l’inventaire est incomplet et d’autres clés peuvent être supprimées.",
+    "confirmClearAppCache": "Supprimer le cache applicatif des préfixes weather, best_spot et emagram ? L’inventaire liste {{count}} clés correspondantes.",
+    "confirmClearAppCacheTruncated": "Supprimer le cache applicatif des préfixes weather, best_spot et emagram ? Au moins {{count}} clés correspondantes sont listées ; l’inventaire est incomplet et d’autres clés peuvent être supprimées.",
+    "deleteSuccess_zero": "Aucune clé de cache supprimée.",
+    "deleteSuccess_one": "{{count}} clé de cache supprimée.",
+    "deleteSuccess_other": "{{count}} clés de cache supprimées.",
+    "deleteError": "Impossible de supprimer les clés. Actualisez l’inventaire puis réessayez.",
     "resolved": "Signification",
     "noResolution": "Résolution indisponible",
     "resolutionGeneric": "Clé inconnue",
@@ -1833,14 +1862,23 @@
     "resolvedWeatherForecastWithSite": "Prévision météo - {{site}} (jour {{day}})",
     "resolvedEmagram": "Émagramme - station {{station}} ({{date}})",
     "resolvedEmagramAnalysis": "Analyse émagramme - site {{site}} ({{date}} {{hour}})",
-    "latest": "derniere",
-    "autoRefresh": "Rafraîchissement auto",
+    "latest": "dernière",
+    "autoRefresh": "Actualiser automatiquement (toutes les 5 s)",
     "refresh": "Rafraîchir",
+    "refreshing": "Actualisation…",
+    "lastUpdated": "Dernière actualisation : {{date}}",
+    "refreshError": "Impossible d’actualiser l’inventaire du cache. Réessayez ; les données affichées peuvent être anciennes.",
     "noKeys": "Aucune clé en cache",
+    "noListedKeys": "Aucune clé disponible à afficher.",
+    "noSearchResults": "Aucune clé listée ne correspond à « {{search}} ».",
+    "clearFilter": "Effacer le filtre",
     "searchPlaceholder": "Filtrer les clés...",
     "keyDetail": "Détail de la clé",
-    "cachedAt": "Mis en cache le",
-    "truncatedWarning": "Affichage limité aux 500 premières clés. Le cache contient plus d'entrées."
+    "truncatedWarning": "Seules les 500 premières clés sont listées. La recherche porte sur cette liste ; une suppression groupée peut aussi toucher des clés non affichées.",
+    "memoryUsageDetail": "Mémoire signalée par Redis",
+    "memoryUnavailable": "Redis n’a pas renvoyé la mémoire utilisée",
+    "ttlNoExpiry": "Sans expiration",
+    "ttlKeyMissing": "La clé n’existe plus"
   },
   "infrastructure": {
     "title": "Infrastructure",
@@ -1852,22 +1890,23 @@
       "cache": "Cache Redis"
     },
     "videoExports": {
-      "ready": "File",
+      "overview": "Suivi",
       "description": "Suivez les exports et nettoyez les fichiers temporaires."
     },
     "intervals": {
       "title": "Synchronisation Intervals.icu",
-      "description": "État opérationnel de l'import manuel.",
+      "description": "Vérifiez si la clé API est renseignée et quels types d’activité sont autorisés pour l’import depuis Intervals.icu.",
       "status": "Statut",
-      "statusDetail": "Configuration fournie par le serveur",
+      "statusDetail": "Une clé API est renseignée côté serveur.",
+      "statusNotConfiguredDetail": "Ajoutez BACKEND_INTERVALS_ICU_API_KEY à l’environnement du serveur pour activer l’import.",
       "notConfigured": "Non configuré",
       "configured": "Configuré",
       "activityTypes": "Types d'activité surveillés",
       "typeCount": "{{count}} type(s)",
       "activityTypesDetail": "Types acceptés par l'import manuel",
-      "noActivityTypes": "Aucun type configuré. Une activité doit d'abord être découverte.",
-      "apiKeyEnvOnly": "La clé API est gérée uniquement dans l'environnement du serveur et n'est jamais affichée ici.",
-      "statusError": "Impossible de charger le statut Intervals.icu.",
+      "noActivityTypes": "Aucun type d’activité n’est autorisé pour l’import. Pour connaître le type d’une activité Zepp, ouvrez Vols → Plus d’actions sur les vols → Importer depuis Intervals.icu, puis prévisualisez une activité. Ajoutez son type à BACKEND_INTERVALS_ICU_ACTIVITY_TYPES dans l’environnement du serveur.",
+      "apiKeyEnvOnly": "La clé API n’est jamais affichée ici.",
+      "statusError": "Impossible de récupérer le statut Intervals.icu. Actualisez la page pour réessayer.",
       "overviewDetail": "{{count}} types d'activité surveillés"
     },
     "deployment": {

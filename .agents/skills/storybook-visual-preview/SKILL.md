@@ -24,7 +24,7 @@ The workflow is:
 - Frontend Storybook target: `nx storybook frontend`, port `6006`.
 - Design system Storybook target: `nx storybook design-system`, port `6007`.
 - Screenshot script: `.agents/skills/storybook-visual-preview/scripts/capture-storybook.mjs`.
-- Default output directory: `.codenomad/storybook-previews` when the user should open the file, or `/tmp/opencode/storybook-visual-preview` for disposable captures.
+- Default output directory: `.codenomad/storybook-previews` when the user should open the file, or `/tmp/codex/storybook-visual-preview` for disposable captures.
 - Browser fallback: if Playwright browsers are missing, the script tries `/usr/bin/chromium`.
 
 Use `local-machine-stack` for the pnpm path, `NX_NO_CLOUD` prefix, dependency readiness, and command timeouts. If dependencies are missing, follow its readiness workflow before capturing.

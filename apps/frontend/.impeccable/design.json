@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-03T19:17:42.000Z",
+  "generatedAt": "2026-10-04T06:53:02.000Z",
   "title": "Design System: Dashboard Parapente",
   "extensions": {
     "colorMeta": {
@@ -73,7 +73,7 @@
       "refersTo": "button-primary",
       "description": "Primary action with sky-blue emphasis and clear interaction states.",
       "html": "<button class=\"ds-btn-primary\">Voir les conditions</button>",
-      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: .5rem 1rem; border: 0; border-radius: .5rem; background: #0284c7; color: #fff; font: 500 .875rem/1.25 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; box-shadow: 0 1px 2px 0 rgb(0 0 0 / .05); cursor: pointer; transition: background-color 150ms cubic-bezier(.4,0,.2,1); } .ds-btn-primary:hover { background: #0369a1; } .ds-btn-primary:active { background: #075985; } .ds-btn-primary:focus-visible { outline: 2px solid #0ea5e9; outline-offset: 2px; } .ds-btn-primary:disabled { opacity: .5; cursor: not-allowed; }"
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.75rem; padding: .625rem 1rem; border: 0; border-radius: .5rem; background: #0284c7; color: #fff; box-shadow: 0 1px 2px 0 rgb(0 0 0 / .05); font: 500 .875rem/1.25 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; white-space: nowrap; cursor: pointer; transition: background-color 150ms cubic-bezier(.4,0,.2,1); } .ds-btn-primary:hover { background: #0369a1; } .ds-btn-primary:active, .ds-btn-primary[data-pressed] { background: #075985; } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #0ea5e9; } .ds-btn-primary:disabled { opacity: .5; cursor: not-allowed; } @media (min-width: 640px) { .ds-btn-primary { min-height: 0; padding-top: .5rem; padding-bottom: .5rem; } } .dark .ds-btn-primary:focus-visible { box-shadow: 0 0 0 2px #111827, 0 0 0 4px #0ea5e9; }"
     },
     {
       "name": "Secondary Button",
@@ -81,7 +81,7 @@
       "refersTo": "button-secondary",
       "description": "Neutral action for supporting or repeatable controls.",
       "html": "<button class=\"ds-btn-secondary\">Choisir un site</button>",
-      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: .5rem 1rem; border: 0; border-radius: .5rem; background: #f3f4f6; color: #374151; font: 500 .875rem/1.25 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; cursor: pointer; transition: background-color 150ms cubic-bezier(.4,0,.2,1), color 150ms cubic-bezier(.4,0,.2,1); } .ds-btn-secondary:hover { background: #e5e7eb; } .ds-btn-secondary:active { background: #d1d5db; } .ds-btn-secondary:focus-visible { outline: 2px solid #0ea5e9; outline-offset: 2px; } .ds-btn-secondary:disabled { opacity: .5; cursor: not-allowed; }"
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.75rem; padding: .625rem 1rem; border: 0; border-radius: .5rem; background: #f3f4f6; color: #374151; font: 500 .875rem/1.25 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; cursor: pointer; transition: background-color 150ms cubic-bezier(.4,0,.2,1), color 150ms cubic-bezier(.4,0,.2,1); } .ds-btn-secondary:hover { background: #e5e7eb; } .ds-btn-secondary:focus-visible { outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #0ea5e9; } .ds-btn-secondary:disabled { opacity: .5; cursor: not-allowed; } .dark .ds-btn-secondary { background: #374151; color: #e5e7eb; } .dark .ds-btn-secondary:hover { background: #4b5563; } @media (min-width: 640px) { .ds-btn-secondary { min-height: 0; padding-top: .5rem; padding-bottom: .5rem; } } .dark .ds-btn-secondary:focus-visible { box-shadow: 0 0 0 2px #111827, 0 0 0 4px #0ea5e9; }"
     },
     {
       "name": "Outline Button",
@@ -89,7 +89,7 @@
       "refersTo": "button-outline",
       "description": "Quiet bordered action for secondary choices.",
       "html": "<button class=\"ds-btn-outline\">Annuler</button>",
-      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: .5rem 1rem; border: 1px solid #d1d5db; border-radius: .5rem; background: #fff; color: #374151; font: 500 .875rem/1.25 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; cursor: pointer; transition: background-color 150ms cubic-bezier(.4,0,.2,1); } .ds-btn-outline:hover { background: #f9fafb; } .ds-btn-outline:active { background: #f3f4f6; } .ds-btn-outline:focus-visible { outline: 2px solid #0ea5e9; outline-offset: 2px; }"
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.75rem; padding: .625rem 1rem; border: 1px solid #d1d5db; border-radius: .5rem; background: #fff; color: #374151; font: 500 .875rem/1.25 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; cursor: pointer; transition: background-color 150ms cubic-bezier(.4,0,.2,1); } .ds-btn-outline:hover { background: #f9fafb; } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #0ea5e9; } .ds-btn-outline:disabled { opacity: .5; cursor: not-allowed; } .dark .ds-btn-outline { border-color: #4b5563; background: #1f2937; color: #e5e7eb; } .dark .ds-btn-outline:hover { background: #374151; } @media (min-width: 640px) { .ds-btn-outline { min-height: 0; padding-top: .5rem; padding-bottom: .5rem; } } .dark .ds-btn-outline:focus-visible { box-shadow: 0 0 0 2px #111827, 0 0 0 4px #0ea5e9; }"
     },
     {
       "name": "Neutral Card",
@@ -97,7 +97,7 @@
       "refersTo": "card-neutral",
       "description": "Routine information container with a fine border and quiet elevation.",
       "html": "<article class=\"ds-card\"><strong>Mont Poupet Nord</strong><p>Vent · 12 km/h</p></article>",
-      "css": ".ds-card { padding: 1rem; border: 1px solid #e5e7eb; border-radius: .5rem; background: #fff; color: #111827; box-shadow: 0 1px 2px 0 rgb(0 0 0 / .05); font: 400 .875rem/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-card strong { font-size: 1rem; font-weight: 600; } .ds-card p { margin: .25rem 0 0; color: #4b5563; }"
+      "css": ".ds-card { position: relative; overflow: hidden; padding: 1rem; border: 1px solid #e5e7eb; border-radius: .5rem; background: #fff; color: #111827; box-shadow: 0 1px 2px 0 rgb(0 0 0 / .05); font: 400 .875rem/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; transition: all 200ms; } .ds-card strong { font-size: 1rem; font-weight: 600; } .ds-card p { margin: .25rem 0 0; color: #4b5563; } .dark .ds-card { border-color: #374151; background: #1f2937; color: #f9fafb; }"
     },
     {
       "name": "Text Input",
@@ -112,7 +112,8 @@
       "kind": "nav",
       "description": "Compact desktop navigation with an unmistakable active destination.",
       "html": "<nav class=\"ds-nav\"><a href=\"#\">Dashboard</a><a class=\"ds-nav-active\" href=\"#\" aria-current=\"page\">Météo</a><a href=\"#\">Vols</a></nav>",
-      "css": ".ds-nav { display: flex; align-items: center; gap: .5rem; font: 500 .875rem/1.25 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-nav a { padding: .5rem .875rem; border-radius: .375rem; color: #4b5563; text-decoration: none; transition: background-color 150ms cubic-bezier(.4,0,.2,1), color 150ms cubic-bezier(.4,0,.2,1); } .ds-nav a:hover { background: #f3f4f6; color: #0284c7; } .ds-nav a:focus-visible { outline: 2px solid #0ea5e9; outline-offset: 2px; } .ds-nav .ds-nav-active { background: #0284c7; color: #fff; } .ds-nav .ds-nav-active:hover { background: #0369a1; color: #fff; }"
+      "css": ".ds-nav { display: flex; align-items: center; gap: .5rem; font: 500 .875rem/1.25 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-nav a { padding: .5rem .875rem; border-radius: .375rem; color: #4b5563; text-decoration: none; transition: background-color 150ms cubic-bezier(.4,0,.2,1), color 150ms cubic-bezier(.4,0,.2,1); } .ds-nav a:hover { background: #f3f4f6; color: #0284c7; } .ds-nav a:focus-visible { outline: 2px solid #0ea5e9; outline-offset: 2px; } .ds-nav .ds-nav-active { background: #0284c7; color: #fff; } .ds-nav .ds-nav-active:hover { background: #0369a1; color: #fff; }",
+      "refersTo": "navigation-active"
     },
     {
       "name": "Weather Hero",

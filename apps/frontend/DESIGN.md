@@ -44,13 +44,25 @@ components:
     textColor: "{colors.paper-white}"
     typography: "{typography.label}"
     rounded: "{rounded.md}"
-    padding: "0.5rem 1rem"
+    padding: "0.625rem 1rem"
   button-secondary:
     backgroundColor: "#f3f4f6"
     textColor: "#374151"
     typography: "{typography.label}"
     rounded: "{rounded.md}"
-    padding: "0.5rem 1rem"
+    padding: "0.625rem 1rem"
+  button-outline:
+    backgroundColor: "{colors.paper-white}"
+    textColor: "#374151"
+    typography: "{typography.label}"
+    rounded: "{rounded.md}"
+    padding: "0.625rem 1rem"
+  navigation-active:
+    backgroundColor: "{colors.altitude-blue}"
+    textColor: "{colors.paper-white}"
+    typography: "{typography.label}"
+    rounded: "{rounded.sm}"
+    padding: "0.5rem 0.875rem"
   card-neutral:
     backgroundColor: "{colors.paper-white}"
     rounded: "{rounded.md}"
@@ -136,9 +148,9 @@ Controls and standard cards use gently rounded corners, most often 0.5rem. Large
 ### Buttons
 - **Character:** Clear, compact controls with familiar touch targets.
 - **Shape:** Rounded corners, usually 0.5rem; small and medium sizes provide at least a 2.5rem touch target on narrow screens.
-- **Primary:** Sky-blue fill with white text; medium buttons use 1rem horizontal and 0.5rem vertical padding.
+- **Primary:** Sky-blue fill with white text; medium buttons use 1rem horizontal and 0.625rem vertical padding on narrow screens, reducing to 0.5rem at the `sm` breakpoint (640px). Their minimum height is 2.75rem on narrow screens.
 - **Hover / Focus:** Darken the fill on hover and press. Keyboard focus uses a visible blue ring with a contrasting offset.
-- **Secondary / Ghost / Outline:** Neutral fills, transparent surfaces, or a fine border; keep labels dark in light mode and readable in dark mode.
+- **Secondary / Ghost / Outline:** Secondary uses a neutral fill; ghost stays transparent until hover; outline uses a fine border. Preserve readable labels and dark-theme treatments.
 - **Semantic variants:** Success, warning, danger, purple accent, and cyan variants exist in the shared button component. Use them only when the action or status warrants the color.
 
 ### Chips
@@ -158,7 +170,7 @@ Controls and standard cards use gently rounded corners, most often 0.5rem. Large
 - **Error / Disabled:** Use readable red error text; disabled controls reduce emphasis and block interaction.
 
 ### Navigation
-- **Style:** Compact sans-serif links in a wrapping desktop row; active destination uses a filled blue background and white text.
+- **Style:** Compact sans-serif links in a wrapping row; active destination uses a filled blue background, white text, and gently rounded corners (6px).
 - **Hover / Focus:** Neutral hover surface and a visible keyboard ring.
 - **Mobile:** Theme control and menu button remain reachable in the header; the navigation opens in a full-height side drawer with generously sized links.
 

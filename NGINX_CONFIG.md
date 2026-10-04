@@ -8,13 +8,13 @@ forwarding settings:
 - Forward port: `8001`
 - WebSocket support: enabled
 
-The production deployment applies `docker-compose.production.yml`, which joins
-the backend to the external Docker network `apps_default` and publishes the
-`parapente-backend` DNS alias there. Set `PROXY_DOCKER_NETWORK` if Nginx Proxy
-Manager uses a network with a different name. The base Compose file does not
-require this network, so local development and staging can start without it.
+The backend joins the external Docker network `apps_default` and publishes the
+`parapente-backend` DNS alias there. Set `PROXY_DOCKER_NETWORK` if the Nginx
+Proxy Manager container uses a network with a different name. For a staging
+stack, the alias follows `CONTAINER_PREFIX`, for example
+`parapente-staging-backend`.
 
-Do not cache HTML or error responses in the proxy. The backend marks HTML for
-revalidation and Vite's fingerprinted assets as immutable. After deployment,
-verify the root page and a lazy-loaded asset return `200` through the public
-domain.
+Do not configure a proxy cache for HTML or error responses. The backend marks
+HTML as revalidatable and Vite's fingerprinted assets as immutable. After
+deploying a new image, verify both `/` and a lazy-loaded asset return `200` from
+the public domain.

@@ -29,11 +29,12 @@ interface FlightProps {
   isActive: boolean;
   isSelected: boolean;
   selectionMode: boolean;
+  isListOption?: boolean;
   onSelectFlight: (flight: FlightSummary) => void;
   onDeleteFlight: (flight: FlightSummary) => void;
 }
 
-function formatFlightDate(date: string, language: string) {
+export function formatFlightDate(date: string, language: string) {
   const [year, month, day] = date.split('-');
   const localDate = new Date(Number(year), Number(month) - 1, Number(day));
 
@@ -57,6 +58,7 @@ export function Flight({
   isActive,
   isSelected,
   selectionMode,
+  isListOption = true,
   onSelectFlight,
   onDeleteFlight,
 }: FlightProps) {
@@ -169,8 +171,8 @@ export function Flight({
   return (
     <Card
       // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
-      role="option"
-      aria-selected={isHighlighted}
+      role={isListOption ? 'option' : 'button'}
+      aria-selected={isListOption ? isHighlighted : undefined}
       tabIndex={0}
       data-testid={`flight-row-${flight.id}`}
       selected={isHighlighted}
@@ -213,7 +215,7 @@ export function Flight({
           <h3 className={`truncate text-sm font-semibold ${titleColor}`}>
             {flight.title || t('flights.untitledFlight')}
           </h3>
-          {!selectionMode && hasMediaStatus && (
+          {hasMediaStatus && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {hasGpx && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
