@@ -1048,7 +1048,7 @@ export function FlightDetails({
           <FlightTelemetryInteractivePreview
             flightId={flight.id}
             hasFlightVideo={hasVideo}
-            hasPanoVideo={hasPanoVideo}
+            hasFaceVideo={hasFaceVideo}
             manualOffsetSeconds={Number(goproOverlayPreviewOffset)}
             youtubeUrls={flight.youtube_urls ?? []}
             videoMarkers={flight.video_markers ?? []}
