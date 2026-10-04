@@ -145,11 +145,8 @@ verify_workers_started() {
         failed=1
       fi
     done
-    youtube_workers=$(docker ps -a \
-      --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" \
-      --filter "label=com.docker.compose.service=youtube-upload-worker" \
-      --format '{{.Names}}')
-    youtube_worker_count=$(printf '%s\n' "$youtube_workers" | sed '/^$/d' | wc -l)
+    youtube_workers=$(compose_cmd ps --all --format '{{.Name}}' youtube-upload-worker)
+    youtube_worker_count=$(printf '%s\n' "$youtube_workers" | sed '/^$/d' | awk 'END { print NR + 0 }')
     if [ "$youtube_worker_count" -ne 3 ]; then
       echo "Readiness check found $youtube_worker_count YouTube upload workers; expected 3"
       failed=1
@@ -506,8 +503,8 @@ deploy_from_portainer_volume() {
             readiness_failed=1
           fi
         done
-        youtube_workers=$(docker ps -a --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" --filter "label=com.docker.compose.service=youtube-upload-worker" --format '{{.Names}}')
-        youtube_worker_count=$(printf '%s\n' "$youtube_workers" | sed '/^$/d' | wc -l)
+        youtube_workers=$(compose_cmd ps --all --format '{{.Name}}' youtube-upload-worker)
+        youtube_worker_count=$(printf '%s\n' "$youtube_workers" | sed '/^$/d' | awk 'END { print NR + 0 }')
         if [ "$youtube_worker_count" -ne 3 ]; then
           echo "Readiness check found $youtube_worker_count YouTube upload workers; expected 3"
           readiness_failed=1
