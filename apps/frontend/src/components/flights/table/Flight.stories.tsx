@@ -143,6 +143,7 @@ export const WithYoutubeVideo = meta.story({
           has_video: false,
           has_youtube_video: true,
           youtube_video_count: 2,
+          youtube_video_types: ['face', 'pano'],
           has_gopro_overlay: false,
         }}
         isActive={false}

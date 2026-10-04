@@ -79,26 +79,28 @@ def _file_exists(file_path: str | None) -> bool:
     return bool(path and path.is_file())
 
 
-def _youtube_video_ids(value: str | None) -> set[str]:
+def _youtube_video_ids(value: str | None) -> list[str]:
     try:
         urls = json.loads(value or "[]")
     except (TypeError, json.JSONDecodeError):
-        return set()
+        return []
     if not isinstance(urls, list):
-        return set()
+        return []
 
-    video_ids: set[str] = set()
+    video_ids: list[str] = []
     for url in urls:
         if not isinstance(url, str):
             continue
         try:
-            video_ids.add(youtube_video_id_from_url(url))
+            video_id = youtube_video_id_from_url(url)
+            if video_id not in video_ids:
+                video_ids.append(video_id)
         except ValueError:
             continue
     return video_ids
 
 
-def _completed_youtube_uploads(value: str | None) -> list[tuple[int, str]]:
+def _completed_youtube_uploads(value: str | None) -> list[tuple[int, str, str]]:
     try:
         uploads = json.loads(value or "[]")
     except (TypeError, json.JSONDecodeError):
@@ -107,11 +109,16 @@ def _completed_youtube_uploads(value: str | None) -> list[tuple[int, str]]:
         return []
 
     return [
-        (upload["user_id"], upload["video_id"])
+        (
+            upload["user_id"],
+            upload["video_id"],
+            upload.get("source_type", "gopro_overlay"),
+        )
         for upload in uploads
         if isinstance(upload, dict)
         and isinstance(upload.get("user_id"), int)
         and isinstance(upload.get("video_id"), str)
+        and isinstance(upload.get("source_type", "gopro_overlay"), str)
     ]
 
 
@@ -362,6 +369,8 @@ def list_flight_summaries(
                     YoutubeUploadJob.user_id,
                     "video_id",
                     YoutubeUploadJob.youtube_video_id,
+                    "source_type",
+                    YoutubeUploadJob.source_type,
                 )
             )
         )
@@ -435,15 +444,20 @@ def list_flight_summaries(
     has_more = len(rows) > page_size
     rows = rows[:page_size]
     youtube_video_ids_by_user: dict[int, set[str]] = {}
-    associated_youtube_ids: dict[str, set[str]] = {}
+    associated_youtube_ids: dict[str, list[str]] = {}
     uploaded_youtube_ids: dict[str, set[str]] = {}
+    uploaded_youtube_types: dict[str, dict[str, str]] = {}
     for row in rows:
         associated_youtube_ids[row.id] = _youtube_video_ids(row.youtube_urls_json)
         uploaded_youtube_ids[row.id] = set()
-        for user_id, video_id in _completed_youtube_uploads(row.completed_youtube_uploads):
+        uploaded_youtube_types[row.id] = {}
+        for user_id, video_id, source_type in _completed_youtube_uploads(
+            row.completed_youtube_uploads
+        ):
             if video_id not in associated_youtube_ids[row.id]:
                 continue
             uploaded_youtube_ids[row.id].add(video_id)
+            uploaded_youtube_types[row.id][video_id] = source_type
             youtube_video_ids_by_user.setdefault(user_id, set()).add(video_id)
     # Do not keep a database connection checked out while calling YouTube.
     # The remote request can take up to 30 seconds; holding the connection
@@ -497,6 +511,11 @@ def list_flight_summaries(
             ),
             has_youtube_video=bool(uploaded_youtube_ids[row.id] & existing_youtube_ids),
             youtube_video_count=len(uploaded_youtube_ids[row.id] & existing_youtube_ids),
+            youtube_video_types=[
+                uploaded_youtube_types[row.id][video_id]
+                for video_id in associated_youtube_ids[row.id]
+                if video_id in uploaded_youtube_ids[row.id] and video_id in existing_youtube_ids
+            ],
             youtube_upload_status=None,
             youtube_upload_progress=None,
             gopro_overlay_job_id=row.gopro_overlay_job_id,

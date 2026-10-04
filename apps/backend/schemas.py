@@ -849,6 +849,18 @@ class FlightSummary(BaseModel):
     has_camera: bool
     has_youtube_video: bool
     youtube_video_count: int
+    youtube_video_types: list[
+        Literal[
+            "gopro_overlay",
+            "camera",
+            "video",
+            "pano",
+            "face",
+            "pilote",
+            "highlight",
+            "youtube_overlay",
+        ]
+    ] = Field(default_factory=list)
     youtube_upload_status: str | None = None
     youtube_upload_progress: int | None = None
     gopro_overlay_job_id: str | None = None

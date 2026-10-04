@@ -116,6 +116,17 @@ export function Flight({
   );
   const youtubeVideoCountLabel =
     flight.youtube_video_count > 1 ? ` x${flight.youtube_video_count}` : '';
+  const youtubeVideoTypes = flight.youtube_video_types ?? [];
+  const youtubeTypeLabels: Record<string, string> = {
+    gopro_overlay: 'flights.goproOverlayBadge',
+    youtube_overlay: 'flights.goproOverlayBadge',
+    camera: 'flights.cameraBadge',
+    video: 'flights.videoBadge',
+    pano: 'flights.panoBadge',
+    face: 'flights.faceBadge',
+    pilote: 'flights.piloteBadge',
+    highlight: 'flights.highlightVideoBadge',
+  };
   const selectFlight = () => {
     if (!selectionMode) {
       onSelectFlight(flight);
@@ -246,14 +257,24 @@ export function Flight({
                   {t('flights.highlightVideoBadge')}
                 </span>
               )}
-              {(hasYoutubeVideo || isYoutubeUploadRunning) && (
+              {youtubeVideoTypes.map((sourceType, index) => (
+                <span
+                  key={`${sourceType}-${index}`}
+                  className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
+                >
+                  <Play className="h-3 w-3" aria-hidden="true" />
+                  {t(youtubeTypeLabels[sourceType] ?? 'flights.youtubeBadge')}
+                </span>
+              ))}
+              {((hasYoutubeVideo && youtubeVideoTypes.length === 0) ||
+                isYoutubeUploadRunning) && (
                 <span
                   aria-live={isYoutubeUploadRunning ? 'polite' : undefined}
                   className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
                 >
                   <Play className="h-3 w-3" aria-hidden="true" />
                   {youtubeLabel}
-                  {youtubeVideoCountLabel}
+                  {youtubeVideoTypes.length === 0 ? youtubeVideoCountLabel : ''}
                 </span>
               )}
               {isVideoExportRunning && (
