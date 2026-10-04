@@ -271,3 +271,31 @@ test('shows the number of available YouTube videos when there are several', () =
 
   expect(screen.getByText('flights.youtubeBadge x2')).toBeInTheDocument();
 });
+
+test('renders a YouTube badge for each available video in source order', () => {
+  render(
+    <Flight
+      flight={{
+        ...flight,
+        has_youtube_video: true,
+        youtube_video_count: 2,
+        youtube_video_types: ['face', 'pano'],
+      }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  const badges = [
+    screen.getByText('flights.faceBadge'),
+    screen.getByText('flights.panoBadge'),
+  ];
+
+  expect(badges[0].compareDocumentPosition(badges[1])).toBe(
+    Node.DOCUMENT_POSITION_FOLLOWING
+  );
+  expect(screen.queryByText('flights.youtubeBadge x2')).not.toBeInTheDocument();
+});

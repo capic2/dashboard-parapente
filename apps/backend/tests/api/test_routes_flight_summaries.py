@@ -7,7 +7,7 @@ from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 import config
-from flight_summaries import _directory_file_exists
+from flight_summaries import _completed_youtube_uploads, _directory_file_exists
 from models import Flight, GoproOverlayJob, HighlightVideoJob, YoutubeUploadJob
 
 API_URL = "/api/flights/summaries"
@@ -201,7 +201,8 @@ def test_summaries_only_report_completed_uploads_that_still_exist(client, db_ses
         flight_date=date(2026, 1, 1),
         youtube_urls_json=(
             '["https://www.youtube.com/watch?v=dQw4w9WgXcQ", '
-            '"https://www.youtube.com/watch?v=9bZkp7q19f0"]'
+            '"https://www.youtube.com/watch?v=9bZkp7q19f0", '
+            '"https://www.youtube.com/watch?v=aaaaaaaaaaa"]'
         ),
     )
     deleted = Flight(id="youtube-deleted", title="Deleted", flight_date=date(2026, 1, 2))
@@ -222,6 +223,7 @@ def test_summaries_only_report_completed_uploads_that_still_exist(client, db_ses
                 progress=100,
                 title="Uploaded",
                 description="",
+                source_type="face",
                 youtube_video_id="dQw4w9WgXcQ",
             ),
             YoutubeUploadJob(
@@ -252,7 +254,19 @@ def test_summaries_only_report_completed_uploads_that_still_exist(client, db_ses
                 progress=100,
                 title="Uploaded second",
                 description="",
+                source_type="pano",
                 youtube_video_id="9bZkp7q19f0",
+            ),
+            YoutubeUploadJob(
+                id="youtube-uploaded-unavailable-job",
+                flight_id=uploaded.id,
+                user_id=1,
+                status="completed",
+                progress=100,
+                title="Uploaded but unavailable",
+                description="",
+                source_type="pilote",
+                youtube_video_id="aaaaaaaaaaa",
             ),
         ]
     )
@@ -260,11 +274,12 @@ def test_summaries_only_report_completed_uploads_that_still_exist(client, db_ses
 
     with patch(
         "flight_summaries.existing_youtube_video_ids",
-        return_value={"aaaaaaaaaaa", "dQw4w9WgXcQ", "9bZkp7q19f0"},
+        return_value={"dQw4w9WgXcQ", "9bZkp7q19f0"},
     ) as verify_videos:
         response = client.get(API_URL)
     flags_by_id = {item["id"]: item["has_youtube_video"] for item in response.json()["flights"]}
     counts_by_id = {item["id"]: item["youtube_video_count"] for item in response.json()["flights"]}
+    types_by_id = {item["id"]: item["youtube_video_types"] for item in response.json()["flights"]}
 
     assert response.status_code == 200
     assert flags_by_id == {
@@ -277,7 +292,18 @@ def test_summaries_only_report_completed_uploads_that_still_exist(client, db_ses
         "youtube-manual": 0,
         "youtube-uploaded": 2,
     }
-    verify_videos.assert_called_once_with({1: {"dQw4w9WgXcQ", "9bZkp7q19f0"}})
+    assert types_by_id == {
+        "youtube-deleted": [],
+        "youtube-manual": [],
+        "youtube-uploaded": ["face", "pano"],
+    }
+    verify_videos.assert_called_once_with({1: {"dQw4w9WgXcQ", "9bZkp7q19f0", "aaaaaaaaaaa"}})
+
+
+def test_completed_youtube_uploads_default_missing_source_type() -> None:
+    assert _completed_youtube_uploads('[{"user_id": 1, "video_id": "dQw4w9WgXcQ"}]') == [
+        (1, "dQw4w9WgXcQ", "gopro_overlay")
+    ]
 
 
 def test_summaries_release_db_connection_before_remote_youtube_check(
