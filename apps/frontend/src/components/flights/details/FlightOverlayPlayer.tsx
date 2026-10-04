@@ -540,15 +540,16 @@ export function FlightOverlayPlayer({
   }, [cameraIsPlaying]);
 
   const playMedia = (video: HTMLVideoElement | null) => {
-    if (video) {
+    if (video?.paused) {
       // The overlay is muted, but browsers can still reject a secondary
       // play() call. The animation-frame synchronizer keeps it aligned then.
       void video.play().catch(() => undefined);
     }
   };
 
-  const playYoutubePips = () => {
+  const playPips = () => {
     youtubePipPlayersRef.current.forEach((player) => player.playVideo());
+    pipVideosRef.current.forEach(playMedia);
   };
 
   const handlePlay = () => {
@@ -556,9 +557,8 @@ export function FlightOverlayPlayer({
     setHasStartedMainPlayback(true);
     setCameraIsPlaying(true);
     syncMedia();
-    playYoutubePips();
+    playPips();
     playMedia(flightRef.current);
-    pipVideosRef.current.forEach(playMedia);
     playMedia(overlayRef.current);
   };
 
@@ -647,6 +647,7 @@ export function FlightOverlayPlayer({
             youtubePipPlayersRef.current.forEach((player) =>
               player.pauseVideo()
             );
+            pipVideosRef.current.forEach((video) => video.pause());
             setYoutubeReady(false);
             setYoutubeFailed(true);
           },
@@ -768,7 +769,8 @@ export function FlightOverlayPlayer({
         youtubeRef.current.pauseVideo();
       } else {
         playbackRequestedRef.current = true;
-        playYoutubePips();
+        syncMediaRef.current?.();
+        playPips();
         youtubeRef.current.playVideo();
       }
       return;
@@ -776,6 +778,8 @@ export function FlightOverlayPlayer({
     if (!cameraRef.current) return;
     if (cameraRef.current.paused) {
       playbackRequestedRef.current = true;
+      syncMediaRef.current?.();
+      playPips();
       void cameraRef.current.play();
     } else {
       playbackRequestedRef.current = false;
