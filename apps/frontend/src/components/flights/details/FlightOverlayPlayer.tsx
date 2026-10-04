@@ -1074,7 +1074,7 @@ export function FlightOverlayPlayer({
         {isInteractive && (
           <div
             data-testid="flight-overlay-controls"
-            className={`pointer-events-none absolute inset-x-0 bottom-0 z-40 max-h-full overflow-y-auto bg-gradient-to-t from-slate-950 via-slate-950/95 to-slate-950/0 px-3 pb-3 pt-12 text-white transition-opacity duration-200 sm:px-4 sm:pb-4 ${controlsVisible ? 'pointer-events-auto opacity-100' : 'opacity-0'}`}
+            className={`absolute inset-x-0 bottom-0 z-40 max-h-full overflow-y-auto bg-gradient-to-t from-slate-950 via-slate-950/95 to-slate-950/0 px-3 pb-3 pt-12 text-white transition-opacity duration-200 sm:px-4 sm:pb-4 ${controlsVisible ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`}
           >
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <button
