@@ -50,7 +50,7 @@ _PLAYLIST_ITEMS_URL = "https://www.googleapis.com/youtube/v3/playlistItems"
 _ACTIVE_STATUSES = {"queued", "uploading"}
 _CANCELLED_STATUS = "cancelled"
 _RANGE_PATTERN = re.compile(r"bytes=0-(\d+)")
-_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="youtube-upload")
+_EXECUTOR = ThreadPoolExecutor(max_workers=3, thread_name_prefix="youtube-upload")
 _SUBMITTED: set[str] = set()
 _SUBMITTED_LOCK = threading.Lock()
 _PREPARING_STATUS = "preparing"
@@ -651,16 +651,35 @@ def remove_youtube_video(
     db.commit()
 
 
-def active_job(db: Session, flight_id: str) -> YoutubeUploadJob | None:
-    return (
-        db.query(YoutubeUploadJob)
-        .filter(
-            YoutubeUploadJob.flight_id == flight_id,
-            YoutubeUploadJob.status.in_(_VISIBLE_ACTIVE_STATUSES),
-        )
-        .order_by(YoutubeUploadJob.created_at.desc())
-        .first()
+def upload_source_key(
+    source_type: str,
+    *,
+    gopro_overlay_job_id: str | None = None,
+    highlight_video_job_id: str | None = None,
+) -> str:
+    """Return the stable identity for one uploadable source within a flight."""
+    return f"{source_type}:{gopro_overlay_job_id or ''}:{highlight_video_job_id or ''}"
+
+
+def active_job(
+    db: Session,
+    flight_id: str,
+    *,
+    source_type: str | None = None,
+    gopro_overlay_job_id: str | None = None,
+    highlight_video_job_id: str | None = None,
+) -> YoutubeUploadJob | None:
+    query = db.query(YoutubeUploadJob).filter(
+        YoutubeUploadJob.flight_id == flight_id,
+        YoutubeUploadJob.status.in_(_VISIBLE_ACTIVE_STATUSES),
     )
+    if source_type is not None:
+        query = query.filter(YoutubeUploadJob.source_type == source_type)
+    if gopro_overlay_job_id is not None:
+        query = query.filter(YoutubeUploadJob.gopro_overlay_job_id == gopro_overlay_job_id)
+    if highlight_video_job_id is not None:
+        query = query.filter(YoutubeUploadJob.highlight_video_job_id == highlight_video_job_id)
+    return query.order_by(YoutubeUploadJob.created_at.desc()).first()
 
 
 def create_youtube_overlay_upload_job(
@@ -674,13 +693,23 @@ def create_youtube_overlay_upload_job(
     gopro_overlay_job_id: str | None = None,
 ) -> YoutubeUploadJob:
     """Create the upload job before the export so the UI can follow the full chain."""
-    if active_job(db, flight_id) is not None:
-        raise RuntimeError("A YouTube upload is already in progress")
+    source_key = upload_source_key("youtube_overlay", gopro_overlay_job_id=gopro_overlay_job_id)
+    if (
+        active_job(
+            db,
+            flight_id,
+            source_type="youtube_overlay",
+            gopro_overlay_job_id=gopro_overlay_job_id,
+        )
+        is not None
+    ):
+        raise RuntimeError("A YouTube upload for this source is already in progress")
     job = YoutubeUploadJob(
         id=str(uuid.uuid4()),
         flight_id=flight_id,
         user_id=user_id,
         source_type="youtube_overlay",
+        active_source_key=source_key,
         gopro_overlay_job_id=gopro_overlay_job_id,
         status=_PREPARING_STATUS,
         progress=0,
@@ -693,7 +722,7 @@ def create_youtube_overlay_upload_job(
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise RuntimeError("A YouTube upload is already in progress") from exc
+        raise RuntimeError("A YouTube upload for this source is already in progress") from exc
     db.refresh(job)
     return job
 
