@@ -215,7 +215,7 @@ export function Flight({
           <h3 className={`truncate text-sm font-semibold ${titleColor}`}>
             {flight.title || t('flights.untitledFlight')}
           </h3>
-          {!selectionMode && hasMediaStatus && (
+          {hasMediaStatus && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {hasGpx && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
