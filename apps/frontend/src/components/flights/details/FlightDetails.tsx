@@ -74,22 +74,26 @@ import { GoproOverlayJobStack } from './GoproOverlayJobStack';
 import { FlightOverlayWorkspace } from './FlightOverlayWorkspace';
 import { FlightTelemetryInteractivePreview } from './FlightTelemetryInteractivePreview';
 import { flightQueryOptions } from '../../../hooks/flights/useFlight';
+import type { FlightDetailsTab } from '../../../routes/-flightSearch';
 
 interface FlightDetailsProps {
   flight: Flight;
   sites: Site[];
   onShowCreateSiteModal: () => void;
+  activeTab?: FlightDetailsTab;
+  onActiveTabChange?: (tab: FlightDetailsTab) => void;
   mobileMode?: boolean;
   onCloseMobile?: () => void;
 }
 
-type FlightDetailsTab = 'infos' | 'replay' | 'logs';
 type GoproOverlayOutputResolution = '1080p' | '4k';
 
 export function FlightDetails({
   flight,
   sites,
   onShowCreateSiteModal,
+  activeTab: controlledActiveTab,
+  onActiveTabChange,
   mobileMode = false,
   onCloseMobile,
 }: FlightDetailsProps) {
@@ -115,7 +119,13 @@ export function FlightDetails({
   const [editingMode, setEditingMode] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesText, setNotesText] = useState(flight.notes ?? '');
-  const [activeTab, setActiveTab] = useState<FlightDetailsTab>('infos');
+  const [localActiveTab, setLocalActiveTab] =
+    useState<FlightDetailsTab>('infos');
+  const activeTab = controlledActiveTab ?? localActiveTab;
+  const setActiveTab = (tab: FlightDetailsTab) => {
+    if (controlledActiveTab === undefined) setLocalActiveTab(tab);
+    onActiveTabChange?.(tab);
+  };
   const [isReplayExpanded, setIsReplayExpanded] = useState(false);
   const [isOverlayWorkspaceExpanded, setIsOverlayWorkspaceExpanded] = useState(
     !hasSavedOverlaySynchronization
