@@ -5,7 +5,8 @@
     "apps/frontend/.storybook/main.ts",
     "apps/frontend/vitest.shims.d.ts",
     "libs/design-system/.storybook/main.ts",
-    ".agents/skills/**/scripts/**"
+    ".agents/skills/**/scripts/**",
+    ".github/skills/**/scripts/**"
   ],
   "ignoreBinaries": ["eslint", ".venv/bin/ruff", ".venv/bin/black"],
   "ignoreDependencies": [
