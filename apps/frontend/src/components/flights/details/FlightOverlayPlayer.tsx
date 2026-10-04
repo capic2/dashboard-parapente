@@ -427,7 +427,7 @@ export function FlightOverlayPlayer({
     if (overlay && Math.abs(overlay.currentTime - overlayTime) > 0.08) {
       overlay.currentTime = clamp(overlayTime, overlay.duration);
     }
-    if ((!camera || !camera.paused) && overlay?.paused) {
+    if (cameraIsPlaying && overlay?.paused) {
       // The camera is the master clock. Browsers can leave a secondary muted
       // WebM paused when it finishes loading or after a seek, so retry it on
       // the next synchronization tick instead of letting the layer freeze.
@@ -764,7 +764,8 @@ export function FlightOverlayPlayer({
             className={masterMediaClassName}
             style={masterMediaStyle}
             onClick={() => {
-              if (layout === 'flight-main') setLayout('camera-main');
+              if (isInteractive) handleTogglePlay();
+              else if (layout === 'flight-main') setLayout('camera-main');
             }}
             aria-label={cameraLabel}
           >
