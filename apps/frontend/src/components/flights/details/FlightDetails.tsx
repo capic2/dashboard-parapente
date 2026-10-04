@@ -333,6 +333,7 @@ export function FlightDetails({
   const handleAddVideoMarker = async (
     marker: Omit<FlightVideoMarker, 'id'>
   ) => {
+    if (isSavingVideoMarkers) return;
     const requestedFlightId = flight.id;
     const queryOptions = flightQueryOptions(requestedFlightId);
     const latestFlight =
@@ -1169,8 +1170,10 @@ export function FlightDetails({
             manualOffsetSeconds={Number(goproOverlayPreviewOffset)}
             youtubeUrls={flight.youtube_urls ?? []}
             videoMarkers={flight.video_markers ?? []}
-            onAddVideoMarker={handleAddVideoMarker}
-            isSavingVideoMarker={updateFlight.isPending}
+            onAddVideoMarker={
+              isSavingVideoMarkers ? undefined : handleAddVideoMarker
+            }
+            isSavingVideoMarker={updateFlight.isPending || isSavingVideoMarkers}
           />
         )}
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
