@@ -7,6 +7,9 @@ import App from './App';
 import './App.css';
 import { initTheme } from './stores/themeStore';
 import { appTitle } from './lib/appEnvironment';
+import { registerPreloadErrorRecovery } from './lib/preloadErrorRecovery';
+
+registerPreloadErrorRecovery();
 
 document.title = appTitle;
 

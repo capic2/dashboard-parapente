@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -8,6 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text as sa_text
+from starlette.middleware.base import RequestResponseEndpoint
+from starlette.requests import Request
+from starlette.responses import Response
 
 # Import configuration (loads environment variables automatically)
 import config
@@ -435,9 +439,7 @@ async def lifespan(app: FastAPI):
         start_gopro_overlay_worker()
         start_preview_scanner()
         if not is_rq_enabled():
-            enqueue_pending_youtube_uploads(
-                recover_active=config.BACKGROUND_JOB_RECOVERY_ENABLED
-            )
+            enqueue_pending_youtube_uploads(recover_active=config.BACKGROUND_JOB_RECOVERY_ENABLED)
 
     yield
 
@@ -461,6 +463,29 @@ app = FastAPI(
     version="0.2.0",
     lifespan=lifespan,
 )
+
+_HASHED_FRONTEND_ASSET = re.compile(r"-[A-Za-z0-9_-]{8,}\.[^/]+$")
+
+
+def _set_frontend_cache_headers(path: str, response: Response) -> None:
+    if response.status_code != 200:
+        return
+
+    content_type = response.headers.get("content-type", "")
+    if content_type.startswith("text/html"):
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    elif path.startswith(("/assets/", "/staging/assets/")) and _HASHED_FRONTEND_ASSET.search(path):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+
+
+@app.middleware("http")
+async def set_frontend_cache_headers(
+    request: Request, call_next: RequestResponseEndpoint
+) -> Response:
+    response = await call_next(request)
+    _set_frontend_cache_headers(request.url.path, response)
+    return response
+
 
 setup_metrics(app)
 
