@@ -420,11 +420,11 @@ function WeatherSourcesTab() {
                 {stats.global_success_rate.toFixed(0)}%
               </div>
             </div>
-            <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-              <div className="text-xs text-purple-600 dark:text-purple-400 font-semibold mb-1">
+            <div className="p-3 bg-sky-50 dark:bg-sky-900/20 rounded-lg">
+              <div className="text-xs text-sky-600 dark:text-sky-400 font-semibold mb-1">
                 {t('settings.weatherSources.avgTime')}
               </div>
-              <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+              <div className="text-2xl font-bold text-sky-900 dark:text-sky-100">
                 {stats.global_avg_response_time_ms
                   ? `${stats.global_avg_response_time_ms}ms`
                   : '-'}
