@@ -257,6 +257,7 @@ from youtube_upload import (
     remove_youtube_video,
     store_download_cookies as store_youtube_download_cookies,
     migrate_flight_playlists,
+    upload_source_key as youtube_upload_source_key,
     youtube_video_availability,
     youtube_video_associations,
 )
@@ -1722,15 +1723,30 @@ def start_flight_youtube_upload(
             if completed_job.youtube_url is not None
         }
         flight.youtube_urls = [url for url in flight.youtube_urls if url not in deleted_urls]
-    existing_job = active_youtube_upload_job(db, flight_id)
+    source_key = youtube_upload_source_key(
+        payload.source_type,
+        gopro_overlay_job_id=overlay.id if overlay is not None else None,
+        highlight_video_job_id=highlight.id if highlight is not None else None,
+    )
+    existing_job = active_youtube_upload_job(
+        db,
+        flight_id,
+        source_type=payload.source_type,
+        gopro_overlay_job_id=overlay.id if overlay is not None else None,
+        highlight_video_job_id=highlight.id if highlight is not None else None,
+    )
     if existing_job is not None:
-        raise HTTPException(status_code=409, detail="A YouTube upload is already in progress")
+        raise HTTPException(
+            status_code=409,
+            detail="A YouTube upload for this source is already in progress",
+        )
 
     job = YoutubeUploadJob(
         id=str(uuid.uuid4()),
         flight_id=flight.id,
         user_id=user.id,
         source_type=payload.source_type,
+        active_source_key=source_key,
         gopro_overlay_job_id=overlay.id if overlay is not None else None,
         highlight_video_job_id=highlight.id if highlight is not None else None,
         status="queued",
@@ -1745,7 +1761,8 @@ def start_flight_youtube_upload(
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
-            status_code=409, detail="A YouTube upload is already in progress"
+            status_code=409,
+            detail="A YouTube upload for this source is already in progress",
         ) from exc
     db.refresh(job)
     response_payload = youtube_upload_job_payload(job)
@@ -1771,12 +1788,23 @@ def start_flight_youtube_upload(
 )
 def cancel_flight_youtube_upload(
     flight_id: str,
+    job_id: str | None = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     if db.get(Flight, flight_id) is None:
         raise HTTPException(status_code=404, detail="Flight not found")
-    job = active_youtube_upload_job(db, flight_id)
+    job = (
+        db.query(YoutubeUploadJob)
+        .filter(
+            YoutubeUploadJob.id == job_id,
+            YoutubeUploadJob.flight_id == flight_id,
+            YoutubeUploadJob.status.in_({"preparing", "queued", "uploading"}),
+        )
+        .first()
+        if job_id
+        else active_youtube_upload_job(db, flight_id)
+    )
     if job is None or job.user_id != user.id:
         raise HTTPException(status_code=409, detail="No YouTube upload is in progress")
     cancelled_job = cancel_youtube_upload(db, job_id=job.id, user_id=user.id)
@@ -8189,9 +8217,17 @@ def create_youtube_overlay_export(
         raise HTTPException(status_code=503, detail="YouTube upload is not configured")
     if not is_youtube_connected(db, user.id):
         raise HTTPException(status_code=409, detail="Connect YouTube before exporting")
-    if active_youtube_upload_job(db, flight.id) is not None:
-        raise HTTPException(status_code=409, detail="A YouTube upload is already in progress")
     overlay_job = _require_saved_gopro_overlay(flight)
+    if (
+        active_youtube_upload_job(
+            db,
+            flight.id,
+            source_type="youtube_overlay",
+            gopro_overlay_job_id=overlay_job.id,
+        )
+        is not None
+    ):
+        raise HTTPException(status_code=409, detail="A YouTube upload is already in progress")
     offset = _require_gopro_overlay_offset(flight)
     try:
         job_id = start_youtube_overlay_export(
