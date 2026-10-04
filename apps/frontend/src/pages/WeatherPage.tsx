@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { RefreshCw } from 'lucide-react';
+import { ChevronRight, RefreshCw } from 'lucide-react';
 import CurrentConditions from '../components/weather/CurrentConditions';
 import Forecast7Day from '../components/weather/Forecast7Day';
 import HourlyForecast from '../components/weather/HourlyForecast';
@@ -677,9 +677,7 @@ export default function WeatherPage() {
         activeWeatherName={activeWeatherName}
         selectedDayLabel={selectedDayLabel}
         sourceLabel={sourceLabel}
-        selectedSiteId={selectedSiteId}
         isSearchMode={Boolean(selectedSearchTarget)}
-        isAuthenticated={isAuthenticated}
         stickySelectionBar={stickySelectionBar}
         forecastPanel={forecastDaySelector}
         bestSpotSuggestion={bestSpotSuggestion}
@@ -703,10 +701,6 @@ export default function WeatherPage() {
 
       <div className="min-w-0 space-y-4">
         {forceRefreshControl}
-
-        {forecastDaySelector}
-
-        {bestSpotSuggestion}
 
         {!currentLocation.isLoading &&
           !selectedSearchTarget &&
@@ -758,24 +752,44 @@ export default function WeatherPage() {
           />
         )}
 
+        {forecastDaySelector}
+
         {!selectedSearchTarget && selectedSiteId && (
           <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:[&>*]:min-w-0 lg:[&>*]:flex-1">
             <WeatherLiveWindPanel
               latitude={selectedSite?.latitude}
               longitude={selectedSite?.longitude}
             />
-
-            {/* Landing Sites Weather */}
-            <WeatherMultiLanding
-              spotId={selectedSiteId}
-              dayIndex={selectedDayIndex}
-            />
           </div>
         )}
 
-        {/* Emagram Analysis (authenticated only) */}
-        {isAuthenticated && !selectedSearchTarget && selectedSiteId && (
-          <EmagramWidget siteId={selectedSiteId} dayIndex={selectedDayIndex} />
+        {!selectedSearchTarget && selectedSiteId && (
+          <details className="group rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-bold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-white">
+              <span>
+                <span className="block">{t('weather.page.advancedTitle')}</span>
+                <span className="mt-0.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                  {t('weather.page.advancedSummary')}
+                </span>
+              </span>
+              <ChevronRight
+                aria-hidden="true"
+                className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-90"
+              />
+            </summary>
+            <div className="space-y-4 border-t border-slate-200 p-3 dark:border-slate-700">
+              <WeatherMultiLanding
+                spotId={selectedSiteId}
+                dayIndex={selectedDayIndex}
+              />
+              {isAuthenticated && (
+                <EmagramWidget
+                  siteId={selectedSiteId}
+                  dayIndex={selectedDayIndex}
+                />
+              )}
+            </div>
+          </details>
         )}
 
         {/* Hourly Forecast */}
@@ -800,6 +814,24 @@ export default function WeatherPage() {
             thermalCeilingByHour={thermalCeilingByHour}
           />
         )}
+
+        <details className="group rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-bold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-white">
+            <span>
+              <span className="block">{t('weather.page.otherSitesTitle')}</span>
+              <span className="mt-0.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                {t('weather.page.otherSitesSummary')}
+              </span>
+            </span>
+            <ChevronRight
+              aria-hidden="true"
+              className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-90"
+            />
+          </summary>
+          <div className="border-t border-slate-200 p-3 dark:border-slate-700">
+            {bestSpotSuggestion}
+          </div>
+        </details>
       </div>
     </div>
   );
