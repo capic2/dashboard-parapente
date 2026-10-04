@@ -47,15 +47,6 @@ export interface WeatherSourceUpdate {
   documentation_url?: string | null;
 }
 
-export interface WeatherSourceStats {
-  total_sources: number;
-  active_sources: number;
-  disabled_sources: number;
-  sources_with_errors: number;
-  global_success_rate: number;
-  global_avg_response_time_ms: number | null;
-}
-
 export interface WeatherSourceTestResult {
   success: boolean;
   response_time_ms: number;

@@ -9,7 +9,6 @@ import { getStaleTime } from '../../lib/cacheConfig';
 import type {
   WeatherSource,
   WeatherSourceUpdate,
-  WeatherSourceStats,
   WeatherSourceTestResult,
 } from '../../types/weatherSources';
 
@@ -25,19 +24,6 @@ export const useWeatherSources = (enabledOnly = false) => {
       return await api.get(`weather-sources${params}`).json<WeatherSource[]>();
     },
     staleTime: getStaleTime(30000), // 30 seconds
-  });
-};
-
-/**
- * Fetch global weather source statistics
- */
-export const useWeatherSourceStats = () => {
-  return useQuery({
-    queryKey: ['weather-sources', 'stats'],
-    queryFn: async () => {
-      return await api.get('weather-sources/stats').json<WeatherSourceStats>();
-    },
-    staleTime: getStaleTime(30000),
   });
 };
 

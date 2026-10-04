@@ -152,9 +152,17 @@ const mockUnknownSource: WeatherSource = {
   updated_at: '2025-06-15T10:00:00.000Z',
 };
 
+const mockTestLocation = {
+  id: 'site-arguel',
+  name: 'Arguel',
+  latitude: 47.2,
+  longitude: 6.0,
+};
+
 const meta = preview.meta({
   title: 'Components/WeatherSourceCard',
   component: WeatherSourceCard,
+  args: { testLocation: mockTestLocation },
   parameters: {
     layout: 'centered',
     docs: {
@@ -180,6 +188,9 @@ const meta = preview.meta({
       control: 'boolean',
       description:
         'Whether this is the last active source (prevents disabling)',
+    },
+    testLocation: {
+      description: 'Site used when checking whether the source responds',
     },
     onDelete: {
       action: 'delete-clicked',
@@ -214,6 +225,9 @@ Default.test('It calls the onDelete function', async ({ canvasElement }) => {
   const canvas = within(canvasElement);
   await userEvent.click(
     canvas.getByRole('button', { name: 'Supprimer la source Open-Meteo' })
+  );
+  await userEvent.click(
+    canvas.getByRole('button', { name: 'Supprimer la source' })
   );
 });
 Default.test('It calls the test endpoint api', async ({ canvasElement }) => {
@@ -609,12 +623,36 @@ export const AllSourceTypes = meta.story({
   name: 'All Source Types',
   render: () => (
     <div className="flex flex-col gap-4 p-4" style={{ width: '500px' }}>
-      <WeatherSourceCard source={mockOpenMeteo} isLastActive={false} />
-      <WeatherSourceCard source={mockWeatherAPI} isLastActive={false} />
-      <WeatherSourceCard source={mockMeteoParapente} isLastActive={false} />
-      <WeatherSourceCard source={mockDisabledSource} isLastActive={false} />
-      <WeatherSourceCard source={mockErrorSource} isLastActive={false} />
-      <WeatherSourceCard source={mockUnknownSource} isLastActive={false} />
+      <WeatherSourceCard
+        source={mockOpenMeteo}
+        testLocation={mockTestLocation}
+        isLastActive={false}
+      />
+      <WeatherSourceCard
+        source={mockWeatherAPI}
+        testLocation={mockTestLocation}
+        isLastActive={false}
+      />
+      <WeatherSourceCard
+        source={mockMeteoParapente}
+        testLocation={mockTestLocation}
+        isLastActive={false}
+      />
+      <WeatherSourceCard
+        source={mockDisabledSource}
+        testLocation={mockTestLocation}
+        isLastActive={false}
+      />
+      <WeatherSourceCard
+        source={mockErrorSource}
+        testLocation={mockTestLocation}
+        isLastActive={false}
+      />
+      <WeatherSourceCard
+        source={mockUnknownSource}
+        testLocation={mockTestLocation}
+        isLastActive={false}
+      />
     </div>
   ),
   parameters: {

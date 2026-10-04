@@ -1,7 +1,7 @@
 import { Suspense, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from '@tanstack/react-router';
-import { useSuspenseQuery } from '@tanstack/react-query';
+import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import {
   Button,
   Tab,
@@ -12,10 +12,12 @@ import {
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import {
   useWeatherSources,
-  useWeatherSourceStats,
   useDeleteWeatherSource,
 } from '../hooks/weather/useWeatherSources';
-import { WeatherSourceCard } from '../components/settings/WeatherSourceCard';
+import {
+  WeatherSourceCard,
+  type WeatherTestLocation,
+} from '../components/settings/WeatherSourceCard';
 import { SportstrackliveSettingsCard } from '../components/settings/SportstrackliveSettingsCard';
 import type { WeatherSource } from '../types/weatherSources';
 import {
@@ -34,22 +36,6 @@ import {
 } from '../hooks/settings/useAppSettings';
 import { getSiteDisplayName } from '../lib/siteDisplay';
 import { Route, settingsTabs, type SettingsTabKey } from '../routes/settings';
-
-// Site interface as returned by API
-interface ApiSite {
-  id: string;
-  name: string;
-  region?: string | null;
-  latitude?: number;
-  longitude?: number;
-  elevation_m?: number;
-  description?: string;
-  orientation?: string;
-  difficulty_level?: string;
-  is_active?: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
 
 type SettingsIconName =
   | 'bell'
@@ -185,7 +171,7 @@ function SitesTab({
         </p>
       ) : (
         <div className="space-y-3">
-          {(sites as unknown as ApiSite[]).map((site: ApiSite) => (
+          {sites.map((site) => (
             <div
               key={site.id}
               className={`flex flex-col gap-3 rounded-xl border p-4 transition-colors sm:flex-row sm:items-center sm:justify-between ${
@@ -239,32 +225,51 @@ function SitesTab({
 function WeatherSourcesTab() {
   const { t } = useTranslation();
   const { data: sources = [], isLoading, error } = useWeatherSources();
-  const { data: stats } = useWeatherSourceStats();
   const deleteSource = useDeleteWeatherSource();
+  const {
+    data: sites = [],
+    isLoading: areSitesLoading,
+    isError: sitesFailedToLoad,
+  } = useQuery(sitesQueryOptions());
+  const favoriteSiteIds = useAppSettingsStore(
+    (state) => state.settings.favoriteSites
+  );
+  const [selectedTestSiteId, setSelectedTestSiteId] = useState('');
+  const [deleteSuccess, setDeleteSuccess] = useState<string | null>(null);
+
+  const testableSites = sites
+    .filter(
+      (site) =>
+        Number.isFinite(site.latitude) && Number.isFinite(site.longitude)
+    )
+    .sort(
+      (left, right) =>
+        Number(favoriteSiteIds.includes(right.id)) -
+        Number(favoriteSiteIds.includes(left.id))
+    );
+  const preferredTestSite =
+    testableSites.find((site) => favoriteSiteIds.includes(site.id)) ??
+    testableSites[0];
+  const selectedTestSite =
+    testableSites.find((site) => site.id === selectedTestSiteId) ??
+    preferredTestSite;
+  const testLocation: WeatherTestLocation | null = selectedTestSite
+    ? {
+        id: selectedTestSite.id,
+        name: getSiteDisplayName(selectedTestSite),
+        latitude: selectedTestSite.latitude,
+        longitude: selectedTestSite.longitude,
+      }
+    : null;
 
   const handleDelete = async (source: WeatherSource) => {
-    if (
-      !confirm(
-        t('settings.weatherSources.deleteConfirm', {
-          name: source.display_name,
-        })
-      )
-    ) {
-      return;
-    }
-
-    try {
-      await deleteSource.mutateAsync(source.source_name);
-      alert(
-        t('settings.weatherSources.deleteSuccess', {
-          name: source.display_name,
-        })
-      );
-    } catch (error: unknown) {
-      const errorMessage =
-        (error as Error)?.message || t('settings.weatherSources.deleteError');
-      alert(errorMessage);
-    }
+    setDeleteSuccess(null);
+    await deleteSource.mutateAsync(source.source_name);
+    setDeleteSuccess(
+      t('settings.weatherSources.deleteSuccess', {
+        name: source.display_name,
+      })
+    );
   };
 
   // Count active sources
@@ -288,55 +293,74 @@ function WeatherSourcesTab() {
 
   return (
     <div className="space-y-4">
-      {/* Header with stats */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-        <div className="mb-2 flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white">
+      <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white">
           <SettingsIcon name="weather" />
           <h2>{t('settings.weatherSources.title')}</h2>
         </div>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
           {t('settings.weatherSources.description')}
         </p>
+        <p className="mt-3 text-sm font-medium text-gray-800 dark:text-gray-200">
+          {t('settings.weatherSources.sourceCountSummary', {
+            active: activeSources.length,
+            total: sources.length,
+          })}
+        </p>
 
-        {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-              <div className="text-xs text-blue-600 dark:text-blue-400 font-semibold mb-1">
-                {t('settings.weatherSources.activeSources')}
-              </div>
-              <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                {stats.active_sources}/{stats.total_sources}
-              </div>
-            </div>
-            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-              <div className="text-xs text-green-600 dark:text-green-400 font-semibold mb-1">
-                {t('settings.weatherSources.globalSuccessRate')}
-              </div>
-              <div className="text-2xl font-bold text-green-900 dark:text-green-100">
-                {stats.global_success_rate.toFixed(0)}%
-              </div>
-            </div>
-            <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-              <div className="text-xs text-purple-600 dark:text-purple-400 font-semibold mb-1">
-                {t('settings.weatherSources.avgTime')}
-              </div>
-              <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-                {stats.global_avg_response_time_ms
-                  ? `${stats.global_avg_response_time_ms}ms`
-                  : '-'}
-              </div>
-            </div>
-            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-              <div className="text-xs text-red-600 dark:text-red-400 font-semibold mb-1">
-                {t('settings.weatherSources.sourcesWithErrors')}
-              </div>
-              <div className="text-2xl font-bold text-red-900 dark:text-red-100">
-                {stats.sources_with_errors}
-              </div>
-            </div>
-          </div>
-        )}
+        <div className="mt-4 max-w-xl">
+          <label
+            htmlFor="weather-test-site"
+            className="block text-sm font-semibold text-gray-800 dark:text-gray-200"
+          >
+            {t('settings.weatherSources.testLocation')}
+          </label>
+          <select
+            id="weather-test-site"
+            value={testLocation?.id ?? ''}
+            onChange={(event) => setSelectedTestSiteId(event.target.value)}
+            disabled={areSitesLoading || testableSites.length === 0}
+            aria-describedby="weather-test-site-help"
+            className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+          >
+            {testableSites.length === 0 && (
+              <option value="">
+                {areSitesLoading
+                  ? t('common.loading')
+                  : t(
+                      sitesFailedToLoad
+                        ? 'settings.weatherSources.testLocationsLoadError'
+                        : 'settings.weatherSources.noTestLocation'
+                    )}
+              </option>
+            )}
+            {testableSites.map((site) => (
+              <option key={site.id} value={site.id}>
+                {getSiteDisplayName(site)}
+                {favoriteSiteIds.includes(site.id)
+                  ? ` · ${t('settings.favorites.favorite')}`
+                  : ''}
+              </option>
+            ))}
+          </select>
+          <p
+            id="weather-test-site-help"
+            className="mt-1 text-xs leading-5 text-gray-600 dark:text-gray-300"
+          >
+            {t('settings.weatherSources.testLocationHelp')}
+          </p>
+        </div>
       </div>
+
+      {deleteSuccess && (
+        <output
+          className="block rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-200"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {deleteSuccess}
+        </output>
+      )}
 
       {/* Sources Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -344,6 +368,7 @@ function WeatherSourcesTab() {
           <WeatherSourceCard
             key={source.id}
             source={source}
+            testLocation={testLocation}
             isLastActive={activeSources.length === 1 && source.is_enabled}
             onDelete={handleDelete}
           />
@@ -355,35 +380,6 @@ function WeatherSourcesTab() {
           {t('settings.weatherSources.noSources')}
         </div>
       )}
-
-      {/* Info Box */}
-      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
-        <h3 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
-          {t('settings.weatherSources.aboutTitle')}
-        </h3>
-        <ul className="text-sm text-yellow-800 dark:text-yellow-200 space-y-1">
-          <li>
-            • <strong>Open-Meteo</strong>:{' '}
-            {t('settings.weatherSources.openMeteoDesc')}
-          </li>
-          <li>
-            • <strong>WeatherAPI</strong>:{' '}
-            {t('settings.weatherSources.weatherApiDesc')}
-          </li>
-          <li>
-            • <strong>Météo Parapente</strong>:{' '}
-            {t('settings.weatherSources.meteoParaglideDesc')}
-          </li>
-          <li>
-            • <strong>Météociel</strong>:{' '}
-            {t('settings.weatherSources.meteocielDesc')}
-          </li>
-          <li>
-            • <strong>Meteoblue</strong>:{' '}
-            {t('settings.weatherSources.meteoblueDesc')}
-          </li>
-        </ul>
-      </div>
     </div>
   );
 }
