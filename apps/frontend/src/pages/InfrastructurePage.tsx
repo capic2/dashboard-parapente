@@ -854,12 +854,12 @@ function InfrastructureOverview() {
         />
         <InfrastructureStatCard
           label={t('infrastructure.tabs.videoExports')}
-          value={t('infrastructure.videoExports.ready', 'File')}
+          value={t('infrastructure.videoExports.overview', 'Suivi')}
           detail={t(
             'infrastructure.videoExports.description',
             'Suivi des exports et nettoyage des fichiers temporaires.'
           )}
-          tone="amber"
+          tone="gray"
         />
         <InfrastructureStatCard
           label={t('cache.totalKeys')}
@@ -938,7 +938,7 @@ export default function InfrastructurePage() {
     <div className="py-4 space-y-8">
       <DeploymentStatusBanner />
 
-      <InfrastructureOverview />
+      {activeTab !== 'video-exports' && <InfrastructureOverview />}
 
       <Tabs
         className="space-y-4"
@@ -958,14 +958,7 @@ export default function InfrastructurePage() {
               </span>
             </span>
           </Tab>
-          <Tab id="video-exports">
-            <span className="flex items-center justify-center gap-2">
-              {t('infrastructure.tabs.videoExports')}
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                {t('infrastructure.videoExports.ready', 'File')}
-              </span>
-            </span>
-          </Tab>
+          <Tab id="video-exports">{t('infrastructure.tabs.videoExports')}</Tab>
           <Tab id="cache">
             <span className="flex items-center justify-center gap-2">
               {t('infrastructure.tabs.cache')}

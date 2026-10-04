@@ -125,8 +125,8 @@
       "youtubeUpload": "YouTube upload"
     },
     "method": {
-      "cpu": "CPU",
-      "gpu": "GPU"
+      "cpu": "CPU (processor)",
+      "gpu": "GPU (graphics card)"
     },
     "table": {
       "method": "Method",
@@ -136,9 +136,19 @@
       "type": "Type",
       "progress": "Progress",
       "lastActivity": "Last activity",
-      "frames": "Frames",
-      "fps": "Frames per second",
-      "eta": "Time remaining"
+      "frames": "Frames processed",
+      "fps": "Speed (frames/s)",
+      "fpsUnit": "frames/s",
+      "eta": "Time remaining",
+      "details": "Details",
+      "technicalDetails": "Technical details"
+    },
+    "gpu": {
+      "unavailable": "NVIDIA acceleration not detected",
+      "checking": "Checking NVIDIA acceleration…",
+      "available": "NVIDIA acceleration available",
+      "live": "updated automatically",
+      "description": "This status describes NVIDIA acceleration availability. CPU processing remains available."
     },
     "resumeSuccess": "Generation resumed",
     "resumeError": "Unable to resume generation",
@@ -1847,7 +1857,7 @@
       "cache": "Redis Cache"
     },
     "videoExports": {
-      "ready": "Queue",
+      "overview": "Overview",
       "description": "Track exports and clean up temporary files."
     },
     "intervals": {

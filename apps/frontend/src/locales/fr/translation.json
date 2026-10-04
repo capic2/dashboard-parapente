@@ -125,8 +125,8 @@
       "youtubeUpload": "Upload YouTube"
     },
     "method": {
-      "cpu": "CPU",
-      "gpu": "GPU"
+      "cpu": "Processeur (CPU)",
+      "gpu": "Carte graphique (GPU)"
     },
     "table": {
       "method": "Méthode",
@@ -136,9 +136,19 @@
       "type": "Type",
       "progress": "Progression",
       "lastActivity": "Dernière activité",
-      "frames": "Images",
-      "fps": "Images par seconde",
-      "eta": "Temps restant"
+      "frames": "Images traitées",
+      "fps": "Vitesse (images/s)",
+      "fpsUnit": "images/s",
+      "eta": "Temps restant",
+      "details": "Détails",
+      "technicalDetails": "Détails techniques"
+    },
+    "gpu": {
+      "unavailable": "Accélération NVIDIA non détectée",
+      "checking": "Vérification de l’accélération NVIDIA…",
+      "available": "Accélération NVIDIA disponible",
+      "live": "mis à jour automatiquement",
+      "description": "Ce statut décrit la disponibilité de l’accélération NVIDIA. Le mode CPU reste disponible."
     },
     "resumeSuccess": "Génération relancée",
     "resumeError": "Impossible de relancer la génération",
@@ -1852,7 +1862,7 @@
       "cache": "Cache Redis"
     },
     "videoExports": {
-      "ready": "File",
+      "overview": "Suivi",
       "description": "Suivez les exports et nettoyez les fichiers temporaires."
     },
     "intervals": {
