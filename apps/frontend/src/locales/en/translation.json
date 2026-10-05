@@ -78,6 +78,14 @@
     "viewWhatsNew": "See what's new",
     "refresh": "Refresh"
   },
+  "versionInfo": {
+    "badge": "Version {{version}}",
+    "title": "Version {{version}}",
+    "buildDetails": "Deployed {{date}} · build {{number}}",
+    "viewReleaseNotes": "View release summary",
+    "noReleaseNotes": "No release summary is available for this version.",
+    "close": "Close"
+  },
   "videoJobs": {
     "title": "Video generations",
     "activeCount_one": "{{count}} generation running",
