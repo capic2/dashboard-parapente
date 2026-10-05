@@ -178,6 +178,80 @@ describe('FlightTelemetryInteractivePreview', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('falls back to an available YouTube video and keeps telemetry visible', () => {
+    const availableUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+    hooks.youtubeAssociations = [
+      { url: availableUrl, title: 'Vol du 02/10/2026 - face' },
+    ];
+    hooks.overlayPreview.data = {
+      video: { preview_segments: [] },
+      alignment: { automatic_offset_seconds: 0, manual_offset_seconds: 0 },
+      gpx: { coordinates: [] },
+    } as unknown as GoproOverlayPreview;
+    hooks.overlayPreview.isPending = false;
+    hooks.overlayPreview.isSuccess = true;
+    hooks.telemetry.data = {
+      points: [
+        {
+          timestamp: 0,
+          lat: 0,
+          lon: 0,
+          elevation: 0,
+          segment: 0,
+        },
+      ],
+      source: 'gpx',
+      has_osv: false,
+      enrichment_status: 'ready',
+      start_time: null,
+      end_time: null,
+      duration_seconds: 0,
+    } as FlightTelemetryData;
+    hooks.telemetry.isPending = false;
+    hooks.telemetry.isSuccess = true;
+    hooks.layout.data = {
+      layout: Object.assign([], { mainVideoSource: 'youtube:vol' }),
+    };
+    hooks.layout.isPending = false;
+    hooks.layout.isSuccess = true;
+    const onCurrentYoutubePositionChange = vi.fn();
+
+    render(
+      <FlightTelemetryInteractivePreview
+        flightId="flight-1"
+        youtubeUrls={[availableUrl]}
+        onCurrentYoutubePositionChange={onCurrentYoutubePositionChange}
+      />
+    );
+
+    expect(screen.getByTestId('player-youtube-main')).toHaveAttribute(
+      'data-url',
+      availableUrl
+    );
+    expect(screen.getByTestId('telemetry-overlay')).toBeInTheDocument();
+    expect(
+      screen.queryByText('telemetryLayout.mainVideoUnavailable')
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('overlay-player'));
+    expect(onCurrentYoutubePositionChange).toHaveBeenCalledWith({
+      videoId: 'dQw4w9WgXcQ',
+      seconds: 180,
+    });
+
+    hooks.overlayPreview.data = undefined;
+    hooks.overlayPreview.isPending = true;
+    hooks.overlayPreview.isSuccess = false;
+    hooks.overlayPreview.isError = false;
+    hooks.telemetry.data = undefined;
+    hooks.telemetry.isPending = true;
+    hooks.telemetry.isSuccess = false;
+    hooks.telemetry.isError = false;
+    hooks.layout.data = undefined;
+    hooks.layout.isPending = true;
+    hooks.layout.isSuccess = false;
+    hooks.youtubeAssociations = [];
+  });
+
   it('shows unavailable only after a request has failed', () => {
     hooks.overlayPreview.isPending = false;
     hooks.overlayPreview.isError = true;
