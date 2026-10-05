@@ -8,6 +8,7 @@ export interface TelemetryPoint {
   lon: number;
   elevation: number;
   timestamp: number;
+  speed_kmh?: number | null;
 }
 
 export const DEFAULT_VIEWER_UNITS: ViewerUnits = {
@@ -97,8 +98,11 @@ export const computeCursorTelemetryLabel = (
 
   const altitudeMeters = current.elevation + elevationOffset;
 
-  let speedKmh = 0;
-  if (safeIndex > 0) {
+  const recordedSpeedKmh = current.speed_kmh;
+  const hasRecordedSpeed =
+    typeof recordedSpeedKmh === 'number' && Number.isFinite(recordedSpeedKmh);
+  let speedKmh = hasRecordedSpeed ? recordedSpeedKmh : 0;
+  if (!hasRecordedSpeed && safeIndex > 0) {
     const previous = coordinates[safeIndex - 1];
     const dtMilliseconds = current.timestamp - previous.timestamp;
 

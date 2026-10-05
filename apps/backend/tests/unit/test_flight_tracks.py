@@ -176,7 +176,68 @@ def test_prefers_gpx_speed_extension_in_meters_per_second() -> None:
     _, points = normalize_track(gpx, "gpx")
 
     assert calculate_track_stats(points)["max_speed_kmh"] == 48.0
+    assert calculate_track_stats(points)["average_speed_kmh"] == pytest.approx(42.0)
     assert b"<gpxtpx:speed>13.333333" in normalize_track(gpx, "gpx")[0]
+
+
+def test_falls_back_to_enhanced_gpx_speed_when_speed_is_an_outlier() -> None:
+    gpx = b"""<gpx xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
+    <trk><trkseg><trkpt lat="47.2" lon="6.0"><extensions>
+    <gpxtpx:TrackPointExtension><gpxtpx:speed>50</gpxtpx:speed>
+    <gpxtpx:enhancedSpeed>4</gpxtpx:enhancedSpeed></gpxtpx:TrackPointExtension>
+    </extensions></trkpt></trkseg></trk></gpx>"""
+
+    _, points = normalize_track(gpx, "gpx")
+
+    assert points[0]["speed_kmh"] == pytest.approx(14.4)
+
+
+def test_weights_recorded_average_speed_by_sample_duration() -> None:
+    points = [
+        {"lat": 47.2, "lon": 6.0, "elevation": 500, "timestamp": 1_000, "speed_kmh": 0},
+        {"lat": 47.2001, "lon": 6.0, "elevation": 500, "timestamp": 2_000, "speed_kmh": 100},
+        {"lat": 47.2002, "lon": 6.0, "elevation": 500, "timestamp": 101_000, "speed_kmh": 100},
+    ]
+
+    assert calculate_track_stats(points)["average_speed_kmh"] == pytest.approx(99.5)
+
+
+def test_falls_back_to_track_average_when_recorded_speeds_cannot_form_interval() -> None:
+    points = [
+        {"lat": 47.2, "lon": 6.0, "elevation": 500, "timestamp": 1_000, "speed_kmh": 15},
+        {"lat": 47.2001, "lon": 6.0, "elevation": 500, "timestamp": 2_000},
+    ]
+
+    assert calculate_track_stats(points)["average_speed_kmh"] == pytest.approx(40, abs=1)
+
+
+def test_falls_back_to_track_average_when_recorded_speeds_cover_only_part_of_track() -> None:
+    points = [
+        {"lat": 47.2, "lon": 6.0, "elevation": 500, "timestamp": 1_000, "speed_kmh": 0},
+        {"lat": 47.2001, "lon": 6.0, "elevation": 500, "timestamp": 2_000, "speed_kmh": 100},
+        {"lat": 47.2002, "lon": 6.0, "elevation": 500, "timestamp": 101_000},
+    ]
+
+    assert calculate_track_stats(points)["average_speed_kmh"] == pytest.approx(0.8, abs=0.1)
+
+
+def test_does_not_average_speed_interval_with_zero_timestamp() -> None:
+    points = [
+        {"lat": 47.2, "lon": 6.0, "elevation": 500, "timestamp": 0, "speed_kmh": 20},
+        {"lat": 47.2001, "lon": 6.0, "elevation": 500, "timestamp": 1_000, "speed_kmh": 30},
+    ]
+
+    assert calculate_track_stats(points)["average_speed_kmh"] == 0
+
+
+def test_calculates_max_speed_from_intervals_without_recorded_speed() -> None:
+    points = [
+        {"lat": 47.2, "lon": 6.0, "elevation": 500, "timestamp": 1_000, "speed_kmh": 0},
+        {"lat": 47.2, "lon": 6.0, "elevation": 500, "timestamp": 2_000},
+        {"lat": 47.20005, "lon": 6.0, "elevation": 500, "timestamp": 3_000},
+    ]
+
+    assert calculate_track_stats(points)["max_speed_kmh"] == pytest.approx(20, abs=0.1)
 
 
 def test_prefers_tcx_speed_in_meters_per_second() -> None:
