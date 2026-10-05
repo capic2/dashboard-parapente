@@ -271,7 +271,11 @@ export function FlightVideoExportControls({
     } catch (error) {
       if (error instanceof HTTPError) {
         const detail = await getHttpErrorDetail(error);
-        toast.error(detail || t('flights.viewer.videoStartError'));
+        const unavailableMessage =
+          error.response.status === 503
+            ? t('flights.viewer.videoStartUnavailable')
+            : t('flights.viewer.videoStartError');
+        toast.error(detail || unavailableMessage);
         return;
       }
 
@@ -314,7 +318,11 @@ export function FlightVideoExportControls({
     } catch (error) {
       if (error instanceof HTTPError) {
         const detail = await getHttpErrorDetail(error);
-        toast.error(detail || t('flights.viewer.regenerateStartError'));
+        const unavailableMessage =
+          error.response.status === 503
+            ? t('flights.viewer.videoStartUnavailable')
+            : t('flights.viewer.regenerateStartError');
+        toast.error(detail || unavailableMessage);
         return;
       }
 
