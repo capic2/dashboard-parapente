@@ -55,6 +55,9 @@ interface FlightTelemetryInteractivePreviewProps {
   manualOffsetSeconds?: number;
   youtubeUrls?: string[];
   videoMarkers?: FlightVideoMarker[];
+  onCurrentYoutubePositionChange?: (
+    position: { videoId: string; seconds: number } | null
+  ) => void;
 }
 
 const EMPTY_YOUTUBE_URLS: string[] = [];
@@ -176,6 +179,7 @@ export function FlightTelemetryInteractivePreview({
   manualOffsetSeconds,
   youtubeUrls = EMPTY_YOUTUBE_URLS,
   videoMarkers = EMPTY_VIDEO_MARKERS,
+  onCurrentYoutubePositionChange,
 }: FlightTelemetryInteractivePreviewProps) {
   const { t, i18n } = useTranslation();
   const token = useAuthStore((state) => state.token);
@@ -879,13 +883,21 @@ export function FlightTelemetryInteractivePreview({
                 }
                 flightLabel={t('flights.goproOverlayFlightVideo')}
                 pips={playablePips}
-                onTimeChange={(cameraTime) =>
+                onTimeChange={(cameraTime) => {
+                  if (youtubeUrl && activeYoutubeVideoId) {
+                    onCurrentYoutubePositionChange?.({
+                      videoId: activeYoutubeVideoId,
+                      seconds: Math.max(0, Math.floor(cameraTime)),
+                    });
+                  } else {
+                    onCurrentYoutubePositionChange?.(null);
+                  }
                   setCameraTime(
                     youtubeUrl || isExplicitFileMain
                       ? cameraTime
                       : sourceTimeAtPreviewTime(cameraTime, previewSegments)
-                  )
-                }
+                  );
+                }}
                 overlayContent={
                   isMainSourceUnavailable ? (
                     <div className="pointer-events-none flex h-full items-center justify-center p-6 text-center text-sm font-medium text-white">
