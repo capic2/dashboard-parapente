@@ -68,6 +68,9 @@ interface GoproOverlaySyncPreviewProps {
   onOffsetChange: (offset: string) => void;
   onOffsetSave: (offset: string) => Promise<void>;
   youtubeUrls?: string[];
+  onCurrentYoutubePositionChange?: (
+    position: { videoId: string; seconds: number } | null
+  ) => void;
 }
 
 type GpxAlignmentTarget = 'start' | 'end';
@@ -141,6 +144,7 @@ export function GoproOverlaySyncPreview({
   onOffsetChange,
   onOffsetSave,
   youtubeUrls = [],
+  onCurrentYoutubePositionChange,
 }: GoproOverlaySyncPreviewProps) {
   const { t } = useTranslation();
   const token = useAuthStore((state) => state.token);
@@ -189,6 +193,7 @@ export function GoproOverlaySyncPreview({
   const sourceVideoTime = youtubeId
     ? videoTime
     : sourceTimeAtPreviewTime(videoTime, previewSegments);
+  const currentYoutubeSecond = Math.max(0, Math.floor(videoTime));
   const previewEndTime = previewSegments.length
     ? Math.max(
         ...previewSegments.map(
@@ -391,6 +396,22 @@ export function GoproOverlaySyncPreview({
     frame = requestAnimationFrame(update);
     return () => cancelAnimationFrame(frame);
   }, [youtubeId, youtubeReady]);
+
+  useEffect(() => {
+    if (!youtubeId || !youtubeReady) {
+      onCurrentYoutubePositionChange?.(null);
+      return;
+    }
+    onCurrentYoutubePositionChange?.({
+      videoId: youtubeId,
+      seconds: currentYoutubeSecond,
+    });
+  }, [
+    currentYoutubeSecond,
+    onCurrentYoutubePositionChange,
+    youtubeId,
+    youtubeReady,
+  ]);
 
   const selectAlignmentTarget = (target: GpxAlignmentTarget) => {
     setAlignmentTarget(target);
