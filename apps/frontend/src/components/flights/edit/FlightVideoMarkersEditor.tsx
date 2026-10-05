@@ -232,7 +232,7 @@ export function FlightVideoMarkersEditor({
                   />
                 </label>
               )}
-              <div className="flex items-end justify-end">
+              <div className="flex items-end justify-end xl:col-start-4">
                 <Button
                   variant="ghost"
                   className="min-h-10 rounded-lg px-3 py-2 text-sm text-red-600 dark:text-red-400"
