@@ -39,6 +39,11 @@ interface YoutubeApi {
   ) => YoutubePlayer;
 }
 
+interface NativeFullscreenBridge {
+  enter: () => void;
+  exit: () => void;
+}
+
 let youtubeApiPromise: Promise<YoutubeApi> | null = null;
 
 function loadYoutubeApi(): Promise<YoutubeApi> {
@@ -201,6 +206,7 @@ export function FlightOverlayPlayer({
   const flightRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
+  const nativeFullscreenActiveRef = useRef(false);
   const syncMediaRef = useRef<((notify?: boolean) => void) | null>(null);
   // The calibration player keeps its existing camera/flight layout.
   const [layout, setLayout] = useState<FlightOverlayLayout>(
@@ -498,6 +504,34 @@ export function FlightOverlayPlayer({
   }, []);
 
   useEffect(() => {
+    const handleNativeFullscreenBack = () => {
+      nativeFullscreenActiveRef.current = false;
+      setIsFullscreen(false);
+      (
+        window as Window & { NativeFullscreen?: NativeFullscreenBridge }
+      ).NativeFullscreen?.exit();
+    };
+
+    window.addEventListener('nativefullscreenback', handleNativeFullscreenBack);
+    return () =>
+      window.removeEventListener(
+        'nativefullscreenback',
+        handleNativeFullscreenBack
+      );
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (nativeFullscreenActiveRef.current) {
+        (
+          window as Window & { NativeFullscreen?: NativeFullscreenBridge }
+        ).NativeFullscreen?.exit();
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
     if (!cameraIsPlaying) return;
 
     let animationFrame = 0;
@@ -772,6 +806,19 @@ export function FlightOverlayPlayer({
 
   const handleToggleFullscreen = () => {
     if (!playerRef.current) return;
+    const nativeFullscreen = (
+      window as Window & { NativeFullscreen?: NativeFullscreenBridge }
+    ).NativeFullscreen;
+
+    if (isInteractive && nativeFullscreen) {
+      const entering = !isFullscreen;
+      nativeFullscreenActiveRef.current = entering;
+      setIsFullscreen(entering);
+      if (entering) nativeFullscreen.enter();
+      else nativeFullscreen.exit();
+      return;
+    }
+
     if (document.fullscreenElement === playerRef.current) {
       void document.exitFullscreen().catch(() => undefined);
     } else {
@@ -824,13 +871,17 @@ export function FlightOverlayPlayer({
   return (
     <div
       ref={playerRef}
-      className="relative overflow-hidden rounded-xl bg-black shadow-sm [&:fullscreen]:flex [&:fullscreen]:flex-col [&:fullscreen]:overflow-y-auto [&:fullscreen]:rounded-none"
+      className={`bg-black shadow-sm [&:fullscreen]:flex [&:fullscreen]:flex-col [&:fullscreen]:overflow-y-auto [&:fullscreen]:rounded-none ${
+        isInteractive && isFullscreen
+          ? 'fixed inset-0 z-[9999] flex h-[100dvh] w-screen max-w-none flex-col overflow-hidden rounded-none'
+          : 'relative overflow-hidden rounded-xl'
+      }`}
       onFocusCapture={handlePlayerFocus}
       onBlurCapture={handlePlayerBlur}
     >
       <div
         data-testid="flight-overlay-media-stage"
-        className={`relative grid min-h-0 bg-black ${isInteractive ? 'aspect-video' : ''} ${layout === 'side-by-side' ? 'grid-cols-1 md:grid-cols-2' : ''}`}
+        className={`relative grid min-h-0 bg-black ${isInteractive && !isFullscreen ? 'aspect-video' : ''} ${isInteractive && isFullscreen ? 'flex-1' : ''} ${layout === 'side-by-side' ? 'grid-cols-1 md:grid-cols-2' : ''}`}
       >
         {masterIsYoutube ? (
           <div
