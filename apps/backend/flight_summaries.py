@@ -473,6 +473,8 @@ def list_flight_summaries(
     storage_root = flight_storage_root()
     detected_pano_paths: list[dict[str, str]] = []
     pano_flags: dict[str, bool] = {}
+    face_flags: dict[str, bool] = {}
+    pilote_flags: dict[str, bool] = {}
     for row in rows:
         path = (
             Path(row.pano_video_file_path)
@@ -483,6 +485,8 @@ def list_flight_summaries(
             / "pano.mp4"
         )
         pano_flags[row.id] = _directory_file_exists(path)
+        face_flags[row.id] = _directory_file_exists(path.with_name("face.mp4"))
+        pilote_flags[row.id] = _directory_file_exists(path.with_name("pilote.mp4"))
         if pano_flags[row.id] and not row.pano_video_file_path:
             detected_pano_paths.append({"id": row.id, "pano_video_file_path": str(path.resolve())})
     if detected_pano_paths:
@@ -536,6 +540,8 @@ def list_flight_summaries(
                 )
             ),
             has_pano_video=pano_flags[row.id],
+            has_face_video=face_flags[row.id],
+            has_pilote_video=pilote_flags[row.id],
             has_highlight_video=bool(_file_exists(row.completed_highlight_path)),
         )
         for row in rows

@@ -73,6 +73,8 @@ export function Flight({
     flight.youtube_upload_status === 'queued' ||
     flight.youtube_upload_status === 'uploading';
   const hasPanoVideo = flight.has_pano_video;
+  const hasFaceVideo = flight.has_face_video === true;
+  const hasPiloteVideo = flight.has_pilote_video === true;
   const hasHighlightVideo = flight.has_highlight_video;
   const hasSportstrackliveTrack =
     flight.sportstracklive_status === 'uploaded' &&
@@ -150,6 +152,8 @@ export function Flight({
     hasYoutubeVideo ||
     isYoutubeUploadRunning ||
     hasPanoVideo ||
+    hasFaceVideo ||
+    hasPiloteVideo ||
     hasHighlightVideo ||
     hasSportstrackliveTrack ||
     isVideoExportRunning ||
@@ -245,6 +249,18 @@ export function Flight({
                 <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
                   <Orbit className="h-3 w-3" aria-hidden="true" />
                   {t('flights.panoBadge')}
+                </span>
+              )}
+              {hasFaceVideo && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
+                  <Video className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.faceBadge')}
+                </span>
+              )}
+              {hasPiloteVideo && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
+                  <Video className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.piloteBadge')}
                 </span>
               )}
               {hasCompletedGoproOverlay && (
