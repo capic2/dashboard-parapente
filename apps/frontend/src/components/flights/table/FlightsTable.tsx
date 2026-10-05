@@ -174,10 +174,11 @@ export function FlightsTable({
     [selectionMode, selectedFlightId, onSelectFlight, onDeleteFlight]
   );
 
-  const currentSort = sorting[0] ?? { id: 'flight_date', desc: true };
+  const rawSort = sorting[0] ?? { id: 'flight_date', desc: true };
   const currentSortColumn = sortableColumns.find(
-    (column) => column.id === currentSort.id
+    (column) => column.id === rawSort.id
   ) ?? { id: 'flight_date', label: t('flights.sortDate') };
+  const currentSort = { id: currentSortColumn.id, desc: rawSort.desc };
 
   const renderSortControls = () => (
     <div className="mb-3 flex items-end gap-2 sm:max-w-sm">
