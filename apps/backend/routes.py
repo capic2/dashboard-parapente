@@ -4979,7 +4979,11 @@ def get_flight_records(
     flights_with_duration = [f for f in flights if effective_duration(f) is not None]
     flights_with_altitude = [f for f in flights if f.max_altitude_m is not None]
     flights_with_distance = [f for f in flights if f.distance_km is not None]
-    flights_with_speed = [f for f in flights if f.max_speed_kmh is not None and f.max_speed_kmh > 0]
+    flights_with_speed = [
+        f
+        for f in flights
+        if not f.gpx_metrics_excluded and f.max_speed_kmh is not None and f.max_speed_kmh > 0
+    ]
     flights_with_climb_rate = [
         flight
         for flight in flights
@@ -7077,6 +7081,20 @@ def parse_gpx_file_from_string(gpx_content: str) -> list[dict]:
         coordinate = {"lat": lat, "lon": lon, "elevation": elevation, "timestamp": timestamp}
         if heart_rate is not None:
             coordinate["heart_rate"] = heart_rate
+        for speed_name in ("speed", "enhancedSpeed"):
+            for speed_elem in trkpt.iter():
+                if speed_elem is trkpt or speed_elem.tag.rsplit("}", 1)[-1] != speed_name:
+                    continue
+                try:
+                    speed_mps = float(speed_elem.text or "")
+                except ValueError:
+                    continue
+                speed_kmh = speed_mps * 3.6
+                if math.isfinite(speed_kmh) and 0 <= speed_kmh < 150:
+                    coordinate["speed_kmh"] = speed_kmh
+                    break
+            if "speed_kmh" in coordinate:
+                break
         coordinates.append(coordinate)
 
     if coordinates:
@@ -7139,26 +7157,39 @@ def calculate_max_speed(coordinates: list[dict]) -> float:
     Returns:
         Maximum speed in km/h
     """
-    if len(coordinates) < 2:
-        return 0.0
-
-    max_speed = 0.0
+    explicit_speeds = [
+        point["speed_kmh"]
+        for point in coordinates
+        if isinstance(point.get("speed_kmh"), (int, float))
+        and math.isfinite(point["speed_kmh"])
+        and 0 <= point["speed_kmh"] < 150
+    ]
+    max_speed = max(explicit_speeds, default=0.0)
 
     for i in range(1, len(coordinates)):
+        previous = coordinates[i - 1]
+        current = coordinates[i]
+        if any(
+            isinstance(point.get("speed_kmh"), (int, float))
+            and math.isfinite(point["speed_kmh"])
+            and 0 <= point["speed_kmh"] < 150
+            for point in (previous, current)
+        ):
+            continue
         # Skip if no valid timestamps
-        if coordinates[i]["timestamp"] == 0 or coordinates[i - 1]["timestamp"] == 0:
+        if current["timestamp"] == 0 or previous["timestamp"] == 0:
             continue
 
         # Calculate distance in km
         distance_km = haversine_distance(
-            coordinates[i - 1]["lat"],
-            coordinates[i - 1]["lon"],
-            coordinates[i]["lat"],
-            coordinates[i]["lon"],
+            previous["lat"],
+            previous["lon"],
+            current["lat"],
+            current["lon"],
         )
 
         # Calculate time in hours
-        time_ms = coordinates[i]["timestamp"] - coordinates[i - 1]["timestamp"]
+        time_ms = current["timestamp"] - previous["timestamp"]
         time_hours = time_ms / (1000 * 3600)
 
         # Calculate speed (avoid division by zero)

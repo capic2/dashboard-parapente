@@ -173,12 +173,18 @@ def _parse_gpx(content: bytes) -> list[TrackPoint]:
                 point["heart_rate"] = int(float(heart_rate))
             if power:
                 point["power"] = int(float(power))
-            speed = _child_text_any(element, ("speed", "enhancedSpeed"))
-            if speed:
-                speed_mps = float(speed)
-                if math.isfinite(speed_mps) and speed_mps >= 0:
+            for speed_name in ("speed", "enhancedSpeed"):
+                speed = _child_text(element, speed_name)
+                if not speed:
+                    continue
+                try:
+                    speed_kmh = float(speed) * 3.6
+                except ValueError:
+                    continue
+                if math.isfinite(speed_kmh) and 0 <= speed_kmh < 150:
                     # GPX TrackPointExtension speed values are meters per second.
-                    point["speed_kmh"] = speed_mps * 3.6
+                    point["speed_kmh"] = speed_kmh
+                    break
             vario = _child_text_any(
                 element, ("vario", "vertical_speed", "verticalSpeed", "climb_rate")
             )
@@ -220,10 +226,10 @@ def _parse_tcx(content: bytes) -> list[TrackPoint]:
                 point["power"] = int(float(power))
             speed = _child_text_any(element, ("Speed", "speed"))
             if speed:
-                speed_mps = float(speed)
-                if math.isfinite(speed_mps) and speed_mps >= 0:
+                speed_kmh = float(speed) * 3.6
+                if math.isfinite(speed_kmh) and 0 <= speed_kmh < 150:
                     # TCX Speed values are meters per second.
-                    point["speed_kmh"] = speed_mps * 3.6
+                    point["speed_kmh"] = speed_kmh
             _append_point(points, point)
     return points
 
@@ -317,9 +323,10 @@ def _parse_fit(content: bytes) -> list[TrackPoint]:
                 speed = frame.get_value("speed", fallback=None)
             if speed is not None:
                 speed_mps = float(speed)
-                if math.isfinite(speed_mps) and speed_mps >= 0:
+                speed_kmh = speed_mps * 3.6
+                if math.isfinite(speed_kmh) and 0 <= speed_kmh < 150:
                     # FIT speed values are meters per second.
-                    point["speed_kmh"] = speed_mps * 3.6
+                    point["speed_kmh"] = speed_kmh
             _append_point(points, point)
     return points
 
@@ -464,22 +471,27 @@ def calculate_track_stats(points: list[TrackPoint]) -> dict[str, Any]:
             and 0 <= point["speed_kmh"] < 150
         )
     ]
-    if explicit_speeds:
-        max_speed = max(explicit_speeds)
-    else:
-        max_speed = 0.0
-        for previous, current in zip(points, points[1:], strict=False):
-            if previous.get("segment", 0) != current.get("segment", 0):
-                continue
-            elapsed = current.get("timestamp", 0) - previous.get("timestamp", 0)
-            if elapsed <= 0:
-                continue
-            segment_distance = _precise_haversine_distance(
-                previous["lat"], previous["lon"], current["lat"], current["lon"]
-            )
-            speed = segment_distance / (elapsed / 3_600_000)
-            if math.isfinite(speed) and speed < 150:
-                max_speed = max(max_speed, speed)
+    max_speed = max(explicit_speeds, default=0.0)
+    for previous, current in zip(points, points[1:], strict=False):
+        if previous.get("segment", 0) != current.get("segment", 0):
+            continue
+        previous_speed = previous.get("speed_kmh")
+        current_speed = current.get("speed_kmh")
+        has_recorded_speed = any(
+            speed is not None and math.isfinite(speed) and 0 <= speed < 150
+            for speed in (previous_speed, current_speed)
+        )
+        if has_recorded_speed:
+            continue
+        elapsed = current.get("timestamp", 0) - previous.get("timestamp", 0)
+        if elapsed <= 0:
+            continue
+        segment_distance = _precise_haversine_distance(
+            previous["lat"], previous["lon"], current["lat"], current["lon"]
+        )
+        speed = segment_distance / (elapsed / 3_600_000)
+        if math.isfinite(speed) and speed < 150:
+            max_speed = max(max_speed, speed)
 
     max_climb_rate = 0.0
     max_sink_rate = 0.0
@@ -516,7 +528,43 @@ def calculate_track_stats(points: list[TrackPoint]) -> dict[str, Any]:
     )
     min_altitude = min(elevations)
     max_altitude = max(elevations)
-    average_speed = distance / (duration_seconds / 3600) if duration_seconds > 0 else 0
+    weighted_speed_total = 0.0
+    weighted_speed_duration = 0
+    track_interval_duration = 0
+    for previous, current in zip(points, points[1:], strict=False):
+        if previous.get("segment", 0) != current.get("segment", 0):
+            continue
+        previous_timestamp = previous.get("timestamp", 0)
+        current_timestamp = current.get("timestamp", 0)
+        if previous_timestamp <= 0 or current_timestamp <= 0:
+            continue
+        elapsed = current_timestamp - previous_timestamp
+        if elapsed <= 0:
+            continue
+        track_interval_duration += elapsed
+        previous_speed = previous.get("speed_kmh")
+        current_speed = current.get("speed_kmh")
+        if (
+            previous_speed is not None
+            and current_speed is not None
+            and math.isfinite(previous_speed)
+            and math.isfinite(current_speed)
+            and 0 <= previous_speed < 150
+            and 0 <= current_speed < 150
+        ):
+            weighted_speed_total += (previous_speed + current_speed) * elapsed / 2
+            weighted_speed_duration += elapsed
+
+    if (
+        duration_seconds > 0
+        and weighted_speed_duration > 0
+        and weighted_speed_duration == track_interval_duration
+    ):
+        average_speed = weighted_speed_total / weighted_speed_duration
+    elif duration_seconds > 0:
+        average_speed = distance / (duration_seconds / 3600)
+    else:
+        average_speed = 0.0
     return {
         "max_altitude_m": round(max_altitude),
         "min_altitude_m": round(min_altitude),

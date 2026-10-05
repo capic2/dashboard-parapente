@@ -165,6 +165,7 @@ class GoproOverlayPreviewCoordinate(BaseModel):
     elevation: float
     timestamp: float
     heart_rate: int | None = None
+    speed_kmh: float | None = None
 
 
 class FlightTelemetryPoint(BaseModel):
