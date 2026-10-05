@@ -23,6 +23,7 @@ import {
 } from 'react-aria-components';
 import {
   CheckSquare,
+  ChevronDown,
   FilePlus2,
   Upload,
   Search,
@@ -249,6 +250,7 @@ export default function FlightHistory() {
 
   const selectedFlightId = params.flightId ?? null;
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [isTagFilterExpanded, setIsTagFilterExpanded] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [flightToDelete, setFlightToDelete] = useState<FlightSummary | null>(
     null
@@ -648,69 +650,94 @@ export default function FlightHistory() {
                   onQueryChange={handleSearchQueryChange}
                 />
                 <fieldset className="min-w-0 space-y-2">
-                  <legend className="text-xs font-semibold text-gray-600 dark:text-gray-300">
-                    {t('flights.tagFilter')}
+                  <legend className="w-full">
+                    <button
+                      type="button"
+                      aria-expanded={isTagFilterExpanded}
+                      aria-controls="flight-tag-filter-options"
+                      onClick={() =>
+                        setIsTagFilterExpanded((expanded) => !expanded)
+                      }
+                      className="flex min-h-9 w-full items-center justify-between gap-2 text-left text-xs font-semibold text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-gray-300"
+                    >
+                      {t('flights.tagFilter')}
+                      <ChevronDown
+                        className={`h-4 w-4 shrink-0 transition-transform ${
+                          isTagFilterExpanded ? 'rotate-180' : ''
+                        }`}
+                        aria-hidden="true"
+                      />
+                    </button>
                   </legend>
-                  <div className="flex flex-wrap gap-1.5">
-                    {FLIGHT_BADGE_FILTERS.map((filter) => {
-                      const isIncluded = selectedBadgeFilters.included.includes(
-                        filter.id
-                      );
-                      const isExcluded = selectedBadgeFilters.excluded.includes(
-                        filter.id
-                      );
-                      const isSelected = isIncluded || isExcluded;
-                      let stateClassName =
-                        'border-slate-300 bg-white text-slate-700 hover:border-sky-400 hover:bg-sky-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700';
-                      let accessibleStateKey = 'flights.tagNotSelected';
-                      if (isIncluded) {
-                        stateClassName =
-                          'border-sky-600 bg-sky-600 text-white dark:border-sky-400 dark:bg-sky-400 dark:text-slate-950';
-                        accessibleStateKey = 'flights.tagIncluded';
-                      }
-                      if (isExcluded) {
-                        stateClassName =
-                          'border-rose-600 bg-rose-600 text-white dark:border-rose-400 dark:bg-rose-400 dark:text-slate-950';
-                        accessibleStateKey = 'flights.tagExcluded';
-                      }
-                      return (
-                        <button
-                          key={filter.id}
-                          type="button"
-                          aria-pressed={isSelected}
-                          aria-label={t(accessibleStateKey, {
-                            tag: t(filter.label),
-                          })}
-                          onClick={() => toggleBadgeFilter(filter.id)}
-                          className={`min-h-9 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${stateClassName}`}
-                        >
-                          {isExcluded && (
-                            <span aria-hidden="true" className="mr-1 font-bold">
-                              −
-                            </span>
-                          )}
-                          {t(filter.label)}
-                        </button>
-                      );
-                    })}
-                    {activeBadgeFilterCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSelectedBadgeFilters({
-                            included: [],
-                            excluded: [],
-                          })
+                  <div
+                    id="flight-tag-filter-options"
+                    hidden={!isTagFilterExpanded}
+                    className="space-y-2"
+                  >
+                    <div className="flex flex-wrap gap-1.5">
+                      {FLIGHT_BADGE_FILTERS.map((filter) => {
+                        const isIncluded =
+                          selectedBadgeFilters.included.includes(filter.id);
+                        const isExcluded =
+                          selectedBadgeFilters.excluded.includes(filter.id);
+                        const isSelected = isIncluded || isExcluded;
+                        let stateClassName =
+                          'border-slate-300 bg-white text-slate-700 hover:border-sky-400 hover:bg-sky-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700';
+                        let accessibleStateKey = 'flights.tagNotSelected';
+                        if (isIncluded) {
+                          stateClassName =
+                            'border-sky-700 bg-sky-700 text-white dark:border-sky-400 dark:bg-sky-400 dark:text-slate-950';
+                          accessibleStateKey = 'flights.tagIncluded';
                         }
-                        className="min-h-9 rounded-full px-3 py-1 text-xs font-medium text-sky-700 underline underline-offset-2 hover:text-sky-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-sky-300 dark:hover:text-sky-100"
-                      >
-                        {t('flights.allTags')}
-                      </button>
-                    )}
+                        if (isExcluded) {
+                          stateClassName =
+                            'border-rose-700 bg-rose-700 text-white dark:border-rose-400 dark:bg-rose-400 dark:text-slate-950';
+                          accessibleStateKey = 'flights.tagExcluded';
+                        }
+                        return (
+                          <button
+                            key={filter.id}
+                            type="button"
+                            aria-pressed={isSelected}
+                            aria-label={t(accessibleStateKey, {
+                              tag: t(filter.label),
+                            })}
+                            onClick={() => toggleBadgeFilter(filter.id)}
+                            className={`min-h-9 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
+                              stateClassName
+                            }`}
+                          >
+                            {isExcluded && (
+                              <span
+                                aria-hidden="true"
+                                className="mr-1 font-bold"
+                              >
+                                −
+                              </span>
+                            )}
+                            {t(filter.label)}
+                          </button>
+                        );
+                      })}
+                      {activeBadgeFilterCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedBadgeFilters({
+                              included: [],
+                              excluded: [],
+                            })
+                          }
+                          className="min-h-9 rounded-full px-3 py-1 text-xs font-medium text-sky-700 underline underline-offset-2 hover:text-sky-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-sky-300 dark:hover:text-sky-100"
+                        >
+                          {t('flights.allTags')}
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {t('flights.tagFilterInstructions')}
+                    </p>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {t('flights.tagFilterInstructions')}
-                  </p>
                 </fieldset>
                 <div className="flex justify-end">
                   <Button
