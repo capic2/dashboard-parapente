@@ -1,11 +1,13 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
   type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Maximize2, Minimize2, Pause, Play } from 'lucide-react';
 import type { FlightVideoMarker } from '@dashboard-parapente/shared-types';
@@ -190,6 +192,7 @@ export function FlightOverlayPlayer({
   videoMarkers = EMPTY_VIDEO_MARKERS,
 }: FlightOverlayPlayerProps) {
   const { t } = useTranslation();
+  const isInteractive = mode === 'interactive';
   const cameraRef = useRef<HTMLVideoElement>(null);
   const youtubeRef = useRef<YoutubePlayer | null>(null);
   const youtubeHostRef = useRef<HTMLDivElement>(null);
@@ -207,6 +210,7 @@ export function FlightOverlayPlayer({
   const flightRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
+  const playerMountRef = useRef<HTMLDivElement>(null);
   const nativeFullscreenActiveRef = useRef(false);
   const syncMediaRef = useRef<((notify?: boolean) => void) | null>(null);
   // The calibration player keeps its existing camera/flight layout.
@@ -230,15 +234,37 @@ export function FlightOverlayPlayer({
   const onTimeChangeRef = useRef(onTimeChange);
   onTimeChangeRef.current = onTimeChange;
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenPortalHost] = useState<HTMLDivElement | null>(() =>
+    isInteractive && typeof document !== 'undefined'
+      ? document.createElement('div')
+      : null
+  );
   const [youtubeReady, setYoutubeReady] = useState(false);
   const [youtubeFailed, setYoutubeFailed] = useState(false);
   const [activePipId, setActivePipId] = useState<string | null>(null);
+
+  useLayoutEffect(() => {
+    if (!isInteractive || !fullscreenPortalHost) return;
+    const mount = playerMountRef.current;
+    if (!mount) return;
+
+    mount.appendChild(fullscreenPortalHost);
+    return () => fullscreenPortalHost.remove();
+  }, [fullscreenPortalHost, isInteractive]);
+
+  useLayoutEffect(() => {
+    if (!fullscreenPortalHost) return;
+    const target =
+      isInteractive && isFullscreen ? document.body : playerMountRef.current;
+    if (target && fullscreenPortalHost.parentElement !== target) {
+      target.appendChild(fullscreenPortalHost);
+    }
+  }, [fullscreenPortalHost, isFullscreen, isInteractive]);
   const youtubeId = youtubeUrl ? getYoutubeVideoId(youtubeUrl) : null;
   const masterIsYoutube = Boolean(youtubeId) && !youtubeFailed;
   const canSeekVideoMarkers = Boolean(
     youtubeId && youtubeReady && masterIsYoutube
   );
-  const isInteractive = mode === 'interactive';
   const hasPlaybackIntent = useCallback(
     () => !isInteractive || playbackRequestedRef.current,
     [isInteractive]
@@ -891,7 +917,7 @@ export function FlightOverlayPlayer({
       'absolute z-20 cursor-pointer rounded-lg border-2 border-white/80 object-cover shadow-xl transition-[width] duration-200 hover:border-sky-300';
   }
 
-  return (
+  const playerElement = (
     <div
       ref={playerRef}
       className={`bg-black shadow-sm [&:fullscreen]:flex [&:fullscreen]:flex-col [&:fullscreen]:overflow-y-auto [&:fullscreen]:rounded-none ${
@@ -1263,6 +1289,18 @@ export function FlightOverlayPlayer({
           </div>
         )}
       </div>
+    </div>
+  );
+
+  if (!isInteractive) return playerElement;
+
+  return (
+    <div
+      ref={playerMountRef}
+      className={`min-w-0 w-full ${isFullscreen ? 'hidden' : ''}`}
+    >
+      {fullscreenPortalHost &&
+        createPortal(playerElement, fullscreenPortalHost)}
     </div>
   );
 }
