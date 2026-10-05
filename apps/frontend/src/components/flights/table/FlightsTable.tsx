@@ -72,6 +72,21 @@ export function FlightsTable({
   }, [flights, groupByDate]);
 
   useEffect(() => {
+    if (!groupByDate || !selectedFlightId) return;
+
+    const selectedDay = dayGroups.find(([, dayFlights]) =>
+      dayFlights.some((flight) => flight.id === selectedFlightId)
+    )?.[0];
+
+    if (selectedDay) {
+      setExpandedDays((previous) => {
+        if (previous.has(selectedDay)) return previous;
+        return new Set(previous).add(selectedDay);
+      });
+    }
+  }, [dayGroups, groupByDate, selectedFlightId]);
+
+  useEffect(() => {
     if (isLoadingMore) {
       wasLoadingMoreRef.current = true;
     } else if (wasLoadingMoreRef.current) {
