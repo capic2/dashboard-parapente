@@ -19,7 +19,7 @@
           "apps/frontend/src/pages/FlightHistory.tsx"
         ],
         "createdAt": "2026-10-04T07:52:50.969Z",
-        "reason": "Detector misreads the selected filter colors: white on sky-700/rose-700 and slate-950 on the light dark-theme variants have readable contrast."
+        "reason": "The detector misreads mutually exclusive hover and selected states: selected text uses readable sky/rose colors in light and dark themes."
       },
       {
         "rule": "gray-on-color",
