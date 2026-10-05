@@ -1078,10 +1078,9 @@ export function FlightDetails({
               showHeader={false}
             />
           )}
-          {hasYoutubeVideo && (
+          {(hasYoutubeVideo || hasVideo || videoMarkersDraft.length > 0) && (
             <div className="border-t border-cyan-200 p-4 dark:border-cyan-900">
               <FlightVideoMarkersEditor
-                youtubeUrls={flight.youtube_urls ?? []}
                 value={videoMarkersDraft}
                 currentYoutubePosition={currentYoutubePosition}
                 onChange={setVideoMarkersDraft}
@@ -1143,7 +1142,7 @@ export function FlightDetails({
       </header>
 
       <div className="min-w-0 space-y-4">
-        {(hasYoutubeVideo || (hasGpx && hasVideo && hasGoproCameraVideo)) &&
+        {(hasYoutubeVideo || hasVideo || videoMarkersDraft.length > 0) &&
           overlayWorkspacePanel}
         {hasGpx && (hasYoutubeVideo || hasFaceVideo || hasPiloteVideo) && (
           <FlightTelemetryInteractivePreview

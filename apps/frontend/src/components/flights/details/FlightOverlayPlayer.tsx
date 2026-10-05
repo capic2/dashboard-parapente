@@ -257,9 +257,9 @@ export function FlightOverlayPlayer({
     }
   }, []);
   const sortedVideoMarkers = isInteractive
-    ? videoMarkers
-        .filter((marker) => marker.youtube_video_id === youtubeId)
-        .sort((a, b) => a.timestamp_seconds - b.timestamp_seconds)
+    ? [...videoMarkers].sort(
+        (a, b) => a.timestamp_seconds - b.timestamp_seconds
+      )
     : [];
   const activeVideoMarkers = sortedVideoMarkers.filter(
     (marker) =>

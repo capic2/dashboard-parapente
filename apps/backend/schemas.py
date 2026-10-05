@@ -599,11 +599,9 @@ class FlightCreate(FlightBase):
 
 class FlightVideoMarker(BaseModel):
     id: str = Field(min_length=1, max_length=100)
-    youtube_video_id: str = Field(pattern=r"^[A-Za-z0-9_-]{11}$")
     kind: Literal["takeoff", "landing", "interest"]
     timestamp_seconds: int = Field(ge=0, le=86400)
     title: str = Field(default="", max_length=100)
-    include_in_youtube_chapters: bool = True
 
     @model_validator(mode="after")
     def interest_marker_has_title(self) -> "FlightVideoMarker":
