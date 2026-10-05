@@ -1,3 +1,4 @@
+import { ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Flight, Site } from '../../../types';
 import {
@@ -131,15 +132,15 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
   });
   const durationLabel =
     flight.duration_minutes == null
-      ? 'N/A'
+      ? t('flights.notAvailable')
       : `${Math.floor(flight.duration_minutes / 60)}h ${flight.duration_minutes % 60}m`;
   const distanceLabel =
     flight.distance_km == null
-      ? 'N/A'
+      ? t('flights.notAvailable')
       : formatDistanceKm(flight.distance_km, units.distance);
   const maxAltitudeLabel =
     flight.max_altitude_m == null
-      ? 'N/A'
+      ? t('flights.notAvailable')
       : formatAltitudeMeters(flight.max_altitude_m, units.altitude);
   const metricTime = (timestamp: number | undefined) =>
     timestamp
@@ -164,11 +165,11 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
       : null;
   const elevationGainLabel =
     flight.elevation_gain_m == null
-      ? 'N/A'
+      ? t('flights.notAvailable')
       : formatAltitudeMeters(flight.elevation_gain_m, units.altitude);
   const maxSpeedLabel =
     flight.max_speed_kmh == null
-      ? 'N/A'
+      ? t('flights.notAvailable')
       : formatSpeedKmh(flight.max_speed_kmh, units.speed);
   const maxSpeedTime =
     trackAnalysis?.coordinates.length &&
@@ -201,6 +202,7 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
     const stats = [
       {
         label: t('flights.minAltitudeLabel'),
+        description: t('flights.minAltitudeDescription'),
         value: formatAltitudeMeters(
           trackAnalysis.min_altitude_m,
           units.altitude
@@ -215,6 +217,7 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
       },
       {
         label: t('flights.altitudeRangeLabel'),
+        description: t('flights.altitudeRangeDescription'),
         value: formatAltitudeMeters(
           trackAnalysis.altitude_range_m ??
             trackAnalysis.max_altitude_m - trackAnalysis.min_altitude_m,
@@ -223,8 +226,9 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
       },
       {
         label: t('flights.maxClimbRateLabel'),
+        description: t('flights.maxClimbRateDescription'),
         value: flight.gpx_metrics_excluded
-          ? 'N/A'
+          ? t('flights.notAvailable')
           : formatVerticalSpeed(
               trackAnalysis.max_climb_rate_ms ?? 0,
               units.altitude
@@ -237,8 +241,9 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
       },
       {
         label: t('flights.maxSinkRateLabel'),
+        description: t('flights.maxSinkRateDescription'),
         value: flight.gpx_metrics_excluded
-          ? 'N/A'
+          ? t('flights.notAvailable')
           : formatVerticalSpeed(
               trackAnalysis.max_sink_rate_ms ?? 0,
               units.altitude
@@ -251,6 +256,7 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
       },
       {
         label: t('flights.averageSpeedLabel'),
+        description: t('flights.averageSpeedDescription'),
         value: formatSpeedKmh(
           trackAnalysis.average_speed_kmh ?? 0,
           units.speed
@@ -258,6 +264,7 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
       },
       {
         label: t('flights.maxDistanceFromTakeoffLabel'),
+        description: t('flights.maxDistanceFromTakeoffDescription'),
         value: formatDistanceKm(
           trackAnalysis.max_distance_from_takeoff_km ?? 0,
           units.distance
@@ -266,6 +273,7 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
       },
       {
         label: t('flights.takeoffAltitudeLabel'),
+        description: t('flights.takeoffAltitudeDescription'),
         value: formatAltitudeMeters(
           trackAnalysis.takeoff_altitude_m ??
             trackAnalysis.coordinates[0]?.elevation ??
@@ -276,6 +284,7 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
       },
       {
         label: t('flights.landingAltitudeLabel'),
+        description: t('flights.landingAltitudeDescription'),
         value: formatAltitudeMeters(
           trackAnalysis.landing_altitude_m ??
             trackAnalysis.coordinates[trackAnalysis.coordinates.length - 1]
@@ -296,6 +305,9 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
           <div className={statClass} key={stat.label}>
             <span className={labelClass}>{stat.label}</span>
             <span className={valueClass}>{stat.value}</span>
+            <span className="mt-1 block text-xs leading-4 text-gray-600 dark:text-gray-300">
+              {stat.description}
+            </span>
             {'time' in stat && stat.time && (
               <span className="mt-1 block text-xs font-normal text-gray-500 dark:text-gray-400">
                 {stat.time}
@@ -364,8 +376,29 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
             </span>
           ) : null}
         </div>
-        {flight.gpx_file_path && trackAnalysisContent}
       </div>
+      {flight.gpx_file_path && (
+        <details className="group mt-3 rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-inset dark:text-gray-100 [&::-webkit-details-marker]:hidden">
+            <span>{t('flights.trackAnalysisDetails')}</span>
+            <ChevronDown
+              aria-hidden="true"
+              className="size-4 shrink-0 text-gray-500 transition-transform group-open:rotate-180 dark:text-gray-400"
+            />
+          </summary>
+          <div className="border-t border-gray-200 p-3 dark:border-gray-700">
+            <p className="mb-3 text-sm text-gray-600 dark:text-gray-300">
+              {t('flights.trackAnalysisHelp')}
+            </p>
+            <div
+              aria-busy={isAnalysisPending}
+              className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4"
+            >
+              {trackAnalysisContent}
+            </div>
+          </div>
+        </details>
+      )}
       {trackFileName && (
         <div className="mt-3 min-w-0">
           <span className={labelClass}>{t('flights.trackFileLabel')}</span>
