@@ -42,6 +42,7 @@ interface YoutubeApi {
 interface NativeFullscreenBridge {
   enter: () => void;
   exit: () => void;
+  supportsOrientationReady?: () => boolean;
 }
 
 let youtubeApiPromise: Promise<YoutubeApi> | null = null;
@@ -506,18 +507,38 @@ export function FlightOverlayPlayer({
   useEffect(() => {
     const handleNativeFullscreenBack = () => {
       nativeFullscreenActiveRef.current = false;
-      setIsFullscreen(false);
-      (
+      const nativeFullscreen = (
         window as Window & { NativeFullscreen?: NativeFullscreenBridge }
-      ).NativeFullscreen?.exit();
+      ).NativeFullscreen;
+      if (nativeFullscreen?.supportsOrientationReady?.() !== true) {
+        setIsFullscreen(false);
+      }
+      nativeFullscreen?.exit();
+    };
+
+    const handleNativeFullscreenOrientationChange = (event: Event) => {
+      const landscape = (event as CustomEvent<{ landscape: boolean }>).detail
+        ?.landscape;
+      if (typeof landscape !== 'boolean') return;
+      nativeFullscreenActiveRef.current = landscape;
+      setIsFullscreen(landscape);
     };
 
     window.addEventListener('nativefullscreenback', handleNativeFullscreenBack);
-    return () =>
+    window.addEventListener(
+      'nativefullscreenorientationchange',
+      handleNativeFullscreenOrientationChange
+    );
+    return () => {
       window.removeEventListener(
         'nativefullscreenback',
         handleNativeFullscreenBack
       );
+      window.removeEventListener(
+        'nativefullscreenorientationchange',
+        handleNativeFullscreenOrientationChange
+      );
+    };
   }, []);
 
   useEffect(
@@ -811,9 +832,11 @@ export function FlightOverlayPlayer({
     ).NativeFullscreen;
 
     if (isInteractive && nativeFullscreen) {
-      const entering = !isFullscreen;
+      const entering = !nativeFullscreenActiveRef.current;
       nativeFullscreenActiveRef.current = entering;
-      setIsFullscreen(entering);
+      if (nativeFullscreen.supportsOrientationReady?.() !== true) {
+        setIsFullscreen(entering);
+      }
       if (entering) nativeFullscreen.enter();
       else nativeFullscreen.exit();
       return;
