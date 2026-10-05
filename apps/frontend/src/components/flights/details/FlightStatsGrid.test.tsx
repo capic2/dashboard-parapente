@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { Flight } from '../../../types';
 import { FlightStatsGrid } from './FlightStatsGrid';
@@ -83,8 +83,27 @@ const flight = {
 } as Flight;
 
 describe('FlightStatsGrid', () => {
+  it('keeps the flight summary visible and collapses explained GPX metrics', () => {
+    render(<FlightStatsGrid flight={flight} sites={[]} />);
+
+    expect(screen.getByText('flights.durationLabel')).toBeInTheDocument();
+    expect(screen.getByText('flights.maxAltitudeLabel')).toBeInTheDocument();
+    const details = screen
+      .getByText('flights.trackAnalysisDetails')
+      .closest('details');
+    expect(details).not.toHaveAttribute('open');
+
+    fireEvent.click(screen.getByText('flights.trackAnalysisDetails'));
+
+    expect(details).toHaveAttribute('open');
+    expect(
+      screen.getByText('flights.maxClimbRateDescription')
+    ).toBeInTheDocument();
+  });
+
   it('shows the detailed metrics calculated from the track', () => {
     render(<FlightStatsGrid flight={flight} sites={[]} />);
+    fireEvent.click(screen.getByText('flights.trackAnalysisDetails'));
 
     expect(screen.getByText('4.6 m/s')).toBeInTheDocument();
     expect(screen.getByText('3.2 m/s')).toBeInTheDocument();
@@ -119,6 +138,7 @@ describe('FlightStatsGrid', () => {
         sites={[]}
       />
     );
+    fireEvent.click(screen.getByText('flights.trackAnalysisDetails'));
 
     expect(screen.queryAllByText(/flights\.metricAtTime/u)).toHaveLength(5);
   });
@@ -138,6 +158,7 @@ describe('FlightStatsGrid', () => {
     });
 
     render(<FlightStatsGrid flight={flight} sites={[]} />);
+    fireEvent.click(screen.getByText('flights.trackAnalysisDetails'));
 
     expect(
       screen.getByText('flights.trackAnalysisUnavailable')
