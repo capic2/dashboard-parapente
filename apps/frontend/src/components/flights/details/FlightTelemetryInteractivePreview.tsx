@@ -210,7 +210,8 @@ export function FlightTelemetryInteractivePreview({
     useVideoExportStatus(youtubeExportJobId);
   const [youtubeExportNow, setYoutubeExportNow] = useState(() => Date.now());
   const validYoutubeUrls = youtubeUrls.filter((url) => getYoutubeVideoId(url));
-  const mainVideoSource = layout.data?.layout.mainVideoSource ?? 'auto';
+  const configuredMainVideoSource =
+    layout.data?.layout.mainVideoSource ?? 'auto';
   const publishedOverlayUrl = youtubeOverlayUpload.data?.youtube_url;
   const isYoutubeOverlayPublished = Boolean(
     youtubeOverlayUpload.data?.status === 'completed' &&
@@ -235,9 +236,9 @@ export function FlightTelemetryInteractivePreview({
     layout.isPending ||
     isEnrichmentPending;
   const isSelectedLocalMainAvailable =
-    (mainVideoSource === 'file:face' && hasFaceVideo) ||
-    (mainVideoSource === 'file:pilote' && hasPiloteVideo) ||
-    (mainVideoSource === 'file:vol' && hasFlightVideo);
+    (configuredMainVideoSource === 'file:face' && hasFaceVideo) ||
+    (configuredMainVideoSource === 'file:pilote' && hasPiloteVideo) ||
+    (configuredMainVideoSource === 'file:vol' && hasFlightVideo);
   const isReady =
     telemetry.isSuccess &&
     layout.isSuccess &&
@@ -293,6 +294,18 @@ export function FlightTelemetryInteractivePreview({
             getYoutubeVideoRoleFromTitle(association.title) === role
         )?.url
       : undefined;
+  const configuredYoutubeRole = configuredMainVideoSource.startsWith('youtube:')
+    ? (configuredMainVideoSource.slice('youtube:'.length) as ReturnType<
+        typeof getYoutubePipVideoRole
+      >)
+    : undefined;
+  const isConfiguredMainSourceAvailable =
+    configuredMainVideoSource === 'auto' ||
+    isSelectedLocalMainAvailable ||
+    Boolean(youtubeUrlForRole(configuredYoutubeRole));
+  const mainVideoSource = isConfiguredMainSourceAvailable
+    ? configuredMainVideoSource
+    : 'auto';
   const cameraUrl = getApiUrlWithSearchParams(
     `flights/${flightId}/gopro-camera/preview`,
     {
@@ -367,6 +380,9 @@ export function FlightTelemetryInteractivePreview({
     ? selectedYoutubeIndex % youtubeMainUrls.length
     : 0;
   const youtubeUrl = youtubeMainUrls[activeYoutubeIndex];
+  const activeYoutubeVideoId = youtubeUrl
+    ? getYoutubeVideoId(youtubeUrl)
+    : null;
   const activeYoutubeRole = youtubeUrl
     ? getYoutubeVideoRoleFromTitle(
         youtubeAssociations.data?.find(
