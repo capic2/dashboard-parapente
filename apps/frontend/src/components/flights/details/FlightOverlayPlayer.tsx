@@ -868,6 +868,17 @@ export function FlightOverlayPlayer({
       return;
     }
 
+    if (isInteractive) {
+      const entering = !isFullscreen;
+      setIsFullscreen(entering);
+      if (document.fullscreenElement === playerRef.current) {
+        if (!entering) void document.exitFullscreen().catch(() => undefined);
+      } else if (entering) {
+        void playerRef.current.requestFullscreen().catch(() => undefined);
+      }
+      return;
+    }
+
     if (document.fullscreenElement === playerRef.current) {
       void document.exitFullscreen().catch(() => undefined);
     } else {
