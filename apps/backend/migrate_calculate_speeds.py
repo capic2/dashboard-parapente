@@ -1,7 +1,8 @@
-"""Idempotently backfill historical null flight max speeds in small transactions."""
+"""Recalculate persisted flight max speeds from their stored track files."""
 
 import argparse
 import logging
+import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,7 +36,7 @@ def backfill_missing_max_speeds(
     batch_size: int = 100,
     base_dir: Path = Path(__file__).parent,
 ) -> BackfillReport:
-    """Process each eligible row once per run and commit after every batch."""
+    """Recalculate every flight with a stored track, in small transactions."""
     if batch_size < 1:
         raise ValueError("batch_size must be positive")
 
@@ -46,7 +47,6 @@ def backfill_missing_max_speeds(
             query = db.query(Flight).filter(
                 Flight.gpx_file_path.isnot(None),
                 Flight.gpx_file_path != "",
-                Flight.max_speed_kmh.is_(None),
             )
             if last_id is not None:
                 query = query.filter(Flight.id > last_id)
@@ -64,16 +64,30 @@ def backfill_missing_max_speeds(
                     file_type = "gpx.gz" if path.name.lower().endswith(".gpx.gz") else path.suffix
                     _, points = normalize_track(content, file_type)
                     max_speed = float(calculate_track_stats(points)["max_speed_kmh"])
-                    if max_speed <= 0:
+                    has_explicit_speed = any(
+                        "speed_kmh" in point
+                        and math.isfinite(point["speed_kmh"])
+                        and 0 <= point["speed_kmh"] < 150
+                        for point in points
+                    )
+                    has_timestamp_pair = any(
+                        previous.get("segment", 0) == current.get("segment", 0)
+                        and current.get("timestamp", 0) > previous.get("timestamp", 0)
+                        for previous, current in zip(points, points[1:], strict=False)
+                    )
+                    if not has_explicit_speed and not has_timestamp_pair:
                         report.unchanged += 1
                         continue
+                    was_changed = flight.max_speed_kmh != max_speed
                     updated = (
                         db.query(Flight)
-                        .filter(Flight.id == flight.id, Flight.max_speed_kmh.is_(None))
+                        .filter(Flight.id == flight.id)
                         .update({Flight.max_speed_kmh: max_speed}, synchronize_session=False)
                     )
-                    report.updated += updated
-                    report.unchanged += 1 - updated
+                    if updated and was_changed:
+                        report.updated += updated
+                    else:
+                        report.unchanged += 1
                 except Exception as exc:
                     report.failed += 1
                     logger.warning("Failed to backfill flight %s: %s", flight.id, exc)
@@ -93,9 +107,15 @@ def backfill_missing_max_speeds(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--batch-size", type=int, default=100)
+    parser.add_argument(
+        "--base-dir",
+        type=Path,
+        default=Path(__file__).parent,
+        help="Root directory used to resolve relative stored track paths",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
-    report = backfill_missing_max_speeds(batch_size=args.batch_size)
+    report = backfill_missing_max_speeds(batch_size=args.batch_size, base_dir=args.base_dir)
     logger.info(
         "Max-speed backfill complete: batches=%d scanned=%d updated=%d unchanged=%d failed=%d",
         report.batches,

@@ -20,11 +20,18 @@ declare global {
 export function ViewerExport() {
   const { t } = useTranslation();
   // Get flightId from URL search params (?flightId=xxx)
-  const search = useSearch({ strict: false }) as { flightId?: string };
+  const search = useSearch({ strict: false }) as {
+    flightId?: string;
+    directorStyle?: 'natural' | 'cinematic' | 'dynamic';
+  };
   const flightId =
     search?.flightId ||
     new URLSearchParams(window.location.search).get('flightId') ||
     '';
+  const directorStyle =
+    search?.directorStyle ||
+    new URLSearchParams(window.location.search).get('directorStyle') ||
+    'natural';
 
   // Setup export mode for Playwright
   useEffect(() => {
@@ -58,7 +65,15 @@ export function ViewerExport() {
           </div>
         }
       >
-        <FlightViewer3D flightId={flightId} exportOnly />
+        <FlightViewer3D
+          flightId={flightId}
+          exportOnly
+          directorStyle={
+            directorStyle === 'cinematic' || directorStyle === 'dynamic'
+              ? directorStyle
+              : 'natural'
+          }
+        />
       </Suspense>
     </div>
   );

@@ -27,10 +27,10 @@ const formatStationWind = (
 
   const direction = formatWindDirection(station.wind_direction_deg ?? null);
   if (station.wind_max_kmh !== null && station.wind_max_kmh !== undefined) {
-    return `${station.wind_avg_kmh} km/h ${direction} (${gustLabel} ${station.wind_max_kmh})`;
+    return `${station.wind_avg_kmh.toFixed(1)} km/h ${direction} (${gustLabel} ${station.wind_max_kmh.toFixed(1)})`;
   }
 
-  return `${station.wind_avg_kmh} km/h ${direction}`;
+  return `${station.wind_avg_kmh.toFixed(1)} km/h ${direction}`;
 };
 
 const StationRow = ({

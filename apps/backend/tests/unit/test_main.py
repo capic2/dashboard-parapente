@@ -14,6 +14,21 @@ def test_health_check_route_is_not_intercepted_by_spa_catch_all(client):
     assert response.json() == {"status": "ok"}
 
 
+def test_staging_api_routes_are_available_without_a_reverse_proxy(client):
+    """A VITE_BASE_PATH=/staging/ build must work on the published HTTP port."""
+    response = client.get("/staging/api/flights")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")
+
+
+def test_staging_cesium_assets_are_available_without_a_reverse_proxy(client):
+    response = client.get("/staging/cesium/Cesium.js")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/javascript")
+
+
 def test_root_route_returns_api_status_when_frontend_is_missing(client, tmp_path, monkeypatch):
     import main
 
@@ -35,7 +50,38 @@ def test_root_route_serves_frontend_index_when_built(client, tmp_path, monkeypat
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
+    assert response.headers["cache-control"] == "no-cache, must-revalidate"
     assert "frontend" in response.text
+
+
+def test_hashed_frontend_assets_are_immutable():
+    import main
+    from fastapi.responses import Response
+
+    response = Response(content="export const loaded = true", media_type="text/javascript")
+    main._set_frontend_cache_headers("/assets/weather.lazy-Abc12345.js", response)
+
+    assert response.headers["cache-control"] == "public, max-age=31536000, immutable"
+
+
+def test_unhashed_frontend_paths_keep_default_cache_headers():
+    import main
+    from fastapi.responses import Response
+
+    response = Response(content="missing asset", media_type="text/javascript")
+    main._set_frontend_cache_headers("/assets/weather.js", response)
+
+    assert "cache-control" not in response.headers
+
+
+def test_frontend_error_responses_are_not_cached_as_successful_assets():
+    import main
+    from fastapi.responses import Response
+
+    response = Response(content="asset unavailable", media_type="text/javascript", status_code=502)
+    main._set_frontend_cache_headers("/assets/weather.lazy-Abc12345.js", response)
+
+    assert "cache-control" not in response.headers
 
 
 @pytest.mark.asyncio

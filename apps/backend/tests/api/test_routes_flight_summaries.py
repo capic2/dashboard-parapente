@@ -7,9 +7,24 @@ from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 import config
+from flight_summaries import _completed_youtube_uploads, _directory_file_exists
 from models import Flight, GoproOverlayJob, HighlightVideoJob, YoutubeUploadJob
 
 API_URL = "/api/flights/summaries"
+
+
+def test_directory_file_exists_ignores_missing_and_symlinked_media(tmp_path: Path) -> None:
+    media = tmp_path / "camera.mp4"
+    assert not _directory_file_exists(media)
+
+    media.write_bytes(b"video")
+    assert _directory_file_exists(media)
+
+    media.unlink()
+    target = tmp_path / "other.mp4"
+    target.write_bytes(b"video")
+    media.symlink_to(target)
+    assert not _directory_file_exists(media)
 
 
 def _add_flights(db_session, *, count: int, site_id: str = "site-arguel") -> None:
@@ -95,6 +110,7 @@ def test_summaries_filter_search_sort_and_hide_paths(client, db_session, arguel_
     assert item["has_video"] is False
     assert item["has_camera"] is False
     assert item["has_youtube_video"] is False
+    assert item["youtube_video_count"] == 0
     assert item["youtube_upload_status"] is None
     assert item["youtube_upload_progress"] is None
     assert item["has_gopro_overlay"] is False
@@ -102,6 +118,12 @@ def test_summaries_filter_search_sort_and_hide_paths(client, db_session, arguel_
     assert item["gopro_overlay_job_id"] == "overlay-job"
     assert not any("path" in key for key in item)
     assert body["flights"][1]["has_youtube_video"] is False
+
+
+def test_summaries_default_query_does_not_require_a_tag(client: TestClient) -> None:
+    response = client.get(API_URL)
+    assert response.status_code == 200
+    assert response.json() == {"flights": [], "total": 0, "next_cursor": None}
 
 
 def test_summaries_report_panorama_file(client, db_session, monkeypatch, tmp_path):
@@ -177,7 +199,11 @@ def test_summaries_only_report_completed_uploads_that_still_exist(client, db_ses
         id="youtube-uploaded",
         title="Uploaded",
         flight_date=date(2026, 1, 1),
-        youtube_urls_json='["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]',
+        youtube_urls_json=(
+            '["https://www.youtube.com/watch?v=dQw4w9WgXcQ", '
+            '"https://www.youtube.com/watch?v=9bZkp7q19f0", '
+            '"https://www.youtube.com/watch?v=aaaaaaaaaaa"]'
+        ),
     )
     deleted = Flight(id="youtube-deleted", title="Deleted", flight_date=date(2026, 1, 2))
     manual = Flight(
@@ -197,6 +223,7 @@ def test_summaries_only_report_completed_uploads_that_still_exist(client, db_ses
                 progress=100,
                 title="Uploaded",
                 description="",
+                source_type="face",
                 youtube_video_id="dQw4w9WgXcQ",
             ),
             YoutubeUploadJob(
@@ -219,16 +246,40 @@ def test_summaries_only_report_completed_uploads_that_still_exist(client, db_ses
                 description="",
                 youtube_video_id="bbbbbbbbbbb",
             ),
+            YoutubeUploadJob(
+                id="youtube-uploaded-second-job",
+                flight_id=uploaded.id,
+                user_id=1,
+                status="completed",
+                progress=100,
+                title="Uploaded second",
+                description="",
+                source_type="pano",
+                youtube_video_id="9bZkp7q19f0",
+            ),
+            YoutubeUploadJob(
+                id="youtube-uploaded-unavailable-job",
+                flight_id=uploaded.id,
+                user_id=1,
+                status="completed",
+                progress=100,
+                title="Uploaded but unavailable",
+                description="",
+                source_type="pilote",
+                youtube_video_id="aaaaaaaaaaa",
+            ),
         ]
     )
     db_session.commit()
 
     with patch(
         "flight_summaries.existing_youtube_video_ids",
-        return_value={"aaaaaaaaaaa", "dQw4w9WgXcQ"},
+        return_value={"dQw4w9WgXcQ", "9bZkp7q19f0"},
     ) as verify_videos:
         response = client.get(API_URL)
     flags_by_id = {item["id"]: item["has_youtube_video"] for item in response.json()["flights"]}
+    counts_by_id = {item["id"]: item["youtube_video_count"] for item in response.json()["flights"]}
+    types_by_id = {item["id"]: item["youtube_video_types"] for item in response.json()["flights"]}
 
     assert response.status_code == 200
     assert flags_by_id == {
@@ -236,7 +287,56 @@ def test_summaries_only_report_completed_uploads_that_still_exist(client, db_ses
         "youtube-manual": False,
         "youtube-uploaded": True,
     }
-    verify_videos.assert_called_once_with({1: {"dQw4w9WgXcQ"}})
+    assert counts_by_id == {
+        "youtube-deleted": 0,
+        "youtube-manual": 0,
+        "youtube-uploaded": 2,
+    }
+    assert types_by_id == {
+        "youtube-deleted": [],
+        "youtube-manual": [],
+        "youtube-uploaded": ["face", "pano"],
+    }
+    verify_videos.assert_called_once_with({1: {"dQw4w9WgXcQ", "9bZkp7q19f0", "aaaaaaaaaaa"}})
+
+
+def test_completed_youtube_uploads_default_missing_source_type() -> None:
+    assert _completed_youtube_uploads('[{"user_id": 1, "video_id": "dQw4w9WgXcQ"}]') == [
+        (1, "dQw4w9WgXcQ", "gopro_overlay")
+    ]
+
+
+def test_summaries_release_db_connection_before_remote_youtube_check(
+    db_session, monkeypatch
+) -> None:
+    from flight_summaries import list_flight_summaries
+
+    _add_flights(db_session, count=2)
+    youtube_check_started = False
+
+    def fake_existing_youtube_video_ids(_video_ids_by_user):
+        nonlocal youtube_check_started
+        youtube_check_started = True
+        assert not db_session.in_transaction()
+        return set()
+
+    monkeypatch.setattr(
+        "flight_summaries.existing_youtube_video_ids",
+        fake_existing_youtube_video_ids,
+    )
+
+    list_flight_summaries(
+        db_session,
+        page_size=20,
+        cursor=None,
+        q=None,
+        site_id=None,
+        gpx_status="all",
+        sort_by="flight_date",
+        sort_order="desc",
+    )
+
+    assert youtube_check_started
 
 
 def test_summaries_require_completed_generations_and_existing_files(
@@ -367,6 +467,38 @@ def test_summaries_put_nulls_last_and_keyset_ties_by_id(client, db_session, argu
         "duration-a",
         "duration-b",
         "duration-null",
+    ]
+
+
+def test_summaries_order_same_day_without_departure_time_by_creation_date(
+    client, db_session, arguel_site
+):
+    db_session.add_all(
+        [
+            Flight(
+                id="created-older",
+                title="Older",
+                flight_date=date(2026, 1, 1),
+                departure_time=None,
+                created_at=datetime(2026, 1, 1, 9),
+            ),
+            Flight(
+                id="created-newer",
+                title="Newer",
+                flight_date=date(2026, 1, 1),
+                departure_time=None,
+                created_at=datetime(2026, 1, 1, 10),
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(API_URL, params={"sort_by": "flight_date", "sort_order": "desc"})
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["flights"]] == [
+        "created-newer",
+        "created-older",
     ]
 
 

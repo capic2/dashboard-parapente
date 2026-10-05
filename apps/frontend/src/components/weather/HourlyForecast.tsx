@@ -1353,7 +1353,7 @@ export default function HourlyForecast({
                       {t('common.wind')}
                     </span>
                     <div className="font-bold text-slate-950 dark:text-white">
-                      {hour.wind}
+                      {hour.wind.toFixed(1)}
                     </div>
                   </div>
                   <div className="rounded-xl border border-white/80 bg-white/85 p-2 dark:border-slate-800 dark:bg-slate-950/55">
@@ -1651,7 +1651,7 @@ export default function HourlyForecast({
                           })}
                           className="w-full p-0 bg-transparent border-none cursor-help rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                         >
-                          {hour.wind}
+                          {hour.wind.toFixed(1)}
                         </Button>
                         <Tooltip offset={8} className="z-50">
                           {renderTooltipContent('wind', hour)}

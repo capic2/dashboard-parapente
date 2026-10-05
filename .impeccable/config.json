@@ -1,0 +1,36 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "apps/frontend/src/components/flights/details/FlightMediaBadges.tsx"
+        ],
+        "createdAt": "2026-10-03T18:33:22.094Z",
+        "reason": "Agent: slate is the default text color; indigo backgrounds and text are hover-scoped state styles, confirmed by inspecting both icon-only controls."
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "apps/frontend/src/pages/FlightHistory.tsx"
+        ],
+        "createdAt": "2026-10-04T07:52:50.969Z",
+        "reason": "Codex reviewed the three reported classes: the default slate text is on white or sky-50, while selected states use white on sky-600/rose-600 and slate-950 on sky-400/rose-400; these pairings are intentional and readable."
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "apps/frontend/src/components/telemetry/TelemetryLayoutEditor.tsx"
+        ],
+        "createdAt": "2026-10-04T18:04:30.309Z",
+        "reason": "false positive: button text is slate on slate background, and hover state changes text to red-600 on red hover background"
+      }
+    ]
+  },
+  "buildPath": "comp"
+}

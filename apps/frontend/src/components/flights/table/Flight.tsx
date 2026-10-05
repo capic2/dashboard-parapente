@@ -4,6 +4,7 @@ import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-t
 import {
   Camera,
   Clock3,
+  ExternalLink,
   FileText,
   MapPin,
   Mountain,
@@ -28,11 +29,12 @@ interface FlightProps {
   isActive: boolean;
   isSelected: boolean;
   selectionMode: boolean;
+  isListOption?: boolean;
   onSelectFlight: (flight: FlightSummary) => void;
   onDeleteFlight: (flight: FlightSummary) => void;
 }
 
-function formatFlightDate(date: string, language: string) {
+export function formatFlightDate(date: string, language: string) {
   const [year, month, day] = date.split('-');
   const localDate = new Date(Number(year), Number(month) - 1, Number(day));
 
@@ -56,6 +58,7 @@ export function Flight({
   isActive,
   isSelected,
   selectionMode,
+  isListOption = true,
   onSelectFlight,
   onDeleteFlight,
 }: FlightProps) {
@@ -71,6 +74,9 @@ export function Flight({
     flight.youtube_upload_status === 'uploading';
   const hasPanoVideo = flight.has_pano_video;
   const hasHighlightVideo = flight.has_highlight_video;
+  const hasSportstrackliveTrack =
+    flight.sportstracklive_status === 'uploaded' &&
+    flight.sportstracklive_track_id != null;
   const hasPersistedGoproOverlay = flight.has_gopro_overlay;
   const isGoproOverlayRunning = isGoproOverlayInProgress(
     flight.gopro_overlay_status
@@ -110,6 +116,19 @@ export function Flight({
     t('flights.youtubeBadge'),
     isYoutubeUploadRunning ? flight.youtube_upload_progress : null
   );
+  const youtubeVideoCountLabel =
+    flight.youtube_video_count > 1 ? ` x${flight.youtube_video_count}` : '';
+  const youtubeVideoTypes = flight.youtube_video_types ?? [];
+  const youtubeTypeLabels: Record<string, string> = {
+    gopro_overlay: 'flights.goproOverlayBadge',
+    youtube_overlay: 'flights.goproOverlayBadge',
+    camera: 'flights.cameraBadge',
+    video: 'flights.videoBadge',
+    pano: 'flights.panoBadge',
+    face: 'flights.faceBadge',
+    pilote: 'flights.piloteBadge',
+    highlight: 'flights.highlightVideoBadge',
+  };
   const selectFlight = () => {
     if (!selectionMode) {
       onSelectFlight(flight);
@@ -132,6 +151,7 @@ export function Flight({
     isYoutubeUploadRunning ||
     hasPanoVideo ||
     hasHighlightVideo ||
+    hasSportstrackliveTrack ||
     isVideoExportRunning ||
     isVideoExportFailed ||
     isHighlightVideoExportRunning ||
@@ -151,8 +171,8 @@ export function Flight({
   return (
     <Card
       // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
-      role="option"
-      aria-selected={isHighlighted}
+      role={isListOption ? 'option' : 'button'}
+      aria-selected={isListOption ? isHighlighted : undefined}
       tabIndex={0}
       data-testid={`flight-row-${flight.id}`}
       selected={isHighlighted}
@@ -195,12 +215,18 @@ export function Flight({
           <h3 className={`truncate text-sm font-semibold ${titleColor}`}>
             {flight.title || t('flights.untitledFlight')}
           </h3>
-          {!selectionMode && hasMediaStatus && (
+          {hasMediaStatus && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {hasGpx && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
                   <FileText className="h-3 w-3" aria-hidden="true" />
                   {t('flights.gpxBadge')}
+                </span>
+              )}
+              {hasSportstrackliveTrack && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-800 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200">
+                  <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.sportstrackliveBadge')}
                 </span>
               )}
               {hasVideo && (
@@ -233,13 +259,24 @@ export function Flight({
                   {t('flights.highlightVideoBadge')}
                 </span>
               )}
-              {(hasYoutubeVideo || isYoutubeUploadRunning) && (
+              {youtubeVideoTypes.map((sourceType, index) => (
+                <span
+                  key={`${sourceType}-${index}`}
+                  className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
+                >
+                  <Play className="h-3 w-3" aria-hidden="true" />
+                  {t(youtubeTypeLabels[sourceType] ?? 'flights.youtubeBadge')}
+                </span>
+              ))}
+              {((hasYoutubeVideo && youtubeVideoTypes.length === 0) ||
+                isYoutubeUploadRunning) && (
                 <span
                   aria-live={isYoutubeUploadRunning ? 'polite' : undefined}
                   className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
                 >
                   <Play className="h-3 w-3" aria-hidden="true" />
                   {youtubeLabel}
+                  {youtubeVideoTypes.length === 0 ? youtubeVideoCountLabel : ''}
                 </span>
               )}
               {isVideoExportRunning && (

@@ -53,6 +53,9 @@ PROJECT_ROOT = _resolve_project_root(BACKEND_ROOT)
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 TESTING = os.getenv("TESTING", "false").lower() == "true"
 IS_TEST_ENV = TESTING or ENVIRONMENT == "test"
+BACKGROUND_JOB_RECOVERY_ENABLED = (
+    os.getenv("BACKEND_BACKGROUND_JOB_RECOVERY_ENABLED", "true").lower() == "true"
+)
 
 if ENVIRONMENT != "production":
     # En développement : chercher .env.development puis .env
@@ -139,6 +142,10 @@ GOPRO_OVERLAY_SEGMENT_SECONDS = int(os.getenv("BACKEND_GOPRO_OVERLAY_SEGMENT_SEC
 # Deployment drain coordination
 DEPLOY_DRAIN_TOKEN = os.getenv("BACKEND_DEPLOY_DRAIN_TOKEN")
 DEPLOY_DRAIN_LEASE_SECONDS = _int_env_at_least("BACKEND_DEPLOY_DRAIN_LEASE_SECONDS", 4500, 1)
+# Keep orphaned admissions bounded independently from the longer drain lease.
+DEPLOY_DRAIN_ADMISSION_LEASE_SECONDS = _int_env_at_least(
+    "BACKEND_DEPLOY_DRAIN_ADMISSION_LEASE_SECONDS", 300, 1
+)
 
 # ============================================================================
 # API
@@ -154,6 +161,7 @@ WEATHERAPI_KEY = os.getenv("BACKEND_WEATHERAPI_KEY")
 METEOBLUE_API_KEY = os.getenv("BACKEND_METEOBLUE_API_KEY")
 OPENWEATHERMAP_API_KEY = os.getenv("BACKEND_OPENWEATHERMAP_API_KEY")
 SPOTAIR_BALISES_API_KEY = os.getenv("BACKEND_SPOTAIR_BALISES_API_KEY")
+OPENAIP_API_KEY = os.getenv("BACKEND_OPENAIP_API_KEY")
 
 # ============================================================================
 # SIA AZBA / RTBA
@@ -237,6 +245,9 @@ JWT_SECRET = os.getenv("BACKEND_JWT_SECRET")
 JWT_EXPIRE_HOURS = int(os.getenv("BACKEND_JWT_EXPIRE_HOURS", "168"))  # 7 days
 ADMIN_EMAIL = os.getenv("BACKEND_ADMIN_EMAIL")
 ADMIN_PASSWORD = os.getenv("BACKEND_ADMIN_PASSWORD")
+INTERNAL_STAGING_AUTO_LOGIN_HOST = os.getenv(
+    "BACKEND_INTERNAL_STAGING_AUTO_LOGIN_HOST", "192.168.1.106:18001"
+)
 
 # ============================================================================
 # YOUTUBE UPLOAD (Optional)
@@ -245,6 +256,7 @@ YOUTUBE_CLIENT_ID = os.getenv("BACKEND_YOUTUBE_CLIENT_ID")
 YOUTUBE_CLIENT_SECRET = os.getenv("BACKEND_YOUTUBE_CLIENT_SECRET")
 YOUTUBE_REDIRECT_URI = os.getenv("BACKEND_YOUTUBE_REDIRECT_URI")
 YOUTUBE_UPLOAD_CHUNK_SIZE = _youtube_upload_chunk_size()
+SPORTSTRACKLIVE_SECRET_KEY = os.getenv("BACKEND_SPORTSTRACKLIVE_SECRET_KEY")
 
 # ============================================================================
 # LOGGING
@@ -315,7 +327,7 @@ GOPRO_OVERLAY_FONT = os.getenv(
     "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
 )
 GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS = int(
-    os.getenv("BACKEND_GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS", "1800")
+    os.getenv("BACKEND_GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS", "3600")
 )
 GOPRO_OVERLAY_OSV_EXIFTOOL_TIMEOUT_SECONDS = int(
     os.getenv("BACKEND_GOPRO_OVERLAY_OSV_EXIFTOOL_TIMEOUT_SECONDS", "600")

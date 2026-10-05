@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from flight_naming import format_automatic_flight_name
-from flight_storage import ensure_flight_directory
+from flight_storage import ensure_flight_directory, flight_temporary_directory
 from flight_tracks import TrackPoint, calculate_track_stats, normalize_track
 from intervals_icu import ExternalActivity, IntervalsError
 from models import Flight, Site
@@ -210,12 +210,15 @@ async def import_external_activities(
                         flight.elevation_gain_m = int(stats["elevation_gain_m"])
                         flight.gpx_max_altitude_m = flight.max_altitude_m
                         flight.gpx_elevation_gain_m = flight.elevation_gain_m
+                        flight.max_climb_rate_ms = float(stats["max_climb_rate_ms"])
+                        flight.max_sink_rate_ms = float(stats["max_sink_rate_ms"])
                         db.flush()
 
                         filename = f"intervals_{_safe_activity_id(activity.id)}.gpx"
                         written_path = ensure_flight_directory(db, flight) / filename
-                        temporary_path = written_path.with_name(
-                            f".{written_path.name}.{uuid.uuid4()}.tmp"
+                        temporary_path = (
+                            flight_temporary_directory(db, flight, "imports")
+                            / f"{written_path.name}.{uuid.uuid4()}.tmp"
                         )
                         temporary_path.write_bytes(gpx)
                         temporary_path.replace(written_path)

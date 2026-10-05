@@ -1,3 +1,4 @@
+import math
 import re
 from datetime import date, datetime, time
 from typing import Any, Literal
@@ -105,6 +106,7 @@ class GoproOverlayProbeResponse(GoproOverlayLayoutsResponse):
 
 class GoproOverlayJob(BaseModel):
     job_id: str
+    operation_id: str | None = None
     flight_id: str | None = None
     status: Literal["queued", "preparing", "running", "completed", "failed", "cancelled"]
     progress: int
@@ -165,11 +167,56 @@ class GoproOverlayPreviewCoordinate(BaseModel):
     heart_rate: int | None = None
 
 
+class FlightTelemetryPoint(BaseModel):
+    timestamp: int
+    lat: float
+    lon: float
+    elevation: float
+    segment: int = 0
+    speed_kmh: float | None = None
+    vario_ms: float | None = None
+    heading_deg: float | None = None
+    distance_km: float | None = None
+    altitude_relative_m: float | None = None
+    heart_rate: int | None = None
+    power: int | None = None
+
+
+class FlightTelemetryResponse(BaseModel):
+    points: list[FlightTelemetryPoint]
+    source: Literal["gpx", "gpx+osv"]
+    has_osv: bool
+    enrichment_status: Literal["missing", "pending", "ready", "failed"]
+    enrichment_error: str | None = None
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    duration_seconds: float
+
+
+class TelemetryLayoutResponse(BaseModel):
+    id: str | None = None
+    scope: Literal["default", "flight"]
+    flight_id: str | None = None
+    xml_content: str
+    format_version: int = 1
+    is_override: bool = False
+
+
+class TelemetryLayoutUpdate(BaseModel):
+    xml_content: str = Field(min_length=1, max_length=500_000)
+
+
+class GoproOverlayEnrichmentResponse(BaseModel):
+    status: Literal["missing", "pending", "ready", "failed"]
+
+
 class GoproOverlayPreviewGpx(BaseModel):
     start_time: datetime
     end_time: datetime
     duration_seconds: float
     coordinates: list[GoproOverlayPreviewCoordinate]
+    enrichment_status: Literal["missing", "pending", "ready", "failed"]
+    enrichment_error: str | None = None
 
 
 class GoproOverlayPreviewAlignment(BaseModel):
@@ -178,10 +225,24 @@ class GoproOverlayPreviewAlignment(BaseModel):
     effective_offset_seconds: float
 
 
+class GoproOverlayPreviewLayer(BaseModel):
+    status: Literal["missing", "generating", "ready", "failed"]
+    job_id: str | None = None
+    error: str | None = None
+
+
 class GoproOverlayPreview(BaseModel):
     video: GoproOverlayPreviewVideo
     gpx: GoproOverlayPreviewGpx
     alignment: GoproOverlayPreviewAlignment
+    overlay: GoproOverlayPreviewLayer
+
+
+class FlightOverlayLayer(BaseModel):
+    """The reusable transparent telemetry overlay for a recorded flight."""
+
+    status: Literal["missing", "queued", "preparing", "running", "completed", "failed", "cancelled"]
+    job: GoproOverlayJob | None = None
 
 
 class GoproOverlayCancelResponse(BaseModel):
@@ -199,6 +260,7 @@ class HighlightVideoClipResponse(BaseModel):
 
 class HighlightVideoJobResponse(BaseModel):
     job_id: str
+    operation_id: str | None = None
     flight_id: str
     status: Literal["queued", "running", "completed", "failed", "cancelled"]
     progress: int
@@ -226,18 +288,76 @@ class DeploymentDrainRequest(BaseModel):
     run_url: str = Field(min_length=1)
 
 
+class DeploymentDrainJob(BaseModel):
+    job_id: str
+    mode: str | None = None
+    status: str
+    internal_status: str | None = None
+    flight_name: str | None = None
+    progress: int | float | None = None
+    message: str | None = None
+    created_at: datetime | None = None
+    started_at: datetime | None = None
+
+
+class DeploymentDrainAdmission(BaseModel):
+    operation: str
+    started_at: datetime
+
+
 class DeploymentDrainStatus(BaseModel):
     phase: Literal["idle", "waiting", "deploying"]
     accepting_jobs: bool
     ready_for_deployment: bool
     active_jobs: int
     admissions_in_progress: int
+    blocking_jobs: list[DeploymentDrainJob] = Field(default_factory=list)
+    active_admissions: list[DeploymentDrainAdmission] = Field(default_factory=list)
     deployment_id: str | None = None
     target_version: str | None = None
     run_url: str | None = None
     requested_at: datetime | None = None
     phase_changed_at: datetime | None = None
     expires_at: datetime | None = None
+
+
+class BackgroundOperationStep(BaseModel):
+    key: str
+    status: Literal["pending", "running", "completed", "failed", "cancelled", "skipped"]
+    progress: int | None = Field(default=None, ge=0, le=100)
+    detail: str | None = None
+    started_at: str | None = None
+    completed_at: str | None = None
+
+
+class BackgroundOperation(BaseModel):
+    operation_id: str
+    operation_type: str
+    title_key: str
+    status: Literal["queued", "running", "completed", "failed", "cancelled"]
+    progress: int | None = Field(default=None, ge=0, le=100)
+    current_step_key: str | None = None
+    current_step_progress: int | None = Field(default=None, ge=0, le=100)
+    current_step_detail: str | None = None
+    steps: list[BackgroundOperationStep] = Field(default_factory=list)
+    result: dict[str, Any] | None = None
+    error_key: str | None = None
+    error_detail: str | None = None
+    source_kind: str | None = None
+    source_id: str | None = None
+    can_cancel: bool = False
+    can_retry: bool = False
+    unread: bool = False
+    created_at: datetime
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    updated_at: datetime
+
+
+class BackgroundOperationStart(BaseModel):
+    operation_id: str
+    status: Literal["queued", "running"] = "queued"
+    detail_url: str
 
 
 # Sites
@@ -250,6 +370,7 @@ class SiteBase(BaseModel):
     region: str | None = None
     country: str | None = "FR"
     description: str | None = None  # Site description
+    practical_info: dict[str, str] = Field(default_factory=dict)
     usage_type: Literal["takeoff", "landing", "both"] | None = "both"  # Site usage type
 
 
@@ -286,6 +407,7 @@ class SiteUpdate(BaseModel):
     camera_close_zoom_percent: int | None = None
     camera_transition_percent: int | None = None
     usage_type: Literal["takeoff", "landing", "both"] | None = None
+    practical_info: dict[str, str] | None = None
 
     @validator("latitude")
     def validate_latitude(cls, v):
@@ -336,6 +458,36 @@ class SiteUpdate(BaseModel):
         return orientation
 
 
+class SitePracticalInfoSuggestionRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=160)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    region: str | None = Field(default=None, max_length=120)
+    country: str | None = Field(default=None, min_length=2, max_length=2)
+    usage_type: Literal["takeoff", "landing", "both"] = "both"
+
+
+class SitePracticalInfoSuggestionFields(BaseModel):
+    access: str = ""
+    rules: str = ""
+    webcam: str = ""
+    contact: str = ""
+    hazards: str = ""
+
+
+class SitePracticalInfoSuggestionSource(BaseModel):
+    title: str
+    url: str
+
+
+class SitePracticalInfoSuggestionResponse(BaseModel):
+    suggestions: SitePracticalInfoSuggestionFields
+    sources: list[SitePracticalInfoSuggestionSource]
+    grounded_result: str
+    grounded_result_is_verified: bool
+    search_suggestions_html: str
+
+
 class Site(SiteBase):
     id: str
     rating: int | None = None  # 0-6 rating from official spots
@@ -356,6 +508,7 @@ class Site(SiteBase):
 class AzbaConstraint(BaseModel):
     id: str
     name: str
+    zone_type: str | None = None
     valid_from: str | None = None
     valid_to: str | None = None
     floor: str | None = None
@@ -417,6 +570,8 @@ class FlightBase(BaseModel):
     distance_km: float | None = None
     elevation_gain_m: int | None = None
     notes: str | None = None
+    conditions_feedback: str | None = None
+    decision_snapshot: str | None = None
 
 
 class FlightCreate(FlightBase):
@@ -442,6 +597,21 @@ class FlightCreate(FlightBase):
         return value
 
 
+class FlightVideoMarker(BaseModel):
+    id: str = Field(min_length=1, max_length=100)
+    youtube_video_id: str = Field(pattern=r"^[A-Za-z0-9_-]{11}$")
+    kind: Literal["takeoff", "landing", "interest"]
+    timestamp_seconds: int = Field(ge=0, le=86400)
+    title: str = Field(default="", max_length=100)
+    include_in_youtube_chapters: bool = True
+
+    @model_validator(mode="after")
+    def interest_marker_has_title(self) -> "FlightVideoMarker":
+        if self.kind == "interest" and not self.title.strip():
+            raise ValueError("Interest markers must have a title")
+        return self
+
+
 class FlightUpdate(BaseModel):
     """Schema for updating flight details - all fields optional for PATCH"""
 
@@ -459,10 +629,26 @@ class FlightUpdate(BaseModel):
     description: str | None = None
     external_url: str | None = None
     youtube_urls: list[str] | None = None
+    video_markers: list[FlightVideoMarker] | None = None
+    tags: list[str] | None = None
+    conditions_feedback: str | None = None
+    decision_snapshot: str | None = None
+    gopro_overlay_gpx_offset: float | None = None
+    gpx_metrics_excluded: bool | None = None
 
     @validator("youtube_urls")
     def valid_youtube_urls(cls, value):
         return normalize_youtube_urls(value) if value is not None else None
+
+    @model_validator(mode="after")
+    def unique_video_marker_ids(self) -> "FlightUpdate":
+        if self.video_markers is not None:
+            marker_ids = [marker.id for marker in self.video_markers]
+            if len(marker_ids) != len(set(marker_ids)):
+                raise ValueError("Video marker IDs must be unique")
+            if len(self.video_markers) > 100:
+                raise ValueError("A flight cannot have more than 100 video markers")
+        return self
 
     @validator("duration_minutes", "max_altitude_m", "elevation_gain_m")
     def positive_values(cls, v):
@@ -470,6 +656,12 @@ class FlightUpdate(BaseModel):
         if v is not None and v < 0:
             raise ValueError("Value must be positive or zero")
         return v
+
+    @validator("gopro_overlay_gpx_offset")
+    def finite_gopro_overlay_offset(cls, value):
+        if value is not None and not math.isfinite(value):
+            raise ValueError("gopro_overlay_gpx_offset must be finite")
+        return value
 
     @validator("distance_km", "max_speed_kmh")
     def positive_floats(cls, v):
@@ -497,7 +689,9 @@ class YoutubeAuthUrlRequest(BaseModel):
 
 
 class YoutubeUploadCreate(BaseModel):
-    source_type: Literal["gopro_overlay", "pano", "highlight"] = "gopro_overlay"
+    source_type: Literal[
+        "gopro_overlay", "camera", "video", "pano", "face", "pilote", "highlight"
+    ] = "gopro_overlay"
     gopro_overlay_job_id: str | None = None
     highlight_video_job_id: str | None = None
     title: str = Field(min_length=1, max_length=100)
@@ -533,13 +727,22 @@ class YoutubeUploadCreate(BaseModel):
         return title
 
 
+class YoutubeOverlayExportCreate(BaseModel):
+    youtube_url: str = Field(min_length=1)
+    pip_youtube_url: str | None = Field(default=None, min_length=1)
+    pip_apply_offset: bool = True
+
+
 class YoutubeUploadJobResponse(BaseModel):
+    operation_id: str | None = None
     job_id: str
     flight_id: str
-    source_type: Literal["gopro_overlay", "pano", "highlight"]
+    source_type: Literal[
+        "gopro_overlay", "camera", "video", "pano", "face", "pilote", "highlight", "youtube_overlay"
+    ]
     gopro_overlay_job_id: str | None = None
     highlight_video_job_id: str | None = None
-    status: Literal["queued", "uploading", "completed", "failed", "cancelled"]
+    status: Literal["preparing", "queued", "uploading", "completed", "failed", "cancelled"]
     progress: int = Field(ge=0, le=100)
     youtube_url: str | None = None
     error: str | None = None
@@ -551,6 +754,7 @@ class YoutubeVideoAssociation(BaseModel):
     video_id: str = Field(pattern=YOUTUBE_VIDEO_ID_PATTERN.pattern)
     can_delete_from_youtube: bool
     exists_on_youtube: bool | None = None
+    title: str | None = None
 
 
 class YoutubeVideoRemoveRequest(BaseModel):
@@ -583,14 +787,18 @@ class Flight(FlightBase):
     external_provider: str | None = None
     external_activity_id: str | None = None
     gpx_file_path: str | None = None
+    gpx_metrics_excluded: bool = False
     external_url: str | None = None
     youtube_urls: list[str] = Field(default_factory=list)
+    video_markers: list[FlightVideoMarker] = Field(default_factory=list)
     video_export_job_id: str | None = None
     video_export_status: str | None = None  # "processing", "completed", "failed"
     video_export_progress: int | None = None
     video_file_path: str | None = None
     video_file_exists: bool = False
     pano_video_file_exists: bool = False
+    face_video_file_exists: bool = False
+    pilote_video_file_exists: bool = False
     gopro_camera_file_exists: bool = False
     gopro_overlay_job_id: str | None = None
     gopro_overlay_status: str | None = None
@@ -624,6 +832,7 @@ class FlightSummary(BaseModel):
     site_region: str | None = None
     name: str | None = None
     title: str | None = None
+    tags: list[str] = Field(default_factory=list)
     flight_date: date
     departure_time: datetime | None = None
     duration_minutes: int | None = None
@@ -631,12 +840,27 @@ class FlightSummary(BaseModel):
     distance_km: float | None = None
     elevation_gain_m: int | None = None
     has_gpx: bool
+    sportstracklive_status: str | None = None
+    sportstracklive_track_id: int | None = None
     video_export_job_id: str | None = None
     video_export_status: str | None = None
     video_export_progress: int | None = None
     has_video: bool
     has_camera: bool
     has_youtube_video: bool
+    youtube_video_count: int
+    youtube_video_types: list[
+        Literal[
+            "gopro_overlay",
+            "camera",
+            "video",
+            "pano",
+            "face",
+            "pilote",
+            "highlight",
+            "youtube_overlay",
+        ]
+    ] = Field(default_factory=list)
     youtube_upload_status: str | None = None
     youtube_upload_progress: int | None = None
     gopro_overlay_job_id: str | None = None
@@ -730,6 +954,8 @@ class FlightRecordsResponse(BaseModel):
     highest_altitude: FlightRecord | None = None
     longest_distance: FlightRecord | None = None
     max_speed: FlightRecord | None = None
+    max_climb_rate: FlightRecord | None = None
+    max_sink_rate: FlightRecord | None = None
     takeoff_elevation_gain: FlightRecord | None = None
     earliest_takeoff: FlightRecord | None = None
     latest_takeoff: FlightRecord | None = None

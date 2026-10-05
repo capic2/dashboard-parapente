@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,12 +19,18 @@ import type {
   CreateSiteData,
 } from '@dashboard-parapente/shared-types';
 import { Modal } from '@dashboard-parapente/design-system';
+import { getApiErrorMessage } from '../../lib/api';
 import LandingAssociationsManager from './LandingAssociationsManager';
 import {
   useLocationSearch,
   useNearbyFlightOptions,
 } from '../../hooks/weather/useCityWeather';
 import { useSites } from '../../hooks/sites/useSites';
+import {
+  useSuggestSitePracticalInfo,
+  type SitePracticalInfoKey,
+  type SitePracticalInfoSuggestions,
+} from '../../hooks/sites/useSiteMutations';
 
 type SiteFormData = Required<SiteUpdate>;
 type SiteUsageType = 'takeoff' | 'landing' | 'both';
@@ -131,6 +138,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
     camera_transition_percent: 12,
     usage_type: 'both',
     description: '',
+    practical_info: {},
   });
 
   // Raw string values for numeric fields (avoids parsing on every keystroke)
@@ -149,6 +157,17 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
   const [limit, setLimit] = useState(5);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
   const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
+  const [suggestionSources, setSuggestionSources] = useState<
+    { title: string; url: string }[]
+  >([]);
+  const [suggestionDraft, setSuggestionDraft] =
+    useState<SitePracticalInfoSuggestions | null>(null);
+  const [suggestionSiteIdentity, setSuggestionSiteIdentity] = useState<
+    string | null
+  >(null);
+  const [suggestionStatus, setSuggestionStatus] = useState('');
+  const [suggestionError, setSuggestionError] = useState('');
+  const practicalInfoSuggestion = useSuggestSitePracticalInfo();
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setDebouncedQuery(query), 300);
@@ -209,6 +228,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         camera_transition_percent: site.camera_transition_percent || 12,
         usage_type: site.usage_type || 'both',
         description: site.description || '',
+        practical_info: site.practical_info ?? {},
       };
       setFormData(initialData);
       setOriginalData(initialData);
@@ -232,6 +252,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         camera_transition_percent: 12,
         usage_type: 'both',
         description: '',
+        practical_info: {},
       });
       setOriginalData(null);
       setLatitudeRaw('');
@@ -244,6 +265,11 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
       setSelectedSpotId(null);
     }
     setErrors({});
+    setSuggestionSources([]);
+    setSuggestionDraft(null);
+    setSuggestionSiteIdentity(null);
+    setSuggestionStatus('');
+    setSuggestionError('');
   }, [site, isOpen]);
 
   useEffect(() => {
@@ -293,6 +319,67 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
       elevation_m: elev,
     }));
     return { latitude: lat, longitude: lon, elevation_m: elev };
+  };
+
+  const latitudeForSuggestions = Number(latitudeRaw);
+  const longitudeForSuggestions = Number(longitudeRaw);
+  const suggestionRequestIdentity = JSON.stringify({
+    name: formData.name.trim(),
+    latitude: latitudeRaw,
+    longitude: longitudeRaw,
+    region: formData.region.trim(),
+    country: formData.country,
+    usage_type: formData.usage_type,
+  });
+  const latestSuggestionRequestIdentity = useRef(suggestionRequestIdentity);
+  latestSuggestionRequestIdentity.current = suggestionRequestIdentity;
+  const canSuggestPracticalInfo =
+    formData.name.trim().length >= 2 &&
+    latitudeRaw.trim() !== '' &&
+    longitudeRaw.trim() !== '' &&
+    Number.isFinite(latitudeForSuggestions) &&
+    latitudeForSuggestions >= -90 &&
+    latitudeForSuggestions <= 90 &&
+    Number.isFinite(longitudeForSuggestions) &&
+    longitudeForSuggestions >= -180 &&
+    longitudeForSuggestions <= 180;
+
+  const hasCurrentSiteSuggestions =
+    suggestionSiteIdentity === suggestionRequestIdentity;
+
+  const handleSuggestPracticalInfo = async () => {
+    const requestIdentity = suggestionRequestIdentity;
+    setSuggestionError('');
+    setSuggestionStatus('');
+    setSuggestionSources([]);
+    setSuggestionDraft(null);
+    setSuggestionSiteIdentity(null);
+
+    try {
+      const result = await practicalInfoSuggestion.mutateAsync({
+        name: formData.name.trim(),
+        latitude: latitudeForSuggestions,
+        longitude: longitudeForSuggestions,
+        ...(formData.region.trim() && { region: formData.region.trim() }),
+        ...(formData.country && { country: formData.country }),
+        usage_type: formData.usage_type,
+      });
+      if (latestSuggestionRequestIdentity.current !== requestIdentity) return;
+      setSuggestionSiteIdentity(requestIdentity);
+      setSuggestionSources(result.sources);
+      setSuggestionDraft(result);
+      setSuggestionStatus(
+        Object.values(result.suggestions).some((value) => value.trim())
+          ? t('editSite.suggestionsReady')
+          : t('editSite.noSuggestions')
+      );
+    } catch (error) {
+      if (latestSuggestionRequestIdentity.current !== requestIdentity) return;
+      setSuggestionSiteIdentity(requestIdentity);
+      setSuggestionError(
+        await getApiErrorMessage(error, t('editSite.suggestionsError'))
+      );
+    }
   };
 
   const validate = () => {
@@ -351,6 +438,9 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           ...(formData.country && { country: formData.country }),
           ...(formData.usage_type && { usage_type: formData.usage_type }),
           ...(formData.description && { description: formData.description }),
+          ...(Object.keys(formData.practical_info).length > 0 && {
+            practical_info: formData.practical_info,
+          }),
         });
       }
       onClose();
@@ -689,6 +779,154 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           </div>
         </div>
 
+        <fieldset className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/50">
+          <legend className="px-1 text-sm font-semibold text-slate-900 dark:text-white">
+            Informations pratiques privées
+          </legend>
+          <p className="text-xs text-slate-600 dark:text-slate-300">
+            Ces informations sont personnelles et ne sont jamais affichées comme
+            des données communautaires.
+          </p>
+          <div className="space-y-2">
+            <Button
+              type="button"
+              onPress={handleSuggestPracticalInfo}
+              isDisabled={
+                !canSuggestPracticalInfo ||
+                isSaving ||
+                practicalInfoSuggestion.isPending
+              }
+              className="inline-flex items-center gap-2 rounded bg-sky-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+            >
+              {practicalInfoSuggestion.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <MapPin className="h-4 w-4" aria-hidden="true" />
+              )}
+              {practicalInfoSuggestion.isPending
+                ? t('editSite.searchingSuggestions')
+                : t('editSite.suggestPracticalInfo')}
+            </Button>
+            {!canSuggestPracticalInfo && (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {t('editSite.suggestionsNeedCoordinates')}
+              </p>
+            )}
+            {hasCurrentSiteSuggestions && suggestionStatus && (
+              <p
+                className="text-xs text-emerald-700 dark:text-emerald-300"
+                aria-live="polite"
+              >
+                {suggestionStatus}
+              </p>
+            )}
+            {hasCurrentSiteSuggestions && suggestionError && (
+              <p
+                className="text-xs text-red-700 dark:text-red-300"
+                role="alert"
+              >
+                {suggestionError}
+              </p>
+            )}
+            {hasCurrentSiteSuggestions && suggestionSources.length > 0 && (
+              <div className="text-xs text-slate-600 dark:text-slate-300">
+                <p className="font-medium">{t('editSite.suggestionSources')}</p>
+                <ul className="mt-1 list-inside list-disc space-y-1">
+                  {suggestionSources.map((source) => (
+                    <li key={source.url}>
+                      <a
+                        href={source.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline decoration-slate-400 underline-offset-2 hover:text-sky-600 dark:hover:text-sky-300"
+                      >
+                        {source.title}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {hasCurrentSiteSuggestions && suggestionDraft?.grounded_result && (
+              <div className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                <p className="text-xs font-medium text-slate-700 dark:text-slate-200">
+                  {t(
+                    suggestionDraft.grounded_result_is_verified
+                      ? 'editSite.groundedSearchResult'
+                      : 'editSite.unverifiedSearchResult'
+                  )}
+                </p>
+                {!suggestionDraft.grounded_result_is_verified && (
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    {t('editSite.unverifiedSearchResultHelp')}
+                  </p>
+                )}
+                <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words text-xs text-slate-600 dark:text-slate-300">
+                  {suggestionDraft.grounded_result}
+                </pre>
+                {suggestionDraft.search_suggestions_html && (
+                  <div
+                    aria-label={t('editSite.searchSuggestionsTitle')}
+                    className="overflow-x-auto rounded border border-slate-200 dark:border-slate-700"
+                    dangerouslySetInnerHTML={{
+                      __html: suggestionDraft.search_suggestions_html,
+                    }}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+          {[
+            ['access', 'Accès / parking'],
+            ['rules', 'Consignes locales'],
+            ['webcam', 'Webcam ou lien utile'],
+            ['contact', 'Contact club'],
+            ['hazards', 'Risques ou pièges connus'],
+          ].map(([key, label]) => (
+            <TextField
+              key={key}
+              value={formData.practical_info[key] ?? ''}
+              onChange={(value: string) =>
+                setFormData({
+                  ...formData,
+                  practical_info: { ...formData.practical_info, [key]: value },
+                })
+              }
+              className="flex flex-col gap-1"
+            >
+              <Label className={labelClass}>{label}</Label>
+              <Input className={inputClass} />
+              {hasCurrentSiteSuggestions &&
+                suggestionDraft?.suggestions[
+                  key as SitePracticalInfoKey
+                ]?.trim() &&
+                !formData.practical_info[key]?.trim() && (
+                  <Button
+                    type="button"
+                    onPress={() => {
+                      const infoKey = key as SitePracticalInfoKey;
+                      const suggestedValue =
+                        suggestionDraft.suggestions[infoKey];
+                      setFormData((current) => ({
+                        ...current,
+                        practical_info: {
+                          ...current.practical_info,
+                          ...(current.practical_info[infoKey]?.trim()
+                            ? {}
+                            : { [infoKey]: suggestedValue }),
+                        },
+                      }));
+                      setSuggestionStatus(t('editSite.suggestionAdded'));
+                    }}
+                    className="mt-1 self-start rounded px-2 py-1 text-xs font-medium text-sky-700 underline underline-offset-2 hover:text-sky-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600 dark:text-sky-300 dark:hover:text-sky-100 cursor-pointer"
+                  >
+                    {t('editSite.addSuggestion')}
+                  </Button>
+                )}
+            </TextField>
+          ))}
+        </fieldset>
+
         {/* GPS Coordinates */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <TextField
@@ -933,7 +1171,11 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           <Button
             type="submit"
             className="inline-flex flex-1 items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 cursor-pointer transition-colors"
-            isDisabled={isSaving || Boolean(duplicateSite)}
+            isDisabled={
+              isSaving ||
+              practicalInfoSuggestion.isPending ||
+              Boolean(duplicateSite)
+            }
           >
             {isSaving ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />

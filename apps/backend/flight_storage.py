@@ -1,5 +1,6 @@
 from pathlib import Path
 from collections.abc import Iterable
+from typing import Literal
 
 from sqlalchemy.orm import Session
 
@@ -42,6 +43,18 @@ def flight_directory(db: Session, flight: Flight) -> Path:
 
 def pano_video_path(db: Session, flight: Flight) -> Path:
     return pano_video_paths(db, [flight])[flight.id]
+
+
+def temporary_video_path(
+    db: Session,
+    flight: Flight,
+    source_type: Literal["pano", "face", "pilote"],
+) -> Path:
+    """Resolve a temporary YouTube source beside the flight's panorama video."""
+    pano_path = pano_video_path(db, flight)
+    if source_type == "pano":
+        return pano_path
+    return pano_path.with_name(f"{source_type}.mp4")
 
 
 def pano_video_paths(db: Session, flights: Iterable[Flight]) -> dict[str, Path]:
@@ -102,7 +115,7 @@ def flight_temporary_directory(db: Session, flight: Flight, namespace: str) -> P
     if not namespace or Path(namespace).name != namespace:
         raise ValueError("Temporary storage namespace must be a single directory name")
 
-    directory = ensure_flight_directory(db, flight) / ".tmp" / namespace
+    directory = ensure_flight_directory(db, flight) / "temp" / namespace
     directory.mkdir(parents=True, exist_ok=True)
     return directory
 

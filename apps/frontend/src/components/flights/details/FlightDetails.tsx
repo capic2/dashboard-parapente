@@ -1,5 +1,5 @@
 import type { ChangeEvent } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -11,6 +11,7 @@ import {
   Modal,
 } from '@dashboard-parapente/design-system';
 import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
+import type { FlightVideoMarker } from '@dashboard-parapente/shared-types';
 import type { GoproOverlayJob } from '@dashboard-parapente/shared-types';
 import type { YoutubeVideoAssociation } from '@dashboard-parapente/shared-types';
 import {
@@ -22,7 +23,6 @@ import {
   Play,
   Wand2,
 } from 'lucide-react';
-import { Input, Label, TextField } from 'react-aria-components';
 import {
   useUpdateFlight,
   useUploadGPXToFlight,
@@ -35,6 +35,7 @@ import {
 } from '../../../hooks/flights/useYoutubeUpload';
 import {
   useCreateFlightGoproOverlayJob,
+  useFlightOverlayLayer,
   useGoproOverlayJobStream,
 } from '../../../hooks/gopro/useGoproOverlay';
 import {
@@ -45,6 +46,7 @@ import {
 } from '../../../hooks/flights/useHighlightVideos';
 import { useToast } from '../../../hooks/useToast';
 import { api, getApiErrorMessage } from '../../../lib/api';
+import { getYoutubeVideoId } from '../../../lib/youtube';
 import {
   hasFlightGoproOverlay,
   hasFlightVideo,
@@ -62,27 +64,37 @@ import { FlightGenerationLogsPanel } from './FlightGenerationLogsPanel';
 import { FlightMediaBadges } from './FlightMediaBadges';
 import { HighlightVideoJobCard } from './HighlightVideoJobCard';
 import { FlightNotesSection } from './FlightNotesSection';
+import { FlightPilotContextSection } from './FlightPilotContextSection';
+import { FlightSportstrackliveCard } from './FlightSportstrackliveCard';
 import { FlightReplayCard } from './FlightReplayCard';
 import { FlightStatsGrid } from './FlightStatsGrid';
+import { FlightSportstrackliveUploadButton } from './FlightSportstrackliveUploadButton';
 import { FlightYoutubeVideos } from './FlightYoutubeVideos';
 import { GoproOverlayJobStack } from './GoproOverlayJobStack';
-import { GoproOverlaySyncPreview } from './GoproOverlaySyncPreview';
+import { FlightOverlayWorkspace } from './FlightOverlayWorkspace';
+import { FlightTelemetryInteractivePreview } from './FlightTelemetryInteractivePreview';
+import { FlightVideoMarkersEditor } from '../edit/FlightVideoMarkersEditor';
+import { flightQueryOptions } from '../../../hooks/flights/useFlight';
+import type { FlightDetailsTab } from '../../../routes/-flightSearch';
 
 interface FlightDetailsProps {
   flight: Flight;
   sites: Site[];
   onShowCreateSiteModal: () => void;
+  activeTab?: FlightDetailsTab;
+  onActiveTabChange?: (tab: FlightDetailsTab) => void;
   mobileMode?: boolean;
   onCloseMobile?: () => void;
 }
 
-type FlightDetailsTab = 'infos' | 'replay' | 'logs';
 type GoproOverlayOutputResolution = '1080p' | '4k';
 
 export function FlightDetails({
   flight,
   sites,
   onShowCreateSiteModal,
+  activeTab: controlledActiveTab,
+  onActiveTabChange,
   mobileMode = false,
   onCloseMobile,
 }: FlightDetailsProps) {
@@ -92,6 +104,10 @@ export function FlightDetails({
   const updateFlight = useUpdateFlight(flight.id);
   const uploadGPXMutation = useUploadGPXToFlight(flight.id);
   const createGoproOverlayJob = useCreateFlightGoproOverlayJob(flight.id);
+  const overlayLayer = useFlightOverlayLayer(flight.id);
+  const hasReadyOverlayLayer = overlayLayer.data?.status === 'completed';
+  const hasSavedOverlaySynchronization =
+    flight.gopro_overlay_gpx_offset != null;
   const highlightVideosQuery = useFlightHighlightVideos(flight.id);
   const createHighlightVideo = useCreateFlightHighlightVideo(flight.id);
   const cancelHighlightVideo = useCancelFlightHighlightVideo(flight.id);
@@ -104,8 +120,35 @@ export function FlightDetails({
   const [editingMode, setEditingMode] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesText, setNotesText] = useState(flight.notes ?? '');
-  const [activeTab, setActiveTab] = useState<FlightDetailsTab>('infos');
+  const [localActiveTab, setLocalActiveTab] =
+    useState<FlightDetailsTab>('infos');
+  const activeTab = controlledActiveTab ?? localActiveTab;
+  const setActiveTab = (tab: FlightDetailsTab) => {
+    if (controlledActiveTab === undefined) setLocalActiveTab(tab);
+    onActiveTabChange?.(tab);
+  };
   const [isReplayExpanded, setIsReplayExpanded] = useState(false);
+  const [isOverlayWorkspaceExpanded, setIsOverlayWorkspaceExpanded] = useState(
+    !hasSavedOverlaySynchronization
+  );
+  const [videoMarkersDraft, setVideoMarkersDraft] = useState(
+    flight.video_markers ?? []
+  );
+  const [currentYoutubePosition, setCurrentYoutubePosition] = useState<{
+    videoId: string;
+    seconds: number;
+  } | null>(null);
+  const persistedVideoMarkersKey = JSON.stringify(flight.video_markers ?? []);
+  const persistedVideoMarkers = useMemo(
+    () => JSON.parse(persistedVideoMarkersKey) as FlightVideoMarker[],
+    [persistedVideoMarkersKey]
+  );
+  const lastPersistedVideoMarkersRef = useRef({
+    flightId: flight.id,
+    key: persistedVideoMarkersKey,
+  });
+  const [videoMarkerTimesValid, setVideoMarkerTimesValid] = useState(true);
+  const [isSavingVideoMarkers, setIsSavingVideoMarkers] = useState(false);
   const [isGoproOverlayDialogOpen, setIsGoproOverlayDialogOpen] =
     useState(false);
   const [goproOverlayJobId, setGoproOverlayJobId] = useState<string | null>(
@@ -119,10 +162,15 @@ export function FlightDetails({
   const [goproOverlayGpxOffset, setGoproOverlayGpxOffset] = useState(
     String(flight.gopro_overlay_gpx_offset ?? 0)
   );
-  const [goproOverlayInitialGpxOffset, setGoproOverlayInitialGpxOffset] =
-    useState<string | null>(null);
+  const [goproOverlayPreviewOffset, setGoproOverlayPreviewOffset] = useState(
+    String(flight.gopro_overlay_gpx_offset ?? 0)
+  );
   const [goproOverlayOutputResolution, setGoproOverlayOutputResolution] =
-    useState<GoproOverlayOutputResolution>('1080p');
+    useState<GoproOverlayOutputResolution>('4k');
+  const [goproOverlayCameraVideo, setGoproOverlayCameraVideo] =
+    useState<File | null>(null);
+  const [isUploadingGoproCameraVideo, setIsUploadingGoproCameraVideo] =
+    useState(false);
   const [downloadingMedia, setDownloadingMedia] =
     useState<DownloadableFlightMedia | null>(null);
   const [deletingGoproOverlayJobId, setDeletingGoproOverlayJobId] = useState<
@@ -136,8 +184,14 @@ export function FlightDetails({
 
   const hasGpx = Boolean(flight.gpx_file_path);
   const hasVideo = hasFlightVideo(flight);
+  const hasYoutubeVideo = (flight.youtube_urls ?? []).some((url) =>
+    getYoutubeVideoId(url)
+  );
   const hasPanoVideo = flight.pano_video_file_exists === true;
+  const hasFaceVideo = flight.face_video_file_exists === true;
+  const hasPiloteVideo = flight.pilote_video_file_exists === true;
   const hasGoproCameraVideo = flight.gopro_camera_file_exists === true;
+  const hasGoproOverlayOffset = flight.gopro_overlay_gpx_offset != null;
   const hasPersistedGoproOverlay = hasFlightGoproOverlay(flight);
   const persistedGoproOverlays = flight.gopro_overlays ?? [];
   const activePersistedGoproOverlay = persistedGoproOverlays.find((overlay) =>
@@ -222,19 +276,33 @@ export function FlightDetails({
     values,
     pendingYoutubeRemovals,
   }: FlightEditSubmission) => {
+    const requestedFlightId = flight.id;
+    const markerDraftAtRequestKey = JSON.stringify(videoMarkersDraft);
+    const markerDraftWasClean =
+      markerDraftAtRequestKey === persistedVideoMarkersKey;
     const remainingRemovals = pendingYoutubeRemovals.filter(
       (removal) =>
         !completedEditYoutubeRemovalIdsRef.current.has(removal.videoId)
     );
 
     try {
-      await updateFlight.mutateAsync({
+      const updatedFlight = await updateFlight.mutateAsync({
         ...values,
         youtube_urls: [
           ...(values.youtube_urls ?? []),
           ...remainingRemovals.map((removal) => removal.url),
         ],
       });
+      if (
+        activeFlightIdRef.current === requestedFlightId &&
+        markerDraftWasClean
+      ) {
+        setVideoMarkersDraft((currentMarkers) =>
+          JSON.stringify(currentMarkers) === markerDraftAtRequestKey
+            ? (updatedFlight.video_markers ?? [])
+            : currentMarkers
+        );
+      }
     } catch (error) {
       toast.error(await getApiErrorMessage(error, t('flights.updateError')));
       throw error;
@@ -264,6 +332,37 @@ export function FlightDetails({
   const handleCancelEdit = () => {
     completedEditYoutubeRemovalIdsRef.current.clear();
     setEditingMode(false);
+  };
+
+  const handleSaveVideoMarkers = async () => {
+    if (!videoMarkerTimesValid || isSavingVideoMarkers) return;
+    const requestedFlightId = flight.id;
+    const markersAtRequest = videoMarkersDraft;
+    const markersAtRequestKey = JSON.stringify(markersAtRequest);
+    setIsSavingVideoMarkers(true);
+    try {
+      const updatedFlight = await updateFlight.mutateAsync({
+        video_markers: markersAtRequest,
+      });
+      queryClient.setQueryData(
+        flightQueryOptions(requestedFlightId).queryKey,
+        updatedFlight
+      );
+      if (activeFlightIdRef.current === requestedFlightId) {
+        setVideoMarkersDraft((currentMarkers) =>
+          JSON.stringify(currentMarkers) === markersAtRequestKey
+            ? (updatedFlight.video_markers ?? [])
+            : currentMarkers
+        );
+        toast.success(t('flights.updateSuccess'));
+      }
+    } catch (error) {
+      toast.error(
+        await getApiErrorMessage(error, t('flights.videoMarkerSaveError'))
+      );
+    } finally {
+      setIsSavingVideoMarkers(false);
+    }
   };
 
   const handleStartEdit = () => {
@@ -374,7 +473,15 @@ export function FlightDetails({
 
   const handleStartGoproOverlay = async () => {
     if (isGoproOverlayRunning) return;
-    if (!hasGoproCameraVideo) {
+    if (!hasGoproOverlayOffset) {
+      toast.error(t('flights.goproOverlayNeedsOffset'));
+      return;
+    }
+    if (!hasReadyOverlayLayer) {
+      toast.error(t('flights.goproOverlayNeedsLayer'));
+      return;
+    }
+    if (!hasGoproCameraVideo && !goproOverlayCameraVideo) {
       toast.error(t('flights.goproOverlayNeedsCameraVideo'));
       return;
     }
@@ -385,20 +492,11 @@ export function FlightDetails({
 
     const requestedFlightId = flight.id;
     const formData = new FormData();
-    const normalizedGpxOffset = goproOverlayGpxOffset.trim();
-    if (normalizedGpxOffset) {
-      const parsedOffset = Number(normalizedGpxOffset);
-      if (!Number.isFinite(parsedOffset)) {
-        toast.error(t('flights.goproOverlayInvalidOffset'));
-        return;
-      }
-    }
-
     setIsGoproOverlayDialogOpen(false);
-    if (normalizedGpxOffset) {
-      formData.append('gpx_offset', normalizedGpxOffset);
-    }
     formData.append('output_resolution', goproOverlayOutputResolution);
+    if (goproOverlayCameraVideo) {
+      formData.append('video_file', goproOverlayCameraVideo);
+    }
 
     try {
       const job = await createGoproOverlayJob.mutateAsync(formData);
@@ -408,6 +506,9 @@ export function FlightDetails({
       void queryClient.invalidateQueries({ queryKey: ['flights'] });
       toast.success(t('flights.goproOverlayStarted'));
     } catch (error) {
+      if (goproOverlayCameraVideo) {
+        void queryClient.invalidateQueries({ queryKey: ['flights'] });
+      }
       toast.error(
         await getApiErrorMessage(error, t('flights.goproOverlayStartError'))
       );
@@ -416,16 +517,52 @@ export function FlightDetails({
 
   const handleOpenGoproOverlayDialog = () => {
     if (createGoproOverlayJob.isPending || isGoproOverlayRunning) return;
-    setGoproOverlayOutputResolution('1080p');
+    setGoproOverlayOutputResolution('4k');
+    setGoproOverlayCameraVideo(null);
     setIsGoproOverlayDialogOpen(true);
-    if (flight.gopro_overlay_gpx_offset != null) {
-      const storedOffset = String(flight.gopro_overlay_gpx_offset);
-      setGoproOverlayInitialGpxOffset(storedOffset);
-      setGoproOverlayGpxOffset(storedOffset);
-      return;
+  };
+
+  const handleGoproCameraVideoChange = async (
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.currentTarget.files?.[0] ?? null;
+    setGoproOverlayCameraVideo(file);
+    if (!file) return;
+    setIsUploadingGoproCameraVideo(true);
+    try {
+      const formData = new FormData();
+      formData.append('video_file', file);
+      await api.post(`flights/${flight.id}/gopro-camera`, {
+        body: formData,
+        timeout: false,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['flights'] });
+      toast.success(t('flights.goproOverlayCameraVideoUploaded'));
+    } catch (error) {
+      setGoproOverlayCameraVideo(null);
+      toast.error(
+        await getApiErrorMessage(
+          error,
+          t('flights.goproOverlayCameraVideoUploadError')
+        )
+      );
+    } finally {
+      setIsUploadingGoproCameraVideo(false);
     }
-    setGoproOverlayInitialGpxOffset('0');
-    setGoproOverlayGpxOffset('0');
+  };
+
+  const handleGoproOverlayOffsetChange = async (nextOffset: string) => {
+    setGoproOverlayGpxOffset(nextOffset);
+    setGoproOverlayPreviewOffset(nextOffset);
+    const parsedOffset = Number(nextOffset);
+    if (Number.isFinite(parsedOffset)) {
+      await updateFlight.mutateAsync({
+        gopro_overlay_gpx_offset: parsedOffset,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ['flights', flight.id, 'gopro-overlay-preview'],
+      });
+    }
   };
 
   const downloadBlob = async (
@@ -605,16 +742,29 @@ export function FlightDetails({
     goproOverlayTitle = t('flights.goproOverlayNeedsCameraVideo');
   } else if (!hasVideo) {
     goproOverlayTitle = t('flights.goproOverlayNeedsVideo');
+  } else if (!hasGoproOverlayOffset) {
+    goproOverlayTitle = t('flights.goproOverlayNeedsOffset');
+  } else if (!hasReadyOverlayLayer) {
+    goproOverlayTitle = t('flights.goproOverlayNeedsLayer');
   }
   let goproOverlayUnavailableReason: string | null = null;
   if (!isGoproOverlayRunning && !hasGoproCameraVideo) {
-    goproOverlayUnavailableReason = t('flights.goproOverlayNeedsCameraVideo');
+    goproOverlayUnavailableReason = t(
+      'flights.goproOverlayNeedsCameraVideoUpload'
+    );
   } else if (!isGoproOverlayRunning && !hasVideo) {
     goproOverlayUnavailableReason = t('flights.goproOverlayNeedsVideo');
+  } else if (!isGoproOverlayRunning && !hasGoproOverlayOffset) {
+    goproOverlayUnavailableReason = t('flights.goproOverlayNeedsOffset');
+  } else if (!isGoproOverlayRunning && !hasReadyOverlayLayer) {
+    goproOverlayUnavailableReason = t('flights.goproOverlayNeedsLayer');
   }
   const canUseGoproOverlayAction =
     (isGoproOverlayRunning && Boolean(effectiveGoproOverlayJobId)) ||
-    (hasGoproCameraVideo && hasVideo && !isGoproOverlayRunning);
+    (hasVideo &&
+      !isGoproOverlayRunning &&
+      (!hasGoproCameraVideo ||
+        (hasGoproOverlayOffset && hasReadyOverlayLayer)));
   const hasGenerationLogs = Boolean(
     flight.video_export_job_id ||
     videoExportStatus?.internal_status ||
@@ -631,6 +781,17 @@ export function FlightDetails({
   );
   const visibleActiveTab =
     !hasGenerationLogs && activeTab === 'logs' ? 'infos' : activeTab;
+  let cameraVideoUploadHint = t(
+    'flights.goproOverlayCameraVideoUploadHintRequired'
+  );
+  if (hasGoproCameraVideo) {
+    cameraVideoUploadHint = t(
+      'flights.goproOverlayCameraVideoUploadHintExisting'
+    );
+  }
+  if (isUploadingGoproCameraVideo) {
+    cameraVideoUploadHint = t('flights.goproOverlayCameraVideoUploading');
+  }
 
   const goproOverlayModal = (
     <Modal
@@ -644,6 +805,32 @@ export function FlightDetails({
           {t('flights.goproOverlayOffsetDialogDescription')}
         </p>
 
+        <div className="flex flex-col gap-1">
+          <label
+            htmlFor="gopro-overlay-camera-video"
+            className="text-sm font-medium text-gray-700 dark:text-gray-200"
+          >
+            {t('flights.goproOverlayCameraVideoUploadLabel')}
+          </label>
+          <input
+            id="gopro-overlay-camera-video"
+            type="file"
+            accept="video/mp4,video/quicktime,.mp4,.mov,.m4v"
+            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+              void handleGoproCameraVideoChange(event)
+            }
+            disabled={isUploadingGoproCameraVideo}
+            className="block min-h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:file:bg-gray-800"
+            aria-describedby="gopro-overlay-camera-video-hint"
+          />
+          <span
+            id="gopro-overlay-camera-video-hint"
+            className="text-xs text-gray-500 dark:text-gray-400"
+          >
+            {cameraVideoUploadHint}
+          </span>
+        </div>
+
         {hasPersistedGoproOverlay && (
           <div
             role="alert"
@@ -656,12 +843,6 @@ export function FlightDetails({
             <span>{t('flights.goproOverlayAdditionalResolution')}</span>
           </div>
         )}
-
-        <GoproOverlaySyncPreview
-          flightId={flight.id}
-          offset={goproOverlayGpxOffset}
-          onOffsetChange={setGoproOverlayGpxOffset}
-        />
 
         <div className="flex flex-col gap-1">
           <label
@@ -696,45 +877,6 @@ export function FlightDetails({
           </span>
         </div>
 
-        <TextField className="flex flex-col gap-1">
-          <div className="flex items-center justify-between gap-2">
-            <Label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-              {t('flights.goproOverlayGpxOffsetLabel')}
-            </Label>
-            {goproOverlayInitialGpxOffset !== null && (
-              <Button
-                variant="ghost"
-                className="min-h-8 px-2 py-1 text-xs"
-                onPress={() =>
-                  setGoproOverlayGpxOffset(goproOverlayInitialGpxOffset)
-                }
-                isDisabled={
-                  goproOverlayGpxOffset === goproOverlayInitialGpxOffset
-                }
-              >
-                {t('common.reset')}
-              </Button>
-            )}
-          </div>
-          <Input
-            type="number"
-            step="0.1"
-            value={goproOverlayGpxOffset}
-            onChange={(event) =>
-              setGoproOverlayGpxOffset(event.currentTarget.value)
-            }
-            className="min-h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            aria-label={t('flights.goproOverlayGpxOffsetLabel')}
-            aria-describedby="gopro-overlay-gpx-offset-hint"
-          />
-          <span
-            id="gopro-overlay-gpx-offset-hint"
-            className="text-xs text-gray-500 dark:text-gray-400"
-          >
-            {t('flights.goproOverlayGpxOffsetHint')}
-          </span>
-        </TextField>
-
         <div className="flex flex-wrap justify-end gap-2 pt-2">
           <Button
             variant="ghost"
@@ -746,7 +888,9 @@ export function FlightDetails({
           <Button
             className="min-h-10 rounded-lg px-3 py-2 text-sm"
             onPress={() => void handleStartGoproOverlay()}
-            isDisabled={createGoproOverlayJob.isPending}
+            isDisabled={
+              createGoproOverlayJob.isPending || isUploadingGoproCameraVideo
+            }
           >
             {createGoproOverlayJob.isPending
               ? t('flights.goproOverlayStarting')
@@ -778,6 +922,15 @@ export function FlightDetails({
 
           <FlightStatsGrid flight={flight} sites={sites} />
 
+          {flight.sportstracklive_status === 'uploaded' &&
+            flight.sportstracklive_track_id != null && (
+              <div className="mb-4">
+                <FlightSportstrackliveCard
+                  trackId={flight.sportstracklive_track_id}
+                />
+              </div>
+            )}
+
           <div className="border-t border-gray-200 pt-3 dark:border-gray-700">
             <div className="flex flex-wrap gap-2">
               <Button
@@ -798,6 +951,13 @@ export function FlightDetails({
                 <FileUp className="h-4 w-4" aria-hidden="true" />
                 {gpxUploadLabel}
               </Button>
+              {hasGpx && (
+                <FlightSportstrackliveUploadButton
+                  flightId={flight.id}
+                  status={flight.sportstracklive_status}
+                  error={flight.sportstracklive_error}
+                />
+              )}
             </div>
           </div>
 
@@ -823,6 +983,14 @@ export function FlightDetails({
               setEditingNotes(false);
             }}
           />
+          <FlightPilotContextSection
+            tags={flight.tags ?? []}
+            feedback={flight.conditions_feedback}
+            isSaving={updateFlight.isPending}
+            onSave={async (tags, conditions_feedback) => {
+              await updateFlight.mutateAsync({ tags, conditions_feedback });
+            }}
+          />
         </>
       )}
     </div>
@@ -836,6 +1004,113 @@ export function FlightDetails({
       compact={mobileMode}
     />
   );
+  useEffect(() => {
+    setIsOverlayWorkspaceExpanded(!hasSavedOverlaySynchronization);
+  }, [hasSavedOverlaySynchronization]);
+  useEffect(() => {
+    const previous = lastPersistedVideoMarkersRef.current;
+    const flightChanged = previous.flightId !== flight.id;
+    const draftWasClean = JSON.stringify(videoMarkersDraft) === previous.key;
+
+    if (flightChanged || draftWasClean) {
+      setVideoMarkersDraft(persistedVideoMarkers);
+      if (flightChanged || videoMarkerTimesValid) {
+        setVideoMarkerTimesValid(true);
+      }
+    }
+
+    lastPersistedVideoMarkersRef.current = {
+      flightId: flight.id,
+      key: persistedVideoMarkersKey,
+    };
+  }, [
+    flight.id,
+    persistedVideoMarkers,
+    persistedVideoMarkersKey,
+    videoMarkerTimesValid,
+    videoMarkersDraft,
+  ]);
+  useLayoutEffect(() => {
+    activeFlightIdRef.current = flight.id;
+  }, [flight.id]);
+
+  const overlayWorkspacePanel = (
+    <section className="overflow-hidden rounded-2xl border border-cyan-200 bg-cyan-50/50 shadow-sm dark:border-cyan-900 dark:bg-cyan-950/20">
+      <button
+        type="button"
+        className="flex w-full cursor-pointer items-center justify-between gap-3 p-4 text-left transition-colors hover:bg-cyan-100/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-inset dark:hover:bg-cyan-950/40 sm:p-5"
+        aria-expanded={isOverlayWorkspaceExpanded}
+        aria-controls="flight-overlay-workspace-panel"
+        onClick={() =>
+          setIsOverlayWorkspaceExpanded((isExpanded) => !isExpanded)
+        }
+      >
+        <span className="flex min-w-0 items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
+            <Wand2 className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <span>
+            <span className="block font-semibold text-slate-950 dark:text-white">
+              {t('flights.overlayWorkspaceTitle')}
+            </span>
+            <span className="block text-sm text-slate-600 dark:text-slate-300">
+              {t('flights.overlayWorkspaceDescription')}
+            </span>
+          </span>
+        </span>
+        <ChevronDown
+          aria-hidden="true"
+          className={`size-5 shrink-0 text-cyan-700 transition-transform duration-200 dark:text-cyan-300 ${isOverlayWorkspaceExpanded ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {isOverlayWorkspaceExpanded && (
+        <div
+          id="flight-overlay-workspace-panel"
+          className="border-t border-cyan-200 dark:border-cyan-900"
+        >
+          {hasGpx && ((hasVideo && hasGoproCameraVideo) || hasYoutubeVideo) && (
+            <FlightOverlayWorkspace
+              flightId={flight.id}
+              initialOffset={goproOverlayGpxOffset}
+              onOffsetPreviewChange={setGoproOverlayPreviewOffset}
+              onSaveOffset={handleGoproOverlayOffsetChange}
+              youtubeUrls={flight.youtube_urls ?? []}
+              showHeader={false}
+            />
+          )}
+          {hasYoutubeVideo && (
+            <div className="border-t border-cyan-200 p-4 dark:border-cyan-900">
+              <FlightVideoMarkersEditor
+                youtubeUrls={flight.youtube_urls ?? []}
+                value={videoMarkersDraft}
+                currentYoutubePosition={currentYoutubePosition}
+                onChange={setVideoMarkersDraft}
+                onValidityChange={setVideoMarkerTimesValid}
+              />
+              <div className="mt-4 flex justify-end">
+                <Button
+                  variant="primary"
+                  className="min-h-10 rounded-lg px-4 py-2 text-sm"
+                  isDisabled={
+                    !videoMarkerTimesValid ||
+                    isSavingVideoMarkers ||
+                    JSON.stringify(videoMarkersDraft) ===
+                      JSON.stringify(flight.video_markers ?? [])
+                  }
+                  onPress={() => void handleSaveVideoMarkers()}
+                >
+                  {isSavingVideoMarkers
+                    ? t('flights.videoMarkerSaving')
+                    : t('flights.videoMarkersSave')}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+
   const logsPanel = (
     <FlightGenerationLogsPanel
       videoJobId={flight.video_export_job_id}
@@ -843,6 +1118,7 @@ export function FlightDetails({
       videoFallbackStatus={flight.video_export_status}
       videoFallbackProgress={flight.video_export_progress}
       goproOverlayJob={goproOverlayJob}
+      overlayLayerJob={overlayLayer.data?.job}
       goproOverlayJobId={effectiveGoproOverlayJobId}
       goproOverlayFallbackStatus={flight.gopro_overlay_status}
       goproOverlayFallbackProgress={flight.gopro_overlay_progress}
@@ -853,23 +1129,41 @@ export function FlightDetails({
 
   const mediaPanel = (
     <div className="space-y-4">
-      <header className="overflow-hidden rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-cyan-50 p-4 shadow-sm dark:border-indigo-900 dark:from-indigo-950/60 dark:via-gray-900 dark:to-cyan-950/40 sm:p-5">
+      <header className="overflow-hidden rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm dark:border-sky-900 dark:bg-slate-900 sm:p-5">
         <div className="flex items-start gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm dark:bg-indigo-500">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-700 text-white shadow-sm dark:bg-sky-600">
             <Images className="h-5 w-5" aria-hidden="true" />
           </span>
           <div>
             <h2 className="text-lg font-bold text-slate-950 dark:text-white">
               {t('flights.mediaPageTitle')}
             </h2>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-              {t('flights.mediaPageDescription')}
-            </p>
           </div>
         </div>
       </header>
 
       <div className="min-w-0 space-y-4">
+        {(hasYoutubeVideo || (hasGpx && hasVideo && hasGoproCameraVideo)) &&
+          overlayWorkspacePanel}
+        {hasGpx && (hasYoutubeVideo || hasFaceVideo || hasPiloteVideo) && (
+          <FlightTelemetryInteractivePreview
+            flightId={flight.id}
+            hasFlightVideo={hasVideo}
+            hasFaceVideo={hasFaceVideo}
+            hasPiloteVideo={hasPiloteVideo}
+            manualOffsetSeconds={Number(goproOverlayPreviewOffset)}
+            youtubeUrls={flight.youtube_urls ?? []}
+            videoMarkers={flight.video_markers ?? []}
+            onCurrentYoutubePositionChange={(position) =>
+              setCurrentYoutubePosition((current) =>
+                current?.videoId === position?.videoId &&
+                current?.seconds === position?.seconds
+                  ? current
+                  : position
+              )
+            }
+          />
+        )}
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
           <button
             type="button"
@@ -914,6 +1208,8 @@ export function FlightDetails({
           hasVideo={hasVideo}
           hasPanoVideo={hasPanoVideo}
           hasGoproCameraVideo={hasGoproCameraVideo}
+          hasFaceVideo={hasFaceVideo}
+          hasPiloteVideo={hasPiloteVideo}
           hasPersistedGoproOverlay={hasPersistedGoproOverlay}
           hasCompletedGoproOverlayJob={visibleGoproOverlays.some(
             (overlay) => overlay.status === 'completed'
@@ -933,6 +1229,7 @@ export function FlightDetails({
             job={latestHighlightVideo}
             flight={flight}
             hasPanoVideo={hasPanoVideo}
+            hasOverlayOffset={hasGoproOverlayOffset}
             isDownloadingAnyMedia={isDownloadingAnyMedia}
             isGenerationPending={createHighlightVideo.isPending}
             isCancellationPending={cancelHighlightVideo.isPending}
@@ -995,79 +1292,80 @@ export function FlightDetails({
               );
             }}
           />
-          {visibleGoproOverlays.length > 0 && (
-            <GoproOverlayJobStack
-              jobs={visibleGoproOverlays}
-              youtubeUploadFlight={flight}
-              isDownloadingAnyMedia={isDownloadingAnyMedia}
-              deletingJobId={deletingGoproOverlayJobId}
-              onDownload={(overlay) => void handleDownloadGoproOverlay(overlay)}
-              onDelete={(overlay) => void handleDeleteGoproOverlay(overlay)}
-              generationCard={
-                <div className="flex min-h-48 flex-col justify-between rounded-xl border border-dashed border-cyan-300 bg-cyan-50/60 p-3 dark:border-cyan-800 dark:bg-cyan-950/20">
-                  <div>
-                    <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
-                      <Wand2 className="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <p className="mt-3 font-semibold text-slate-950 dark:text-white">
-                      {t('flights.goproOverlayAddCardTitle')}
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">
-                      {goproOverlayUnavailableReason ??
-                        t('flights.goproOverlayAddCardDescription')}
-                    </p>
-                  </div>
-                  <Button
-                    variant={isGoproOverlayRunning ? 'danger' : 'outline'}
-                    className="mt-4 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
-                    onPress={goproOverlayAction}
-                    isDisabled={
-                      !canUseGoproOverlayAction ||
-                      createGoproOverlayJob.isPending ||
-                      isCancellingGoproOverlay
-                    }
-                    title={goproOverlayTitle}
-                    aria-label={goproOverlayLabel}
-                  >
-                    <Wand2 className="h-4 w-4" aria-hidden="true" />
-                    {goproOverlayCompactLabel}
-                  </Button>
-                </div>
-              }
-            />
-          )}
-          {visibleGoproOverlays.length === 0 && (
-            <div className="flex min-h-48 flex-col justify-between rounded-xl border border-dashed border-cyan-300 bg-cyan-50/60 p-3 dark:border-cyan-800 dark:bg-cyan-950/20">
-              <div>
-                <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
-                  <Wand2 className="h-5 w-5" aria-hidden="true" />
-                </span>
-                <p className="mt-3 font-semibold text-slate-950 dark:text-white">
-                  {t('flights.goproOverlayAddCardTitle')}
-                </p>
-                <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">
-                  {goproOverlayUnavailableReason ??
-                    t('flights.goproOverlayAddCardDescription')}
-                </p>
-              </div>
-              <Button
-                variant={isGoproOverlayRunning ? 'danger' : 'outline'}
-                className="mt-4 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
-                onPress={goproOverlayAction}
-                isDisabled={
-                  !canUseGoproOverlayAction ||
-                  createGoproOverlayJob.isPending ||
-                  isCancellingGoproOverlay
-                }
-                title={goproOverlayTitle}
-                aria-label={goproOverlayLabel}
-              >
-                <Wand2 className="h-4 w-4" aria-hidden="true" />
-                {goproOverlayCompactLabel}
-              </Button>
-            </div>
-          )}
         </FlightMediaBadges>
+
+        {visibleGoproOverlays.length > 0 && (
+          <GoproOverlayJobStack
+            jobs={visibleGoproOverlays}
+            youtubeUploadFlight={flight}
+            isDownloadingAnyMedia={isDownloadingAnyMedia}
+            deletingJobId={deletingGoproOverlayJobId}
+            onDownload={(overlay) => void handleDownloadGoproOverlay(overlay)}
+            onDelete={(overlay) => void handleDeleteGoproOverlay(overlay)}
+            generationCard={
+              <div className="flex min-h-48 flex-col justify-between rounded-xl border border-dashed border-cyan-300 bg-cyan-50/60 p-3 dark:border-cyan-800 dark:bg-cyan-950/20">
+                <div>
+                  <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
+                    <Wand2 className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <p className="mt-3 font-semibold text-slate-950 dark:text-white">
+                    {t('flights.goproOverlayAddCardTitle')}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">
+                    {goproOverlayUnavailableReason ??
+                      t('flights.goproOverlayAddCardDescription')}
+                  </p>
+                </div>
+                <Button
+                  variant={isGoproOverlayRunning ? 'danger' : 'outline'}
+                  className="mt-4 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
+                  onPress={goproOverlayAction}
+                  isDisabled={
+                    !canUseGoproOverlayAction ||
+                    createGoproOverlayJob.isPending ||
+                    isCancellingGoproOverlay
+                  }
+                  title={goproOverlayTitle}
+                  aria-label={goproOverlayLabel}
+                >
+                  <Wand2 className="h-4 w-4" aria-hidden="true" />
+                  {goproOverlayCompactLabel}
+                </Button>
+              </div>
+            }
+          />
+        )}
+        {visibleGoproOverlays.length === 0 && (
+          <div className="order-5 flex min-h-48 flex-col justify-between rounded-xl border border-dashed border-cyan-300 bg-cyan-50/60 p-3 dark:border-cyan-800 dark:bg-cyan-950/20">
+            <div>
+              <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
+                <Wand2 className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <p className="mt-3 font-semibold text-slate-950 dark:text-white">
+                {t('flights.goproOverlayAddCardTitle')}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">
+                {goproOverlayUnavailableReason ??
+                  t('flights.goproOverlayAddCardDescription')}
+              </p>
+            </div>
+            <Button
+              variant={isGoproOverlayRunning ? 'danger' : 'outline'}
+              className="mt-4 min-h-10 w-full rounded-lg px-3 py-2 text-sm"
+              onPress={goproOverlayAction}
+              isDisabled={
+                !canUseGoproOverlayAction ||
+                createGoproOverlayJob.isPending ||
+                isCancellingGoproOverlay
+              }
+              title={goproOverlayTitle}
+              aria-label={goproOverlayLabel}
+            >
+              <Wand2 className="h-4 w-4" aria-hidden="true" />
+              {goproOverlayCompactLabel}
+            </Button>
+          </div>
+        )}
 
         {(flight.youtube_urls?.length ?? 0) > 0 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800 sm:p-5">
@@ -1145,7 +1443,7 @@ export function FlightDetails({
           <TabPanel id="infos" className="outline-none">
             {infoCard}
           </TabPanel>
-          <TabPanel id="replay" className="outline-none">
+          <TabPanel id="replay" className="outline-none" shouldForceMount>
             {mediaPanel}
           </TabPanel>
           {hasGenerationLogs && (
@@ -1178,7 +1476,9 @@ export function FlightDetails({
         {hasGenerationLogs && <Tab id="logs">{t('flights.logsTab')}</Tab>}
       </TabList>
       <TabPanel id="infos">{infoCard}</TabPanel>
-      <TabPanel id="replay">{mediaPanel}</TabPanel>
+      <TabPanel id="replay" shouldForceMount>
+        {mediaPanel}
+      </TabPanel>
       {hasGenerationLogs && <TabPanel id="logs">{processingPanel}</TabPanel>}
     </Tabs>
   );

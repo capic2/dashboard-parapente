@@ -9,6 +9,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Site } from '../types';
 import type { FlightSummary } from '@dashboard-parapente/shared-types';
+import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
 import type { RowSelectionState, SortingState } from '@tanstack/react-table';
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import {
@@ -42,9 +43,11 @@ import { HTTPError } from 'ky';
 import { api } from '../lib/api';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useFlight } from '../hooks/flights/useFlight';
+import { isGoproOverlayInProgress } from '../lib/flightMediaState';
 import {
   normalizeFlightsSearch,
   serializeFlightsSearch,
+  type FlightDetailsTab,
   type FlightsSearch,
   type FlightsRouteSearch,
 } from '../routes/-flightSearch';
@@ -126,6 +129,70 @@ function FlightSearchInput({
   );
 }
 
+const FLIGHT_BADGE_FILTERS = [
+  { id: 'gpx', label: 'flights.gpxBadge' },
+  { id: 'sportstracklive', label: 'flights.sportstrackliveBadge' },
+  { id: 'video', label: 'flights.videoBadge' },
+  { id: 'camera', label: 'flights.cameraBadge' },
+  { id: 'pano', label: 'flights.panoBadge' },
+  { id: 'goproOverlay', label: 'flights.goproOverlayBadge' },
+  { id: 'highlightVideo', label: 'flights.highlightVideoBadge' },
+  { id: 'youtube', label: 'flights.youtubeBadge' },
+] as const;
+
+type FlightBadgeFilter = (typeof FLIGHT_BADGE_FILTERS)[number]['id'];
+type BadgeFilterSelection = {
+  included: FlightBadgeFilter[];
+  excluded: FlightBadgeFilter[];
+};
+
+function flightHasBadgeFilter(
+  flight: FlightSummary,
+  filter: FlightBadgeFilter
+) {
+  switch (filter) {
+    case 'gpx':
+      return flight.has_gpx;
+    case 'sportstracklive':
+      return (
+        flight.sportstracklive_status === 'uploaded' &&
+        flight.sportstracklive_track_id != null
+      );
+    case 'video':
+      return (
+        flight.has_video ||
+        (flight.video_export_status != null &&
+          (VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(flight.video_export_status) ||
+            flight.video_export_status === 'failed'))
+      );
+    case 'camera':
+      return flight.has_camera;
+    case 'pano':
+      return flight.has_pano_video;
+    case 'goproOverlay':
+      return (
+        flight.has_gopro_overlay ||
+        isGoproOverlayInProgress(flight.gopro_overlay_status) ||
+        flight.gopro_overlay_status === 'failed'
+      );
+    case 'highlightVideo':
+      return (
+        flight.has_highlight_video ||
+        (flight.highlight_video_status != null &&
+          (VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(
+            flight.highlight_video_status
+          ) ||
+            flight.highlight_video_status === 'failed'))
+      );
+    case 'youtube':
+      return (
+        flight.has_youtube_video ||
+        flight.youtube_upload_status === 'queued' ||
+        flight.youtube_upload_status === 'uploading'
+      );
+  }
+}
+
 export default function FlightHistory() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -133,6 +200,8 @@ export default function FlightHistory() {
   const routeSearch = useSearch({ strict: false }) as FlightsRouteSearch;
   const search = normalizeFlightsSearch(routeSearch);
   const summariesQuery = useFlightSummaries(search);
+  const [selectedBadgeFilters, setSelectedBadgeFilters] =
+    useState<BadgeFilterSelection>({ included: [], excluded: [] });
   const activeJobsQuery = useActiveFlightMediaJobs();
   const flights = useMemo(
     () =>
@@ -142,7 +211,39 @@ export default function FlightHistory() {
       ),
     [summariesQuery.data, activeJobsQuery.data]
   );
+  const filteredFlights = useMemo(() => {
+    const { included, excluded } = selectedBadgeFilters;
+    if (included.length === 0 && excluded.length === 0) return flights;
+    return flights.filter((flight) => {
+      const matchesIncluded =
+        included.length === 0 ||
+        included.some((filter) => flightHasBadgeFilter(flight, filter));
+      const matchesExcluded = excluded.every(
+        (filter) => !flightHasBadgeFilter(flight, filter)
+      );
+      return matchesIncluded && matchesExcluded;
+    });
+  }, [flights, selectedBadgeFilters]);
+  const activeBadgeFilterCount =
+    selectedBadgeFilters.included.length + selectedBadgeFilters.excluded.length;
   const totalFlights = summariesQuery.data?.pages[0]?.total ?? 0;
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = summariesQuery;
+  let flightCountLabel = t('flights.registered', { count: totalFlights });
+  if (search.siteId) {
+    flightCountLabel = t('flights.registeredForSite', { count: totalFlights });
+  }
+  if (activeBadgeFilterCount > 0) {
+    flightCountLabel = t('flights.filteredFlightCount', {
+      count: filteredFlights.length,
+      total: totalFlights,
+    });
+  }
+
+  useEffect(() => {
+    if (activeBadgeFilterCount > 0 && hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage();
+    }
+  }, [activeBadgeFilterCount, fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   const isMobile = useIsMobile();
 
@@ -177,6 +278,8 @@ export default function FlightHistory() {
             key={selectedFlightId}
             flight={selectedFlight}
             sites={sites}
+            activeTab={routeSearch.tab ?? 'infos'}
+            onActiveTabChange={handleActiveTabChange}
             onShowCreateSiteModal={() => setShowCreateSiteModal(true)}
             mobileMode
             onCloseMobile={handleCloseMobileDetail}
@@ -189,6 +292,8 @@ export default function FlightHistory() {
           key={selectedFlightId}
           flight={selectedFlight}
           sites={sites}
+          activeTab={routeSearch.tab ?? 'infos'}
+          onActiveTabChange={handleActiveTabChange}
           onShowCreateSiteModal={() => setShowCreateSiteModal(true)}
         />
       );
@@ -234,7 +339,7 @@ export default function FlightHistory() {
 
     return (
       <FlightsTable
-        flights={flights}
+        flights={filteredFlights}
         selectedFlightId={selectedFlightId}
         selectionMode={selectionMode}
         onSelectFlight={handleSelectFlight}
@@ -256,9 +361,14 @@ export default function FlightHistory() {
             order: first.desc ? 'desc' : 'asc',
           });
         }}
-        hasMoreFlights={summariesQuery.hasNextPage}
-        isLoadingMore={summariesQuery.isFetchingNextPage}
-        onLoadMore={() => void summariesQuery.fetchNextPage()}
+        hasMoreFlights={hasNextPage}
+        isLoadingMore={isFetchingNextPage}
+        onLoadMore={() => void fetchNextPage()}
+        emptyMessage={
+          activeBadgeFilterCount > 0
+            ? t('flights.noFlightsWithBadges')
+            : t('flights.noFlights')
+        }
       />
     );
   };
@@ -285,17 +395,39 @@ export default function FlightHistory() {
         return navigate({
           to: '/flights/$flightId',
           params: { flightId },
-          search: serializeFlightsSearch(nextSearch),
+          search: {
+            ...serializeFlightsSearch(nextSearch),
+            tab: routeSearch.tab,
+          },
           replace: true,
         });
       }
       return navigate({
         to: '/flights',
-        search: serializeFlightsSearch(nextSearch),
+        search: { ...serializeFlightsSearch(nextSearch), tab: routeSearch.tab },
         replace: true,
       });
     },
-    [navigate, selectedFlightId]
+    [navigate, routeSearch.tab, selectedFlightId]
+  );
+
+  const handleActiveTabChange = useCallback(
+    (tab: FlightDetailsTab) => {
+      const nextSearch = {
+        ...serializeFlightsSearch(search),
+        tab: tab === 'infos' ? undefined : tab,
+      };
+      if (selectedFlightId) {
+        void navigate({
+          to: '/flights/$flightId',
+          params: { flightId: selectedFlightId },
+          search: nextSearch,
+        });
+        return;
+      }
+      void navigate({ to: '/flights', search: nextSearch });
+    },
+    [navigate, search, selectedFlightId]
   );
 
   const handleSearchQueryChange = (query: string) => {
@@ -308,17 +440,17 @@ export default function FlightHistory() {
         void navigate({
           to: '/flights/$flightId',
           params: { flightId },
-          search: serializeFlightsSearch(search),
+          search: { ...serializeFlightsSearch(search), tab: routeSearch.tab },
         });
         return;
       }
 
       void navigate({
         to: '/flights',
-        search: serializeFlightsSearch(search),
+        search: { ...serializeFlightsSearch(search), tab: routeSearch.tab },
       });
     },
-    [navigate, search]
+    [navigate, routeSearch.tab, search]
   );
 
   const handleSelectFlight = useCallback(
@@ -343,11 +475,29 @@ export default function FlightHistory() {
 
   const handleSelectAll = useCallback(() => {
     const allSelected: RowSelectionState = {};
-    for (const flight of flights) {
+    for (const flight of filteredFlights) {
       allSelected[flight.id] = true;
     }
     setRowSelection(allSelected);
-  }, [flights]);
+  }, [filteredFlights]);
+
+  const toggleBadgeFilter = (filter: FlightBadgeFilter) => {
+    setSelectedBadgeFilters((current) => {
+      if (current.included.includes(filter)) {
+        return {
+          included: current.included.filter((selected) => selected !== filter),
+          excluded: [...current.excluded, filter],
+        };
+      }
+      if (current.excluded.includes(filter)) {
+        return {
+          ...current,
+          excluded: current.excluded.filter((selected) => selected !== filter),
+        };
+      }
+      return { ...current, included: [...current.included, filter] };
+    });
+  };
 
   const handleDeselectAll = useCallback(() => {
     setRowSelection({});
@@ -439,9 +589,7 @@ export default function FlightHistory() {
             {t('flights.history')}
           </h1>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-            {search.siteId
-              ? t('flights.registeredForSite', { count: totalFlights })
-              : t('flights.registered', { count: totalFlights })}
+            {flightCountLabel}
           </p>
         </div>
 
@@ -499,22 +647,72 @@ export default function FlightHistory() {
                   initialQuery={search.q ?? ''}
                   onQueryChange={handleSearchQueryChange}
                 />
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                  <select
-                    value={search.gpx}
-                    onChange={(event) =>
-                      void navigateWithSearch({
-                        ...search,
-                        gpx: event.target.value as FlightsSearch['gpx'],
-                      })
-                    }
-                    aria-label={t('flights.gpxFilter')}
-                    className="min-h-10 min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                  >
-                    <option value="all">{t('flights.allGpxStatuses')}</option>
-                    <option value="with">{t('flights.withGpx')}</option>
-                    <option value="missing">{t('flights.withoutGpx')}</option>
-                  </select>
+                <fieldset className="min-w-0 space-y-2">
+                  <legend className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+                    {t('flights.tagFilter')}
+                  </legend>
+                  <div className="flex flex-wrap gap-1.5">
+                    {FLIGHT_BADGE_FILTERS.map((filter) => {
+                      const isIncluded = selectedBadgeFilters.included.includes(
+                        filter.id
+                      );
+                      const isExcluded = selectedBadgeFilters.excluded.includes(
+                        filter.id
+                      );
+                      const isSelected = isIncluded || isExcluded;
+                      let stateClassName =
+                        'border-slate-300 bg-white text-slate-700 hover:border-sky-400 hover:bg-sky-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700';
+                      let accessibleStateKey = 'flights.tagNotSelected';
+                      if (isIncluded) {
+                        stateClassName =
+                          'border-sky-600 bg-sky-600 text-white dark:border-sky-400 dark:bg-sky-400 dark:text-slate-950';
+                        accessibleStateKey = 'flights.tagIncluded';
+                      }
+                      if (isExcluded) {
+                        stateClassName =
+                          'border-rose-600 bg-rose-600 text-white dark:border-rose-400 dark:bg-rose-400 dark:text-slate-950';
+                        accessibleStateKey = 'flights.tagExcluded';
+                      }
+                      return (
+                        <button
+                          key={filter.id}
+                          type="button"
+                          aria-pressed={isSelected}
+                          aria-label={t(accessibleStateKey, {
+                            tag: t(filter.label),
+                          })}
+                          onClick={() => toggleBadgeFilter(filter.id)}
+                          className={`min-h-9 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${stateClassName}`}
+                        >
+                          {isExcluded && (
+                            <span aria-hidden="true" className="mr-1 font-bold">
+                              −
+                            </span>
+                          )}
+                          {t(filter.label)}
+                        </button>
+                      );
+                    })}
+                    {activeBadgeFilterCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedBadgeFilters({
+                            included: [],
+                            excluded: [],
+                          })
+                        }
+                        className="min-h-9 rounded-full px-3 py-1 text-xs font-medium text-sky-700 underline underline-offset-2 hover:text-sky-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-sky-300 dark:hover:text-sky-100"
+                      >
+                        {t('flights.allTags')}
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {t('flights.tagFilterInstructions')}
+                  </p>
+                </fieldset>
+                <div className="flex justify-end">
                   <Button
                     variant="ghost"
                     onClick={handleToggleSelectionMode}

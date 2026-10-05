@@ -3,7 +3,10 @@
   "defaultBase": "main",
   "parallel": 5,
   "namedInputs": {
-    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "default": [
+      "{projectRoot}/**/*",
+      "sharedGlobals"
+    ],
     "production": [
       "default",
       "!{projectRoot}/**/*.spec.ts",
@@ -16,7 +19,9 @@
       "!{projectRoot}/.venv/**/*",
       "!{projectRoot}/venv/**/*"
     ],
-    "sharedGlobals": ["{workspaceRoot}/.env"],
+    "sharedGlobals": [
+      "{workspaceRoot}/.env"
+    ],
     "packageFiles": [
       "{projectRoot}/package.json",
       "{projectRoot}/package-lock.json",
@@ -32,8 +37,14 @@
   "targetDefaults": {
     "build": {
       "cache": true,
-      "dependsOn": ["^build"],
-      "inputs": ["production", "^production", "packageFiles"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "production",
+        "^production",
+        "packageFiles"
+      ]
     },
     "test": {
       "cache": true,
@@ -56,20 +67,46 @@
     },
     "format": {
       "cache": true,
-      "inputs": ["default", "{workspaceRoot}/.oxfmtrc.json"]
+      "inputs": [
+        "default",
+        "{workspaceRoot}/.oxfmtrc.json"
+      ]
     },
     "format:check": {
       "cache": true,
-      "inputs": ["default", "{workspaceRoot}/.oxfmtrc.json"]
+      "inputs": [
+        "default",
+        "{workspaceRoot}/.oxfmtrc.json"
+      ]
     },
     "type-check": {
       "cache": true,
-      "inputs": ["production", "^production", "packageFiles"]
+      "inputs": [
+        "production",
+        "^production",
+        "packageFiles"
+      ]
     },
     "serve": {
       "cache": false
     }
   },
   "analytics": true,
-  "nxCloudId": "69bf0235c7064c7de15b0122"
+  "nxCloudId": "69bf0235c7064c7de15b0122",
+  "plugins": [
+    {
+      "plugin": "@nx/vite/plugin",
+      "options": {
+        "devTargetName": "dev",
+        "typecheckTargetName": "typecheck",
+        "buildTargetName": "build",
+        "serveTargetName": "serve",
+        "previewTargetName": "preview",
+        "serveStaticTargetName": "serve-static"
+      },
+      "include": [
+        "apps/frontend/**/*"
+      ]
+    }
+  ]
 }

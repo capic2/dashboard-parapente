@@ -113,7 +113,7 @@ describe('FlightVideoExportControls', () => {
 
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith('flights/flight-1/export-video', {
-        searchParams: { mode: 'manual_fast' },
+        searchParams: { mode: 'manual_fast', director_style: 'natural' },
       });
     });
   });
@@ -129,12 +129,27 @@ describe('FlightVideoExportControls', () => {
 
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith('flights/flight-1/export-video', {
-        searchParams: { mode: 'manual' },
+        searchParams: { mode: 'manual', director_style: 'natural' },
       });
     });
   });
 
-  it('regenerates a cancelled export even when preserved frames are available', async () => {
+  it('includes the selected visual style in the export request', async () => {
+    render(<FlightVideoExportControls flight={mockFlight} />);
+
+    fireEvent.change(screen.getByLabelText(/Style visuel/u), {
+      target: { value: 'cinematic' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Generate video/u }));
+
+    await waitFor(() => {
+      expect(apiPost).toHaveBeenCalledWith('flights/flight-1/export-video', {
+        searchParams: { mode: 'manual_fast', director_style: 'cinematic' },
+      });
+    });
+  });
+
+  it('resumes a cancelled export when preserved frames are available', async () => {
     mockFlight.video_export_status = 'cancelled';
     mockFlight.video_export_job_id = 'job-cancelled';
     exportStatusMock.current = {
@@ -148,16 +163,12 @@ describe('FlightVideoExportControls', () => {
 
     render(<FlightVideoExportControls flight={mockFlight} />);
 
-    expect(screen.queryByText('frames preserved')).not.toBeInTheDocument();
+    expect(screen.getByText('frames preserved')).toBeInTheDocument();
 
-    fireEvent.click(
-      screen.getByRole('button', { name: /Restart generation/u })
-    );
+    fireEvent.click(screen.getByRole('button', { name: /Resume generation/u }));
 
     await waitFor(() => {
-      expect(apiPost).toHaveBeenCalledWith('flights/flight-1/export-video', {
-        searchParams: { mode: 'manual_fast' },
-      });
+      expect(apiPost).toHaveBeenCalledWith('exports/job-cancelled/resume');
     });
     expect(confirmMock).not.toHaveBeenCalled();
   });

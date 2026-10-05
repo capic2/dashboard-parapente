@@ -3,15 +3,18 @@ import { createRootRoute, Outlet, useMatchRoute } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import Header from '../components/common/Header';
 import AppUpdateBanner from '../components/common/AppUpdateBanner';
+import DeploymentStatusBanner from '../components/common/DeploymentStatusBanner';
 import { queryClient } from '../lib/queryClient';
 import { appVersionQueryOptions } from '../hooks/common/useAppVersion';
 import { useVersionUpdates } from '../hooks/common/useVersionUpdates';
+import { getStagingPrNumber } from '../lib/appEnvironment';
 
 export const Route = createRootRoute({
   loader: ({ location }) => {
     if (
       location.pathname === '/login' ||
-      location.pathname === '/export-viewer'
+      location.pathname === '/export-viewer' ||
+      location.pathname === '/privacy'
     ) {
       return null;
     }
@@ -45,13 +48,19 @@ function RootComponent() {
   const matchRoute = useMatchRoute();
   const isLoginPage = matchRoute({ to: '/login' });
   const isExportViewerPage = matchRoute({ to: '/export-viewer' });
+  const isPrivacyPage = matchRoute({ to: '/privacy' });
+  const isInfrastructurePage = matchRoute({
+    to: '/infrastructure',
+    fuzzy: true,
+  });
   const appVersion = Route.useLoaderData();
   const version = appVersion?.version ?? null;
+  const stagingPrNumber = getStagingPrNumber(version);
   const { latestVersion, releaseNotesUrl } = useVersionUpdates(
     isLoginPage || isExportViewerPage ? null : version
   );
 
-  if (isLoginPage || isExportViewerPage) {
+  if (isLoginPage || isExportViewerPage || isPrivacyPage) {
     return <Outlet />;
   }
 
@@ -70,6 +79,7 @@ function RootComponent() {
             onRefresh={() => window.location.reload()}
           />
         )}
+        {!isInfrastructurePage && <DeploymentStatusBanner />}
         <Header />
         <main>
           <Suspense>
@@ -78,6 +88,7 @@ function RootComponent() {
         </main>
       </div>
       {version && <VersionBadge version={version} />}
+      {stagingPrNumber && <StagingPrBadge prNumber={stagingPrNumber} />}
     </div>
   );
 }
@@ -87,5 +98,18 @@ function VersionBadge({ version }: { version: string }) {
     <div className="fixed bottom-3 right-3 z-30 rounded-full border border-sky-200 bg-white/90 px-3 py-1 text-xs font-semibold text-sky-700 shadow-sm backdrop-blur dark:border-sky-800 dark:bg-gray-900/90 dark:text-sky-300">
       Version {version}
     </div>
+  );
+}
+
+function StagingPrBadge({ prNumber }: { prNumber: string }) {
+  return (
+    <a
+      href={`https://github.com/capic2/dashboard-parapente/pull/${prNumber}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="fixed bottom-3 left-3 z-30 rounded-full border border-amber-200 bg-amber-50/95 px-3 py-1 text-xs font-semibold text-amber-800 shadow-sm backdrop-blur hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/95 dark:text-amber-200 dark:hover:bg-amber-900"
+    >
+      PR #{prNumber}
+    </a>
   );
 }

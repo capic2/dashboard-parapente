@@ -17,6 +17,7 @@ import TimeOfDayChart from '../components/analytics/TimeOfDayChart';
 import WeekdayChart from '../components/analytics/WeekdayChart';
 import RecordsDashboard from '../components/analytics/RecordsDashboard';
 import AchievementsBadges from '../components/analytics/AchievementsBadges';
+import AnalyticsInsights from '../components/analytics/AnalyticsInsights';
 
 // Loading fallback component
 function ChartSkeleton() {
@@ -37,16 +38,26 @@ export default function Analytics() {
     dateFrom: search.dateFrom ?? null,
     dateTo: search.dateTo ?? null,
   };
+  const flightFilters = {
+    siteId: filters.siteId,
+    dateFrom: filters.dateFrom ?? undefined,
+    dateTo: filters.dateTo ?? undefined,
+  };
   const { data: flights = [], isLoading: flightsLoading } = useFlights({
     limit: 500,
     siteId: search.siteId,
     dateFrom: search.dateFrom,
     dateTo: search.dateTo,
   });
-  const { data: stats, isLoading: statsLoading } = useFlightStats();
-  const { data: records, isLoading: recordsLoading } = useFlightRecords();
+  const { data: comparisonFlights = [], isLoading: comparisonLoading } =
+    useFlights({ limit: 500, siteId: search.siteId });
+  const { data: stats, isLoading: statsLoading } =
+    useFlightStats(flightFilters);
+  const { data: records, isLoading: recordsLoading } =
+    useFlightRecords(flightFilters);
 
-  const isLoading = flightsLoading || statsLoading || recordsLoading;
+  const isLoading =
+    flightsLoading || statsLoading || recordsLoading || comparisonLoading;
 
   return (
     <div>
@@ -115,6 +126,13 @@ export default function Analytics() {
               <AchievementsBadges stats={stats} />
             </section>
           )}
+
+          <AnalyticsInsights
+            flights={flights}
+            comparisonFlights={comparisonFlights}
+            dateFrom={search.dateFrom}
+            dateTo={search.dateTo}
+          />
 
           {/* Charts Grid */}
           <section className="grid grid-cols-1 gap-4">

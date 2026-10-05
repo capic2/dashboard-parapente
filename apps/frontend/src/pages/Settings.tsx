@@ -1,7 +1,16 @@
-import { Suspense, useState, useEffect } from 'react';
+import {
+  Suspense,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSuspenseQuery } from '@tanstack/react-query';
-import { Switch } from 'react-aria-components';
+import { Link } from '@tanstack/react-router';
+import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
+import { Input, Label, TextField } from 'react-aria-components';
+import { Search } from 'lucide-react';
 import {
   Button,
   Tab,
@@ -12,10 +21,13 @@ import {
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import {
   useWeatherSources,
-  useWeatherSourceStats,
   useDeleteWeatherSource,
 } from '../hooks/weather/useWeatherSources';
-import { WeatherSourceCard } from '../components/settings/WeatherSourceCard';
+import {
+  WeatherSourceCard,
+  type WeatherTestLocation,
+} from '../components/settings/WeatherSourceCard';
+import { SportstrackliveSettingsCard } from '../components/settings/SportstrackliveSettingsCard';
 import type { WeatherSource } from '../types/weatherSources';
 import {
   DEFAULT_APP_SETTINGS,
@@ -32,6 +44,7 @@ import {
   type AppSettings as BackendAppSettings,
 } from '../hooks/settings/useAppSettings';
 import { getSiteDisplayName } from '../lib/siteDisplay';
+import { Route, settingsTabs, type SettingsTabKey } from '../routes/settings';
 
 // Site interface as returned by API
 interface ApiSite {
@@ -49,7 +62,13 @@ interface ApiSite {
   updated_at?: string;
 }
 
-type SettingsTabKey = 'general' | 'sites' | 'weather' | 'data';
+function normalizeSiteSearch(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/gu, '')
+    .toLowerCase()
+    .trim();
+}
 
 type SettingsIconName =
   | 'bell'
@@ -60,6 +79,7 @@ type SettingsIconName =
   | 'ruler'
   | 'settings'
   | 'sliders'
+  | 'upload'
   | 'weather';
 
 function SettingsIcon({ name }: { name: SettingsIconName }) {
@@ -84,6 +104,7 @@ function SettingsIcon({ name }: { name: SettingsIconName }) {
     sliders: (
       <path d="M4 6h10m4 0h2M4 12h2m4 0h10M4 18h10m4 0h2M14 4v4M8 10v4m8 2v4" />
     ),
+    upload: <path d="M12 16V4m0 0L7 9m5-5 5 5M5 14v5h14v-5" />,
     weather: (
       <path d="M17.5 18H8a5 5 0 1 1 1.2-9.9A6 6 0 0 1 20 11.7 3.5 3.5 0 0 1 17.5 18Z" />
     ),
@@ -142,7 +163,9 @@ function SavedStatus({ isVisible }: { isVisible: boolean }) {
   const { t } = useTranslation();
 
   return (
-    <div
+    <output
+      aria-live="polite"
+      aria-atomic="true"
       className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition-opacity duration-200 ${
         isVisible
           ? 'border-emerald-200 bg-emerald-50 text-emerald-700 opacity-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
@@ -151,8 +174,112 @@ function SavedStatus({ isVisible }: { isVisible: boolean }) {
     >
       <SettingsIcon name={isVisible ? 'check' : 'settings'} />
       <span>{isVisible ? t('settings.saved') : t('settings.autoSave')}</span>
-    </div>
+    </output>
   );
+}
+
+type SettingsBackupCache = {
+  freshnessLevel?: FreshnessLevel;
+  autoRefreshWeather?: boolean;
+  httpTimeout?: HttpTimeout;
+};
+
+type SettingsBackup = {
+  settings: AppSettings;
+  cacheSettings?: SettingsBackupCache;
+};
+
+type SettingsBackupPreview = SettingsBackup & { fileName: string };
+
+type DataFeedback = {
+  scope: 'export' | 'import' | 'reset';
+  kind: 'loading' | 'ready' | 'success' | 'error';
+  message: string;
+};
+
+function getDataFeedbackClassName(kind: DataFeedback['kind']): string {
+  switch (kind) {
+    case 'error':
+      return 'bg-red-50 text-red-800 dark:bg-red-950/40 dark:text-red-200';
+    case 'success':
+      return 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200';
+    default:
+      return 'bg-sky-50 text-sky-800 dark:bg-sky-950/40 dark:text-sky-200';
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isValidAppSettings(value: unknown): value is AppSettings {
+  if (
+    !isRecord(value) ||
+    !isRecord(value.units) ||
+    !isRecord(value.notifications)
+  ) {
+    return false;
+  }
+
+  return (
+    (value.units.distance === 'km' || value.units.distance === 'miles') &&
+    (value.units.altitude === 'm' || value.units.altitude === 'ft') &&
+    (value.units.speed === 'kmh' || value.units.speed === 'mph') &&
+    (value.language === 'fr' || value.language === 'en') &&
+    (value.theme === 'light' ||
+      value.theme === 'dark' ||
+      value.theme === 'auto') &&
+    typeof value.notifications.weather === 'boolean' &&
+    typeof value.notifications.flights === 'boolean' &&
+    typeof value.notifications.alerts === 'boolean' &&
+    Array.isArray(value.favoriteSites) &&
+    value.favoriteSites.every((siteId) => typeof siteId === 'string')
+  );
+}
+
+function parseSettingsBackup(value: unknown): SettingsBackup | null {
+  if (!isRecord(value) || !isValidAppSettings(value.settings)) return null;
+
+  if (value.cacheSettings === undefined) {
+    return { settings: value.settings };
+  }
+
+  if (!isRecord(value.cacheSettings)) return null;
+
+  const { freshnessLevel, autoRefreshWeather, httpTimeout } =
+    value.cacheSettings;
+  const allowedFreshness: readonly FreshnessLevel[] = [
+    'realtime',
+    'normal',
+    'economy',
+  ];
+  const allowedTimeouts: readonly HttpTimeout[] = [15000, 30000, 60000];
+
+  if (
+    (freshnessLevel !== undefined &&
+      !allowedFreshness.includes(freshnessLevel as FreshnessLevel)) ||
+    (autoRefreshWeather !== undefined &&
+      typeof autoRefreshWeather !== 'boolean') ||
+    (httpTimeout !== undefined &&
+      !allowedTimeouts.includes(httpTimeout as HttpTimeout))
+  ) {
+    return null;
+  }
+
+  return {
+    settings: value.settings,
+    cacheSettings: {
+      ...(freshnessLevel !== undefined && {
+        freshnessLevel: freshnessLevel as FreshnessLevel,
+      }),
+      ...(autoRefreshWeather !== undefined && {
+        autoRefreshWeather: autoRefreshWeather as boolean,
+      }),
+      ...(httpTimeout !== undefined && {
+        httpTimeout: httpTimeout as HttpTimeout,
+      }),
+    },
+  };
 }
 
 // Sites Favorites Tab Component
@@ -165,6 +292,21 @@ function SitesTab({
 }) {
   const { t } = useTranslation();
   const { data: sites } = useSuspenseQuery(sitesQueryOptions());
+  const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const siteList = sites as unknown as ApiSite[];
+  const normalizedSearchQuery = normalizeSiteSearch(deferredSearchQuery);
+  const filteredSites = useMemo(
+    () =>
+      siteList.filter((site) => {
+        if (!normalizedSearchQuery) return true;
+
+        return [site.name, site.region ?? ''].some((value) =>
+          normalizeSiteSearch(value).includes(normalizedSearchQuery)
+        );
+      }),
+    [normalizedSearchQuery, siteList]
+  );
   const favoriteCount = settings.favoriteSites.length;
 
   return (
@@ -176,57 +318,95 @@ function SitesTab({
       })}
     >
       {sites.length === 0 ? (
-        <p className="text-gray-600 dark:text-gray-300 text-center py-8">
-          {t('settings.favorites.noSites')}
-        </p>
-      ) : (
-        <div className="space-y-3">
-          {(sites as unknown as ApiSite[]).map((site: ApiSite) => (
-            <div
-              key={site.id}
-              className={`flex flex-col gap-3 rounded-xl border p-4 transition-colors sm:flex-row sm:items-center sm:justify-between ${
-                settings.favoriteSites.includes(site.id)
-                  ? 'border-sky-300 bg-sky-50 dark:border-sky-700 dark:bg-sky-900/20'
-                  : 'border-gray-200 bg-gray-50 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600'
-              }`}
-            >
-              <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 dark:text-white">
-                  {getSiteDisplayName(site)}
-                </h3>
-                {site.latitude && site.longitude && site.elevation_m && (
-                  <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                    {site.latitude.toFixed(4)}, {site.longitude.toFixed(4)} ·{' '}
-                    {site.elevation_m}m
-                  </div>
-                )}
-                {site.description && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {site.description}
-                  </p>
-                )}
-              </div>
-              <Button
-                onClick={() => toggleFavorite(site.id)}
-                aria-pressed={settings.favoriteSites.includes(site.id)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors sm:ml-4 ${
-                  settings.favoriteSites.includes(site.id)
-                    ? 'bg-sky-600 text-white hover:bg-sky-700'
-                    : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                }`}
-              >
-                {settings.favoriteSites.includes(site.id)
-                  ? t('settings.favorites.favorite')
-                  : t('settings.favorites.add')}
-              </Button>
-            </div>
-          ))}
+        <div className="py-8 text-center">
+          <p className="font-semibold text-gray-800 dark:text-gray-100">
+            {t('settings.favorites.noSites')}
+          </p>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+            {t('settings.favorites.noSitesDescription')}
+          </p>
+          <Link
+            to="/sites"
+            className="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg bg-sky-600 px-4 py-2 font-medium text-white transition-colors hover:bg-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-800"
+          >
+            {t('settings.favorites.manageSites')}
+          </Link>
         </div>
+      ) : (
+        <>
+          <TextField
+            value={searchQuery}
+            onChange={setSearchQuery}
+            className="mb-4 flex max-w-xl flex-col gap-1"
+          >
+            <Label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+              {t('settings.favorites.searchLabel')}
+            </Label>
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                aria-hidden="true"
+              />
+              <Input
+                type="search"
+                placeholder={t('settings.favorites.searchPlaceholder')}
+                className="min-h-11 w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              />
+            </div>
+          </TextField>
+          {filteredSites.length === 0 ? (
+            <output className="block py-6 text-center text-gray-600 dark:text-gray-300">
+              {t('settings.favorites.noSearchResults', {
+                query: deferredSearchQuery.trim(),
+              })}
+            </output>
+          ) : (
+            <div className="space-y-3">
+              {filteredSites.map((site: ApiSite) => (
+                <div
+                  key={site.id}
+                  className={`flex flex-col gap-3 rounded-xl border p-4 transition-colors sm:flex-row sm:items-center sm:justify-between ${
+                    settings.favoriteSites.includes(site.id)
+                      ? 'border-sky-300 bg-sky-50 dark:border-sky-700 dark:bg-sky-900/20'
+                      : 'border-gray-200 bg-gray-50 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600'
+                  }`}
+                >
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 dark:text-white">
+                      {getSiteDisplayName(site)}
+                    </h3>
+                    {site.latitude && site.longitude && site.elevation_m && (
+                      <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                        {site.latitude.toFixed(4)}, {site.longitude.toFixed(4)}
+                        {' · '}
+                        {site.elevation_m}m
+                      </div>
+                    )}
+                    {site.description && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {site.description}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    onClick={() => toggleFavorite(site.id)}
+                    aria-pressed={settings.favoriteSites.includes(site.id)}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors sm:ml-4 ${
+                      settings.favoriteSites.includes(site.id)
+                        ? 'bg-sky-600 text-white hover:bg-sky-700'
+                        : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {settings.favoriteSites.includes(site.id)
+                      ? t('settings.favorites.favorite')
+                      : t('settings.favorites.add')}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
-      <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-200">
-        <strong>{t('settings.favorites.tip')}</strong>{' '}
-        {t('settings.favorites.tipText')}
-      </div>
     </SettingsCard>
   );
 }
@@ -235,32 +415,51 @@ function SitesTab({
 function WeatherSourcesTab() {
   const { t } = useTranslation();
   const { data: sources = [], isLoading, error } = useWeatherSources();
-  const { data: stats } = useWeatherSourceStats();
   const deleteSource = useDeleteWeatherSource();
+  const {
+    data: sites = [],
+    isLoading: areSitesLoading,
+    isError: sitesFailedToLoad,
+  } = useQuery(sitesQueryOptions());
+  const favoriteSiteIds = useAppSettingsStore(
+    (state) => state.settings.favoriteSites
+  );
+  const [selectedTestSiteId, setSelectedTestSiteId] = useState('');
+  const [deleteSuccess, setDeleteSuccess] = useState<string | null>(null);
+
+  const testableSites = sites
+    .filter(
+      (site) =>
+        Number.isFinite(site.latitude) && Number.isFinite(site.longitude)
+    )
+    .sort(
+      (left, right) =>
+        Number(favoriteSiteIds.includes(right.id)) -
+        Number(favoriteSiteIds.includes(left.id))
+    );
+  const preferredTestSite =
+    testableSites.find((site) => favoriteSiteIds.includes(site.id)) ??
+    testableSites[0];
+  const selectedTestSite =
+    testableSites.find((site) => site.id === selectedTestSiteId) ??
+    preferredTestSite;
+  const testLocation: WeatherTestLocation | null = selectedTestSite
+    ? {
+        id: selectedTestSite.id,
+        name: getSiteDisplayName(selectedTestSite),
+        latitude: selectedTestSite.latitude,
+        longitude: selectedTestSite.longitude,
+      }
+    : null;
 
   const handleDelete = async (source: WeatherSource) => {
-    if (
-      !confirm(
-        t('settings.weatherSources.deleteConfirm', {
-          name: source.display_name,
-        })
-      )
-    ) {
-      return;
-    }
-
-    try {
-      await deleteSource.mutateAsync(source.source_name);
-      alert(
-        t('settings.weatherSources.deleteSuccess', {
-          name: source.display_name,
-        })
-      );
-    } catch (error: unknown) {
-      const errorMessage =
-        (error as Error)?.message || t('settings.weatherSources.deleteError');
-      alert(errorMessage);
-    }
+    setDeleteSuccess(null);
+    await deleteSource.mutateAsync(source.source_name);
+    setDeleteSuccess(
+      t('settings.weatherSources.deleteSuccess', {
+        name: source.display_name,
+      })
+    );
   };
 
   // Count active sources
@@ -284,55 +483,74 @@ function WeatherSourcesTab() {
 
   return (
     <div className="space-y-4">
-      {/* Header with stats */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md">
-        <div className="mb-2 flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white">
+      <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white">
           <SettingsIcon name="weather" />
           <h2>{t('settings.weatherSources.title')}</h2>
         </div>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
           {t('settings.weatherSources.description')}
         </p>
+        <p className="mt-3 text-sm font-medium text-gray-800 dark:text-gray-200">
+          {t('settings.weatherSources.sourceCountSummary', {
+            active: activeSources.length,
+            total: sources.length,
+          })}
+        </p>
 
-        {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-              <div className="text-xs text-blue-600 dark:text-blue-400 font-semibold mb-1">
-                {t('settings.weatherSources.activeSources')}
-              </div>
-              <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                {stats.active_sources}/{stats.total_sources}
-              </div>
-            </div>
-            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-              <div className="text-xs text-green-600 dark:text-green-400 font-semibold mb-1">
-                {t('settings.weatherSources.globalSuccessRate')}
-              </div>
-              <div className="text-2xl font-bold text-green-900 dark:text-green-100">
-                {stats.global_success_rate.toFixed(0)}%
-              </div>
-            </div>
-            <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-              <div className="text-xs text-purple-600 dark:text-purple-400 font-semibold mb-1">
-                {t('settings.weatherSources.avgTime')}
-              </div>
-              <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-                {stats.global_avg_response_time_ms
-                  ? `${stats.global_avg_response_time_ms}ms`
-                  : '-'}
-              </div>
-            </div>
-            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-              <div className="text-xs text-red-600 dark:text-red-400 font-semibold mb-1">
-                {t('settings.weatherSources.sourcesWithErrors')}
-              </div>
-              <div className="text-2xl font-bold text-red-900 dark:text-red-100">
-                {stats.sources_with_errors}
-              </div>
-            </div>
-          </div>
-        )}
+        <div className="mt-4 max-w-xl">
+          <label
+            htmlFor="weather-test-site"
+            className="block text-sm font-semibold text-gray-800 dark:text-gray-200"
+          >
+            {t('settings.weatherSources.testLocation')}
+          </label>
+          <select
+            id="weather-test-site"
+            value={testLocation?.id ?? ''}
+            onChange={(event) => setSelectedTestSiteId(event.target.value)}
+            disabled={areSitesLoading || testableSites.length === 0}
+            aria-describedby="weather-test-site-help"
+            className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+          >
+            {testableSites.length === 0 && (
+              <option value="">
+                {areSitesLoading
+                  ? t('common.loading')
+                  : t(
+                      sitesFailedToLoad
+                        ? 'settings.weatherSources.testLocationsLoadError'
+                        : 'settings.weatherSources.noTestLocation'
+                    )}
+              </option>
+            )}
+            {testableSites.map((site) => (
+              <option key={site.id} value={site.id}>
+                {getSiteDisplayName(site)}
+                {favoriteSiteIds.includes(site.id)
+                  ? ` · ${t('settings.favorites.favorite')}`
+                  : ''}
+              </option>
+            ))}
+          </select>
+          <p
+            id="weather-test-site-help"
+            className="mt-1 text-xs leading-5 text-gray-600 dark:text-gray-300"
+          >
+            {t('settings.weatherSources.testLocationHelp')}
+          </p>
+        </div>
       </div>
+
+      {deleteSuccess && (
+        <output
+          className="block rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-200"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {deleteSuccess}
+        </output>
+      )}
 
       {/* Sources Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -340,6 +558,7 @@ function WeatherSourcesTab() {
           <WeatherSourceCard
             key={source.id}
             source={source}
+            testLocation={testLocation}
             isLastActive={activeSources.length === 1 && source.is_enabled}
             onDelete={handleDelete}
           />
@@ -351,35 +570,6 @@ function WeatherSourcesTab() {
           {t('settings.weatherSources.noSources')}
         </div>
       )}
-
-      {/* Info Box */}
-      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
-        <h3 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
-          {t('settings.weatherSources.aboutTitle')}
-        </h3>
-        <ul className="text-sm text-yellow-800 dark:text-yellow-200 space-y-1">
-          <li>
-            • <strong>Open-Meteo</strong>:{' '}
-            {t('settings.weatherSources.openMeteoDesc')}
-          </li>
-          <li>
-            • <strong>WeatherAPI</strong>:{' '}
-            {t('settings.weatherSources.weatherApiDesc')}
-          </li>
-          <li>
-            • <strong>Météo Parapente</strong>:{' '}
-            {t('settings.weatherSources.meteoParaglideDesc')}
-          </li>
-          <li>
-            • <strong>Météociel</strong>:{' '}
-            {t('settings.weatherSources.meteocielDesc')}
-          </li>
-          <li>
-            • <strong>Meteoblue</strong>:{' '}
-            {t('settings.weatherSources.meteoblueDesc')}
-          </li>
-        </ul>
-      </div>
     </div>
   );
 }
@@ -1025,13 +1215,22 @@ function PerformanceSection() {
 
 export default function Settings() {
   const { t, i18n } = useTranslation();
+  const { tab } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const { preference: themePreference, setPreference: setThemePreference } =
     useThemeStore();
   const settings = useAppSettingsStore((state) => state.settings);
   const setSettings = useAppSettingsStore((state) => state.setSettings);
   const resetSettings = useAppSettingsStore((state) => state.resetSettings);
   const [saved, setSaved] = useState(false);
-  const [activeTab, setActiveTab] = useState<SettingsTabKey>('general');
+  const [importPreview, setImportPreview] =
+    useState<SettingsBackupPreview | null>(null);
+  const [dataFeedback, setDataFeedback] = useState<DataFeedback | null>(null);
+  const [isResetConfirmationOpen, setIsResetConfirmationOpen] = useState(false);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+  const importRequestRef = useRef(0);
+  const activeTab: SettingsTabKey =
+    tab === 'weather' ? 'sites' : (tab ?? 'general');
 
   useEffect(() => {
     void i18n.changeLanguage(settings.language);
@@ -1059,7 +1258,7 @@ export default function Settings() {
     }));
   };
 
-  // Export data
+  // Export local preferences and browser cache settings only.
   const exportData = () => {
     const cacheSettings = useCacheSettingsStore.getState();
     const data = {
@@ -1078,73 +1277,96 @@ export default function Settings() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `paragliding-settings-${new Date().toISOString().split('T')[0]}.json`;
+    const fileName = `paragliding-settings-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
+    setDataFeedback({
+      scope: 'export',
+      kind: 'success',
+      message: t('settings.data.exportSuccess', { fileName }),
+    });
   };
 
-  // Import data
-  const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const readImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const requestId = ++importRequestRef.current;
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = '';
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const imported = JSON.parse(e.target?.result as string);
-        if (imported.settings) {
-          updateSettings(imported.settings as AppSettings);
-        }
-        if (imported.cacheSettings) {
-          const { setFreshnessLevel, setAutoRefreshWeather, setHttpTimeout } =
-            useCacheSettingsStore.getState();
-          const allowedFreshness: readonly FreshnessLevel[] = [
-            'realtime',
-            'normal',
-            'economy',
-          ];
-          const allowedTimeouts: readonly HttpTimeout[] = [15000, 30000, 60000];
+    setImportPreview(null);
+    setDataFeedback({
+      scope: 'import',
+      kind: 'loading',
+      message: t('settings.data.importReading'),
+    });
 
-          if (
-            allowedFreshness.includes(
-              imported.cacheSettings.freshnessLevel as FreshnessLevel
-            )
-          ) {
-            setFreshnessLevel(
-              imported.cacheSettings.freshnessLevel as FreshnessLevel
-            );
-          }
-          if (imported.cacheSettings.autoRefreshWeather !== undefined)
-            setAutoRefreshWeather(imported.cacheSettings.autoRefreshWeather);
-          if (
-            allowedTimeouts.includes(
-              imported.cacheSettings.httpTimeout as HttpTimeout
-            )
-          ) {
-            setHttpTimeout(imported.cacheSettings.httpTimeout as HttpTimeout);
-          }
-        }
-        alert(t('settings.data.importSuccess'));
-      } catch {
-        alert(t('settings.data.importError'));
-      }
-    };
-    reader.readAsText(file);
+    try {
+      const fileContents = await file.text();
+      if (requestId !== importRequestRef.current) return;
+
+      const parsed = parseSettingsBackup(JSON.parse(fileContents));
+      if (!parsed) throw new Error('Invalid settings backup');
+
+      setImportPreview({ ...parsed, fileName: file.name });
+      setDataFeedback({
+        scope: 'import',
+        kind: 'ready',
+        message: t('settings.data.importReady'),
+      });
+    } catch {
+      if (requestId !== importRequestRef.current) return;
+
+      setDataFeedback({
+        scope: 'import',
+        kind: 'error',
+        message: t('settings.data.importError'),
+      });
+    }
   };
 
-  // Clear all data
-  const clearData = () => {
-    if (window.confirm(t('settings.data.resetConfirm'))) {
-      resetSettings();
-      // Reset cache settings to defaults
-      const { setFreshnessLevel, setAutoRefreshWeather, setHttpTimeout } =
-        useCacheSettingsStore.getState();
-      setFreshnessLevel('normal');
-      setAutoRefreshWeather(true);
-      setHttpTimeout(30000);
-      setThemePreference(DEFAULT_APP_SETTINGS.theme);
-      alert(t('settings.data.resetSuccess'));
+  const applyImport = () => {
+    if (!importPreview) return;
+
+    importRequestRef.current += 1;
+    updateSettings(importPreview.settings);
+    setThemePreference(importPreview.settings.theme);
+    const cacheStore = useCacheSettingsStore.getState();
+    if (importPreview.cacheSettings?.freshnessLevel) {
+      cacheStore.setFreshnessLevel(importPreview.cacheSettings.freshnessLevel);
     }
+    if (importPreview.cacheSettings?.autoRefreshWeather !== undefined) {
+      cacheStore.setAutoRefreshWeather(
+        importPreview.cacheSettings.autoRefreshWeather
+      );
+    }
+    if (importPreview.cacheSettings?.httpTimeout) {
+      cacheStore.setHttpTimeout(importPreview.cacheSettings.httpTimeout);
+    }
+
+    setImportPreview(null);
+    setDataFeedback({
+      scope: 'import',
+      kind: 'success',
+      message: t('settings.data.importSuccess'),
+    });
+  };
+
+  const resetPreferences = () => {
+    importRequestRef.current += 1;
+    resetSettings();
+    const cacheStore = useCacheSettingsStore.getState();
+    cacheStore.setFreshnessLevel('normal');
+    cacheStore.setAutoRefreshWeather(true);
+    cacheStore.setHttpTimeout(30000);
+    setThemePreference(DEFAULT_APP_SETTINGS.theme);
+    setIsResetConfirmationOpen(false);
+    setDataFeedback({
+      scope: 'reset',
+      kind: 'success',
+      message: t('settings.data.resetSuccess'),
+    });
   };
 
   return (
@@ -1167,14 +1389,39 @@ export default function Settings() {
         </div>
       </section>
 
+      <Link
+        to="/settings/telemetry-layout"
+        className="flex items-center justify-between gap-4 rounded-2xl border border-violet-200 bg-violet-50/70 p-4 text-violet-950 transition-colors hover:bg-violet-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:border-violet-900 dark:bg-violet-950/20 dark:text-violet-100 dark:hover:bg-violet-950/40"
+      >
+        <span>
+          <span className="block font-semibold">
+            {t('telemetryLayout.title')}
+          </span>
+          <span className="mt-1 block text-sm text-violet-800/80 dark:text-violet-200/80">
+            {t('telemetryLayout.description')}
+          </span>
+        </span>
+        <span className="shrink-0 text-sm font-semibold">
+          {t('telemetryLayout.configure')} →
+        </span>
+      </Link>
+
       <Tabs
         selectedKey={activeTab}
-        onSelectionChange={(key) => setActiveTab(key as SettingsTabKey)}
+        onSelectionChange={(key) => {
+          const selectedTab = key as SettingsTabKey;
+          void navigate({
+            search: (previous) => ({
+              ...previous,
+              tab: selectedTab === 'general' ? undefined : selectedTab,
+            }),
+          });
+        }}
         className="space-y-4"
       >
         {/* Tabs Navigation */}
         <TabList className="mb-4 grid-cols-2 sm:flex">
-          {(['general', 'sites', 'weather', 'data'] as const).map((tabKey) => (
+          {settingsTabs.map((tabKey) => (
             <Tab key={tabKey} id={tabKey} className="flex-1">
               {tabKey === 'general' && (
                 <span className="inline-flex items-center justify-center gap-2">
@@ -1185,13 +1432,13 @@ export default function Settings() {
               {tabKey === 'sites' && (
                 <span className="inline-flex items-center justify-center gap-2">
                   <SettingsIcon name="mapPin" />
-                  {t('settings.tabs.favoriteSites')}
+                  {t('settings.tabs.sitesAndWeather')}
                 </span>
               )}
-              {tabKey === 'weather' && (
+              {tabKey === 'sportstracklive' && (
                 <span className="inline-flex items-center justify-center gap-2">
-                  <SettingsIcon name="weather" />
-                  {t('settings.tabs.weatherSources')}
+                  <SettingsIcon name="upload" />
+                  {t('settings.tabs.sportstracklive')}
                 </span>
               )}
               {tabKey === 'data' && (
@@ -1215,10 +1462,10 @@ export default function Settings() {
               description={t('settings.units.description')}
             >
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <fieldset className="min-w-0">
+                  <legend className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     {t('settings.units.distance')}
-                  </label>
+                  </legend>
                   <div className="flex flex-wrap gap-2 sm:gap-4">
                     <Button
                       onClick={() =>
@@ -1253,12 +1500,12 @@ export default function Settings() {
                       {t('settings.units.miles')}
                     </Button>
                   </div>
-                </div>
+                </fieldset>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <fieldset className="min-w-0">
+                  <legend className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     {t('settings.units.altitude')}
-                  </label>
+                  </legend>
                   <div className="flex flex-wrap gap-2 sm:gap-4">
                     <Button
                       onClick={() =>
@@ -1293,12 +1540,12 @@ export default function Settings() {
                       {t('settings.units.feet')}
                     </Button>
                   </div>
-                </div>
+                </fieldset>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <fieldset className="min-w-0">
+                  <legend className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     {t('settings.units.speed')}
-                  </label>
+                  </legend>
                   <div className="flex flex-wrap gap-2 sm:gap-4">
                     <Button
                       onClick={() =>
@@ -1333,7 +1580,7 @@ export default function Settings() {
                       mph
                     </Button>
                   </div>
-                </div>
+                </fieldset>
               </div>
             </SettingsCard>
 
@@ -1344,10 +1591,10 @@ export default function Settings() {
               description={t('settings.languageTheme.description')}
             >
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <fieldset className="min-w-0">
+                  <legend className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     {t('settings.languageTheme.language')}
-                  </label>
+                  </legend>
                   <div className="flex flex-wrap gap-2 sm:gap-4">
                     <Button
                       onClick={() => {
@@ -1376,12 +1623,15 @@ export default function Settings() {
                       English
                     </Button>
                   </div>
-                </div>
+                </fieldset>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <fieldset className="min-w-0">
+                  <legend className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     {t('settings.languageTheme.theme')}
-                  </label>
+                  </legend>
+                  <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                    {t('settings.languageTheme.themeHelp')}
+                  </p>
                   <div className="flex flex-wrap gap-2 sm:gap-4">
                     {(['light', 'dark', 'auto'] as const).map((theme) => (
                       <Button
@@ -1401,7 +1651,7 @@ export default function Settings() {
                       </Button>
                     ))}
                   </div>
-                </div>
+                </fieldset>
               </div>
             </SettingsCard>
 
@@ -1413,94 +1663,43 @@ export default function Settings() {
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                  <span>
+                  <div>
                     <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       {t('settings.notifications.weatherAlerts')}
                     </span>
                     <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
                       {t('settings.notifications.weatherAlertsHelp')}
                     </span>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                    {t('settings.notifications.unavailable')}
                   </span>
-                  <Switch
-                    aria-label={t('settings.notifications.weatherAlerts')}
-                    isSelected={settings.notifications.weather}
-                    onChange={(isSelected: boolean) =>
-                      updateSettings((prev) => ({
-                        ...prev,
-                        notifications: {
-                          ...prev.notifications,
-                          weather: isSelected,
-                        },
-                      }))
-                    }
-                    className="group"
-                  >
-                    <div className="relative inline-flex items-center cursor-pointer">
-                      <div className="w-11 h-6 bg-gray-300 group-focus-visible:outline-none group-focus-visible:ring-2 group-focus-visible:ring-sky-300 rounded-full group-data-[selected]:bg-sky-600 transition-colors">
-                        <div className="absolute top-[2px] left-[2px] bg-white border-gray-300 border rounded-full h-5 w-5 transition-transform group-data-[selected]:translate-x-full"></div>
-                      </div>
-                    </div>
-                  </Switch>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                  <span>
+                  <div>
                     <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       {t('settings.notifications.newFlights')}
                     </span>
                     <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
                       {t('settings.notifications.newFlightsHelp')}
                     </span>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                    {t('settings.notifications.unavailable')}
                   </span>
-                  <Switch
-                    aria-label={t('settings.notifications.newFlights')}
-                    isSelected={settings.notifications.flights}
-                    onChange={(isSelected: boolean) =>
-                      updateSettings((prev) => ({
-                        ...prev,
-                        notifications: {
-                          ...prev.notifications,
-                          flights: isSelected,
-                        },
-                      }))
-                    }
-                    className="group"
-                  >
-                    <div className="relative inline-flex items-center cursor-pointer">
-                      <div className="w-11 h-6 bg-gray-300 group-focus-visible:outline-none group-focus-visible:ring-2 group-focus-visible:ring-sky-300 rounded-full group-data-[selected]:bg-sky-600 transition-colors">
-                        <div className="absolute top-[2px] left-[2px] bg-white border-gray-300 border rounded-full h-5 w-5 transition-transform group-data-[selected]:translate-x-full"></div>
-                      </div>
-                    </div>
-                  </Switch>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                  <span>
+                  <div>
                     <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       {t('settings.notifications.customAlerts')}
                     </span>
                     <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
                       {t('settings.notifications.customAlertsHelp')}
                     </span>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                    {t('settings.notifications.unavailable')}
                   </span>
-                  <Switch
-                    aria-label={t('settings.notifications.customAlerts')}
-                    isSelected={settings.notifications.alerts}
-                    onChange={(isSelected: boolean) =>
-                      updateSettings((prev) => ({
-                        ...prev,
-                        notifications: {
-                          ...prev.notifications,
-                          alerts: isSelected,
-                        },
-                      }))
-                    }
-                    className="group"
-                  >
-                    <div className="relative inline-flex items-center cursor-pointer">
-                      <div className="w-11 h-6 bg-gray-300 group-focus-visible:outline-none group-focus-visible:ring-2 group-focus-visible:ring-sky-300 rounded-full group-data-[selected]:bg-sky-600 transition-colors">
-                        <div className="absolute top-[2px] left-[2px] bg-white border-gray-300 border rounded-full h-5 w-5 transition-transform group-data-[selected]:translate-x-full"></div>
-                      </div>
-                    </div>
-                  </Switch>
                 </div>
               </div>
             </SettingsCard>
@@ -1511,25 +1710,52 @@ export default function Settings() {
 
           {/* SITES TAB */}
           <TabPanel id="sites" className="outline-none">
-            <Suspense
-              fallback={
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md animate-pulse space-y-3">
-                  {[...Array(4)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-16 bg-gray-200 dark:bg-gray-600 rounded-lg"
-                    ></div>
-                  ))}
-                </div>
-              }
+            <Tabs
+              selectedKey={tab === 'weather' ? 'weather' : 'sites'}
+              onSelectionChange={(key) => {
+                void navigate({
+                  search: (previous) => ({
+                    ...previous,
+                    tab: key === 'weather' ? 'weather' : 'sites',
+                  }),
+                });
+              }}
+              className="space-y-4"
             >
-              <SitesTab settings={settings} toggleFavorite={toggleFavorite} />
-            </Suspense>
+              <TabList
+                aria-label={t('settings.tabs.siteConfiguration')}
+                className="mb-4 flex flex-wrap"
+              >
+                <Tab id="sites">{t('settings.tabs.favoriteSites')}</Tab>
+                <Tab id="weather">{t('settings.tabs.weatherSources')}</Tab>
+              </TabList>
+              <TabPanel id="sites" className="outline-none">
+                <Suspense
+                  fallback={
+                    <div className="space-y-3 rounded-xl bg-white p-6 shadow-md dark:bg-gray-800">
+                      {[...Array(4)].map((_, i) => (
+                        <div
+                          key={i}
+                          className="h-16 rounded-lg bg-gray-200 dark:bg-gray-600"
+                        />
+                      ))}
+                    </div>
+                  }
+                >
+                  <SitesTab
+                    settings={settings}
+                    toggleFavorite={toggleFavorite}
+                  />
+                </Suspense>
+              </TabPanel>
+              <TabPanel id="weather" className="outline-none">
+                <WeatherSourcesTab />
+              </TabPanel>
+            </Tabs>
           </TabPanel>
 
-          {/* WEATHER SOURCES TAB */}
-          <TabPanel id="weather" className="outline-none">
-            <WeatherSourcesTab />
+          <TabPanel id="sportstracklive" className="outline-none">
+            <SportstrackliveSettingsCard />
           </TabPanel>
 
           {/* DATA TAB */}
@@ -1548,19 +1774,87 @@ export default function Settings() {
                   >
                     {t('settings.data.export')}
                   </Button>
-                  <label className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all flex items-center justify-center gap-2 cursor-pointer">
+                  <Button
+                    onClick={() => {
+                      importRequestRef.current += 1;
+                      setIsResetConfirmationOpen(false);
+                      importFileInputRef.current?.click();
+                    }}
+                    className="w-full px-6 py-3 rounded-lg border border-gray-300 bg-gray-100 font-semibold text-gray-800 transition-colors hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 flex items-center justify-center gap-2"
+                  >
                     {t('settings.data.import')}
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={importData}
-                      className="hidden"
-                    />
-                  </label>
+                  </Button>
+                  <input
+                    ref={importFileInputRef}
+                    type="file"
+                    accept=".json,application/json"
+                    onChange={readImportFile}
+                    className="sr-only"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                  />
                 </div>
                 <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-sm text-yellow-800 dark:text-yellow-200">
                   {t('settings.data.importWarning')}
                 </div>
+                {(dataFeedback?.scope === 'import' ||
+                  dataFeedback?.scope === 'export') && (
+                  <p
+                    className={`mt-4 rounded-lg p-3 text-sm ${getDataFeedbackClassName(dataFeedback.kind)}`}
+                    role={dataFeedback.kind === 'error' ? 'alert' : 'status'}
+                    aria-live={
+                      dataFeedback.kind === 'error' ? 'assertive' : 'polite'
+                    }
+                  >
+                    {dataFeedback.message}
+                  </p>
+                )}
+                {importPreview && (
+                  <section
+                    className="mt-4 rounded-xl border border-sky-200 bg-sky-50/70 p-4 dark:border-sky-800 dark:bg-sky-950/30"
+                    aria-labelledby="settings-import-preview-title"
+                  >
+                    <h3
+                      id="settings-import-preview-title"
+                      className="font-semibold text-slate-950 dark:text-white"
+                    >
+                      {t('settings.data.importPreviewTitle')}
+                    </h3>
+                    <p className="mt-1 break-all text-sm text-slate-700 dark:text-slate-200">
+                      {importPreview.fileName}
+                    </p>
+                    <p className="mt-3 text-sm text-slate-700 dark:text-slate-200">
+                      {t('settings.data.importPreviewDescription')}
+                    </p>
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">
+                      <li>{t('settings.data.importPreviewPreferences')}</li>
+                      {importPreview.cacheSettings && (
+                        <li>{t('settings.data.importPreviewCache')}</li>
+                      )}
+                    </ul>
+                    <p className="mt-3 text-sm text-slate-700 dark:text-slate-200">
+                      {t('settings.data.importPreviewExclusions')}
+                    </p>
+                    <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                      <Button
+                        onClick={() => {
+                          importRequestRef.current += 1;
+                          setImportPreview(null);
+                          setDataFeedback(null);
+                        }}
+                        className="min-h-11 px-4 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                      >
+                        {t('settings.data.importCancel')}
+                      </Button>
+                      <Button
+                        onClick={applyImport}
+                        className="min-h-11 bg-sky-600 px-4 py-2 text-white hover:bg-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
+                      >
+                        {t('settings.data.importApply')}
+                      </Button>
+                    </div>
+                  </section>
+                )}
               </SettingsCard>
 
               {/* Clear Data Section */}
@@ -1570,7 +1864,12 @@ export default function Settings() {
                 description={t('settings.data.resetDescription')}
               >
                 <Button
-                  onClick={clearData}
+                  onClick={() => {
+                    importRequestRef.current += 1;
+                    setDataFeedback(null);
+                    setImportPreview(null);
+                    setIsResetConfirmationOpen(true);
+                  }}
                   className="w-full px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all"
                 >
                   {t('settings.data.resetAll')}
@@ -1578,18 +1877,41 @@ export default function Settings() {
                 <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-sm text-red-800 dark:text-red-200">
                   {t('settings.data.resetWarning')}
                 </div>
-              </SettingsCard>
-
-              {/* User Profile Placeholder */}
-              <SettingsCard icon="bell" title={t('settings.profile.title')}>
-                <div className="p-8 bg-gray-50 dark:bg-gray-900 rounded-lg text-center">
-                  <p className="text-gray-600 dark:text-gray-300 mb-2">
-                    {t('settings.profile.wip')}
-                  </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {t('settings.profile.wipDetails')}
-                  </p>
-                </div>
+                {isResetConfirmationOpen && (
+                  <fieldset className="mt-4 rounded-xl border border-red-200 bg-red-50/70 p-4 dark:border-red-900 dark:bg-red-950/30">
+                    <legend className="font-semibold text-red-950 dark:text-red-100">
+                      {t('settings.data.resetConfirmTitle')}
+                    </legend>
+                    <p className="mt-1 text-sm text-red-900 dark:text-red-200">
+                      {t('settings.data.resetConfirmDescription')}
+                    </p>
+                    <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                      <Button
+                        onClick={() => {
+                          importRequestRef.current += 1;
+                          setIsResetConfirmationOpen(false);
+                        }}
+                        className="min-h-11 px-4 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                      >
+                        {t('settings.data.resetConfirmCancel')}
+                      </Button>
+                      <Button
+                        onClick={resetPreferences}
+                        className="min-h-11 bg-red-600 px-4 py-2 text-white hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                      >
+                        {t('settings.data.resetConfirmAction')}
+                      </Button>
+                    </div>
+                  </fieldset>
+                )}
+                {dataFeedback?.scope === 'reset' && (
+                  <output
+                    className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
+                    aria-live="polite"
+                  >
+                    {dataFeedback.message}
+                  </output>
+                )}
               </SettingsCard>
             </div>
           </TabPanel>

@@ -8,6 +8,7 @@ worker while keeping a small in-memory status snapshot for compatibility.
 
 import asyncio
 import json
+import logging
 import shutil
 import threading
 import uuid
@@ -40,6 +41,8 @@ from video_acceleration import (
     select_video_accelerator,
 )
 
+logger = logging.getLogger(__name__)
+
 # Storage for export jobs (compatibility snapshot)
 export_jobs: dict[str, dict[str, Any]] = {}
 
@@ -56,7 +59,7 @@ def _video_legacy_temp_images_dir() -> Path:
     return Path(config.VIDEO_LEGACY_TEMP_IMAGES_DIR)
 
 
-_LOG_TAIL_LINE_COUNT = 100
+_LOG_TAIL_LINE_COUNT = 200
 
 
 def _job_log_path(job_id: str) -> Path:
@@ -342,6 +345,9 @@ def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
         "quality": job.quality,
         "speed": job.speed,
         "mode": job.mode,
+        "source_type": job.source_type,
+        "youtube_url": job.youtube_url,
+        "overlay_job_id": job.overlay_job_id,
         "render_method": job.render_method,
         "created_at": _to_iso(job.created_at),
         "updated_at": _to_iso(job.updated_at),
@@ -561,7 +567,11 @@ def _update_job(
             should_update_flight = popped_update_db
         else:
             should_update_flight = _get_job_update_db_flag(job_id, True)
-        if should_update_flight:
+        # YouTube overlay exports share this job table but must never replace
+        # the flight's Cesium export state. The per-process update flag is not
+        # available to a separate RQ worker, so enforce this from persisted job
+        # metadata as well.
+        if should_update_flight and job.mode != "youtube_overlay":
             _update_flight_from_job(db, job)
         db.commit()
 
@@ -808,7 +818,108 @@ def process_video_export_job(job_id: str) -> None:
     if not acquired_job_id:
         return
 
+    job = _get_job(acquired_job_id)
+    if job and job.mode == "youtube_overlay":
+        _export_youtube_overlay_job(acquired_job_id)
+        return
     asyncio.run(_export_video_manual_render(acquired_job_id))
+
+
+def _export_youtube_overlay_job(job_id: str) -> None:
+    """Download a selected YouTube source and compose the existing alpha layer."""
+    from youtube_overlay_export import (
+        YoutubeExportError,
+        cleanup_work_dir,
+        export_youtube_overlay,
+        new_work_dir,
+        output_path,
+    )
+    from youtube_upload import download_cookies_for_upload_job
+
+    job = _get_job(job_id)
+    if not job or not job.youtube_url or not job.overlay_job_id:
+        _log_job(job_id, "Export YouTube échoué: paramètres d’export incomplets")
+        _update_job(job_id, status=_STATUS_FAILED, error="Paramètres d’export YouTube incomplets")
+        return
+
+    work_dir = new_work_dir(job_id)
+    destination = output_path(job_id)
+    upload_started = False
+
+    def progress(message: str, download_percent: int | None = None) -> None:
+        if _is_cancelled(job_id):
+            raise YoutubeExportError("Export annulé")
+        _log_job(job_id, message)
+        progress_percent = (
+            1 + round(download_percent * 49 / 100) if download_percent is not None else None
+        )
+        _update_job(
+            job_id,
+            status=_STATUS_RUNNING,
+            message=message,
+            **({"progress": progress_percent} if progress_percent is not None else {}),
+        )
+
+    try:
+        _log_job(job_id, "Préparation de l’export YouTube")
+        _update_job(
+            job_id, status=_STATUS_RUNNING, message="Préparation de l’export YouTube", progress=1
+        )
+        download_cookies = download_cookies_for_upload_job(job.youtube_upload_job_id)
+        export_youtube_overlay(
+            url=job.youtube_url,
+            overlay_job_id=job.overlay_job_id,
+            output_path=destination,
+            offset_seconds=float(job.overlay_offset_seconds or 0),
+            work_dir=work_dir,
+            progress=progress,
+            cookies=download_cookies,
+            pip_url=job.pip_youtube_url,
+            pip_apply_offset=job.pip_apply_offset,
+        )
+        if _is_cancelled(job_id):
+            raise YoutubeExportError("Export annulé")
+        if not job.youtube_upload_job_id:
+            raise YoutubeExportError("Job d’upload YouTube introuvable")
+        from youtube_upload import enqueue_youtube_overlay_upload
+
+        enqueue_youtube_overlay_upload(job.youtube_upload_job_id, destination)
+        upload_started = True
+        _log_job(job_id, "Vidéo composée et upload YouTube lancé")
+        try:
+            completed_job = _update_job(
+                job_id,
+                status=_STATUS_COMPLETED,
+                progress=100,
+                message="Vidéo composée, envoi YouTube en cours",
+                video_path=str(destination),
+            )
+        except Exception as exc:
+            logger.exception("Unable to finalize handed-off YouTube export %s", job_id)
+            _log_job(job_id, f"Upload YouTube lancé, statut d’export non mis à jour: {exc}")
+            return
+        if completed_job is None:
+            _log_job(job_id, "Upload YouTube lancé, mais le job d’export a été annulé")
+    except YoutubeExportError as exc:
+        _log_job(job_id, f"Export YouTube échoué: {exc}")
+        if not upload_started and job and job.youtube_upload_job_id:
+            from youtube_upload import fail_youtube_overlay_upload
+
+            fail_youtube_overlay_upload(job.youtube_upload_job_id, str(exc))
+        _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
+    except Exception as exc:
+        _log_job(job_id, f"Export YouTube échoué avec une erreur inattendue: {exc}")
+        if not upload_started and job and job.youtube_upload_job_id:
+            from youtube_upload import fail_youtube_overlay_upload
+
+            fail_youtube_overlay_upload(job.youtube_upload_job_id, str(exc))
+        _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
+    finally:
+        _log_job(job_id, "Nettoyage des fichiers temporaires YouTube")
+        cleanup_work_dir(work_dir)
+        if not upload_started:
+            destination.unlink(missing_ok=True)
+        _clear_job_cancel_requested(job_id)
 
 
 def _cleanup_temp_dir(temp_dir: Path | None) -> None:
@@ -1634,7 +1745,11 @@ def _worker_loop():
                 _WORKER_STOP.wait(1)
                 continue
 
-            asyncio.run(_export_video_manual_render(job_id))
+            job = _get_job(job_id)
+            if job and job.mode == "youtube_overlay":
+                _export_youtube_overlay_job(job_id)
+            else:
+                asyncio.run(_export_video_manual_render(job_id))
         except Exception as e:
             if job_id:
                 print(f"❌ Worker failed for job {job_id}: {e}")
@@ -1695,12 +1810,19 @@ def _enqueue_video_export_job(
     frontend_url: str = "http://localhost:5173",
     update_db: bool = True,
     auth_token: str | None = None,
+    source_type: str = "flight",
+    youtube_url: str | None = None,
+    pip_youtube_url: str | None = None,
+    pip_apply_offset: bool = True,
+    overlay_job_id: str | None = None,
+    overlay_offset_seconds: float | None = None,
+    youtube_upload_job_id: str | None = None,
 ):
     """Create a new export job and enqueue it for the configured queue backend."""
     if not _dependencies_ok:
         raise RuntimeError("Missing dependencies for video export")
 
-    with job_admission():
+    with job_admission("video_export_create"):
         job_id = str(uuid.uuid4())
         now = datetime.utcnow()
 
@@ -1724,6 +1846,13 @@ def _enqueue_video_export_job(
                 started_at=None,
                 updated_at=now,
                 created_at=now,
+                source_type=source_type,
+                youtube_url=youtube_url,
+                pip_youtube_url=pip_youtube_url,
+                pip_apply_offset=pip_apply_offset,
+                overlay_job_id=overlay_job_id,
+                overlay_offset_seconds=overlay_offset_seconds,
+                youtube_upload_job_id=youtube_upload_job_id,
             )
             db.add(job)
 
@@ -1745,6 +1874,57 @@ def _enqueue_video_export_job(
         _set_job_auth_token(job_id, _resolve_video_export_job_token(job_id, flight_id, auth_token))
         _enqueue_existing_video_export_job(job_id)
     return job_id
+
+
+def start_youtube_overlay_export(
+    *,
+    flight_id: str,
+    youtube_url: str,
+    overlay_job_id: str,
+    overlay_offset_seconds: float,
+    youtube_user_id: int,
+    pip_youtube_url: str | None = None,
+    pip_apply_offset: bool = True,
+    auth_token: str | None = None,
+) -> str:
+    """Queue a YouTube overlay export followed by automatic YouTube publication."""
+    from youtube_upload import create_youtube_overlay_upload_job, fail_youtube_overlay_upload
+
+    with SessionLocal() as db:
+        flight = db.get(Flight, flight_id)
+        if flight is None:
+            raise RuntimeError("Flight not found")
+        flight_date = flight.flight_date.strftime("%d/%m/%Y") if flight.flight_date else "sans date"
+        title = flight.name or f"Vol du {flight_date}"
+        upload_job = create_youtube_overlay_upload_job(
+            db,
+            flight_id=flight.id,
+            user_id=youtube_user_id,
+            title=f"{title} - overlay YouTube",
+            description=flight.notes or "",
+            gopro_overlay_job_id=overlay_job_id,
+        )
+    try:
+        return _enqueue_video_export_job(
+            flight_id=flight_id,
+            mode="youtube_overlay",
+            quality="1080p",
+            fps=30,
+            speed=1,
+            frontend_url="",
+            update_db=False,
+            auth_token=auth_token,
+            source_type="youtube",
+            youtube_url=youtube_url,
+            pip_youtube_url=pip_youtube_url,
+            pip_apply_offset=pip_apply_offset,
+            overlay_job_id=overlay_job_id,
+            overlay_offset_seconds=overlay_offset_seconds,
+            youtube_upload_job_id=upload_job.id,
+        )
+    except Exception as exc:
+        fail_youtube_overlay_upload(upload_job.id, str(exc))
+        raise
 
 
 def start_video_export_manual(
@@ -1802,7 +1982,11 @@ async def _export_video_manual_render(job_id: str):
     speed = job.speed or 1
     is_fast_mode = job.mode == "manual_fast"
     flight_id = job.flight_id
-    frontend_url = resolve_frontend_url(job.frontend_url)
+    raw_frontend_url = job.frontend_url
+    frontend_url, _, director_style = raw_frontend_url.partition("#director=")
+    frontend_url = resolve_frontend_url(frontend_url)
+    if director_style not in {"natural", "cinematic", "dynamic"}:
+        director_style = "natural"
     export_root = _video_export_dir()
     temp_dir: Path | None = None
     frames_dir: Path | None = None
@@ -1811,6 +1995,7 @@ async def _export_video_manual_render(job_id: str):
     pending_frame_writes: set[asyncio.Task[None]] = set()
     auth_token = job.auth_token
     url = f"{frontend_url}/export-viewer?flightId={flight_id}&jobId={job_id}"
+    url = f"{url}&directorStyle={director_style}"
     preflight_url = url
     log_url = url
     if auth_token:
@@ -2462,7 +2647,7 @@ def resume_video_export(job_id: str, auth_token: str | None = None) -> bool:
     if not resume_info["can_resume"]:
         return False
 
-    with job_admission():
+    with job_admission("video_export_resume"):
         resumed_job = _update_job(
             job_id,
             status=_STATUS_QUEUED,

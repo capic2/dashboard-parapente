@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { format, parseISO, type Locale } from 'date-fns';
 import { enUS, fr } from 'date-fns/locale';
+import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { FlightRecords } from '../../types';
 
@@ -134,6 +135,40 @@ export default function RecordsDashboard({ records }: RecordsDashboardProps) {
       color: 'violet' as CardColor,
     },
     {
+      icon: <ArrowUpRight aria-hidden className="h-6 w-6" />,
+      title: t('records.maxClimbRate'),
+      formattedValue: records.max_climb_rate
+        ? `+${records.max_climb_rate.value.toFixed(1)} m/s`
+        : null,
+      detail: records.max_climb_rate
+        ? renderFlightDetail(
+            records.max_climb_rate,
+            formatDate,
+            t('records.unknownDate')
+          )
+        : null,
+      partial: records.max_climb_rate?.partial,
+      unavailableReason: t('records.unavailable.climbRate'),
+      color: 'emerald' as CardColor,
+    },
+    {
+      icon: <ArrowDownRight aria-hidden className="h-6 w-6" />,
+      title: t('records.maxSinkRate'),
+      formattedValue: records.max_sink_rate
+        ? `-${records.max_sink_rate.value.toFixed(1)} m/s`
+        : null,
+      detail: records.max_sink_rate
+        ? renderFlightDetail(
+            records.max_sink_rate,
+            formatDate,
+            t('records.unknownDate')
+          )
+        : null,
+      partial: records.max_sink_rate?.partial,
+      unavailableReason: t('records.unavailable.sinkRate'),
+      color: 'rose' as CardColor,
+    },
+    {
       icon: '📈',
       title: t('records.takeoffElevationGain'),
       formattedValue: records.takeoff_elevation_gain
@@ -252,7 +287,7 @@ function renderFlightDetail(
 }
 
 interface RecordCardDefinition {
-  icon: string;
+  icon: ReactNode;
   title: string;
   formattedValue: string | null;
   detail: ReactNode;

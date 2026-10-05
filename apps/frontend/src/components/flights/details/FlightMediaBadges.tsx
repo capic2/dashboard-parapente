@@ -3,13 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@dashboard-parapente/design-system';
 import {
   CircleAlert,
-  Camera,
+  Clock3,
   Download,
   FileText,
   FileUp,
   FolderDown,
   LoaderCircle,
-  Orbit,
   Video,
   Wand2,
 } from 'lucide-react';
@@ -17,6 +16,7 @@ import type { Flight } from '../../../types';
 import { FlightVideoExportControls } from '../video-export/FlightVideoExportControls';
 import { FlightMediaThumbnail } from './FlightMediaThumbnail';
 import { FlightGpxThumbnail } from './FlightGpxThumbnail';
+import { FlightTemporaryMediaCard } from './FlightTemporaryMediaCard';
 import { FlightYoutubeUploadControls } from './FlightYoutubeUploadControls';
 
 interface FlightMediaBadgesProps {
@@ -25,6 +25,8 @@ interface FlightMediaBadgesProps {
   hasVideo: boolean;
   hasPanoVideo: boolean;
   hasGoproCameraVideo: boolean;
+  hasFaceVideo: boolean;
+  hasPiloteVideo: boolean;
   flight: Flight;
   hasPersistedGoproOverlay: boolean;
   hasCompletedGoproOverlayJob: boolean;
@@ -45,6 +47,8 @@ export function FlightMediaBadges({
   hasVideo,
   hasPanoVideo,
   hasGoproCameraVideo,
+  hasFaceVideo,
+  hasPiloteVideo,
   flight,
   hasPersistedGoproOverlay,
   hasCompletedGoproOverlayJob,
@@ -143,36 +147,6 @@ export function FlightMediaBadges({
             </Button>
           </div>
         </div>
-        <div className="order-3 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
-          {hasGoproCameraVideo ? (
-            <FlightMediaThumbnail
-              path={`/flights/${flightId}/gopro-camera/thumbnail`}
-              videoPath={`/flights/${flightId}/gopro-camera`}
-              alt={t(
-                'flights.cameraThumbnailAlt',
-                'Miniature de la vidéo caméra'
-              )}
-            />
-          ) : (
-            <div className="flex aspect-video items-center justify-center bg-slate-100 p-6 text-center dark:bg-slate-800">
-              <div>
-                <Camera
-                  className="mx-auto h-8 w-8 text-slate-400"
-                  aria-hidden="true"
-                />
-                <p className="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  {t('flights.cameraUnavailable', 'Aucun fichier camera.mp4')}
-                </p>
-              </div>
-            </div>
-          )}
-          <div className="flex items-center gap-3 p-3">
-            <Camera className="h-5 w-5 text-slate-500" aria-hidden="true" />
-            <span className="font-semibold text-slate-950 dark:text-white">
-              {t('flights.cameraBadge')}
-            </span>
-          </div>
-        </div>
         <div className="order-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
           {hasVideo && (
             <FlightMediaThumbnail
@@ -246,6 +220,12 @@ export function FlightMediaBadges({
                   showLogsPanel={false}
                 />
               )}
+              {hasVideo && (
+                <FlightYoutubeUploadControls
+                  flight={flight}
+                  source={{ source_type: 'video' }}
+                />
+              )}
               {!hasGpx && !hasVideo && (
                 <>
                   <p className="mb-3 rounded-lg bg-amber-50 p-2 text-xs font-medium text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
@@ -268,43 +248,42 @@ export function FlightMediaBadges({
             </div>
           </div>
         </div>
-        <div className="order-4 overflow-hidden rounded-xl border border-violet-200 bg-white shadow-sm dark:border-violet-800 dark:bg-slate-900/60">
-          {hasPanoVideo ? (
-            <FlightMediaThumbnail
-              path={`/flights/${flightId}/pano/thumbnail`}
-              videoPath={`/flights/${flightId}/pano`}
-              alt={t('flights.panoThumbnailAlt')}
-            />
-          ) : (
-            <div className="flex aspect-video items-center justify-center bg-violet-50 p-6 text-center dark:bg-violet-950/20">
-              <div>
-                <Orbit
-                  className="mx-auto h-8 w-8 text-violet-500"
-                  aria-hidden="true"
-                />
-                <p className="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  {t('flights.panoUnavailable', 'Aucun fichier pano.mp4')}
-                </p>
-              </div>
+        {(hasGoproCameraVideo ||
+          hasPanoVideo ||
+          hasFaceVideo ||
+          hasPiloteVideo) && (
+          <section
+            aria-labelledby="flight-temporary-sources-title"
+            className="order-3 col-span-full rounded-xl border border-amber-200 bg-amber-50/50 p-3 dark:border-amber-900 dark:bg-amber-950/10 sm:p-4"
+          >
+            <div className="mb-3 flex items-center gap-2">
+              <Clock3
+                className="h-4 w-4 text-amber-800 dark:text-amber-200"
+                aria-hidden="true"
+              />
+              <h4
+                id="flight-temporary-sources-title"
+                className="text-sm font-semibold text-slate-950 dark:text-white"
+              >
+                {t('flights.temporarySourcesTitle')}
+              </h4>
             </div>
-          )}
-          <div className="p-3">
-            <div className="flex items-center gap-3">
-              <Orbit className="h-5 w-5 text-violet-600" aria-hidden="true" />
-              <span className="font-semibold text-slate-950 dark:text-white">
-                {t('flights.panoBadge')}
-              </span>
+            <div className="space-y-2">
+              {hasGoproCameraVideo && (
+                <FlightTemporaryMediaCard flight={flight} sourceType="camera" />
+              )}
+              {hasPanoVideo && (
+                <FlightTemporaryMediaCard flight={flight} sourceType="pano" />
+              )}
+              {hasFaceVideo && (
+                <FlightTemporaryMediaCard flight={flight} sourceType="face" />
+              )}
+              {hasPiloteVideo && (
+                <FlightTemporaryMediaCard flight={flight} sourceType="pilote" />
+              )}
             </div>
-            {hasPanoVideo && (
-              <div className="mt-3">
-                <FlightYoutubeUploadControls
-                  flight={flight}
-                  source={{ source_type: 'pano' }}
-                />
-              </div>
-            )}
-          </div>
-        </div>
+          </section>
+        )}
         {showPersistedOverlayBadge && (
           <div className="order-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
             <FlightMediaThumbnail

@@ -24,9 +24,11 @@ def _reconciliation_loop(stop_event: threading.Event) -> None:
     """Re-enqueue database jobs that missed Redis during a transient outage."""
     while not stop_event.wait(config.JOB_QUEUE_RECONCILIATION_INTERVAL_SECONDS):
         try:
-            queued_count = (
-                enqueue_pending_video_export_jobs() + enqueue_pending_highlight_video_jobs()
-            )
+            # Startup performs active-job recovery once. The periodic pass must
+            # only requeue stale jobs so it cannot reset live RQ jobs.
+            queued_count = enqueue_pending_video_export_jobs(
+                recover_active=False
+            ) + enqueue_pending_highlight_video_jobs(recover_active=False)
             if queued_count:
                 logger.info("Reconciled %s pending media job(s)", queued_count)
         except Exception:
@@ -59,7 +61,9 @@ def main() -> None:
     # The dedicated highlight worker owns recovery of running highlight jobs.
     # Recovering them here races with that worker during a deployment and can
     # reset a job that has already started processing.
-    recovered_count = enqueue_pending_video_export_jobs(recover_active=True)
+    recovered_count = enqueue_pending_video_export_jobs(
+        recover_active=config.BACKGROUND_JOB_RECOVERY_ENABLED
+    )
     if recovered_count:
         logger.info("Enqueued %s recovered media job(s)", recovered_count)
 

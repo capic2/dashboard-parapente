@@ -1,6 +1,6 @@
 import asyncio
 import logging
-import sqlite3
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -9,6 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text as sa_text
+from starlette.middleware.base import RequestResponseEndpoint
+from starlette.requests import Request
+from starlette.responses import Response
 
 # Import configuration (loads environment variables automatically)
 import config
@@ -22,6 +25,7 @@ from gopro_overlay_export import start_gopro_overlay_worker, stop_gopro_overlay_
 from gopro_preview_proxy import start_preview_scanner, stop_preview_scanner
 from job_queue import is_rq_enabled
 from metrics import setup_metrics
+from database_migrations import run_migrations
 from models import Site  # Needed for database initialization
 from routes import public_router, router
 from scheduler import start_scheduler, stop_scheduler
@@ -344,90 +348,14 @@ def seed_weather_sources():
         return False
 
 
-def run_migrations():
-    """
-    Run SQL migrations from db/migrations directory.
-    Each SQL statement is executed individually to handle idempotent migrations
-    gracefully (e.g., ALTER TABLE ADD COLUMN that already exists).
-    """
-    from database import DB_PATH
-
-    migrations_dir = Path(__file__).parent / "sql_migrations"
-
-    if not migrations_dir.exists():
-        logger.warning(f"Migrations directory not found: {migrations_dir}")
-        return
-
-    # Get all .sql migration files
-    migration_files = sorted(migrations_dir.glob("*.sql"))
-
-    if not migration_files:
-        logger.info("No migration files found")
-        return
-
-    logger.info(f"Running {len(migration_files)} migration(s)...")
-
-    conn = sqlite3.connect(str(DB_PATH))
-    cursor = conn.cursor()
-
-    for migration_file in migration_files:
-        logger.info(f"Applying migration: {migration_file.name}")
-
-        with open(migration_file) as f:
-            sql = f.read()
-
-        # Execute each statement individually so that one "already exists" error
-        # doesn't prevent subsequent statements in the same migration from running.
-        # Split by semicolons, strip comments, and skip empty statements.
-        applied = 0
-        skipped = 0
-
-        for raw_statement in sql.split(";"):
-            # Strip comment lines and whitespace
-            lines = [
-                line for line in raw_statement.splitlines() if not line.strip().startswith("--")
-            ]
-            clean = "\n".join(lines).strip()
-            if not clean:
-                continue
-
-            try:
-                cursor.execute(clean)
-                conn.commit()
-                applied += 1
-            except sqlite3.IntegrityError:
-                # Row already exists (UNIQUE constraint) — idempotent, skip
-                conn.rollback()
-                skipped += 1
-            except sqlite3.OperationalError as e:
-                err_msg = str(e).lower()
-                if "already exists" in err_msg or "duplicate column name" in err_msg:
-                    skipped += 1
-                else:
-                    logger.error(
-                        f"✗ Migration {migration_file.name} failed on statement: {clean[:100]}"
-                    )
-                    logger.error(f"  Error: {e}")
-                    raise
-
-        if skipped > 0 and applied == 0:
-            logger.info(f"⊙ Migration {migration_file.name} already applied (skipping)")
-        elif skipped > 0:
-            logger.info(
-                f"✓ Migration {migration_file.name}: {applied} applied, {skipped} already existed"
-            )
-        else:
-            logger.info(f"✓ Migration {migration_file.name} applied successfully")
-
-    conn.close()
-    logger.info("✓ All migrations completed")
-
-
 # Initialize database (create schema + seed sites)
 # Skip in test mode - tests use temporary in-memory DB
 if not config.TESTING:
     initialize_database()
     run_migrations()
+    from flight_vertical_rate_migration import backfill_missing_vertical_rates
+
+    backfill_missing_vertical_rates()
     from flight_temp_migration import migrate_legacy_flight_temporary_files
 
     migrate_legacy_flight_temporary_files()
@@ -511,7 +439,7 @@ async def lifespan(app: FastAPI):
         start_gopro_overlay_worker()
         start_preview_scanner()
         if not is_rq_enabled():
-            enqueue_pending_youtube_uploads(recover_active=True)
+            enqueue_pending_youtube_uploads(recover_active=config.BACKGROUND_JOB_RECOVERY_ENABLED)
 
     yield
 
@@ -536,6 +464,29 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_HASHED_FRONTEND_ASSET = re.compile(r"-[A-Za-z0-9_-]{8,}\.[^/]+$")
+
+
+def _set_frontend_cache_headers(path: str, response: Response) -> None:
+    if response.status_code != 200:
+        return
+
+    content_type = response.headers.get("content-type", "")
+    if content_type.startswith("text/html"):
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    elif path.startswith(("/assets/", "/staging/assets/")) and _HASHED_FRONTEND_ASSET.search(path):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+
+
+@app.middleware("http")
+async def set_frontend_cache_headers(
+    request: Request, call_next: RequestResponseEndpoint
+) -> Response:
+    response = await call_next(request)
+    _set_frontend_cache_headers(request.url.path, response)
+    return response
+
+
 setup_metrics(app)
 
 # CORS - Allow all origins for development (restrict in production)
@@ -550,6 +501,13 @@ app.add_middleware(
 # Include routes (public_router first for route priority)
 app.include_router(public_router)
 app.include_router(router)
+
+# PR staging can be reached directly on its published HTTP port, without the
+# reverse proxy that normally strips the /staging prefix. Keep the same API
+# available under that prefix so a frontend built with VITE_BASE_PATH=/staging/
+# remains usable in both access modes.
+app.include_router(public_router, prefix="/staging")
+app.include_router(router, prefix="/staging")
 
 # Database
 DB_PATH = Path(__file__).parent / "db" / "dashboard.db"
@@ -603,12 +561,28 @@ def read_root():
 # ============================================
 
 STATIC_DIR = Path(__file__).parent / "static"
+STAGING_CESIUM_DIR = STATIC_DIR / "staging" / "cesium"
+if not STAGING_CESIUM_DIR.exists():
+    # Local builds keep Cesium at the static root, while Vite's /staging/
+    # build nests it under static/staging.
+    STAGING_CESIUM_DIR = STATIC_DIR / "cesium"
 
 if STATIC_DIR.exists():
     logger.info(f"✓ Static directory found: {STATIC_DIR}")
 
     # Mount static assets (CSS, JS, images, etc.)
     app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+    app.mount(
+        "/staging/assets",
+        StaticFiles(directory=STATIC_DIR / "assets"),
+        name="staging-assets",
+    )
+    app.mount(
+        "/staging/cesium",
+        StaticFiles(directory=STAGING_CESIUM_DIR),
+        name="staging-cesium",
+    )
+    app.mount("/cesium", StaticFiles(directory=STAGING_CESIUM_DIR), name="cesium")
 
     # Catch-all route for SPA (MUST be LAST route)
     @app.get("/{full_path:path}")

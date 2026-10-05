@@ -5,8 +5,8 @@ FROM node:24-alpine AS frontend-builder
 
 WORKDIR /workspace
 
-ARG VITE_CESIUM_ION_TOKEN
-ENV VITE_CESIUM_ION_TOKEN=${VITE_CESIUM_ION_TOKEN}
+ARG VITE_BASE_PATH=/
+ENV VITE_BASE_PATH=${VITE_BASE_PATH}
 ENV NX_NO_CLOUD=true
 
 # Installer pnpm
@@ -30,7 +30,8 @@ COPY libs/design-system ./libs/design-system
 COPY apps/frontend ./apps/frontend
 
 # Build frontend avec Nx
-RUN pnpm exec nx build frontend --configuration=production
+RUN --mount=type=secret,id=VITE_CESIUM_ION_TOKEN,env=VITE_CESIUM_ION_TOKEN,required=false \
+    pnpm exec nx build frontend --configuration=production
 
 # ============================================
 # Stage 2: Backend Python avec Playwright
@@ -81,6 +82,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xdg-utils \
     curl \
     ffmpeg \
+    rclone \
     patch \
     nodejs \
     npm \
@@ -123,8 +125,8 @@ RUN mkdir -p /app/db && chmod 755 /app/db && \
     mkdir -p /app/emagram-cache && chmod 755 /app/emagram-cache && \
     mkdir -p "$CODEX_HOME" && chmod 700 "$CODEX_HOME"
 
-# Rendre le script d'entrypoint exécutable
-RUN chmod +x entrypoint.sh
+# Rendre les scripts de maintenance exécutables
+RUN chmod +x entrypoint.sh database_backup.sh
 
 # This changes for every deployment, so keep it after the expensive dependency
 # layers to preserve their BuildKit cache.

@@ -13,13 +13,12 @@ import threading
 import time
 import uuid
 from collections.abc import Iterator
-from contextlib import AbstractContextManager, contextmanager
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Literal
 
 import config
-from deployment_drain import DeploymentDrainActive, job_admission
 from video_acceleration import h264_encode_args, select_video_accelerator
 
 logger = logging.getLogger(__name__)
@@ -63,11 +62,23 @@ def _source_fingerprint(camera_path: Path) -> SourceFingerprint:
 
 
 def _preview_path(camera_path: Path) -> Path:
-    return camera_path.with_name(PREVIEW_FILENAME)
+    candidate = _preview_directory(camera_path) / PREVIEW_FILENAME
+    legacy = camera_path.with_name(PREVIEW_FILENAME)
+    return legacy if legacy.exists() and not candidate.exists() else candidate
 
 
 def _manifest_path(camera_path: Path) -> Path:
-    return camera_path.with_name(MANIFEST_FILENAME)
+    candidate = _preview_directory(camera_path) / MANIFEST_FILENAME.removeprefix(".")
+    legacy = camera_path.with_name(MANIFEST_FILENAME)
+    return legacy if legacy.exists() and not candidate.exists() else candidate
+
+
+def _preview_directory(camera_path: Path) -> Path:
+    return camera_path.parent / "temp" / "gopro-preview"
+
+
+def preview_path(camera_path: Path) -> Path:
+    return _preview_path(camera_path)
 
 
 def _load_manifest(camera_path: Path) -> dict[str, Any]:
@@ -80,6 +91,7 @@ def _load_manifest(camera_path: Path) -> dict[str, Any]:
 
 def _write_manifest(camera_path: Path, manifest: dict[str, Any]) -> None:
     manifest_path = _manifest_path(camera_path)
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = manifest_path.with_suffix(
         f"{manifest_path.suffix}.{os.getpid()}.{threading.get_ident()}.tmp"
     )
@@ -362,11 +374,15 @@ def _file_lock(lock_path: Path) -> Iterator[None]:
 
 
 def _preview_lock(camera_path: Path) -> AbstractContextManager[None]:
-    return _file_lock(camera_path.with_name(LOCK_FILENAME))
+    path = _preview_directory(camera_path) / LOCK_FILENAME.removeprefix(".")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return _file_lock(path)
 
 
 def _state_lock(camera_path: Path) -> AbstractContextManager[None]:
-    return _file_lock(camera_path.with_name(STATE_LOCK_FILENAME))
+    path = _preview_directory(camera_path) / STATE_LOCK_FILENAME.removeprefix(".")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return _file_lock(path)
 
 
 def _ffmpeg_command(
@@ -490,7 +506,8 @@ def process_preview_job(
     camera_path = Path(camera_path_value)
     if not camera_path.is_file():
         return
-    temporary_path = camera_path.with_name(f".{PREVIEW_FILENAME}.{os.getpid()}.part.mp4")
+    temporary_path = _preview_directory(camera_path) / f"{PREVIEW_FILENAME}.{os.getpid()}.part.mp4"
+    temporary_path.parent.mkdir(parents=True, exist_ok=True)
     follow_up_duration = 0
     with _preview_lock(camera_path):
         fingerprint = _source_fingerprint(camera_path)
@@ -509,7 +526,9 @@ def process_preview_job(
         if available >= requested and _preview_path(camera_path).is_file():
             return
         try:
-            with job_admission():
+            # Keep the body scoped without registering a deployment admission:
+            # this cache can be interrupted and safely regenerated later.
+            with nullcontext():
                 source_duration = _probe_duration(camera_path)
                 effective_duration = min(requested, max(1, math.ceil(source_duration or requested)))
                 effective_target = min(
@@ -565,8 +584,6 @@ def process_preview_job(
                     )
                     manifest = latest_manifest
                     _write_manifest(camera_path, manifest)
-        except DeploymentDrainActive:
-            manifest.update(status="missing", generation_started_at=None, error=None)
         except Exception as error:
             logger.warning("GoPro preview generation failed for %s: %s", camera_path, error)
             manifest.update(status="failed", generation_started_at=None, error=str(error)[:1000])
@@ -596,18 +613,23 @@ _STABILITY_OBSERVATIONS: dict[Path, tuple[SourceFingerprint, float]] = {}
 
 def _cleanup_stale_preview_temp_files(camera_path: Path) -> None:
     cutoff = time.time() - config.GOPRO_PREVIEW_TIMEOUT_SECONDS
-    patterns = (f".{PREVIEW_FILENAME}.*.part.mp4", f"{MANIFEST_FILENAME}.*.tmp")
-    for pattern in patterns:
-        for temporary_path in camera_path.parent.glob(pattern):
-            try:
-                if temporary_path.stat().st_mtime < cutoff:
-                    _unlink_temp_file(temporary_path)
-            except OSError:
-                logger.warning(
-                    "Failed to inspect temporary GoPro preview file %s",
-                    temporary_path,
-                    exc_info=True,
-                )
+    patterns = (f"{PREVIEW_FILENAME}.*.part.mp4", f"{MANIFEST_FILENAME.removeprefix('.')}.*.tmp")
+    legacy_patterns = (f".{PREVIEW_FILENAME}.*.part.mp4", f"{MANIFEST_FILENAME}.*.tmp")
+    for directory, directory_patterns in (
+        (_preview_directory(camera_path), patterns),
+        (camera_path.parent, legacy_patterns),
+    ):
+        for pattern in directory_patterns:
+            for temporary_path in directory.glob(pattern):
+                try:
+                    if temporary_path.stat().st_mtime < cutoff:
+                        _unlink_temp_file(temporary_path)
+                except OSError:
+                    logger.warning(
+                        "Failed to inspect temporary GoPro preview file %s",
+                        temporary_path,
+                        exc_info=True,
+                    )
 
 
 def scan_for_gopro_previews() -> int:

@@ -8,6 +8,7 @@ import logging
 import re
 import threading
 import time
+import uuid
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
@@ -19,13 +20,21 @@ import httpx
 from cryptography.fernet import Fernet, InvalidToken
 from jose import JWTError, jwt
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from spatialmedia import metadata_utils
 
 import config
 from database import SessionLocal
-from flight_storage import pano_video_path
-from models import Flight, GoproOverlayJob, HighlightVideoJob, YoutubeCredential, YoutubeUploadJob
+from flight_storage import flight_sequence_number, pano_video_path, temporary_video_path
+from models import (
+    Flight,
+    GoproOverlayJob,
+    HighlightVideoJob,
+    VideoExportJob,
+    YoutubeCredential,
+    YoutubeUploadJob,
+)
 from schemas import youtube_video_id_from_url
 
 logger = logging.getLogger(__name__)
@@ -36,16 +45,21 @@ _AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
 _UPLOAD_URL = "https://www.googleapis.com/upload/youtube/v3/videos"
 _VIDEOS_URL = "https://www.googleapis.com/youtube/v3/videos"
+_PLAYLISTS_URL = "https://www.googleapis.com/youtube/v3/playlists"
+_PLAYLIST_ITEMS_URL = "https://www.googleapis.com/youtube/v3/playlistItems"
 _ACTIVE_STATUSES = {"queued", "uploading"}
 _CANCELLED_STATUS = "cancelled"
 _RANGE_PATTERN = re.compile(r"bytes=0-(\d+)")
-_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="youtube-upload")
+_EXECUTOR = ThreadPoolExecutor(max_workers=3, thread_name_prefix="youtube-upload")
 _SUBMITTED: set[str] = set()
 _SUBMITTED_LOCK = threading.Lock()
+_PREPARING_STATUS = "preparing"
+_VISIBLE_ACTIVE_STATUSES = _ACTIVE_STATUSES | {_PREPARING_STATUS}
 _LOG_TAIL_LINE_COUNT = 100
 _PANORAMA_PREPARATION_PROGRESS_MAX = 10
 _PANORAMA_PREPARATION_POLL_SECONDS = 10
 _PANORAMA_PREPARATION_HEARTBEAT_SECONDS = 60
+_ORPHANED_UPLOAD_ARTIFACT_MAX_AGE = timedelta(hours=24)
 
 
 class YoutubeConfigurationError(RuntimeError):
@@ -68,11 +82,23 @@ class YoutubeRemoteDeletionError(RuntimeError):
     pass
 
 
+def playlist_title_for_flight(db: Session, flight: Flight) -> str:
+    """Return the YouTube playlist name for a flight's daily sequence."""
+    sequence = flight_sequence_number(db, flight)
+    return f"Parapente - Vol {sequence} du {flight.flight_date.strftime('%d/%m/%Y')}"
+
+
 class YoutubeVideoAssociationPayload(TypedDict):
     url: str
     video_id: str
     can_delete_from_youtube: bool
     exists_on_youtube: bool | None
+    title: str | None
+
+
+class YoutubeVideoMetadataPayload(TypedDict):
+    exists: bool | None
+    title: str | None
 
 
 def _youtube_upload_log_path(job_id: str) -> Path:
@@ -123,6 +149,49 @@ def _oauth_error_detail(response: httpx.Response) -> str:
         if isinstance(error, str):
             return error[:300]
     return f"HTTP {response.status_code}"
+
+
+def _youtube_upload_error_detail(response: httpx.Response) -> str:
+    """Return a concise, sanitized reason for a rejected YouTube upload request."""
+    try:
+        payload = response.json()
+    except (ValueError, TypeError):
+        payload = None
+
+    detail = f"YouTube rejected the upload metadata ({response.status_code})"
+    if not isinstance(payload, dict):
+        return detail
+
+    error = payload.get("error")
+    if not isinstance(error, dict):
+        return detail
+
+    reasons: list[str] = []
+    errors = error.get("errors")
+    if isinstance(errors, list):
+        for item in errors[:2]:
+            if not isinstance(item, dict):
+                continue
+            reason = item.get("reason")
+            if isinstance(reason, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", reason):
+                reasons.append(reason)
+
+    message = error.get("message")
+    safe_message = ""
+    if isinstance(message, str):
+        safe_message = re.sub(r"\s+", " ", message).strip()
+        safe_message = re.sub(r"https?://\S+", "[redacted-url]", safe_message)
+        safe_message = re.sub(
+            r"(?i)\b(access_token|refresh_token|client_secret|token)\s*[=:]\s*\S+",
+            r"\1=[redacted]",
+            safe_message,
+        )[:500]
+
+    if reasons:
+        detail += f"; reason: {', '.join(reasons)}"
+    if safe_message:
+        detail += f"; message: {safe_message}"
+    return detail
 
 
 def _clear_invalid_youtube_authorization(user_id: int, encrypted_refresh_token: str) -> None:
@@ -240,6 +309,28 @@ def is_connected(db: Session, user_id: int) -> bool:
     return credential is not None and _OAUTH_SCOPE in credential.oauth_scope.split()
 
 
+def store_download_cookies(db: Session, *, user_id: int, cookies: str) -> None:
+    credential = db.get(YoutubeCredential, user_id)
+    if credential is None:
+        raise YoutubeOAuthError("Connect YouTube before adding download cookies")
+    credential.download_cookies_encrypted = encrypt_secret(cookies)
+    credential.updated_at = datetime.utcnow()
+    db.commit()
+
+
+def download_cookies_for_upload_job(upload_job_id: str | None) -> str | None:
+    if not upload_job_id:
+        return None
+    with SessionLocal() as db:
+        upload_job = db.get(YoutubeUploadJob, upload_job_id)
+        if upload_job is None:
+            return None
+        credential = db.get(YoutubeCredential, upload_job.user_id)
+        if credential is None or not credential.download_cookies_encrypted:
+            return None
+        return decrypt_secret(credential.download_cookies_encrypted)
+
+
 def disconnect(db: Session, user_id: int) -> None:
     credential = db.get(YoutubeCredential, user_id)
     if credential is not None:
@@ -275,6 +366,121 @@ def _access_token(user_id: int) -> str:
     if not isinstance(access_token, str) or not access_token:
         raise YoutubeOAuthError("Google returned an invalid access token")
     return access_token
+
+
+def _youtube_api_error(response: httpx.Response) -> RuntimeError:
+    return RuntimeError(f"YouTube API request failed ({response.status_code})")
+
+
+def _find_or_create_playlist(*, user_id: int, title: str) -> tuple[str, bool]:
+    access_token = _access_token(user_id)
+    headers = {"Authorization": f"Bearer {access_token}"}
+    page_token: str | None = None
+    while True:
+        response = httpx.get(
+            _PLAYLISTS_URL,
+            params={
+                "part": "snippet",
+                "mine": "true",
+                "maxResults": 50,
+                **({"pageToken": page_token} if page_token else {}),
+            },
+            headers=headers,
+            timeout=30,
+        )
+        if response.is_error:
+            raise _youtube_api_error(response)
+        payload = response.json()
+        for item in payload.get("items", []):
+            if item.get("snippet", {}).get("title") == title:
+                return item["id"], False
+        page_token = payload.get("nextPageToken")
+        if not page_token:
+            break
+    response = httpx.post(
+        _PLAYLISTS_URL,
+        params={"part": "snippet,status"},
+        headers={**headers, "Content-Type": "application/json"},
+        json={"snippet": {"title": title}, "status": {"privacyStatus": "private"}},
+        timeout=30,
+    )
+    if response.is_error:
+        raise _youtube_api_error(response)
+    playlist_id = response.json().get("id")
+    if not isinstance(playlist_id, str) or not playlist_id:
+        raise RuntimeError("YouTube did not return a playlist identifier")
+    return playlist_id, True
+
+
+def add_video_to_flight_playlist(*, user_id: int, playlist_title: str, video_id: str) -> bool:
+    """Create/reuse the flight playlist and add the video once."""
+    playlist_id, playlist_created = _find_or_create_playlist(user_id=user_id, title=playlist_title)
+    access_token = _access_token(user_id)
+    if not playlist_created:
+        page_token: str | None = None
+        while True:
+            response = httpx.get(
+                _PLAYLIST_ITEMS_URL,
+                params={
+                    "part": "snippet",
+                    "playlistId": playlist_id,
+                    "maxResults": 50,
+                    **({"pageToken": page_token} if page_token else {}),
+                },
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=30,
+            )
+            if response.is_error:
+                raise _youtube_api_error(response)
+            payload = response.json()
+            if any(
+                item.get("snippet", {}).get("resourceId", {}).get("videoId") == video_id
+                for item in payload.get("items", [])
+            ):
+                return False
+            page_token = payload.get("nextPageToken")
+            if not page_token:
+                break
+    response = httpx.post(
+        _PLAYLIST_ITEMS_URL,
+        params={"part": "snippet"},
+        headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
+        json={
+            "snippet": {
+                "playlistId": playlist_id,
+                "resourceId": {"kind": "youtube#video", "videoId": video_id},
+            }
+        },
+        timeout=30,
+    )
+    if response.status_code == 409:
+        return True
+    if response.is_error:
+        raise _youtube_api_error(response)
+    return True
+
+
+def migrate_flight_playlists(*, user_id: int) -> dict[str, int]:
+    """Organize all locally associated historical videos for a YouTube account."""
+    added = skipped = failed = 0
+    with SessionLocal() as db:
+        flights = db.query(Flight).filter(Flight.youtube_urls_json != "[]").all()
+        for flight in flights:
+            try:
+                for url in flight.youtube_urls:
+                    video_id = youtube_video_id_from_url(url)
+                    if not add_video_to_flight_playlist(
+                        user_id=user_id,
+                        playlist_title=playlist_title_for_flight(db, flight),
+                        video_id=video_id,
+                    ):
+                        skipped += 1
+                    else:
+                        added += 1
+            except Exception:
+                logger.exception("Unable to migrate YouTube playlist for flight %s", flight.id)
+                failed += 1
+    return {"added": added, "skipped": skipped, "failed": failed}
 
 
 def job_payload(job: YoutubeUploadJob) -> dict[str, Any]:
@@ -315,8 +521,20 @@ def youtube_video_availability(
     video_ids_by_user: dict[int, set[str]],
 ) -> dict[str, bool | None]:
     """Return remote availability, preserving unknown results when YouTube is unavailable."""
+    return {
+        video_id: details["exists"]
+        for video_id, details in youtube_video_metadata(video_ids_by_user).items()
+    }
+
+
+def youtube_video_metadata(
+    video_ids_by_user: dict[int, set[str]],
+) -> dict[str, YoutubeVideoMetadataPayload]:
+    """Return YouTube availability and title for each requested video."""
     availability = {
-        video_id: None for video_ids in video_ids_by_user.values() for video_id in video_ids
+        video_id: {"exists": None, "title": None}
+        for video_ids in video_ids_by_user.values()
+        for video_id in video_ids
     }
     for user_id, video_ids in video_ids_by_user.items():
         try:
@@ -331,19 +549,23 @@ def youtube_video_availability(
             try:
                 response = httpx.get(
                     _VIDEOS_URL,
-                    params={"part": "id", "id": ",".join(batch)},
+                    params={"part": "id,snippet", "id": ",".join(batch)},
                     headers={"Authorization": f"Bearer {access_token}"},
                     timeout=30,
                 )
                 response.raise_for_status()
                 items = response.json().get("items", [])
-                existing_ids = {
-                    item["id"]
+                existing_items = {
+                    item["id"]: item
                     for item in items
                     if isinstance(item, dict) and isinstance(item.get("id"), str)
                 }
                 for video_id in batch:
-                    availability[video_id] = video_id in existing_ids
+                    item = existing_items.get(video_id)
+                    availability[video_id]["exists"] = item is not None
+                    snippet = item.get("snippet") if item else None
+                    title = snippet.get("title") if isinstance(snippet, dict) else None
+                    availability[video_id]["title"] = title if isinstance(title, str) else None
             except (httpx.HTTPError, ValueError, AttributeError) as exc:
                 logger.warning("Unable to verify YouTube video batch: %s", _safe_log_error(exc))
     return availability
@@ -361,26 +583,24 @@ def existing_youtube_video_ids(video_ids_by_user: dict[int, set[str]]) -> set[st
 def youtube_video_associations(
     db: Session, *, flight: Flight, user_id: int
 ) -> list[YoutubeVideoAssociationPayload]:
-    """Return local links and whether the connected user may delete each video."""
+    """Return local links with YouTube titles and deletion permissions."""
     associations = [(url, youtube_video_id_from_url(url)) for url in flight.youtube_urls]
     video_ids = {video_id for _, video_id in associations}
     youtube_connected = is_connected(db, user_id)
-    deletable_video_ids = {
-        video_id
-        for (video_id,) in (
-            db.query(YoutubeUploadJob.youtube_video_id)
-            .filter(
-                YoutubeUploadJob.flight_id == flight.id,
-                YoutubeUploadJob.user_id == user_id,
-                YoutubeUploadJob.status == "completed",
-                YoutubeUploadJob.youtube_video_id.in_(video_ids),
-            )
-            .all()
+    upload_rows = (
+        db.query(YoutubeUploadJob.youtube_video_id, YoutubeUploadJob.title)
+        .filter(
+            YoutubeUploadJob.flight_id == flight.id,
+            YoutubeUploadJob.user_id == user_id,
+            YoutubeUploadJob.status == "completed",
+            YoutubeUploadJob.youtube_video_id.in_(video_ids),
         )
-        if video_id is not None
-    }
-    availability = (
-        youtube_video_availability({user_id: deletable_video_ids})
+        .all()
+    )
+    upload_titles = {video_id: title for video_id, title in upload_rows if video_id is not None}
+    deletable_video_ids = set(upload_titles)
+    metadata = (
+        youtube_video_metadata({user_id: deletable_video_ids})
         if youtube_connected and deletable_video_ids
         else {}
     )
@@ -389,7 +609,12 @@ def youtube_video_associations(
             "url": url,
             "video_id": video_id,
             "can_delete_from_youtube": youtube_connected and video_id in deletable_video_ids,
-            "exists_on_youtube": availability.get(video_id),
+            "exists_on_youtube": (
+                metadata.get(video_id, {}).get("exists")
+                if video_id in deletable_video_ids
+                else None
+            ),
+            "title": metadata.get(video_id, {}).get("title") or upload_titles.get(video_id),
         }
         for url, video_id in associations
     ]
@@ -469,16 +694,129 @@ def remove_youtube_video(
     db.commit()
 
 
-def active_job(db: Session, flight_id: str) -> YoutubeUploadJob | None:
-    return (
-        db.query(YoutubeUploadJob)
-        .filter(
-            YoutubeUploadJob.flight_id == flight_id,
-            YoutubeUploadJob.status.in_(_ACTIVE_STATUSES),
-        )
-        .order_by(YoutubeUploadJob.created_at.desc())
-        .first()
+def upload_source_key(
+    source_type: str,
+    *,
+    gopro_overlay_job_id: str | None = None,
+    highlight_video_job_id: str | None = None,
+) -> str:
+    """Return the stable identity for one uploadable source within a flight."""
+    return f"{source_type}:{gopro_overlay_job_id or ''}:{highlight_video_job_id or ''}"
+
+
+def active_job(
+    db: Session,
+    flight_id: str,
+    *,
+    source_type: str | None = None,
+    gopro_overlay_job_id: str | None = None,
+    highlight_video_job_id: str | None = None,
+) -> YoutubeUploadJob | None:
+    query = db.query(YoutubeUploadJob).filter(
+        YoutubeUploadJob.flight_id == flight_id,
+        YoutubeUploadJob.status.in_(_VISIBLE_ACTIVE_STATUSES),
     )
+    if source_type is not None:
+        query = query.filter(YoutubeUploadJob.source_type == source_type)
+    if gopro_overlay_job_id is not None:
+        query = query.filter(YoutubeUploadJob.gopro_overlay_job_id == gopro_overlay_job_id)
+    if highlight_video_job_id is not None:
+        query = query.filter(YoutubeUploadJob.highlight_video_job_id == highlight_video_job_id)
+    return query.order_by(YoutubeUploadJob.created_at.desc()).first()
+
+
+def create_youtube_overlay_upload_job(
+    db: Session,
+    *,
+    flight_id: str,
+    user_id: int,
+    title: str,
+    description: str = "",
+    privacy_status: str = "unlisted",
+    gopro_overlay_job_id: str | None = None,
+) -> YoutubeUploadJob:
+    """Create the upload job before the export so the UI can follow the full chain."""
+    source_key = upload_source_key("youtube_overlay", gopro_overlay_job_id=gopro_overlay_job_id)
+    if (
+        active_job(
+            db,
+            flight_id,
+            source_type="youtube_overlay",
+            gopro_overlay_job_id=gopro_overlay_job_id,
+        )
+        is not None
+    ):
+        raise RuntimeError("A YouTube upload for this source is already in progress")
+    job = YoutubeUploadJob(
+        id=str(uuid.uuid4()),
+        flight_id=flight_id,
+        user_id=user_id,
+        source_type="youtube_overlay",
+        active_source_key=source_key,
+        gopro_overlay_job_id=gopro_overlay_job_id,
+        status=_PREPARING_STATUS,
+        progress=0,
+        title=title[:100],
+        description=description[:5000],
+        privacy_status=privacy_status,
+    )
+    db.add(job)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise RuntimeError("A YouTube upload for this source is already in progress") from exc
+    db.refresh(job)
+    return job
+
+
+def enqueue_youtube_overlay_upload(job_id: str, source_path: Path) -> None:
+    """Attach the generated file to a preparing job and enqueue the upload."""
+    upload_job_id = job_id
+    with SessionLocal() as db:
+        job = db.get(YoutubeUploadJob, upload_job_id)
+        if job is None or job.source_type != "youtube_overlay":
+            raise RuntimeError("YouTube overlay upload job not found")
+        updated = (
+            db.query(YoutubeUploadJob)
+            .filter(
+                YoutubeUploadJob.id == upload_job_id,
+                YoutubeUploadJob.status == _PREPARING_STATUS,
+            )
+            .update(
+                {
+                    "source_path": str(source_path),
+                    "status": "queued",
+                    "updated_at": datetime.utcnow(),
+                }
+            )
+        )
+        if updated != 1:
+            db.rollback()
+            raise RuntimeError("YouTube overlay upload job is no longer preparing")
+        db.commit()
+    try:
+        enqueue_youtube_upload(upload_job_id)
+    except Exception as exc:
+        fail_youtube_overlay_upload(upload_job_id, str(exc))
+        _delete_generated_overlay_source(source_path)
+        raise
+
+
+def fail_youtube_overlay_upload(job_id: str, error: str) -> None:
+    """Fail an upload when its preceding video export or queue submission fails."""
+    with SessionLocal() as db:
+        db.query(YoutubeUploadJob).filter(
+            YoutubeUploadJob.id == job_id,
+            YoutubeUploadJob.status.in_({_PREPARING_STATUS, "queued"}),
+        ).update(
+            {
+                "status": "failed",
+                "error": error[:1000],
+                "updated_at": datetime.utcnow(),
+            }
+        )
+        db.commit()
 
 
 def _is_cancelled(job_id: str) -> bool:
@@ -504,12 +842,32 @@ def _update_active_job(job_id: str, **changes: Any) -> bool:
 
 def cancel_upload(db: Session, *, job_id: str, user_id: int) -> YoutubeUploadJob | None:
     """Persist cancellation and stop the RQ job when one exists."""
+    job = (
+        db.query(YoutubeUploadJob)
+        .filter(YoutubeUploadJob.id == job_id, YoutubeUploadJob.user_id == user_id)
+        .first()
+    )
+    linked_export_job_id = None
+    generated_overlay_path = None
+    if job is not None and job.status == _PREPARING_STATUS:
+        linked_export_job_id = (
+            db.query(VideoExportJob.id)
+            .filter(
+                VideoExportJob.youtube_upload_job_id == job_id,
+                VideoExportJob.status.in_(
+                    {"queued", "running", "initializing", "capturing", "encoding"}
+                ),
+            )
+            .scalar()
+        )
+    if job is not None and job.source_type == "youtube_overlay" and job.source_path:
+        generated_overlay_path = Path(job.source_path)
     updated = (
         db.query(YoutubeUploadJob)
         .filter(
             YoutubeUploadJob.id == job_id,
             YoutubeUploadJob.user_id == user_id,
-            YoutubeUploadJob.status.in_(_ACTIVE_STATUSES),
+            YoutubeUploadJob.status.in_(_VISIBLE_ACTIVE_STATUSES),
         )
         .update(
             {
@@ -523,6 +881,12 @@ def cancel_upload(db: Session, *, job_id: str, user_id: int) -> YoutubeUploadJob
     db.commit()
     if updated != 1:
         return None
+    if linked_export_job_id is not None:
+        from video_export_manual import cancel_video_export
+
+        cancel_video_export(linked_export_job_id)
+    if generated_overlay_path is not None:
+        _delete_generated_overlay_source(generated_overlay_path)
     _log_job(job_id, "YouTube upload cancelled")
 
     from job_queue import delete_job, is_rq_enabled
@@ -563,7 +927,7 @@ def _start_session(job: YoutubeUploadJob, video_path: Path, access_token: str) -
         timeout=30,
     )
     if response.is_error:
-        raise RuntimeError(f"YouTube rejected the upload metadata ({response.status_code})")
+        raise RuntimeError(_youtube_upload_error_detail(response))
     session_url = response.headers.get("location")
     parsed = urlparse(session_url or "")
     if parsed.scheme != "https" or parsed.hostname != "www.googleapis.com":
@@ -611,10 +975,13 @@ def _session_offset(
 
 def _finish_upload(job_id: str, video_id: str) -> None:
     youtube_url = f"https://www.youtube.com/watch?v={video_id}"
+    generated_overlay_path: Path | None = None
     with SessionLocal() as db:
         job = db.get(YoutubeUploadJob, job_id)
         if job is None:
             return
+        if job.source_type == "youtube_overlay" and job.source_path:
+            generated_overlay_path = Path(job.source_path)
         flight = db.get(Flight, job.flight_id)
         if flight is None:
             raise RuntimeError("Flight was deleted during the YouTube upload")
@@ -643,16 +1010,70 @@ def _finish_upload(job_id: str, video_id: str) -> None:
         urls = flight.youtube_urls
         if youtube_url not in urls:
             flight.youtube_urls = [*urls, youtube_url]
+        playlist_title = playlist_title_for_flight(db, flight)
         db.commit()
+        user_id = job.user_id
     _log_job(job_id, f"YouTube upload completed: {youtube_url}")
+    try:
+        add_video_to_flight_playlist(
+            user_id=user_id, playlist_title=playlist_title, video_id=video_id
+        )
+        _log_job(job_id, "Video added to the flight playlist")
+    except Exception as exc:
+        # The upload remains successful; playlist organization can be retried later.
+        logger.exception("Unable to add YouTube video %s to its flight playlist", video_id)
+        _log_job(job_id, f"Playlist organization failed: {_safe_log_error(exc)}")
+    if generated_overlay_path is not None:
+        _delete_generated_overlay_source(generated_overlay_path)
+
+
+def _delete_generated_overlay_source(path: Path) -> None:
+    """Delete only generated YouTube-overlay files after upload and playlisting."""
+    try:
+        path.resolve().relative_to(Path(config.VIDEO_EXPORT_DIR).resolve())
+    except ValueError:
+        logger.warning("Refusing to delete YouTube overlay source outside export storage: %s", path)
+        return
+    try:
+        path.unlink(missing_ok=True)
+        logger.info("Removed generated YouTube overlay source %s", path)
+    except OSError:
+        logger.warning("Unable to remove generated YouTube overlay source %s", path)
 
 
 def _source_video_path(db: Session, job: YoutubeUploadJob) -> Path:
+    if job.source_type == "youtube_overlay":
+        if not job.source_path:
+            raise RuntimeError("YouTube overlay upload has no generated video source")
+        return Path(job.source_path)
+    if job.source_type == "camera":
+        flight = db.get(Flight, job.flight_id)
+        if flight is None:
+            raise RuntimeError("Flight is no longer available")
+        root = config.GOPRO_OVERLAY_PARAGLIDING_ROOT.strip()
+        if not root:
+            raise RuntimeError("GoPro overlay storage is not configured")
+        return (
+            Path(root).expanduser()
+            / flight.flight_date.strftime("%Y%m%d")
+            / f"{flight_sequence_number(db, flight):02d}"
+            / "camera.mp4"
+        )
+    if job.source_type == "video":
+        flight = db.get(Flight, job.flight_id)
+        if flight is None or not flight.video_file_path:
+            raise RuntimeError("Flat flight video is no longer available")
+        return Path(flight.video_file_path)
     if job.source_type == "pano":
         flight = db.get(Flight, job.flight_id)
         if flight is None:
             raise RuntimeError("Flight is no longer available")
         return pano_video_path(db, flight)
+    if job.source_type in {"face", "pilote"}:
+        flight = db.get(Flight, job.flight_id)
+        if flight is None:
+            raise RuntimeError("Flight is no longer available")
+        return temporary_video_path(db, flight, job.source_type)
     if job.source_type != "gopro_overlay":
         if job.source_type != "highlight":
             raise RuntimeError("YouTube upload has an unsupported video source")
@@ -679,6 +1100,57 @@ def _panorama_upload_path(job_id: str) -> Path:
     return Path(config.VIDEO_EXPORT_DIR) / ".youtube-uploads" / f"{job_id}.spherical.mp4"
 
 
+def _upload_artifact_job_id(path: Path) -> str | None:
+    """Return the upload job id encoded in a generated panorama filename."""
+    for suffix in (".spherical.part.mp4", ".spherical.mp4"):
+        if path.name.endswith(suffix):
+            job_id = path.name[: -len(suffix)]
+            return job_id or None
+    return None
+
+
+def cleanup_orphaned_upload_artifacts(
+    *, now: datetime | None = None, max_age: timedelta = _ORPHANED_UPLOAD_ARTIFACT_MAX_AGE
+) -> int:
+    """Remove stale temporary YouTube panorama files not owned by active jobs.
+
+    A grace period protects artifacts from a job that is being recovered while
+    the API or RQ worker is starting. Unknown filenames are left untouched.
+    """
+    artifact_dir = Path(config.VIDEO_EXPORT_DIR) / ".youtube-uploads"
+    if not artifact_dir.is_dir():
+        return 0
+
+    with SessionLocal() as db:
+        active_job_ids = {
+            job_id
+            for (job_id,) in db.query(YoutubeUploadJob.id)
+            .filter(YoutubeUploadJob.status.in_(_ACTIVE_STATUSES))
+            .all()
+        }
+
+    current_time = now or datetime.now(timezone.utc)
+    removed_count = 0
+    for artifact_path in artifact_dir.iterdir():
+        if not artifact_path.is_file():
+            continue
+        job_id = _upload_artifact_job_id(artifact_path)
+        if job_id is None or job_id in active_job_ids:
+            continue
+        try:
+            modified_at = datetime.fromtimestamp(artifact_path.stat().st_mtime, tz=timezone.utc)
+            if current_time - modified_at < max_age:
+                continue
+            artifact_path.unlink()
+            removed_count += 1
+        except OSError:
+            logger.warning("Unable to remove orphaned YouTube artifact %s", artifact_path)
+
+    if removed_count:
+        logger.info("Removed %s orphaned YouTube upload artifact(s)", removed_count)
+    return removed_count
+
+
 def _has_spherical_panorama_metadata(video_path: Path) -> bool:
     def debug_metadata(message: object, *extra: object) -> None:
         logger.debug("Spatial metadata inspector: %s", " ".join(map(str, (message, *extra))))
@@ -703,7 +1175,7 @@ def _prepare_upload_video(
     source_path: Path,
     progress_callback: Callable[[int], Any] | None = None,
 ) -> Path:
-    """Return a YouTube-ready source, injecting 360 metadata for panoramas."""
+    """Return a YouTube-ready source, reusing valid panorama metadata when present."""
     if source_type != "pano":
         return source_path
 
@@ -712,6 +1184,12 @@ def _prepare_upload_video(
         if _has_spherical_panorama_metadata(upload_path):
             return upload_path
         upload_path.unlink()
+
+    if _has_spherical_panorama_metadata(source_path):
+        if progress_callback is not None:
+            progress_callback(_PANORAMA_PREPARATION_PROGRESS_MAX)
+        _log_job(job_id, "Source panorama already has verified 360° metadata")
+        return source_path
 
     upload_path.parent.mkdir(parents=True, exist_ok=True)
     partial_path = upload_path.with_suffix(".part.mp4")
@@ -835,6 +1313,7 @@ def process_youtube_upload(job_id: str) -> None:
         source_size = video_path.stat().st_size
         if source_size <= 0:
             raise RuntimeError("Source video is empty")
+        source_video_path = video_path
         video_path = _prepare_upload_video(
             job_id,
             source_type,
@@ -842,7 +1321,8 @@ def process_youtube_upload(job_id: str) -> None:
             progress_callback=lambda progress: _update_active_job(job_id, progress=progress),
         )
         if source_type == "pano":
-            prepared_video_path = video_path
+            if video_path != source_video_path:
+                prepared_video_path = video_path
             _log_job(job_id, "Panorama metadata ready for interactive 360° playback")
         total_size = video_path.stat().st_size
         if total_size <= 0:
@@ -942,6 +1422,18 @@ def process_youtube_upload(job_id: str) -> None:
                 prepared_video_path.unlink(missing_ok=True)
             except OSError:
                 logger.warning("Unable to remove prepared panorama for YouTube upload %s", job_id)
+        generated_overlay_path: Path | None = None
+        with SessionLocal() as db:
+            job = db.get(YoutubeUploadJob, job_id)
+            if (
+                job is not None
+                and job.source_type == "youtube_overlay"
+                and job.source_path
+                and job.status in {"completed", "failed", "cancelled"}
+            ):
+                generated_overlay_path = Path(job.source_path)
+        if generated_overlay_path is not None:
+            _delete_generated_overlay_source(generated_overlay_path)
         with _SUBMITTED_LOCK:
             _SUBMITTED.discard(job_id)
 
@@ -987,6 +1479,7 @@ def enqueue_youtube_upload(job_id: str) -> None:
 def enqueue_pending_youtube_uploads(
     *, recover_active: bool = False, migrate_legacy_queue: bool = False
 ) -> int:
+    cleanup_orphaned_upload_artifacts()
     with SessionLocal() as db:
         jobs = (
             db.query(YoutubeUploadJob)

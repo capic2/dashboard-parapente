@@ -2,7 +2,7 @@ import gzip
 import io
 import math
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, TypedDict
 
 from spots.distance import haversine_distance
@@ -15,12 +15,19 @@ class TrackPoint(TypedDict, total=False):
     timestamp: int
     heart_rate: int
     power: int
+    speed_kmh: float
+    vario_ms: float
+    heading_deg: float
+    distance_km: float
+    altitude_relative_m: float
     segment: int
 
 
 MAX_TRACK_BYTES = 100 * 1024 * 1024
 MAX_XML_TRACK_BYTES = 25 * 1024 * 1024
 MAX_TRACK_POINTS = 500_000
+MAX_VERTICAL_RATE_ABS_MS = 8.0
+VERTICAL_RATE_WINDOW_SECONDS = 3.0
 
 
 def _append_point(points: list[TrackPoint], point: TrackPoint) -> None:
@@ -76,6 +83,14 @@ def _child_text(element: ET.Element, name: str) -> str | None:
     for child in element.iter():
         if _local_name(child) == name and child.text:
             return child.text
+    return None
+
+
+def _child_text_any(element: ET.Element, names: tuple[str, ...]) -> str | None:
+    for name in names:
+        value = _child_text(element, name)
+        if value is not None:
+            return value
     return None
 
 
@@ -158,6 +173,20 @@ def _parse_gpx(content: bytes) -> list[TrackPoint]:
                 point["heart_rate"] = int(float(heart_rate))
             if power:
                 point["power"] = int(float(power))
+            speed = _child_text_any(element, ("speed", "enhancedSpeed"))
+            if speed:
+                speed_mps = float(speed)
+                if math.isfinite(speed_mps) and speed_mps >= 0:
+                    # GPX TrackPointExtension speed values are meters per second.
+                    point["speed_kmh"] = speed_mps * 3.6
+            vario = _child_text_any(
+                element, ("vario", "vertical_speed", "verticalSpeed", "climb_rate")
+            )
+            if vario:
+                point["vario_ms"] = float(vario)
+            heading = _child_text_any(element, ("heading", "course", "track"))
+            if heading:
+                point["heading_deg"] = float(heading)
             _append_point(points, point)
     return points
 
@@ -189,7 +218,64 @@ def _parse_tcx(content: bytes) -> list[TrackPoint]:
                 point["heart_rate"] = int(float(heart_rate))
             if power:
                 point["power"] = int(float(power))
+            speed = _child_text_any(element, ("Speed", "speed"))
+            if speed:
+                speed_mps = float(speed)
+                if math.isfinite(speed_mps) and speed_mps >= 0:
+                    # TCX Speed values are meters per second.
+                    point["speed_kmh"] = speed_mps * 3.6
             _append_point(points, point)
+    return points
+
+
+def _parse_igc(content: bytes) -> list[TrackPoint]:
+    flight_date: date | None = None
+    points: list[TrackPoint] = []
+    for raw_line in content.decode("ascii", errors="ignore").splitlines():
+        line = raw_line.strip()
+        if line.startswith(("HFDTE", "HFDTEDATE")):
+            date_text = line.split(":", 1)[-1][0:6]
+            if len(date_text) == 6 and date_text.isdigit():
+                day, month, year = int(date_text[0:2]), int(date_text[2:4]), int(date_text[4:6])
+                flight_date = date(2000 + year if year < 50 else 1900 + year, month, day)
+            continue
+        if not line.startswith("B") or len(line) < 35:
+            continue
+        try:
+            hours, minutes, seconds = int(line[1:3]), int(line[3:5]), int(line[5:7])
+            latitude = int(line[7:9]) + (int(line[9:11]) + int(line[11:14]) / 1000) / 60
+            if line[14] == "S":
+                latitude = -latitude
+            longitude = int(line[15:18]) + (int(line[18:20]) + int(line[20:23]) / 1000) / 60
+            if line[23] == "W":
+                longitude = -longitude
+            elevation = float(int(line[30:35]))
+            timestamp = 0
+            if flight_date is not None:
+                timestamp = int(
+                    datetime(
+                        flight_date.year,
+                        flight_date.month,
+                        flight_date.day,
+                        hours,
+                        minutes,
+                        seconds,
+                        tzinfo=timezone.utc,
+                    ).timestamp()
+                    * 1000
+                )
+            _append_point(
+                points,
+                {
+                    "lat": latitude,
+                    "lon": longitude,
+                    "elevation": elevation,
+                    "timestamp": timestamp,
+                    "segment": 0,
+                },
+            )
+        except (ValueError, IndexError):
+            continue
     return points
 
 
@@ -226,6 +312,14 @@ def _parse_fit(content: bytes) -> list[TrackPoint]:
                 point["heart_rate"] = int(heart_rate)
             if power is not None:
                 point["power"] = int(power)
+            speed = frame.get_value("enhanced_speed", fallback=None)
+            if speed is None:
+                speed = frame.get_value("speed", fallback=None)
+            if speed is not None:
+                speed_mps = float(speed)
+                if math.isfinite(speed_mps) and speed_mps >= 0:
+                    # FIT speed values are meters per second.
+                    point["speed_kmh"] = speed_mps * 3.6
             _append_point(points, point)
     return points
 
@@ -241,12 +335,25 @@ def normalize_track(content: bytes, file_type: str) -> tuple[bytes, list[TrackPo
         points = _parse_gpx(decoded)
     elif normalized_type == "tcx":
         points = _parse_tcx(decoded)
+    elif normalized_type == "igc":
+        points = _parse_igc(decoded)
     else:
         raise ValueError(f"Unsupported original activity file type: {file_type or 'unknown'}")
     if not points:
         raise ValueError("Activity file contains no positioned track points")
     _fill_missing_elevations(points)
     return track_to_gpx(points), points
+
+
+def shift_track_timestamps(points: list[TrackPoint], offset_ms: int) -> list[TrackPoint]:
+    """Move a track back onto its source timeline without changing its samples."""
+    if offset_ms == 0:
+        return points
+    for point in points:
+        timestamp = point.get("timestamp", 0)
+        if timestamp > 0:
+            point["timestamp"] = timestamp + offset_ms
+    return points
 
 
 def track_to_gpx(points: list[TrackPoint]) -> bytes:
@@ -276,7 +383,7 @@ def track_to_gpx(points: list[TrackPoint]) -> bytes:
             ET.SubElement(element, "{http://www.topografix.com/GPX/1/1}time").text = (
                 timestamp.isoformat().replace("+00:00", "Z")
             )
-        if "heart_rate" in point or "power" in point:
+        if "heart_rate" in point or "power" in point or "speed_kmh" in point:
             extensions = ET.SubElement(element, "{http://www.topografix.com/GPX/1/1}extensions")
             extension = ET.SubElement(
                 extensions,
@@ -288,10 +395,48 @@ def track_to_gpx(points: list[TrackPoint]) -> bytes:
                 ).text = str(point["heart_rate"])
             if "power" in point:
                 ET.SubElement(extension, "power").text = str(point["power"])
+            if "speed_kmh" in point:
+                ET.SubElement(
+                    extension,
+                    "{http://www.garmin.com/xmlschemas/TrackPointExtension/v1}speed",
+                ).text = str(point["speed_kmh"] / 3.6)
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
+def _precise_haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Return segment distance in km without the display-oriented rounding."""
+    radius_km = 6371.0
+    lat1_rad, lat2_rad = math.radians(lat1), math.radians(lat2)
+    delta_lat = math.radians(lat2 - lat1)
+    delta_lon = math.radians(lon2 - lon1)
+    haversine = (
+        math.sin(delta_lat / 2) ** 2
+        + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon / 2) ** 2
+    )
+    return radius_km * 2 * math.atan2(math.sqrt(haversine), math.sqrt(1 - haversine))
+
+
 def calculate_track_stats(points: list[TrackPoint]) -> dict[str, Any]:
+    if not points:
+        return {
+            "max_altitude_m": 0,
+            "min_altitude_m": 0,
+            "altitude_range_m": 0,
+            "takeoff_altitude_m": 0,
+            "landing_altitude_m": 0,
+            "elevation_gain_m": 0,
+            "elevation_loss_m": 0,
+            "distance_km": 0,
+            "max_distance_from_takeoff_km": 0,
+            "flight_duration_seconds": 0,
+            "duration_minutes": 0,
+            "average_speed_kmh": 0,
+            "max_speed_kmh": 0,
+            "max_climb_rate_ms": 0,
+            "max_sink_rate_ms": 0,
+            "departure_time": None,
+        }
+
     elevations = [point.get("elevation", 0.0) for point in points]
     distance = sum(
         haversine_distance(previous["lat"], previous["lon"], current["lat"], current["lon"])
@@ -303,28 +448,141 @@ def calculate_track_stats(points: list[TrackPoint]) -> dict[str, Any]:
         for previous, current in zip(points, points[1:], strict=False)
         if previous.get("segment", 0) == current.get("segment", 0)
     )
+    loss = sum(
+        max(0.0, previous.get("elevation", 0.0) - current.get("elevation", 0.0))
+        for previous, current in zip(points, points[1:], strict=False)
+        if previous.get("segment", 0) == current.get("segment", 0)
+    )
     valid_times = [point["timestamp"] for point in points if point.get("timestamp", 0) > 0]
     duration_seconds = (valid_times[-1] - valid_times[0]) / 1000 if len(valid_times) > 1 else 0
-    max_speed = 0.0
-    for previous, current in zip(points, points[1:], strict=False):
-        if previous.get("segment", 0) != current.get("segment", 0):
-            continue
-        elapsed = current.get("timestamp", 0) - previous.get("timestamp", 0)
-        if elapsed <= 0:
-            continue
-        segment_distance = haversine_distance(
-            previous["lat"], previous["lon"], current["lat"], current["lon"]
+    explicit_speeds = [
+        point["speed_kmh"]
+        for point in points
+        if (
+            "speed_kmh" in point
+            and math.isfinite(point["speed_kmh"])
+            and 0 <= point["speed_kmh"] < 150
         )
-        speed = segment_distance / (elapsed / 3_600_000)
-        if math.isfinite(speed) and speed < 150:
-            max_speed = max(max_speed, speed)
+    ]
+    if explicit_speeds:
+        max_speed = max(explicit_speeds)
+    else:
+        max_speed = 0.0
+        for previous, current in zip(points, points[1:], strict=False):
+            if previous.get("segment", 0) != current.get("segment", 0):
+                continue
+            elapsed = current.get("timestamp", 0) - previous.get("timestamp", 0)
+            if elapsed <= 0:
+                continue
+            segment_distance = _precise_haversine_distance(
+                previous["lat"], previous["lon"], current["lat"], current["lon"]
+            )
+            speed = segment_distance / (elapsed / 3_600_000)
+            if math.isfinite(speed) and speed < 150:
+                max_speed = max(max_speed, speed)
+
+    max_climb_rate = 0.0
+    max_sink_rate = 0.0
+    for current_index, current in enumerate(points[1:], start=1):
+        current_timestamp = current.get("timestamp", 0)
+        if current_timestamp <= 0:
+            continue
+
+        for previous_index in range(current_index - 1, -1, -1):
+            candidate = points[previous_index]
+            if candidate.get("segment", 0) != current.get("segment", 0):
+                break
+            previous_timestamp = candidate.get("timestamp", 0)
+            elapsed = current_timestamp - previous_timestamp
+            if previous_timestamp <= 0 or elapsed <= 0:
+                continue
+            if elapsed < VERTICAL_RATE_WINDOW_SECONDS * 1000:
+                continue
+
+            vertical_rate = (current.get("elevation", 0.0) - candidate.get("elevation", 0.0)) / (
+                elapsed / 1000
+            )
+            if not math.isfinite(vertical_rate) or abs(vertical_rate) > MAX_VERTICAL_RATE_ABS_MS:
+                continue
+
+            max_climb_rate = max(max_climb_rate, vertical_rate)
+            max_sink_rate = max(max_sink_rate, -vertical_rate)
+            break
+
+    takeoff = points[0]
+    max_distance_from_takeoff = max(
+        _precise_haversine_distance(takeoff["lat"], takeoff["lon"], point["lat"], point["lon"])
+        for point in points
+    )
+    min_altitude = min(elevations)
+    max_altitude = max(elevations)
+    average_speed = distance / (duration_seconds / 3600) if duration_seconds > 0 else 0
     return {
-        "max_altitude_m": round(max(elevations)),
+        "max_altitude_m": round(max_altitude),
+        "min_altitude_m": round(min_altitude),
+        "altitude_range_m": round(max_altitude - min_altitude),
+        "takeoff_altitude_m": round(elevations[0]),
+        "landing_altitude_m": round(elevations[-1]),
         "elevation_gain_m": round(gain),
+        "elevation_loss_m": round(loss),
         "distance_km": round(distance, 2),
+        "max_distance_from_takeoff_km": round(max_distance_from_takeoff, 2),
+        "flight_duration_seconds": round(duration_seconds),
         "duration_minutes": round(duration_seconds / 60),
+        "average_speed_kmh": round(average_speed, 2),
         "max_speed_kmh": round(max_speed, 2),
+        "max_climb_rate_ms": round(max_climb_rate, 2),
+        "max_sink_rate_ms": round(max_sink_rate, 2),
         "departure_time": (
             datetime.fromtimestamp(valid_times[0] / 1000, tz=timezone.utc) if valid_times else None
         ),
     }
+
+
+def enrich_telemetry_points(points: list[TrackPoint]) -> list[TrackPoint]:
+    """Add point-level values needed by the interactive telemetry overlay."""
+    enriched: list[TrackPoint] = []
+    cumulative_distance = 0.0
+    takeoff = points[0] if points else None
+
+    for index, source in enumerate(points):
+        point = dict(source)
+        point.setdefault("elevation", 0.0)
+        previous = points[index - 1] if index else None
+        same_segment = previous is not None and previous.get("segment", 0) == point.get(
+            "segment", 0
+        )
+        if same_segment and previous is not None:
+            distance = _precise_haversine_distance(
+                previous["lat"], previous["lon"], point["lat"], point["lon"]
+            )
+            cumulative_distance += distance
+            point["distance_km"] = cumulative_distance
+
+            if "heading_deg" not in point:
+                delta_lon = math.radians(point["lon"] - previous["lon"])
+                lat1 = math.radians(previous["lat"])
+                lat2 = math.radians(point["lat"])
+                x = math.sin(delta_lon) * math.cos(lat2)
+                y = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(
+                    delta_lon
+                )
+                if x or y:
+                    point["heading_deg"] = (math.degrees(math.atan2(x, y)) + 360) % 360
+
+            if "vario_ms" not in point:
+                elapsed = point.get("timestamp", 0) - previous.get("timestamp", 0)
+                if elapsed > 0:
+                    point["vario_ms"] = (
+                        point.get("elevation", 0.0) - previous.get("elevation", 0.0)
+                    ) / (elapsed / 1000)
+        else:
+            point["distance_km"] = cumulative_distance
+
+        if takeoff is not None:
+            point["altitude_relative_m"] = point.get("elevation", 0.0) - takeoff.get(
+                "elevation", 0.0
+            )
+        enriched.append(point)
+
+    return enriched

@@ -44,6 +44,7 @@ _VIDEO_EXPORT_CLEANUP_INTERVAL_MINUTES = 15
 
 # Semaphore to limit concurrent database operations (prevent pool exhaustion)
 _db_semaphore = asyncio.Semaphore(5)
+_weather_fetch_lock = asyncio.Lock()
 
 
 async def fetch_and_store_weather(site_code: str, day_index: int = 0):
@@ -199,6 +200,12 @@ async def fetch_and_cache_weather(site_id: str, day_index: int = 0, db: Session 
                 inc_weather_fetch(site_id, day_index, "error")
                 return False
 
+            # Do not keep a checked-out SQLAlchemy connection while the weather
+            # providers are queried over the network.  This function is called
+            # for many sites/days during warmup and a held connection per task
+            # can exhaust the pool before the API can answer health checks.
+            db.commit()
+
             logger.info(f"Fetching {site.name} (day {day_index})...")
 
             # Fetch normalized forecast (will auto-cache via weather_pipeline.py)
@@ -236,38 +243,43 @@ async def scheduled_weather_fetch():
     Fetches all 7 days (0-6) for each site to pre-populate cache
     Runs every hour
     """
-    logger.info(f"⏰ Scheduled weather fetch started at {datetime.now()}")
-    started_at = time.perf_counter()
+    if _weather_fetch_lock.locked():
+        logger.warning("Skipping weather fetch because another run is still active")
+        return
 
-    tasks = []
+    async with _weather_fetch_lock:
+        logger.info(f"⏰ Scheduled weather fetch started at {datetime.now()}")
+        started_at = time.perf_counter()
 
-    # Fetch all 7 days for each default site
-    for site_id in DEFAULT_SITES:
-        for day_index in range(7):
-            tasks.append(fetch_and_cache_weather(site_id, day_index=day_index))
+        tasks = []
 
-    # Execute all fetches in parallel
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+        # Fetch all 7 days for each default site
+        for site_id in DEFAULT_SITES:
+            for day_index in range(7):
+                tasks.append(fetch_and_cache_weather(site_id, day_index=day_index))
 
-    # Log results
-    success_count = sum(1 for r in results if r and not isinstance(r, Exception))
-    inc_scheduler_run("success" if success_count else "error")
-    observe_scheduler_run(time.perf_counter() - started_at)
-    logger.info(
-        f"✅ Scheduled fetch completed: {success_count}/{len(tasks)} succeeded at {datetime.now()}"
-    )
+        # Execute all fetches in parallel
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    # Refresh best spot cache after weather data is updated
-    try:
-        from best_spot import refresh_best_spot_cache
+        # Log results
+        success_count = sum(1 for r in results if r and not isinstance(r, Exception))
+        inc_scheduler_run("success" if success_count else "error")
+        observe_scheduler_run(time.perf_counter() - started_at)
+        logger.info(
+            f"✅ Scheduled fetch completed: {success_count}/{len(tasks)} succeeded at {datetime.now()}"
+        )
 
-        db = SessionLocal()
+        # Refresh best spot cache after weather data is updated
         try:
-            await refresh_best_spot_cache(db)
-        finally:
-            db.close()
-    except Exception as e:
-        logger.error(f"Error refreshing best spot cache: {e}", exc_info=True)
+            from best_spot import refresh_best_spot_cache
+
+            db = SessionLocal()
+            try:
+                await refresh_best_spot_cache(db)
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"Error refreshing best spot cache: {e}", exc_info=True)
 
 
 async def scheduled_video_export_cleanup() -> None:
@@ -330,6 +342,9 @@ def start_scheduler():
         id="weather_fetch",
         name=f"Weather fetch every {interval} min (6 sites × 2 days)",
         replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=60,
     )
     scheduler.add_job(
         scheduled_video_export_cleanup,

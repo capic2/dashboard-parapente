@@ -166,6 +166,14 @@ class TestCalculateParaIndex:
         assert result["para_index"] == 0
         assert result["verdict"] == "DONNÉES INSUFFISANTES"
         assert result["emoji"] == "❌"
+        assert result["metrics"] == {
+            "avg_wind_kmh": 0,
+            "max_gust_kmh": 0,
+            "total_rain_mm": 0,
+            "avg_temp_c": 0,
+            "avg_lifted_index": 0,
+            "thunderstorm_risk": "inconnu",
+        }
 
     def test_medium_conditions(self):
         """Borderline conditions → not excellent"""

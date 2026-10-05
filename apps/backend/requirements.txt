@@ -5,13 +5,13 @@
 # ============================================
 # FastAPI Framework & Server
 # ============================================
-fastapi==0.141.1
-uvicorn[standard]==0.52.4
+fastapi==0.142.2
+uvicorn[standard]==0.54.0
 
 # ============================================
 # Database ORM
 # ============================================
-sqlalchemy==2.0.52
+sqlalchemy==2.1.3
 
 # ============================================
 # Data Validation & Settings
@@ -22,8 +22,8 @@ pydantic-settings==2.15.0
 # ============================================
 # Configuration Management
 # ============================================
-python-dotenv==1.2.3
-tzdata==2026.3
+python-dotenv==1.2.4
+tzdata==2026.5
 
 # ============================================
 # Async File I/O
@@ -33,7 +33,7 @@ aiofiles==25.1.0
 # ============================================
 # Web Scraping & Browser Automation
 # ============================================
-playwright==1.62.0
+playwright==1.63.0
 scrapling==0.4.15
 beautifulsoup4==4.15.0
 
@@ -41,6 +41,7 @@ beautifulsoup4==4.15.0
 # HTTP Clients
 # ============================================
 requests==2.34.2
+yt-dlp==2026.8.19
 httpx==0.28.1
 fitdecode==0.11.0
 
@@ -61,14 +62,15 @@ rq==2.12.0
 pytest==9.1.1
 pytest-asyncio==1.4.0
 pytest-cov==7.1.0
-fakeredis==2.37.1
+fakeredis==2.39.0
+PyYAML==6.0.3
 
 # ============================================
 # Code Quality & Linting
 # ============================================
-ruff==0.16.6
-black==26.5.1
-isort==9.0.1
+ruff==0.16.10
+black==26.10.0
+isort==9.0.2
 
 # ============================================
 # File Upload Support
@@ -84,8 +86,8 @@ spatialmedia @ https://github.com/google/spatial-media/archive/2308497c39bb604a7
 # Meteorology & Scientific Computing
 # ============================================
 metpy==1.7.1
-matplotlib==3.11.1
-numpy==2.5.2
+matplotlib==3.11.2
+numpy==2.5.3
 pillow==12.3.0
 
 # ============================================

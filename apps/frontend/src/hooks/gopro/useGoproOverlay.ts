@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { GoproOverlayJob } from '@dashboard-parapente/shared-types';
 import { api } from '../../lib/api';
 import type { GeoPoint } from '../../types/flight';
@@ -27,13 +27,50 @@ export type GoproOverlayPreview = {
     end_time: string;
     duration_seconds: number;
     coordinates: GeoPoint[];
+    enrichment_status?: 'missing' | 'pending' | 'ready' | 'failed';
+    enrichment_error?: string | null;
   };
   alignment: {
     automatic_offset_seconds: number;
     manual_offset_seconds: number;
     effective_offset_seconds: number;
   };
+  overlay: {
+    status: 'missing' | 'generating' | 'ready' | 'failed';
+    job_id?: string | null;
+    error?: string | null;
+  };
 };
+
+export type FlightOverlayLayer = {
+  status: 'missing' | GoproOverlayJob['status'];
+  job: GoproOverlayJob | null;
+};
+
+export function useFlightOverlayLayer(flightId: string) {
+  return useQuery({
+    queryKey: ['flights', flightId, 'overlay-layer'],
+    queryFn: () =>
+      api.get(`flights/${flightId}/overlay-layer`).json<FlightOverlayLayer>(),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === 'queued' ||
+        status === 'preparing' ||
+        status === 'running'
+        ? STATUS_POLL_INTERVAL_MS
+        : false;
+    },
+  });
+}
+
+export function useGenerateFlightOverlayLayer(flightId: string) {
+  return useMutation({
+    mutationFn: () =>
+      api
+        .post(`flights/${flightId}/overlay-layer`, { timeout: false })
+        .json<GoproOverlayJob>(),
+  });
+}
 
 export function goproPreviewRefetchInterval(
   status?: GoproOverlayPreview['video']['preview_status']
@@ -51,8 +88,13 @@ export function useGoproOverlayPreview(flightId: string, enabled: boolean) {
         .get(`flights/${flightId}/gopro-overlay/preview`)
         .json<GoproOverlayPreview>(),
     enabled,
-    refetchInterval: (query) =>
-      goproPreviewRefetchInterval(query.state.data?.video.preview_status),
+    refetchOnWindowFocus: false,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (data?.gpx?.enrichment_status === 'pending') return 2000;
+      if (data?.overlay.status === 'generating') return 2000;
+      return goproPreviewRefetchInterval(data?.video.preview_status);
+    },
   });
 }
 
@@ -73,6 +115,25 @@ export function useGenerateGoproPreview(flightId: string) {
           },
         })
         .json(),
+  });
+}
+
+export function useGenerateGoproMerge(flightId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api
+        .post(`flights/${flightId}/gopro-overlay/merge`)
+        .json<{ status: 'missing' | 'pending' | 'ready' }>(),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ['flights', flightId, 'gopro-overlay-preview'],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['flights', flightId, 'telemetry'],
+        }),
+      ]),
   });
 }
 

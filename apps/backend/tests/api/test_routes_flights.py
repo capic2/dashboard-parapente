@@ -6,12 +6,16 @@ Coverage: GET, POST, PATCH, DELETE for flights.
 """
 
 from datetime import date, datetime, timedelta
+import json
 from pathlib import Path
+import re
 from unittest.mock import patch
 
 import config
+import pytest
 from fastapi.testclient import TestClient
-from models import Flight, GoproOverlayJob, HighlightVideoJob
+from flight_tracks import calculate_track_stats, normalize_track
+from models import Flight, GoproOverlayJob, HighlightVideoJob, Site, YoutubeUploadJob
 from sqlalchemy.orm import Session
 from video_thumbnail import VideoThumbnailError
 
@@ -50,7 +54,54 @@ class TestFlightsListEndpoint:
         assert "flights" in data
         assert len(data["flights"]) == 3
 
-    def test_get_flights_returns_all_gopro_overlays(self, client, db_session, arguel_site):
+    def test_get_flights_reports_temporary_video_availability_independently(
+        self,
+        client: TestClient,
+        db_session: Session,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+        flights = [
+            Flight(
+                id="flight-face-video-presence",
+                name="Face video presence",
+                flight_date=date(2026, 3, 15),
+            ),
+            Flight(
+                id="flight-pilote-video-presence",
+                name="Pilote video presence",
+                flight_date=date(2026, 3, 15),
+            ),
+        ]
+        db_session.add_all(flights)
+        db_session.commit()
+        face_dir = tmp_path / "20260315" / "01"
+        pilote_dir = tmp_path / "20260315" / "02"
+        face_dir.mkdir(parents=True)
+        pilote_dir.mkdir(parents=True)
+        (face_dir / "face.mp4").write_bytes(b"face")
+        (pilote_dir / "pilote.mp4").write_bytes(b"pilote")
+
+        response = client.get(f"{API_PREFIX}/flights")
+
+        assert response.status_code == 200
+        returned = {item["id"]: item for item in response.json()["flights"]}
+        assert returned[flights[0].id]["face_video_file_exists"] is True
+        assert returned[flights[0].id]["pilote_video_file_exists"] is False
+        assert returned[flights[1].id]["face_video_file_exists"] is False
+        assert returned[flights[1].id]["pilote_video_file_exists"] is True
+
+        face_detail = client.get(f"{API_PREFIX}/flights/{flights[0].id}")
+        pilote_detail = client.get(f"{API_PREFIX}/flights/{flights[1].id}")
+        assert face_detail.json()["face_video_file_exists"] is True
+        assert face_detail.json()["pilote_video_file_exists"] is False
+        assert pilote_detail.json()["face_video_file_exists"] is False
+        assert pilote_detail.json()["pilote_video_file_exists"] is True
+
+    def test_get_flights_returns_video_overlays_but_excludes_overlay_layer(
+        self, client, db_session, arguel_site
+    ):
         flight = Flight(
             id="flight-multi-overlay",
             name="Flight with multiple overlays",
@@ -58,9 +109,10 @@ class TestFlightsListEndpoint:
             site_id=arguel_site.id,
         )
         db_session.add(flight)
-        for job_id, width, height, created_at in (
-            ("overlay-1080p", 1920, 1080, datetime(2026, 3, 15, 12)),
-            ("overlay-4k", 3840, 2160, datetime(2026, 3, 15, 13)),
+        for job_id, width, height, created_at, overlay_only in (
+            ("overlay-1080p", 1920, 1080, datetime(2026, 3, 15, 12), False),
+            ("overlay-4k", 3840, 2160, datetime(2026, 3, 15, 13), False),
+            ("overlay-layer", 3840, 2160, datetime(2026, 3, 15, 14), True),
         ):
             db_session.add(
                 GoproOverlayJob(
@@ -82,6 +134,7 @@ class TestFlightsListEndpoint:
                     created_at=created_at,
                     updated_at=created_at,
                     completed_at=created_at,
+                    command_json=json.dumps({"overlay_only": overlay_only}),
                 )
             )
         db_session.commit()
@@ -547,6 +600,68 @@ class TestFlightsListEndpoint:
         assert response.status_code == 404
         assert response.json()["detail"] == "No Pano video available for this flight"
 
+    def test_get_face_and_pilote_thumbnails(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        flight_dir = tmp_path / "20260315" / "01"
+        flight_dir.mkdir(parents=True)
+        pano_path = flight_dir / "pano.mp4"
+        pano_path.write_bytes(b"pano")
+        face_path = flight_dir / "face.mp4"
+        face_path.write_bytes(b"face")
+        pilote_path = flight_dir / "pilote.mp4"
+        pilote_path.write_bytes(b"pilote")
+        flight = Flight(
+            id="flight-face-pilote-thumbnails",
+            name="Face and pilote thumbnails",
+            flight_date=date(2026, 3, 15),
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.commit()
+        thumbnail_path = tmp_path / "temporary-thumbnail.jpg"
+        thumbnail_path.write_bytes(b"jpeg")
+
+        with patch("routes.get_video_thumbnail", return_value=thumbnail_path) as get_thumbnail:
+            face_response = client.get(
+                f"{API_PREFIX}/flights/{flight.id}/temporary-media/face/thumbnail"
+            )
+            pilote_response = client.get(
+                f"{API_PREFIX}/flights/{flight.id}/temporary-media/pilote/thumbnail"
+            )
+
+        assert face_response.status_code == 200
+        assert pilote_response.status_code == 200
+        assert face_response.content == b"jpeg"
+        assert pilote_response.content == b"jpeg"
+        assert get_thumbnail.call_args_list == [((face_path,),), ((pilote_path,),)]
+
+    def test_streams_face_and_pilote_videos(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        flight_dir = tmp_path / "20260315" / "01"
+        flight_dir.mkdir(parents=True)
+        pano_path = flight_dir / "pano.mp4"
+        pano_path.write_bytes(b"pano")
+        (flight_dir / "face.mp4").write_bytes(b"face")
+        (flight_dir / "pilote.mp4").write_bytes(b"pilote")
+        flight = Flight(
+            id="flight-face-pilote-streams",
+            name="Face and pilote streams",
+            flight_date=date(2026, 3, 15),
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        face_response = client.get(f"{API_PREFIX}/flights/{flight.id}/temporary-media/face")
+        pilote_response = client.get(f"{API_PREFIX}/flights/{flight.id}/temporary-media/pilote")
+
+        assert face_response.status_code == 200
+        assert face_response.content == b"face"
+        assert pilote_response.status_code == 200
+        assert pilote_response.content == b"pilote"
+
     def test_stream_flight_pano(self, client, db_session, tmp_path):
         pano_path = tmp_path / "pano.mp4"
         pano_path.write_bytes(b"pano")
@@ -959,6 +1074,8 @@ class TestFlightRecordsEndpoint:
         assert data["highest_altitude"] is None
         assert data["longest_distance"] is None
         assert data["max_speed"] is None
+        assert data["max_climb_rate"] is None
+        assert data["max_sink_rate"] is None
         assert data["takeoff_elevation_gain"] is None
         assert data["earliest_takeoff"] is None
         assert data["latest_takeoff"] is None
@@ -1013,6 +1130,49 @@ class TestFlightRecordsEndpoint:
 
         assert data["max_speed"]["flight_id"] == "flight-3"
         assert data["max_speed"]["value"] == 55.0
+
+    def test_get_flight_records_finds_vertical_speed_records(self, client, db_session, arguel_site):
+        """GET /flights/records reads persisted rates and excludes opted-out tracks."""
+        flights = [
+            Flight(
+                id="flight-climb",
+                name="Best climb",
+                flight_date=date(2026, 3, 15),
+                site_id=arguel_site.id,
+                max_climb_rate_ms=4.2,
+                max_sink_rate_ms=1.5,
+            ),
+            Flight(
+                id="flight-sink",
+                name="Best sink",
+                flight_date=date(2026, 3, 16),
+                site_id=arguel_site.id,
+                max_climb_rate_ms=2.1,
+                max_sink_rate_ms=3.4,
+            ),
+            Flight(
+                id="flight-excluded",
+                name="Excluded track",
+                flight_date=date(2026, 3, 17),
+                site_id=arguel_site.id,
+                max_climb_rate_ms=5.0,
+                max_sink_rate_ms=5.0,
+                gpx_metrics_excluded=True,
+            ),
+        ]
+        db_session.add_all(flights)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/records")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["max_climb_rate"]["flight_id"] == "flight-climb"
+        assert data["max_climb_rate"]["value"] == 4.2
+        assert data["max_climb_rate"]["partial"] is True
+        assert data["max_sink_rate"]["flight_id"] == "flight-sink"
+        assert data["max_sink_rate"]["value"] == 3.4
+        assert data["max_sink_rate"]["partial"] is True
 
     def test_get_flight_records_finds_takeoff_elevation_gain(self, client, db_session, arguel_site):
         """GET /flights/records finds max altitude above takeoff elevation"""
@@ -1248,6 +1408,59 @@ class TestUpdateFlightEndpoint:
         db_session.refresh(sample_flight)
         assert sample_flight.notes == "Great thermal conditions!"
 
+    def test_takeoff_and_landing_markers_set_effective_flight_duration(
+        self, client, db_session, sample_flight
+    ):
+        video_id = "dQw4w9WgXcQ"
+        response = client.patch(
+            f"{API_PREFIX}/flights/{sample_flight.id}",
+            json={
+                "youtube_urls": [f"https://youtu.be/{video_id}"],
+                "video_markers": [
+                    {
+                        "id": "takeoff-marker",
+                        "youtube_video_id": video_id,
+                        "kind": "takeoff",
+                        "timestamp_seconds": 120,
+                    },
+                    {
+                        "id": "landing-marker",
+                        "youtube_video_id": video_id,
+                        "kind": "landing",
+                        "timestamp_seconds": 7320,
+                    },
+                ],
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json()["data"]["duration_minutes"] == 120
+        db_session.refresh(sample_flight)
+        assert sample_flight.duration_minutes == 60
+        assert sample_flight.real_duration_minutes == 120
+
+        flight_response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}")
+        assert flight_response.status_code == 200
+        assert flight_response.json()["duration_minutes"] == 120
+
+        stats_response = client.get(f"{API_PREFIX}/flights/stats")
+        assert stats_response.status_code == 200
+        assert stats_response.json()["total_duration_minutes"] == 120
+
+        records_response = client.get(f"{API_PREFIX}/flights/records")
+        assert records_response.status_code == 200
+        assert records_response.json()["longest_duration"]["value"] == 120
+
+        url_update_response = client.patch(
+            f"{API_PREFIX}/flights/{sample_flight.id}",
+            json={"youtube_urls": ["https://youtu.be/9bZkp7q19f0"]},
+        )
+        assert url_update_response.status_code == 200
+        assert url_update_response.json()["data"]["duration_minutes"] == 60
+        db_session.refresh(sample_flight)
+        assert sample_flight.real_duration_minutes is None
+        assert sample_flight.video_markers == []
+
     def test_update_flight_youtube_urls_normalizes_and_deduplicates(
         self, client, db_session, sample_flight
     ):
@@ -1292,6 +1505,39 @@ class TestUpdateFlightEndpoint:
         assert sample_flight.name == "New Name"
         assert sample_flight.notes == "New notes"
         assert sample_flight.distance_km == 20.5
+
+    def test_update_gpx_metrics_exclusion_recalculates_vertical_rates(
+        self, client, db_session, sample_flight
+    ):
+        sample_flight.gpx_file_path = "private/track.gpx"
+        sample_flight.max_climb_rate_ms = 1.0
+        sample_flight.max_sink_rate_ms = 0.5
+        db_session.commit()
+
+        with (
+            patch("routes.parse_gpx_file", return_value=[{"timestamp": 1}]),
+            patch(
+                "routes.calculate_track_stats",
+                return_value={"max_climb_rate_ms": 4.2, "max_sink_rate_ms": 3.4},
+            ) as calculate_stats,
+        ):
+            response = client.patch(
+                f"{API_PREFIX}/flights/{sample_flight.id}",
+                json={"gpx_metrics_excluded": True},
+            )
+            assert response.status_code == 200
+
+            response = client.patch(
+                f"{API_PREFIX}/flights/{sample_flight.id}",
+                json={"gpx_metrics_excluded": False},
+            )
+
+        assert response.status_code == 200
+        assert calculate_stats.call_count == 2
+        db_session.refresh(sample_flight)
+        assert sample_flight.gpx_metrics_excluded is False
+        assert sample_flight.max_climb_rate_ms == 4.2
+        assert sample_flight.max_sink_rate_ms == 3.4
 
 
 class TestDeleteFlightEndpoint:
@@ -1416,13 +1662,25 @@ class TestFlightGPXEndpoints:
 
         assert response.status_code == 200
         db_session.refresh(sample_flight)
-        assert sample_flight.max_speed_kmh is not None
-        assert sample_flight.max_speed_kmh > 0
+        _, points = normalize_track(sample_gpx.encode(), "gpx")
+        expected = calculate_track_stats(points)
+        assert sample_flight.duration_minutes == expected["duration_minutes"]
+        assert sample_flight.max_altitude_m == expected["max_altitude_m"]
+        assert sample_flight.max_speed_kmh == expected["max_speed_kmh"]
+        assert sample_flight.distance_km == expected["distance_km"]
+        assert sample_flight.elevation_gain_m == expected["elevation_gain_m"]
+        assert sample_flight.gpx_max_altitude_m == expected["max_altitude_m"]
+        assert sample_flight.gpx_elevation_gain_m == expected["elevation_gain_m"]
+        assert sample_flight.max_climb_rate_ms == expected["max_climb_rate_ms"]
+        assert sample_flight.max_sink_rate_ms == expected["max_sink_rate_ms"]
+        assert sample_flight.departure_time == expected["departure_time"].replace(tzinfo=None)
 
     def test_upload_gpx_succeeds_when_stat_calculation_fails(
         self, client, db_session, sample_flight, sample_gpx
     ):
         sample_flight.max_speed_kmh = None
+        sample_flight.max_climb_rate_ms = 4.2
+        sample_flight.max_sink_rate_ms = 3.4
         db_session.commit()
         files = {"gpx_file": ("test.gpx", sample_gpx.encode(), "application/gpx+xml")}
         with (
@@ -1439,6 +1697,8 @@ class TestFlightGPXEndpoints:
         db_session.refresh(sample_flight)
         assert sample_flight.gpx_file_path == "private/track.gpx"
         assert sample_flight.max_speed_kmh is None
+        assert sample_flight.max_climb_rate_ms is None
+        assert sample_flight.max_sink_rate_ms is None
 
 
 class TestCreateFlightFromGPX:
@@ -1446,11 +1706,116 @@ class TestCreateFlightFromGPX:
 
     def test_create_flight_from_gpx_valid(self, client, db_session, arguel_site, sample_gpx):
         """POST /flights/create-from-gpx creates flight from GPX"""
-        files = {"file": ("arguel.gpx", sample_gpx.encode(), "application/gpx+xml")}
+        files = {"gpx_file": ("arguel.gpx", sample_gpx.encode(), "application/gpx+xml")}
         data = {"site_id": "site-arguel"}
-        response = client.post(f"{API_PREFIX}/flights/create-from-gpx", files=files, data=data)
-        # Should succeed or fail gracefully
-        assert response.status_code in [200, 201, 400, 422, 500]
+        with (
+            patch("routes.write_flight_text_file", return_value=Path("private/track.gpx")),
+            patch("video_export_manual.trigger_auto_export"),
+        ):
+            response = client.post(f"{API_PREFIX}/flights/create-from-gpx", files=files, data=data)
+
+        assert response.status_code == 200
+        flight = db_session.get(Flight, response.json()["flight_id"])
+        assert flight is not None
+        assert flight.max_climb_rate_ms == 1.0
+        assert flight.max_sink_rate_ms == 0.77
+
+    def test_create_flight_from_gpx_reuses_flight_for_repeated_upload(
+        self, client, db_session, arguel_site, sample_gpx
+    ):
+        files = {"gpx_file": ("arguel.gpx", sample_gpx.encode(), "application/gpx+xml")}
+        data = {"site_id": "site-arguel"}
+        with (
+            patch("routes.write_flight_text_file", return_value=Path("private/track.gpx")),
+            patch("video_export_manual.trigger_auto_export"),
+        ):
+            first_response = client.post(
+                f"{API_PREFIX}/flights/create-from-gpx", files=files, data=data
+            )
+            second_response = client.post(
+                f"{API_PREFIX}/flights/create-from-gpx", files=files, data=data
+            )
+
+        assert first_response.status_code == 200
+        assert second_response.status_code == 200
+        assert second_response.json()["flight_id"] == first_response.json()["flight_id"]
+        assert db_session.query(Flight).count() == 1
+
+    def test_create_flight_from_gpx_keeps_distinct_tracks_with_same_start_time(
+        self, client, db_session, arguel_site, sample_gpx
+    ):
+        distinct_gpx = sample_gpx.replace('lat="47.22356"', 'lat="47.22357"', 1)
+        files = [
+            {"gpx_file": ("arguel.gpx", content.encode(), "application/gpx+xml")}
+            for content in (sample_gpx, distinct_gpx)
+        ]
+        data = {"site_id": "site-arguel"}
+        with (
+            patch("routes.write_flight_text_file", return_value=Path("private/track.gpx")),
+            patch("video_export_manual.trigger_auto_export"),
+        ):
+            responses = [
+                client.post(f"{API_PREFIX}/flights/create-from-gpx", files=upload, data=data)
+                for upload in files
+            ]
+
+        assert all(response.status_code == 200 for response in responses)
+        flights = [response.json()["flight"] for response in responses]
+        assert flights[0]["id"] != flights[1]["id"]
+        assert flights[0]["name"] != flights[1]["name"]
+        assert db_session.query(Flight).count() == 2
+
+    def test_create_flight_from_gpx_deduplicates_per_site(
+        self, client, db_session, arguel_site, chalais_site, sample_gpx
+    ):
+        files = {"gpx_file": ("arguel.gpx", sample_gpx.encode(), "application/gpx+xml")}
+        with (
+            patch("routes.write_flight_text_file", return_value=Path("private/track.gpx")),
+            patch("video_export_manual.trigger_auto_export"),
+        ):
+            arguel_response = client.post(
+                f"{API_PREFIX}/flights/create-from-gpx",
+                files=files,
+                params={"site_id": arguel_site.id},
+            )
+            chalais_response = client.post(
+                f"{API_PREFIX}/flights/create-from-gpx",
+                files=files,
+                params={"site_id": chalais_site.id},
+            )
+
+        assert arguel_response.status_code == 200
+        assert chalais_response.status_code == 200
+        assert arguel_response.json()["flight_id"] != chalais_response.json()["flight_id"]
+        assert db_session.query(Flight).count() == 2
+
+    def test_create_flight_from_timestamp_less_gpx_reuses_flight_on_later_date(
+        self, client, db_session, arguel_site, sample_gpx
+    ):
+        timestamp_less_gpx = re.sub(r"\s*<time>[^<]*</time>", "", sample_gpx)
+        files = {"gpx_file": ("arguel.gpx", timestamp_less_gpx.encode(), "application/gpx+xml")}
+        with (
+            patch("routes.write_flight_text_file", return_value=Path("private/track.gpx")),
+            patch("video_export_manual.trigger_auto_export"),
+            patch("routes.date") as mocked_date,
+        ):
+            mocked_date.today.return_value = date(2026, 3, 15)
+            first_response = client.post(
+                f"{API_PREFIX}/flights/create-from-gpx",
+                files=files,
+                data={"site_id": arguel_site.id},
+            )
+            mocked_date.today.return_value = date(2026, 3, 16)
+            second_response = client.post(
+                f"{API_PREFIX}/flights/create-from-gpx",
+                files=files,
+                data={"site_id": arguel_site.id},
+            )
+
+        assert first_response.status_code == 200
+        assert second_response.status_code == 200
+        assert second_response.json()["flight_id"] == first_response.json()["flight_id"]
+        assert db_session.query(Flight).count() == 1
 
     def test_create_flight_from_gpx_no_file(self, client, db_session, arguel_site):
         """POST /flights/create-from-gpx fails without file"""
@@ -1481,8 +1846,30 @@ class TestHighlightVideoEndpoints:
         self, client, db_session, monkeypatch, tmp_path
     ):
         pano_path = tmp_path / "pano.mp4"
+        overlay_path = tmp_path / "telemetry-overlay.webm"
         pano_path.write_bytes(b"pano")
+        overlay_path.write_bytes(b"transparent overlay layer")
         flight = self._flight(db_session, "highlight-queue", pano_path)
+        db_session.add(
+            GoproOverlayJob(
+                id="overlay-layer-queue",
+                flight_id=flight.id,
+                status="completed",
+                progress=100,
+                message="Overlay ready",
+                video_path="camera.mp4",
+                gpx_path="track.gpx",
+                layout_id="parapente-3840",
+                layout_label="Parapente",
+                layout_path="layout.xml",
+                output_path=str(overlay_path),
+                temp_output_path=str(tmp_path / "overlay.tmp.mov"),
+                output_filename=overlay_path.name,
+                command_json=json.dumps({"overlay_only": True}),
+                completed_at=datetime(2026, 3, 15, 12),
+            )
+        )
+        db_session.commit()
         enqueue = patch("job_queue.enqueue_once")
         monkeypatch.setattr("job_queue.is_rq_enabled", lambda: True)
         with enqueue as enqueue_mock:
@@ -1496,6 +1883,43 @@ class TestHighlightVideoEndpoints:
         assert "source_video_path" not in payload
         assert "output_path" not in payload
         enqueue_mock.assert_called_once()
+
+    def test_create_uses_the_pre_generated_transparent_overlay_layer(
+        self, client, db_session, monkeypatch, tmp_path
+    ):
+        pano_path = tmp_path / "pano.mp4"
+        overlay_path = tmp_path / "telemetry-overlay.webm"
+        pano_path.write_bytes(b"pano")
+        overlay_path.write_bytes(b"transparent overlay layer")
+        flight = self._flight(db_session, "highlight-overlay-layer", pano_path)
+        db_session.add(
+            GoproOverlayJob(
+                id="overlay-layer-ready",
+                flight_id=flight.id,
+                status="completed",
+                progress=100,
+                message="Overlay ready",
+                video_path="camera.mp4",
+                gpx_path="track.gpx",
+                layout_id="parapente-3840",
+                layout_label="Parapente",
+                layout_path="layout.xml",
+                output_path=str(overlay_path),
+                temp_output_path=str(tmp_path / "overlay.tmp.mov"),
+                output_filename=overlay_path.name,
+                command_json=json.dumps({"overlay_only": True}),
+                completed_at=datetime(2026, 3, 15, 12),
+            )
+        )
+        db_session.commit()
+
+        monkeypatch.setattr("job_queue.is_rq_enabled", lambda: True)
+        with patch("job_queue.enqueue_once"):
+            response = client.post(f"{API_PREFIX}/flights/{flight.id}/highlight-videos")
+
+        assert response.status_code == 202
+        highlight = db_session.query(HighlightVideoJob).filter_by(flight_id=flight.id).one()
+        assert highlight.overlay_video_path == str(overlay_path)
 
     def test_create_reuses_active_job(self, client, db_session, tmp_path):
         pano_path = tmp_path / "pano.mp4"
@@ -1717,6 +2141,55 @@ class TestHighlightVideoEndpoints:
         assert response.status_code == 409
 
 
+class TestFlightOverlayLayerEndpoint:
+    def test_rejects_duplicate_overlay_layer_generation(
+        self, client: TestClient, db_session: Session, arguel_site: Site
+    ) -> None:
+        flight = Flight(
+            id="flight-overlay-layer-active",
+            name="Flight with active overlay layer",
+            flight_date=date(2026, 3, 15),
+            site_id=arguel_site.id,
+            gopro_overlay_gpx_offset=0.0,
+        )
+        db_session.add(flight)
+        db_session.add(
+            GoproOverlayJob(
+                id="overlay-layer-active",
+                flight_id=flight.id,
+                status="running",
+                progress=42,
+                message="Rendering overlay",
+                video_path="camera.mp4",
+                gpx_path="track.gpx",
+                layout_id="parapente",
+                layout_label="Parapente",
+                layout_path="layout.xml",
+                output_path="overlay.mov",
+                temp_output_path="overlay.tmp.mov",
+                output_filename="telemetry-overlay.webm",
+                command_json=json.dumps({"overlay_only": True}),
+            )
+        )
+        db_session.commit()
+
+        with patch(
+            "routes.check_gopro_overlay_dependencies",
+            return_value={
+                "gopro_dashboard": True,
+                "ffmpeg": True,
+                "ffprobe": True,
+                "ffmpeg_vaapi": False,
+            },
+        ):
+            response = client.post(f"{API_PREFIX}/flights/{flight.id}/overlay-layer")
+
+        assert response.status_code == 409
+        assert response.json()["detail"] == (
+            "An overlay layer is already being generated for this flight"
+        )
+
+
 class TestHealthCheck:
     """Tests for /health endpoint"""
 
@@ -1728,3 +2201,188 @@ class TestHealthCheck:
         assert "status" in data
         assert data["status"] == "ok"
         assert "message" in data
+
+
+class TestDeleteFlightTemporaryMedia:
+    @staticmethod
+    def _completed_upload(
+        db_session: Session,
+        flight: Flight,
+        *,
+        source_type: str,
+        youtube_video_id: str = "dQw4w9WgXcQ",
+    ) -> None:
+        youtube_url = f"https://www.youtube.com/watch?v={youtube_video_id}"
+        flight.youtube_urls = [youtube_url]
+        db_session.add(
+            YoutubeUploadJob(
+                id=f"youtube-{source_type}-{flight.id}",
+                flight_id=flight.id,
+                user_id=1,
+                source_type=source_type,
+                status="completed",
+                progress=100,
+                title="Uploaded source",
+                description="",
+                privacy_status="unlisted",
+                youtube_video_id=youtube_video_id,
+                youtube_url=youtube_url,
+            )
+        )
+        db_session.commit()
+
+    def test_delete_is_rejected_before_youtube_publication(
+        self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+        pano_path = tmp_path / "20260315" / "01" / "pano.mp4"
+        pano_path.parent.mkdir(parents=True)
+        pano_path.write_bytes(b"pano")
+        flight = Flight(
+            id="flight-temp-pano-unpublished",
+            flight_date=date(2026, 3, 15),
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/pano")
+
+        assert response.status_code == 409
+        assert pano_path.read_bytes() == b"pano"
+
+    def test_delete_is_rejected_when_youtube_no_longer_has_the_video(
+        self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+        monkeypatch.setattr(
+            "routes.youtube_video_availability",
+            lambda grouped: {
+                video_id: False for video_ids in grouped.values() for video_id in video_ids
+            },
+        )
+        pano_path = tmp_path / "20260315" / "01" / "pano.mp4"
+        pano_path.parent.mkdir(parents=True)
+        pano_path.write_bytes(b"pano")
+        flight = Flight(
+            id="flight-temp-pano-unavailable",
+            flight_date=date(2026, 3, 15),
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.flush()
+        self._completed_upload(db_session, flight, source_type="pano")
+
+        response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/pano")
+
+        assert response.status_code == 409
+        assert pano_path.read_bytes() == b"pano"
+
+    def test_delete_pano_removes_only_the_local_file_and_clears_its_path(
+        self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+        monkeypatch.setattr(
+            "routes.youtube_video_availability",
+            lambda grouped: {
+                video_id: True for video_ids in grouped.values() for video_id in video_ids
+            },
+        )
+        pano_path = tmp_path / "20260315" / "01" / "pano.mp4"
+        pano_path.parent.mkdir(parents=True)
+        pano_path.write_bytes(b"pano")
+        camera_path = pano_path.parent / "camera.mp4"
+        camera_path.write_bytes(b"camera")
+        flight = Flight(
+            id="flight-temp-pano-published",
+            flight_date=date(2026, 3, 15),
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.flush()
+        self._completed_upload(db_session, flight, source_type="pano")
+
+        response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/pano")
+
+        assert response.status_code == 204
+        assert not pano_path.exists()
+        assert camera_path.read_bytes() == b"camera"
+        db_session.refresh(flight)
+        assert flight.pano_video_file_path is None
+
+    def test_delete_camera_removes_only_camera_source(
+        self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+        monkeypatch.setattr(
+            "routes.youtube_video_availability",
+            lambda grouped: {
+                video_id: True for video_ids in grouped.values() for video_id in video_ids
+            },
+        )
+        source_dir = tmp_path / "20260315" / "01"
+        source_dir.mkdir(parents=True)
+        camera_path = source_dir / "camera.mp4"
+        camera_path.write_bytes(b"camera")
+        pano_path = source_dir / "pano.mp4"
+        pano_path.write_bytes(b"pano")
+        flight = Flight(
+            id="flight-temp-camera-published",
+            flight_date=date(2026, 3, 15),
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.flush()
+        self._completed_upload(db_session, flight, source_type="camera")
+
+        response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/camera")
+
+        assert response.status_code == 204
+        assert not camera_path.exists()
+        assert pano_path.read_bytes() == b"pano"
+
+    def test_delete_face_and_pilote_removes_only_selected_flight_files(
+        self,
+        client: TestClient,
+        db_session: Session,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+        monkeypatch.setattr(
+            "routes.youtube_video_availability",
+            lambda grouped: {
+                video_id: True for video_ids in grouped.values() for video_id in video_ids
+            },
+        )
+        flight_dir = tmp_path / "20260315" / "01"
+        flight_dir.mkdir(parents=True)
+        pano_path = flight_dir / "pano.mp4"
+        face_path = flight_dir / "face.mp4"
+        pilote_path = flight_dir / "pilote.mp4"
+        camera_path = flight_dir / "camera.mp4"
+        for path in (pano_path, face_path, pilote_path, camera_path):
+            path.write_bytes(path.stem.encode())
+        flight = Flight(
+            id="flight-face-pilote-delete",
+            flight_date=date(2026, 3, 15),
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.flush()
+        self._completed_upload(
+            db_session, flight, source_type="face", youtube_video_id="dQw4w9WgXcQ"
+        )
+        self._completed_upload(
+            db_session, flight, source_type="pilote", youtube_video_id="dQw4w9WgXcQ"
+        )
+
+        face_response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/face")
+        pilote_response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/pilote")
+
+        assert face_response.status_code == 204
+        assert pilote_response.status_code == 204
+        assert not face_path.exists()
+        assert not pilote_path.exists()
+        assert pano_path.read_bytes() == b"pano"
+        assert camera_path.read_bytes() == b"camera"

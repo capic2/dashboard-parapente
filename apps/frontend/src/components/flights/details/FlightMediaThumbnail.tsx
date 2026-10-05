@@ -151,6 +151,9 @@ export function FlightMediaThumbnail({
     queryKey: ['flight-media-thumbnail', path],
     queryFn: ({ signal }) => api.get(path, { signal }).blob(),
     retry: false,
+    // Refetching the thumbnail on window focus updates dataUpdatedAt and
+    // remounts the player, which interrupts an active flight media video.
+    refetchOnWindowFocus: false,
   });
 
   if (isError) return <ThumbnailUnavailable inline={!interactive} />;

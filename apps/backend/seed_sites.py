@@ -106,14 +106,26 @@ def seed_sites():
             },
         ]
 
-        # Insert or replace each site
+        # Insert each site or update only the fields owned by this seeder.
         for site in sites:
             cursor.execute(
                 """
-                INSERT OR REPLACE INTO sites
+                INSERT INTO sites
                 (id, code, name, latitude, longitude, elevation_m, region, country,
-                 rating, orientation, linked_spot_id, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 rating, orientation, linked_spot_id, practical_info, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    code = excluded.code,
+                    name = excluded.name,
+                    latitude = excluded.latitude,
+                    longitude = excluded.longitude,
+                    elevation_m = excluded.elevation_m,
+                    region = excluded.region,
+                    country = excluded.country,
+                    rating = excluded.rating,
+                    orientation = excluded.orientation,
+                    linked_spot_id = excluded.linked_spot_id,
+                    updated_at = excluded.updated_at
             """,
                 (
                     site["id"],
@@ -127,6 +139,7 @@ def seed_sites():
                     site["rating"],
                     site["orientation"],
                     site["linked_spot_id"],
+                    "{}",
                     now,
                     now,
                 ),

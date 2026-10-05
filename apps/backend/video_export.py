@@ -200,7 +200,7 @@ def start_video_export_background(
     """
     Start video export in a background thread
     """
-    with job_admission():
+    with job_admission("video_export_background"):
         job_id = f"{flight_id}-{int(time.time())}"
 
         export_jobs[job_id] = {

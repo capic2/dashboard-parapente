@@ -15,6 +15,7 @@ import type { YoutubeVideoAssociation } from '@dashboard-parapente/shared-types'
 import type { Key } from 'react-aria-components';
 import type { Flight, FlightFormData, Site } from '../../../types';
 import { getSiteDisplayName } from '../../../lib/siteDisplay';
+import { getYoutubeVideoId } from '../../../lib/youtube';
 import { Plus, Trash2 } from 'lucide-react';
 import { YoutubeAssociationRemovalModal } from '../YoutubeAssociationRemovalModal';
 
@@ -129,10 +130,19 @@ export function FlightEditForm({
       elevation_gain_m: flight.elevation_gain_m ?? 0,
       max_speed_kmh: flight.max_speed_kmh ?? 0,
       notes: flight.notes ?? '',
+      gpx_metrics_excluded: flight.gpx_metrics_excluded ?? false,
     },
     onSubmit: async ({ value }) => {
       const removedUrls = new Set(
-        pendingYoutubeRemovals.map((removal) => removal.url)
+        pendingYoutubeRemovals.map((removal) => removal.url.trim())
+      );
+      const youtubeUrls = youtubeRows
+        .map((row) => row.value.trim())
+        .filter((url) => Boolean(url) && !removedUrls.has(url));
+      const submittedVideoIds = new Set(
+        youtubeUrls
+          .map((url) => getYoutubeVideoId(url))
+          .filter((videoId): videoId is string => videoId !== null)
       );
       await onSubmit({
         values: {
@@ -147,9 +157,11 @@ export function FlightEditForm({
           elevation_gain_m: value.elevation_gain_m,
           max_speed_kmh: value.max_speed_kmh,
           notes: value.notes,
-          youtube_urls: youtubeRows
-            .map((row) => row.value.trim())
-            .filter((url) => Boolean(url) && !removedUrls.has(url)),
+          gpx_metrics_excluded: value.gpx_metrics_excluded,
+          youtube_urls: youtubeUrls,
+          video_markers: (flight.video_markers ?? []).filter((marker) =>
+            submittedVideoIds.has(marker.youtube_video_id)
+          ),
         },
         pendingYoutubeRemovals,
       });
@@ -516,6 +528,19 @@ export function FlightEditForm({
           )}
         </form.Field>
       </div>
+
+      <form.Field name="gpx_metrics_excluded">
+        {(field) => (
+          <label className="mt-4 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+            <input
+              type="checkbox"
+              checked={field.state.value}
+              onChange={(event) => field.handleChange(event.target.checked)}
+            />
+            {t('flights.excludeGpxMetrics')}
+          </label>
+        )}
+      </form.Field>
 
       <YoutubeAssociationRemovalModal
         association={removalAssociation}

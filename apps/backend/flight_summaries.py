@@ -79,26 +79,28 @@ def _file_exists(file_path: str | None) -> bool:
     return bool(path and path.is_file())
 
 
-def _youtube_video_ids(value: str | None) -> set[str]:
+def _youtube_video_ids(value: str | None) -> list[str]:
     try:
         urls = json.loads(value or "[]")
     except (TypeError, json.JSONDecodeError):
-        return set()
+        return []
     if not isinstance(urls, list):
-        return set()
+        return []
 
-    video_ids: set[str] = set()
+    video_ids: list[str] = []
     for url in urls:
         if not isinstance(url, str):
             continue
         try:
-            video_ids.add(youtube_video_id_from_url(url))
+            video_id = youtube_video_id_from_url(url)
+            if video_id not in video_ids:
+                video_ids.append(video_id)
         except ValueError:
             continue
     return video_ids
 
 
-def _completed_youtube_uploads(value: str | None) -> list[tuple[int, str]]:
+def _completed_youtube_uploads(value: str | None) -> list[tuple[int, str, str]]:
     try:
         uploads = json.loads(value or "[]")
     except (TypeError, json.JSONDecodeError):
@@ -107,16 +109,32 @@ def _completed_youtube_uploads(value: str | None) -> list[tuple[int, str]]:
         return []
 
     return [
-        (upload["user_id"], upload["video_id"])
+        (
+            upload["user_id"],
+            upload["video_id"],
+            upload.get("source_type", "gopro_overlay"),
+        )
         for upload in uploads
         if isinstance(upload, dict)
         and isinstance(upload.get("user_id"), int)
         and isinstance(upload.get("video_id"), str)
+        and isinstance(upload.get("source_type", "gopro_overlay"), str)
     ]
 
 
 def _flight_directory(flight_date: date, sequence: int) -> Path:
     return Path(config.PARAGLIDING_DATA_ROOT) / flight_date.strftime("%Y%m%d") / f"{sequence:02d}"
+
+
+def _directory_file_exists(path: Path) -> bool:
+    """Check a media file via its parent directory to avoid stale NFS dentries."""
+    try:
+        return any(
+            entry.name == path.name and not entry.is_symlink() and entry.is_file()
+            for entry in path.parent.iterdir()
+        )
+    except OSError:
+        return False
 
 
 def _null_safe_equal(left: Any, right: Any) -> ColumnElement[bool]:
@@ -179,21 +197,24 @@ def _cursor_context(
     sort_by: FlightSortBy,
     sort_order: SortOrder,
 ) -> dict[str, Any]:
-    return {
-        "v": 1,
+    context = {
+        "v": 2,
         "q": q,
         "site_id": site_id,
         "gpx_status": gpx_status,
         "sort_by": sort_by,
         "sort_order": sort_order,
     }
+    return context
 
 
 def _ordering(sort_by: FlightSortBy) -> list[ColumnElement[Any]]:
     if sort_by == "flight_date":
-        return [Flight.flight_date, Flight.departure_time, Flight.id]
+        return [Flight.flight_date, Flight.departure_time, Flight.created_at, Flight.id]
     if sort_by == "site_name":
         return [func.lower(Site.name), Flight.id]
+    if sort_by == "duration_minutes":
+        return [func.coalesce(Flight.real_duration_minutes, Flight.duration_minutes), Flight.id]
     return [getattr(Flight, sort_by), Flight.id]
 
 
@@ -224,7 +245,8 @@ def _deserialize_cursor_values(
             return [
                 date.fromisoformat(values[0]),
                 datetime.fromisoformat(values[1]) if values[1] is not None else None,
-                str(values[2]),
+                datetime.fromisoformat(values[2]) if values[2] is not None else None,
+                str(values[3]),
             ]
         if sort_by in {"duration_minutes", "max_altitude_m"}:
             return [int(values[0]) if values[0] is not None else None, str(values[1])]
@@ -256,6 +278,7 @@ def _apply_filters(
     q: str | None,
     site_id: str | None,
     gpx_status: FlightGpxStatus,
+    tag: str | None,
 ) -> Query[Any]:
     if site_id:
         query = query.filter(Flight.site_id == site_id)
@@ -313,6 +336,7 @@ def list_flight_summaries(
         q=normalized_q,
         site_id=site_id,
         gpx_status=gpx_status,
+        tag=None,
     )
     total = base_query.with_entities(func.count(Flight.id)).scalar() or 0
 
@@ -347,6 +371,8 @@ def list_flight_summaries(
                     YoutubeUploadJob.user_id,
                     "video_id",
                     YoutubeUploadJob.youtube_video_id,
+                    "source_type",
+                    YoutubeUploadJob.source_type,
                 )
             )
         )
@@ -383,11 +409,16 @@ def list_flight_summaries(
         Flight.title,
         Flight.flight_date,
         Flight.departure_time,
-        Flight.duration_minutes,
+        Flight.created_at,
+        func.coalesce(Flight.real_duration_minutes, Flight.duration_minutes).label(
+            "duration_minutes"
+        ),
         Flight.max_altitude_m,
         Flight.distance_km,
         Flight.elevation_gain_m,
         Flight.gpx_file_path,
+        Flight.sportstracklive_status,
+        Flight.sportstracklive_track_id,
         Flight.video_export_job_id,
         Flight.video_export_status,
         Flight.video_file_path,
@@ -417,16 +448,26 @@ def list_flight_summaries(
     has_more = len(rows) > page_size
     rows = rows[:page_size]
     youtube_video_ids_by_user: dict[int, set[str]] = {}
-    associated_youtube_ids: dict[str, set[str]] = {}
+    associated_youtube_ids: dict[str, list[str]] = {}
     uploaded_youtube_ids: dict[str, set[str]] = {}
+    uploaded_youtube_types: dict[str, dict[str, str]] = {}
     for row in rows:
         associated_youtube_ids[row.id] = _youtube_video_ids(row.youtube_urls_json)
         uploaded_youtube_ids[row.id] = set()
-        for user_id, video_id in _completed_youtube_uploads(row.completed_youtube_uploads):
+        uploaded_youtube_types[row.id] = {}
+        for user_id, video_id, source_type in _completed_youtube_uploads(
+            row.completed_youtube_uploads
+        ):
             if video_id not in associated_youtube_ids[row.id]:
                 continue
             uploaded_youtube_ids[row.id].add(video_id)
+            uploaded_youtube_types[row.id][video_id] = source_type
             youtube_video_ids_by_user.setdefault(user_id, set()).add(video_id)
+    # Do not keep a database connection checked out while calling YouTube.
+    # The remote request can take up to 30 seconds; holding the connection
+    # here exhausts the SQLite pool and blocks unrelated flight endpoints,
+    # including telemetry calibration.
+    db.close()
     existing_youtube_ids = existing_youtube_video_ids(youtube_video_ids_by_user)
 
     storage_root = flight_storage_root()
@@ -441,7 +482,7 @@ def list_flight_summaries(
             / f"{row.flight_sequence:02d}"
             / "pano.mp4"
         )
-        pano_flags[row.id] = path.is_file()
+        pano_flags[row.id] = _directory_file_exists(path)
         if pano_flags[row.id] and not row.pano_video_file_path:
             detected_pano_paths.append({"id": row.id, "pano_video_file_path": str(path.resolve())})
     if detected_pano_paths:
@@ -463,14 +504,22 @@ def list_flight_summaries(
             distance_km=row.distance_km,
             elevation_gain_m=row.elevation_gain_m,
             has_gpx=_file_exists(row.gpx_file_path),
+            sportstracklive_status=row.sportstracklive_status,
+            sportstracklive_track_id=row.sportstracklive_track_id,
             video_export_job_id=row.video_export_job_id,
             video_export_status=row.video_export_status,
             video_export_progress=None,
             has_video=row.video_export_status == "completed" and _file_exists(row.video_file_path),
-            has_camera=(
+            has_camera=_directory_file_exists(
                 _flight_directory(row.flight_date, row.flight_sequence) / "camera.mp4"
-            ).is_file(),
+            ),
             has_youtube_video=bool(uploaded_youtube_ids[row.id] & existing_youtube_ids),
+            youtube_video_count=len(uploaded_youtube_ids[row.id] & existing_youtube_ids),
+            youtube_video_types=[
+                uploaded_youtube_types[row.id][video_id]
+                for video_id in associated_youtube_ids[row.id]
+                if video_id in uploaded_youtube_ids[row.id] and video_id in existing_youtube_ids
+            ],
             youtube_upload_status=None,
             youtube_upload_progress=None,
             gopro_overlay_job_id=row.gopro_overlay_job_id,
@@ -495,7 +544,7 @@ def list_flight_summaries(
     if has_more and rows:
         last = rows[-1]
         if sort_by == "flight_date":
-            values = [last.flight_date, last.departure_time, last.id]
+            values = [last.flight_date, last.departure_time, last.created_at, last.id]
         elif sort_by == "site_name":
             values = [last.site_name.lower() if last.site_name else None, last.id]
         else:

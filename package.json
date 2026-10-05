@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Paragliding Dashboard - Weather, Flights, and Analytics - Nx Monorepo",
   "private": true,
-  "packageManager": "pnpm@11.25.0",
+  "packageManager": "pnpm@12.5.1",
   "scripts": {
     "dev": "nx run-many -t serve -p frontend,backend --parallel",
     "build": "nx run-many -t build --all",
@@ -14,6 +14,7 @@
     "test:e2e:ui": "nx e2e:ui e2e",
     "test:e2e:debug": "nx e2e:debug e2e",
     "test:e2e:report": "nx e2e:report e2e",
+    "setup:local": "./scripts/bootstrap-local.sh",
     "check:worktree": "./scripts/git/check-worktree-policy.sh",
     "lint": "nx run-many -t lint --all",
     "lint:affected": "nx affected -t lint",
@@ -99,8 +100,8 @@
       "oxfmt -c .oxfmtrc.json"
     ],
     "apps/backend/**/*.py": [
-      "apps/backend/.venv/bin/ruff check --output-format=github",
-      "apps/backend/.venv/bin/black"
+      ".venv/bin/ruff check --output-format=github",
+      ".venv/bin/black"
     ]
   },
   "msw": {
@@ -110,8 +111,8 @@
   },
   "pnpm": {
     "overrides": {
-      "react": "19.2.8",
-      "react-dom": "19.2.8"
+      "react": "19.3.0",
+      "react-dom": "19.3.0"
     }
   }
 }

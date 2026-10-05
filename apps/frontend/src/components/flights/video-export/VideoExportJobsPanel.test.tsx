@@ -98,6 +98,7 @@ const {
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
+    i18n: { resolvedLanguage: 'fr', language: 'fr' },
     t: (_key: string, fallback: string, values?: Record<string, unknown>) => {
       if (!values) {
         return fallback;
@@ -326,9 +327,11 @@ describe('VideoExportJobsPanel', () => {
     expect(screen.getAllByText('GPU').length).toBeGreaterThan(0);
     expect(screen.getAllByText('CPU').length).toBeGreaterThan(0);
     expect(screen.getAllByText('42%').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('12.4 fps').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('0.0 fps').length).toBeGreaterThan(0);
-    expect(screen.queryByText('30.0 fps')).not.toBeInTheDocument();
+    for (const summary of screen.getAllByText('Détails techniques')) {
+      fireEvent.click(summary);
+    }
+    expect(screen.getAllByText('12,4 images/s').length).toBeGreaterThan(0);
+    expect(screen.queryByText('30,0 images/s')).not.toBeInTheDocument();
     expect(screen.getAllByText('En cours').length).toBeGreaterThan(1);
     expect(
       screen.getAllByRole('button', { name: 'Actions' }).length
@@ -352,9 +355,12 @@ describe('VideoExportJobsPanel', () => {
 
     render(<VideoExportJobsPanel />);
 
-    expect(screen.getAllByText('1.1 fps').length).toBeGreaterThan(0);
+    for (const summary of screen.getAllByText('Détails techniques')) {
+      fireEvent.click(summary);
+    }
+    expect(screen.getAllByText('1,1 images/s').length).toBeGreaterThan(0);
     expect(screen.getAllByText('679 min').length).toBeGreaterThan(0);
-    expect(screen.queryByText('12.4 fps')).not.toBeInTheDocument();
+    expect(screen.queryByText('12,4 images/s')).not.toBeInTheDocument();
   });
 
   it('shows a stuck warning when an active job has not updated recently', () => {
@@ -411,7 +417,9 @@ describe('VideoExportJobsPanel', () => {
   it('filters jobs by status', () => {
     render(<VideoExportJobsPanel />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Terminés/u }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Statut' }), {
+      target: { value: 'completed' },
+    });
 
     expect(screen.getAllByText('Vol terminé').length).toBeGreaterThan(0);
     expect(screen.queryByText('Nom du vol test')).not.toBeInTheDocument();
@@ -517,7 +525,9 @@ describe('VideoExportJobsPanel', () => {
   it('filters jobs by type', () => {
     render(<VideoExportJobsPanel />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Overlay GoPro/u }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Type' }), {
+      target: { value: 'gopro' },
+    });
 
     expect(screen.getAllByText('Nom du vol overlay').length).toBeGreaterThan(0);
     expect(
@@ -529,7 +539,9 @@ describe('VideoExportJobsPanel', () => {
   it('resets active filters', () => {
     render(<VideoExportJobsPanel />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Overlay GoPro/u }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Type' }), {
+      target: { value: 'gopro' },
+    });
     expect(screen.queryByText('Vol test')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Réinitialiser' }));
@@ -620,9 +632,7 @@ describe('VideoExportJobsPanel', () => {
       <VideoExportJobsPanel typeFilter="gopro" onTypeFilterChange={vi.fn()} />
     );
 
-    expect(
-      screen.getByRole('button', { name: /Tous les types/u })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Type' })).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Réinitialiser' })
     ).toBeInTheDocument();

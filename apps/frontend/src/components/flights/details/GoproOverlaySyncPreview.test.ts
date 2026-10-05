@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  calibrationTelemetryTimestampAtVideoTime,
+  manualOffsetForGpxEndAtVideoTime,
   manualOffsetForGpxStartAtVideoTime,
   sourceTimeAtPreviewTime,
 } from './GoproOverlaySyncPreview';
+import { telemetryTimestampAtVideoTime } from './goproSyncTelemetry';
 
 const segments = [
   {
@@ -40,6 +43,28 @@ describe('sourceTimeAtPreviewTime', () => {
   });
 });
 
+describe('telemetryTimestampAtVideoTime', () => {
+  it('uses only the manual calibration offset', () => {
+    expect(telemetryTimestampAtVideoTime(1_000_000, 37, 6.6)).toBe(1_030_400);
+  });
+});
+
+// PROTECTED CALIBRATION SYNC CONTRACT — changes require explicit user
+// authorization and must preserve the rendered calibration behavior.
+describe('calibrationTelemetryTimestampAtVideoTime', () => {
+  it('keeps calibration on the GPX timeline and applies both offsets', () => {
+    expect(
+      calibrationTelemetryTimestampAtVideoTime(1_000_000, 6.6, -3, 10.4)
+    ).toBe(999_200);
+  });
+
+  it('uses the first coordinate timestamp when the GPX start metadata differs', () => {
+    expect(
+      calibrationTelemetryTimestampAtVideoTime(1_002_000, 7.4, -3, 10.4)
+    ).toBe(1_002_000);
+  });
+});
+
 describe('manualOffsetForGpxStartAtVideoTime', () => {
   // REGRESSION CONTRACT — do not weaken or change these calibration cases
   // without explicit user authorization. They must match the rendered overlay.
@@ -49,5 +74,15 @@ describe('manualOffsetForGpxStartAtVideoTime', () => {
 
   it('advances the GPX track when the selected video instant precedes its automatic start', () => {
     expect(manualOffsetForGpxStartAtVideoTime(7.5, 10)).toBe(-2.5);
+  });
+});
+
+describe('manualOffsetForGpxEndAtVideoTime', () => {
+  it('aligns the last GPX point with the current source-video time', () => {
+    expect(manualOffsetForGpxEndAtVideoTime(642.5, -156, 600)).toBe(198.5);
+  });
+
+  it('advances the GPX track when the selected video instant precedes its end', () => {
+    expect(manualOffsetForGpxEndAtVideoTime(607.5, 10, 600)).toBe(-2.5);
   });
 });

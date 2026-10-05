@@ -108,16 +108,19 @@ export default function Forecast7Day({
       </div>
 
       <div className="flex max-w-full min-w-0 snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2 scrollbar-thin sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:pb-0 sm:snap-none md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
-        {dailySummary.days.map((day, index) => {
-          const isSelected = index === selectedDayIndex;
+        {dailySummary.days.map((day) => {
+          // The API can omit today when all of today's flying hours are past.
+          // Keep the backend day index instead of treating the array position
+          // as the day index, otherwise "tomorrow" loads today's hourly data.
+          const isSelected = day.day_index === selectedDayIndex;
           const verdictVisual = getVerdictVisual(day.verdict);
           const VerdictIcon = verdictVisual.Icon;
 
           return (
             <Button
-              key={index}
-              onClick={() => onSelectDay?.(index)}
-              onMouseEnter={() => handleMouseEnter(index)}
+              key={day.day_index}
+              onClick={() => onSelectDay?.(day.day_index)}
+              onMouseEnter={() => handleMouseEnter(day.day_index)}
               className={`relative min-h-[158px] min-w-[150px] flex-shrink-0 snap-start rounded-2xl border p-3 text-left transition-colors hover:border-sky-500 hover:bg-sky-50/70 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:hover:bg-sky-950/30 sm:min-w-0 sm:flex-shrink ${
                 isSelected
                   ? 'border-sky-600 bg-sky-50 shadow-lg ring-2 ring-sky-200 dark:bg-sky-900/20 dark:ring-sky-700'

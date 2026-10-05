@@ -16,6 +16,7 @@ const mockSites: Site[] = [
     longitude: 6.0,
     elevation_m: 427,
     country: 'FR',
+    practical_info: {},
     usage_type: 'takeoff',
     flight_count: 12,
     is_active: true,
@@ -30,6 +31,7 @@ const mockSites: Site[] = [
     longitude: 6.22,
     elevation_m: 920,
     country: 'FR',
+    practical_info: {},
     usage_type: 'takeoff',
     flight_count: 5,
     is_active: true,
@@ -43,6 +45,7 @@ const fullFlight: Flight = {
   name: 'Arguel 15-03 14h00',
   title: 'Vol thermique Arguel',
   flight_date: '2026-03-15',
+  tags: [],
   departure_time: '2026-03-15T14:00:00',
   duration_minutes: 95,
   distance_km: 18.5,
@@ -62,6 +65,8 @@ const fullFlight: Flight = {
 const flightWithMediaThumbnails: Flight = {
   ...fullFlight,
   pano_video_file_exists: true,
+  face_video_file_exists: true,
+  pilote_video_file_exists: true,
   gopro_overlay_file_exists: true,
   gopro_overlays: [
     {
@@ -106,6 +111,7 @@ const flightWithoutGpx: Flight = {
   name: 'Chalais 10-03 11h00',
   title: 'Vol dynamique Chalais',
   flight_date: '2026-03-10',
+  tags: [],
   departure_time: '2026-03-10T11:00:00',
   duration_minutes: 45,
   distance_km: 5.2,
@@ -121,6 +127,7 @@ const flightWithoutGpx: Flight = {
 const minimalFlight: Flight = {
   id: 'flight-003',
   flight_date: '2026-03-05',
+  tags: [],
   title: null,
   name: null,
   site_name: null,
@@ -145,6 +152,20 @@ const mockGPXData = {
     elevation: 800 + Math.sin(i / 10) * 400,
     timestamp: 1773842400000 + i * 60000,
   })),
+  max_altitude_m: 1850,
+  min_altitude_m: 700,
+  altitude_range_m: 1150,
+  takeoff_altitude_m: 800,
+  landing_altitude_m: 760,
+  elevation_gain_m: 1200,
+  elevation_loss_m: 1240,
+  total_distance_km: 18.5,
+  max_distance_from_takeoff_km: 8.4,
+  flight_duration_seconds: 5700,
+  average_speed_kmh: 11.7,
+  max_speed_kmh: 52.3,
+  max_climb_rate_ms: 4.6,
+  max_sink_rate_ms: 3.2,
 };
 
 const defaultHandlers = [
@@ -157,6 +178,18 @@ const defaultHandlers = [
   http.get('*/api/flights/:id/pano/thumbnail', () =>
     HttpResponse.text(
       '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="p" x2="1"><stop stop-color="#4c1d95"/><stop offset="1" stop-color="#c4b5fd"/></linearGradient></defs><rect width="640" height="360" fill="url(#p)"/><circle cx="320" cy="180" r="110" fill="none" stroke="white" stroke-width="8"/><path d="M50 270 210 130 320 230 460 105 610 270" fill="none" stroke="white" stroke-width="12"/></svg>',
+      { headers: { 'Content-Type': 'image/svg+xml' } }
+    )
+  ),
+  http.get('*/api/flights/:id/temporary-media/face/thumbnail', () =>
+    HttpResponse.text(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#0f766e"/><circle cx="320" cy="130" r="70" fill="#fcd34d"/><path d="M160 360c12-98 58-145 160-145s148 47 160 145" fill="#f8fafc"/></svg>',
+      { headers: { 'Content-Type': 'image/svg+xml' } }
+    )
+  ),
+  http.get('*/api/flights/:id/temporary-media/pilote/thumbnail', () =>
+    HttpResponse.text(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#1e3a8a"/><path d="M0 290 170 130 280 220 420 90 640 270V360H0Z" fill="#bae6fd"/><circle cx="505" cy="70" r="28" fill="#fef3c7"/></svg>',
       { headers: { 'Content-Type': 'image/svg+xml' } }
     )
   ),

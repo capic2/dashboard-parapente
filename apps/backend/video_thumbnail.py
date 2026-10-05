@@ -22,15 +22,19 @@ class VideoThumbnailError(RuntimeError):
 
 
 def _thumbnail_path(video_path: Path) -> Path:
-    return video_path.with_name(f".{video_path.name}.thumbnail.jpg")
+    return _thumbnail_directory(video_path) / f"{video_path.name}.thumbnail.jpg"
 
 
 def _manifest_path(video_path: Path) -> Path:
-    return video_path.with_name(f".{video_path.name}.thumbnail.json")
+    return _thumbnail_directory(video_path) / f"{video_path.name}.thumbnail.json"
 
 
 def _lock_path(video_path: Path) -> Path:
-    return video_path.with_name(f".{video_path.name}.thumbnail.lock")
+    return _thumbnail_directory(video_path) / f"{video_path.name}.thumbnail.lock"
+
+
+def _thumbnail_directory(video_path: Path) -> Path:
+    return video_path.parent / "temp" / "thumbnails"
 
 
 def _source_fingerprint(video_path: Path) -> dict[str, int]:
@@ -59,7 +63,9 @@ def _cache_is_current(video_path: Path, fingerprint: dict[str, int]) -> bool:
 
 @contextmanager
 def _thumbnail_lock(video_path: Path) -> Iterator[None]:
-    with _lock_path(video_path).open("a", encoding="utf-8") as lock_file:
+    lock_path = _lock_path(video_path)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a", encoding="utf-8") as lock_file:
         fcntl.flock(lock_file, fcntl.LOCK_EX)
         try:
             yield
@@ -118,11 +124,9 @@ def get_video_thumbnail(video_path: Path) -> Path:
         if _cache_is_current(video_path, fingerprint):
             return thumbnail_path
 
-        temporary_path = thumbnail_path.with_name(f".{thumbnail_path.name}.{os.getpid()}.part.jpg")
+        temporary_path = thumbnail_path.with_name(f"{thumbnail_path.name}.{os.getpid()}.part.jpg")
         manifest_path = _manifest_path(video_path)
-        temporary_manifest_path = manifest_path.with_name(
-            f".{manifest_path.name}.{os.getpid()}.tmp"
-        )
+        temporary_manifest_path = manifest_path.with_name(f"{manifest_path.name}.{os.getpid()}.tmp")
         try:
             _extract_thumbnail(video_path, temporary_path)
             temporary_path.replace(thumbnail_path)

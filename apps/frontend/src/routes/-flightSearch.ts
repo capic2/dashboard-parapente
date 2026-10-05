@@ -9,6 +9,8 @@ export const flightSortBySchema = z.enum([
   'distance_km',
 ]);
 export const flightSortOrderSchema = z.enum(['asc', 'desc']);
+export const flightDetailsTabSchema = z.enum(['infos', 'replay', 'logs']);
+export type FlightDetailsTab = z.infer<typeof flightDetailsTabSchema>;
 
 const optionalTrimmedString = z.preprocess(
   (value) =>
@@ -31,12 +33,19 @@ export const flightsSearchSchema = z.object({
 });
 
 export type FlightsSearch = z.infer<typeof flightsSearchSchema>;
-export type FlightsRouteSearch = Partial<FlightsSearch>;
+export type FlightsRouteSearch = Partial<FlightsSearch> & {
+  tab?: FlightDetailsTab;
+};
 
 export function validateFlightsSearch(
   search: Record<string, unknown>
 ): FlightsRouteSearch {
-  return serializeFlightsSearch(flightsSearchSchema.parse(search));
+  const parsedSearch = flightsSearchSchema.parse(search);
+  const tab = flightDetailsTabSchema.catch('infos').parse(search.tab);
+  return {
+    ...serializeFlightsSearch(parsedSearch),
+    tab: tab === 'infos' ? undefined : tab,
+  };
 }
 
 export function normalizeFlightsSearch(

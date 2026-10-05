@@ -70,6 +70,12 @@ FULL_CONFIDENCE_SOURCE_BASELINE = 5
 PARIS_TIME_ZONE = ZoneInfo("Europe/Paris")
 
 
+def get_forecast_target_date(day_index: int, now: datetime | None = None) -> str:
+    """Return the forecast date using the application's local weather day."""
+    current_time = now.astimezone(PARIS_TIME_ZONE) if now else datetime.now(PARIS_TIME_ZONE)
+    return (current_time + timedelta(days=day_index)).date().isoformat()
+
+
 def filter_remaining_hours(
     hours: list[dict[str, Any]],
     day_index: int,
@@ -186,6 +192,11 @@ async def fetch_from_enabled_sources(
             .order_by(WeatherSourceConfig.priority.desc())
             .all()
         )
+
+        # Release the connection before awaiting external weather providers.
+        # Keeping the session transaction open across network I/O exhausts the
+        # pool during the startup warmup burst and makes /health unavailable.
+        db.commit()
 
         if not enabled_sources:
             logger.warning("No enabled weather sources found! Using fallback.")
@@ -777,6 +788,7 @@ async def get_daily_aggregate(
     elevation_m: int | None = None,
     db=None,
     force_refresh: bool = False,
+    site_orientation: str | None = None,
 ) -> dict[str, Any] | None:
     """
     Get daily aggregate data (SIMPLIFIED - reuses get_normalized_forecast).
@@ -821,7 +833,7 @@ async def get_daily_aggregate(
         return None
 
     # Calculate target date
-    target_date = (datetime.now() + timedelta(days=day_index)).strftime("%Y-%m-%d")
+    target_date = get_forecast_target_date(day_index)
 
     # Filter to flyable hours BEFORE calculating para_index (same as /weather endpoint)
     # This ensures consistency between daily-summary cards and hourly view
@@ -881,7 +893,7 @@ async def get_daily_aggregate(
     verdict = para_result["verdict"]
     emoji = para_result["emoji"]
 
-    return {
+    daily_result = {
         "date": target_date,
         "para_index": para_index,
         "verdict": verdict,
@@ -894,6 +906,15 @@ async def get_daily_aggregate(
         "precip_total": precip_total,
         "cached_at": forecast_result.get("cached_at"),
     }
+
+    if site_orientation is not None:
+        from best_spot import calculate_daily_wind_adjusted_score
+
+        daily_result["score"] = calculate_daily_wind_adjusted_score(
+            flyable_consensus, site_orientation, slots=slots
+        )
+
+    return daily_result
 
 
 def calculate_daily_para_index(

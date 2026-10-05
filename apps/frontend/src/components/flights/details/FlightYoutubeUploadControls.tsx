@@ -8,9 +8,8 @@ import {
   useCancelYoutubeUpload,
   useStartYoutubeUpload,
   useYoutubeAuthorizationUrl,
+  useYoutubeSourcePublicationStatus,
   useYoutubeStatus,
-  useYoutubeUpload,
-  useYoutubeVideoAssociations,
   youtubeVideoAssociationsQueryKey,
   type YoutubeUploadSource,
 } from '../../../hooks/flights/useYoutubeUpload';
@@ -20,6 +19,7 @@ import { getApiErrorMessage } from '../../../lib/api';
 interface FlightYoutubeUploadControlsProps {
   flight: Flight;
   source: YoutubeUploadSource;
+  compact?: boolean;
 }
 
 type PrivacyStatus = 'private' | 'unlisted' | 'public';
@@ -32,32 +32,36 @@ function getDefaultYoutubeTitle(
 ): string {
   const baseTitle =
     flight.name ?? flight.title ?? `Vol du ${flight.flight_date}`;
-  const suffix =
-    source.source_type === 'highlight' ? ' meilleurs moments' : ' pano';
-  const needsPanoSuffix =
-    source.source_type === 'pano' && !/\bpano\b/iu.test(baseTitle);
-  const needsHighlightSuffix =
-    source.source_type === 'highlight' &&
-    !/meilleurs moments/iu.test(baseTitle);
-
-  if (!needsPanoSuffix && !needsHighlightSuffix) {
-    return baseTitle.slice(0, YOUTUBE_TITLE_MAX_LENGTH);
+  let role = 'vol';
+  if (source.source_type === 'camera' || source.source_type === 'face') {
+    role = 'face';
+  } else if (source.source_type === 'pano') {
+    role = 'pano';
+  } else if (source.source_type === 'pilote') {
+    role = 'pilote';
   }
-
-  return `${baseTitle.slice(0, YOUTUBE_TITLE_MAX_LENGTH - suffix.length).trimEnd()}${suffix}`;
+  const suffix = ` - ${role}`;
+  const titleWithoutRole = baseTitle.replace(
+    /\s*-\s*(face|pilote|pano|vol)$/iu,
+    ''
+  );
+  return `${titleWithoutRole.slice(0, YOUTUBE_TITLE_MAX_LENGTH - suffix.length).trimEnd()}${suffix}`;
 }
 
 export function FlightYoutubeUploadControls({
   flight,
   source,
+  compact = false,
 }: FlightYoutubeUploadControlsProps) {
   const { t } = useTranslation();
   const toast = useToast();
   const queryClient = useQueryClient();
   const connection = useYoutubeStatus();
-  const upload = useYoutubeUpload(flight.id, source);
-  const activeUpload = useYoutubeUpload(flight.id);
-  const associations = useYoutubeVideoAssociations(flight.id);
+  const { upload, isPublished } = useYoutubeSourcePublicationStatus(
+    flight.id,
+    source,
+    flight.youtube_urls ?? []
+  );
   const startUpload = useStartYoutubeUpload(flight.id);
   const cancelUpload = useCancelYoutubeUpload(flight.id);
   const authorizationUrl = useYoutubeAuthorizationUrl();
@@ -71,20 +75,10 @@ export function FlightYoutubeUploadControls({
   );
   const [privacyStatus, setPrivacyStatus] = useState<PrivacyStatus>('unlisted');
 
-  const hasActiveUpload =
-    activeUpload.data?.status === 'queued' ||
-    activeUpload.data?.status === 'uploading';
   const isActive =
-    upload.data?.status === 'queued' || upload.data?.status === 'uploading';
-  const isPublished = Boolean(
-    upload.data?.status === 'completed' &&
-    upload.data.youtube_url &&
-    flight.youtube_urls?.includes(upload.data.youtube_url) &&
-    associations.data?.find(
-      (association) => association.url === upload.data?.youtube_url
-    )?.exists_on_youtube !== false
-  );
-
+    upload.data?.status === 'preparing' ||
+    upload.data?.status === 'queued' ||
+    upload.data?.status === 'uploading';
   useEffect(() => {
     if (
       previousStatus.current &&
@@ -149,8 +143,13 @@ export function FlightYoutubeUploadControls({
   };
 
   const handleCancel = async () => {
+    const jobId = upload.data?.job_id;
+    if (!jobId) return;
     try {
-      await cancelUpload.mutateAsync();
+      await cancelUpload.mutateAsync({
+        targetFlightId: flight.id,
+        jobId,
+      });
       toast.success(t('flights.youtubeUploadCancelled'));
     } catch (error) {
       toast.error(
@@ -180,21 +179,18 @@ export function FlightYoutubeUploadControls({
     buttonTitle = t('flights.youtubeUploadStopTitle');
   } else if (isPublished) {
     buttonTitle = t('flights.youtubeUploadPublished');
-  } else if (hasActiveUpload) {
-    buttonTitle = t('flights.youtubeUploadOtherOverlayInProgress');
   }
 
   return (
     <>
       <Button
         variant="outline"
-        className="min-h-10 w-full rounded-lg border-red-200 px-3 py-2 text-sm text-red-700 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"
+        className={`min-h-10 w-full rounded-lg border-red-200 px-3 py-2 text-sm text-red-700 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30 ${compact ? 'sm:w-auto' : ''}`}
         onPress={() => void (isActive ? handleCancel() : handlePrimaryAction())}
         isDisabled={
           connection.isLoading ||
           upload.isLoading ||
           isPublished ||
-          (hasActiveUpload && !isActive) ||
           authorizationUrl.isPending ||
           cancelUpload.isPending
         }

@@ -28,6 +28,7 @@ const summary = FlightSummariesResponseSchema.parse({
       has_video: false,
       has_camera: false,
       has_youtube_video: false,
+      youtube_video_count: 0,
       youtube_upload_status: null,
       youtube_upload_progress: null,
       has_gopro_overlay: false,
