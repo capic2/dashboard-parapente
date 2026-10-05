@@ -167,15 +167,20 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
     flight.elevation_gain_m == null
       ? t('flights.notAvailable')
       : formatAltitudeMeters(flight.elevation_gain_m, units.altitude);
+  const trackMaxSpeedKmh = flight.gpx_metrics_excluded
+    ? undefined
+    : trackAnalysis?.max_speed_kmh;
+  const maxSpeedKmh = trackMaxSpeedKmh ?? flight.max_speed_kmh;
   const maxSpeedLabel =
-    flight.max_speed_kmh == null
+    maxSpeedKmh == null
       ? t('flights.notAvailable')
-      : formatSpeedKmh(flight.max_speed_kmh, units.speed);
+      : formatSpeedKmh(maxSpeedKmh, units.speed);
   const maxSpeedTime =
+    !flight.gpx_metrics_excluded &&
     trackAnalysis?.coordinates.length &&
-    flight.max_speed_kmh != null &&
+    maxSpeedKmh != null &&
     trackAnalysis.max_speed_kmh != null &&
-    Math.abs(flight.max_speed_kmh - trackAnalysis.max_speed_kmh) <= 0.1
+    Math.abs(maxSpeedKmh - trackAnalysis.max_speed_kmh) <= 0.1
       ? metricTime(getMaxSpeedTimestamp(trackAnalysis.coordinates))
       : null;
   const trackFileName = flight.gpx_file_path?.split(/[\\/]/u).pop();

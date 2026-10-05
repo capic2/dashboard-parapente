@@ -852,6 +852,7 @@ export const GeoPointSchema = z.object({
   lon: z.number(),
   elevation: z.number(),
   timestamp: z.number(),
+  speed_kmh: z.number().optional(),
 });
 
 export const GPXDataSchema = z.object({

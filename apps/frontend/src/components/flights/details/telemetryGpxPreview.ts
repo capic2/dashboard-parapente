@@ -42,15 +42,18 @@ function headingDegrees(
 
 function numericExtensionValue(
   trackPoint: Element,
-  localNames: readonly string[]
+  localNames: readonly string[],
+  isValid: (value: number) => boolean = Number.isFinite
 ) {
   for (const localName of localNames) {
     const element = Array.from(trackPoint.getElementsByTagName('*')).find(
       (candidate) =>
         candidate.localName === localName || candidate.tagName === localName
     );
-    const value = Number(element?.textContent);
-    if (Number.isFinite(value)) return value;
+    const text = element?.textContent?.trim();
+    if (!text) continue;
+    const value = Number(text);
+    if (Number.isFinite(value) && isValid(value)) return value;
   }
   return undefined;
 }
@@ -79,10 +82,11 @@ export async function parseTelemetryGpxFile(
     lastTimestamp = timestamp;
     const heartRate = numericExtensionValue(trackPoint, ['hr', 'heartRate']);
     const power = numericExtensionValue(trackPoint, ['power', 'watts']);
-    const speedMps = numericExtensionValue(trackPoint, [
-      'speed',
-      'enhancedSpeed',
-    ]);
+    const speedMps = numericExtensionValue(
+      trackPoint,
+      ['speed', 'enhancedSpeed'],
+      (value) => value >= 0 && value * 3.6 < 150
+    );
     const recordedVario = numericExtensionValue(trackPoint, [
       'vario',
       'vertical_speed',

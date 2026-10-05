@@ -16,6 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 from flight_tracks import calculate_track_stats, normalize_track
 from models import Flight, GoproOverlayJob, HighlightVideoJob, Site, YoutubeUploadJob
+from routes import calculate_max_speed
 from sqlalchemy.orm import Session
 from video_thumbnail import VideoThumbnailError
 
@@ -1643,6 +1644,59 @@ class TestFlightGPXEndpoints:
         response = client.get(f"{API_PREFIX}/flights/flight-test-001/gpx-data")
         # Should return empty or 404
         assert response.status_code in [200, 404]
+
+    def test_get_gpx_data_preserves_recorded_gpx_speed(
+        self, client, db_session, sample_flight, tmp_path
+    ):
+        gpx_path = tmp_path / "speed.gpx"
+        gpx_path.write_text(
+            """<gpx xmlns="http://www.topografix.com/GPX/1/1"
+                xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
+              <trk><trkseg>
+                <trkpt lat="47.2" lon="6.0"><time>2026-07-01T10:00:00Z</time>
+                  <extensions><gpxtpx:TrackPointExtension><gpxtpx:speed>10</gpxtpx:speed>
+                  </gpxtpx:TrackPointExtension></extensions>
+                </trkpt>
+                <trkpt lat="47.2001" lon="6.0001"><time>2026-07-01T10:00:01Z</time>
+                  <extensions><gpxtpx:TrackPointExtension><gpxtpx:speed>12</gpxtpx:speed>
+                  </gpxtpx:TrackPointExtension></extensions>
+                </trkpt>
+                <trkpt lat="47.2002" lon="6.0002"><time>2026-07-01T10:00:02Z</time>
+                  <extensions><gpxtpx:TrackPointExtension><gpxtpx:speed>invalid</gpxtpx:speed>
+                    <gpxtpx:enhancedSpeed>5</gpxtpx:enhancedSpeed>
+                  </gpxtpx:TrackPointExtension></extensions>
+                </trkpt>
+                <trkpt lat="47.2003" lon="6.0003"><time>2026-07-01T10:00:03Z</time>
+                  <extensions><gpxtpx:TrackPointExtension><gpxtpx:speed>50</gpxtpx:speed>
+                    <gpxtpx:enhancedSpeed>4</gpxtpx:enhancedSpeed>
+                  </gpxtpx:TrackPointExtension></extensions>
+                </trkpt>
+              </trkseg></trk>
+            </gpx>""",
+            encoding="utf-8",
+        )
+        sample_flight.gpx_file_path = str(gpx_path)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/flight-test-001/gpx-data")
+
+        assert response.status_code == 200
+        assert [point["speed_kmh"] for point in response.json()["data"]["coordinates"]] == [
+            36,
+            43.2,
+            18,
+            14.4,
+        ]
+        assert response.json()["data"]["max_speed_kmh"] == 43.2
+
+    def test_max_speed_uses_geometry_only_for_intervals_without_recorded_speed(self):
+        coordinates = [
+            {"lat": 47.2, "lon": 6.0, "timestamp": 1_000, "speed_kmh": 0},
+            {"lat": 47.2, "lon": 6.0, "timestamp": 2_000},
+            {"lat": 47.20005, "lon": 6.0, "timestamp": 3_000},
+        ]
+
+        assert calculate_max_speed(coordinates) == pytest.approx(20, abs=0.1)
 
     def test_download_gpx_no_file(self, client, db_session, sample_flight):
         """GET /flights/{flight_id}/gpx returns 404 when no GPX file"""

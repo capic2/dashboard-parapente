@@ -21,4 +21,25 @@ describe('telemetryAtTimestamp', () => {
     expect(telemetryAtTimestamp(coordinates, 999)).toBeNull();
     expect(telemetryAtTimestamp(coordinates, 11_001)).toBeNull();
   });
+
+  it('uses and interpolates recorded GPX speeds instead of GPS displacement', () => {
+    const telemetry = telemetryAtTimestamp(
+      [
+        { ...coordinates[0], speed_kmh: 18 },
+        { ...coordinates[1], speed_kmh: 22 },
+      ],
+      6_000
+    );
+
+    expect(telemetry?.speedKmh).toBe(20);
+  });
+
+  it('uses the available recorded GPX speed when the other sample has none', () => {
+    const telemetry = telemetryAtTimestamp(
+      [{ ...coordinates[0], speed_kmh: 27 }, coordinates[1]],
+      6_000
+    );
+
+    expect(telemetry?.speedKmh).toBe(27);
+  });
 });
