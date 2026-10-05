@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+import pytest
 from sqlalchemy import event
 from sqlalchemy.orm import Session
 
@@ -146,6 +147,41 @@ def test_summaries_report_panorama_file(client, db_session, monkeypatch, tmp_pat
     assert response.json()["flights"][0]["has_pano_video"] is True
     db_session.refresh(flight)
     assert flight.pano_video_file_path == str((directory / "pano.mp4").resolve())
+
+
+def test_summaries_report_face_and_pilote_files(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    flight = Flight(
+        id="summary-camera-views",
+        title="Face et pilote",
+        flight_date=date(2026, 1, 1),
+        departure_time=datetime(2026, 1, 1, 10),
+    )
+    db_session.add(flight)
+    db_session.commit()
+    directory = tmp_path / "20260101" / "01"
+    directory.mkdir(parents=True)
+    (directory / "face.mp4").write_bytes(b"face")
+
+    response = client.get(API_URL)
+
+    assert response.status_code == 200
+    summary = response.json()["flights"][0]
+    assert summary["has_face_video"] is True
+    assert summary["has_pilote_video"] is False
+
+    (directory / "pilote.mp4").write_bytes(b"pilote")
+    response = client.get(API_URL)
+
+    assert response.status_code == 200
+    summary = response.json()["flights"][0]
+    assert summary["has_face_video"] is True
+    assert summary["has_pilote_video"] is True
 
 
 def test_summaries_report_generated_highlight_video(
