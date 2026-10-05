@@ -11,6 +11,7 @@ import { getApiUrlWithSearchParams } from '../../../lib/api';
 import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
 import { useFlightTelemetry } from '../../../hooks/flights/useFlightTelemetry';
+import { useYoutubeVideoAssociations } from '../../../hooks/flights/useYoutubeUpload';
 import type { GeoPoint } from '../../../types/flight';
 import {
   telemetryAtTimestamp,
@@ -18,6 +19,7 @@ import {
 } from './goproSyncTelemetry';
 import type { GoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { getYoutubeVideoId } from '../../../lib/youtube';
+import { getYoutubeVideoRoleFromTitle } from './flightTelemetryLayout';
 
 interface YoutubePlayer {
   destroy: () => void;
@@ -149,7 +151,21 @@ export function GoproOverlaySyncPreview({
   const { t } = useTranslation();
   const token = useAuthStore((state) => state.token);
   const queryClient = useQueryClient();
-  const youtubeId = youtubeUrls.map(getYoutubeVideoId).find(Boolean) ?? null;
+  const youtubeAssociations = useYoutubeVideoAssociations(flightId);
+  const pilotYoutubeUrl = youtubeUrls.find(
+    (url) =>
+      getYoutubeVideoId(url) &&
+      youtubeAssociations.data?.some(
+        (association) =>
+          association.url === url &&
+          getYoutubeVideoRoleFromTitle(association.title) === 'pilote'
+      )
+  );
+  const preferredYoutubeUrl =
+    pilotYoutubeUrl ?? youtubeUrls.find((url) => getYoutubeVideoId(url));
+  const youtubeId = preferredYoutubeUrl
+    ? getYoutubeVideoId(preferredYoutubeUrl)
+    : null;
   const isYoutubeCalibration = Boolean(youtubeId);
   // Keep the preview query enabled for YouTube calibration: when the durable
   // enriched GPX is missing, the backend uses this request to start its
