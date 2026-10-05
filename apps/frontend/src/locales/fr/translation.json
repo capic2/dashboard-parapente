@@ -1629,6 +1629,7 @@
       "speed": "Vitesse",
       "videoSection": "Vidéo",
       "videoStartError": "Impossible de lancer la génération",
+      "videoStartUnavailable": "Le service vidéo refuse temporairement ce lancement. Réessayez dans quelques minutes.",
       "videoStartGenericError": "Erreur lors du lancement de la génération",
       "videoDownloadError": "Impossible de télécharger la vidéo",
       "videoGeneratingTitle": "Génération vidéo en cours... (~60-90 min)",
