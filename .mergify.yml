@@ -5,13 +5,12 @@ queue_rules:
     merge_method: squash
     update_method: merge
     batch_size: 5
+    # Queue PRs before CI completes; validate the updated queue batch before merge.
+    branch_protection_injection_mode: merge
     commit_message_format:
       title: pr-title
       body: pr-body
     queue_conditions:
-      - check-success=main
-      - check-success=E2E Tests
-      - check-success=Chromatic (Frontend)
       - base=main
       - "#approved-reviews-by>=0"
     merge_conditions:
@@ -25,9 +24,6 @@ pull_request_rules:
     conditions:
       - base=main
       - label=automerge
-      - check-success=main
-      - check-success=E2E Tests
-      - check-success=Chromatic (Frontend)
       - "#changes-requested-reviews-by=0"
     actions:
       queue:
