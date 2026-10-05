@@ -15,7 +15,6 @@ import type { YoutubeVideoAssociation } from '@dashboard-parapente/shared-types'
 import type { Key } from 'react-aria-components';
 import type { Flight, FlightFormData, Site } from '../../../types';
 import { getSiteDisplayName } from '../../../lib/siteDisplay';
-import { getYoutubeVideoId } from '../../../lib/youtube';
 import { Plus, Trash2 } from 'lucide-react';
 import { YoutubeAssociationRemovalModal } from '../YoutubeAssociationRemovalModal';
 
@@ -139,11 +138,6 @@ export function FlightEditForm({
       const youtubeUrls = youtubeRows
         .map((row) => row.value.trim())
         .filter((url) => Boolean(url) && !removedUrls.has(url));
-      const submittedVideoIds = new Set(
-        youtubeUrls
-          .map((url) => getYoutubeVideoId(url))
-          .filter((videoId): videoId is string => videoId !== null)
-      );
       await onSubmit({
         values: {
           name: value.name,
@@ -159,9 +153,7 @@ export function FlightEditForm({
           notes: value.notes,
           gpx_metrics_excluded: value.gpx_metrics_excluded,
           youtube_urls: youtubeUrls,
-          video_markers: (flight.video_markers ?? []).filter((marker) =>
-            submittedVideoIds.has(marker.youtube_video_id)
-          ),
+          video_markers: flight.video_markers ?? [],
         },
         pendingYoutubeRemovals,
       });
