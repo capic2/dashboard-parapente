@@ -78,6 +78,14 @@
     "viewWhatsNew": "Voir les nouveautés",
     "refresh": "Rafraîchir"
   },
+  "versionInfo": {
+    "badge": "Version {{version}}",
+    "title": "Version {{version}}",
+    "buildDetails": "Déployée le {{date}} · build {{number}}",
+    "viewReleaseNotes": "Voir le récapitulatif",
+    "noReleaseNotes": "Aucun récapitulatif n’est disponible pour cette version.",
+    "close": "Fermer"
+  },
   "videoJobs": {
     "title": "Générations vidéo",
     "activeCount_one": "{{count}} génération en cours",
