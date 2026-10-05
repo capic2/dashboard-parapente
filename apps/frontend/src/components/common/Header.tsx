@@ -16,6 +16,8 @@ import { MonitorCog, Moon, Sun } from 'lucide-react';
 import { Button } from '@dashboard-parapente/design-system';
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore, type ThemePreference } from '../../stores/themeStore';
+import { appTitle } from '../../lib/appEnvironment';
+import { OperationCenter } from './OperationCenter';
 
 const linkClass =
   'px-3.5 py-2 rounded-md text-gray-600 dark:text-gray-300 text-sm transition-all hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-sky-600 [&.active]:bg-sky-600 [&.active]:text-white';
@@ -103,12 +105,13 @@ export default function Header() {
   return (
     <header className="mb-4 flex items-center justify-between gap-2.5 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg shadow-slate-200/60 dark:border-slate-700 dark:bg-slate-900/95 dark:shadow-black/25">
       <h1 className="text-2xl sm:text-xl text-sky-600 dark:text-sky-400 font-semibold min-w-0 sm:min-w-[200px] m-0 truncate">
-        {t('header.title')}
+        {appTitle}
       </h1>
 
       {/* Desktop navigation */}
       <nav className="hidden sm:flex gap-2 flex-wrap items-center">
         {navLinks(linkClass)}
+        {isAuthenticated && <OperationCenter />}
         <MenuTrigger>
           <AriaButton
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100 text-sm font-medium transition-all hover:bg-gray-300 dark:hover:bg-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
@@ -257,6 +260,11 @@ export default function Header() {
                     </div>
                     <nav className="flex-1 overflow-y-auto p-3 flex flex-col gap-1">
                       {navLinks(drawerLinkClass, close)}
+                      {isAuthenticated && (
+                        <div className="px-1 py-2">
+                          <OperationCenter />
+                        </div>
+                      )}
                     </nav>
                     <div className="p-4 border-t border-gray-200 dark:border-gray-700">
                       {isAuthenticated ? (

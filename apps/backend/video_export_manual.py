@@ -8,12 +8,14 @@ worker while keeping a small in-memory status snapshot for compatibility.
 
 import asyncio
 import json
+import logging
 import shutil
 import threading
 import uuid
 import traceback
 import time
 from collections import deque
+from collections.abc import Collection
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -21,14 +23,25 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 import config
+from datetime_utils import to_api_utc
 from deployment_drain import DeploymentDrainActive, job_admission
 from auth import create_job_token, decode_job_token
 from database import SessionLocal
-from flight_storage import get_video_output_path
+from flight_storage import flight_temporary_directory, get_video_output_path
 from models import Flight, VideoExportJob
+from video_acceleration import (
+    VideoAccelerator,
+    chromium_launch_args,
+    h264_encode_args,
+    select_video_accelerator,
+)
+
+logger = logging.getLogger(__name__)
 
 # Storage for export jobs (compatibility snapshot)
 export_jobs: dict[str, dict[str, Any]] = {}
@@ -46,7 +59,7 @@ def _video_legacy_temp_images_dir() -> Path:
     return Path(config.VIDEO_LEGACY_TEMP_IMAGES_DIR)
 
 
-_LOG_TAIL_LINE_COUNT = 100
+_LOG_TAIL_LINE_COUNT = 200
 
 
 def _job_log_path(job_id: str) -> Path:
@@ -72,6 +85,7 @@ def _log_job(job_id: str, message: str) -> None:
         log_path = _job_log_path(job_id)
         log_path.parent.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        _set_job_runtime(job_id, updated_at=timestamp)
         with log_path.open("a", encoding="utf-8") as log_file:
             log_file.write(f"[{timestamp}] {message}\n")
     except OSError:
@@ -113,6 +127,7 @@ _MAX_PENDING_FRAME_WRITES = 4
 _MAX_FFMPEG_STDERR_LINES = 200
 _FFMPEG_PIPE_POLL_SECONDS = 1.0
 _EXPORT_VIEWER_READY_TIMEOUT_SECONDS = 180
+_EXPORT_PAGE_EVALUATE_TIMEOUT_SECONDS = 120
 _FFMPEG_STALL_TIMEOUT_SECONDS = 10 * 60
 _ORPHAN_TEMP_CLEANUP_GRACE_SECONDS = 30
 _EXPORT_FRAME_TERRAIN_TIMEOUT_SECONDS = 10.0
@@ -205,39 +220,13 @@ def _is_software_webgl_renderer(renderer: str) -> bool:
     )
 
 
-def _chromium_launch_args(
-    render_device: Path = Path("/dev/dri/renderD128"),
-) -> list[str]:
-    args = [
-        "--enable-gpu",
-        "--enable-webgl",
-        "--enable-webgl2",
-        "--ignore-gpu-blocklist",
-        "--disable-gpu-vsync",
-        "--disable-dev-shm-usage",
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--js-flags=--max-old-space-size=8192",
-        "--disable-background-timer-throttling",
-        "--disable-backgrounding-occluded-windows",
-        "--disable-renderer-backgrounding",
-        "--force-device-scale-factor=1",
-        "--high-dpi-support=1",
-    ]
-    if render_device.exists():
-        return [
-            *args,
-            "--use-gl=angle",
-            "--use-angle=gl-egl",
-            "--enable-gpu-rasterization",
-            "--enable-zero-copy",
-        ]
-    return [
-        *args,
-        "--use-gl=angle",
-        "--use-angle=swiftshader-webgl",
-        "--enable-unsafe-swiftshader",
-    ]
+def _chromium_launch_args(accelerator: VideoAccelerator | None = None) -> list[str]:
+    selected = accelerator or select_video_accelerator(config.VIDEO_ACCELERATOR)
+    return chromium_launch_args(selected)
+
+
+def _render_method_for_accelerator(accelerator: VideoAccelerator) -> str:
+    return "gpu" if accelerator == "nvidia" else "cpu"
 
 
 def _to_public_status(status: str) -> str:
@@ -250,7 +239,7 @@ def _to_public_status(status: str) -> str:
 
 
 def _to_iso(value: datetime | None) -> str | None:
-    return value.isoformat() if value else None
+    return to_api_utc(value)
 
 
 def _default_frontend_url() -> str:
@@ -356,6 +345,10 @@ def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
         "quality": job.quality,
         "speed": job.speed,
         "mode": job.mode,
+        "source_type": job.source_type,
+        "youtube_url": job.youtube_url,
+        "overlay_job_id": job.overlay_job_id,
+        "render_method": job.render_method,
         "created_at": _to_iso(job.created_at),
         "updated_at": _to_iso(job.updated_at),
         "cancelled_at": _to_iso(job.cancelled_at),
@@ -386,6 +379,16 @@ def _set_job_runtime(job_id: str, **kwargs: Any) -> None:
 def _clear_job_runtime(job_id: str) -> None:
     with _JOB_RUNTIME_LOCK:
         _JOB_RUNTIME.pop(job_id, None)
+
+
+def _set_job_render_method(job_id: str, render_method: str | None) -> None:
+    normalized_method = render_method if render_method in {"cpu", "gpu"} else None
+    with SessionLocal() as db:
+        job = db.query(VideoExportJob).filter(VideoExportJob.id == job_id).first()
+        if job:
+            job.render_method = normalized_method
+            job.updated_at = datetime.utcnow()
+            db.commit()
 
 
 def _set_job_cancel_requested(job_id: str) -> None:
@@ -518,31 +521,44 @@ def _update_job(
     job_id: str,
     *,
     update_db: bool | None = None,
-    **kwargs,
+    allowed_current_statuses: Collection[str] | None = None,
+    **kwargs: Any,
 ) -> VideoExportJob | None:
+    allowed_statuses = (
+        set(allowed_current_statuses) if allowed_current_statuses is not None else _ACTIVE_STATUSES
+    )
+    now = datetime.utcnow()
+    changes = {**kwargs, "updated_at": now}
+    target_status = changes.get("status")
+
+    if target_status == _STATUS_RUNNING and "started_at" not in changes:
+        changes["started_at"] = func.coalesce(VideoExportJob.started_at, now)
+    if target_status in _TERMINAL_STATUSES:
+        changes["auth_token"] = None
+        if target_status == _STATUS_COMPLETED and "completed_at" not in changes:
+            changes["completed_at"] = func.coalesce(VideoExportJob.completed_at, now)
+        if target_status == _STATUS_CANCELLED and "cancelled_at" not in changes:
+            changes["cancelled_at"] = func.coalesce(VideoExportJob.cancelled_at, now)
+
     with SessionLocal() as db:
-        job = db.query(VideoExportJob).filter(VideoExportJob.id == job_id).first()
-        if not job:
+        updated_rows = (
+            db.query(VideoExportJob)
+            .filter(VideoExportJob.id == job_id)
+            .filter(VideoExportJob.status.in_(allowed_statuses))
+            .update(changes, synchronize_session=False)
+        )
+        if updated_rows != 1:
+            db.rollback()
             return None
 
-        for key, value in kwargs.items():
-            setattr(job, key, value)
-
-        job.updated_at = datetime.utcnow()
-        if job.status == _STATUS_RUNNING and not job.started_at:
-            job.started_at = datetime.utcnow()
+        job = db.get(VideoExportJob, job_id)
+        if not job:
+            db.rollback()
+            return None
 
         popped_update_db: bool | None = None
         if job.status in _TERMINAL_STATUSES:
-            job.auth_token = None
-            if job.status == _STATUS_COMPLETED:
-                if not job.completed_at:
-                    job.completed_at = datetime.utcnow()
-            if job.status == _STATUS_CANCELLED and not job.cancelled_at:
-                job.cancelled_at = datetime.utcnow()
-
             _clear_job_runtime(job_id)
-
             popped_update_db = _pop_job_update_db_flag(job_id)
 
         if update_db is not None:
@@ -551,7 +567,11 @@ def _update_job(
             should_update_flight = popped_update_db
         else:
             should_update_flight = _get_job_update_db_flag(job_id, True)
-        if should_update_flight:
+        # YouTube overlay exports share this job table but must never replace
+        # the flight's Cesium export state. The per-process update flag is not
+        # available to a separate RQ worker, so enforce this from persisted job
+        # metadata as well.
+        if should_update_flight and job.mode != "youtube_overlay":
             _update_flight_from_job(db, job)
         db.commit()
 
@@ -575,74 +595,108 @@ def _is_cancelled(job_id: str) -> bool:
 def _mark_stale_jobs_as_queued():
     with SessionLocal() as db:
         cutoff = datetime.utcnow() - timedelta(minutes=2)
-        stale_jobs = (
-            db.query(VideoExportJob)
-            .filter(VideoExportJob.status.in_(list(_ACTIVE_STATUSES)))
-            .filter(VideoExportJob.updated_at < cutoff)
-            .all()
-        )
+        stale_job_ids = [
+            job_id
+            for (job_id,) in (
+                db.query(VideoExportJob.id)
+                .filter(VideoExportJob.status.in_(list(_ACTIVE_STATUSES)))
+                .filter(VideoExportJob.updated_at < cutoff)
+                .all()
+            )
+        ]
 
-        if not stale_jobs:
+        if not stale_job_ids:
             return
 
-        for job in stale_jobs:
-            job.status = _STATUS_QUEUED
-            job.message = "Recovered from restart"
-            job.updated_at = datetime.utcnow()
-
+        now = datetime.utcnow()
+        (
+            db.query(VideoExportJob)
+            .filter(VideoExportJob.id.in_(stale_job_ids))
+            .filter(VideoExportJob.status.in_(list(_ACTIVE_STATUSES)))
+            .filter(VideoExportJob.updated_at < cutoff)
+            .update(
+                {
+                    "status": _STATUS_QUEUED,
+                    "message": "Recovered from restart",
+                    "updated_at": now,
+                },
+                synchronize_session=False,
+            )
+        )
         db.commit()
 
+        stale_jobs = db.query(VideoExportJob).filter(VideoExportJob.id.in_(stale_job_ids)).all()
         for job in stale_jobs:
             _set_memory_snapshot(job.id, _snapshot_from_job(job))
 
 
 def _recover_active_jobs_after_worker_restart() -> None:
     with SessionLocal() as db:
-        active_jobs = (
-            db.query(VideoExportJob).filter(VideoExportJob.status.in_(list(_ACTIVE_STATUSES))).all()
-        )
-        for job in active_jobs:
-            job.status = _STATUS_QUEUED
-            job.message = "Recovered after worker restart"
-            job.updated_at = datetime.utcnow()
-        if active_jobs:
-            db.commit()
+        active_job_ids = [
+            job_id
+            for (job_id,) in db.query(VideoExportJob.id)
+            .filter(VideoExportJob.status.in_(list(_ACTIVE_STATUSES)))
+            .all()
+        ]
+        if not active_job_ids:
+            return
 
+        (
+            db.query(VideoExportJob)
+            .filter(VideoExportJob.id.in_(active_job_ids))
+            .filter(VideoExportJob.status.in_(list(_ACTIVE_STATUSES)))
+            .update(
+                {
+                    "status": _STATUS_QUEUED,
+                    "message": "Recovered after worker restart",
+                    "updated_at": datetime.utcnow(),
+                },
+                synchronize_session=False,
+            )
+        )
+        db.commit()
+
+        active_jobs = db.query(VideoExportJob).filter(VideoExportJob.id.in_(active_job_ids)).all()
         for job in active_jobs:
             _set_memory_snapshot(job.id, _snapshot_from_job(job))
 
 
 def _acquire_next_job() -> str | None:
     with SessionLocal() as db:
-        job = (
-            db.query(VideoExportJob)
+        job_id = (
+            db.query(VideoExportJob.id)
             .filter(VideoExportJob.status == _STATUS_QUEUED)
-            .with_for_update(skip_locked=True)
             .order_by(VideoExportJob.created_at)
-            .first()
+            .scalar()
         )
-        if not job:
-            return None
-
-        job.status = _STATUS_RUNNING
-        job.message = "Starting manual export"
-        job.updated_at = datetime.utcnow()
-        job.started_at = datetime.utcnow()
-        db.commit()
-        _set_memory_snapshot(job.id, _snapshot_from_job(job))
-        return job.id
+    return _acquire_job(str(job_id)) if job_id else None
 
 
 def _acquire_job(job_id: str) -> str | None:
+    now = datetime.utcnow()
     with SessionLocal() as db:
-        job = db.query(VideoExportJob).filter(VideoExportJob.id == job_id).first()
-        if not job or job.status != _STATUS_QUEUED:
+        updated_rows = (
+            db.query(VideoExportJob)
+            .filter(VideoExportJob.id == job_id)
+            .filter(VideoExportJob.status == _STATUS_QUEUED)
+            .update(
+                {
+                    "status": _STATUS_RUNNING,
+                    "message": "Starting manual export",
+                    "updated_at": now,
+                    "started_at": now,
+                },
+                synchronize_session=False,
+            )
+        )
+        if updated_rows != 1:
+            db.rollback()
             return None
 
-        job.status = _STATUS_RUNNING
-        job.message = "Starting manual export"
-        job.updated_at = datetime.utcnow()
-        job.started_at = datetime.utcnow()
+        job = db.get(VideoExportJob, job_id)
+        if not job:
+            db.rollback()
+            return None
         db.commit()
         _set_memory_snapshot(job.id, _snapshot_from_job(job))
         return job.id
@@ -764,7 +818,108 @@ def process_video_export_job(job_id: str) -> None:
     if not acquired_job_id:
         return
 
+    job = _get_job(acquired_job_id)
+    if job and job.mode == "youtube_overlay":
+        _export_youtube_overlay_job(acquired_job_id)
+        return
     asyncio.run(_export_video_manual_render(acquired_job_id))
+
+
+def _export_youtube_overlay_job(job_id: str) -> None:
+    """Download a selected YouTube source and compose the existing alpha layer."""
+    from youtube_overlay_export import (
+        YoutubeExportError,
+        cleanup_work_dir,
+        export_youtube_overlay,
+        new_work_dir,
+        output_path,
+    )
+    from youtube_upload import download_cookies_for_upload_job
+
+    job = _get_job(job_id)
+    if not job or not job.youtube_url or not job.overlay_job_id:
+        _log_job(job_id, "Export YouTube échoué: paramètres d’export incomplets")
+        _update_job(job_id, status=_STATUS_FAILED, error="Paramètres d’export YouTube incomplets")
+        return
+
+    work_dir = new_work_dir(job_id)
+    destination = output_path(job_id)
+    upload_started = False
+
+    def progress(message: str, download_percent: int | None = None) -> None:
+        if _is_cancelled(job_id):
+            raise YoutubeExportError("Export annulé")
+        _log_job(job_id, message)
+        progress_percent = (
+            1 + round(download_percent * 49 / 100) if download_percent is not None else None
+        )
+        _update_job(
+            job_id,
+            status=_STATUS_RUNNING,
+            message=message,
+            **({"progress": progress_percent} if progress_percent is not None else {}),
+        )
+
+    try:
+        _log_job(job_id, "Préparation de l’export YouTube")
+        _update_job(
+            job_id, status=_STATUS_RUNNING, message="Préparation de l’export YouTube", progress=1
+        )
+        download_cookies = download_cookies_for_upload_job(job.youtube_upload_job_id)
+        export_youtube_overlay(
+            url=job.youtube_url,
+            overlay_job_id=job.overlay_job_id,
+            output_path=destination,
+            offset_seconds=float(job.overlay_offset_seconds or 0),
+            work_dir=work_dir,
+            progress=progress,
+            cookies=download_cookies,
+            pip_url=job.pip_youtube_url,
+            pip_apply_offset=job.pip_apply_offset,
+        )
+        if _is_cancelled(job_id):
+            raise YoutubeExportError("Export annulé")
+        if not job.youtube_upload_job_id:
+            raise YoutubeExportError("Job d’upload YouTube introuvable")
+        from youtube_upload import enqueue_youtube_overlay_upload
+
+        enqueue_youtube_overlay_upload(job.youtube_upload_job_id, destination)
+        upload_started = True
+        _log_job(job_id, "Vidéo composée et upload YouTube lancé")
+        try:
+            completed_job = _update_job(
+                job_id,
+                status=_STATUS_COMPLETED,
+                progress=100,
+                message="Vidéo composée, envoi YouTube en cours",
+                video_path=str(destination),
+            )
+        except Exception as exc:
+            logger.exception("Unable to finalize handed-off YouTube export %s", job_id)
+            _log_job(job_id, f"Upload YouTube lancé, statut d’export non mis à jour: {exc}")
+            return
+        if completed_job is None:
+            _log_job(job_id, "Upload YouTube lancé, mais le job d’export a été annulé")
+    except YoutubeExportError as exc:
+        _log_job(job_id, f"Export YouTube échoué: {exc}")
+        if not upload_started and job and job.youtube_upload_job_id:
+            from youtube_upload import fail_youtube_overlay_upload
+
+            fail_youtube_overlay_upload(job.youtube_upload_job_id, str(exc))
+        _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
+    except Exception as exc:
+        _log_job(job_id, f"Export YouTube échoué avec une erreur inattendue: {exc}")
+        if not upload_started and job and job.youtube_upload_job_id:
+            from youtube_upload import fail_youtube_overlay_upload
+
+            fail_youtube_overlay_upload(job.youtube_upload_job_id, str(exc))
+        _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
+    finally:
+        _log_job(job_id, "Nettoyage des fichiers temporaires YouTube")
+        cleanup_work_dir(work_dir)
+        if not upload_started:
+            destination.unlink(missing_ok=True)
+        _clear_job_cancel_requested(job_id)
 
 
 def _cleanup_temp_dir(temp_dir: Path | None) -> None:
@@ -811,8 +966,38 @@ def _contiguous_frame_count(frames_dir: Path) -> int:
     return frame_index
 
 
-def _job_temp_dir_for_export(job_id: str) -> Path:
-    preferred_temp_dir = _job_temp_dir(_video_temp_images_dir(), job_id)
+def _flight_job_temp_dir(db: Session, flight_id: str, job_id: str) -> Path | None:
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        return None
+    return flight_temporary_directory(db, flight, "video-exports") / job_id
+
+
+def _job_temp_dir_for_export(job: VideoExportJob | str) -> Path:
+    if isinstance(job, str):
+        preferred_temp_dir = _job_temp_dir(_video_temp_images_dir(), job)
+        legacy_temp_dir = _job_temp_dir(_video_legacy_temp_images_dir(), job)
+        if _contiguous_frame_count(legacy_temp_dir / "frames") > _contiguous_frame_count(
+            preferred_temp_dir / "frames"
+        ):
+            return legacy_temp_dir
+        return preferred_temp_dir
+
+    flight_id = getattr(job, "flight_id", None)
+    job_id = job.id
+    if not isinstance(flight_id, str):
+        return _job_temp_dir(_video_temp_images_dir(), job_id)
+
+    preferred_temp_dir: Path | None = None
+    try:
+        with SessionLocal() as db:
+            preferred_temp_dir = _flight_job_temp_dir(db, flight_id, job_id)
+    except SQLAlchemyError:
+        return _job_temp_dir(_video_temp_images_dir(), job_id)
+
+    if preferred_temp_dir is None:
+        return _job_temp_dir(_video_temp_images_dir(), job_id)
+
     preferred_frames_dir = preferred_temp_dir / "frames"
     legacy_temp_root = _video_legacy_temp_images_dir()
     legacy_temp_dir = _job_temp_dir(legacy_temp_root, job_id)
@@ -834,7 +1019,7 @@ def _write_frame_file_atomic(frame_path: Path, frame_png: bytes) -> None:
 
 
 def _job_resume_info(job: VideoExportJob) -> dict[str, Any]:
-    frames_dir = _job_temp_dir_for_export(job.id) / "frames"
+    frames_dir = _job_temp_dir_for_export(job) / "frames"
     existing_indexes = _existing_frame_indexes(frames_dir)
     total_frames = job.total_frames or 0
     resume_from_frame = _first_missing_frame_index(frames_dir, total_frames)
@@ -960,9 +1145,21 @@ def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, 
     }
     export_root = _video_export_dir()
 
-    for job_id in known_inactive_job_ids:
+    for export in exports:
+        job_id = str(export.get("job_id") or "")
+        if not job_id or job_id not in known_inactive_job_ids:
+            continue
         for temp_root in temp_roots:
             candidates.append((_job_temp_dir(temp_root, job_id), temp_root))
+        flight_id = export.get("flight_id")
+        if isinstance(flight_id, str):
+            try:
+                with SessionLocal() as db:
+                    temp_dir = _flight_job_temp_dir(db, flight_id, job_id)
+            except SQLAlchemyError:
+                temp_dir = None
+            if temp_dir:
+                candidates.append((temp_dir, temp_dir.parent))
         candidates.append((export_root / f"frames_{job_id}", export_root))
         candidates.append((Path("/tmp") / f"playwright-debug-{job_id}.png", Path("/tmp")))
         candidates.append((Path("/tmp") / f"playwright-error-{job_id}.png", Path("/tmp")))
@@ -1031,6 +1228,18 @@ def cleanup_video_export_job_temp_files(job_id: str) -> dict[str, Any]:
         (Path("/tmp") / f"playwright-error-{job_id}.png", Path("/tmp")),
         (_job_log_path(job_id), _video_export_dir()),
     ]
+    try:
+        job = _get_job(job_id)
+    except SQLAlchemyError:
+        job = None
+    if job and isinstance(getattr(job, "flight_id", None), str):
+        try:
+            with SessionLocal() as db:
+                temp_dir = _flight_job_temp_dir(db, job.flight_id, job_id)
+        except SQLAlchemyError:
+            temp_dir = None
+        if temp_dir:
+            candidates.append((temp_dir, temp_dir.parent))
 
     deleted_paths: list[str] = []
     errors: list[dict[str, str]] = []
@@ -1100,6 +1309,40 @@ def _job_temp_dir(temp_root: Path, job_id: str) -> Path:
     return temp_root / job_id
 
 
+def _cleanup_job_temp_dirs(job_id: str) -> None:
+    """Remove every temporary frame directory associated with an export job."""
+    temp_roots = {
+        _video_temp_images_dir().resolve(strict=False),
+        _video_legacy_temp_images_dir().resolve(strict=False),
+    }
+    for temp_root in temp_roots:
+        _cleanup_temp_dir(_job_temp_dir(temp_root, job_id))
+    try:
+        job = _get_job(job_id)
+    except SQLAlchemyError:
+        job = None
+    if job and isinstance(getattr(job, "flight_id", None), str):
+        try:
+            with SessionLocal() as db:
+                temp_dir = _flight_job_temp_dir(db, job.flight_id, job_id)
+        except SQLAlchemyError:
+            temp_dir = None
+        if temp_dir:
+            _cleanup_temp_dir(temp_dir)
+
+
+def _cleanup_job_temp_dirs_unless_resumable(job_id: str) -> None:
+    """Remove job artifacts unless captured frames can resume a terminal job."""
+    try:
+        job = _get_job(job_id)
+        if job and _job_resume_info(job)["can_resume"]:
+            return
+    except (OSError, SQLAlchemyError) as exc:
+        _log_job(job_id, f"Unable to inspect temporary video files for cleanup: {exc}")
+        return
+    _cleanup_job_temp_dirs(job_id)
+
+
 def _job_frames_dir(temp_root: Path, job_id: str) -> Path:
     return _job_temp_dir(temp_root, job_id) / "frames"
 
@@ -1113,6 +1356,12 @@ def _capture_progress_percent(frame_count: int, total_frames: int) -> int:
         return 5
     ratio = min(max(frame_count / total_frames, 0.0), 1.0)
     return min(80, max(5, int(5 + ratio * 75)))
+
+
+def _capture_fps(frame_count: int, resume_from_frame: int, elapsed: float) -> float:
+    """Return capture throughput excluding frames restored from disk."""
+    captured_since_start = max(0, frame_count - resume_from_frame)
+    return captured_since_start / elapsed if elapsed > 0 else 0
 
 
 def _parse_ffmpeg_out_time_seconds(line: str) -> float | None:
@@ -1151,14 +1400,27 @@ def _ffmpeg_encoding_settings(is_fast_mode: bool) -> tuple[str, str]:
     return "medium", "18"
 
 
+def _should_encode_concurrently(is_fast_mode: bool) -> bool:
+    """Stream fast-mode frames to FFmpeg while they are captured.
+
+    NVENC accepts the same PNG pipe input as the CPU encoder.  Keeping the
+    encoder running during capture removes the otherwise fully serial encoding
+    phase without giving up the on-disk frames used for job recovery.
+    """
+
+    return is_fast_mode
+
+
 def _ffmpeg_command(
     *,
     fps: int,
     output_file: Path,
     is_fast_mode: bool,
     frames_dir: Path | None = None,
+    accelerator: VideoAccelerator | None = None,
 ) -> list[str]:
     ffmpeg_preset, ffmpeg_crf = _ffmpeg_encoding_settings(is_fast_mode)
+    selected = accelerator or select_video_accelerator(config.VIDEO_ACCELERATOR)
     if frames_dir is None:
         input_args = [
             "-f",
@@ -1181,14 +1443,12 @@ def _ffmpeg_command(
     return [
         "ffmpeg",
         *input_args,
-        "-c:v",
-        "libx264",
-        "-preset",
-        ffmpeg_preset,
-        "-crf",
-        ffmpeg_crf,
-        "-pix_fmt",
-        "yuv420p",
+        *h264_encode_args(
+            selected,
+            quality=ffmpeg_crf,
+            cpu_preset=ffmpeg_preset,
+            include_audio=False,
+        ),
         "-nostats",
         "-progress",
         "pipe:2",
@@ -1436,6 +1696,24 @@ async def _wait_for_export_frame_terrain(
         await asyncio.sleep(min(poll_seconds, remaining_seconds))
 
 
+async def _evaluate_export_page(page: Any, expression: str, arg: Any = None) -> Any:
+    """Evaluate export-viewer JavaScript without allowing Chromium to hang the job."""
+    try:
+        if arg is None:
+            evaluation = page.evaluate(expression)
+        else:
+            evaluation = page.evaluate(expression, arg)
+        return await asyncio.wait_for(
+            evaluation,
+            timeout=_EXPORT_PAGE_EVALUATE_TIMEOUT_SECONDS,
+        )
+    except TimeoutError as exc:
+        raise RuntimeError(
+            "Chromium export-viewer evaluation timed out after "
+            f"{_EXPORT_PAGE_EVALUATE_TIMEOUT_SECONDS}s"
+        ) from exc
+
+
 def _ffmpeg_output_file_activity(
     output_file: Path, last_size: int, last_mtime_ns: int
 ) -> tuple[bool, int, int]:
@@ -1467,7 +1745,11 @@ def _worker_loop():
                 _WORKER_STOP.wait(1)
                 continue
 
-            asyncio.run(_export_video_manual_render(job_id))
+            job = _get_job(job_id)
+            if job and job.mode == "youtube_overlay":
+                _export_youtube_overlay_job(job_id)
+            else:
+                asyncio.run(_export_video_manual_render(job_id))
         except Exception as e:
             if job_id:
                 print(f"❌ Worker failed for job {job_id}: {e}")
@@ -1528,12 +1810,19 @@ def _enqueue_video_export_job(
     frontend_url: str = "http://localhost:5173",
     update_db: bool = True,
     auth_token: str | None = None,
+    source_type: str = "flight",
+    youtube_url: str | None = None,
+    pip_youtube_url: str | None = None,
+    pip_apply_offset: bool = True,
+    overlay_job_id: str | None = None,
+    overlay_offset_seconds: float | None = None,
+    youtube_upload_job_id: str | None = None,
 ):
     """Create a new export job and enqueue it for the configured queue backend."""
     if not _dependencies_ok:
         raise RuntimeError("Missing dependencies for video export")
 
-    with job_admission():
+    with job_admission("video_export_create"):
         job_id = str(uuid.uuid4())
         now = datetime.utcnow()
 
@@ -1548,10 +1837,22 @@ def _enqueue_video_export_job(
                 speed=speed,
                 progress=0,
                 message="Job enqueued",
+                # Expose the expected method immediately. The worker updates
+                # this value again after checking the actual WebGL renderer.
+                render_method=_render_method_for_accelerator(
+                    select_video_accelerator(config.VIDEO_ACCELERATOR)
+                ),
                 frontend_url=frontend_url,
                 started_at=None,
                 updated_at=now,
                 created_at=now,
+                source_type=source_type,
+                youtube_url=youtube_url,
+                pip_youtube_url=pip_youtube_url,
+                pip_apply_offset=pip_apply_offset,
+                overlay_job_id=overlay_job_id,
+                overlay_offset_seconds=overlay_offset_seconds,
+                youtube_upload_job_id=youtube_upload_job_id,
             )
             db.add(job)
 
@@ -1573,6 +1874,57 @@ def _enqueue_video_export_job(
         _set_job_auth_token(job_id, _resolve_video_export_job_token(job_id, flight_id, auth_token))
         _enqueue_existing_video_export_job(job_id)
     return job_id
+
+
+def start_youtube_overlay_export(
+    *,
+    flight_id: str,
+    youtube_url: str,
+    overlay_job_id: str,
+    overlay_offset_seconds: float,
+    youtube_user_id: int,
+    pip_youtube_url: str | None = None,
+    pip_apply_offset: bool = True,
+    auth_token: str | None = None,
+) -> str:
+    """Queue a YouTube overlay export followed by automatic YouTube publication."""
+    from youtube_upload import create_youtube_overlay_upload_job, fail_youtube_overlay_upload
+
+    with SessionLocal() as db:
+        flight = db.get(Flight, flight_id)
+        if flight is None:
+            raise RuntimeError("Flight not found")
+        flight_date = flight.flight_date.strftime("%d/%m/%Y") if flight.flight_date else "sans date"
+        title = flight.name or f"Vol du {flight_date}"
+        upload_job = create_youtube_overlay_upload_job(
+            db,
+            flight_id=flight.id,
+            user_id=youtube_user_id,
+            title=f"{title} - overlay YouTube",
+            description=flight.notes or "",
+            gopro_overlay_job_id=overlay_job_id,
+        )
+    try:
+        return _enqueue_video_export_job(
+            flight_id=flight_id,
+            mode="youtube_overlay",
+            quality="1080p",
+            fps=30,
+            speed=1,
+            frontend_url="",
+            update_db=False,
+            auth_token=auth_token,
+            source_type="youtube",
+            youtube_url=youtube_url,
+            pip_youtube_url=pip_youtube_url,
+            pip_apply_offset=pip_apply_offset,
+            overlay_job_id=overlay_job_id,
+            overlay_offset_seconds=overlay_offset_seconds,
+            youtube_upload_job_id=upload_job.id,
+        )
+    except Exception as exc:
+        fail_youtube_overlay_upload(upload_job.id, str(exc))
+        raise
 
 
 def start_video_export_manual(
@@ -1630,7 +1982,11 @@ async def _export_video_manual_render(job_id: str):
     speed = job.speed or 1
     is_fast_mode = job.mode == "manual_fast"
     flight_id = job.flight_id
-    frontend_url = resolve_frontend_url(job.frontend_url)
+    raw_frontend_url = job.frontend_url
+    frontend_url, _, director_style = raw_frontend_url.partition("#director=")
+    frontend_url = resolve_frontend_url(frontend_url)
+    if director_style not in {"natural", "cinematic", "dynamic"}:
+        director_style = "natural"
     export_root = _video_export_dir()
     temp_dir: Path | None = None
     frames_dir: Path | None = None
@@ -1639,6 +1995,7 @@ async def _export_video_manual_render(job_id: str):
     pending_frame_writes: set[asyncio.Task[None]] = set()
     auth_token = job.auth_token
     url = f"{frontend_url}/export-viewer?flightId={flight_id}&jobId={job_id}"
+    url = f"{url}&directorStyle={director_style}"
     preflight_url = url
     log_url = url
     if auth_token:
@@ -1656,11 +2013,16 @@ async def _export_video_manual_render(job_id: str):
         # Resolution mapping
         resolutions = {"720p": (1280, 720), "1080p": (1920, 1080), "4K": (3840, 2160)}
         width, height = resolutions.get(quality, (1920, 1080))
+        accelerator = select_video_accelerator(config.VIDEO_ACCELERATOR)
+        if config.VIDEO_ACCELERATOR == "nvidia" and accelerator == "cpu":
+            _log_job(job_id, "NVIDIA NVENC unavailable; falling back to CPU")
+        else:
+            _log_job(job_id, f"Video accelerator selected: {accelerator}")
 
         async with async_playwright() as p:
             browser = await p.chromium.launch(
                 headless=True,
-                args=_chromium_launch_args(),
+                args=_chromium_launch_args(accelerator),
             )
 
             context = await browser.new_context(
@@ -1692,7 +2054,7 @@ async def _export_video_manual_render(job_id: str):
                     timeout=_EXPORT_VIEWER_READY_TIMEOUT_SECONDS * 1000,
                 )
             except PlaywrightTimeoutError as exc:
-                viewer_state = await page.evaluate(_EXPORT_VIEWER_STATE_SCRIPT)
+                viewer_state = await _evaluate_export_page(page, _EXPORT_VIEWER_STATE_SCRIPT)
                 body_text = str(viewer_state.get("bodyText") or "").strip()
                 raise Exception(
                     "Export viewer did not become ready within "
@@ -1704,7 +2066,7 @@ async def _export_video_manual_render(job_id: str):
                     f"body={body_text[:300]!r})"
                 ) from exc
 
-            viewer_state = await page.evaluate(_EXPORT_VIEWER_STATE_SCRIPT)
+            viewer_state = await _evaluate_export_page(page, _EXPORT_VIEWER_STATE_SCRIPT)
 
             if viewer_state.get("isLoginPage"):
                 raise Exception(
@@ -1728,24 +2090,29 @@ async def _export_video_manual_render(job_id: str):
 
             _log_job(job_id, "Cesium viewer found")
 
-            renderer_info = await page.evaluate(_WEBGL_RENDERER_SCRIPT)
+            renderer_info = await _evaluate_export_page(page, _WEBGL_RENDERER_SCRIPT)
             renderer = str(renderer_info.get("renderer") or "unknown")
             vendor = str(renderer_info.get("vendor") or "unknown")
             if not renderer_info.get("available"):
                 _log_job(job_id, "WebGL renderer unavailable")
+                _set_job_render_method(job_id, "cpu")
             elif _is_software_webgl_renderer(renderer):
                 _log_job(
                     job_id,
                     f"WebGL renderer is software: vendor={vendor}, renderer={renderer}",
                 )
+                _set_job_render_method(job_id, "cpu")
             else:
                 _log_job(
                     job_id, f"WebGL renderer is hardware: vendor={vendor}, renderer={renderer}"
                 )
+                _set_job_render_method(job_id, "gpu")
 
             _update_job(job_id, message="Configuring manual render mode")
 
-            setup_result = await page.evaluate("""
+            setup_result = await _evaluate_export_page(
+                page,
+                """
                 () => {
                     const cesiumContainer = document.querySelector('.cesium-viewer');
                     if (!cesiumContainer) {
@@ -1775,7 +2142,8 @@ async def _export_video_manual_render(job_id: str):
                         checkViewer();
                     });
                 }
-            """)
+            """,
+            )
 
             if not setup_result.get("success"):
                 raise Exception("Failed to configure Cesium manual render mode")
@@ -1797,7 +2165,9 @@ async def _export_video_manual_render(job_id: str):
 
             _update_job(job_id, message="Extracting GPS data")
 
-            flight_data = await page.evaluate("""
+            flight_data = await _evaluate_export_page(
+                page,
+                """
                 () => {
                     if (typeof window._getExportMetadata === 'function') {
                         return window._getExportMetadata();
@@ -1813,7 +2183,8 @@ async def _export_video_manual_render(job_id: str):
                         duration: coordinates.length > 0 ? coordinates.length : 300
                     };
                 }
-            """)
+            """,
+            )
 
             total_gps_points = flight_data["totalPoints"]
             duration_seconds = flight_data["duration"]
@@ -1841,7 +2212,7 @@ async def _export_video_manual_render(job_id: str):
             )
             _set_job_runtime(job_id, phase=_STATUS_INITIALIZING)
 
-            temp_dir = _job_temp_dir_for_export(job_id)
+            temp_dir = _job_temp_dir_for_export(job)
             frames_dir = temp_dir / "frames"
             _prepare_export_dirs(export_root, temp_dir, frames_dir)
 
@@ -1865,7 +2236,9 @@ async def _export_video_manual_render(job_id: str):
                     timeout=30000,
                 )
             else:
-                await page.evaluate("""
+                await _evaluate_export_page(
+                    page,
+                    """
                     () => {
                         const playButton = Array.from(document.querySelectorAll('button'))
                             .find(btn =>
@@ -1877,12 +2250,12 @@ async def _export_video_manual_render(job_id: str):
                             console.log('▶️  Play button clicked');
                         }
                     }
-                """)
+                """,
+                )
 
             frame_count = 0
             ms_per_frame = (duration_seconds * 1000) / max(total_frames, 1)
             _log_job(job_id, f"Capturing 1 frame every {ms_per_frame:.1f}ms")
-            start_time = time.time()
             resume_from_frame = _first_missing_frame_index(frames_dir, total_frames)
             if resume_from_frame > 0:
                 frame_count = resume_from_frame
@@ -1901,17 +2274,20 @@ async def _export_video_manual_render(job_id: str):
                 )
                 _log_job(job_id, f"Resuming capture from frame {resume_from_frame}/{total_frames}")
 
+            start_time = time.time()
             encoding_output_file = temp_dir / "encoding.mp4"
+            concurrent_encoding = _should_encode_concurrently(is_fast_mode)
             ffmpeg_cmd = _ffmpeg_command(
                 fps=fps,
                 output_file=encoding_output_file,
                 is_fast_mode=is_fast_mode,
-                frames_dir=None if is_fast_mode else frames_dir,
+                frames_dir=None if concurrent_encoding else frames_dir,
+                accelerator=accelerator,
             )
             ffmpeg_stderr: deque[str] = deque(maxlen=_MAX_FFMPEG_STDERR_LINES)
             ffmpeg_state: dict[str, float] = {}
 
-            if is_fast_mode:
+            if concurrent_encoding:
                 _log_job(job_id, f"Starting concurrent FFmpeg encoding: {' '.join(ffmpeg_cmd)}")
                 ffmpeg_process = await asyncio.create_subprocess_exec(
                     *ffmpeg_cmd,
@@ -1963,7 +2339,8 @@ async def _export_video_manual_render(job_id: str):
                     return
 
                 if is_fast_mode:
-                    frame_state = await page.evaluate(
+                    frame_state = await _evaluate_export_page(
+                        page,
                         """
                         ({ frameIndex, totalFrames }) => {
                             return window._setExportFrame(frameIndex, totalFrames);
@@ -1984,25 +2361,27 @@ async def _export_video_manual_render(job_id: str):
 
                 frame_path = frames_dir / f"frame{i:05d}.png"
                 if is_fast_mode:
-                    assert ffmpeg_process is not None
-                    assert ffmpeg_process.stdin is not None
                     frame_png = await page.screenshot(type="png", timeout=60000)
-                    frame_written = await _write_ffmpeg_frame(
-                        job_id=job_id,
-                        process=ffmpeg_process,
-                        stderr_task=ffmpeg_stderr_task,
-                        stderr_lines=ffmpeg_stderr,
-                        state=ffmpeg_state,
-                        frame_png=frame_png,
-                    )
-                    if not frame_written:
-                        await browser.close()
-                        _update_job(
-                            job_id,
-                            status=_STATUS_CANCELLED,
-                            message="Export cancelled by user",
+                    if concurrent_encoding:
+                        assert ffmpeg_process is not None
+                        assert ffmpeg_process.stdin is not None
+                        assert ffmpeg_stderr_task is not None
+                        frame_written = await _write_ffmpeg_frame(
+                            job_id=job_id,
+                            process=ffmpeg_process,
+                            stderr_task=ffmpeg_stderr_task,
+                            stderr_lines=ffmpeg_stderr,
+                            state=ffmpeg_state,
+                            frame_png=frame_png,
                         )
-                        return
+                        if not frame_written:
+                            await browser.close()
+                            _update_job(
+                                job_id,
+                                status=_STATUS_CANCELLED,
+                                message="Export cancelled by user",
+                            )
+                            return
 
                     pending_frame_writes.add(
                         asyncio.create_task(
@@ -2022,7 +2401,7 @@ async def _export_video_manual_render(job_id: str):
                 if frame_count % 10 == 0:
                     progress = _capture_progress_percent(frame_count, total_frames)
                     elapsed = time.time() - start_time
-                    fps_actual = frame_count / elapsed if elapsed > 0 else 0
+                    fps_actual = _capture_fps(frame_count, resume_from_frame, elapsed)
                     eta_seconds = (total_frames - frame_count) / fps_actual if fps_actual > 0 else 0
                     eta_seconds_int = max(0, int(eta_seconds)) if eta_seconds > 0 else None
 
@@ -2031,6 +2410,7 @@ async def _export_video_manual_render(job_id: str):
                         phase=_STATUS_CAPTURING,
                         eta_seconds=eta_seconds_int,
                         frames_captured=frame_count,
+                        fps_actual=round(fps_actual, 1),
                     )
 
                     _update_job(
@@ -2053,7 +2433,7 @@ async def _export_video_manual_render(job_id: str):
                 await asyncio.gather(*pending_frame_writes)
                 pending_frame_writes.clear()
 
-            if is_fast_mode:
+            if concurrent_encoding:
                 assert ffmpeg_process is not None
                 assert ffmpeg_process.stdin is not None
                 ffmpeg_process.stdin.close()
@@ -2090,7 +2470,7 @@ async def _export_video_manual_render(job_id: str):
             )
             _set_job_runtime(job_id, phase=_STATUS_ENCODING, eta_seconds=None)
 
-            if not is_fast_mode:
+            if not concurrent_encoding:
                 _log_job(job_id, f"FFmpeg command: {' '.join(ffmpeg_cmd)}")
                 ffmpeg_process = await asyncio.create_subprocess_exec(
                     *ffmpeg_cmd,
@@ -2110,16 +2490,56 @@ async def _export_video_manual_render(job_id: str):
 
             assert ffmpeg_process is not None
             assert ffmpeg_stderr_task is not None
-            encoding_completed = await _wait_for_ffmpeg_process(
-                job_id=job_id,
-                process=ffmpeg_process,
-                stderr_task=ffmpeg_stderr_task,
-                stderr_lines=ffmpeg_stderr,
-                state=ffmpeg_state,
-                output_file=encoding_output_file,
-                video_duration=video_duration,
-                ffmpeg_cmd=ffmpeg_cmd,
-            )
+            try:
+                encoding_completed = await _wait_for_ffmpeg_process(
+                    job_id=job_id,
+                    process=ffmpeg_process,
+                    stderr_task=ffmpeg_stderr_task,
+                    stderr_lines=ffmpeg_stderr,
+                    state=ffmpeg_state,
+                    output_file=encoding_output_file,
+                    video_duration=video_duration,
+                    ffmpeg_cmd=ffmpeg_cmd,
+                )
+            except RuntimeError:
+                if accelerator != "nvidia" or _is_cancelled(job_id):
+                    raise
+                _log_job(job_id, "NVENC encoding failed; retrying with CPU encoding")
+                _set_job_render_method(job_id, "cpu")
+                encoding_output_file.unlink(missing_ok=True)
+                ffmpeg_cmd = _ffmpeg_command(
+                    fps=fps,
+                    output_file=encoding_output_file,
+                    is_fast_mode=is_fast_mode,
+                    frames_dir=frames_dir,
+                    accelerator="cpu",
+                )
+                ffmpeg_stderr = deque(maxlen=_MAX_FFMPEG_STDERR_LINES)
+                ffmpeg_state = {"started_at": time.monotonic()}
+                ffmpeg_process = await asyncio.create_subprocess_exec(
+                    *ffmpeg_cmd,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                assert ffmpeg_process.stderr is not None
+                ffmpeg_stderr_task = asyncio.create_task(
+                    _drain_ffmpeg_stderr(
+                        job_id,
+                        ffmpeg_process.stderr,
+                        ffmpeg_stderr,
+                        ffmpeg_state,
+                    )
+                )
+                encoding_completed = await _wait_for_ffmpeg_process(
+                    job_id=job_id,
+                    process=ffmpeg_process,
+                    stderr_task=ffmpeg_stderr_task,
+                    stderr_lines=ffmpeg_stderr,
+                    state=ffmpeg_state,
+                    output_file=encoding_output_file,
+                    video_duration=video_duration,
+                    ffmpeg_cmd=ffmpeg_cmd,
+                )
             if not encoding_completed:
                 return
 
@@ -2127,8 +2547,6 @@ async def _export_video_manual_render(job_id: str):
             output_file = _video_output_path(flight_id, timestamp)
             await asyncio.to_thread(shutil.move, str(encoding_output_file), str(output_file))
             _log_job(job_id, f"Video encoded: {output_file}")
-
-            _cleanup_temp_dir(temp_dir)
 
             file_size_mb = output_file.stat().st_size / (1024 * 1024)
             _update_job(
@@ -2163,6 +2581,7 @@ async def _export_video_manual_render(job_id: str):
             await ffmpeg_process.wait()
         if ffmpeg_stderr_task is not None:
             await asyncio.gather(ffmpeg_stderr_task, return_exceptions=True)
+        _cleanup_job_temp_dirs_unless_resumable(job_id)
         _clear_job_cancel_requested(job_id)
         _clear_job_auth_token(job_id)
 
@@ -2191,14 +2610,16 @@ def cancel_video_export(job_id: str, update_db: bool = True) -> bool:
     else:
         _delete_rq_video_export_job(job_id)
 
-    _update_job(
+    cancelled_job = _update_job(
         job_id,
         status=_STATUS_CANCELLED,
         message="Export cancelled by user",
         error=None,
         update_db=update_db,
     )
-    _clear_job_auth_token(job_id)
+    if not cancelled_job:
+        _clear_job_cancel_requested(job_id)
+        return False
 
     print(f"🛑 Video export {job_id} cancelled")
     return True
@@ -2213,18 +2634,21 @@ def resume_video_export(job_id: str, auth_token: str | None = None) -> bool:
     if job.status not in {_STATUS_CANCELLED, _STATUS_FAILED}:
         return False
 
-    if _is_job_cancel_requested(job_id):
-        if config.JOB_QUEUE_BACKEND != "rq" or _is_rq_video_export_job_started(job_id):
+    if config.JOB_QUEUE_BACKEND == "rq":
+        if _is_rq_video_export_job_started(job_id):
             return False
+    elif _is_job_cancel_requested(job_id):
+        return False
+
+    if _is_job_cancel_requested(job_id):
         _clear_job_cancel_requested(job_id)
 
     resume_info = _job_resume_info(job)
     if not resume_info["can_resume"]:
         return False
 
-    with job_admission():
-        _set_job_update_db_flag(job_id, True)
-        _update_job(
+    with job_admission("video_export_resume"):
+        resumed_job = _update_job(
             job_id,
             status=_STATUS_QUEUED,
             progress=_capture_progress_percent(
@@ -2240,10 +2664,13 @@ def resume_video_export(job_id: str, auth_token: str | None = None) -> bool:
             video_path=None,
             completed_at=None,
             cancelled_at=None,
+            auth_token=_resolve_video_export_job_token(job_id, job.flight_id, auth_token),
+            allowed_current_statuses={_STATUS_CANCELLED, _STATUS_FAILED},
+            update_db=True,
         )
-        _set_job_auth_token(
-            job_id, _resolve_video_export_job_token(job_id, job.flight_id, auth_token)
-        )
+        if not resumed_job:
+            return False
+        _set_job_update_db_flag(job_id, True)
         _set_job_runtime(
             job_id,
             phase=_STATUS_QUEUED,

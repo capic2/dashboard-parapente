@@ -1,1 +1,1 @@
-export type DownloadableFlightMedia = 'gpx' | 'video' | 'overlay';
+export type DownloadableFlightMedia = 'gpx' | 'video' | 'overlay' | 'highlight';

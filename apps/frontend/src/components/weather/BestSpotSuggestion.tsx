@@ -7,6 +7,7 @@
  * Updated to support displaying the date for different days
  */
 
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format, addDays } from 'date-fns';
 import type { Locale } from 'date-fns';
@@ -26,8 +27,13 @@ import { WindIndicator } from '../common/WindIndicator';
 import type { BestSpotResult } from '@dashboard-parapente/shared-types';
 import { weatherCardClassName } from './weatherUi';
 import { getSiteDisplayName } from '../../lib/siteDisplay';
+import {
+  BEST_SPOT_RADIUS_OPTIONS_KM,
+  DEFAULT_BEST_SPOT_RADIUS_KM,
+} from '../../hooks/useBestSpotRadius';
 
 type HourlyBestSpot = BestSpotResult & { hour: number };
+const EMPTY_HOURLY_BEST_SPOTS: HourlyBestSpot[] = [];
 
 type ReasonTranslator = (key: string) => string;
 
@@ -41,6 +47,10 @@ interface BestSpotSuggestionProps {
   hourlyStartHour?: number;
   onSelectSite: (siteId: string) => void;
   selectedDayIndex?: number;
+  radiusKm?: number;
+  onRadiusChange?: (radiusKm: number) => void;
+  locationUnavailable?: boolean;
+  onRetryLocation?: () => void;
   className?: string;
 }
 
@@ -189,16 +199,23 @@ function localizeBestSpotReason(reason: string, t: ReasonTranslator) {
 
 export const BestSpotSuggestion = ({
   bestSpot,
-  hourlyBestSpots = [],
+  hourlyBestSpots,
   hourlyStartHour,
   onSelectSite,
   selectedDayIndex = 0,
+  radiusKm,
+  onRadiusChange,
+  locationUnavailable = false,
+  onRetryLocation,
   className = '',
 }: BestSpotSuggestionProps) => {
   const { t, i18n } = useTranslation();
+  const resolvedHourlyBestSpots = hourlyBestSpots ?? EMPTY_HOURLY_BEST_SPOTS;
+  const resolvedRadiusKm = radiusKm ?? DEFAULT_BEST_SPOT_RADIUS_KM;
 
   // Calculate the date label based on selectedDayIndex
-  const selectedDate = addDays(new Date(), selectedDayIndex);
+  const [today] = useState(() => new Date());
+  const selectedDate = addDays(today, selectedDayIndex);
   const dateFnsLocale = i18n.language.startsWith('en') ? enUS : fr;
   const dateLabel = getDateLabel(
     selectedDayIndex,
@@ -219,11 +236,35 @@ export const BestSpotSuggestion = ({
             <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-300">
               {t('weather.bestSpotFor', { date: dateLabel })}
             </h3>
-            <div className="mt-1 text-lg font-bold text-slate-500 dark:text-slate-400">
-              {t('weather.calculating')}
-            </div>
+            {locationUnavailable ? (
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  {t('weather.locationUnavailableForBestSpot')}
+                </p>
+                {onRetryLocation && (
+                  <button
+                    type="button"
+                    onClick={onRetryLocation}
+                    className="cursor-pointer rounded-lg border border-sky-300 px-3 py-1.5 text-sm font-semibold text-sky-700 transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-950/60"
+                  >
+                    {t('common.retry')}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="mt-1 text-lg font-bold text-slate-500 dark:text-slate-400">
+                {t('weather.calculating')}
+              </div>
+            )}
           </div>
         </div>
+        {onRadiusChange && (
+          <RadiusSelector
+            radiusKm={resolvedRadiusKm}
+            onRadiusChange={onRadiusChange}
+            className="mt-4"
+          />
+        )}
       </div>
     );
   }
@@ -247,7 +288,7 @@ export const BestSpotSuggestion = ({
   const localizedReason = localizeBestSpotReason(reason, t);
   const scoreColor = getScoreColor(adjustedScore);
   const verdictInfo = getVerdict(adjustedScore, verdict ?? undefined);
-  const hourlyRows = hourlyBestSpots.map((hourlySpot) => {
+  const hourlyRows = resolvedHourlyBestSpots.map((hourlySpot) => {
     const hourlyScore = Math.min(
       100,
       Math.max(0, Math.round(hourlySpot.score ?? hourlySpot.paraIndex))
@@ -299,6 +340,14 @@ export const BestSpotSuggestion = ({
             {verdictInfo.label}
           </span>
         </div>
+
+        {onRadiusChange && (
+          <RadiusSelector
+            radiusKm={resolvedRadiusKm}
+            onRadiusChange={onRadiusChange}
+            className="mb-4"
+          />
+        )}
 
         {/* Site name + rating */}
         <div className="flex min-w-0 items-center gap-2 mb-4">
@@ -426,7 +475,7 @@ export const BestSpotSuggestion = ({
           {localizedReason}
         </p>
 
-        {hourlyBestSpots.length > 0 && (
+        {resolvedHourlyBestSpots.length > 0 && (
           <div className="@container/best-spot-timeline mb-4 min-w-0 border-t border-slate-100 pt-3 dark:border-slate-700">
             <div className="flex items-center justify-between gap-2 mb-2">
               <span className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -612,6 +661,38 @@ export const BestSpotSuggestion = ({
     </div>
   );
 };
+
+function RadiusSelector({
+  radiusKm,
+  onRadiusChange,
+  className = '',
+}: {
+  radiusKm: number;
+  onRadiusChange: (radiusKm: number) => void;
+  className?: string;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <label
+      className={`flex items-center justify-between gap-3 text-xs font-semibold text-slate-500 dark:text-slate-400 ${className}`}
+    >
+      <span>{t('weather.bestSpotRadius')}</span>
+      <select
+        aria-label={t('weather.bestSpotRadius')}
+        value={radiusKm}
+        onChange={(event) => onRadiusChange(Number(event.target.value))}
+        className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:border-sky-600 dark:focus:ring-sky-900"
+      >
+        {BEST_SPOT_RADIUS_OPTIONS_KM.map((option) => (
+          <option key={option} value={option}>
+            {t('weather.bestSpotRadiusValue', { radius: option })}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 /**
  * Compact version for sidebar or small spaces

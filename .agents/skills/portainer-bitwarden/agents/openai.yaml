@@ -1,0 +1,3 @@
+interface:
+  display_name: "Portainer Bitwarden"
+  short_description: "Inspect Portainer containers and logs safely"

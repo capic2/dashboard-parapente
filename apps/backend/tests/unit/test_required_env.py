@@ -38,6 +38,14 @@ def test_required_env_accepts_non_empty_variable(monkeypatch):
     assert config.required_env("BACKEND_VALID_PATH") == "/valid/path"
 
 
+def test_api_configuration_requires_weatherapi_key_outside_tests(monkeypatch):
+    monkeypatch.setattr(config, "IS_TEST_ENV", False)
+    monkeypatch.setattr(config, "WEATHERAPI_KEY", None)
+
+    with pytest.raises(ValueError, match="WEATHERAPI_KEY environment variable is required"):
+        config.validate_api_configuration()
+
+
 def test_video_export_paths_use_legacy_defaults():
     data_root = Path(config.PARAGLIDING_DATA_ROOT)
 

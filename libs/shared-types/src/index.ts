@@ -44,6 +44,7 @@ export const SiteSchema = z.object({
   usage_type: z.enum(['takeoff', 'landing', 'both']).optional(),
   // Legacy fields kept for backward compatibility
   description: z.string().optional().catch(''),
+  practical_info: z.record(z.string(), z.string()).optional().default({}),
   difficulty_level: z.string().optional().catch(''),
   is_active: z.boolean().optional().default(true),
 });
@@ -60,6 +61,93 @@ export const LandingAssociationSchema = z.object({
 });
 
 export type LandingAssociation = z.infer<typeof LandingAssociationSchema>;
+
+export const GoproOverlayJobSchema = z.object({
+  job_id: z.string(),
+  operation_id: z.string().nullable().optional(),
+  flight_id: z.string().nullish(),
+  status: z.enum([
+    'queued',
+    'preparing',
+    'running',
+    'completed',
+    'failed',
+    'cancelled',
+  ]),
+  progress: z.number(),
+  message: z.string(),
+  error: z.string().nullish(),
+  render_method: z.enum(['cpu', 'gpu']).nullish(),
+  gpx_path: z.string().nullish(),
+  layout_id: z.string(),
+  layout_label: z.string(),
+  output_filename: z.string(),
+  video_width: z.number().nullish(),
+  video_height: z.number().nullish(),
+  output_resolution: z.enum(['1080p', '4k', 'source']).nullish(),
+  gpx_offset: z.number().optional().default(0),
+  created_at: z.string(),
+  updated_at: z.string(),
+  completed_at: z.string().nullish(),
+  log_tail: z.array(z.string()).optional().default([]),
+  job_token: z.string().nullish(),
+});
+
+export const HighlightVideoClipSchema = z.object({
+  start_seconds: z.number(),
+  duration_seconds: z.number(),
+  yaw_degrees: z.number(),
+  overlay_start_seconds: z.number(),
+  category: z.string(),
+});
+
+export const HighlightVideoJobSchema = z.object({
+  job_id: z.string(),
+  flight_id: z.string(),
+  status: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
+  progress: z.number(),
+  message: z.string().nullish(),
+  log_tail: z.array(z.string()).default([]),
+  error: z.string().nullish(),
+  render_method: z.enum(['cpu', 'gpu']).nullish(),
+  output_format: z.string(),
+  overlay_offset_seconds: z.number(),
+  selection: z.array(HighlightVideoClipSchema).default([]),
+  created_at: z.string(),
+  updated_at: z.string().nullish(),
+  completed_at: z.string().nullish(),
+});
+
+export const YoutubeVideoAssociationSchema = z.object({
+  url: z.string().url(),
+  video_id: z.string().min(1),
+  can_delete_from_youtube: z.boolean(),
+  exists_on_youtube: z.boolean().nullish(),
+  title: z.string().nullish(),
+});
+
+export const YoutubeVideoAssociationsSchema = z.array(
+  YoutubeVideoAssociationSchema
+);
+
+export const FlightVideoMarkerSchema = z
+  .object({
+    id: z.string().min(1).max(100),
+    youtube_video_id: z.string().regex(/^[A-Za-z0-9_-]{11}$/u),
+    kind: z.enum(['takeoff', 'landing', 'interest']),
+    timestamp_seconds: z.number().int().nonnegative().max(86400),
+    title: z.string().max(100).default(''),
+    include_in_youtube_chapters: z.boolean().default(true),
+  })
+  .superRefine((marker, context) => {
+    if (marker.kind === 'interest' && !marker.title.trim()) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Interest markers must have a title',
+        path: ['title'],
+      });
+    }
+  });
 
 export const FlightSchema = z
   .object({
@@ -79,10 +167,22 @@ export const FlightSchema = z
     distance_km: z.number().nullish(),
     elevation_gain_m: z.number().nullish(),
     notes: z.string().nullish(),
+    tags: z.array(z.string()).optional().default([]),
+    conditions_feedback: z.string().nullish(),
+    decision_snapshot: z.string().nullish(),
     gpx_file_path: z.string().nullish(),
+    sportstracklive_status: z
+      .enum(['queued', 'uploading', 'uploaded', 'failed'])
+      .nullish(),
+    sportstracklive_track_id: z.number().nullish(),
+    sportstracklive_error: z.string().nullish(),
+    sportstracklive_uploaded_at: z.string().nullish(),
+    gpx_metrics_excluded: z.boolean().optional(),
     gpx_max_altitude_m: z.number().nullish(),
     gpx_elevation_gain_m: z.number().nullish(),
     external_url: z.string().nullish(),
+    youtube_urls: z.array(z.string()).optional(),
+    video_markers: z.array(FlightVideoMarkerSchema).optional(),
     video_export_job_id: z.string().nullish(),
     video_export_status: z
       .enum([
@@ -100,6 +200,9 @@ export const FlightSchema = z
     video_export_progress: z.number().nullish(),
     video_file_path: z.string().nullish(),
     video_file_exists: z.boolean().nullish(),
+    pano_video_file_exists: z.boolean().nullish(),
+    face_video_file_exists: z.boolean().nullish(),
+    pilote_video_file_exists: z.boolean().nullish(),
     gopro_camera_file_exists: z.boolean().nullish(),
     gopro_overlay_job_id: z.string().nullish(),
     gopro_overlay_status: z
@@ -115,6 +218,8 @@ export const FlightSchema = z
     gopro_overlay_progress: z.number().nullish(),
     gopro_overlay_file_path: z.string().nullish(),
     gopro_overlay_file_exists: z.boolean().nullish(),
+    gopro_overlay_gpx_offset: z.number().nullish(),
+    gopro_overlays: z.array(GoproOverlayJobSchema).optional(),
     site: SiteSchema.optional(),
     created_at: z.string().optional(),
     updated_at: z.string().optional(),
@@ -137,6 +242,7 @@ export const FlightSummarySchema = z.object({
   site_region: z.string().nullable(),
   name: z.string().nullable(),
   title: z.string().nullable(),
+  tags: z.array(z.string()).default([]),
   flight_date: z.string(),
   departure_time: z.string().nullable(),
   duration_minutes: z.number().nullable(),
@@ -144,8 +250,37 @@ export const FlightSummarySchema = z.object({
   distance_km: z.number().nullable(),
   elevation_gain_m: z.number().nullable(),
   has_gpx: z.boolean(),
+  sportstracklive_status: z
+    .enum(['queued', 'uploading', 'uploaded', 'failed'])
+    .nullable()
+    .optional(),
+  sportstracklive_track_id: z.number().nullable().optional(),
   has_video: z.boolean(),
+  has_camera: z.boolean(),
+  has_youtube_video: z.boolean(),
+  youtube_video_count: z.number().int().nonnegative(),
+  youtube_video_types: z
+    .array(
+      z.enum([
+        'gopro_overlay',
+        'camera',
+        'video',
+        'pano',
+        'face',
+        'pilote',
+        'highlight',
+        'youtube_overlay',
+      ])
+    )
+    .optional(),
+  youtube_upload_status: z.string().nullable(),
+  youtube_upload_progress: z.number().nullable(),
   has_gopro_overlay: z.boolean(),
+  has_pano_video: z.boolean(),
+  has_highlight_video: z.boolean(),
+  highlight_video_job_id: z.string().nullable().optional(),
+  highlight_video_status: z.string().nullable().optional(),
+  highlight_video_progress: z.number().nullable().optional(),
   video_export_job_id: z.string().nullable(),
   video_export_status: z.string().nullable(),
   video_export_progress: z.number().nullable(),
@@ -171,6 +306,51 @@ export const ActiveFlightMediaJobSchema = z.object({
 export const ActiveFlightMediaJobsResponseSchema = z.object({
   jobs: z.array(ActiveFlightMediaJobSchema),
 });
+
+export const BackgroundOperationStepSchema = z.object({
+  key: z.string(),
+  status: z.enum([
+    'pending',
+    'running',
+    'completed',
+    'failed',
+    'cancelled',
+    'skipped',
+  ]),
+  progress: z.number().nullable().optional(),
+  detail: z.string().nullable().optional(),
+  started_at: z.string().nullable().optional(),
+  completed_at: z.string().nullable().optional(),
+});
+
+export const BackgroundOperationSchema = z.object({
+  operation_id: z.string(),
+  operation_type: z.string(),
+  title_key: z.string(),
+  status: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
+  progress: z.number().nullable().optional(),
+  current_step_key: z.string().nullable().optional(),
+  current_step_progress: z.number().nullable().optional(),
+  current_step_detail: z.string().nullable().optional(),
+  steps: z.array(BackgroundOperationStepSchema),
+  result: z.record(z.string(), z.unknown()).nullable().optional(),
+  error_key: z.string().nullable().optional(),
+  error_detail: z.string().nullable().optional(),
+  source_kind: z.string().nullable().optional(),
+  source_id: z.string().nullable().optional(),
+  can_cancel: z.boolean(),
+  can_retry: z.boolean(),
+  unread: z.boolean(),
+  created_at: z.string(),
+  started_at: z.string().nullable().optional(),
+  completed_at: z.string().nullable().optional(),
+  updated_at: z.string(),
+});
+
+export type BackgroundOperation = z.infer<typeof BackgroundOperationSchema>;
+export type BackgroundOperationStep = z.infer<
+  typeof BackgroundOperationStepSchema
+>;
 
 export const FlightStatsSchema = z.object({
   total_flights: z.number().catch(0),
@@ -442,6 +622,7 @@ export const FlightDecisionResponseSchema = z.object({
 export const AzbaConstraintSchema = z.object({
   id: z.string(),
   name: z.string(),
+  zone_type: z.string().nullish(),
   valid_from: z.string().nullish(),
   valid_to: z.string().nullish(),
   floor: z.string().nullish(),
@@ -655,6 +836,8 @@ export const FlightRecordsSchema = z.object({
   highest_altitude: FlightRecordSchema.nullish(),
   longest_distance: FlightRecordSchema.nullish(),
   max_speed: FlightRecordSchema.nullish(),
+  max_climb_rate: FlightRecordSchema.nullish(),
+  max_sink_rate: FlightRecordSchema.nullish(),
   takeoff_elevation_gain: FlightRecordSchema.nullish(),
   earliest_takeoff: FlightRecordSchema.nullish(),
   latest_takeoff: FlightRecordSchema.nullish(),
@@ -677,10 +860,18 @@ export const GPXDataSchema = z.object({
   coordinates: z.array(GeoPointSchema),
   max_altitude_m: z.number(),
   min_altitude_m: z.number(),
+  altitude_range_m: z.number().optional(),
+  takeoff_altitude_m: z.number().optional(),
+  landing_altitude_m: z.number().optional(),
   elevation_gain_m: z.number(),
   elevation_loss_m: z.number(),
   total_distance_km: z.number(),
+  max_distance_from_takeoff_km: z.number().optional(),
   flight_duration_seconds: z.number(),
+  average_speed_kmh: z.number().optional(),
+  max_speed_kmh: z.number().optional(),
+  max_climb_rate_ms: z.number().optional(),
+  max_sink_rate_ms: z.number().optional(),
 });
 
 // ============================================================================
@@ -704,6 +895,7 @@ export const SiteUpdateSchema = z
     camera_transition_percent: z.number().nullable(),
     usage_type: z.enum(['takeoff', 'landing', 'both']),
     description: z.string(),
+    practical_info: z.record(z.string(), z.string()),
   })
   .partial();
 
@@ -721,7 +913,13 @@ export const CreateSiteSchema = SiteUpdateSchema.omit({
 export type Site = z.infer<typeof SiteSchema>;
 export type SiteUpdate = z.infer<typeof SiteUpdateSchema>;
 export type CreateSiteData = z.infer<typeof CreateSiteSchema>;
+export type FlightVideoMarker = z.infer<typeof FlightVideoMarkerSchema>;
 export type Flight = z.infer<typeof FlightSchema>;
+export type HighlightVideoJob = z.infer<typeof HighlightVideoJobSchema>;
+export type GoproOverlayJob = z.infer<typeof GoproOverlayJobSchema>;
+export type YoutubeVideoAssociation = z.infer<
+  typeof YoutubeVideoAssociationSchema
+>;
 export type FlightSummary = z.infer<typeof FlightSummarySchema>;
 export type FlightSummariesResponse = z.infer<
   typeof FlightSummariesResponseSchema

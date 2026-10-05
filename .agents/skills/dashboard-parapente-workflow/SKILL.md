@@ -27,17 +27,20 @@ Projects: `frontend` in `apps/frontend`, `backend` in `apps/backend`, `design-sy
 
 ## Analysis Source Of Truth
 
-- Use `origin/main` as the default source of truth for repository analysis, diagnostics, code review, and behavior checks.
-- Before drawing conclusions from the current checkout, check whether it is aligned with `origin/main`.
-- If the current checkout is stale, dirty, or ambiguous, inspect `origin/main` directly or create/use a clean worktree from `origin/main`.
-- Only analyze local uncommitted changes, a non-main branch, or a specific worktree when the user explicitly asks for that target.
-- State which target is being analyzed when the distinction matters: local checkout, `origin/main`, or a named worktree.
+- When a pull request, branch, commit, worktree, or diff is supplied, analyze that target. For pull-request reviews, always use the PR base, head, and diff.
+- When no analysis or review target is supplied, use the current `main` commit published by GitHub as the default source of truth for repository analysis, diagnostics, code review, and behavior checks.
+- Resolve the GitHub SHA first with `gh api repos/{owner}/{repo}/commits/main --jq .sha`; never assume the local `origin/main` tracking ref is current.
+- For read-only analysis, inspect files at that GitHub SHA with GitHub API or raw URLs without changing local refs.
+- For implementation, fetch `origin/main` and create/use a clean worktree from the freshly fetched ref.
+- If GitHub is unavailable, report that the analysis uses a local ref that may be stale.
+- Only analyze local uncommitted changes, a non-main branch, or a specific worktree when that target is supplied by the user or review context.
+- State which target is being analyzed when the distinction matters: a GitHub SHA, local checkout, or a named worktree.
 
 ## Worktrees
 
 Load `implementation-worktree-strategy` before implementation tasks: feature work, bug fixes, refactors, and code changes.
 
-When a worktree is created, work from the new worktree path, launch the `worktree-bootstrap` subagent immediately, and run impacted checks there before PR creation.
+When a worktree is created, work from the new worktree path and run the lightweight readiness check locally. Use `worktree-bootstrap` only when dependencies are missing/unusable and parallel setup is explicitly useful.
 
 Do not open a PR from a stale worktree. Fetch remote changes, update against `origin/main`, resolve conflicts, and rerun impacted checks first.
 
@@ -69,7 +72,7 @@ Use `local-machine-stack` for the exact backend validation command.
 
 Prefer affected Nx validation from `local-machine-stack` for implementation and PR validation. Use direct project targets only after an affected run identifies a failing project, or when explicitly requested. Use `run-many` only when affected detection is inappropriate or a full-repo check is required.
 
-For long validation runs, prefer a validation subagent that runs commands from the active worktree and returns a concise pass/fail report. The main agent fixes failures and decides whether more validation is needed.
+For long validation runs, run commands locally by default. Use a validation subagent only when the user requests parallel execution or the task has independent workstreams that justify its token cost.
 
 ## GitHub And CodeRabbit
 
@@ -77,9 +80,19 @@ Use `gh` for all GitHub interactions: issues, PRs, checks, releases, comments, A
 
 Before creating or updating a PR, check branch status, review commits and diff against the base branch, run impacted checks, and fix failures.
 
+Before pushing changes to a branch associated with a PR, check the PR state with
+`gh`. Never push additional commits to a PR that is already merged or closed;
+create a new branch from the current `origin/main` and open a new PR for the
+follow-up changes.
+
+Before creating or updating a PR, fetch the latest `origin/main` and integrate
+it into the working branch. If conflicts occur, resolve every conflict before
+continuing, verify that no conflict markers remain, and rerun the impacted
+checks before pushing.
+
 Run the `coderabbit-cli` skill at the end of implementation, after relevant validation and before marking the work ready to ship, unless the user explicitly skips it. Do not defer CodeRabbit to the push step.
 
-For CodeRabbit comments, delegate discovery and triage to a subagent. It should inspect only relevant PR conversations through `gh` and return requested changes, affected files/lines, priority, and conversations to reply to or close. When fixed, reply to each resolved conversation and close it.
+For CodeRabbit comments, inspect only relevant PR conversations directly by default. Delegate discovery and triage only when the user requests it or the PR has enough independent conversations to justify the extra agent.
 
 ## Git
 - Do not commit unless explicitly requested.

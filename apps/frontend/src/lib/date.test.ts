@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseApiUtcDate } from './date';
+import { parseApiLocalDate, parseApiUtcDate } from './date';
 
 describe('parseApiUtcDate', () => {
   it('treats ISO datetime without timezone as UTC', () => {
@@ -18,5 +18,11 @@ describe('parseApiUtcDate', () => {
     expect(parseApiUtcDate('2026-04-15T10:00:00+02:00').toISOString()).toBe(
       '2026-04-15T08:00:00.000Z'
     );
+  });
+});
+
+describe('parseApiLocalDate', () => {
+  it('keeps date-only API values in the local calendar', () => {
+    expect(parseApiLocalDate('2026-08-30').getDate()).toBe(30);
   });
 });

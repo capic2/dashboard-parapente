@@ -7,6 +7,7 @@ import {
 } from 'react';
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
+import { parseApiUtcDate } from '../lib/date';
 import { Checkbox, Input, TextField } from 'react-aria-components';
 import {
   createColumnHelper,
@@ -23,8 +24,8 @@ import {
   TabList,
   TabPanel,
   Tabs,
-  ToastContainer,
 } from '@dashboard-parapente/design-system';
+import { useToast } from '../hooks/useToast';
 import {
   useCacheOverview,
   useCacheKeyDetail,
@@ -34,7 +35,6 @@ import type { CacheKeyInfo } from '../hooks/admin/useCache';
 import { useIntervalsStatus } from '../hooks/admin/useIntervalsStatus';
 import { useDeploymentDrainStatus } from '../hooks/admin/useDeploymentDrainStatus';
 import { VideoExportJobsPanel } from '../components/flights/video-export/VideoExportJobsPanel';
-import { useToastStore } from '../hooks/useToast';
 import {
   normalizeInfrastructureTab,
   type InfrastructureSearch,
@@ -72,7 +72,7 @@ function DeploymentStatusBanner() {
     ? status.phase_changed_at
     : status.requested_at;
   const requestedAt = phaseStartedAt
-    ? new Date(phaseStartedAt).getTime()
+    ? parseApiUtcDate(phaseStartedAt).getTime()
     : Number.NaN;
   const elapsedMinutes = Number.isNaN(requestedAt)
     ? null
@@ -144,7 +144,9 @@ function DeploymentStatusBanner() {
   );
 }
 
-function formatTtl(ttl: number): string {
+function formatTtl(ttl: number, t: (key: string) => string): string {
+  if (ttl === -1) return t('cache.ttlNoExpiry');
+  if (ttl === -2) return t('cache.ttlKeyMissing');
   if (ttl < 0) return '—';
   if (ttl === 0) return '0s';
   const h = Math.floor(ttl / 3600);
@@ -160,11 +162,52 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KB`;
 }
 
-function CacheKeyCell({ value }: { value: string }) {
+function CacheKeyCell({
+  value,
+  ttl,
+  size,
+}: {
+  value: string;
+  ttl: number;
+  size: number;
+}) {
+  const { t } = useTranslation();
+  const toast = useToast();
+
+  const copyKey = async () => {
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('Clipboard API unavailable');
+      }
+      await navigator.clipboard.writeText(value);
+      toast.success(t('cache.copySuccess'));
+    } catch {
+      toast.error(t('cache.copyError'));
+    }
+  };
+
   return (
-    <span className="font-mono text-xs text-gray-700 dark:text-gray-300 truncate block max-w-xs">
-      {value}
-    </span>
+    <div className="flex min-w-0 items-center gap-2">
+      <div className="min-w-0">
+        <span
+          title={value}
+          className="block max-w-xs truncate font-mono text-xs text-gray-700 dark:text-gray-300"
+        >
+          {value}
+        </span>
+        <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400 sm:hidden">
+          {t('cache.ttl')}: {formatTtl(ttl, t)} · {t('cache.size')}:{' '}
+          {formatSize(size)}
+        </span>
+      </div>
+      <Button
+        onPress={() => void copyKey()}
+        aria-label={t('cache.copyKey')}
+        className="shrink-0 rounded px-2 py-1 text-xs text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-gray-700"
+      >
+        {t('cache.copy')}
+      </Button>
+    </div>
   );
 }
 
@@ -179,9 +222,11 @@ function ResolvedCell({ resolved }: { resolved: CacheKeyInfo['resolved'] }) {
 }
 
 function TtlCell({ value }: { value: number }) {
+  const { t } = useTranslation();
+
   return (
     <span className="text-xs text-gray-600 dark:text-gray-400">
-      {formatTtl(value)}
+      {formatTtl(value, t)}
     </span>
   );
 }
@@ -240,7 +285,13 @@ function buildCacheColumns({
   return [
     columnHelper.accessor('key', {
       header: t('cache.key'),
-      cell: (info) => <CacheKeyCell value={info.getValue()} />,
+      cell: (info) => (
+        <CacheKeyCell
+          value={info.getValue()}
+          ttl={info.row.original.ttl}
+          size={info.row.original.size}
+        />
+      ),
     }),
     columnHelper.accessor('resolved', {
       header: t('cache.resolved'),
@@ -348,13 +399,7 @@ function IntervalsStatusSection() {
   const statusLabel = status?.configured
     ? t('infrastructure.intervals.configured')
     : t('infrastructure.intervals.notConfigured');
-  const statusTone: 'green' | 'amber' | 'red' | 'gray' = status?.configured
-    ? 'green'
-    : 'red';
-  const statusClassName = status?.configured
-    ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-    : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
-
+  const statusTone: 'green' | 'gray' = status?.configured ? 'green' : 'gray';
   return (
     <div className="space-y-4">
       <div>
@@ -385,7 +430,11 @@ function IntervalsStatusSection() {
             <InfrastructureStatCard
               label={t('infrastructure.intervals.status')}
               value={statusLabel}
-              detail={t('infrastructure.intervals.statusDetail')}
+              detail={
+                status.configured
+                  ? t('infrastructure.intervals.statusDetail')
+                  : t('infrastructure.intervals.statusNotConfiguredDetail')
+              }
               tone={statusTone}
             />
             <InfrastructureStatCard
@@ -398,16 +447,9 @@ function IntervalsStatusSection() {
             />
           </div>
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                {t('infrastructure.intervals.activityTypes')}
-              </h4>
-              <span
-                className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusClassName}`}
-              >
-                {statusLabel}
-              </span>
-            </div>
+            <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+              {t('infrastructure.intervals.activityTypes')}
+            </h4>
             {status.activity_types.length > 0 ? (
               <div className="mt-3 flex flex-wrap gap-2">
                 {status.activity_types.map((type) => (
@@ -450,7 +492,8 @@ function CacheSection({
   onAutoRefreshChange: (autoRefresh: boolean) => void;
   onSearchFilterChange: (searchFilter: string) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
   const deferredSearchFilter = useDeferredValue(searchFilter);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -458,16 +501,40 @@ function CacheSection({
     null
   );
 
-  const { data: overview, refetch } = useCacheOverview(
-    autoRefresh ? 5000 : undefined
-  );
+  const {
+    data: overview,
+    refetch,
+    isFetching,
+    isError: hasOverviewError,
+    dataUpdatedAt,
+  } = useCacheOverview(autoRefresh ? 5000 : undefined);
   const { data: keyDetail } = useCacheKeyDetail(selectedKey);
   const deleteMutation = useDeleteCacheKey();
+  const visibleAppCacheKeyCount = Object.entries(overview.groups)
+    .filter(([prefix]) =>
+      ['weather:', 'best_spot:', 'emagram:'].some((appPrefix) =>
+        prefix.startsWith(appPrefix)
+      )
+    )
+    .reduce((count, [, group]) => count + group.count, 0);
+
+  const deleteCacheKeys = (pattern: string) => {
+    deleteMutation.mutate(pattern, {
+      onSuccess: ({ success, keys_deleted: count }) => {
+        if (!success) {
+          toast.error(t('cache.deleteError'));
+          return;
+        }
+        toast.success(t('cache.deleteSuccess', { count }));
+      },
+      onError: () => toast.error(t('cache.deleteError')),
+    });
+  };
 
   const filteredGroups = useMemo(() => {
-    if (!deferredSearchFilter) return overview.groups;
+    const normalizedSearch = deferredSearchFilter.trim().toLowerCase();
+    if (!normalizedSearch) return overview.groups;
 
-    const lower = deferredSearchFilter.toLowerCase();
     const result: typeof overview.groups = {};
     for (const [prefix, group] of Object.entries(overview.groups)) {
       const filteredKeys = group.keys.filter((k) => {
@@ -479,7 +546,7 @@ function CacheSection({
 
         return values
           .map((value) => String(value).toLowerCase())
-          .some((value) => value.includes(lower));
+          .some((value) => value.includes(normalizedSearch));
       });
       if (filteredKeys.length > 0) {
         result[prefix] = { count: filteredKeys.length, keys: filteredKeys };
@@ -508,18 +575,32 @@ function CacheSection({
   );
 
   const handleDeleteKey = (key: string) => {
-    requestConfirm(t('cache.confirmDelete'), () => deleteMutation.mutate(key));
+    requestConfirm(t('cache.confirmDelete', { key }), () =>
+      deleteCacheKeys(key)
+    );
   };
 
-  const handleClearPattern = (pattern: string) => {
-    requestConfirm(t('cache.confirmClearPattern', { pattern }), () =>
-      deleteMutation.mutate(pattern)
+  const handleClearPattern = (pattern: string, count: number) => {
+    requestConfirm(
+      t(
+        overview.truncated
+          ? 'cache.confirmClearPatternTruncated'
+          : 'cache.confirmClearPattern',
+        { pattern, count }
+      ),
+      () => deleteCacheKeys(pattern)
     );
   };
 
   const handleClearAll = () => {
-    requestConfirm(t('cache.confirmClearAll'), () =>
-      deleteMutation.mutate('*')
+    requestConfirm(
+      t(
+        overview.truncated
+          ? 'cache.confirmClearAppCacheTruncated'
+          : 'cache.confirmClearAppCache',
+        { count: visibleAppCacheKeyCount }
+      ),
+      () => deleteCacheKeys('*')
     );
   };
 
@@ -535,34 +616,6 @@ function CacheSection({
             'Inspecte les clés actives, leur TTL et les groupes les plus volumineux.'
           )}
         </p>
-      </div>
-
-      {/* Stats bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md text-center">
-          <div className="text-3xl font-bold text-sky-600 dark:text-sky-400">
-            {overview.total_keys}
-          </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            {t('cache.totalKeys')}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md text-center">
-          <div className="text-3xl font-bold text-sky-600 dark:text-sky-400">
-            {overview.memory_usage ?? '—'}
-          </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            {t('cache.memoryUsage')}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md text-center">
-          <div className="text-3xl font-bold text-sky-600 dark:text-sky-400">
-            {Object.keys(overview.groups).length}
-          </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            {t('cache.groups')}
-          </div>
-        </div>
       </div>
 
       {/* Truncated warning */}
@@ -610,9 +663,10 @@ function CacheSection({
         </Checkbox>
         <Button
           onPress={() => refetch()}
+          isDisabled={isFetching}
           className="min-h-11 px-4 py-2.5 sm:min-h-0 sm:px-3 sm:py-1.5 rounded-md bg-sky-600 text-white text-sm hover:bg-sky-700 transition-colors cursor-pointer"
         >
-          {t('cache.refresh')}
+          {t(isFetching ? 'cache.refreshing' : 'cache.refresh')}
         </Button>
         <TextField
           value={searchFilter}
@@ -634,10 +688,46 @@ function CacheSection({
         </Button>
       </div>
 
+      {dataUpdatedAt > 0 && (
+        <output
+          aria-live="polite"
+          className="text-xs text-gray-500 dark:text-gray-400"
+        >
+          {t('cache.lastUpdated', {
+            date: new Intl.DateTimeFormat(i18n.language, {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            }).format(dataUpdatedAt),
+          })}
+        </output>
+      )}
+      {hasOverviewError && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200"
+        >
+          {t('cache.refreshError')}
+        </div>
+      )}
+
       {/* Groups */}
       {Object.keys(filteredGroups).length === 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-md text-center text-gray-500 dark:text-gray-400">
-          {t('cache.noKeys')}
+          {deferredSearchFilter.trim() ? (
+            <div className="space-y-3">
+              <p>
+                {t('cache.noSearchResults', { search: deferredSearchFilter })}
+              </p>
+              <Button
+                onPress={() => onSearchFilterChange('')}
+                className="rounded-md px-3 py-2 text-sm text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-gray-700"
+              >
+                {t('cache.clearFilter')}
+              </Button>
+            </div>
+          ) : (
+            t(overview.total_keys === 0 ? 'cache.noKeys' : 'cache.noListedKeys')
+          )}
         </div>
       ) : (
         <div className="space-y-3">
@@ -650,7 +740,12 @@ function CacheSection({
                 group={group}
                 isExpanded={expandedGroups.has(prefix)}
                 onToggle={() => toggleGroup(prefix)}
-                onClearPattern={() => handleClearPattern(`${prefix}:*`)}
+                onClearPattern={() =>
+                  handleClearPattern(
+                    `${prefix}:*`,
+                    overview.groups[prefix]?.count ?? group.count
+                  )
+                }
                 onViewKey={(key) => setSelectedKey(key)}
                 onDeleteKey={handleDeleteKey}
                 isPending={deleteMutation.isPending}
@@ -692,7 +787,7 @@ function CacheSection({
                   {t('cache.ttl')}
                 </span>
                 <p className="text-gray-800 dark:text-gray-200">
-                  {formatTtl(keyDetail.ttl)}
+                  {formatTtl(keyDetail.ttl, t)}
                 </p>
               </div>
               <div>
@@ -704,21 +799,6 @@ function CacheSection({
                 </p>
               </div>
             </div>
-            {keyDetail.type === 'json' &&
-              typeof keyDetail.value === 'object' &&
-              keyDetail.value !== null &&
-              'cached_at' in (keyDetail.value as Record<string, unknown>) && (
-                <div className="text-sm">
-                  <span className="text-gray-500 dark:text-gray-400">
-                    {t('cache.cachedAt')}:{' '}
-                  </span>
-                  <span className="text-gray-800 dark:text-gray-200">
-                    {String(
-                      (keyDetail.value as Record<string, unknown>).cached_at
-                    )}
-                  </span>
-                </div>
-              )}
             <pre className="bg-gray-100 dark:bg-gray-900 rounded-lg p-4 text-xs font-mono overflow-auto max-h-[60vh] text-gray-800 dark:text-gray-200">
               {JSON.stringify(keyDetail.value, null, 2)}
             </pre>
@@ -736,7 +816,7 @@ function CacheSection({
       >
         {pendingConfirm && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-700 dark:text-gray-300">
+            <p className="break-words text-sm text-gray-700 dark:text-gray-300">
               {pendingConfirm.message}
             </p>
             <div className="flex justify-end gap-3">
@@ -855,12 +935,12 @@ function InfrastructureOverview() {
         />
         <InfrastructureStatCard
           label={t('infrastructure.tabs.videoExports')}
-          value={t('infrastructure.videoExports.ready', 'File')}
+          value={t('infrastructure.videoExports.overview', 'Suivi')}
           detail={t(
             'infrastructure.videoExports.description',
             'Suivi des exports et nettoyage des fichiers temporaires.'
           )}
-          tone="amber"
+          tone="gray"
         />
         <InfrastructureStatCard
           label={t('cache.totalKeys')}
@@ -871,12 +951,12 @@ function InfrastructureOverview() {
         <InfrastructureStatCard
           label={t('cache.memoryUsage')}
           value={cacheOverview.memory_usage ?? '—'}
-          detail={
-            cacheOverview.truncated
-              ? t('cache.truncatedWarning')
-              : t('cache.noResolution')
-          }
-          tone={cacheOverview.truncated ? 'amber' : 'gray'}
+          detail={t(
+            cacheOverview.memory_usage
+              ? 'cache.memoryUsageDetail'
+              : 'cache.memoryUnavailable'
+          )}
+          tone={cacheOverview.memory_usage ? 'sky' : 'gray'}
         />
       </div>
     </section>
@@ -888,7 +968,6 @@ export default function InfrastructurePage() {
   const navigate = useNavigate();
   const params = useParams({ strict: false }) as { tab?: string };
   const search = useSearch({ strict: false }) as InfrastructureSearch;
-  const { toasts, removeToast } = useToastStore();
   const { data: intervalsStatus } = useIntervalsStatus();
   const { data: cacheOverview } = useCacheOverview();
   const activeTab = normalizeInfrastructureTab(params.tab);
@@ -901,8 +980,6 @@ export default function InfrastructurePage() {
       'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300';
     intervalsBadgeLabel = t('infrastructure.intervals.configured');
   } else if (intervalsStatus) {
-    intervalsBadgeClassName =
-      'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200';
     intervalsBadgeLabel = t('infrastructure.intervals.notConfigured');
   }
 
@@ -916,6 +993,8 @@ export default function InfrastructurePage() {
       search: {
         cacheSearch: nextSearch.cacheSearch || undefined,
         cacheAutoRefresh: nextSearch.cacheAutoRefresh ? true : undefined,
+        videoExportStatus: nextSearch.videoExportStatus || undefined,
+        videoExportType: nextSearch.videoExportType || undefined,
       },
     });
   };
@@ -936,11 +1015,9 @@ export default function InfrastructurePage() {
 
   return (
     <div className="py-4 space-y-8">
-      <ToastContainer toasts={toasts} onClose={removeToast} />
-
       <DeploymentStatusBanner />
 
-      <InfrastructureOverview />
+      {activeTab !== 'video-exports' && <InfrastructureOverview />}
 
       <Tabs
         className="space-y-4"
@@ -960,14 +1037,7 @@ export default function InfrastructurePage() {
               </span>
             </span>
           </Tab>
-          <Tab id="video-exports">
-            <span className="flex items-center justify-center gap-2">
-              {t('infrastructure.tabs.videoExports')}
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                {t('infrastructure.videoExports.ready', 'File')}
-              </span>
-            </span>
-          </Tab>
+          <Tab id="video-exports">{t('infrastructure.tabs.videoExports')}</Tab>
           <Tab id="cache">
             <span className="flex items-center justify-center gap-2">
               {t('infrastructure.tabs.cache')}
@@ -982,7 +1052,23 @@ export default function InfrastructurePage() {
           <IntervalsStatusSection />
         </TabPanel>
         <TabPanel id="video-exports" className="outline-none">
-          <VideoExportJobsPanel limit={null} />
+          <VideoExportJobsPanel
+            limit={null}
+            statusFilter={search.videoExportStatus}
+            typeFilter={search.videoExportType}
+            onStatusFilterChange={(videoExportStatus) =>
+              navigateToInfrastructure(activeTab, {
+                ...search,
+                videoExportStatus,
+              })
+            }
+            onTypeFilterChange={(videoExportType) =>
+              navigateToInfrastructure(activeTab, {
+                ...search,
+                videoExportType,
+              })
+            }
+          />
         </TabPanel>
         <TabPanel id="cache" className="outline-none">
           <CacheSection
@@ -1030,6 +1116,7 @@ function GroupSection({
     [t, onViewKey, onDeleteKey, isPending]
   );
 
+  // oxlint-disable-next-line react/incompatible-library -- TanStack Table exposes non-memoizable functions; this component intentionally relies on its local table state.
   const table = useReactTable({
     data: group.keys,
     columns,

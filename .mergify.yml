@@ -32,9 +32,6 @@ pull_request_rules:
     actions:
       queue:
         name: default
-      label:
-        add:
-          - ready-to-merge
   - name: Auto-merge Renovate patches SECURITY
     conditions:
       - base=main
@@ -120,70 +117,6 @@ pull_request_rules:
 
           Une fois valide, ajoutez le label automerge pour declencher le merge
           automatique.
-  - name: Label ready-to-merge quand conditions remplies
-    conditions:
-      - base=main
-      - check-success=main
-      - check-success=E2E Tests
-      - check-success=Chromatic (Frontend)
-      - "#changes-requested-reviews-by=0"
-      - -draft
-      - -conflict
-    actions:
-      label:
-        add:
-          - ready-to-merge
-  - name: Retirer ready-to-merge si conditions non remplies
-    conditions:
-      - base=main
-      - or:
-          - check-failure=main
-          - check-failure=E2E Tests
-          - check-failure=Chromatic (Frontend)
-    actions:
-      label:
-        remove:
-          - ready-to-merge
-  - name: Retirer ready-to-merge si changes requested
-    conditions:
-      - base=main
-      - "#changes-requested-reviews-by>0"
-    actions:
-      label:
-        remove:
-          - ready-to-merge
-  - name: Retirer ready-to-merge si draft
-    conditions:
-      - base=main
-      - draft
-    actions:
-      label:
-        remove:
-          - ready-to-merge
-  - name: Retirer ready-to-merge si conflict
-    conditions:
-      - base=main
-      - conflict
-    actions:
-      label:
-        remove:
-          - ready-to-merge
-  - name: Notification PR prete a merger
-    conditions:
-      - base=main
-      - label=ready-to-merge
-      - -label=automerge
-      - -label=renovate
-      - -draft
-    actions:
-      comment:
-        message: |
-          Cette PR est prete a etre mergee!
-
-          Tous les checks sont verts et les conditions de merge sont remplies.
-
-          Pour activer le merge automatique, ajoutez le label automerge.
-          Sinon, vous pouvez merger manuellement quand vous etes pret.
 merge_protections:
   - name: Verification des checks CI
     description: Les checks main doivent passer

@@ -4,6 +4,41 @@ import type { SiteUpdate } from '@dashboard-parapente/shared-types';
 
 export type { SiteUpdate };
 
+export type SitePracticalInfoKey =
+  | 'access'
+  | 'rules'
+  | 'webcam'
+  | 'contact'
+  | 'hazards';
+
+export type SitePracticalInfoSuggestions = {
+  suggestions: Record<SitePracticalInfoKey, string>;
+  sources: { title: string; url: string }[];
+  grounded_result: string;
+  grounded_result_is_verified: boolean;
+  search_suggestions_html: string;
+};
+
+export type SitePracticalInfoSuggestionRequest = {
+  name: string;
+  latitude?: number;
+  longitude?: number;
+  region?: string;
+  country?: string;
+  usage_type?: 'takeoff' | 'landing' | 'both';
+};
+
+export const useSuggestSitePracticalInfo = () =>
+  useMutation({
+    mutationFn: (site: SitePracticalInfoSuggestionRequest) =>
+      api
+        .post('sites/practical-info/suggestions', {
+          json: site,
+          timeout: 60000,
+        })
+        .json<SitePracticalInfoSuggestions>(),
+  });
+
 /**
  * Update site mutation
  */

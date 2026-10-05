@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { enUS } from 'date-fns/locale';
+import { parseApiUtcDate } from '../../lib/date';
 
 interface CacheTimestampProps {
   cachedAt: string | null | undefined;
@@ -23,7 +24,7 @@ export default function CacheTimestamp({
   }
 
   const locale = i18n.language === 'fr' ? fr : enUS;
-  const relativeTime = formatDistanceToNow(new Date(cachedAt), {
+  const relativeTime = formatDistanceToNow(parseApiUtcDate(cachedAt), {
     addSuffix: true,
     locale,
   });
@@ -31,7 +32,7 @@ export default function CacheTimestamp({
   return (
     <span
       className={`text-xs text-gray-400 dark:text-gray-400 ${className}`}
-      title={new Date(cachedAt).toLocaleString(i18n.language)}
+      title={parseApiUtcDate(cachedAt).toLocaleString(i18n.language)}
     >
       {t('weather.updatedAt')} {relativeTime}
     </span>

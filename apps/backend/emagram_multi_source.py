@@ -545,6 +545,7 @@ def _normalize_llm_analysis(
         "force_thermique_indices": raw_analysis.get("force_thermique_indices", []),
         "heures_volables": raw_analysis.get("heures_volables"),
         "score_volabilite": raw_analysis.get("score_volabilite"),
+        "sources_agreement": raw_analysis.get("sources_agreement"),
         "conseils_vol": raw_analysis.get("conseils_vol"),
         "alertes_securite": raw_analysis.get("alertes_securite", []),
         "details_analyse": raw_analysis.get("details_analyse"),

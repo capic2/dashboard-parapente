@@ -15,6 +15,7 @@ import { useThemeStore } from '../../stores/themeStore';
 import { format } from 'date-fns';
 import { enUS, fr } from 'date-fns/locale';
 import type { Flight } from '../../types';
+import { parseApiLocalDate } from '../../lib/date';
 
 interface ProgressChartProps {
   flights: Flight[];
@@ -31,7 +32,8 @@ export default function ProgressChart({ flights }: ProgressChartProps) {
       .filter((f) => f.duration_minutes && f.flight_date)
       .sort(
         (a, b) =>
-          new Date(a.flight_date).getTime() - new Date(b.flight_date).getTime()
+          parseApiLocalDate(a.flight_date).getTime() -
+          parseApiLocalDate(b.flight_date).getTime()
       );
 
     return sortedFlights.map((flight, index) => {
@@ -50,12 +52,16 @@ export default function ProgressChart({ flights }: ProgressChartProps) {
         rollingFlights.length;
 
       return {
-        date: format(new Date(flight.flight_date), 'dd MMM', {
+        date: format(parseApiLocalDate(flight.flight_date), 'dd MMM', {
           locale: i18n.language === 'en' ? enUS : fr,
         }),
-        fullDate: format(new Date(flight.flight_date), 'dd MMMM yyyy', {
-          locale: i18n.language === 'en' ? enUS : fr,
-        }),
+        fullDate: format(
+          parseApiLocalDate(flight.flight_date),
+          'dd MMMM yyyy',
+          {
+            locale: i18n.language === 'en' ? enUS : fr,
+          }
+        ),
         duration: flight.duration_minutes,
         average: Math.round(avgDuration),
         rollingAvg: Math.round(rollingAvg),

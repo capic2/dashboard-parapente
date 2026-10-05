@@ -10,7 +10,7 @@ on:
     types: [opened, reopened, closed]
   workflow_run:
     workflows: ['CI - Nx Monorepo']
-    types: [completed]
+    types: [completed, in_progress]
 
 env:
   PROJECT_ID: 'PVT_kwHOCaf4ns4BTClc'
@@ -208,3 +208,78 @@ jobs:
             -f optionId="$STATUS_BLOCKED"
 
           echo "Moved PR to blocked"
+
+  # Job 4: When a blocked Renovate PR is retried, mark it as in progress again
+  mark-in-progress:
+    name: Mark running PR as in progress
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.action == 'in_progress' &&
+      github.event.workflow_run.event == 'pull_request'
+    steps:
+      - name: Check if Renovate PR and update status
+        env:
+          GH_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          # Find the PR for this workflow run
+          PR_DATA=$(gh pr view "$HEAD_BRANCH" --repo "${{ github.repository }}" --json author,nodeId 2>/dev/null || echo "")
+
+          if [ -z "$PR_DATA" ]; then
+            echo "No PR found for branch $HEAD_BRANCH, skipping"
+            exit 0
+          fi
+
+          PR_AUTHOR=$(echo "$PR_DATA" | jq -r '.author.login')
+          PR_NODE_ID=$(echo "$PR_DATA" | jq -r '.nodeId')
+
+          if [ "$PR_AUTHOR" != "renovate" ]; then
+            echo "PR is not from Renovate (author: $PR_AUTHOR), skipping"
+            exit 0
+          fi
+
+          # Find the item ID for this PR in the project
+          ITEM_ID=$(gh api graphql -f query='
+            query($projectId: ID!, $cursor: String) {
+              node(id: $projectId) {
+                ... on ProjectV2 {
+                  items(first: 100, after: $cursor) {
+                    nodes {
+                      id
+                      content {
+                        ... on PullRequest { id }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ' -f projectId="$PROJECT_ID" --jq ".data.node.items.nodes[] | select(.content.id == \"$PR_NODE_ID\") | .id")
+
+          if [ -z "$ITEM_ID" ]; then
+            echo "PR not found in project, skipping"
+            exit 0
+          fi
+
+          # Update status to "In progress"
+          gh api graphql -f query='
+            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+              updateProjectV2ItemFieldValue(
+                input: {
+                  projectId: $projectId
+                  itemId: $itemId
+                  fieldId: $fieldId
+                  value: { singleSelectOptionId: $optionId }
+                }
+              ) {
+                projectV2Item { id }
+              }
+            }
+          ' \
+            -f projectId="$PROJECT_ID" \
+            -f itemId="$ITEM_ID" \
+            -f fieldId="$STATUS_FIELD_ID" \
+            -f optionId="$STATUS_IN_PROGRESS"
+
+          echo "Moved running PR to In progress"

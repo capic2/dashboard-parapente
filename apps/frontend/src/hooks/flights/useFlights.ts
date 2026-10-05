@@ -35,16 +35,27 @@ const isMediaExportInProgress = (flight: Flight) =>
     isGoproOverlayInProgress(flight.gopro_overlay_status)
   );
 
-export const flightsQueryOptions = (filters: FlightFilters = {}) => {
-  const searchParams = Object.entries(filters).reduce(
-    (acc, [key, value]) => {
-      if (value !== undefined) {
-        acc[key] = String(value);
-      }
-      return acc;
+const flightFilterSearchParams = (filters: FlightFilters) => {
+  const entries: [keyof FlightFilters, string][] = [
+    ['siteId', 'site_id'],
+    ['dateFrom', 'date_from'],
+    ['dateTo', 'date_to'],
+    ['limit', 'limit'],
+  ];
+
+  return entries.reduce(
+    (searchParams, [filterKey, apiKey]) => {
+      const value = filters[filterKey];
+      if (value !== undefined && value !== null)
+        searchParams[apiKey] = String(value);
+      return searchParams;
     },
     {} as Record<string, string>
   );
+};
+
+export const flightsQueryOptions = (filters: FlightFilters = {}) => {
+  const searchParams = flightFilterSearchParams(filters);
 
   return queryOptions<Flight[]>({
     queryKey: ['flights', filters],
@@ -64,11 +75,17 @@ export const flightsQueryOptions = (filters: FlightFilters = {}) => {
   });
 };
 
-export const flightStatsQueryOptions = () =>
+export const flightStatsQueryOptions = (filters: FlightFilters = {}) =>
   queryOptions<FlightStats>({
-    queryKey: ['flights', 'stats'],
+    queryKey: ['flights', 'stats', filters],
     queryFn: async () => {
-      const data = await api.get('flights/stats').json();
+      const analyticsFilters: FlightFilters = {
+        siteId: filters.siteId,
+        dateFrom: filters.dateFrom,
+        dateTo: filters.dateTo,
+      };
+      const searchParams = flightFilterSearchParams(analyticsFilters);
+      const data = await api.get('flights/stats', { searchParams }).json();
       const validation = FlightStatsSchema.safeParse(data);
       if (!validation.success) {
         throw new Error(`Invalid flight stats: ${validation.error.message}`);
@@ -78,11 +95,17 @@ export const flightStatsQueryOptions = () =>
     staleTime: getStaleTime(1000 * 60 * 60),
   });
 
-export const flightRecordsQueryOptions = () =>
+export const flightRecordsQueryOptions = (filters: FlightFilters = {}) =>
   queryOptions<FlightRecords>({
-    queryKey: ['flights', 'records'],
+    queryKey: ['flights', 'records', filters],
     queryFn: async () => {
-      const data = await api.get('flights/records').json();
+      const analyticsFilters: FlightFilters = {
+        siteId: filters.siteId,
+        dateFrom: filters.dateFrom,
+        dateTo: filters.dateTo,
+      };
+      const searchParams = flightFilterSearchParams(analyticsFilters);
+      const data = await api.get('flights/records', { searchParams }).json();
       const validation = FlightRecordsSchema.safeParse(data);
       if (!validation.success) {
         throw new Error(`Invalid flight records: ${validation.error.message}`);
@@ -104,15 +127,19 @@ export const useFlights = (
 /**
  * Fetch learning statistics
  */
-export const useFlightStats = (): UseQueryResult<FlightStats, Error> => {
-  return useQuery(flightStatsQueryOptions());
+export const useFlightStats = (
+  filters: FlightFilters = {}
+): UseQueryResult<FlightStats, Error> => {
+  return useQuery(flightStatsQueryOptions(filters));
 };
 
 /**
  * Fetch personal flight records
  */
-export const useFlightRecords = (): UseQueryResult<FlightRecords, Error> => {
-  return useQuery(flightRecordsQueryOptions());
+export const useFlightRecords = (
+  filters: FlightFilters = {}
+): UseQueryResult<FlightRecords, Error> => {
+  return useQuery(flightRecordsQueryOptions(filters));
 };
 
 /**
@@ -120,11 +147,11 @@ export const useFlightRecords = (): UseQueryResult<FlightRecords, Error> => {
  */
 export const useUpdateFlight = (
   flightId: string | undefined
-): UseMutationResult<Flight, Error, FlightFormData> => {
+): UseMutationResult<Flight, Error, Partial<FlightFormData>> => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (flightData: FlightFormData) => {
+    mutationFn: async (flightData: Partial<FlightFormData>) => {
       if (!flightId) throw new Error('Flight ID is required');
       const data = await api
         .patch(`flights/${flightId}`, { json: flightData })
@@ -185,21 +212,10 @@ export function useCreateFlight() {
   });
 }
 
-const IntervalsSyncResponseSchema = z.object({
-  success: z.boolean(),
-  imported: z.number().int().nonnegative(),
-  updated: z.number().int().nonnegative(),
-  skipped: z.number().int().nonnegative(),
-  failed: z.number().int().nonnegative(),
-  flights: z.array(
-    z.object({
-      id: z.string(),
-      external_provider: z.string(),
-      external_activity_id: z.string(),
-      name: z.string(),
-      date: z.string(),
-    })
-  ),
+const BackgroundOperationStartSchema = z.object({
+  operation_id: z.string(),
+  status: z.enum(['queued', 'running']),
+  detail_url: z.string(),
 });
 
 const IntervalsActivitySchema = z.object({
@@ -216,28 +232,30 @@ const IntervalsPreviewResponseSchema = z.object({
   activity_types: z.array(z.string()),
 });
 
-export type IntervalsSyncResponse = z.infer<typeof IntervalsSyncResponseSchema>;
+export type IntervalsSyncResponse = z.infer<
+  typeof BackgroundOperationStartSchema
+>;
 
 export function useIntervalsSyncMutation() {
-  const queryClient = useQueryClient();
-
   return useMutation<
     IntervalsSyncResponse,
     Error,
-    { date_from: string; date_to: string }
+    { date_from: string; date_to: string; activity_ids: string[] }
   >({
     mutationFn: async ({
       date_from,
       date_to,
+      activity_ids,
     }: {
       date_from: string;
       date_to: string;
+      activity_ids: string[];
     }) => {
       let data: unknown;
       try {
         data = await api
           .post('flights/sync-intervals', {
-            json: { date_from, date_to },
+            json: { date_from, date_to, activity_ids },
           })
           .json();
       } catch (error) {
@@ -250,21 +268,13 @@ export function useIntervalsSyncMutation() {
         throw error;
       }
 
-      const validation = IntervalsSyncResponseSchema.safeParse(data);
+      const validation = BackgroundOperationStartSchema.safeParse(data);
       if (!validation.success) {
         // oxlint-disable-next-line no-console
         console.error('Invalid Intervals.icu sync response', validation.error);
         throw new Error(i18n.t('intervals.invalidResponse'));
       }
-      if (!validation.data.success) {
-        throw new Error(i18n.t('intervals.syncError'));
-      }
       return validation.data;
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['flights'] });
-      void queryClient.invalidateQueries({ queryKey: ['flights', 'stats'] });
-      void queryClient.invalidateQueries({ queryKey: ['flights', 'records'] });
     },
   });
 }

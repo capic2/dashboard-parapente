@@ -114,6 +114,9 @@ export default function AirspaceConstraintsPanel({
                     {constraint.name}
                   </strong>
                   <div className="mt-1 flex flex-wrap gap-2 text-xs font-semibold text-red-800 dark:text-red-200">
+                    {constraint.zone_type && (
+                      <span>{constraint.zone_type}</span>
+                    )}
                     {distance && <span>{distance}</span>}
                     {constraint.floor && <span>{constraint.floor}</span>}
                     {constraint.ceiling && <span>{constraint.ceiling}</span>}

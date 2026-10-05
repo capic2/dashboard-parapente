@@ -96,6 +96,17 @@ cache/
 storybook-static
 PORTAINER_MIGRATION.md
 .env.portainer
-.opencode/portainer.env
 .codenomad/
 apps/backend/db
+
+# Local Codex settings and worktrees
+.codex/config.toml
+.codex/worktree/
+
+# Generated Impeccable critique reports
+.impeccable/critique/
+
+# GitHub Copilot Impeccable adapters (Codex uses .agents/skills/impeccable)
+.github/agents/impeccable-*.agent.md
+.github/hooks/impeccable.json
+.github/skills/impeccable/

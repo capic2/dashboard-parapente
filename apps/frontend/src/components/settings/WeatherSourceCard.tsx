@@ -7,24 +7,34 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Switch, TextField, Input, Text, Link } from 'react-aria-components';
 import { Button } from '@dashboard-parapente/design-system';
+import { parseApiUtcDate } from '../../lib/date';
 import type { WeatherSource } from '../../types/weatherSources';
 import {
   useUpdateWeatherSource,
   useTestWeatherSource,
 } from '../../hooks/weather/useWeatherSources';
 
+export interface WeatherTestLocation {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+
 interface WeatherSourceCardProps {
   source: WeatherSource;
+  testLocation: WeatherTestLocation | null;
   isLastActive: boolean; // True if this is the only active source
-  onDelete?: (source: WeatherSource) => void;
+  onDelete?: (source: WeatherSource) => Promise<void> | void;
 }
 
 export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
   source,
+  testLocation,
   isLastActive,
   onDelete,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const updateSource = useUpdateWeatherSource();
   const testSource = useTestWeatherSource();
 
@@ -32,6 +42,8 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
   const [apiKeyValue, setApiKeyValue] = useState('');
   const [isEditingApiKey, setIsEditingApiKey] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [testResult, setTestResult] = useState<{
     success: boolean;
     message: string;
@@ -41,45 +53,47 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
     message: string;
   } | null>(null);
 
-  // Status badge styling
-  const getStatusBadge = () => {
-    const statusLabels = {
-      active: t('settings.weatherSources.active'),
-      error: t('settings.weatherSources.error'),
-      disabled: t('settings.weatherSources.disabled'),
-      unknown: t('settings.weatherSources.untested'),
-    };
+  const getLatestCheckStatus = () => {
+    if (source.requires_api_key && !source.api_key_configured) {
+      return 'missingKey' as const;
+    }
 
-    const statusClasses = {
-      active:
-        'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200',
-      error: 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200',
-      disabled: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300',
-      unknown:
-        'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200',
-    };
+    const latestSuccess = source.last_success_at
+      ? parseApiUtcDate(source.last_success_at).getTime()
+      : null;
+    const latestError = source.last_error_at
+      ? parseApiUtcDate(source.last_error_at).getTime()
+      : null;
 
-    return (
-      <span
-        className={`px-2 py-1 text-xs font-semibold rounded ${statusClasses[source.status]}`}
-        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
-        role="status"
-        aria-label={`Statut de la source: ${statusLabels[source.status]}`}
-      >
-        {statusLabels[source.status]}
-      </span>
-    );
+    if (
+      latestError !== null &&
+      Number.isFinite(latestError) &&
+      (latestSuccess === null ||
+        !Number.isFinite(latestSuccess) ||
+        latestError > latestSuccess)
+    ) {
+      return 'error' as const;
+    }
+
+    return latestSuccess !== null && Number.isFinite(latestSuccess)
+      ? ('active' as const)
+      : ('unknown' as const);
   };
 
-  const getScraperLabel = () => {
-    switch (source.scraper_type) {
-      case 'api':
-        return 'API';
-      case 'playwright':
-        return 'Browser';
-      case 'stealth':
-        return 'Stealth';
-    }
+  const latestCheckStatus = getLatestCheckStatus();
+  const checkStatusLabels = {
+    active: t('settings.weatherSources.lastCheckSucceeded'),
+    error: t('settings.weatherSources.lastCheckFailed'),
+    missingKey: t('settings.weatherSources.missingApiKeyState'),
+    unknown: t('settings.weatherSources.neverChecked'),
+  };
+  const checkStatusClasses = {
+    active:
+      'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200',
+    error: 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200',
+    missingKey:
+      'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-900 dark:text-yellow-100',
+    unknown: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200',
   };
 
   const getNotificationClassName = () => {
@@ -95,24 +109,12 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
     }
   };
 
-  const getSuccessRateClassName = () => {
-    if (source.success_rate >= 95) {
-      return 'text-green-600 dark:text-green-400';
-    }
-    if (source.success_rate >= 80) {
-      return 'text-yellow-600 dark:text-yellow-400';
-    }
-    return 'text-red-600 dark:text-red-400';
-  };
-
   const notificationTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
-  const testResultTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   useEffect(() => {
     return () => {
       if (notificationTimerRef.current)
         clearTimeout(notificationTimerRef.current);
-      if (testResultTimerRef.current) clearTimeout(testResultTimerRef.current);
     };
   }, []);
 
@@ -183,21 +185,23 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
 
   // Test source
   const handleTest = async () => {
+    if (!testLocation) return;
+
     setIsTesting(true);
     setTestResult(null);
 
     try {
-      // Use a default test location (Besançon area)
       const result = await testSource.mutateAsync({
         sourceName: source.source_name,
-        lat: 47.24,
-        lon: 6.02,
+        lat: testLocation.latitude,
+        lon: testLocation.longitude,
       });
 
       if (result.success) {
         setTestResult({
           success: true,
           message: t('settings.weatherSources.testSuccess', {
+            site: testLocation.name,
             time: result.response_time_ms,
           }),
         });
@@ -205,6 +209,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
         setTestResult({
           success: false,
           message: t('settings.weatherSources.testFailure', {
+            site: testLocation.name,
             error: result.error || t('settings.weatherSources.unknownError'),
           }),
         });
@@ -213,6 +218,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       setTestResult({
         success: false,
         message: t('settings.weatherSources.testError', {
+          site: testLocation.name,
           error:
             error instanceof Error
               ? error.message
@@ -221,25 +227,37 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       });
     } finally {
       setIsTesting(false);
-      // Clear test result after 5 seconds
-      if (testResultTimerRef.current) clearTimeout(testResultTimerRef.current);
-      testResultTimerRef.current = setTimeout(() => setTestResult(null), 5000);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!onDelete) return;
+
+    setIsDeleting(true);
+    try {
+      await onDelete(source);
+      setIsConfirmingDelete(false);
+    } catch {
+      showNotification(
+        'error',
+        t('settings.weatherSources.deleteError', {
+          name: source.display_name,
+        })
+      );
+      setIsConfirmingDelete(false);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   // Format timestamp
   const formatTimestamp = (timestamp: string | null) => {
     if (!timestamp) return t('common.never');
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-
-    if (diffMins < 1) return t('common.justNow');
-    if (diffMins < 60) return t('common.minutesAgo', { count: diffMins });
-    if (diffMins < 1440)
-      return t('common.hoursAgo', { count: Math.floor(diffMins / 60) });
-    return t('common.daysAgo', { count: Math.floor(diffMins / 1440) });
+    const date = parseApiUtcDate(timestamp);
+    return new Intl.DateTimeFormat(i18n.language, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(date);
   };
 
   return (
@@ -269,13 +287,31 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-              {getScraperLabel()}
-            </span>
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">
               {source.display_name}
             </h3>
-            {getStatusBadge()}
+            <span
+              className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                source.is_enabled
+                  ? 'bg-sky-100 text-sky-900 dark:bg-sky-900/30 dark:text-sky-100'
+                  : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'
+              }`}
+              // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
+              role="status"
+            >
+              {t(
+                source.is_enabled
+                  ? 'settings.weatherSources.sourceEnabled'
+                  : 'settings.weatherSources.sourceDisabled'
+              )}
+            </span>
+            <span
+              className={`rounded-full px-2 py-1 text-xs font-semibold ${checkStatusClasses[latestCheckStatus]}`}
+              // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
+              role="status"
+            >
+              {checkStatusLabels[latestCheckStatus]}
+            </span>
           </div>
           <Text
             slot="description"
@@ -410,61 +446,49 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
         </div>
       )}
 
-      {/* Statistics */}
-      <div
-        className="grid grid-cols-3 gap-2 mb-3 text-center"
-        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
-        role="group"
-        aria-label={t('settings.weatherSources.performanceStatsAria')}
-      >
-        <div className="p-2 bg-gray-50 dark:bg-gray-900 rounded">
-          <div
-            className="text-xs text-gray-600 dark:text-gray-300"
-            id={`success-rate-label-${source.source_name}`}
-          >
-            {t('settings.weatherSources.successRate')}
-          </div>
-          <div
-            className={`text-lg font-bold ${getSuccessRateClassName()}`}
-            aria-labelledby={`success-rate-label-${source.source_name}`}
-            aria-live="polite"
-          >
-            {source.success_rate.toFixed(0)}%
-          </div>
+      <details className="mb-3 rounded-md border border-gray-200 px-3 py-2 dark:border-gray-700">
+        <summary className="cursor-pointer text-sm font-medium text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-gray-200">
+          {t('settings.weatherSources.diagnostics')}
+        </summary>
+        <div
+          className="mt-3 space-y-3 text-sm"
+          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
+          role="group"
+          aria-label={t('settings.weatherSources.performanceStatsAria')}
+        >
+          <p className="text-xs leading-5 text-gray-600 dark:text-gray-300">
+            {t('settings.weatherSources.diagnosticsHelp')}
+          </p>
+          <dl className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="rounded bg-gray-50 p-2 dark:bg-gray-900">
+              <dt className="text-xs text-gray-600 dark:text-gray-300">
+                {t('settings.weatherSources.recordedSuccessRate')}
+              </dt>
+              <dd className="mt-1 font-semibold text-gray-900 dark:text-white">
+                {source.success_rate.toFixed(0)}%
+              </dd>
+            </div>
+            <div className="rounded bg-gray-50 p-2 dark:bg-gray-900">
+              <dt className="text-xs text-gray-600 dark:text-gray-300">
+                {t('settings.weatherSources.avgSuccessfulResponseTime')}
+              </dt>
+              <dd className="mt-1 font-semibold text-gray-900 dark:text-white">
+                {typeof source.avg_response_time_ms === 'number'
+                  ? `${source.avg_response_time_ms} ms`
+                  : '–'}
+              </dd>
+            </div>
+            <div className="rounded bg-gray-50 p-2 dark:bg-gray-900">
+              <dt className="text-xs text-gray-600 dark:text-gray-300">
+                {t('settings.weatherSources.recordedRequests')}
+              </dt>
+              <dd className="mt-1 font-semibold text-gray-900 dark:text-white">
+                {source.success_count + source.error_count}
+              </dd>
+            </div>
+          </dl>
         </div>
-        <div className="p-2 bg-gray-50 dark:bg-gray-900 rounded">
-          <div
-            className="text-xs text-gray-600 dark:text-gray-300"
-            id={`response-time-label-${source.source_name}`}
-          >
-            {t('settings.weatherSources.avgResponseTime')}
-          </div>
-          <div
-            className="text-lg font-bold text-gray-900 dark:text-white"
-            aria-labelledby={`response-time-label-${source.source_name}`}
-            aria-live="polite"
-          >
-            {source.avg_response_time_ms
-              ? `${source.avg_response_time_ms}ms`
-              : '-'}
-          </div>
-        </div>
-        <div className="p-2 bg-gray-50 dark:bg-gray-900 rounded">
-          <div
-            className="text-xs text-gray-600 dark:text-gray-300"
-            id={`calls-count-label-${source.source_name}`}
-          >
-            {t('settings.weatherSources.calls')}
-          </div>
-          <div
-            className="text-lg font-bold text-gray-900 dark:text-white"
-            aria-labelledby={`calls-count-label-${source.source_name}`}
-            aria-live="polite"
-          >
-            {source.success_count + source.error_count}
-          </div>
-        </div>
-      </div>
+      </details>
 
       {/* Last activity */}
       <div
@@ -532,7 +556,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
       >
         <Button
           onPress={handleTest}
-          isDisabled={isTesting || !source.is_enabled}
+          isDisabled={isTesting || !source.is_enabled || !testLocation}
           className="flex-1 px-3 py-2 text-sm font-medium bg-blue-600 text-white rounded hover:bg-blue-700 pressed:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
           aria-label={t('settings.weatherSources.testSourceAria', {
             name: source.display_name,
@@ -554,7 +578,7 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
             'meteoblue',
           ].includes(source.source_name) && (
             <Button
-              onPress={() => onDelete(source)}
+              onPress={() => setIsConfirmingDelete(true)}
               className="px-3 py-2 text-sm font-medium bg-red-600 text-white rounded hover:bg-red-700 pressed:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
               aria-label={t('settings.weatherSources.deleteSourceAria', {
                 name: source.display_name,
@@ -564,6 +588,34 @@ export const WeatherSourceCard: React.FC<WeatherSourceCardProps> = ({
             </Button>
           )}
       </div>
+
+      {isConfirmingDelete && (
+        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950/30">
+          <p className="text-sm text-red-900 dark:text-red-100">
+            {t('settings.weatherSources.deleteConfirmInline', {
+              name: source.display_name,
+            })}
+          </p>
+          <div className="mt-3 flex flex-wrap justify-end gap-2">
+            <Button
+              onPress={() => setIsConfirmingDelete(false)}
+              isDisabled={isDeleting}
+              className="rounded px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:opacity-50 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              onPress={handleConfirmDelete}
+              isDisabled={isDeleting}
+              className="rounded bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:opacity-50"
+            >
+              {isDeleting
+                ? t('settings.weatherSources.deletePending')
+                : t('settings.weatherSources.confirmDelete')}
+            </Button>
+          </div>
+        </div>
+      )}
     </article>
   );
 };

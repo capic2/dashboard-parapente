@@ -16,9 +16,16 @@ export type VideoExportStatusPayload = {
   job_id: string;
   status: string;
   internal_status?: string;
+  render_method?: 'cpu' | 'gpu' | null;
   progress?: number;
   message?: string | null;
   error?: string | null;
+  created_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  updated_at?: string | null;
+  total_frames?: number | null;
+  fps?: number | null;
   eta_seconds?: number;
   can_resume?: boolean;
   frames_captured?: number;
@@ -30,11 +37,13 @@ export type VideoExportStatusPayload = {
 type HookState = {
   status: VideoExportStatusPayload | null;
   isConnected: boolean;
+  error: Error | null;
 };
 
 const initialState: HookState = {
   status: null,
   isConnected: false,
+  error: null,
 };
 
 const TERMINAL_STATUSES = new Set(['cancelled', 'completed', 'failed']);
@@ -61,9 +70,23 @@ export const toStatusPayload = (
       typeof value.internal_status === 'string'
         ? value.internal_status
         : undefined,
+    render_method:
+      value.render_method === 'cpu' || value.render_method === 'gpu'
+        ? value.render_method
+        : undefined,
     progress: typeof value.progress === 'number' ? value.progress : undefined,
     message: typeof value.message === 'string' ? value.message : null,
     error: typeof value.error === 'string' ? value.error : null,
+    created_at: typeof value.created_at === 'string' ? value.created_at : null,
+    started_at: typeof value.started_at === 'string' ? value.started_at : null,
+    completed_at:
+      typeof value.completed_at === 'string' ? value.completed_at : null,
+    updated_at: typeof value.updated_at === 'string' ? value.updated_at : null,
+    total_frames:
+      typeof value.total_frames === 'number'
+        ? Math.max(0, value.total_frames)
+        : null,
+    fps: typeof value.fps === 'number' ? Math.max(0, value.fps) : null,
     eta_seconds:
       typeof value.eta_seconds === 'number'
         ? Math.max(0, value.eta_seconds)
@@ -170,6 +193,7 @@ export function useVideoExportStatus(
       setState({
         status,
         isConnected: true,
+        error: null,
       });
     };
 
@@ -177,6 +201,7 @@ export function useVideoExportStatus(
       setState((previous) => ({
         ...previous,
         isConnected: false,
+        error: new Error('Video export status stream disconnected'),
       }));
     };
 
@@ -195,6 +220,7 @@ export function useVideoExportStatus(
     return {
       status: polledStatus.data ?? null,
       isConnected: polledStatus.isSuccess,
+      error: polledStatus.error ?? null,
     };
   }
 

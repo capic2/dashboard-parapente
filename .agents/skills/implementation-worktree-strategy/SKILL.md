@@ -1,6 +1,6 @@
 ---
 name: implementation-worktree-strategy
-description: Enforces the Git start-of-work strategy for repository code changes by checking the current branch, fetching `origin/main`, and deciding whether to stay on the current branch or create a worktree from `origin/main`. Use when the user asks to implémenter, ajouter, corriger, refactorer, modifier du code, faire une feature, faire une implémentation, changer le frontend, changer le backend, or otherwise requests a code change, especially when worktrees must be created in `.codenomad/worktree` with names prefixed by `wt-`.
+description: Enforces the Git start-of-work strategy for repository code changes by checking the current branch, fetching `origin/main`, and deciding whether to stay on the current branch or create a worktree from `origin/main`. Use when the user asks to implémenter, ajouter, corriger, refactorer, modifier du code, faire une feature, faire une implémentation, changer le frontend, changer le backend, or otherwise requests a code change. Prefer Codex-managed worktrees, with names prefixed by `wt-`.
 ---
 
 # Implementation Worktree Strategy
@@ -14,21 +14,22 @@ Before any implementation task:
 3. If on another branch, ask whether to create a worktree.
 4. If yes, fetch `origin/main` and create the worktree from `origin/main`.
 5. If no, stay on the current branch.
-6. When a worktree is created, immediately launch the `worktree-bootstrap` subagent for dependency readiness.
+6. When a worktree is created, check dependency readiness locally. Use the `worktree-bootstrap` subagent only when installation is missing/unusable and parallel setup would materially reduce wait time.
 
-Create worktrees in `.codenomad/worktree` with names starting with `wt-`.
+When the Codex app worktree tool is available, create worktrees with that tool and use a name starting with `wt-`. For CLI-only sessions without the tool, create worktrees in `.codex/worktree`.
 Whenever a worktree is created, immediately name the current AI session with the exact worktree name.
 
 ## Analysis Baseline
 
-- Treat `origin/main` as the baseline for implementation analysis before editing.
-- Do not rely on local `main` for conclusions unless it has been verified aligned with `origin/main`.
-- If local `main` is stale, dirty, or ambiguous, create the implementation worktree from `origin/main` and continue analysis there.
+- Treat the current `main` commit published by GitHub as the implementation baseline.
+- Fetch `origin/main` before analysis and verify that the fetched SHA matches GitHub `main`; do not assume an existing local tracking ref is current.
+- Do not rely on local `main` for conclusions unless it has been verified aligned with the freshly fetched `origin/main`.
+- If local `main` is stale, dirty, or ambiguous, create the implementation worktree from the freshly fetched `origin/main` and continue analysis there.
 - If the user asks about local uncommitted changes or a specific branch/worktree, analyze that explicit target and say so.
 
 ## Worktree Bootstrap Subagent
 
-After creating a worktree, launch the `worktree-bootstrap` subagent immediately and let it run in parallel with the main implementation work.
+After creating a worktree, perform the lightweight readiness check locally. Delegate setup only when dependencies are missing or unusable and the user has asked for parallel execution.
 
 Subagent responsibility:
 
@@ -48,7 +49,7 @@ The main agent remains responsible for interpreting blockers and making code cha
 - Fetch `origin/main`.
 - Create a worktree from `origin/main`.
 - Name the current AI session with the exact worktree name.
-- Launch the `worktree-bootstrap` subagent.
+- Run the local readiness check; launch `worktree-bootstrap` only for missing/unusable dependencies when parallel setup is explicitly useful.
 - Continue implementation in that worktree.
 
 ### If current branch is not `main`
@@ -60,10 +61,10 @@ Ask:
 If yes:
 
 - Fetch `origin/main`.
-- Create a worktree from `origin/main` in `.codenomad/worktree`.
+- Create a worktree from `origin/main` using the Codex app worktree tool, or in `.codex/worktree` for CLI-only sessions.
 - Use a name like `wt-<task-label>`.
 - Name the current AI session with the exact worktree name.
-- Launch the `worktree-bootstrap` subagent.
+- Run the local readiness check; launch `worktree-bootstrap` only for missing/unusable dependencies when parallel setup is explicitly useful.
 - Continue there.
 
 If no:
@@ -75,7 +76,7 @@ If no:
 
 Before creating any worktree, run `git fetch origin main`.
 
-Create the worktree and branch from `origin/main`, not from local `main`: `git worktree add -b wt-<task-label> .codenomad/worktree/wt-<task-label> origin/main`.
+Create the worktree and branch from `origin/main`, not from local `main`. In the Codex app, use the managed worktree tool with `origin/main` as the ref. In CLI-only sessions, use: `git worktree add -b wt-<task-label> .codex/worktree/wt-<task-label> origin/main`.
 
 Never create an implementation worktree from stale local `main` unless the repository has no remote, and report that limitation.
 

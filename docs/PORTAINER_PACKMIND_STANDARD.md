@@ -132,3 +132,8 @@ Resultat: <success/rollback>
 
 Pour ce projet, la source de verite de la stack est `docker-compose.yml` a la racine.
 Portainer doit etre aligne avec cette definition et non l'inverse.
+
+Ne pas configurer `BACKEND_IMAGE`, `CI_BACKEND_IMAGE` ou
+`BACKEND_DEPLOY_VERSION` dans Portainer. Un redeploiement manuel utilise le tag
+`backend:main`; seul le workflow CI fournit `CI_BACKEND_IMAGE` pour deployer un
+tag immuable. La version de deploiement est embarquee dans l'image.

@@ -12,8 +12,11 @@ export function hasFlightVideo(flight: Flight): boolean {
 }
 
 export function hasFlightGoproOverlay(flight: Flight): boolean {
-  return Boolean(
-    flight.gopro_overlay_file_path && flight.gopro_overlay_file_exists === true
+  return (
+    flight.gopro_overlays?.some((overlay) => overlay.status === 'completed') ||
+    Boolean(
+      flight.gopro_overlay_file_path && flight.gopro_overlay_file_exists === true
+    )
   );
 }
 

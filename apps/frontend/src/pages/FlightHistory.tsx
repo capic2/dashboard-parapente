@@ -9,9 +9,18 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Site } from '../types';
 import type { FlightSummary } from '@dashboard-parapente/shared-types';
+import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
 import type { RowSelectionState, SortingState } from '@tanstack/react-table';
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
-import { Input, TextField } from 'react-aria-components';
+import {
+  Button as AriaButton,
+  Input,
+  Menu,
+  MenuItem,
+  MenuTrigger,
+  Popover,
+  TextField,
+} from 'react-aria-components';
 import {
   CheckSquare,
   FilePlus2,
@@ -20,6 +29,7 @@ import {
   Trash2,
   X,
   RefreshCw,
+  MoreHorizontal,
 } from 'lucide-react';
 import { IntervalsSyncModal } from '../components/flights/intervals-sync/IntervalsSyncModal';
 import { CreateFlightModal } from '../components/flights/create-flight/CreateFlightModal';
@@ -27,28 +37,20 @@ import { CreateSiteModal } from '../components/flights/create-site/CreateSiteMod
 import { FlightsTable } from '../components/flights/table/FlightsTable';
 import { FlightDetails } from '../components/flights/details/FlightDetails';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
-import {
-  ToastContainer,
-  Modal,
-  Button,
-} from '@dashboard-parapente/design-system';
-import { useToast, useToastStore } from '../hooks/useToast';
+import { Modal, Button } from '@dashboard-parapente/design-system';
+import { useToast } from '../hooks/useToast';
 import { HTTPError } from 'ky';
-import { api, getApiErrorMessage } from '../lib/api';
+import { api } from '../lib/api';
 import { useIsMobile } from '../hooks/useIsMobile';
-import { isUnavailableMediaError } from '../lib/flightMediaState';
 import { useFlight } from '../hooks/flights/useFlight';
+import { isGoproOverlayInProgress } from '../lib/flightMediaState';
 import {
   normalizeFlightsSearch,
   serializeFlightsSearch,
+  type FlightDetailsTab,
   type FlightsSearch,
   type FlightsRouteSearch,
 } from '../routes/-flightSearch';
-
-type DownloadingFlightMedia = {
-  flightId: string;
-  type: 'gpx' | 'video' | 'overlay';
-};
 
 function FlightListSkeleton() {
   return (
@@ -89,11 +91,106 @@ function FlightListError({
   );
 }
 
-function getFlightDownloadName(flight: FlightSummary, extension: string) {
-  const rawName = flight.title?.trim() || flight.name?.trim() || flight.id;
-  const filename = rawName.replace(/[^a-zA-Z0-9._-]+/gu, '_');
+function FlightSearchInput({
+  initialQuery,
+  onQueryChange,
+}: {
+  initialQuery: string;
+  onQueryChange: (query: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
 
-  return `${filename || flight.id}.${extension}`;
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (query === initialQuery) return;
+    const timeout = window.setTimeout(() => onQueryChange(query), 300);
+    return () => window.clearTimeout(timeout);
+  }, [initialQuery, onQueryChange, searchQuery]);
+
+  return (
+    <TextField
+      value={searchQuery}
+      onChange={setSearchQuery}
+      aria-label={t('flights.searchPlaceholder')}
+    >
+      <div className="relative">
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+          aria-hidden="true"
+        />
+        <Input
+          maxLength={200}
+          placeholder={t('flights.searchPlaceholder')}
+          className="min-h-11 w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+        />
+      </div>
+    </TextField>
+  );
+}
+
+const FLIGHT_BADGE_FILTERS = [
+  { id: 'gpx', label: 'flights.gpxBadge' },
+  { id: 'sportstracklive', label: 'flights.sportstrackliveBadge' },
+  { id: 'video', label: 'flights.videoBadge' },
+  { id: 'camera', label: 'flights.cameraBadge' },
+  { id: 'pano', label: 'flights.panoBadge' },
+  { id: 'goproOverlay', label: 'flights.goproOverlayBadge' },
+  { id: 'highlightVideo', label: 'flights.highlightVideoBadge' },
+  { id: 'youtube', label: 'flights.youtubeBadge' },
+] as const;
+
+type FlightBadgeFilter = (typeof FLIGHT_BADGE_FILTERS)[number]['id'];
+type BadgeFilterSelection = {
+  included: FlightBadgeFilter[];
+  excluded: FlightBadgeFilter[];
+};
+
+function flightHasBadgeFilter(
+  flight: FlightSummary,
+  filter: FlightBadgeFilter
+) {
+  switch (filter) {
+    case 'gpx':
+      return flight.has_gpx;
+    case 'sportstracklive':
+      return (
+        flight.sportstracklive_status === 'uploaded' &&
+        flight.sportstracklive_track_id != null
+      );
+    case 'video':
+      return (
+        flight.has_video ||
+        (flight.video_export_status != null &&
+          (VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(flight.video_export_status) ||
+            flight.video_export_status === 'failed'))
+      );
+    case 'camera':
+      return flight.has_camera;
+    case 'pano':
+      return flight.has_pano_video;
+    case 'goproOverlay':
+      return (
+        flight.has_gopro_overlay ||
+        isGoproOverlayInProgress(flight.gopro_overlay_status) ||
+        flight.gopro_overlay_status === 'failed'
+      );
+    case 'highlightVideo':
+      return (
+        flight.has_highlight_video ||
+        (flight.highlight_video_status != null &&
+          (VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(
+            flight.highlight_video_status
+          ) ||
+            flight.highlight_video_status === 'failed'))
+      );
+    case 'youtube':
+      return (
+        flight.has_youtube_video ||
+        flight.youtube_upload_status === 'queued' ||
+        flight.youtube_upload_status === 'uploading'
+      );
+  }
 }
 
 export default function FlightHistory() {
@@ -103,6 +200,8 @@ export default function FlightHistory() {
   const routeSearch = useSearch({ strict: false }) as FlightsRouteSearch;
   const search = normalizeFlightsSearch(routeSearch);
   const summariesQuery = useFlightSummaries(search);
+  const [selectedBadgeFilters, setSelectedBadgeFilters] =
+    useState<BadgeFilterSelection>({ included: [], excluded: [] });
   const activeJobsQuery = useActiveFlightMediaJobs();
   const flights = useMemo(
     () =>
@@ -112,7 +211,39 @@ export default function FlightHistory() {
       ),
     [summariesQuery.data, activeJobsQuery.data]
   );
+  const filteredFlights = useMemo(() => {
+    const { included, excluded } = selectedBadgeFilters;
+    if (included.length === 0 && excluded.length === 0) return flights;
+    return flights.filter((flight) => {
+      const matchesIncluded =
+        included.length === 0 ||
+        included.some((filter) => flightHasBadgeFilter(flight, filter));
+      const matchesExcluded = excluded.every(
+        (filter) => !flightHasBadgeFilter(flight, filter)
+      );
+      return matchesIncluded && matchesExcluded;
+    });
+  }, [flights, selectedBadgeFilters]);
+  const activeBadgeFilterCount =
+    selectedBadgeFilters.included.length + selectedBadgeFilters.excluded.length;
   const totalFlights = summariesQuery.data?.pages[0]?.total ?? 0;
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = summariesQuery;
+  let flightCountLabel = t('flights.registered', { count: totalFlights });
+  if (search.siteId) {
+    flightCountLabel = t('flights.registeredForSite', { count: totalFlights });
+  }
+  if (activeBadgeFilterCount > 0) {
+    flightCountLabel = t('flights.filteredFlightCount', {
+      count: filteredFlights.length,
+      total: totalFlights,
+    });
+  }
+
+  useEffect(() => {
+    if (activeBadgeFilterCount > 0 && hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage();
+    }
+  }, [activeBadgeFilterCount, fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   const isMobile = useIsMobile();
 
@@ -129,13 +260,7 @@ export default function FlightHistory() {
     'file'
   );
   const [showCreateSiteModal, setShowCreateSiteModal] = useState(false);
-  const [showMobileDetail, setShowMobileDetail] = useState(false);
-  const [searchQuery, setSearchQuery] = useState(search.q ?? '');
-  const [downloadingFlightMedia, setDownloadingFlightMedia] =
-    useState<DownloadingFlightMedia | null>(null);
-  const [unavailableMedia, setUnavailableMedia] = useState<Set<string>>(
-    () => new Set()
-  );
+  const showMobileDetail = Boolean(isMobile && selectedFlightId);
   const selectedFlightQuery = useFlight(selectedFlightId ?? '');
   const selectedFlight = selectedFlightQuery.data;
   const [isDeleting, setIsDeleting] = useState(false);
@@ -143,7 +268,6 @@ export default function FlightHistory() {
   const sites = sitesQuery.data ?? [];
   const queryClient = useQueryClient();
   const toast = useToast();
-  const { toasts, removeToast } = useToastStore();
   const previousActiveJobs = useRef(activeJobsQuery.data ?? []);
 
   const renderDetailPanel = (mobileMode: boolean) => {
@@ -154,6 +278,8 @@ export default function FlightHistory() {
             key={selectedFlightId}
             flight={selectedFlight}
             sites={sites}
+            activeTab={routeSearch.tab ?? 'infos'}
+            onActiveTabChange={handleActiveTabChange}
             onShowCreateSiteModal={() => setShowCreateSiteModal(true)}
             mobileMode
             onCloseMobile={handleCloseMobileDetail}
@@ -166,6 +292,8 @@ export default function FlightHistory() {
           key={selectedFlightId}
           flight={selectedFlight}
           sites={sites}
+          activeTab={routeSearch.tab ?? 'infos'}
+          onActiveTabChange={handleActiveTabChange}
           onShowCreateSiteModal={() => setShowCreateSiteModal(true)}
         />
       );
@@ -210,48 +338,38 @@ export default function FlightHistory() {
     }
 
     return (
-      <>
-        <FlightsTable
-          flights={flights}
-          selectedFlightId={selectedFlightId}
-          selectionMode={selectionMode}
-          onSelectFlight={handleSelectFlight}
-          onDeleteFlight={setFlightToDelete}
-          onDownloadGpx={handleDownloadFlightGpx}
-          onDownloadVideo={handleDownloadFlightVideo}
-          onDownloadOverlay={handleDownloadFlightOverlay}
-          downloadingMedia={downloadingFlightMedia}
-          unavailableMedia={unavailableMedia}
-          rowSelection={rowSelection}
-          onRowSelectionChange={setRowSelection}
-          sorting={[{ id: search.sort, desc: search.order === 'desc' }]}
-          onSortingChange={(updater) => {
-            const current: SortingState = [
-              { id: search.sort, desc: search.order === 'desc' },
-            ];
-            const next =
-              typeof updater === 'function' ? updater(current) : updater;
-            const first = next[0];
-            if (!first) return;
-            void navigateWithSearch({
-              ...search,
-              sort: first.id as FlightsSearch['sort'],
-              order: first.desc ? 'desc' : 'asc',
-            });
-          }}
-        />
-        {summariesQuery.hasNextPage && (
-          <Button
-            className="mt-3 w-full"
-            isDisabled={summariesQuery.isFetchingNextPage}
-            onClick={() => void summariesQuery.fetchNextPage()}
-          >
-            {summariesQuery.isFetchingNextPage
-              ? t('flights.loadingMore')
-              : t('flights.loadMore')}
-          </Button>
-        )}
-      </>
+      <FlightsTable
+        flights={filteredFlights}
+        selectedFlightId={selectedFlightId}
+        selectionMode={selectionMode}
+        onSelectFlight={handleSelectFlight}
+        onDeleteFlight={setFlightToDelete}
+        rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
+        sorting={[{ id: search.sort, desc: search.order === 'desc' }]}
+        onSortingChange={(updater) => {
+          const current: SortingState = [
+            { id: search.sort, desc: search.order === 'desc' },
+          ];
+          const next =
+            typeof updater === 'function' ? updater(current) : updater;
+          const first = next[0];
+          if (!first) return;
+          void navigateWithSearch({
+            ...search,
+            sort: first.id as FlightsSearch['sort'],
+            order: first.desc ? 'desc' : 'asc',
+          });
+        }}
+        hasMoreFlights={hasNextPage}
+        isLoadingMore={isFetchingNextPage}
+        onLoadMore={() => void fetchNextPage()}
+        emptyMessage={
+          activeBadgeFilterCount > 0
+            ? t('flights.noFlightsWithBadges')
+            : t('flights.noFlights')
+        }
+      />
     );
   };
 
@@ -271,41 +389,50 @@ export default function FlightHistory() {
     }
   }, [activeJobsQuery.data, queryClient]);
 
-  useEffect(() => {
-    setUnavailableMedia(new Set());
-  }, [summariesQuery.dataUpdatedAt]);
-
   const navigateWithSearch = useCallback(
     (nextSearch: FlightsSearch, flightId = selectedFlightId) => {
       if (flightId) {
         return navigate({
           to: '/flights/$flightId',
           params: { flightId },
-          search: serializeFlightsSearch(nextSearch),
+          search: {
+            ...serializeFlightsSearch(nextSearch),
+            tab: routeSearch.tab,
+          },
           replace: true,
         });
       }
       return navigate({
         to: '/flights',
-        search: serializeFlightsSearch(nextSearch),
+        search: { ...serializeFlightsSearch(nextSearch), tab: routeSearch.tab },
         replace: true,
       });
     },
-    [navigate, selectedFlightId]
+    [navigate, routeSearch.tab, selectedFlightId]
   );
 
-  useEffect(() => {
-    setSearchQuery(search.q ?? '');
-  }, [search.q]);
+  const handleActiveTabChange = useCallback(
+    (tab: FlightDetailsTab) => {
+      const nextSearch = {
+        ...serializeFlightsSearch(search),
+        tab: tab === 'infos' ? undefined : tab,
+      };
+      if (selectedFlightId) {
+        void navigate({
+          to: '/flights/$flightId',
+          params: { flightId: selectedFlightId },
+          search: nextSearch,
+        });
+        return;
+      }
+      void navigate({ to: '/flights', search: nextSearch });
+    },
+    [navigate, search, selectedFlightId]
+  );
 
-  useEffect(() => {
-    const q = searchQuery.trim() || undefined;
-    if (q === search.q) return;
-    const timeout = window.setTimeout(() => {
-      void navigateWithSearch({ ...search, q });
-    }, 300);
-    return () => window.clearTimeout(timeout);
-  }, [navigateWithSearch, search, searchQuery]);
+  const handleSearchQueryChange = (query: string) => {
+    void navigateWithSearch({ ...search, q: query || undefined });
+  };
 
   const setSelectedFlightId = useCallback(
     (flightId: string | undefined) => {
@@ -313,37 +440,27 @@ export default function FlightHistory() {
         void navigate({
           to: '/flights/$flightId',
           params: { flightId },
-          search: serializeFlightsSearch(search),
+          search: { ...serializeFlightsSearch(search), tab: routeSearch.tab },
         });
         return;
       }
 
       void navigate({
         to: '/flights',
-        search: serializeFlightsSearch(search),
+        search: { ...serializeFlightsSearch(search), tab: routeSearch.tab },
       });
     },
-    [navigate, search]
+    [navigate, routeSearch.tab, search]
   );
-
-  useEffect(() => {
-    if (isMobile && selectedFlightId) {
-      setShowMobileDetail(true);
-    }
-  }, [isMobile, selectedFlightId]);
 
   const handleSelectFlight = useCallback(
     (flight: FlightSummary) => {
       setSelectedFlightId(flight.id);
-      if (isMobile) {
-        setShowMobileDetail(true);
-      }
     },
-    [isMobile, setSelectedFlightId]
+    [setSelectedFlightId]
   );
 
   const handleCloseMobileDetail = useCallback(() => {
-    setShowMobileDetail(false);
     setSelectedFlightId(undefined);
   }, [setSelectedFlightId]);
 
@@ -351,7 +468,6 @@ export default function FlightHistory() {
     setSelectionMode((prev) => !prev);
     setRowSelection({});
     setSelectedFlightId(undefined);
-    setShowMobileDetail(false);
   }, [setSelectedFlightId]);
 
   const selectedFlightIds = Object.keys(rowSelection);
@@ -359,11 +475,29 @@ export default function FlightHistory() {
 
   const handleSelectAll = useCallback(() => {
     const allSelected: RowSelectionState = {};
-    for (const flight of flights) {
+    for (const flight of filteredFlights) {
       allSelected[flight.id] = true;
     }
     setRowSelection(allSelected);
-  }, [flights]);
+  }, [filteredFlights]);
+
+  const toggleBadgeFilter = (filter: FlightBadgeFilter) => {
+    setSelectedBadgeFilters((current) => {
+      if (current.included.includes(filter)) {
+        return {
+          included: current.included.filter((selected) => selected !== filter),
+          excluded: [...current.excluded, filter],
+        };
+      }
+      if (current.excluded.includes(filter)) {
+        return {
+          ...current,
+          excluded: current.excluded.filter((selected) => selected !== filter),
+        };
+      }
+      return { ...current, included: [...current.included, filter] };
+    });
+  };
 
   const handleDeselectAll = useCallback(() => {
     setRowSelection({});
@@ -416,7 +550,6 @@ export default function FlightHistory() {
         toast.success(t('flights.deletedSuccess'));
         if (selectedFlightId === flightToDelete.id) {
           setSelectedFlightId(undefined);
-          setShowMobileDetail(false);
         }
         setFlightToDelete(null);
       }
@@ -448,271 +581,198 @@ export default function FlightHistory() {
     t,
   ]);
 
-  const handleDownloadFlightGpx = useCallback(
-    async (flight: FlightSummary) => {
-      if (!flight.has_gpx || downloadingFlightMedia) return;
-
-      setDownloadingFlightMedia({ flightId: flight.id, type: 'gpx' });
-      try {
-        const blob = await api.get(`flights/${flight.id}/gpx`).blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = getFlightDownloadName(flight, 'gpx');
-        a.click();
-        URL.revokeObjectURL(url);
-      } catch (error) {
-        if (isUnavailableMediaError(error)) {
-          setUnavailableMedia((current) =>
-            new Set(current).add(`${flight.id}:gpx`)
-          );
-        }
-        toast.error(t('flights.gpxDownloadError'));
-      } finally {
-        setDownloadingFlightMedia(null);
-      }
-    },
-    [downloadingFlightMedia, t, toast]
-  );
-
-  const handleDownloadFlightVideo = useCallback(
-    async (flight: FlightSummary) => {
-      if (!flight.has_video || downloadingFlightMedia) {
-        return;
-      }
-
-      setDownloadingFlightMedia({ flightId: flight.id, type: 'video' });
-      try {
-        const blob = await api
-          .get(`flights/${flight.id}/video`, {
-            timeout: false,
-          })
-          .blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = getFlightDownloadName(flight, 'mp4');
-        a.click();
-        URL.revokeObjectURL(url);
-      } catch (error) {
-        if (isUnavailableMediaError(error)) {
-          setUnavailableMedia((current) =>
-            new Set(current).add(`${flight.id}:video`)
-          );
-        }
-        toast.error(
-          await getApiErrorMessage(
-            error,
-            t('flights.viewer.videoDownloadError')
-          )
-        );
-      } finally {
-        setDownloadingFlightMedia(null);
-      }
-    },
-    [downloadingFlightMedia, t, toast]
-  );
-
-  const handleDownloadFlightOverlay = useCallback(
-    async (flight: FlightSummary) => {
-      if (!flight.has_gopro_overlay || downloadingFlightMedia) return;
-
-      setDownloadingFlightMedia({ flightId: flight.id, type: 'overlay' });
-      try {
-        const blob = await api
-          .get(`flights/${flight.id}/gopro-overlay`, {
-            timeout: false,
-          })
-          .blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = getFlightDownloadName(flight, 'mp4');
-        a.click();
-        URL.revokeObjectURL(url);
-      } catch (error) {
-        if (isUnavailableMediaError(error)) {
-          setUnavailableMedia((current) =>
-            new Set(current).add(`${flight.id}:overlay`)
-          );
-        }
-        toast.error(
-          await getApiErrorMessage(
-            error,
-            t('flights.goproOverlayDownloadError')
-          )
-        );
-      } finally {
-        setDownloadingFlightMedia(null);
-      }
-    },
-    [downloadingFlightMedia, t, toast]
-  );
-
   return (
     <div>
-      {/* Toast notifications */}
-      <ToastContainer toasts={toasts} onClose={removeToast} />
-
-      <div className="mb-4 bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-              {t('flights.history')}
-            </h1>
-            <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-              {selectionMode && selectedCount > 0 ? (
-                <span className="text-sky-600 dark:text-sky-400 font-semibold">
-                  {t('flights.selected', { count: selectedCount })}
-                </span>
-              ) : (
-                <span>
-                  {search.siteId
-                    ? t('flights.registeredForSite', {
-                        count: totalFlights,
-                      })
-                    : t('flights.registered', {
-                        count: totalFlights,
-                      })}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            {!selectionMode && (
-              <Button
-                onClick={() => {
-                  setCreateFlightMode('file');
-                  setShowCreateFlightModal(true);
-                }}
-                className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors flex items-center gap-2"
-              >
-                <Upload className="h-4 w-4" aria-hidden="true" />
-                {t('flights.importFile')}
-              </Button>
-            )}
-
-            {!selectionMode && (
-              <Button
-                onClick={() => {
-                  setCreateFlightMode('manual');
-                  setShowCreateFlightModal(true);
-                }}
-                variant="secondary"
-                className="px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-              >
-                <FilePlus2 className="h-4 w-4" aria-hidden="true" />
-                {t('flights.manualEntry')}
-              </Button>
-            )}
-
-            {!selectionMode && (
-              <Button
-                onClick={() => setShowIntervalsSyncModal(true)}
-                variant="secondary"
-                className="px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-              >
-                <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                {t('flights.syncIntervals')}
-              </Button>
-            )}
-
-            <Button
-              onClick={handleToggleSelectionMode}
-              className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-                selectionMode
-                  ? 'bg-gray-600 text-white hover:bg-gray-700'
-                  : 'bg-white text-sky-700 border border-sky-200 hover:bg-sky-50 dark:bg-gray-800 dark:text-sky-300 dark:border-sky-800 dark:hover:bg-sky-950/40'
-              }`}
-            >
-              {selectionMode ? (
-                <X className="h-4 w-4" aria-hidden="true" />
-              ) : (
-                <CheckSquare className="h-4 w-4" aria-hidden="true" />
-              )}
-              {selectionMode ? t('flights.cancel') : t('flights.select')}
-            </Button>
-          </div>
+      <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-950 dark:text-white">
+            {t('flights.history')}
+          </h1>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+            {flightCountLabel}
+          </p>
         </div>
 
-        {!selectionMode && (
-          <div className="grid grid-cols-1 gap-3 border-t border-gray-200 pt-3 dark:border-gray-700 md:grid-cols-[minmax(0,1fr)_220px]">
-            <TextField
-              value={searchQuery}
-              onChange={setSearchQuery}
-              aria-label={t('flights.searchPlaceholder')}
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => {
+              setCreateFlightMode('file');
+              setShowCreateFlightModal(true);
+            }}
+            className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 sm:flex-none"
+          >
+            <Upload className="h-4 w-4" aria-hidden="true" />
+            {t('flights.importFile')}
+          </Button>
+          <MenuTrigger>
+            <AriaButton
+              aria-label={t('flights.moreActions')}
+              className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
             >
-              <div className="relative">
-                <Search
-                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-                  aria-hidden="true"
-                />
-                <Input
-                  maxLength={200}
-                  placeholder={t('flights.searchPlaceholder')}
-                  className="min-h-11 w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-                />
-              </div>
-            </TextField>
+              <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+            </AriaButton>
+            <Popover className="z-40 mt-2 w-64 rounded-xl border border-gray-200 bg-white p-1 shadow-xl dark:border-gray-700 dark:bg-gray-800">
+              <Menu className="outline-none">
+                <MenuItem
+                  onAction={() => {
+                    setCreateFlightMode('manual');
+                    setShowCreateFlightModal(true);
+                  }}
+                  className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+                >
+                  <FilePlus2 className="h-4 w-4" aria-hidden="true" />
+                  {t('flights.manualEntry')}
+                </MenuItem>
+                <MenuItem
+                  onAction={() => setShowIntervalsSyncModal(true)}
+                  className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+                >
+                  <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                  {t('flights.syncIntervals')}
+                </MenuItem>
+              </Menu>
+            </Popover>
+          </MenuTrigger>
+        </div>
+      </header>
 
-            <select
-              value={search.gpx}
-              onChange={(event) =>
-                void navigateWithSearch({
-                  ...search,
-                  gpx: event.target.value as FlightsSearch['gpx'],
-                })
-              }
-              aria-label={t('flights.gpxFilter')}
-              className="min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-            >
-              <option value="all">{t('flights.allGpxStatuses')}</option>
-              <option value="with">{t('flights.withGpx')}</option>
-              <option value="missing">{t('flights.withoutGpx')}</option>
-            </select>
-          </div>
-        )}
-
-        {selectionMode && (
-          <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
-            <Button
-              onClick={handleSelectAll}
-              className="px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
-            >
-              {t('flights.selectAll')}
-            </Button>
-            <Button
-              onClick={handleDeselectAll}
-              className="px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
-            >
-              {t('flights.deselectAll')}
-            </Button>
-            <Button
-              onClick={() => setShowMultiDeleteConfirm(true)}
-              isDisabled={selectedCount === 0}
-              className="ml-0 sm:ml-auto px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed"
-            >
-              <Trash2 className="h-4 w-4" aria-hidden="true" />
-              {t('flights.deleteCount', { count: selectedCount })}
-            </Button>
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(22rem,26rem)_minmax(0,1fr)]">
         {/* Flight List */}
         {(!isMobile || !showMobileDetail) && (
-          <div className={isMobile ? '' : 'lg:col-span-1 lg:h-full'}>
+          <aside className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/40">
+            {!selectionMode ? (
+              <div className="mb-3 space-y-2 border-b border-slate-200 pb-3 dark:border-slate-700">
+                <FlightSearchInput
+                  key={search.q ?? ''}
+                  initialQuery={search.q ?? ''}
+                  onQueryChange={handleSearchQueryChange}
+                />
+                <fieldset className="min-w-0 space-y-2">
+                  <legend className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+                    {t('flights.tagFilter')}
+                  </legend>
+                  <div className="flex flex-wrap gap-1.5">
+                    {FLIGHT_BADGE_FILTERS.map((filter) => {
+                      const isIncluded = selectedBadgeFilters.included.includes(
+                        filter.id
+                      );
+                      const isExcluded = selectedBadgeFilters.excluded.includes(
+                        filter.id
+                      );
+                      const isSelected = isIncluded || isExcluded;
+                      let stateClassName =
+                        'border-slate-300 bg-white text-slate-700 hover:border-sky-400 hover:bg-sky-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700';
+                      let accessibleStateKey = 'flights.tagNotSelected';
+                      if (isIncluded) {
+                        stateClassName =
+                          'border-sky-600 bg-sky-600 text-white dark:border-sky-400 dark:bg-sky-400 dark:text-slate-950';
+                        accessibleStateKey = 'flights.tagIncluded';
+                      }
+                      if (isExcluded) {
+                        stateClassName =
+                          'border-rose-600 bg-rose-600 text-white dark:border-rose-400 dark:bg-rose-400 dark:text-slate-950';
+                        accessibleStateKey = 'flights.tagExcluded';
+                      }
+                      return (
+                        <button
+                          key={filter.id}
+                          type="button"
+                          aria-pressed={isSelected}
+                          aria-label={t(accessibleStateKey, {
+                            tag: t(filter.label),
+                          })}
+                          onClick={() => toggleBadgeFilter(filter.id)}
+                          className={`min-h-9 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${stateClassName}`}
+                        >
+                          {isExcluded && (
+                            <span aria-hidden="true" className="mr-1 font-bold">
+                              −
+                            </span>
+                          )}
+                          {t(filter.label)}
+                        </button>
+                      );
+                    })}
+                    {activeBadgeFilterCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedBadgeFilters({
+                            included: [],
+                            excluded: [],
+                          })
+                        }
+                        className="min-h-9 rounded-full px-3 py-1 text-xs font-medium text-sky-700 underline underline-offset-2 hover:text-sky-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-sky-300 dark:hover:text-sky-100"
+                      >
+                        {t('flights.allTags')}
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {t('flights.tagFilterInstructions')}
+                  </p>
+                </fieldset>
+                <div className="flex justify-end">
+                  <Button
+                    variant="ghost"
+                    onClick={handleToggleSelectionMode}
+                    className="min-h-10 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <CheckSquare className="h-4 w-4" aria-hidden="true" />
+                    {t('flights.select')}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-800 dark:bg-sky-950/30">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold text-sky-900 dark:text-sky-100">
+                    {t('flights.selected', { count: selectedCount })}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleToggleSelectionMode}
+                    aria-label={t('flights.cancel')}
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleSelectAll}
+                  >
+                    {t('flights.selectAll')}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleDeselectAll}
+                  >
+                    {t('flights.deselectAll')}
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => setShowMultiDeleteConfirm(true)}
+                    isDisabled={selectedCount === 0}
+                    className="ml-auto"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    {t('flights.deleteCount', { count: selectedCount })}
+                  </Button>
+                </div>
+              </div>
+            )}
             {renderListPanel()}
-          </div>
+          </aside>
         )}
 
         {/* Detail Panel + 3D Viewer (desktop) */}
         {!isMobile && (
-          <div className="lg:col-span-2 space-y-4">
-            {renderDetailPanel(false)}
-          </div>
+          <main className="min-w-0 space-y-4">{renderDetailPanel(false)}</main>
         )}
 
         {/* Detail Panel + 3D Viewer (mobile) */}

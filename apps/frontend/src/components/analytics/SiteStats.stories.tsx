@@ -13,6 +13,7 @@ const meta = preview.meta({
 const mockFlights = [
   ...Array.from({ length: 15 }, (_, i) => ({
     id: `${i}`,
+    tags: [],
     site_name: 'Annecy',
     site_id: '1',
     max_altitude_m: 1200 + i * 10,
@@ -21,6 +22,7 @@ const mockFlights = [
   })),
   ...Array.from({ length: 10 }, (_, i) => ({
     id: `${i + 15}`,
+    tags: [],
     site_name: 'Chamonix',
     site_id: '2',
     max_altitude_m: 1500 + i * 10,
@@ -29,6 +31,7 @@ const mockFlights = [
   })),
   ...Array.from({ length: 8 }, (_, i) => ({
     id: `${i + 25}`,
+    tags: [],
     site_name: 'Mont Poupet',
     site_id: '3',
     max_altitude_m: 1000 + i * 10,
@@ -37,6 +40,7 @@ const mockFlights = [
   })),
   ...Array.from({ length: 5 }, (_, i) => ({
     id: `${i + 33}`,
+    tags: [],
     site_name: 'Talloires',
     site_id: '4',
     max_altitude_m: 1300 + i * 10,
@@ -50,6 +54,7 @@ const mockFlightsWithNull = [
   // Add flights without site_id (should be ignored)
   ...Array.from({ length: 3 }, (_, i) => ({
     id: `no-site-${i}`,
+    tags: [],
     site_name: null,
     site_id: null,
     max_altitude_m: 1000,

@@ -30,6 +30,9 @@ export const deploymentDrainStatusQueryOptions = () =>
       query.state.data?.phase === 'idle' ? 30_000 : 5_000,
   });
 
-export function useDeploymentDrainStatus() {
-  return useQuery(deploymentDrainStatusQueryOptions());
+export function useDeploymentDrainStatus(enabled = true) {
+  return useQuery({
+    ...deploymentDrainStatusQueryOptions(),
+    enabled,
+  });
 }

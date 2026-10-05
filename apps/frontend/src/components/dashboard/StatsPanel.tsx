@@ -7,10 +7,13 @@ import {
   Ruler,
   Timer,
   Trophy,
+  RefreshCw,
   Waves,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { Button } from '@dashboard-parapente/design-system';
 import { useFlightStats } from '../../hooks/flights/useFlights';
+import { parseApiLocalDate } from '../../lib/date';
 
 const iconClass = 'h-5 w-5';
 
@@ -53,7 +56,13 @@ function StatCard({ icon: Icon, label, value, tone }: StatCardProps) {
 
 export default function StatsPanel() {
   const { t, i18n } = useTranslation();
-  const { data: stats, isLoading, error } = useFlightStats();
+  const {
+    data: stats,
+    isLoading,
+    error,
+    refetch,
+    isRefetching,
+  } = useFlightStats();
 
   if (isLoading) {
     return (
@@ -85,6 +94,19 @@ export default function StatsPanel() {
         <div className="py-5 text-center text-red-500 dark:text-red-400 text-sm">
           {t('common.dataUnavailable')}
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onPress={() => void refetch()}
+          isDisabled={isRefetching}
+          className="mx-auto"
+        >
+          <RefreshCw
+            className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`}
+            aria-hidden="true"
+          />
+          {t('common.refresh')}
+        </Button>
       </div>
     );
   }
@@ -152,7 +174,7 @@ export default function StatsPanel() {
       icon: CalendarDays,
       label: t('stats.lastFlight'),
       value: stats.last_flight_date
-        ? new Date(stats.last_flight_date).toLocaleDateString(
+        ? parseApiLocalDate(stats.last_flight_date).toLocaleDateString(
             i18n.language.startsWith('en') ? 'en-US' : 'fr-FR',
             {
               day: '2-digit',

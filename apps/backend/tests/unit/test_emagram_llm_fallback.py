@@ -82,6 +82,18 @@ def test_default_order_prefers_free_providers(monkeypatch: pytest.MonkeyPatch) -
     assert calls == ["groq"]
 
 
+def test_normalize_llm_analysis_preserves_source_agreement() -> None:
+    analysis = _analysis("groq")
+    analysis["sources_agreement"] = "medium"
+
+    result = emagram._normalize_llm_analysis(
+        analysis,
+        {"provider": "groq", "model": "groq-model", "analyzer": "groq"},
+    )
+
+    assert result["sources_agreement"] == "medium"
+
+
 def test_falls_back_from_groq_to_openrouter(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = []
     _configure_providers(monkeypatch, ["groq", "openrouter", "google"])

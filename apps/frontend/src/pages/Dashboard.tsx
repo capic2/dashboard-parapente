@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueries } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
@@ -15,18 +16,37 @@ import { createWeatherQueryFn } from '../hooks/weather/useWeather';
 import { getStaleTime, getWeatherRefetchInterval } from '../lib/cacheConfig';
 import type { WeatherData } from '../types';
 import type { SiteWeatherEntry } from '../components/dashboard/AllSitesConditions';
+import { useCurrentLocation } from '../hooks/useCurrentLocation';
+import { useBestSpotRadius } from '../hooks/useBestSpotRadius';
 
 export default function Dashboard() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const currentLocation = useCurrentLocation();
+  const { radiusKm, setRadiusKm } = useBestSpotRadius();
   const {
     data: sites = [],
     isLoading: areSitesLoading,
     isError: sitesLoadFailed,
     refetch: refetchSites,
   } = useQuery(sitesQueryOptions());
-  const { data: bestSpot } = useBestSpotAPI(0);
-  const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(0);
+  const nearbyLocation = currentLocation.isLoading
+    ? undefined
+    : currentLocation.location;
+  const { data: bestSpot } = useBestSpotAPI(
+    0,
+    nearbyLocation,
+    radiusKm,
+    !currentLocation.isLoading && Boolean(nearbyLocation)
+  );
+  const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(
+    0,
+    24,
+    nearbyLocation,
+    radiusKm,
+    !currentLocation.isLoading && Boolean(nearbyLocation)
+  );
+  const [today] = useState(() => new Date());
   const todayLabel = new Intl.DateTimeFormat(
     i18n.language.startsWith('en') ? 'en-US' : 'fr-FR',
     {
@@ -34,7 +54,7 @@ export default function Dashboard() {
       day: 'numeric',
       month: 'long',
     }
-  ).format(new Date());
+  ).format(today);
 
   // Fetch current weather for all sites (day 0), auto-refresh every hour
   const weatherQueries = useQueries({
@@ -54,6 +74,14 @@ export default function Dashboard() {
     isLoading: weatherQueries[index]?.isLoading ?? true,
     isError: weatherQueries[index]?.isError ?? false,
   }));
+
+  const refreshFailedWeather = () => {
+    void Promise.all(
+      weatherQueries
+        .filter((query) => query.isError)
+        .map((query) => query.refetch())
+    );
+  };
 
   if (areSitesLoading) {
     return <DashboardLoadingState label={t('common.loading')} />;
@@ -149,9 +177,18 @@ export default function Dashboard() {
             void navigate({ to: '/weather', search: { siteId } })
           }
           selectedDayIndex={0}
+          radiusKm={radiusKm}
+          onRadiusChange={setRadiusKm}
+          locationUnavailable={
+            !currentLocation.isLoading && !currentLocation.location
+          }
+          onRetryLocation={currentLocation.requestLocation}
         />
 
-        <AllSitesConditions entries={siteWeatherEntries} />
+        <AllSitesConditions
+          entries={siteWeatherEntries}
+          onRefresh={refreshFailedWeather}
+        />
       </div>
     </div>
   );

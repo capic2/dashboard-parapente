@@ -1,5 +1,7 @@
 import asyncio
+import fcntl
 import fnmatch
+import hashlib
 import hmac
 import json
 import logging
@@ -8,10 +10,11 @@ import os
 import subprocess
 import uuid
 import xml.etree.ElementTree as ET
+from dataclasses import asdict
 from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 from zoneinfo import ZoneInfo
 
 if TYPE_CHECKING:
@@ -23,18 +26,22 @@ from fastapi import (
     Depends,
     File,
     Form,
+    Path as FastAPIPath,
     HTTPException,
     Query,
     Request,
     Response,
     UploadFile,
 )
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
+from pydantic import BaseModel, Field
 
 import config
+from datetime_utils import to_api_utc
 from auth import (
     authenticate_user,
     create_access_token,
@@ -52,7 +59,10 @@ from deployment_drain import (
     job_admission,
 )
 from emagram_freshness import get_emagram_cutoff_utc
+from flight_file_paths import resolve_flight_file_path as _resolve_flight_file_path
 from flight_decision import build_flight_decision, normalize_objective
+from flight_duration import calculate_real_flight_duration_minutes
+from flight_naming import format_automatic_flight_name
 from flight_summaries import (
     FlightGpxStatus,
     FlightSortBy,
@@ -60,32 +70,71 @@ from flight_summaries import (
     SortOrder,
     list_flight_summaries,
 )
-from flight_storage import flight_sequence_number, write_flight_text_file
-from flight_tracks import calculate_track_stats, normalize_track
+from flight_storage import (
+    ensure_flight_directory,
+    flight_sequence_number,
+    flight_storage_root,
+    pano_video_path,
+    pano_video_paths,
+    temporary_video_path,
+    write_flight_text_file,
+)
+from flight_tracks import (
+    calculate_track_stats,
+    enrich_telemetry_points,
+    normalize_track,
+)
 from gopro_overlay_export import (
+    align_video_start_time_to_gpx,
     cancel_gopro_overlay_job,
     check_gopro_overlay_dependencies,
     create_gopro_overlay_job,
     create_gopro_overlay_job_from_paths,
     delete_gopro_overlay_job,
     delete_gopro_overlay_output,
+    enriched_gpx_path,
+    ensure_enriched_gpx,
+    first_gpx_timestamp,
+    _first_gpx_at_for_camera_timeline,
     get_gopro_overlay_job,
+    gpx_duration_seconds,
     gopro_overlay_output_path,
+    gopro_overlay_browser_preview_path,
+    gopro_overlay_job_to_payload,
     list_gopro_overlay_jobs,
     list_gopro_overlay_layouts,
+    probe_video_duration,
     probe_video_resolution,
+    resolve_gopro_video_start_time,
     save_uploaded_file,
     stream_gopro_overlay_job,
 )
+import gopro_preview_proxy
+from video_acceleration import get_gpu_runtime_status
 from models import (
+    BackgroundOperation as BackgroundOperationModel,
     EmagramAnalysis,
     Flight,
+    GoproOverlayJob as GoproOverlayJobModel,
+    HighlightVideoJob,
     Site,
     SiteLandingAssociation,
     User,
     VideoExportJob,
     WeatherForecast,
     WeatherSourceConfig,
+    YoutubeUploadJob,
+    TelemetryLayout,
+)
+from telemetry_layouts import DEFAULT_TELEMETRY_LAYOUT_XML, validate_telemetry_layout_xml
+from sportstracklive import (
+    connection_settings as sportstracklive_connection_settings,
+    launch_automatic_upload_worker as launch_sportstracklive_upload_worker,
+    mark_automatic_upload_queued as mark_sportstracklive_upload_queued,
+    queue_automatic_upload as queue_sportstracklive_upload,
+    remove_connection_settings as remove_sportstracklive_connection_settings,
+    save_connection_settings as save_sportstracklive_connection_settings,
+    upload_flight as send_flight_to_sportstracklive,
 )
 from para_index import analyze_hourly_slots, calculate_para_index, format_slots_summary
 from schemas import (
@@ -95,22 +144,45 @@ from schemas import EmagramAnalysis as EmagramAnalysisSchema
 from schemas import (
     EmagramAnalysisListItem,
     EmagramTriggerRequest,
+    DeploymentDrainAdmission,
     DeploymentDrainRequest,
+    DeploymentDrainJob,
     DeploymentDrainStatus,
+    BackgroundOperation,
+    BackgroundOperationStart,
     ExternalImportResult,
     FlightCreate,
     FlightDecisionResponse,
     FlightRecordsResponse,
     FlightSummariesResponse,
+    Flight as FlightSchema,
     FlightUpdate,
+    youtube_video_id_from_url,
     GoproOverlayCancelResponse,
     GoproOverlayDependencies,
     GoproOverlayJob,
+    GoproOverlayPreview,
+    FlightTelemetryResponse,
+    TelemetryLayoutResponse,
+    TelemetryLayoutUpdate,
+    FlightOverlayLayer,
+    GoproOverlayEnrichmentResponse,
+    GoproPreviewRequest,
+    GoproPreviewState,
     GoproOverlayLayoutsResponse,
     GoproOverlayProbeResponse,
+    HighlightVideoClipResponse,
+    HighlightVideoDeleteResponse,
+    HighlightVideoJobResponse,
     IntervalsPreviewResponse,
     IntervalsStatus,
     IntervalsSyncRequest,
+    YoutubeAuthUrlRequest,
+    YoutubeVideoAssociation,
+    YoutubeVideoRemoveRequest,
+    YoutubeUploadCreate,
+    YoutubeUploadJobResponse,
+    YoutubeOverlayExportCreate,
 )
 from schemas import LandingAssociation as LandingAssociationSchema
 from schemas import (
@@ -122,6 +194,8 @@ from schemas import (
 from schemas import Site as SiteSchema
 from schemas import (
     SiteCreate,
+    SitePracticalInfoSuggestionRequest,
+    SitePracticalInfoSuggestionResponse,
     SiteUpdate,
     SpotsResponse,
     VideoExportTempCleanupResponse,
@@ -134,6 +208,15 @@ from schemas import (
     WeatherSourceTestResult,
 )
 from versioning import get_version_payload
+from video_thumbnail import VideoThumbnailError, get_video_thumbnail
+from gopro_overlay_inputs import first_matching_file, latest_matching_file
+from highlight_video_worker import (
+    STATUS_QUEUED as HIGHLIGHT_STATUS_QUEUED,
+    cleanup_highlight_job_files,
+    create_highlight_job_id,
+    enqueue_highlight_video_job,
+    process_highlight_video_job,
+)
 from video_export import cancel_video_export as cancel_video_export_stream
 from video_export import delete_export_job as delete_video_export_stream_job
 from video_export import get_export_status as get_export_status_stream
@@ -150,9 +233,42 @@ from video_export_manual import (
     resume_video_export,
     start_video_export_manual,
     start_video_export_manual_fast,
+    start_youtube_overlay_export,
 )
-from weather_pipeline import get_daily_aggregate, get_normalized_forecast
+from weather_pipeline import filter_remaining_hours, get_daily_aggregate, get_normalized_forecast
 from weather_sources import ensure_weather_source_configs
+from youtube_upload import (
+    YoutubeConfigurationError,
+    YoutubeOAuthError,
+    YoutubeRemoteDeletionError,
+    YoutubeVideoDeletionForbiddenError,
+    YoutubeVideoNotAssociatedError,
+    active_job as active_youtube_upload_job,
+    cancel_upload as cancel_youtube_upload,
+    create_authorization_url,
+    decode_oauth_state,
+    disconnect as disconnect_youtube,
+    enqueue_youtube_upload,
+    exchange_authorization_code,
+    is_configured as is_youtube_configured,
+    is_connected as is_youtube_connected,
+    job_payload as youtube_upload_job_payload,
+    latest_job as latest_youtube_upload_job,
+    remove_youtube_video,
+    store_download_cookies as store_youtube_download_cookies,
+    migrate_flight_playlists,
+    upload_source_key as youtube_upload_source_key,
+    youtube_video_availability,
+    youtube_video_associations,
+)
+from operations import (
+    ACTIVE_STATUSES as OPERATION_ACTIVE_STATUSES,
+    OperationReporter,
+    get_user_operation,
+    operation_payload,
+    purge_expired_operations,
+    sync_operation_from_snapshot,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +282,7 @@ _VIDEO_EXPORT_IN_PROGRESS_STATUSES = {
     "capturing",
     "encoding",
     "preparing",
+    "uploading",
 }
 
 _VIDEO_EXPORT_CANCELLABLE_STATUSES = {
@@ -231,16 +348,6 @@ def _mark_flight_export_processing(db: Session, flight: Flight, job_id: str):
     db.refresh(flight)
 
 
-def _resolve_flight_file_path(file_path: str | None) -> Path | None:
-    if not file_path:
-        return None
-
-    path = Path(file_path)
-    if path.is_absolute() or path.exists():
-        return path
-    return Path(__file__).parent / path
-
-
 def _flight_video_file_exists(flight: Flight) -> bool:
     video_path = _resolve_flight_file_path(flight.video_file_path)
     return bool(video_path and video_path.exists())
@@ -262,32 +369,6 @@ def _resolve_gopro_paragliding_path(file_path: str | None) -> Path | None:
     if resolved != root_path and root_path not in resolved.parents:
         raise ValueError("GoPro overlay path must be inside the paragliding root")
     return resolved
-
-
-def _latest_matching_file(directory: Path, pattern: str) -> Path | None:
-    if not directory.is_dir():
-        return None
-    pattern_lower = pattern.lower()
-    matches = [
-        path
-        for path in directory.iterdir()
-        if path.is_file() and fnmatch.fnmatchcase(path.name.lower(), pattern_lower)
-    ]
-    if not matches:
-        return None
-    return max(matches, key=lambda path: (path.stat().st_mtime, path.name))
-
-
-def _first_matching_file(directory: Path, pattern: str) -> Path | None:
-    if not directory.is_dir():
-        return None
-    pattern_lower = pattern.lower()
-    matches = sorted(
-        path
-        for path in directory.iterdir()
-        if path.is_file() and fnmatch.fnmatchcase(path.name.lower(), pattern_lower)
-    )
-    return matches[0] if matches else None
 
 
 def _matching_files_by_mtime(directory: Path, pattern: str) -> list[Path]:
@@ -329,12 +410,42 @@ def _flight_gopro_overlay_path(
     return output_path if output_path.exists() else None
 
 
+def _directory_file_exists(path: Path) -> bool:
+    """Check a media file via its parent directory to avoid stale NFS dentries."""
+    try:
+        return any(
+            entry.name == path.name and not entry.is_symlink() and entry.is_file()
+            for entry in path.parent.iterdir()
+        )
+    except OSError:
+        return False
+
+
 def _flight_gopro_camera_file_exists(db: Session, flight: Flight) -> bool:
     try:
         camera_path = _gopro_overlay_flight_directory(db, flight, create=False) / "camera.mp4"
     except HTTPException:
         return False
-    return camera_path.exists()
+    return _directory_file_exists(camera_path)
+
+
+def _flight_gopro_camera_path(db: Session, flight: Flight) -> Path:
+    input_dir = _gopro_overlay_flight_directory(db, flight, create=False)
+    camera_path = input_dir / "camera.mp4"
+    if not _directory_file_exists(camera_path):
+        raise HTTPException(status_code=404, detail="GoPro camera video not found")
+    return camera_path
+
+
+def _flight_gopro_preview_inputs(db: Session, flight: Flight) -> tuple[Path, Path]:
+    camera_path = _flight_gopro_camera_path(db, flight)
+    input_dir = camera_path.parent
+    gpx_path = _resolve_flight_file_path(flight.gpx_file_path)
+    if not gpx_path or not gpx_path.is_file():
+        gpx_path = first_matching_file(input_dir, "Zepp*.gpx")
+    if not gpx_path or not gpx_path.is_file():
+        raise HTTPException(status_code=404, detail="Flight GPX file not found")
+    return camera_path, gpx_path
 
 
 _GOPRO_OVERLAY_IN_PROGRESS_STATUSES = {"queued", "preparing", "running"}
@@ -344,6 +455,12 @@ _GOPRO_OVERLAY_MERGED_GPX_FILENAME = "merged-gopro-overlay.gpx"
 def _flight_gopro_overlay_file_path(
     db: Session, flight: Flight, job: dict[str, Any] | None = None
 ) -> str | None:
+    layer_job = _flight_overlay_layer_job(flight)
+    if layer_job and layer_job.status == "completed":
+        layer_path = _resolve_flight_file_path(layer_job.output_path)
+        if layer_path and layer_path.is_file():
+            return str(layer_path)
+
     stored_path = _resolve_flight_file_path(flight.gopro_overlay_file_path)
     if stored_path and stored_path.exists():
         return str(stored_path)
@@ -427,8 +544,8 @@ def _flight_gopro_overlay_progress(flight: Flight, job: dict[str, Any] | None = 
 
 
 def _flight_gopro_overlay_file_exists(db: Session, flight: Flight) -> bool:
-    overlay_path = _flight_gopro_overlay_file_path(db, flight)
-    return bool(overlay_path)
+    overlay_path = ensure_flight_directory(db, flight) / "overlays" / "pano-telemetry-overlay.mov"
+    return overlay_path.is_file()
 
 
 def _flight_gopro_overlay_state(db: Session, flight: Flight) -> dict[str, Any]:
@@ -456,10 +573,32 @@ def _flight_gopro_overlay_state(db: Session, flight: Flight) -> dict[str, Any]:
     }
 
 
-def _mark_flight_gopro_overlay_job(db: Session, flight: Flight, job: dict[str, Any]) -> None:
+def _is_overlay_layer_job(job: GoproOverlayJobModel) -> bool:
+    try:
+        metadata = json.loads(job.command_json or "{}")
+    except json.JSONDecodeError:
+        return False
+    return isinstance(metadata, dict) and metadata.get("overlay_only") is True
+
+
+def _flight_gopro_overlay_jobs(flight: Flight) -> list[dict[str, Any]]:
+    return [
+        GoproOverlayJob.model_validate(gopro_overlay_job_to_payload(job)).model_dump(mode="json")
+        for job in reversed(flight.gopro_overlay_jobs)
+        if not _is_overlay_layer_job(job)
+    ]
+
+
+def _mark_flight_gopro_overlay_job(
+    db: Session, flight: Flight, job: dict[str, Any], *, gpx_offset: float
+) -> None:
+    db_job = next((item for item in flight.gopro_overlay_jobs if item.id == job["job_id"]), None)
+    if db_job is not None:
+        db_job.flight_id = flight.id
     flight.gopro_overlay_job_id = job["job_id"]
     flight.gopro_overlay_status = job["status"]
     flight.gopro_overlay_file_path = job.get("output_path")
+    flight.gopro_overlay_gpx_offset = gpx_offset
     db.commit()
     db.refresh(flight)
 
@@ -543,6 +682,18 @@ def _video_export_public_status(export: dict[str, Any]) -> str:
 
 
 def _video_export_can_cancel(export: dict[str, Any]) -> bool:
+    if export.get("mode") == "youtube_upload":
+        return (
+            export.get("status") in {"preparing", "queued", "uploading"}
+            and bool(export.get("job_id"))
+            and bool(export.get("flight_id"))
+        )
+    if export.get("mode") == "highlight":
+        return (
+            export.get("status") in {"queued", "running"}
+            and bool(export.get("job_id"))
+            and bool(export.get("flight_id"))
+        )
     if export.get("mode") == "gopro_overlay":
         return export.get("status") in {"queued", "running"} and bool(export.get("job_id"))
 
@@ -558,8 +709,15 @@ def _video_export_can_cancel(export: dict[str, Any]) -> bool:
 
 
 def _video_export_can_delete(export: dict[str, Any]) -> bool:
+    if export.get("mode") == "youtube_upload":
+        return False
     if not export.get("job_id"):
         return False
+
+    if export.get("mode") == "highlight":
+        return export.get("status") in _VIDEO_EXPORT_TERMINAL_STATUSES and bool(
+            export.get("flight_id")
+        )
 
     if export.get("mode") in {"manual", "manual_fast"}:
         return True
@@ -576,6 +734,7 @@ def _gopro_overlay_export_job_payload(job: dict[str, Any]) -> dict[str, Any]:
         "progress": job.get("progress"),
         "message": job.get("message"),
         "error": job.get("error"),
+        "render_method": job.get("render_method"),
         "gpx_path": job.get("gpx_path"),
         "mode": "gopro_overlay",
         "flight_title": job.get("output_filename") or job.get("layout_label"),
@@ -587,6 +746,49 @@ def _gopro_overlay_export_job_payload(job: dict[str, Any]) -> dict[str, Any]:
         "layout_label": job.get("layout_label"),
         "log_tail": job.get("log_tail") or [],
         "has_output_file": bool(output_path and Path(str(output_path)).exists()),
+    }
+
+
+def _highlight_export_job_payload(job: HighlightVideoJob) -> dict[str, Any]:
+    output_path = job.output_path
+    return {
+        "job_id": job.id,
+        "flight_id": job.flight_id,
+        "status": job.status,
+        "internal_status": job.status,
+        "progress": job.progress,
+        "message": job.message,
+        "error": job.error,
+        "mode": "highlight",
+        "flight_title": "Meilleurs moments",
+        "output_filename": Path(output_path).name if output_path else None,
+        "created_at": to_api_utc(job.created_at),
+        "updated_at": to_api_utc(job.updated_at),
+        "started_at": to_api_utc(job.started_at),
+        "completed_at": to_api_utc(job.completed_at),
+        "cancelled_at": to_api_utc(job.cancelled_at),
+        "has_output_file": bool(output_path and Path(output_path).is_file()),
+    }
+
+
+def _youtube_upload_export_job_payload(job: YoutubeUploadJob) -> dict[str, Any]:
+    return {
+        "job_id": job.id,
+        "flight_id": job.flight_id,
+        "status": job.status,
+        "internal_status": job.status,
+        "progress": job.progress,
+        "message": job.title,
+        "error": job.error,
+        "mode": "youtube_upload",
+        "source_type": job.source_type,
+        "youtube_url": job.youtube_url,
+        "created_at": to_api_utc(job.created_at),
+        "updated_at": to_api_utc(job.updated_at),
+        "started_at": to_api_utc(job.started_at),
+        "completed_at": to_api_utc(job.completed_at),
+        "log_tail": [],
+        "has_output_file": False,
     }
 
 
@@ -639,34 +841,183 @@ def _build_video_export_jobs_payload(
     return sorted(jobs, key=_video_export_sort_value, reverse=True)
 
 
-def _get_video_export_jobs_payload(db: Session, active_only: bool = False) -> dict[str, Any]:
+class VideoExportJobPayload(BaseModel):
+    job_id: str
+    flight_id: str | None = None
+    flight_name: str | None = None
+    flight_title: str | None = None
+    status: str
+    internal_status: str | None = None
+    progress: int | float | None = None
+    total_frames: int | None = None
+    fps: int | float | None = None
+    fps_actual: int | float | None = None
+    eta_seconds: int | float | None = None
+    message: str | None = None
+    error: str | None = None
+    render_method: str | None = None
+    gpx_path: str | None = None
+    mode: str | None = None
+    source_type: str | None = None
+    youtube_url: str | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    cancelled_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    can_resume: bool = False
+    frames_captured: int | None = None
+    resume_from_frame: int | None = None
+    output_filename: str | None = None
+    layout_label: str | None = None
+    log_tail: list[str] = Field(default_factory=list)
+    has_output_file: bool = False
+    can_cancel: bool = False
+    can_delete: bool = False
+
+
+class VideoExportJobsResponse(BaseModel):
+    jobs: list[VideoExportJobPayload]
+    page: int
+    page_size: int
+    total: int
+    total_pages: int
+    status_counts: dict[str, int] = Field(default_factory=dict)
+    type_counts: dict[str, int] = Field(default_factory=dict)
+
+
+class SportstrackLiveSettingsUpdate(BaseModel):
+    upload_key: str | None = None
+    auto_upload: bool = False
+
+
+def _get_video_export_jobs_payload(
+    db: Session,
+    active_only: bool = False,
+    status_filter: str | None = None,
+    type_filter: str | None = None,
+    page: int | None = None,
+    page_size: int | None = None,
+) -> dict[str, Any]:
     jobs = _build_video_export_jobs_payload(
         list_exports_manual()
         + list_exports_stream()
-        + [_gopro_overlay_export_job_payload(job) for job in list_gopro_overlay_jobs()],
+        + [_gopro_overlay_export_job_payload(job) for job in list_gopro_overlay_jobs()]
+        + [_highlight_export_job_payload(job) for job in db.query(HighlightVideoJob).all()]
+        + [_youtube_upload_export_job_payload(job) for job in db.query(YoutubeUploadJob).all()],
         db,
     )
     if active_only:
-        jobs = [job for job in jobs if job.get("can_cancel")]
-    return {"jobs": jobs}
+        jobs = [
+            job
+            for job in jobs
+            if job.get("can_cancel")
+            or job.get("status") in (_VIDEO_EXPORT_IN_PROGRESS_STATUSES | {"uploading"})
+        ]
+        jobs.sort(
+            key=lambda job: (
+                _video_export_sort_value(job),
+                str(job.get("job_id") or ""),
+            ),
+            reverse=True,
+        )
+    type_counts = {
+        "all": len(jobs),
+        "video": sum(job.get("mode") in {"manual", "manual_fast", "stream"} for job in jobs),
+        "gopro": sum(job.get("mode") == "gopro_overlay" for job in jobs),
+        "highlight": sum(job.get("mode") == "highlight" for job in jobs),
+        "youtube": sum(job.get("mode") in {"youtube", "youtube_upload"} for job in jobs),
+    }
+    if type_filter == "video":
+        jobs = [job for job in jobs if job.get("mode") in {"manual", "manual_fast", "stream"}]
+    elif type_filter == "gopro":
+        jobs = [job for job in jobs if job.get("mode") == "gopro_overlay"]
+    elif type_filter == "highlight":
+        jobs = [job for job in jobs if job.get("mode") == "highlight"]
+    elif type_filter == "youtube":
+        jobs = [job for job in jobs if job.get("mode") in {"youtube", "youtube_upload"}]
+    status_counts = {
+        "all": len(jobs),
+        "active": sum(
+            job.get("can_cancel")
+            or job.get("status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
+            or job.get("status") == "uploading"
+            for job in jobs
+        ),
+        "completed": sum(job.get("status") == "completed" for job in jobs),
+        "failed": sum(job.get("status") == "failed" for job in jobs),
+        "cancelled": sum(job.get("status") == "cancelled" for job in jobs),
+    }
+    if status_filter == "active":
+        jobs = [
+            job
+            for job in jobs
+            if job.get("can_cancel")
+            or job.get("status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
+            or job.get("status") == "uploading"
+        ]
+    elif status_filter and status_filter != "all":
+        jobs = [job for job in jobs if job.get("status") == status_filter]
+    payload: dict[str, Any] = {
+        "jobs": jobs,
+        "status_counts": status_counts,
+        "type_counts": type_counts,
+    }
+    if page is not None and page_size is not None:
+        total = len(jobs)
+        total_pages = max(1, math.ceil(total / page_size))
+        start = (page - 1) * page_size
+        payload.update(
+            {
+                "jobs": jobs[start : start + page_size],
+                "page": page,
+                "page_size": page_size,
+                "total": total,
+                "total_pages": total_pages,
+            }
+        )
+    return payload
 
 
-def _active_deployment_job_count(db: Session) -> int:
+def _active_deployment_jobs(db: Session) -> list[dict[str, Any]]:
     jobs = _get_video_export_jobs_payload(db)["jobs"]
-    return sum(
-        1
+    return [
+        job
         for job in jobs
         if job.get("status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
         or job.get("internal_status") in _VIDEO_EXPORT_IN_PROGRESS_STATUSES
-    )
+    ]
 
 
 def _deployment_drain_status(db: Session) -> DeploymentDrainStatus:
     state = deployment_drain.get_state()
     # Admissions are registered before jobs become visible in storage. Reading
     # this counter first prevents a handoff from looking idle between the two.
-    admissions = deployment_drain.admissions_in_progress()
-    active_jobs = _active_deployment_job_count(db)
+    admission_details = [
+        DeploymentDrainAdmission.model_validate(details)
+        for details in deployment_drain.admissions_details()
+    ]
+    admissions = len(admission_details)
+    blocking_jobs = [
+        DeploymentDrainJob.model_validate(
+            {
+                key: job.get(key)
+                for key in (
+                    "job_id",
+                    "mode",
+                    "status",
+                    "internal_status",
+                    "flight_name",
+                    "progress",
+                    "message",
+                    "created_at",
+                    "started_at",
+                )
+            }
+        )
+        for job in _active_deployment_jobs(db)
+    ]
+    active_jobs = len(blocking_jobs)
     if state is None:
         return DeploymentDrainStatus(
             phase="idle",
@@ -674,6 +1025,8 @@ def _deployment_drain_status(db: Session) -> DeploymentDrainStatus:
             ready_for_deployment=False,
             active_jobs=active_jobs,
             admissions_in_progress=admissions,
+            blocking_jobs=blocking_jobs,
+            active_admissions=admission_details,
         )
     return DeploymentDrainStatus(
         **state,
@@ -681,6 +1034,8 @@ def _deployment_drain_status(db: Session) -> DeploymentDrainStatus:
         ready_for_deployment=active_jobs == 0 and admissions == 0,
         active_jobs=active_jobs,
         admissions_in_progress=admissions,
+        blocking_jobs=blocking_jobs,
+        active_admissions=admission_details,
     )
 
 
@@ -736,6 +1091,726 @@ public_router = APIRouter(prefix="/api", tags=["api"])
 
 # Protected routes: require valid JWT token
 router = APIRouter(prefix="/api", tags=["api"], dependencies=[Depends(get_current_user)])
+
+
+def _operation_start_payload(operation: BackgroundOperationModel) -> BackgroundOperationStart:
+    return BackgroundOperationStart(
+        operation_id=operation.id,
+        status="queued",
+        detail_url=f"/api/operations/{operation.id}",
+    )
+
+
+def _ensure_job_operation(
+    db: Session,
+    *,
+    user_id: int,
+    source_kind: str,
+    source_id: str,
+    operation_type: str,
+    title_key: str,
+    steps: list[str],
+    can_cancel: bool = False,
+    can_retry: bool = False,
+) -> BackgroundOperationModel:
+    existing = (
+        db.query(BackgroundOperationModel)
+        .filter(
+            BackgroundOperationModel.user_id == user_id,
+            BackgroundOperationModel.source_kind == source_kind,
+            BackgroundOperationModel.source_id == source_id,
+        )
+        .first()
+    )
+    if existing is not None:
+        return existing
+    return OperationReporter.create(
+        db,
+        user_id=user_id,
+        operation_type=operation_type,
+        title_key=title_key,
+        steps=steps,
+        source_kind=source_kind,
+        source_id=source_id,
+        can_cancel=can_cancel,
+        can_retry=can_retry,
+    ).operation
+
+
+def _refresh_operation_from_source(db: Session, operation: BackgroundOperationModel) -> None:
+    if not operation.source_kind or not operation.source_id:
+        return
+    status: str | None = None
+    progress: int | float | None = None
+    detail: str | None = None
+    error: str | None = None
+    if operation.source_kind == "video_export":
+        snapshot = _resolve_export_status(operation.source_id)
+        if snapshot:
+            status = snapshot.get("internal_status") or snapshot.get("status")
+            progress = snapshot.get("progress")
+            detail = snapshot.get("message")
+            error = snapshot.get("error")
+    elif operation.source_kind == "gopro_overlay":
+        snapshot = get_gopro_overlay_job(operation.source_id)
+        if snapshot:
+            status = snapshot.get("status")
+            progress = snapshot.get("progress")
+            detail = snapshot.get("message")
+            error = snapshot.get("error")
+    elif operation.source_kind == "highlight_video":
+        job = (
+            db.query(HighlightVideoJob).filter(HighlightVideoJob.id == operation.source_id).first()
+        )
+        if job:
+            status = job.status
+            progress = job.progress
+            detail = job.message
+            error = job.error
+    elif operation.source_kind == "youtube_upload":
+        job = db.query(YoutubeUploadJob).filter(YoutubeUploadJob.id == operation.source_id).first()
+        if job:
+            status = job.status
+            progress = job.progress
+            detail = job.title
+            error = job.error
+    if status is not None:
+        sync_operation_from_snapshot(
+            db,
+            operation,
+            status=status,
+            progress=progress,
+            detail=detail,
+            error=error,
+        )
+
+
+def _refresh_operations(db: Session, operations: list[BackgroundOperationModel]) -> None:
+    for operation in operations:
+        _refresh_operation_from_source(db, operation)
+
+
+def _spots_data_is_recent(last_sync_value: Any, *, now: datetime | None = None) -> bool:
+    if not last_sync_value:
+        return False
+    try:
+        last_sync = datetime.fromisoformat(str(last_sync_value))
+    except (TypeError, ValueError):
+        return False
+    reference = now or datetime.utcnow()
+    if last_sync.tzinfo and reference.tzinfo is None:
+        reference = reference.replace(tzinfo=last_sync.tzinfo)
+    elif last_sync.tzinfo is None and reference.tzinfo is not None:
+        reference = reference.replace(tzinfo=None)
+    return reference - last_sync < timedelta(days=7)
+
+
+def _cancel_operation_source(db: Session, operation: BackgroundOperationModel) -> None:
+    source_id = operation.source_id
+    if not operation.source_kind or not source_id:
+        return
+    if operation.source_kind == "video_export":
+        if not cancel_video_export_manual(source_id):
+            cancel_video_export_stream(source_id)
+    elif operation.source_kind == "gopro_overlay":
+        cancel_gopro_overlay_job(source_id)
+    elif operation.source_kind == "highlight_video":
+        job = db.query(HighlightVideoJob).filter(HighlightVideoJob.id == source_id).first()
+        if job is not None and job.status in {HIGHLIGHT_STATUS_QUEUED, "running"}:
+            job.status = "cancelled"
+            job.message = "Rendu des meilleurs moments annulé"
+            job.completed_at = datetime.utcnow()
+            job.cancelled_at = datetime.utcnow()
+            db.commit()
+    elif operation.source_kind == "youtube_upload":
+        cancel_youtube_upload(db, job_id=source_id, user_id=operation.user_id)
+
+
+def _read_operations_payload(user_id: int) -> list[dict[str, Any]]:
+    with SessionLocal() as db:
+        purge_expired_operations(db)
+        operations = (
+            db.query(BackgroundOperationModel)
+            .filter(BackgroundOperationModel.user_id == user_id)
+            .order_by(BackgroundOperationModel.updated_at.desc())
+            .limit(100)
+            .all()
+        )
+        _refresh_operations(db, operations)
+        return [
+            BackgroundOperation.model_validate(operation_payload(item)).model_dump(mode="json")
+            for item in operations
+        ]
+
+
+@router.get("/operations", response_model=list[BackgroundOperation])
+def list_background_operations(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    include_completed: bool = Query(default=True),
+    limit: int = Query(default=100, ge=1, le=200),
+) -> list[BackgroundOperation]:
+    purge_expired_operations(db)
+    query = db.query(BackgroundOperationModel).filter(BackgroundOperationModel.user_id == user.id)
+    if not include_completed:
+        query = query.filter(BackgroundOperationModel.status.in_(OPERATION_ACTIVE_STATUSES))
+    operations = query.order_by(BackgroundOperationModel.updated_at.desc()).limit(limit).all()
+    _refresh_operations(db, operations)
+    return [BackgroundOperation.model_validate(operation_payload(item)) for item in operations]
+
+
+@router.get("/operations/stream")
+async def stream_background_operations(
+    request: Request,
+    user: User = Depends(get_current_user),
+) -> StreamingResponse:
+    async def event_stream():
+        last_payload = ""
+        while not await request.is_disconnected():
+            operations = await asyncio.to_thread(_read_operations_payload, user.id)
+            payload = json.dumps(
+                operations,
+                ensure_ascii=False,
+                default=str,
+                separators=(",", ":"),
+            )
+            if payload != last_payload:
+                last_payload = payload
+                yield f"event: operations\ndata: {payload}\n\n"
+            await asyncio.sleep(2)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.get("/operations/{operation_id}", response_model=BackgroundOperation)
+def get_background_operation(
+    operation_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BackgroundOperation:
+    operation = get_user_operation(db, operation_id, user.id)
+    if operation is None:
+        raise HTTPException(status_code=404, detail="Operation not found")
+    _refresh_operation_from_source(db, operation)
+    return BackgroundOperation.model_validate(operation_payload(operation))
+
+
+@router.patch("/operations/{operation_id}/read", response_model=BackgroundOperation)
+def mark_background_operation_read(
+    operation_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BackgroundOperation:
+    operation = get_user_operation(db, operation_id, user.id)
+    if operation is None:
+        raise HTTPException(status_code=404, detail="Operation not found")
+    operation.read_at = datetime.utcnow()
+    db.commit()
+    db.refresh(operation)
+    return BackgroundOperation.model_validate(operation_payload(operation))
+
+
+@router.delete("/operations/{operation_id}", status_code=204, response_class=Response)
+def delete_background_operation(
+    operation_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    operation = get_user_operation(db, operation_id, user.id)
+    if operation is None:
+        raise HTTPException(status_code=404, detail="Operation not found")
+    if operation.status in OPERATION_ACTIVE_STATUSES:
+        raise HTTPException(status_code=409, detail="Active operation cannot be deleted")
+    db.delete(operation)
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/operations/{operation_id}/cancel", response_model=BackgroundOperation)
+def cancel_background_operation(
+    operation_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BackgroundOperation:
+    operation = get_user_operation(db, operation_id, user.id)
+    if operation is None:
+        raise HTTPException(status_code=404, detail="Operation not found")
+    if operation.status not in OPERATION_ACTIVE_STATUSES or not operation.can_cancel:
+        raise HTTPException(status_code=409, detail="Operation cannot be cancelled")
+    _cancel_operation_source(db, operation)
+    reporter = OperationReporter(db, operation)
+    reporter.cancel()
+    return BackgroundOperation.model_validate(operation_payload(operation))
+
+
+@router.post("/operations/{operation_id}/retry", response_model=BackgroundOperation)
+def retry_background_operation(
+    operation_id: str,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BackgroundOperation:
+    operation = get_user_operation(db, operation_id, user.id)
+    if operation is None:
+        raise HTTPException(status_code=404, detail="Operation not found")
+    if operation.status not in {"failed", "cancelled"} or not operation.can_retry:
+        raise HTTPException(status_code=409, detail="Operation cannot be retried")
+    if not operation.source_id:
+        raise HTTPException(status_code=409, detail="Operation has no retryable source")
+
+    if operation.source_kind == "video_export":
+        from video_export_manual import resume_video_export
+
+        if not resume_video_export(operation.source_id):
+            raise HTTPException(status_code=409, detail="Video export cannot be resumed")
+    elif operation.source_kind == "gopro_overlay":
+        from gopro_overlay_export import _enqueue_existing_gopro_overlay_job
+
+        if get_gopro_overlay_job(operation.source_id) is None:
+            raise HTTPException(status_code=404, detail="GoPro overlay job not found")
+        _enqueue_existing_gopro_overlay_job(operation.source_id)
+    elif operation.source_kind == "highlight_video":
+        job = (
+            db.query(HighlightVideoJob).filter(HighlightVideoJob.id == operation.source_id).first()
+        )
+        if job is None:
+            raise HTTPException(status_code=404, detail="Highlight job not found")
+        job.status = HIGHLIGHT_STATUS_QUEUED
+        job.progress = 0
+        job.error = None
+        job.message = "En attente du rendu"
+        job.completed_at = None
+        job.cancelled_at = None
+        try:
+            db.commit()
+        except IntegrityError as exc:
+            db.rollback()
+            raise HTTPException(
+                status_code=409, detail="A highlight render is already in progress"
+            ) from exc
+        from job_queue import is_rq_enabled
+
+        if is_rq_enabled():
+            enqueue_highlight_video_job(job.id)
+        else:
+            background_tasks.add_task(process_highlight_video_job, job.id)
+    elif operation.source_kind == "youtube_upload":
+        job = db.query(YoutubeUploadJob).filter(YoutubeUploadJob.id == operation.source_id).first()
+        if job is None or job.user_id != user.id:
+            raise HTTPException(status_code=404, detail="YouTube upload not found")
+        job.status = "queued"
+        job.progress = 0
+        job.error = None
+        job.completed_at = None
+        try:
+            db.commit()
+        except IntegrityError as exc:
+            db.rollback()
+            raise HTTPException(
+                status_code=409, detail="A YouTube upload is already in progress"
+            ) from exc
+        enqueue_youtube_upload(job.id)
+    else:
+        raise HTTPException(status_code=409, detail="Operation has no retry handler")
+
+    OperationReporter(db, operation).reopen()
+    return BackgroundOperation.model_validate(operation_payload(operation))
+
+
+@router.get("/youtube/status")
+def get_youtube_status(
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> dict[str, bool]:
+    """Return whether OAuth is configured and connected for the current user."""
+    return {
+        "configured": is_youtube_configured(),
+        "connected": is_youtube_connected(db, user.id),
+    }
+
+
+_MAX_YOUTUBE_COOKIE_FILE_BYTES = 5 * 1024 * 1024
+
+
+def _validate_youtube_cookie_file(content: bytes) -> str:
+    if not content:
+        raise HTTPException(status_code=422, detail="The cookie file is empty")
+    if len(content) > _MAX_YOUTUBE_COOKIE_FILE_BYTES:
+        raise HTTPException(status_code=413, detail="The cookie file exceeds 5 MiB")
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=422, detail="The cookie file must be UTF-8 text") from exc
+
+    first_line = next((line.strip() for line in text.splitlines() if line.strip()), "")
+    if first_line not in {"# Netscape HTTP Cookie File", "# HTTP Cookie File"}:
+        raise HTTPException(
+            status_code=422,
+            detail="Choose a cookies.txt file in Netscape format",
+        )
+
+    retained_lines = [first_line]
+    has_youtube_cookie = False
+    for line in text.splitlines():
+        if not line or line.startswith("#") and not line.startswith("#HttpOnly_"):
+            continue
+        columns = line.split("\t")
+        if len(columns) < 7:
+            continue
+        domain = columns[0].removeprefix("#HttpOnly_").lstrip(".").lower()
+        is_youtube_domain = domain == "youtube.com" or domain.endswith(".youtube.com")
+        is_google_domain = domain == "google.com" or domain.endswith(".google.com")
+        if is_youtube_domain or is_google_domain:
+            retained_lines.append(line)
+        if is_youtube_domain and columns[5] and columns[6]:
+            has_youtube_cookie = True
+    if not has_youtube_cookie:
+        raise HTTPException(
+            status_code=422,
+            detail="The cookie file contains no YouTube cookies",
+        )
+    return "\n".join(retained_lines) + "\n"
+
+
+@router.put("/youtube/download-cookies")
+async def upload_youtube_download_cookies(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, bool]:
+    if not is_youtube_connected(db, user.id):
+        raise HTTPException(status_code=409, detail="Connect YouTube before uploading cookies")
+    cookies = _validate_youtube_cookie_file(await file.read(_MAX_YOUTUBE_COOKIE_FILE_BYTES + 1))
+    store_youtube_download_cookies(db, user_id=user.id, cookies=cookies)
+    return {"configured": True}
+
+
+@router.post("/youtube/auth-url")
+def get_youtube_auth_url(
+    payload: YoutubeAuthUrlRequest,
+    user: User = Depends(get_current_user),
+) -> dict[str, str]:
+    try:
+        return {
+            "authorization_url": create_authorization_url(
+                user_id=user.id, return_to=payload.return_to
+            )
+        }
+    except YoutubeConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@public_router.get("/youtube/oauth/callback")
+def youtube_oauth_callback(
+    state: str,
+    code: str | None = None,
+    error: str | None = None,
+    db: Session = Depends(get_db),
+) -> RedirectResponse:
+    """Finish Google's OAuth redirect without requiring the app JWT in the browser URL."""
+    try:
+        user_id, return_to = decode_oauth_state(state)
+    except YoutubeOAuthError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    separator = "&" if "?" in return_to else "?"
+    if error or not code:
+        return RedirectResponse(f"{return_to}{separator}youtube=denied", status_code=303)
+    try:
+        exchange_authorization_code(db, user_id=user_id, code=code)
+    except (YoutubeConfigurationError, YoutubeOAuthError) as exc:
+        logger.warning("YouTube OAuth callback failed: %s", exc)
+        return RedirectResponse(f"{return_to}{separator}youtube=error", status_code=303)
+    return RedirectResponse(f"{return_to}{separator}youtube=connected", status_code=303)
+
+
+@router.delete("/youtube/connection", status_code=204)
+def delete_youtube_connection(
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> Response:
+    disconnect_youtube(db, user.id)
+    return Response(status_code=204)
+
+
+@router.post("/youtube/playlists/migrate")
+def migrate_youtube_playlists(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, int]:
+    """Organize existing locally linked YouTube videos by flight."""
+    if not is_youtube_connected(db, user.id):
+        raise HTTPException(status_code=409, detail="Connect YouTube before migrating playlists")
+    return migrate_flight_playlists(user_id=user.id)
+
+
+@router.get(
+    "/flights/{flight_id}/youtube-videos",
+    response_model=list[YoutubeVideoAssociation],
+)
+def get_flight_youtube_videos(
+    flight_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
+    flight = db.get(Flight, flight_id)
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    return youtube_video_associations(db, flight=flight, user_id=user.id)
+
+
+@router.post(
+    "/flights/{flight_id}/youtube-videos/{video_id}/remove",
+    status_code=204,
+)
+def remove_flight_youtube_video(
+    flight_id: str,
+    payload: YoutubeVideoRemoveRequest,
+    video_id: str = FastAPIPath(pattern=r"^[A-Za-z0-9_-]{11}$"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    flight = db.get(Flight, flight_id)
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    try:
+        remove_youtube_video(
+            db,
+            flight=flight,
+            video_id=video_id,
+            user_id=user.id,
+            delete_from_youtube=payload.delete_from_youtube,
+        )
+    except YoutubeVideoNotAssociatedError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except YoutubeVideoDeletionForbiddenError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except YoutubeOAuthError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except YoutubeRemoteDeletionError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return Response(status_code=204)
+
+
+@router.get(
+    "/flights/{flight_id}/youtube-upload",
+    response_model=YoutubeUploadJobResponse | None,
+)
+def get_flight_youtube_upload(
+    flight_id: str,
+    source_type: (
+        Literal[
+            "gopro_overlay",
+            "camera",
+            "video",
+            "pano",
+            "face",
+            "pilote",
+            "highlight",
+            "youtube_overlay",
+        ]
+        | None
+    ) = None,
+    gopro_overlay_job_id: str | None = None,
+    highlight_video_job_id: str | None = None,
+    db: Session = Depends(get_db),
+) -> dict[str, Any] | None:
+    if db.get(Flight, flight_id) is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    job = latest_youtube_upload_job(
+        db,
+        flight_id,
+        source_type=source_type,
+        gopro_overlay_job_id=gopro_overlay_job_id,
+        highlight_video_job_id=highlight_video_job_id,
+    )
+    return youtube_upload_job_payload(job) if job else None
+
+
+@router.post(
+    "/flights/{flight_id}/youtube-upload",
+    response_model=YoutubeUploadJobResponse,
+    status_code=202,
+)
+def start_flight_youtube_upload(
+    flight_id: str,
+    payload: YoutubeUploadCreate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    if not is_youtube_configured():
+        raise HTTPException(status_code=503, detail="YouTube upload is not configured")
+    if not is_youtube_connected(db, user.id):
+        raise HTTPException(status_code=409, detail="Connect YouTube before uploading")
+    flight = db.get(Flight, flight_id)
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    overlay = None
+    highlight = None
+    if payload.source_type == "gopro_overlay":
+        overlay = db.get(GoproOverlayJobModel, payload.gopro_overlay_job_id)
+        if overlay is None or overlay.flight_id != flight.id:
+            raise HTTPException(status_code=404, detail="GoPro overlay not found for this flight")
+        video_path = _resolve_flight_file_path(overlay.output_path)
+        if overlay.status != "completed" or video_path is None or not video_path.is_file():
+            raise HTTPException(
+                status_code=409, detail="Generate the GoPro overlay before uploading"
+            )
+    elif payload.source_type == "highlight":
+        highlight = db.get(HighlightVideoJob, payload.highlight_video_job_id)
+        if (
+            highlight is None
+            or highlight.flight_id != flight.id
+            or highlight.status != "completed"
+            or not highlight.output_path
+        ):
+            raise HTTPException(
+                status_code=409, detail="Generate the best-moments video before uploading"
+            )
+        video_path = Path(highlight.output_path)
+        if not video_path.is_file():
+            raise HTTPException(status_code=409, detail="Best-moments video is not available")
+    elif payload.source_type in {"pano", "face", "pilote"}:
+        video_path = temporary_video_path(db, flight, payload.source_type)
+        if not _directory_file_exists(video_path):
+            source_label = {"pano": "Panorama", "face": "Face", "pilote": "Pilote"}[
+                payload.source_type
+            ]
+            raise HTTPException(status_code=409, detail=f"{source_label} video is not available")
+    elif payload.source_type == "camera":
+        video_path = _flight_gopro_camera_path(db, flight)
+    else:
+        video_path = _resolve_flight_file_path(flight.video_file_path)
+        if video_path is None or not video_path.is_file():
+            raise HTTPException(status_code=409, detail="Flat flight video is not available")
+
+    completed_source_query = db.query(YoutubeUploadJob).filter(
+        YoutubeUploadJob.flight_id == flight.id,
+        YoutubeUploadJob.source_type == payload.source_type,
+        YoutubeUploadJob.status == "completed",
+        YoutubeUploadJob.youtube_url.in_(flight.youtube_urls),
+    )
+    if overlay is not None:
+        completed_source_query = completed_source_query.filter(
+            YoutubeUploadJob.gopro_overlay_job_id == overlay.id
+        )
+    if highlight is not None:
+        completed_source_query = completed_source_query.filter(
+            YoutubeUploadJob.highlight_video_job_id == highlight.id
+        )
+    completed_source_jobs = completed_source_query.all()
+    if completed_source_jobs:
+        video_ids_by_user: dict[int, set[str]] = {}
+        for completed_job in completed_source_jobs:
+            if completed_job.youtube_video_id is not None:
+                video_ids_by_user.setdefault(completed_job.user_id, set()).add(
+                    completed_job.youtube_video_id
+                )
+        availability = youtube_video_availability(video_ids_by_user)
+        if any(
+            completed_job.youtube_video_id is None
+            or availability.get(completed_job.youtube_video_id) is not False
+            for completed_job in completed_source_jobs
+        ):
+            raise HTTPException(
+                status_code=409, detail="This video is already published on YouTube"
+            )
+        deleted_urls = {
+            completed_job.youtube_url
+            for completed_job in completed_source_jobs
+            if completed_job.youtube_url is not None
+        }
+        flight.youtube_urls = [url for url in flight.youtube_urls if url not in deleted_urls]
+    source_key = youtube_upload_source_key(
+        payload.source_type,
+        gopro_overlay_job_id=overlay.id if overlay is not None else None,
+        highlight_video_job_id=highlight.id if highlight is not None else None,
+    )
+    existing_job = active_youtube_upload_job(
+        db,
+        flight_id,
+        source_type=payload.source_type,
+        gopro_overlay_job_id=overlay.id if overlay is not None else None,
+        highlight_video_job_id=highlight.id if highlight is not None else None,
+    )
+    if existing_job is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="A YouTube upload for this source is already in progress",
+        )
+
+    job = YoutubeUploadJob(
+        id=str(uuid.uuid4()),
+        flight_id=flight.id,
+        user_id=user.id,
+        source_type=payload.source_type,
+        active_source_key=source_key,
+        gopro_overlay_job_id=overlay.id if overlay is not None else None,
+        highlight_video_job_id=highlight.id if highlight is not None else None,
+        status="queued",
+        progress=0,
+        title=payload.title,
+        description=payload.description,
+        privacy_status=payload.privacy_status,
+    )
+    db.add(job)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="A YouTube upload for this source is already in progress",
+        ) from exc
+    db.refresh(job)
+    response_payload = youtube_upload_job_payload(job)
+    operation = _ensure_job_operation(
+        db,
+        user_id=user.id,
+        source_kind="youtube_upload",
+        source_id=job.id,
+        operation_type="youtube_upload",
+        title_key="operations.youtubeUpload",
+        steps=["prepare", "upload", "finalize"],
+        can_cancel=True,
+        can_retry=True,
+    )
+    response_payload["operation_id"] = operation.id
+    enqueue_youtube_upload(job.id)
+    return response_payload
+
+
+@router.delete(
+    "/flights/{flight_id}/youtube-upload",
+    response_model=YoutubeUploadJobResponse,
+)
+def cancel_flight_youtube_upload(
+    flight_id: str,
+    job_id: str | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    if db.get(Flight, flight_id) is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    job = (
+        db.query(YoutubeUploadJob)
+        .filter(
+            YoutubeUploadJob.id == job_id,
+            YoutubeUploadJob.flight_id == flight_id,
+            YoutubeUploadJob.status.in_({"preparing", "queued", "uploading"}),
+        )
+        .first()
+        if job_id
+        else active_youtube_upload_job(db, flight_id)
+    )
+    if job is None or job.user_id != user.id:
+        raise HTTPException(status_code=409, detail="No YouTube upload is in progress")
+    cancelled_job = cancel_youtube_upload(db, job_id=job.id, user_id=user.id)
+    if cancelled_job is None:
+        raise HTTPException(status_code=409, detail="YouTube upload is no longer active")
+    return youtube_upload_job_payload(cancelled_job)
 
 
 @public_router.get(
@@ -851,6 +1926,28 @@ def login(
     return {"access_token": token, "token_type": "bearer"}
 
 
+@public_router.post("/auth/internal-staging-login")
+def internal_staging_login(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Bootstrap the frontend token on the private staging HTTP origin only."""
+    if request.headers.get("host") != config.INTERNAL_STAGING_AUTO_LOGIN_HOST:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    user = db.query(User).filter(User.email == config.ADMIN_EMAIL).first()
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=401, detail="Internal staging user unavailable")
+
+    token = create_access_token(user.email)
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        max_age=config.JWT_EXPIRE_HOURS * 60 * 60,
+        httponly=True,
+        samesite="lax",
+        secure=False,
+    )
+    return {"access_token": token, "token_type": "bearer"}
+
+
 @public_router.get("/auth/me")
 def get_me(user: User = Depends(get_current_user)):
     """Get current authenticated user info."""
@@ -862,8 +1959,52 @@ def get_me(user: User = Depends(get_current_user)):
 # ============================================================================
 
 
-@router.post("/spots/sync")
-async def sync_paragliding_spots(force: bool = False, db: Session = Depends(get_db)):
+def _run_spots_sync_operation(operation_id: str, force: bool) -> None:
+    from spots import get_sync_status, sync_to_database
+
+    db = SessionLocal()
+    operation = (
+        db.query(BackgroundOperationModel)
+        .filter(BackgroundOperationModel.id == operation_id)
+        .first()
+    )
+    if operation is None:
+        db.close()
+        return
+    reporter = OperationReporter(db, operation)
+    try:
+        reporter.start()
+        reporter.start_step("check_freshness")
+        status = get_sync_status(db)
+        reporter.complete_step("check_freshness")
+        if not force and _spots_data_is_recent(status.get("last_sync")):
+            reporter.start_step("finalize", "Les données sont déjà récentes")
+            reporter.complete_step("finalize")
+            reporter.complete({"synced": False, "stats": status})
+            return
+        reporter.start_step("sync_sources")
+        stats = sync_to_database(db)
+        if "error" in stats:
+            raise RuntimeError(str(stats["error"]))
+        reporter.complete_step("sync_sources", f"{stats.get('total', 0)} site(s)")
+        reporter.start_step("finalize")
+        reporter.complete_step("finalize")
+        reporter.complete({"synced": True, "stats": stats})
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Spots sync operation %s failed", operation_id)
+        reporter.fail(str(exc))
+    finally:
+        db.close()
+
+
+@router.post("/spots/sync", response_model=BackgroundOperationStart, status_code=202)
+async def sync_paragliding_spots(
+    background_tasks: BackgroundTasks,
+    force: bool = False,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BackgroundOperationStart:
     """
     Sync paragliding spots from OpenAIP and ParaglidingSpots.com
 
@@ -877,44 +2018,16 @@ async def sync_paragliding_spots(force: bool = False, db: Session = Depends(get_
         POST /api/spots/sync
         POST /api/spots/sync?force=true
     """
-    from datetime import datetime
-
-    from spots import get_sync_status, sync_to_database
-
-    # Check if sync is needed
-    status = get_sync_status(db)
-
-    if not force and status.get("last_sync"):
-        # Parse last sync time
-        try:
-            last_sync = datetime.fromisoformat(status["last_sync"])
-            days_since_sync = (datetime.utcnow() - last_sync).days
-
-            if days_since_sync < 7:
-                return {
-                    "success": True,
-                    "message": f"Data is recent (synced {days_since_sync} days ago). Use force=true to sync anyway.",
-                    "stats": status,
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "synced": False,
-                }
-        except (ValueError, TypeError):
-            pass
-
-    # Perform sync
-    logger.info("Starting paragliding spots sync...")
-    stats = sync_to_database(db)
-
-    if "error" in stats:
-        raise HTTPException(status_code=500, detail=f"Sync failed: {stats['error']}")
-
-    return {
-        "success": True,
-        "message": f"Synced {stats['total']} spots ({stats['added']} new, {stats['updated']} updated)",
-        "stats": stats,
-        "timestamp": datetime.utcnow().isoformat(),
-        "synced": True,
-    }
+    operation = OperationReporter.create(
+        db,
+        user_id=user.id,
+        operation_type="spots_sync",
+        title_key="operations.spotsSync",
+        steps=["check_freshness", "sync_sources", "finalize"],
+        can_retry=False,
+    ).operation
+    background_tasks.add_task(_run_spots_sync_operation, operation.id, force)
+    return _operation_start_payload(operation)
 
 
 @public_router.get("/spots/geocode")
@@ -1406,17 +2519,42 @@ async def get_spot_weather(
 # ============================================================================
 
 
+@router.post(
+    "/sites/practical-info/suggestions",
+    response_model=SitePracticalInfoSuggestionResponse,
+)
+async def suggest_site_practical_info_endpoint(
+    request: SitePracticalInfoSuggestionRequest,
+) -> SitePracticalInfoSuggestionResponse:
+    """Return web-grounded suggestions for private practical site notes."""
+    from site_practical_info import suggest_site_practical_info
+
+    try:
+        response = await suggest_site_practical_info(request.model_dump())
+        return SitePracticalInfoSuggestionResponse.model_validate(response)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @public_router.get("/spots", response_model=SpotsResponse)
 def get_spots(db: Session = Depends(get_db)):
     """Get all user-managed paragliding spots with flight counts"""
-    from sqlalchemy import func
+    # Count flights at takeoff sites and at their associated landing sites.
+    # UNION removes duplicate site/flight pairs if a flight is linked both ways.
+    site_flights = (
+        db.query(Flight.site_id.label("site_id"), Flight.id.label("flight_id"))
+        .union(
+            db.query(
+                SiteLandingAssociation.landing_site_id.label("site_id"),
+                Flight.id.label("flight_id"),
+            ).join(Flight, Flight.site_id == SiteLandingAssociation.takeoff_site_id)
+        )
+        .subquery()
+    )
 
-    from models import Flight
-
-    # Query sites with flight count
     sites_with_counts = (
-        db.query(Site, func.count(Flight.id).label("flight_count"))
-        .outerjoin(Flight, Site.id == Flight.site_id)
+        db.query(Site, func.count(site_flights.c.flight_id).label("flight_count"))
+        .outerjoin(site_flights, Site.id == site_flights.c.site_id)
         .group_by(Site.id)
         .all()
     )
@@ -1484,6 +2622,7 @@ async def create_site(site_data: SiteCreate, db: Session = Depends(get_db)):
         country=site_data.country or "FR",
         usage_type=site_data.usage_type or "both",
         orientation=site_data.orientation,
+        practical_info=site_data.practical_info,
         site_type="user_spot",  # Mark as user-created
     )
 
@@ -2014,11 +3153,22 @@ async def get_landing_associations_weather(
 # IMPORTANT: This must be BEFORE /spots/{spot_id} to avoid route collision
 
 
+def _validate_optional_coordinates(latitude: float | None, longitude: float | None) -> None:
+    if (latitude is None) != (longitude is None):
+        raise HTTPException(
+            status_code=422,
+            detail="latitude and longitude must be provided together",
+        )
+
+
 @public_router.get("/spots/best")
 async def get_best_spot(
     day_index: int = Query(
         default=0, ge=0, le=6, description="Day index (0=today, 1=tomorrow, ..., 6=in 6 days)"
     ),
+    latitude: float | None = Query(default=None, ge=-90, le=90),
+    longitude: float | None = Query(default=None, ge=-180, le=180),
+    radius_km: float = Query(default=50, gt=0, le=500),
     db: Session = Depends(get_db),
 ):
     """
@@ -2059,7 +3209,8 @@ async def get_best_spot(
     from best_spot import get_best_spot_cached
 
     try:
-        best_spot = await get_best_spot_cached(db, day_index)
+        _validate_optional_coordinates(latitude, longitude)
+        best_spot = await get_best_spot_cached(db, day_index, latitude, longitude, radius_km)
 
         if not best_spot:
             raise HTTPException(
@@ -2087,13 +3238,19 @@ async def get_hourly_best_spots(
         description="Day index (0=today, 1=tomorrow, ..., 6=in 6 days)",
     ),
     hours: int = Query(default=24, ge=1, le=24, description="Maximum number of hourly winners"),
+    latitude: float | None = Query(default=None, ge=-90, le=90),
+    longitude: float | None = Query(default=None, ge=-180, le=180),
+    radius_km: float = Query(default=50, gt=0, le=500),
     db: Session = Depends(get_db),
 ):
     """Get the best flying spot for each upcoming flyable hour."""
     from best_spot import get_hourly_best_spots_cached
 
     try:
-        hourly_best_spots = await get_hourly_best_spots_cached(db, day_index, hours)
+        _validate_optional_coordinates(latitude, longitude)
+        hourly_best_spots = await get_hourly_best_spots_cached(
+            db, day_index, hours, latitude, longitude, radius_km
+        )
 
         if not hourly_best_spots:
             raise HTTPException(
@@ -2926,6 +4083,8 @@ async def _build_coordinate_weather_payload(
         except (ValueError, IndexError):
             pass
 
+    if days == 1:
+        flyable_consensus = filter_remaining_hours(flyable_consensus, day_index)
     para_result = calculate_para_index(flyable_consensus)
     slots = analyze_hourly_slots(flyable_consensus)
 
@@ -2943,7 +4102,9 @@ async def _build_coordinate_weather_payload(
         "verdict": para_result["verdict"],
         "emoji": para_result["emoji"],
         "explanation": para_result["explanation"],
-        "metrics": para_result["metrics"],
+        # Keep the endpoint total even when today's remaining flyable hours
+        # are empty (for example, after sunset).
+        "metrics": para_result.get("metrics", {}),
         "slots": slots,
         "slots_summary": format_slots_summary(slots),
         "total_sources": total_sources,
@@ -3063,6 +4224,8 @@ async def get_weather(
             pass  # Keep all hours if parsing fails
 
     # Calculate para_index (using only flyable hours)
+    if days == 1:
+        flyable_consensus = filter_remaining_hours(flyable_consensus, day_index)
     para_result = calculate_para_index(flyable_consensus)
 
     # Calculate wind-adjusted score (same logic as best_spot)
@@ -3121,7 +4284,9 @@ async def get_weather(
         "verdict": para_result["verdict"],
         "emoji": para_result["emoji"],
         "explanation": para_result["explanation"],
-        "metrics": para_result["metrics"],
+        # Keep the endpoint total even when today's remaining flyable hours
+        # are empty (for example, after sunset).
+        "metrics": para_result.get("metrics", {}),
         "slots": slots,
         "slots_summary": slots_summary,
         "total_sources": total_sources,
@@ -3338,6 +4503,7 @@ async def get_weather_summary(
             pass  # Keep all hours if parsing fails
 
     # Calculate para_index (using only flyable hours)
+    flyable_consensus = filter_remaining_hours(flyable_consensus, day_index)
     para_result = calculate_para_index(flyable_consensus)
 
     # Calculate average wind speed for the day (simplified metric)
@@ -3430,6 +4596,7 @@ async def get_daily_summary(
                     sources=None,  # Use all 5 sources (default: open-meteo, weatherapi, meteo-parapente, meteociel, meteoblue)
                     site_name=site.name,
                     elevation_m=site.elevation_m,
+                    site_orientation=site.orientation,
                     force_refresh=force_refresh,
                 )
             )
@@ -3464,9 +4631,11 @@ async def get_daily_summary(
                 wind_fav = get_wind_favorability(
                     wind_dir_str, site.orientation, day_result["wind_avg"]
                 )
-                day_score = calculate_wind_adjusted_score(
-                    day_result["para_index"], wind_fav, slots=day_result.get("slots")
-                )
+                day_score = day_result.get("score")
+                if day_score is None:
+                    day_score = calculate_wind_adjusted_score(
+                        day_result["para_index"], wind_fav, slots=day_result.get("slots")
+                    )
 
                 summary_days.append(
                     {
@@ -3575,10 +4744,14 @@ def get_flights(
             ) from e
 
     flights = query.order_by(Flight.flight_date.desc()).limit(limit).all()
+    previous_pano_paths = {flight.id: flight.pano_video_file_path for flight in flights}
+    pano_paths = pano_video_paths(db, flights)
 
     # Convert to dict (user_id removed - not needed for single-user app)
     flights_data = []
-    export_state_changed = False
+    export_state_changed = any(
+        previous_pano_paths[flight.id] != flight.pano_video_file_path for flight in flights
+    )
     for flight in flights:
         previous_video_job_id = flight.video_export_job_id
         previous_video_status = flight.video_export_status
@@ -3603,27 +4776,41 @@ def get_flights(
             "description": flight.description,
             "flight_date": flight.flight_date.isoformat() if flight.flight_date else None,
             "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
-            "duration_minutes": flight.duration_minutes,
+            "duration_minutes": (
+                flight.real_duration_minutes
+                if flight.real_duration_minutes is not None
+                else flight.duration_minutes
+            ),
             "max_altitude_m": flight.max_altitude_m,
             "max_speed_kmh": flight.max_speed_kmh,
             "distance_km": flight.distance_km,
             "elevation_gain_m": flight.elevation_gain_m,
             "notes": flight.notes,
             "gpx_file_path": flight.gpx_file_path,
+            "gpx_metrics_excluded": flight.gpx_metrics_excluded,
             "video_export_job_id": flight.video_export_job_id,
             "video_export_status": video_export["status"],
             "video_export_progress": video_export["progress"],
             "video_file_path": flight.video_file_path,
             "video_file_exists": _flight_video_file_exists(flight),
+            "pano_video_file_exists": _directory_file_exists(pano_paths[flight.id]),
+            "face_video_file_exists": _directory_file_exists(
+                pano_paths[flight.id].with_name("face.mp4")
+            ),
+            "pilote_video_file_exists": _directory_file_exists(
+                pano_paths[flight.id].with_name("pilote.mp4")
+            ),
             "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
             "gopro_overlay_job_id": flight.gopro_overlay_job_id,
             "gopro_overlay_status": gopro_overlay["status"],
             "gopro_overlay_progress": gopro_overlay["progress"],
             "gopro_overlay_file_path": gopro_overlay["file_path"],
             "gopro_overlay_file_exists": gopro_overlay["file_exists"],
+            "gopro_overlay_gpx_offset": flight.gopro_overlay_gpx_offset,
+            "gopro_overlays": _flight_gopro_overlay_jobs(flight),
             "external_url": flight.external_url,
-            "created_at": flight.created_at.isoformat() if flight.created_at else None,
-            "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
+            "created_at": to_api_utc(flight.created_at),
+            "updated_at": to_api_utc(flight.updated_at),
         }
         flights_data.append(flight_dict)
 
@@ -3637,10 +4824,44 @@ def get_flights(
     return {"flights": flights_data}
 
 
+def _apply_flight_analytics_filters(
+    query: Any,
+    site_id: str | None,
+    date_from: str | None,
+    date_to: str | None,
+) -> Any:
+    """Apply the optional Analytics page filters to a flight query."""
+    if site_id:
+        query = query.filter(Flight.site_id == site_id)
+    for value, operator, field_name in (
+        (date_from, Flight.flight_date.__ge__, "date_from"),
+        (date_to, Flight.flight_date.__le__, "date_to"),
+    ):
+        if not value:
+            continue
+        try:
+            query = query.filter(operator(datetime.strptime(value, "%Y-%m-%d").date()))
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid {field_name} format. Use YYYY-MM-DD",
+            ) from exc
+    return query
+
+
 @router.get("/flights/stats")
-def get_flight_stats(db: Session = Depends(get_db)):
+def get_flight_stats(
+    site_id: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    db: Session = Depends(get_db),
+):
     """Get aggregate flight statistics"""
-    flights = db.query(Flight).all()
+    query = _apply_flight_analytics_filters(
+        db.query(Flight).options(joinedload(Flight.site)), site_id, date_from, date_to
+    )
+
+    flights = query.all()
 
     if not flights:
         return {
@@ -3661,7 +4882,11 @@ def get_flight_stats(db: Session = Depends(get_db)):
 
     # Calculate totals
     total_flights = len(flights)
-    total_minutes = sum(f.duration_minutes or 0 for f in flights)
+    total_minutes = sum(
+        (f.real_duration_minutes if f.real_duration_minutes is not None else f.duration_minutes)
+        or 0
+        for f in flights
+    )
     total_hours = round(total_minutes / 60, 1)
     total_distance = sum(f.distance_km or 0 for f in flights)
     total_elevation_gain = sum(f.elevation_gain_m or 0 for f in flights)
@@ -3674,18 +4899,14 @@ def get_flight_stats(db: Session = Depends(get_db)):
     max_altitude = max((f.max_altitude_m or 0 for f in flights), default=0)
 
     # Find most common spot
-    spot_counts = (
-        db.query(Site.name, func.count(Flight.id).label("count"))
-        .join(Flight)
-        .group_by(Site.name)
-        .order_by(func.count(Flight.id).desc())
-        .first()
-    )
-
-    favorite_spot = spot_counts[0] if spot_counts else None
+    site_counts: dict[str, int] = {}
+    for flight in flights:
+        if flight.site and flight.site.name:
+            site_counts[flight.site.name] = site_counts.get(flight.site.name, 0) + 1
+    favorite_spot = max(site_counts, key=site_counts.get) if site_counts else None
 
     # Get last flight date
-    last_flight = db.query(Flight).order_by(Flight.flight_date.desc()).first()
+    last_flight = max(flights, key=lambda flight: flight.flight_date)
     last_flight_date = last_flight.flight_date.isoformat() if last_flight else None
 
     return {
@@ -3706,25 +4927,38 @@ def get_flight_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/flights/records", response_model=FlightRecordsResponse)
-def get_flight_records(db: Session = Depends(get_db)) -> FlightRecordsResponse:
+def get_flight_records(
+    site_id: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    db: Session = Depends(get_db),
+) -> FlightRecordsResponse:
     """
-    Get personal flight records (longest duration, highest altitude, longest distance, max speed)
+    Get personal flight records, including maximum horizontal and vertical speeds.
 
     Returns:
         {
             "longest_duration": { "value": 120, "flight_id": "...", "date": "2025-11-15", "site_name": "Annecy" },
             "highest_altitude": { ... },
             "longest_distance": { ... },
-            "max_speed": { ... }
+            "max_speed": { ... },
+            "max_climb_rate": { ... },
+            "max_sink_rate": { ... }
         }
     """
-    flights = db.query(Flight).all()
+    query = _apply_flight_analytics_filters(
+        db.query(Flight).options(joinedload(Flight.site)), site_id, date_from, date_to
+    )
+
+    flights = query.all()
 
     empty_records = {
         "longest_duration": None,
         "highest_altitude": None,
         "longest_distance": None,
         "max_speed": None,
+        "max_climb_rate": None,
+        "max_sink_rate": None,
         "takeoff_elevation_gain": None,
         "earliest_takeoff": None,
         "latest_takeoff": None,
@@ -3736,10 +4970,41 @@ def get_flight_records(db: Session = Depends(get_db)) -> FlightRecordsResponse:
         return FlightRecordsResponse(**empty_records)
 
     # Filter out None values and find records
-    flights_with_duration = [f for f in flights if f.duration_minutes is not None]
+    def effective_duration(flight: Flight) -> int | None:
+        return (
+            flight.real_duration_minutes
+            if flight.real_duration_minutes is not None
+            else flight.duration_minutes
+        )
+
+    flights_with_duration = [f for f in flights if effective_duration(f) is not None]
     flights_with_altitude = [f for f in flights if f.max_altitude_m is not None]
     flights_with_distance = [f for f in flights if f.distance_km is not None]
     flights_with_speed = [f for f in flights if f.max_speed_kmh is not None and f.max_speed_kmh > 0]
+    flights_with_climb_rate = [
+        flight
+        for flight in flights
+        if not flight.gpx_metrics_excluded
+        and flight.max_climb_rate_ms is not None
+        and flight.max_climb_rate_ms > 0
+    ]
+    flights_with_sink_rate = [
+        flight
+        for flight in flights
+        if not flight.gpx_metrics_excluded
+        and flight.max_sink_rate_ms is not None
+        and flight.max_sink_rate_ms > 0
+    ]
+    flights_with_climb_data = [
+        flight
+        for flight in flights
+        if not flight.gpx_metrics_excluded and flight.max_climb_rate_ms is not None
+    ]
+    flights_with_sink_data = [
+        flight
+        for flight in flights
+        if not flight.gpx_metrics_excluded and flight.max_sink_rate_ms is not None
+    ]
     flights_with_takeoff_elevation_gain = [
         f
         for f in flights
@@ -3750,7 +5015,7 @@ def get_flight_records(db: Session = Depends(get_db)) -> FlightRecordsResponse:
 
     # Find records
     longest = (
-        max(flights_with_duration, key=lambda f: f.duration_minutes)
+        max(flights_with_duration, key=lambda f: effective_duration(f) or 0)
         if flights_with_duration
         else None
     )
@@ -3763,6 +5028,16 @@ def get_flight_records(db: Session = Depends(get_db)) -> FlightRecordsResponse:
         max(flights_with_distance, key=lambda f: f.distance_km) if flights_with_distance else None
     )
     fastest = max(flights_with_speed, key=lambda f: f.max_speed_kmh) if flights_with_speed else None
+    fastest_climb = (
+        max(flights_with_climb_rate, key=lambda flight: flight.max_climb_rate_ms)
+        if flights_with_climb_rate
+        else None
+    )
+    fastest_sink = (
+        max(flights_with_sink_rate, key=lambda flight: flight.max_sink_rate_ms)
+        if flights_with_sink_rate
+        else None
+    )
     greatest_takeoff_gain = (
         max(
             flights_with_takeoff_elevation_gain,
@@ -3874,10 +5149,14 @@ def get_flight_records(db: Session = Depends(get_db)) -> FlightRecordsResponse:
     )
 
     return FlightRecordsResponse(
-        longest_duration=format_record(longest, "duration_minutes", flights_with_duration),
+        longest_duration=format_computed_flight_record(
+            longest, effective_duration(longest) if longest else None, flights_with_duration
+        ),
         highest_altitude=format_record(highest, "max_altitude_m", flights_with_altitude),
         longest_distance=format_record(farthest, "distance_km", flights_with_distance),
         max_speed=format_record(fastest, "max_speed_kmh", flights_with_speed),
+        max_climb_rate=format_record(fastest_climb, "max_climb_rate_ms", flights_with_climb_data),
+        max_sink_rate=format_record(fastest_sink, "max_sink_rate_ms", flights_with_sink_data),
         takeoff_elevation_gain=format_computed_flight_record(
             greatest_takeoff_gain,
             (
@@ -3969,16 +5248,108 @@ async def preview_intervals_activities(
     )
 
 
-@router.post("/flights/sync-intervals", response_model=ExternalImportResult)
-async def sync_intervals_activities(
-    request: IntervalsSyncRequest, db: Session = Depends(get_db)
-) -> ExternalImportResult:
+async def _run_intervals_sync_operation(
+    operation_id: str, payload: dict[str, Any], user_id: int
+) -> None:
     from external_flight_import import import_external_activities
-    from intervals_sync import (
-        _acquire_shared_lock,
-        _release_shared_lock,
-        _renew_shared_lock,
+    from intervals_sync import _acquire_shared_lock, _release_shared_lock, _renew_shared_lock
+
+    db = SessionLocal()
+    operation = (
+        db.query(BackgroundOperationModel)
+        .filter(BackgroundOperationModel.id == operation_id)
+        .first()
     )
+    if operation is None:
+        db.close()
+        return
+    reporter = OperationReporter(db, operation)
+    redis = None
+    token = ""
+    stop_renewal = asyncio.Event()
+    renewal_task = None
+    queued_sportstracklive_flight_ids: list[str] = []
+    try:
+        request = IntervalsSyncRequest.model_validate(payload)
+        reporter.start()
+        reporter.start_step("fetch_activities")
+        redis, token = await _acquire_shared_lock()
+        if token == "":
+            raise RuntimeError("Another Intervals.icu synchronization is already running")
+        lock_lost = asyncio.Event()
+        renewal_task = (
+            asyncio.create_task(_renew_shared_lock(redis, token, stop_renewal, lock_lost))
+            if redis is not None and token
+            else None
+        )
+        client = _intervals_client()
+        activities = await client.list_activities(
+            request.date_from, request.date_to, config.INTERVALS_ICU_ACTIVITY_TYPES
+        )
+        if request.activity_ids is not None:
+            selected_activity_ids = set(request.activity_ids)
+            activities = [
+                activity for activity in activities if activity.id in selected_activity_ids
+            ]
+        existing_activity_ids = {
+            row[0]
+            for row in db.query(Flight.external_activity_id)
+            .filter(
+                Flight.external_provider == "intervals_icu",
+                Flight.external_activity_id.in_([activity.id for activity in activities]),
+            )
+            .all()
+        }
+        reporter.complete_step("fetch_activities", f"{len(activities)} activité(s) trouvée(s)")
+        reporter.start_step("import_flights")
+        result = await import_external_activities(
+            db,
+            "intervals_icu",
+            client,
+            activities,
+            should_stop=lock_lost.is_set,
+        )
+        for activity in activities:
+            if activity.id in existing_activity_ids:
+                continue
+            flight = (
+                db.query(Flight)
+                .filter(
+                    Flight.external_provider == "intervals_icu",
+                    Flight.external_activity_id == activity.id,
+                )
+                .first()
+            )
+            if flight is not None and flight.gpx_file_path:
+                if mark_sportstracklive_upload_queued(db, flight, user_id):
+                    queued_sportstracklive_flight_ids.append(flight.id)
+        reporter.complete_step("import_flights")
+        reporter.start_step("finalize")
+        reporter.complete_step("finalize")
+        reporter.complete(
+            result=ExternalImportResult.model_validate(result).model_dump(mode="json")
+        )
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Intervals operation %s failed", operation_id)
+        reporter.fail(str(exc))
+    finally:
+        stop_renewal.set()
+        if renewal_task is not None:
+            await renewal_task
+        await _release_shared_lock(redis, token)
+        db.close()
+        for flight_id in queued_sportstracklive_flight_ids:
+            launch_sportstracklive_upload_worker(flight_id, user_id)
+
+
+@router.post("/flights/sync-intervals", response_model=BackgroundOperationStart, status_code=202)
+async def sync_intervals_activities(
+    request: IntervalsSyncRequest,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BackgroundOperationStart:
 
     if not config.INTERVALS_ICU_ACTIVITY_TYPES:
         raise HTTPException(
@@ -3989,40 +5360,21 @@ async def sync_intervals_activities(
             ),
         )
 
-    redis, token = await _acquire_shared_lock()
-    if token == "":
-        raise HTTPException(
-            status_code=409,
-            detail="Another Intervals.icu synchronization is already running.",
-        )
-    stop_renewal = asyncio.Event()
-    lock_lost = asyncio.Event()
-    renewal_task = (
-        asyncio.create_task(_renew_shared_lock(redis, token, stop_renewal, lock_lost))
-        if redis is not None and token
-        else None
+    operation = OperationReporter.create(
+        db,
+        user_id=user.id,
+        operation_type="intervals_sync",
+        title_key="operations.intervalsSync",
+        steps=["fetch_activities", "import_flights", "finalize"],
+        can_retry=False,
+    ).operation
+    background_tasks.add_task(
+        _run_intervals_sync_operation,
+        operation.id,
+        request.model_dump(mode="json"),
+        user.id,
     )
-    client = _intervals_client()
-    try:
-        activities = await client.list_activities(
-            request.date_from, request.date_to, config.INTERVALS_ICU_ACTIVITY_TYPES
-        )
-        result = await import_external_activities(
-            db,
-            "intervals_icu",
-            client,
-            activities,
-            should_stop=lock_lost.is_set,
-        )
-    except Exception as exc:
-        db.rollback()
-        _raise_intervals_http_error(exc)
-    finally:
-        stop_renewal.set()
-        if renewal_task is not None:
-            await renewal_task
-        await _release_shared_lock(redis, token)
-    return ExternalImportResult.model_validate(result)
+    return _operation_start_payload(operation)
 
 
 @router.get("/flights/{flight_id}")
@@ -4036,6 +5388,8 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
     previous_video_status = flight.video_export_status
     previous_overlay_job_id = flight.gopro_overlay_job_id
     previous_overlay_status = flight.gopro_overlay_status
+    previous_pano_path = flight.pano_video_file_path
+    pano_path = pano_video_path(db, flight)
     video_export = _flight_video_export_state(db, flight)
     gopro_overlay = _flight_gopro_overlay_state(db, flight)
     export_state_changed = (
@@ -4043,6 +5397,7 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         or previous_video_status != flight.video_export_status
         or previous_overlay_job_id != flight.gopro_overlay_job_id
         or previous_overlay_status != flight.gopro_overlay_status
+        or previous_pano_path != flight.pano_video_file_path
     )
 
     # Build response with flight data
@@ -4056,29 +5411,48 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "description": flight.description,
         "flight_date": flight.flight_date.isoformat() if flight.flight_date else None,
         "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
-        "duration_minutes": flight.duration_minutes,
+        "duration_minutes": (
+            flight.real_duration_minutes
+            if flight.real_duration_minutes is not None
+            else flight.duration_minutes
+        ),
         "max_altitude_m": flight.max_altitude_m,
         "max_speed_kmh": flight.max_speed_kmh,
         "distance_km": flight.distance_km,
         "elevation_gain_m": flight.elevation_gain_m,
         "notes": flight.notes,
+        "tags": flight.tags,
+        "conditions_feedback": flight.conditions_feedback,
+        "decision_snapshot": flight.decision_snapshot,
         "gpx_file_path": flight.gpx_file_path,
+        "gpx_metrics_excluded": flight.gpx_metrics_excluded,
         "gpx_max_altitude_m": flight.gpx_max_altitude_m,
         "gpx_elevation_gain_m": flight.gpx_elevation_gain_m,
         "external_url": flight.external_url,
+        "youtube_urls": flight.youtube_urls,
+        "video_markers": flight.video_markers,
         "video_export_job_id": flight.video_export_job_id,
         "video_export_status": video_export["status"],
         "video_export_progress": video_export["progress"],
         "video_file_path": flight.video_file_path,
         "video_file_exists": _flight_video_file_exists(flight),
+        "pano_video_file_exists": _directory_file_exists(pano_path),
+        "face_video_file_exists": _directory_file_exists(pano_path.with_name("face.mp4")),
+        "pilote_video_file_exists": _directory_file_exists(pano_path.with_name("pilote.mp4")),
         "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
         "gopro_overlay_job_id": flight.gopro_overlay_job_id,
         "gopro_overlay_status": gopro_overlay["status"],
         "gopro_overlay_progress": gopro_overlay["progress"],
         "gopro_overlay_file_path": gopro_overlay["file_path"],
         "gopro_overlay_file_exists": gopro_overlay["file_exists"],
-        "created_at": flight.created_at.isoformat() if flight.created_at else None,
-        "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
+        "gopro_overlay_gpx_offset": flight.gopro_overlay_gpx_offset,
+        "sportstracklive_status": flight.sportstracklive_status,
+        "sportstracklive_track_id": flight.sportstracklive_track_id,
+        "sportstracklive_error": flight.sportstracklive_error,
+        "sportstracklive_uploaded_at": to_api_utc(flight.sportstracklive_uploaded_at),
+        "gopro_overlays": _flight_gopro_overlay_jobs(flight),
+        "created_at": to_api_utc(flight.created_at),
+        "updated_at": to_api_utc(flight.updated_at),
     }
 
     # Include site details with orientation
@@ -4148,8 +5522,59 @@ async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session =
     # 3. Update only provided fields (exclude_unset skips None values)
     update_data = flight_data.dict(exclude_unset=True)
 
+    if update_data.get("video_markers") is not None:
+        urls = update_data.get("youtube_urls", flight.youtube_urls) or []
+        associated_video_ids: set[str] = set()
+        for url in urls:
+            try:
+                associated_video_ids.add(youtube_video_id_from_url(url))
+            except ValueError:
+                continue
+        if any(
+            marker["youtube_video_id"] not in associated_video_ids
+            for marker in update_data["video_markers"]
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail="Each video marker must reference a YouTube video associated with the flight",
+            )
+
+    gpx_metrics_excluded = update_data.get("gpx_metrics_excluded")
+    if (
+        gpx_metrics_excluded is not None
+        and gpx_metrics_excluded != flight.gpx_metrics_excluded
+        and flight.gpx_file_path
+    ):
+        try:
+            coordinates = parse_gpx_file(Path(flight.gpx_file_path))
+            stats = calculate_track_stats(coordinates)
+            flight.max_climb_rate_ms = stats["max_climb_rate_ms"]
+            flight.max_sink_rate_ms = stats["max_sink_rate_ms"]
+        except Exception as exc:
+            logger.warning(
+                "Could not recalculate vertical rates after changing GPX exclusion for %s: %s",
+                flight_id,
+                exc,
+            )
+
     for field, value in update_data.items():
         setattr(flight, field, value)
+
+    if "video_markers" in update_data or "youtube_urls" in update_data:
+        associated_video_ids: set[str] = set()
+        for url in flight.youtube_urls:
+            try:
+                associated_video_ids.add(youtube_video_id_from_url(url))
+            except ValueError:
+                continue
+        associated_markers = [
+            marker
+            for marker in flight.video_markers
+            if marker.get("youtube_video_id") in associated_video_ids
+        ]
+        if associated_markers != flight.video_markers:
+            flight.video_markers = associated_markers
+        flight.real_duration_minutes = calculate_real_flight_duration_minutes(associated_markers)
 
     # 4. updated_at is handled automatically by SQLAlchemy
 
@@ -4159,7 +5584,17 @@ async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session =
         logger.info(f" Updated flight {flight_id}: {list(update_data.keys())}")
 
         # Return in the format expected by frontend (ApiResponseSchema)
-        return {"data": flight, "status": "success", "message": "Flight updated successfully"}
+        response_flight = FlightSchema.model_validate(flight).model_dump(mode="json")
+        response_flight["duration_minutes"] = (
+            flight.real_duration_minutes
+            if flight.real_duration_minutes is not None
+            else flight.duration_minutes
+        )
+        return {
+            "data": response_flight,
+            "status": "success",
+            "message": "Flight updated successfully",
+        }
     except Exception as e:
         db.rollback()
         logger.error(f"Failed to update flight {flight_id}: {e}", exc_info=True)
@@ -4185,28 +5620,264 @@ def get_flight_gpx_data(flight_id: str, db: Session = Depends(get_db)):
 
     # Parse GPX file
     try:
-        print(f"🔍 DEBUG API - Parsing GPX for flight {flight_id}: {gpx_path}")
         coordinates = parse_gpx_file(gpx_path)
-        print(f"🔍 DEBUG API - Parsed {len(coordinates)} coordinates")
-        if coordinates:
-            print(f"🔍 DEBUG API - First timestamp: {coordinates[0]['timestamp']}")
-            print(f"🔍 DEBUG API - Last timestamp: {coordinates[-1]['timestamp']}")
-
-        stats = calculate_gpx_stats(coordinates)
+        stats = calculate_track_stats(coordinates)
 
         return {
             "data": {
                 "coordinates": coordinates,
                 "max_altitude_m": stats["max_altitude_m"],
                 "min_altitude_m": stats["min_altitude_m"],
+                "altitude_range_m": stats["altitude_range_m"],
+                "takeoff_altitude_m": stats["takeoff_altitude_m"],
+                "landing_altitude_m": stats["landing_altitude_m"],
                 "elevation_gain_m": stats["elevation_gain_m"],
                 "elevation_loss_m": stats["elevation_loss_m"],
-                "total_distance_km": stats["total_distance_km"],
+                "total_distance_km": stats["distance_km"],
+                "max_distance_from_takeoff_km": stats["max_distance_from_takeoff_km"],
                 "flight_duration_seconds": stats["flight_duration_seconds"],
+                "average_speed_kmh": stats["average_speed_kmh"],
+                "max_speed_kmh": stats["max_speed_kmh"],
+                "max_climb_rate_ms": (
+                    None if flight.gpx_metrics_excluded else stats["max_climb_rate_ms"]
+                ),
+                "max_sink_rate_ms": (
+                    None if flight.gpx_metrics_excluded else stats["max_sink_rate_ms"]
+                ),
             }
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse GPX file: {str(e)}") from e
+
+
+@router.get(
+    "/flights/{flight_id}/telemetry",
+    response_model=FlightTelemetryResponse,
+)
+def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> FlightTelemetryResponse:
+    """Return normalized GPX/OSV telemetry for the interactive video overlay."""
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    if not flight.gpx_file_path:
+        raise HTTPException(status_code=404, detail="No GPX file available for this flight")
+
+    source_path = Path(flight.gpx_file_path)
+    if not source_path.is_file():
+        raise HTTPException(status_code=404, detail="GPX file not found on disk")
+
+    telemetry_path = source_path
+    osv_paths: list[Path] = []
+    enrichment_status = "ready"
+    try:
+        camera_path = _flight_gopro_camera_path(db, flight)
+        osv_paths = _matching_files_by_mtime(camera_path.parent, "*.osv")
+        if osv_paths:
+            # OSV merging can take several minutes for a long camera recording.
+            # The overlay preview endpoint prepares this cache asynchronously;
+            # telemetry must remain responsive while that work is in progress.
+            cached_path = enriched_gpx_path(camera_path.parent)
+            enrichment_status = _enriched_gpx_status(camera_path.parent)
+            if enrichment_status == "ready":
+                telemetry_path = cached_path
+            else:
+                telemetry_path = source_path
+    except HTTPException:
+        # The GPX-only overlay remains usable when no GoPro camera is stored.
+        pass
+    except (OSError, ValueError) as exc:
+        logger.warning("Unable to enrich telemetry for %s: %s", flight_id, exc)
+
+    # The remaining work is file parsing only. Do not keep the request's DB
+    # connection checked out while reading the GPX/OSV cache.
+    db.close()
+
+    try:
+        file_type = telemetry_path.name.rsplit(".", 1)[-1]
+        if telemetry_path.suffix.lower() == ".gz":
+            file_type = telemetry_path.name.rsplit(".", 2)[-2] + ".gz"
+        normalized, points = normalize_track(telemetry_path.read_bytes(), file_type)
+        del normalized
+        if osv_paths and enrichment_status == "ready":
+            source_start = first_gpx_timestamp(source_path)
+            if source_start is not None:
+                source_start_ms = int(source_start.timestamp() * 1000)
+                points = [point for point in points if point.get("timestamp", 0) >= source_start_ms]
+        enriched_points = (
+            [] if enrichment_status != "ready" and osv_paths else enrich_telemetry_points(points)
+        )
+    except (OSError, ValueError) as exc:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to parse flight telemetry: {exc}"
+        ) from exc
+
+    timestamps = [point["timestamp"] for point in enriched_points if point.get("timestamp", 0) > 0]
+    payload_points = [dict(point) for point in enriched_points]
+    start_timestamp = min(timestamps) if timestamps else None
+    end_timestamp = max(timestamps) if timestamps else None
+    start_time = (
+        datetime.fromtimestamp(start_timestamp / 1000, tz=timezone.utc)
+        if start_timestamp is not None
+        else None
+    )
+    end_time = (
+        datetime.fromtimestamp(end_timestamp / 1000, tz=timezone.utc)
+        if end_timestamp is not None
+        else None
+    )
+    duration_seconds = (
+        (end_timestamp - start_timestamp) / 1000
+        if start_timestamp is not None and end_timestamp is not None
+        else 0.0
+    )
+
+    return FlightTelemetryResponse(
+        points=payload_points,
+        source="gpx+osv" if osv_paths else "gpx",
+        has_osv=bool(osv_paths),
+        enrichment_status=enrichment_status,
+        enrichment_error=(
+            "Unable to generate enriched GPX" if enrichment_status == "failed" else None
+        ),
+        start_time=start_time,
+        end_time=end_time,
+        duration_seconds=duration_seconds,
+    )
+
+
+def _telemetry_layout_response(
+    layout: TelemetryLayout | None,
+    *,
+    flight_id: str | None,
+    default_xml: str,
+    is_override: bool = False,
+) -> dict[str, Any]:
+    return {
+        "id": layout.id if layout else None,
+        "scope": "flight" if flight_id else "default",
+        "flight_id": flight_id,
+        "xml_content": layout.xml_content if layout else default_xml,
+        "format_version": layout.format_version if layout else 1,
+        "is_override": is_override,
+    }
+
+
+@router.get("/telemetry-layouts/default", response_model=TelemetryLayoutResponse)
+def get_default_telemetry_layout(
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> dict[str, Any]:
+    layout = (
+        db.query(TelemetryLayout)
+        .filter(TelemetryLayout.user_id == user.id, TelemetryLayout.flight_id.is_(None))
+        .first()
+    )
+    return _telemetry_layout_response(
+        layout, flight_id=None, default_xml=DEFAULT_TELEMETRY_LAYOUT_XML
+    )
+
+
+@router.put("/telemetry-layouts/default", response_model=TelemetryLayoutResponse)
+def update_default_telemetry_layout(
+    payload: TelemetryLayoutUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    try:
+        xml_content = validate_telemetry_layout_xml(payload.xml_content)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    layout = (
+        db.query(TelemetryLayout)
+        .filter(TelemetryLayout.user_id == user.id, TelemetryLayout.flight_id.is_(None))
+        .first()
+    )
+    if layout is None:
+        layout = TelemetryLayout(id=str(uuid.uuid4()), user_id=user.id, xml_content=xml_content)
+        db.add(layout)
+    else:
+        layout.xml_content = xml_content
+    db.commit()
+    db.refresh(layout)
+    return _telemetry_layout_response(
+        layout, flight_id=None, default_xml=DEFAULT_TELEMETRY_LAYOUT_XML
+    )
+
+
+@router.get("/flights/{flight_id}/telemetry-layout", response_model=TelemetryLayoutResponse)
+def get_flight_telemetry_layout(
+    flight_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    if db.get(Flight, flight_id) is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    layout = (
+        db.query(TelemetryLayout)
+        .filter(TelemetryLayout.user_id == user.id, TelemetryLayout.flight_id == flight_id)
+        .first()
+    )
+    is_override = layout is not None
+    if layout is None:
+        layout = (
+            db.query(TelemetryLayout)
+            .filter(TelemetryLayout.user_id == user.id, TelemetryLayout.flight_id.is_(None))
+            .first()
+        )
+    return _telemetry_layout_response(
+        layout,
+        flight_id=flight_id,
+        default_xml=DEFAULT_TELEMETRY_LAYOUT_XML,
+        is_override=is_override,
+    )
+
+
+@router.put("/flights/{flight_id}/telemetry-layout", response_model=TelemetryLayoutResponse)
+def update_flight_telemetry_layout(
+    flight_id: str,
+    payload: TelemetryLayoutUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    if db.get(Flight, flight_id) is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    try:
+        xml_content = validate_telemetry_layout_xml(payload.xml_content)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    layout = (
+        db.query(TelemetryLayout)
+        .filter(TelemetryLayout.user_id == user.id, TelemetryLayout.flight_id == flight_id)
+        .first()
+    )
+    if layout is None:
+        layout = TelemetryLayout(
+            id=str(uuid.uuid4()), user_id=user.id, flight_id=flight_id, xml_content=xml_content
+        )
+        db.add(layout)
+    else:
+        layout.xml_content = xml_content
+    db.commit()
+    db.refresh(layout)
+    return _telemetry_layout_response(
+        layout, flight_id=flight_id, default_xml=DEFAULT_TELEMETRY_LAYOUT_XML
+    )
+
+
+@router.delete("/flights/{flight_id}/telemetry-layout", status_code=204)
+def delete_flight_telemetry_layout(
+    flight_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    layout = (
+        db.query(TelemetryLayout)
+        .filter(TelemetryLayout.user_id == user.id, TelemetryLayout.flight_id == flight_id)
+        .first()
+    )
+    if layout is not None:
+        db.delete(layout)
+        db.commit()
+    return Response(status_code=204)
 
 
 @router.get("/flights/{flight_id}/gpx-data/debug")
@@ -4260,6 +5931,20 @@ def download_flight_gpx(flight_id: str, db: Session = Depends(get_db)):
     return FileResponse(path=gpx_path, media_type="application/gpx+xml", filename=filename)
 
 
+@router.post("/flights/{flight_id}/sportstracklive-upload")
+def upload_flight_to_sportstracklive(
+    flight_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    if flight.sportstracklive_status == "uploaded":
+        raise HTTPException(status_code=409, detail="Ce vol est déjà envoyé à SportsTrackLive.")
+    return send_flight_to_sportstracklive(db, flight, user.id)
+
+
 @router.get("/flights/{flight_id}/video")
 def download_flight_video(flight_id: str, db: Session = Depends(get_db)) -> FileResponse:
     """Download generated video for a flight."""
@@ -4276,6 +5961,414 @@ def download_flight_video(flight_id: str, db: Session = Depends(get_db)) -> File
     return FileResponse(path=video_path, media_type="video/mp4", filename=video_path.name)
 
 
+def _video_thumbnail_response(video_path: Path) -> FileResponse:
+    try:
+        thumbnail_path = get_video_thumbnail(video_path)
+    except VideoThumbnailError as exc:
+        logger.warning("Unable to generate thumbnail for %s: %s", video_path, exc)
+        raise HTTPException(status_code=422, detail="Unable to generate video thumbnail") from exc
+    return FileResponse(
+        path=thumbnail_path,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+@router.get("/flights/{flight_id}/video/thumbnail")
+def get_flight_video_thumbnail(flight_id: str, db: Session = Depends(get_db)) -> FileResponse:
+    """Return a thumbnail for the generated flight video."""
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+
+    video_path = _resolve_flight_file_path(flight.video_file_path)
+    if not video_path or not video_path.is_file():
+        raise HTTPException(status_code=404, detail="No video file available for this flight")
+    return _video_thumbnail_response(video_path)
+
+
+@router.get("/flights/{flight_id}/pano/thumbnail")
+def get_flight_pano_thumbnail(flight_id: str, db: Session = Depends(get_db)) -> FileResponse:
+    """Return a thumbnail for the flight Pano video."""
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+
+    pano_path = _resolve_flight_file_path(flight.pano_video_file_path)
+    if not pano_path or not pano_path.is_file():
+        raise HTTPException(status_code=404, detail="No Pano video available for this flight")
+    return _video_thumbnail_response(pano_path)
+
+
+@router.get("/flights/{flight_id}/pano")
+def stream_flight_pano(flight_id: str, db: Session = Depends(get_db)) -> FileResponse:
+    """Stream the flight Pano video in the browser."""
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    pano_path = _resolve_flight_file_path(flight.pano_video_file_path)
+    if not pano_path or not pano_path.is_file():
+        raise HTTPException(status_code=404, detail="No Pano video available for this flight")
+    return FileResponse(
+        path=pano_path,
+        media_type="video/mp4",
+        filename=pano_path.name,
+        content_disposition_type="inline",
+    )
+
+
+@router.delete(
+    "/flights/{flight_id}/temporary-media/{source_type}",
+    status_code=204,
+)
+def delete_flight_temporary_media(
+    flight_id: str,
+    source_type: Literal["camera", "pano", "face", "pilote"],
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    flight = db.get(Flight, flight_id)
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+
+    completed_uploads = (
+        db.query(YoutubeUploadJob)
+        .filter(
+            YoutubeUploadJob.flight_id == flight.id,
+            YoutubeUploadJob.user_id == user.id,
+            YoutubeUploadJob.source_type == source_type,
+            YoutubeUploadJob.status == "completed",
+            YoutubeUploadJob.youtube_url.in_(flight.youtube_urls or []),
+            YoutubeUploadJob.youtube_video_id.is_not(None),
+        )
+        .all()
+    )
+    video_ids = {
+        job.youtube_video_id for job in completed_uploads if job.youtube_video_id is not None
+    }
+    availability = youtube_video_availability({user.id: video_ids}) if video_ids else {}
+    if not any(availability.get(video_id) is True for video_id in video_ids):
+        raise HTTPException(
+            status_code=409,
+            detail="Publish this source to YouTube before deleting its local file",
+        )
+
+    if source_type == "camera":
+        media_path = _flight_gopro_camera_path(db, flight)
+    else:
+        source_path = _resolve_flight_file_path(str(temporary_video_path(db, flight, source_type)))
+        if source_path is None or source_path.is_symlink() or not source_path.is_file():
+            raise HTTPException(status_code=404, detail=f"{source_type.title()} video not found")
+        resolved_source_path = source_path.resolve()
+        storage_root = flight_storage_root().resolve()
+        if storage_root not in resolved_source_path.parents:
+            raise HTTPException(
+                status_code=409,
+                detail=f"{source_type.title()} video is outside flight storage",
+            )
+        media_path = resolved_source_path
+
+    try:
+        media_path.unlink()
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Temporary video not found") from exc
+    except OSError as exc:
+        logger.exception(
+            "Unable to delete temporary %s video for flight %s", source_type, flight.id
+        )
+        raise HTTPException(status_code=500, detail="Unable to delete temporary video") from exc
+
+    if source_type == "pano":
+        flight.pano_video_file_path = None
+        db.commit()
+    return Response(status_code=204)
+
+
+@router.get("/flights/{flight_id}/temporary-media/{source_type}/thumbnail")
+def get_flight_temporary_media_thumbnail(
+    flight_id: str,
+    source_type: Literal["face", "pilote"],
+    db: Session = Depends(get_db),
+) -> FileResponse:
+    flight = db.get(Flight, flight_id)
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    media_path = temporary_video_path(db, flight, source_type)
+    if not _directory_file_exists(media_path):
+        raise HTTPException(status_code=404, detail=f"{source_type.title()} video not found")
+    return _video_thumbnail_response(media_path)
+
+
+@router.get("/flights/{flight_id}/temporary-media/{source_type}")
+def stream_flight_temporary_media(
+    flight_id: str,
+    source_type: Literal["face", "pilote"],
+    db: Session = Depends(get_db),
+) -> FileResponse:
+    flight = db.get(Flight, flight_id)
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    media_path = temporary_video_path(db, flight, source_type)
+    if not _directory_file_exists(media_path):
+        raise HTTPException(status_code=404, detail=f"{source_type.title()} video not found")
+    return FileResponse(
+        path=media_path,
+        media_type="video/mp4",
+        filename=media_path.name,
+        content_disposition_type="inline",
+    )
+
+
+def _highlight_job_payload(job: HighlightVideoJob) -> HighlightVideoJobResponse:
+    try:
+        raw_selection = json.loads(job.selection_json) if job.selection_json else []
+        if not isinstance(raw_selection, list):
+            raise ValueError("selection must be a list")
+        selection = [HighlightVideoClipResponse.model_validate(item) for item in raw_selection]
+    except (json.JSONDecodeError, TypeError, ValueError):
+        selection = []
+    return HighlightVideoJobResponse(
+        job_id=job.id,
+        flight_id=job.flight_id,
+        status=job.status,
+        progress=job.progress,
+        message=job.message,
+        log_tail=[job.message] if job.message else [],
+        error=job.error,
+        render_method=job.render_method,
+        output_format=job.output_format,
+        overlay_offset_seconds=float(job.overlay_offset_seconds or 0.0),
+        selection=selection,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+        completed_at=job.completed_at,
+    )
+
+
+@router.get(
+    "/flights/{flight_id}/highlight-videos",
+    response_model=list[HighlightVideoJobResponse],
+)
+def list_flight_highlight_videos(
+    flight_id: str, db: Session = Depends(get_db)
+) -> list[HighlightVideoJobResponse]:
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    return [
+        _highlight_job_payload(job)
+        for job in reversed(
+            db.query(HighlightVideoJob)
+            .filter(HighlightVideoJob.flight_id == flight_id)
+            .order_by(HighlightVideoJob.created_at)
+            .all()
+        )
+    ]
+
+
+@router.get("/flights/{flight_id}/highlight-videos/{job_id}/download")
+def download_flight_highlight_video(
+    flight_id: str, job_id: str, db: Session = Depends(get_db)
+) -> FileResponse:
+    job = (
+        db.query(HighlightVideoJob)
+        .filter(HighlightVideoJob.id == job_id, HighlightVideoJob.flight_id == flight_id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Highlight video job not found")
+    if job.status != "completed" or not job.output_path:
+        raise HTTPException(status_code=409, detail="Highlight video is not ready")
+    output_path = Path(job.output_path)
+    if not output_path.is_file():
+        raise HTTPException(status_code=404, detail="Highlight video file not found")
+    return FileResponse(
+        path=output_path,
+        media_type="video/mp4",
+        filename=output_path.name,
+        content_disposition_type="inline",
+    )
+
+
+@router.delete(
+    "/flights/{flight_id}/highlight-videos/{job_id}/cancel",
+    response_model=HighlightVideoJobResponse,
+)
+def cancel_flight_highlight_video(
+    flight_id: str, job_id: str, db: Session = Depends(get_db)
+) -> HighlightVideoJobResponse:
+    job = (
+        db.query(HighlightVideoJob)
+        .filter(HighlightVideoJob.id == job_id, HighlightVideoJob.flight_id == flight_id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Highlight video job not found")
+    if job.status not in {HIGHLIGHT_STATUS_QUEUED, "running"}:
+        raise HTTPException(status_code=409, detail="Highlight video cannot be cancelled")
+    job.status = "cancelled"
+    job.message = "Rendu des meilleurs moments annulé"
+    job.completed_at = datetime.utcnow()
+    db.commit()
+    db.refresh(job)
+    return _highlight_job_payload(job)
+
+
+@router.delete(
+    "/flights/{flight_id}/highlight-videos/{job_id}",
+    response_model=HighlightVideoDeleteResponse,
+)
+def delete_flight_highlight_video(
+    flight_id: str, job_id: str, db: Session = Depends(get_db)
+) -> HighlightVideoDeleteResponse:
+    """Delete a terminal best-moments job and its generated files."""
+    job = (
+        db.query(HighlightVideoJob)
+        .filter(HighlightVideoJob.id == job_id, HighlightVideoJob.flight_id == flight_id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Highlight video job not found")
+    if job.status in {HIGHLIGHT_STATUS_QUEUED, "running"}:
+        raise HTTPException(
+            status_code=409, detail="Highlight video cannot be deleted while active"
+        )
+
+    output_dir = (
+        Path(job.output_path).parent
+        if job.output_path
+        else Path(job.source_video_path).parent / "highlights" / job.id
+    )
+    deleted_files = cleanup_highlight_job_files(output_dir, job_id=job.id)
+    # Preserve deletion of legacy rows whose final video predates the
+    # per-job highlights directory layout.
+    if deleted_files == 0 and job.output_path:
+        legacy_output_path = Path(job.output_path)
+        if legacy_output_path.is_file():
+            legacy_output_path.unlink()
+            deleted_files = 1
+            try:
+                legacy_output_path.parent.rmdir()
+            except OSError:
+                pass
+
+    db.delete(job)
+    db.commit()
+    return HighlightVideoDeleteResponse(job_id=job_id, deleted=True, files_deleted=deleted_files)
+
+
+@router.get("/flights/{flight_id}/highlight-videos/{job_id}/thumbnail")
+def get_flight_highlight_video_thumbnail(
+    flight_id: str, job_id: str, db: Session = Depends(get_db)
+) -> FileResponse:
+    """Return a thumbnail for a completed best-moments video."""
+    job = (
+        db.query(HighlightVideoJob)
+        .filter(HighlightVideoJob.id == job_id, HighlightVideoJob.flight_id == flight_id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Highlight video job not found")
+    if job.status != "completed" or not job.output_path:
+        raise HTTPException(status_code=404, detail="Highlight video is not ready")
+    output_path = Path(job.output_path)
+    if not output_path.is_file():
+        raise HTTPException(status_code=404, detail="Highlight video file not found")
+    return _video_thumbnail_response(output_path)
+
+
+@router.post(
+    "/flights/{flight_id}/highlight-videos",
+    response_model=HighlightVideoJobResponse,
+    status_code=202,
+)
+def create_flight_highlight_video(
+    flight_id: str,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> HighlightVideoJobResponse:
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    overlay_offset = _require_gopro_overlay_offset(flight)
+
+    pano_path = pano_video_path(db, flight)
+    if not pano_path.is_file():
+        raise HTTPException(status_code=409, detail="Panorama video is not available")
+
+    active = (
+        db.query(HighlightVideoJob)
+        .filter(
+            HighlightVideoJob.flight_id == flight_id,
+            HighlightVideoJob.status.in_([HIGHLIGHT_STATUS_QUEUED, "running"]),
+        )
+        .order_by(HighlightVideoJob.created_at.desc())
+        .first()
+    )
+    if active:
+        return _highlight_job_payload(active)
+
+    overlay_layer = _require_ready_gopro_overlay_layer(flight)
+    # Highlights must consume the reusable transparent layer generated by the
+    # dedicated overlay-layer endpoint.  The legacy flight overlay path may
+    # point to a composited GoPro video and is not suitable for this step.
+    overlay_path = _resolve_flight_file_path(overlay_layer.output_path)
+    if overlay_path is None or not overlay_path.is_file():
+        raise HTTPException(
+            status_code=409,
+            detail="The synchronized overlay layer output is not available",
+        )
+    job = HighlightVideoJob(
+        id=create_highlight_job_id(),
+        flight_id=flight_id,
+        status=HIGHLIGHT_STATUS_QUEUED,
+        progress=0,
+        message="En attente du rendu",
+        source_video_path=str(pano_path),
+        overlay_video_path=str(overlay_path),
+        output_format="original",
+        overlay_offset_seconds=overlay_offset,
+    )
+    db.add(job)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        active = (
+            db.query(HighlightVideoJob)
+            .filter(
+                HighlightVideoJob.flight_id == flight_id,
+                HighlightVideoJob.status.in_([HIGHLIGHT_STATUS_QUEUED, "running"]),
+            )
+            .order_by(HighlightVideoJob.created_at.desc())
+            .first()
+        )
+        if active:
+            return _highlight_job_payload(active)
+        raise
+    db.refresh(job)
+
+    from job_queue import is_rq_enabled
+
+    if is_rq_enabled():
+        enqueue_highlight_video_job(job.id)
+    else:
+        background_tasks.add_task(process_highlight_video_job, job.id)
+    operation = _ensure_job_operation(
+        db,
+        user_id=user.id,
+        source_kind="highlight_video",
+        source_id=job.id,
+        operation_type="highlight_video",
+        title_key="operations.highlightVideo",
+        steps=["prepare", "select", "render", "finalize"],
+        can_cancel=True,
+        can_retry=True,
+    )
+    return _highlight_job_payload(job).model_copy(update={"operation_id": operation.id})
+
+
 @router.get("/flights/{flight_id}/gopro-overlay")
 def download_flight_gopro_overlay(flight_id: str, db: Session = Depends(get_db)) -> FileResponse:
     """Download generated GoPro overlay video for a flight."""
@@ -4287,7 +6380,28 @@ def download_flight_gopro_overlay(flight_id: str, db: Session = Depends(get_db))
     if not overlay_path:
         raise HTTPException(status_code=404, detail="No GoPro overlay available for this flight")
 
-    return FileResponse(path=overlay_path, media_type="video/mp4", filename=overlay_path.name)
+    return FileResponse(
+        path=overlay_path,
+        media_type="video/mp4",
+        filename=overlay_path.name,
+        content_disposition_type="inline",
+    )
+
+
+@router.get("/flights/{flight_id}/gopro-overlay/thumbnail")
+def get_flight_gopro_overlay_thumbnail(
+    flight_id: str, db: Session = Depends(get_db)
+) -> FileResponse:
+    """Return a thumbnail for the current GoPro overlay video."""
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+
+    overlay_path_value = _flight_gopro_overlay_file_path(db, flight)
+    overlay_path = Path(overlay_path_value) if overlay_path_value else None
+    if not overlay_path or not overlay_path.is_file():
+        raise HTTPException(status_code=404, detail="No GoPro overlay available for this flight")
+    return _video_thumbnail_response(overlay_path)
 
 
 @router.post("/flights")
@@ -4329,6 +6443,9 @@ def create_flight(flight_data: FlightCreate, db: Session = Depends(get_db)):
         distance_km=flight_data.distance_km,
         elevation_gain_m=flight_data.elevation_gain_m,
         notes=flight_data.notes,
+        tags=flight_data.tags,
+        conditions_feedback=flight_data.conditions_feedback,
+        decision_snapshot=flight_data.decision_snapshot,
     )
     try:
         db.add(flight)
@@ -4356,6 +6473,9 @@ def create_flight(flight_data: FlightCreate, db: Session = Depends(get_db)):
         "distance_km": flight.distance_km,
         "elevation_gain_m": flight.elevation_gain_m,
         "notes": flight.notes,
+        "tags": flight.tags,
+        "conditions_feedback": flight.conditions_feedback,
+        "decision_snapshot": flight.decision_snapshot,
         "gpx_file_path": None,
         "external_url": None,
         "video_export_job_id": None,
@@ -4363,20 +6483,27 @@ def create_flight(flight_data: FlightCreate, db: Session = Depends(get_db)):
         "video_export_progress": None,
         "video_file_path": None,
         "video_file_exists": False,
+        "pano_video_file_exists": False,
+        "face_video_file_exists": False,
+        "pilote_video_file_exists": False,
         "gopro_camera_file_exists": False,
         "gopro_overlay_job_id": None,
         "gopro_overlay_status": None,
         "gopro_overlay_progress": None,
         "gopro_overlay_file_path": None,
         "gopro_overlay_file_exists": False,
-        "created_at": flight.created_at.isoformat() if flight.created_at else None,
-        "updated_at": flight.updated_at.isoformat() if flight.updated_at else None,
+        "created_at": to_api_utc(flight.created_at),
+        "updated_at": to_api_utc(flight.updated_at),
     }
 
 
 @router.post("/flights/{flight_id}/upload-gpx")
 async def upload_gpx_to_flight(
-    flight_id: str, gpx_file: UploadFile = File(...), db: Session = Depends(get_db)
+    background_tasks: BackgroundTasks,
+    flight_id: str,
+    gpx_file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Upload un fichier GPX pour un vol existant
@@ -4397,19 +6524,37 @@ async def upload_gpx_to_flight(
 
         # Keep the upload successful even if historical/statistical data is malformed.
         flight.gpx_file_path = str(file_path)
+        # A replacement GPX is a new track; allow it to be sent again.
+        flight.sportstracklive_status = None
+        flight.sportstracklive_track_id = None
+        flight.sportstracklive_error = None
+        flight.sportstracklive_upload_started_at = None
+        flight.sportstracklive_uploaded_at = None
+        flight.max_climb_rate_ms = None
+        flight.max_sink_rate_ms = None
         flight.updated_at = datetime.utcnow()
         try:
             _, points = normalize_track(gpx_content, "gpx")
-            max_speed_kmh = float(calculate_track_stats(points)["max_speed_kmh"])
-            if max_speed_kmh > 0:
-                flight.max_speed_kmh = max_speed_kmh
+            stats = calculate_track_stats(points)
+            flight.duration_minutes = stats["duration_minutes"]
+            flight.max_altitude_m = stats["max_altitude_m"]
+            flight.max_speed_kmh = stats["max_speed_kmh"]
+            flight.distance_km = stats["distance_km"]
+            flight.elevation_gain_m = stats["elevation_gain_m"]
+            flight.gpx_max_altitude_m = stats["max_altitude_m"]
+            flight.gpx_elevation_gain_m = stats["elevation_gain_m"]
+            flight.max_climb_rate_ms = stats["max_climb_rate_ms"]
+            flight.max_sink_rate_ms = stats["max_sink_rate_ms"]
+            flight.departure_time = stats["departure_time"]
         except Exception as exc:
             logger.warning(
-                "Could not calculate max speed for uploaded GPX on %s: %s", flight_id, exc
+                "Could not calculate GPX stats for uploaded track on %s: %s", flight_id, exc
             )
 
         db.commit()
         db.refresh(flight)
+
+        queue_sportstracklive_upload(db, flight, user.id, background_tasks)
 
         logger.info("Added GPX file to flight %s", flight_id)
 
@@ -4418,7 +6563,7 @@ async def upload_gpx_to_flight(
             from video_export_manual import trigger_auto_export
 
             frontend_url = resolve_frontend_url()
-            with job_admission():
+            with job_admission("auto_video_export"):
                 trigger_auto_export(flight_id, db, frontend_url)
         except Exception as e:
             logger.warning(f"Failed to trigger auto video export: {e}")
@@ -4438,7 +6583,11 @@ async def upload_gpx_to_flight(
 
 @router.post("/flights/create-from-gpx")
 async def create_flight_from_gpx(
-    gpx_file: UploadFile = File(...), site_id: str | None = None, db: Session = Depends(get_db)
+    background_tasks: BackgroundTasks,
+    gpx_file: UploadFile = File(...),
+    site_id: str | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Créer un nouveau vol depuis un fichier GPX ou IGC
@@ -4482,6 +6631,7 @@ async def create_flight_from_gpx(
 
         # 3. Calculer les statistiques
         stats = calculate_gpx_stats(coordinates)
+        vertical_stats = calculate_track_stats(coordinates)
 
         # 4. Déterminer le site si pas fourni
         if not site_id and coordinates:
@@ -4497,7 +6647,7 @@ async def create_flight_from_gpx(
         # Extraire la date et heure depuis le GPX (premier trackpoint)
         flight_date = date.today()  # Default
         departure_time = None
-        flight_name = f"Vol du {flight_date.strftime('%d/%m/%Y')}"  # Default
+        flight_name = format_automatic_flight_name(flight_date)
 
         if stats.get("first_trackpoint") and stats["first_trackpoint"].get("time"):
             # Le timestamp du GPX est en UTC, on le convertit en heure locale française
@@ -4512,12 +6662,48 @@ async def create_flight_from_gpx(
                 departure_time = departure_datetime_utc.astimezone(paris_tz)
                 flight_date = departure_time.date()
 
-                # Nom du vol avec date ET heure
-                flight_name = f"Vol du {flight_date.strftime('%d/%m/%Y')} à {departure_time.strftime('%H:%M')}"
+                flight_name = format_automatic_flight_name(flight_date, departure_time)
 
                 print(
                     f"🔍 DEBUG Date/Time - UTC: {departure_datetime_utc}, Local: {departure_time}, Name: {flight_name}"
                 )
+
+        # Include the track content in the generated name so that repeat
+        # uploads reuse the flight without merging distinct tracks at the
+        # same date and time.
+        track_identity = hashlib.sha256(file_content).hexdigest()[:16]
+        flight_name = f"{flight_name} [{track_identity}]"
+        existing_flight = (
+            db.query(Flight)
+            .filter(
+                Flight.site_id == site_id,
+                Flight.name.endswith(f"[{track_identity}]"),
+            )
+            .first()
+        )
+        if existing_flight:
+            return {
+                "success": True,
+                "flight_id": existing_flight.id,
+                "flight": {
+                    "id": existing_flight.id,
+                    "name": existing_flight.name,
+                    "title": existing_flight.title,
+                    "flight_date": existing_flight.flight_date.isoformat(),
+                    "departure_time": (
+                        existing_flight.departure_time.isoformat()
+                        if existing_flight.departure_time
+                        else None
+                    ),
+                    "duration_minutes": existing_flight.duration_minutes,
+                    "max_altitude_m": existing_flight.max_altitude_m,
+                    "distance_km": existing_flight.distance_km,
+                    "elevation_gain_m": existing_flight.elevation_gain_m,
+                    "max_speed_kmh": existing_flight.max_speed_kmh,
+                    "site_id": existing_flight.site_id,
+                    "gpx_file_path": existing_flight.gpx_file_path,
+                },
+            }
 
         flight = Flight(
             id=flight_id,
@@ -4535,6 +6721,8 @@ async def create_flight_from_gpx(
             distance_km=stats.get("total_distance_km"),
             elevation_gain_m=stats.get("elevation_gain_m"),
             max_speed_kmh=stats.get("max_speed_kmh", 0),
+            max_climb_rate_ms=vertical_stats["max_climb_rate_ms"],
+            max_sink_rate_ms=vertical_stats["max_sink_rate_ms"],
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
         )
@@ -4551,6 +6739,8 @@ async def create_flight_from_gpx(
         db.commit()
         db.refresh(flight)
 
+        queue_sportstracklive_upload(db, flight, user.id, background_tasks)
+
         logger.info(
             f" Created new flight from {file_type.upper()}: {flight.name} (ID: {flight_id})"
         )
@@ -4560,7 +6750,7 @@ async def create_flight_from_gpx(
             from video_export_manual import trigger_auto_export
 
             frontend_url = resolve_frontend_url()
-            with job_admission():
+            with job_admission("auto_video_export"):
                 trigger_auto_export(flight_id, db, frontend_url)
         except Exception as e:
             logger.warning(f"Failed to trigger auto video export: {e}")
@@ -4900,7 +7090,25 @@ def parse_gpx_file_from_string(gpx_content: str) -> list[dict]:
         else:
             timestamp = 0
 
-        coordinates.append({"lat": lat, "lon": lon, "elevation": elevation, "timestamp": timestamp})
+        heart_rate_elem = next(
+            (
+                element
+                for element in trkpt.iter()
+                if element is not trkpt and element.tag.rsplit("}", 1)[-1] == "hr" and element.text
+            ),
+            None,
+        )
+        heart_rate = None
+        if heart_rate_elem is not None and heart_rate_elem.text:
+            try:
+                heart_rate = int(float(heart_rate_elem.text))
+            except Exception as e:
+                print(f"⚠️ DEBUG Parse heart rate failed: {e}")
+
+        coordinate = {"lat": lat, "lon": lon, "elevation": elevation, "timestamp": timestamp}
+        if heart_rate is not None:
+            coordinate["heart_rate"] = heart_rate
+        coordinates.append(coordinate)
 
     if coordinates:
         print(
@@ -4936,6 +7144,20 @@ def parse_gpx_file(gpx_path: Path) -> list[dict]:
         # Parse as GPX file (XML)
         print(f"🔍 DEBUG - Detected GPX file: {gpx_path.name}")
         return parse_gpx_file_from_string(content)
+
+
+def _restore_missing_heart_rates(coordinates: list[dict], source_coordinates: list[dict]) -> None:
+    """Keep source GPX heart rates when OSV enrichment omits them."""
+    heart_rates_by_timestamp = {
+        point["timestamp"]: point["heart_rate"]
+        for point in source_coordinates
+        if point.get("timestamp") and point.get("heart_rate") is not None
+    }
+    for point in coordinates:
+        if point.get("heart_rate") is None:
+            heart_rate = heart_rates_by_timestamp.get(point.get("timestamp"))
+            if heart_rate is not None:
+                point["heart_rate"] = heart_rate
 
 
 def calculate_max_speed(coordinates: list[dict]) -> float:
@@ -5160,6 +7382,8 @@ def start_flight_video_export(
     fps: int = 15,
     speed: int = 1,
     mode: str = "manual",  # "manual", "manual_fast", or "stream"
+    director_style: str = "natural",
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -5191,8 +7415,11 @@ def start_flight_video_export(
 
     logger.info(f" Flight found: {flight.title} (date: {flight.flight_date})")
 
-    # Determine frontend URL
+    if director_style not in {"natural", "cinematic", "dynamic"}:
+        raise HTTPException(status_code=400, detail="Invalid director_style")
+
     frontend_url = resolve_frontend_url(config.FRONTEND_URL)
+    manual_frontend_url = f"{frontend_url}#director={director_style}"
 
     # Start export with selected mode
     job_id: str
@@ -5214,7 +7441,7 @@ def start_flight_video_export(
                 quality=quality,
                 fps=fps,
                 speed=speed,
-                frontend_url=frontend_url,
+                frontend_url=manual_frontend_url,
             )
         except DeploymentDrainActive:
             raise
@@ -5234,7 +7461,7 @@ def start_flight_video_export(
                         quality=quality,
                         fps=fps,
                         speed=speed,
-                        frontend_url=frontend_url,
+                        frontend_url=manual_frontend_url,
                     )
                     effective_mode = "manual"
                 else:
@@ -5278,9 +7505,21 @@ def start_flight_video_export(
         effective_mode = "stream"
         _mark_flight_export_processing(db=db, flight=flight, job_id=job_id)
 
+    operation = _ensure_job_operation(
+        db,
+        user_id=user.id,
+        source_kind="video_export",
+        source_id=job_id,
+        operation_type="video_export",
+        title_key="operations.videoExport",
+        steps=["prepare", "render", "finalize"],
+        can_cancel=True,
+        can_retry=True,
+    )
     return _with_video_export_job_token(
         {
             "job_id": job_id,
+            "operation_id": operation.id,
             "message": f"Video export started ({_video_export_mode_label(effective_mode)})",
             "mode": effective_mode,
             "status_url": f"/api/exports/{job_id}/status",
@@ -5294,6 +7533,7 @@ def start_flight_video_export(
 def generate_flight_video(
     request: Request,
     flight_id: str,
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -5352,9 +7592,21 @@ def generate_flight_video(
 
     logger.info(f" Video generation started: job_id={job_id}")
 
+    operation = _ensure_job_operation(
+        db,
+        user_id=user.id,
+        source_kind="video_export",
+        source_id=job_id,
+        operation_type="video_export",
+        title_key="operations.videoExport",
+        steps=["prepare", "render", "finalize"],
+        can_cancel=True,
+        can_retry=True,
+    )
     return _with_video_export_job_token(
         {
             "job_id": job_id,
+            "operation_id": operation.id,
             "message": started_message,
             "status_url": f"/api/exports/{job_id}/status",
         },
@@ -5378,19 +7630,55 @@ def get_video_export_status(job_id: str):
 @router.get("/video-export-jobs")
 def list_video_export_jobs(
     active_only: bool = False,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=1, le=100),
+    status_filter: Literal["all", "active", "completed", "failed", "cancelled"] = Query(
+        default="all"
+    ),
+    type_filter: Literal["all", "video", "gopro", "highlight", "youtube"] = Query(default="all"),
     db: Session = Depends(get_db),
-):
+) -> VideoExportJobsResponse:
     """List video export jobs across all flights."""
-    return _get_video_export_jobs_payload(db, active_only=active_only)
+    payload = _get_video_export_jobs_payload(
+        db,
+        active_only=active_only,
+        status_filter=status_filter,
+        type_filter=type_filter,
+        page=page,
+        page_size=page_size,
+    )
+    return VideoExportJobsResponse(**payload)
+
+
+@router.get("/video-export-gpu-status")
+def video_export_gpu_status(response: Response) -> dict[str, object]:
+    """Return live GPU telemetry for the infrastructure dashboard."""
+
+    response.headers["Cache-Control"] = "no-store"
+    return get_gpu_runtime_status()
 
 
 @router.get("/video-export-jobs/stream")
-async def stream_video_export_jobs(request: Request) -> StreamingResponse:
+async def stream_video_export_jobs(
+    request: Request,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=1, le=100),
+    status_filter: Literal["all", "active", "completed", "failed", "cancelled"] = Query(
+        default="all"
+    ),
+    type_filter: Literal["all", "video", "gopro", "highlight", "youtube"] = Query(default="all"),
+) -> StreamingResponse:
     """Stream video export job list updates without frontend polling."""
 
     def read_payload() -> dict[str, Any]:
         with SessionLocal() as db:
-            return _get_video_export_jobs_payload(db)
+            return _get_video_export_jobs_payload(
+                db,
+                status_filter=status_filter,
+                type_filter=type_filter,
+                page=page,
+                page_size=page_size,
+            )
 
     async def event_stream():
         yield "retry: 5000\n\n"
@@ -5700,6 +7988,612 @@ def get_gopro_overlay_dependencies() -> GoproOverlayDependencies:
     return check_gopro_overlay_dependencies()
 
 
+def _prepare_enriched_gpx_in_background(
+    osv_paths: list[Path],
+    gpx_path: Path,
+    input_dir: Path,
+    *,
+    video_duration: float,
+    first_gpx_at: float | None,
+) -> None:
+    try:
+        ensure_enriched_gpx(
+            osv_paths,
+            gpx_path,
+            input_dir,
+            video_duration=video_duration,
+            first_gpx_at=first_gpx_at,
+        )
+        try:
+            _enriched_gpx_error_path(input_dir).unlink(missing_ok=True)
+        except OSError:
+            logger.warning("Unable to clear enriched GPX error marker in %s", input_dir)
+    except Exception as exc:
+        try:
+            _enriched_gpx_error_path(input_dir).touch()
+        except OSError:
+            logger.warning("Unable to persist enriched GPX error marker in %s", input_dir)
+        logger.warning("Unable to prepare enriched GPX in background: %s", exc)
+
+
+def _enriched_gpx_error_path(input_dir: Path) -> Path:
+    return input_dir / "merged-gopro-overlay.error"
+
+
+def _enriched_gpx_status(input_dir: Path) -> str:
+    if enriched_gpx_path(input_dir).is_file():
+        return "ready"
+    if _enriched_gpx_error_path(input_dir).is_file():
+        return "failed"
+    lock_path = input_dir / "merged-gopro-overlay.lock"
+    try:
+        with lock_path.open("a+") as lock_file:
+            try:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return "pending"
+            finally:
+                try:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                except OSError:
+                    pass
+    except OSError:
+        return "missing"
+    return "missing"
+
+
+def _clear_enriched_gpx_error(input_dir: Path) -> None:
+    try:
+        _enriched_gpx_error_path(input_dir).unlink(missing_ok=True)
+    except OSError:
+        logger.warning("Unable to clear enriched GPX error marker in %s", input_dir)
+
+
+_INTERACTIVE_OVERLAY_FILENAME = "interactive-gopro-overlay.webm"
+_INTERACTIVE_OVERLAY_JOB_FILENAME = "interactive-gopro-overlay.json"
+
+
+def _interactive_overlay_job_path(camera_path: Path) -> Path:
+    return camera_path.parent / _INTERACTIVE_OVERLAY_JOB_FILENAME
+
+
+def _interactive_overlay_state(camera_path: Path) -> dict[str, Any]:
+    job_path = _interactive_overlay_job_path(camera_path)
+    if not job_path.is_file():
+        return {"status": "missing", "job_id": None, "error": None}
+    try:
+        job_id = json.loads(job_path.read_text()).get("job_id")
+    except (OSError, ValueError, AttributeError):
+        return {"status": "missing", "job_id": None, "error": None}
+    job = get_gopro_overlay_job(str(job_id)) if job_id else None
+    if not job or job.get("output_filename") != _INTERACTIVE_OVERLAY_FILENAME:
+        return {"status": "missing", "job_id": None, "error": None}
+    status = str(job.get("status") or "missing")
+    if status == "completed":
+        status = "ready" if gopro_overlay_output_path(str(job_id)) else "generating"
+    return {
+        "status": status if status in {"generating", "ready", "failed"} else "generating",
+        "job_id": str(job_id),
+        "error": job.get("error"),
+    }
+
+
+def _generate_interactive_overlay_in_background(
+    camera_path: Path,
+    gpx_path: Path,
+    osv_paths: list[Path],
+    video_duration: float,
+    first_gpx_at: float | None,
+    gpx_offset: float,
+) -> None:
+    job_path = _interactive_overlay_job_path(camera_path)
+    if job_path.is_file() and _interactive_overlay_state(camera_path)["status"] in {
+        "generating",
+        "ready",
+    }:
+        return
+    try:
+        render_gpx_path = gpx_path
+        if osv_paths:
+            render_gpx_path = ensure_enriched_gpx(
+                osv_paths,
+                gpx_path,
+                camera_path.parent,
+                video_duration=video_duration,
+                first_gpx_at=first_gpx_at,
+            )
+        job = create_gopro_overlay_job_from_paths(
+            video_path=camera_path,
+            gpx_path=render_gpx_path,
+            pip_path=None,
+            layout_id=None,
+            output_filename=_INTERACTIVE_OVERLAY_FILENAME,
+            output_resolution="source",
+            output_dir=str(camera_path.parent),
+            flight_id=None,
+            overlay_only=True,
+            gpx_offset=gpx_offset,
+        )
+        temp_path = job_path.with_suffix(".tmp")
+        temp_path.write_text(json.dumps({"job_id": job["job_id"]}))
+        temp_path.replace(job_path)
+    except (OSError, ValueError) as exc:
+        logger.warning("Unable to generate interactive GoPro overlay: %s", exc)
+
+
+def _flight_overlay_layer_job(flight: Flight) -> GoproOverlayJobModel | None:
+    """Return the newest job that rendered the reusable transparent layer."""
+    for job in reversed(flight.gopro_overlay_jobs):
+        if _is_overlay_layer_job(job):
+            return job
+    return None
+
+
+def _flight_saved_overlay_job(flight: Flight) -> GoproOverlayJobModel | None:
+    """Return the newest completed overlay configuration saved for the flight."""
+    for job in reversed(flight.gopro_overlay_jobs):
+        if job.status == "completed":
+            return job
+    return None
+
+
+def _require_gopro_overlay_offset(flight: Flight) -> float:
+    """Require an explicit persisted synchronization offset before rendering."""
+    if flight.gopro_overlay_gpx_offset is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Set the GoPro overlay synchronization offset before generating media",
+        )
+    return float(flight.gopro_overlay_gpx_offset)
+
+
+def _require_ready_gopro_overlay_layer(flight: Flight) -> GoproOverlayJobModel:
+    """Require a completed reusable transparent layer before composing media."""
+    job = _flight_overlay_layer_job(flight)
+    if job is None or job.status != "completed":
+        raise HTTPException(
+            status_code=409,
+            detail="Generate the synchronized overlay layer before generating media",
+        )
+    return job
+
+
+def _require_saved_gopro_overlay(flight: Flight) -> GoproOverlayJobModel:
+    """Require a completed saved overlay; its transparent layer is rendered on demand."""
+    job = _flight_saved_overlay_job(flight)
+    if job is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Enregistrez un overlay avant de générer la vidéo YouTube",
+        )
+    return job
+
+
+@router.get(
+    "/flights/{flight_id}/overlay-layer",
+    response_model=FlightOverlayLayer,
+)
+def get_flight_overlay_layer(flight_id: str, db: Session = Depends(get_db)) -> FlightOverlayLayer:
+    """Expose the durable transparent telemetry layer independently of video exports."""
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    job = _flight_overlay_layer_job(flight)
+    if job is None:
+        return FlightOverlayLayer(status="missing")
+    return FlightOverlayLayer(
+        status=job.status,
+        job=GoproOverlayJob.model_validate(gopro_overlay_job_to_payload(job)),
+    )
+
+
+@router.post("/flights/{flight_id}/youtube-overlay-export", status_code=202)
+def create_youtube_overlay_export(
+    flight_id: str,
+    payload: YoutubeOverlayExportCreate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Queue a downloadable MP4 composed from an associated YouTube video."""
+    flight = db.get(Flight, flight_id)
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    if payload.youtube_url not in (flight.youtube_urls or []):
+        raise HTTPException(
+            status_code=400, detail="YouTube video is not associated with this flight"
+        )
+    if payload.pip_youtube_url is not None:
+        if payload.pip_youtube_url not in (flight.youtube_urls or []):
+            raise HTTPException(
+                status_code=400,
+                detail="PiP YouTube video is not associated with this flight",
+            )
+        if payload.pip_youtube_url == payload.youtube_url:
+            raise HTTPException(
+                status_code=400,
+                detail="PiP YouTube video must differ from the main video",
+            )
+    if not is_youtube_configured():
+        raise HTTPException(status_code=503, detail="YouTube upload is not configured")
+    if not is_youtube_connected(db, user.id):
+        raise HTTPException(status_code=409, detail="Connect YouTube before exporting")
+    overlay_job = _require_saved_gopro_overlay(flight)
+    if (
+        active_youtube_upload_job(
+            db,
+            flight.id,
+            source_type="youtube_overlay",
+            gopro_overlay_job_id=overlay_job.id,
+        )
+        is not None
+    ):
+        raise HTTPException(status_code=409, detail="A YouTube upload is already in progress")
+    offset = _require_gopro_overlay_offset(flight)
+    try:
+        job_id = start_youtube_overlay_export(
+            flight_id=flight_id,
+            youtube_url=payload.youtube_url,
+            pip_youtube_url=payload.pip_youtube_url,
+            pip_apply_offset=payload.pip_apply_offset,
+            overlay_job_id=overlay_job.id,
+            overlay_offset_seconds=offset,
+            youtube_user_id=user.id,
+        )
+    except DeploymentDrainActive:
+        raise
+    except Exception as exc:
+        logger.exception("Unable to queue YouTube overlay export for flight %s", flight_id)
+        raise HTTPException(
+            status_code=503,
+            detail="The video export queue is unavailable. Try again later.",
+        ) from exc
+    operation = _ensure_job_operation(
+        db,
+        user_id=user.id,
+        source_kind="video_export",
+        source_id=job_id,
+        operation_type="youtube_overlay_export",
+        title_key="operations.youtubeOverlayExport",
+        steps=["prepare", "render", "finalize"],
+        can_cancel=True,
+        can_retry=True,
+    )
+    return {"job_id": job_id, "operation_id": operation.id, "status": "queued"}
+
+
+@router.post(
+    "/flights/{flight_id}/overlay-layer",
+    response_model=GoproOverlayJob,
+)
+@_map_async_deployment_drain_rejection
+async def create_flight_overlay_layer(
+    flight_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> GoproOverlayJob:
+    """Queue one alpha overlay timeline that exports and highlights can reuse."""
+    dependencies = check_gopro_overlay_dependencies()
+    missing = [
+        name for name, available in dependencies.items() if not available and name != "ffmpeg_vaapi"
+    ]
+    if missing:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Missing GoPro overlay dependencies: {', '.join(missing)}",
+        )
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    current_layer_job = _flight_overlay_layer_job(flight)
+    if current_layer_job and current_layer_job.status in _GOPRO_OVERLAY_IN_PROGRESS_STATUSES:
+        raise HTTPException(
+            status_code=409,
+            detail="An overlay layer is already being generated for this flight",
+        )
+    video_path, gpx_path = _flight_gopro_preview_inputs(db, flight)
+    output_size = probe_video_resolution(video_path)
+    if output_size[0] is None or output_size[1] is None:
+        raise HTTPException(status_code=422, detail="Camera video has no usable dimensions")
+    output_dir = ensure_flight_directory(db, flight) / "overlays"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        job = await asyncio.to_thread(
+            create_gopro_overlay_job_from_paths,
+            video_path=video_path,
+            gpx_path=gpx_path,
+            pip_path=None,
+            layout_id=None,
+            output_filename="telemetry-overlay.webm",
+            output_resolution="source",
+            output_dir=str(output_dir),
+            gpx_offset=float(flight.gopro_overlay_gpx_offset or 0.0),
+            flight_id=flight.id,
+            overlay_only=True,
+            overlay_size=(output_size[0], output_size[1]),
+        )
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    operation = _ensure_job_operation(
+        db,
+        user_id=user.id,
+        source_kind="gopro_overlay",
+        source_id=str(job["job_id"]),
+        operation_type="gopro_overlay",
+        title_key="operations.goproOverlay",
+        steps=["prepare", "render", "finalize"],
+        can_cancel=True,
+        can_retry=True,
+    )
+    return GoproOverlayJob.model_validate({**job, "operation_id": operation.id})
+
+
+@router.post(
+    "/flights/{flight_id}/gopro-overlay/merge",
+    response_model=GoproOverlayEnrichmentResponse,
+)
+def start_flight_gopro_overlay_merge(
+    flight_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> GoproOverlayEnrichmentResponse:
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+
+    camera_path, gpx_path = _flight_gopro_preview_inputs(db, flight)
+    osv_paths = _matching_files_by_mtime(camera_path.parent, "*.osv")
+    if not osv_paths:
+        return GoproOverlayEnrichmentResponse(status="ready")
+
+    status = _enriched_gpx_status(camera_path.parent)
+    if status == "failed":
+        _clear_enriched_gpx_error(camera_path.parent)
+        status = "missing"
+    if status == "ready":
+        return GoproOverlayEnrichmentResponse(status="ready")
+    if status == "pending":
+        return GoproOverlayEnrichmentResponse(status="pending")
+
+    video_duration = probe_video_duration(camera_path)
+    gpx_start = first_gpx_timestamp(gpx_path)
+    video_start = resolve_gopro_video_start_time(camera_path, gpx_start)
+    if video_duration is None or gpx_start is None or video_start is None:
+        raise HTTPException(status_code=422, detail="Unable to prepare GPX/GoPro merge")
+    aligned_video_start = align_video_start_time_to_gpx(video_start, gpx_start)
+    if aligned_video_start is None:
+        raise HTTPException(status_code=422, detail="Unable to align camera video and GPX")
+
+    background_tasks.add_task(
+        _prepare_enriched_gpx_in_background,
+        osv_paths,
+        gpx_path,
+        camera_path.parent,
+        video_duration=video_duration,
+        first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
+    )
+    return GoproOverlayEnrichmentResponse(status="pending")
+
+
+@router.get(
+    "/flights/{flight_id}/gopro-overlay/preview",
+    response_model=GoproOverlayPreview,
+)
+def get_flight_gopro_overlay_preview(
+    flight_id: str,
+    response: Response,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> GoproOverlayPreview:
+    response.headers["Cache-Control"] = "no-store"
+
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+
+    camera_path, gpx_path = _flight_gopro_preview_inputs(db, flight)
+    # Everything below probes/parses files and schedules background work. The
+    # database connection is no longer needed for this request.
+    db.close()
+    osv_paths = _matching_files_by_mtime(camera_path.parent, "*.osv")
+    video_duration = probe_video_duration(camera_path)
+    gpx_start = first_gpx_timestamp(gpx_path)
+    gpx_duration = gpx_duration_seconds(gpx_path)
+    video_start = resolve_gopro_video_start_time(camera_path, gpx_start)
+    if video_duration is None or video_start is None:
+        raise HTTPException(status_code=422, detail="Camera video has no usable time metadata")
+    if gpx_start is None or gpx_duration is None:
+        raise HTTPException(status_code=422, detail="GPX track has no usable timestamps")
+
+    aligned_video_start = align_video_start_time_to_gpx(video_start, gpx_start)
+    if aligned_video_start is None:
+        raise HTTPException(status_code=422, detail="Unable to align camera video and GPX track")
+    automatic_offset = (gpx_start - aligned_video_start).total_seconds()
+    # The enriched GPX is the only source exposed to the preview once OSV
+    # enrichment is complete. While the merge is running, expose no
+    # coordinates at all.
+    enrichment_status = _enriched_gpx_status(camera_path.parent) if osv_paths else "ready"
+    if enrichment_status == "missing" and osv_paths:
+        # A preview request is also the entry point used by the YouTube
+        # calibration UI. That UI does not have a rendered GoPro overlay to
+        # trigger the old manual merge action, so make the durable enriched
+        # GPX generation self-starting when the cache is absent.
+        _clear_enriched_gpx_error(camera_path.parent)
+        background_tasks.add_task(
+            _prepare_enriched_gpx_in_background,
+            osv_paths,
+            gpx_path,
+            camera_path.parent,
+            video_duration=video_duration,
+            first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
+        )
+        enrichment_status = "pending"
+    if enrichment_status == "ready" and osv_paths:
+        gpx_path = enriched_gpx_path(camera_path.parent)
+    if enrichment_status != "ready" and osv_paths:
+        coordinates = []
+    else:
+        coordinates = parse_gpx_file(gpx_path)
+        if osv_paths:
+            source_start_ms = int(gpx_start.timestamp() * 1000)
+            coordinates = [
+                coordinate
+                for coordinate in coordinates
+                if coordinate.get("timestamp", 0) >= source_start_ms
+            ]
+    manual_offset = float(flight.gopro_overlay_gpx_offset or 0.0)
+    effective_offset = automatic_offset + manual_offset
+    overlay_state = _interactive_overlay_state(camera_path)
+    if overlay_state["status"] in {"missing", "failed"} and enrichment_status == "ready":
+        background_tasks.add_task(
+            _generate_interactive_overlay_in_background,
+            camera_path,
+            gpx_path,
+            osv_paths,
+            video_duration,
+            _first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
+            manual_offset,
+        )
+    # The calibration preview must cover the complete camera timeline.  The
+    # preview proxy keeps only the beginning and the end of this range, so the
+    # end button lands on the end of the video rather than on the end of the
+    # currently recorded GPX sequence.
+    preview_target_end = video_duration
+    preview_state = gopro_preview_proxy.get_preview_state(camera_path, preview_target_end)
+    preview_segments = list(preview_state.segments)
+    if preview_state.available_duration_seconds <= 0 or not preview_segments:
+        preview_segments = gopro_preview_proxy.preview_segments(
+            preview_target_end,
+            config.GOPRO_PREVIEW_DEFAULT_SECONDS,
+        )
+    return GoproOverlayPreview(
+        video={
+            "duration_seconds": video_duration,
+            "start_time": aligned_video_start,
+            "preview_target_end_seconds": preview_target_end,
+            "preview_segments": [asdict(segment) for segment in preview_segments],
+            "preview_status": preview_state.status,
+            "preview_available_duration_seconds": preview_state.available_duration_seconds,
+            "preview_requested_duration_seconds": preview_state.requested_duration_seconds,
+            "preview_max_duration_seconds": min(
+                config.GOPRO_PREVIEW_MAX_SECONDS,
+                max(config.GOPRO_PREVIEW_DEFAULT_SECONDS, math.ceil(video_duration)),
+            ),
+            "preview_error": preview_state.error,
+        },
+        gpx={
+            "start_time": gpx_start,
+            "end_time": gpx_start + timedelta(seconds=gpx_duration),
+            "duration_seconds": gpx_duration,
+            "coordinates": coordinates,
+            "enrichment_status": enrichment_status,
+            "enrichment_error": (
+                "Unable to generate enriched GPX" if enrichment_status == "failed" else None
+            ),
+        },
+        alignment={
+            "automatic_offset_seconds": automatic_offset,
+            "manual_offset_seconds": manual_offset,
+            "effective_offset_seconds": effective_offset,
+        },
+        overlay=overlay_state,
+    )
+
+
+@router.get("/flights/{flight_id}/gopro-camera")
+def stream_flight_gopro_camera(flight_id: str, db: Session = Depends(get_db)) -> FileResponse:
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    camera_path = _flight_gopro_camera_path(db, flight)
+    return FileResponse(path=camera_path, media_type="video/mp4", content_disposition_type="inline")
+
+
+@router.get("/flights/{flight_id}/gopro-camera/thumbnail")
+def get_flight_gopro_camera_thumbnail(
+    flight_id: str, db: Session = Depends(get_db)
+) -> FileResponse:
+    """Return a thumbnail for the flight GoPro camera video."""
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    camera_path = _flight_gopro_camera_path(db, flight)
+    return _video_thumbnail_response(camera_path)
+
+
+@router.get("/flights/{flight_id}/gopro-camera/preview")
+def stream_flight_gopro_camera_preview(
+    flight_id: str,
+    target_end_seconds: float | None = Query(None, ge=0),
+    db: Session = Depends(get_db),
+) -> FileResponse:
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    camera_path = _flight_gopro_camera_path(db, flight)
+    db.close()
+    preview_state = gopro_preview_proxy.get_preview_state(camera_path, target_end_seconds)
+    preview_path = gopro_preview_proxy.preview_path(camera_path)
+    video_path = (
+        preview_path
+        if (
+            target_end_seconds is not None
+            and preview_state.available_duration_seconds > 0
+            and preview_path.is_file()
+        )
+        else camera_path
+    )
+    return FileResponse(
+        path=video_path,
+        media_type="video/mp4",
+        content_disposition_type="inline",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.post(
+    "/flights/{flight_id}/gopro-camera/preview",
+    response_model=GoproPreviewState,
+)
+def generate_flight_gopro_camera_preview(
+    flight_id: str,
+    request: GoproPreviewRequest,
+    db: Session = Depends(get_db),
+) -> GoproPreviewState:
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    if request.duration_seconds > config.GOPRO_PREVIEW_MAX_SECONDS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Preview duration must not exceed {config.GOPRO_PREVIEW_MAX_SECONDS} seconds",
+        )
+    camera_path = _flight_gopro_camera_path(db, flight)
+    return GoproPreviewState.model_validate(
+        asdict(
+            gopro_preview_proxy.request_preview(
+                camera_path, request.duration_seconds, request.target_end_seconds
+            )
+        )
+    )
+
+
+@router.post(
+    "/flights/{flight_id}/gopro-camera",
+)
+async def upload_flight_gopro_camera(
+    flight_id: str,
+    video_file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Store the onboard camera video for a flight before overlay setup."""
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    input_dir = _gopro_overlay_flight_directory(db, flight)
+    await save_uploaded_file(video_file, input_dir / "camera.mp4", {".mp4", ".mov", ".m4v"})
+    return {"filename": "camera.mp4"}
+
+
 @router.post(
     "/flights/{flight_id}/gopro-overlay",
     response_model=GoproOverlayJob,
@@ -5716,13 +8610,17 @@ async def create_flight_gopro_overlay_job(
     output_dir: str | None = Form(None),
     layout_id: str | None = Form(None),
     output_filename: str | None = Form(None),
+    output_resolution: Literal["1080p", "4k"] = Form("4k"),
     gpx_offset: float = Form(0.0),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> GoproOverlayJob:
     """Create a GoPro overlay render job from provided media and the flight GPX fallback."""
     _validate_gpx_offset(gpx_offset)
     dependencies = check_gopro_overlay_dependencies()
-    missing = [name for name, available in dependencies.items() if not available]
+    missing = [
+        name for name, available in dependencies.items() if not available and name != "ffmpeg_vaapi"
+    ]
     if missing:
         raise HTTPException(
             status_code=503,
@@ -5732,13 +8630,12 @@ async def create_flight_gopro_overlay_job(
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
+    _require_gopro_overlay_offset(flight)
+    _require_ready_gopro_overlay_layer(flight)
 
     title = flight.title or flight.name or flight.id
     input_dir = _gopro_overlay_flight_directory(db, flight)
     use_input_output_dir = not output_dir or not output_dir.strip()
-    resolved_output_filename = (
-        "final.mp4" if use_input_output_dir else output_filename or f"{title}-overlay.mp4"
-    )
 
     try:
         resolved_output_dir = (
@@ -5753,8 +8650,13 @@ async def create_flight_gopro_overlay_job(
         resolved_gpx_path = _resolve_gopro_paragliding_path(gpx_path)
         resolved_pip_path = _resolve_gopro_paragliding_path(pip_path)
         auto_video_path = input_dir / "camera.mp4"
-        auto_gpx_path = _first_matching_file(input_dir, "Zepp*.gpx")
-        auto_pip_path = _latest_matching_file(input_dir, "flight*.mp4")
+        auto_gpx_path = first_matching_file(input_dir, "Zepp*.gpx")
+        previous_overlay_path = _resolve_flight_file_path(flight.gopro_overlay_file_path)
+        auto_pip_path = latest_matching_file(
+            input_dir,
+            "flight*.mp4",
+            (previous_overlay_path,) if previous_overlay_path else (),
+        )
         auto_osv_paths = _matching_files_by_mtime(input_dir, "*.osv")
         logger.info(
             "GoPro overlay auto inputs for flight %s in %s: camera=%s, gpx=%s, pip=%s, osv=%s",
@@ -5784,6 +8686,7 @@ async def create_flight_gopro_overlay_job(
                     status_code=400,
                     detail="Generate the flight video before creating the GoPro overlay",
                 )
+            resolved_output_filename = output_filename or f"{title}-{output_resolution}.mp4"
             job = await asyncio.to_thread(
                 create_gopro_overlay_job_from_paths,
                 video_path=resolved_video_path,
@@ -5791,11 +8694,24 @@ async def create_flight_gopro_overlay_job(
                 pip_path=fallback_pip_path,
                 layout_id=layout_id,
                 output_filename=resolved_output_filename,
+                output_resolution=output_resolution,
                 output_dir=resolved_output_dir,
                 gpx_offset=gpx_offset,
+                flight_id=flight.id,
             )
-            _mark_flight_gopro_overlay_job(db, flight, job)
-            return _with_gopro_overlay_job_token(job)
+            _mark_flight_gopro_overlay_job(db, flight, job, gpx_offset=gpx_offset)
+            operation = _ensure_job_operation(
+                db,
+                user_id=user.id,
+                source_kind="gopro_overlay",
+                source_id=str(job["job_id"]),
+                operation_type="gopro_overlay",
+                title_key="operations.goproOverlay",
+                steps=["prepare", "render", "finalize"],
+                can_cancel=True,
+                can_retry=True,
+            )
+            return _with_gopro_overlay_job_token({**job, "operation_id": operation.id})
 
         if not video_file or not video_file.filename:
             raise HTTPException(status_code=400, detail="GoPro camera video is required")
@@ -5811,6 +8727,7 @@ async def create_flight_gopro_overlay_job(
                 detail="Generate the flight video before creating the GoPro overlay",
             )
 
+        resolved_output_filename = output_filename or f"{title}-{output_resolution}.mp4"
         job = await create_gopro_overlay_job(
             video_file=video_file,
             gpx_file=gpx_file_for_job,
@@ -5819,12 +8736,25 @@ async def create_flight_gopro_overlay_job(
             pip_file=osv_video_file,
             layout_id=layout_id,
             output_filename=resolved_output_filename,
+            output_resolution=output_resolution,
             output_dir=resolved_output_dir,
             pin_inputs=pin_overlay_inputs,
             gpx_offset=gpx_offset,
+            flight_id=flight.id,
         )
-        _mark_flight_gopro_overlay_job(db, flight, job)
-        return _with_gopro_overlay_job_token(job)
+        _mark_flight_gopro_overlay_job(db, flight, job, gpx_offset=gpx_offset)
+        operation = _ensure_job_operation(
+            db,
+            user_id=user.id,
+            source_kind="gopro_overlay",
+            source_id=str(job["job_id"]),
+            operation_type="gopro_overlay",
+            title_key="operations.goproOverlay",
+            steps=["prepare", "render", "finalize"],
+            can_cancel=True,
+            can_retry=True,
+        )
+        return _with_gopro_overlay_job_token({**job, "operation_id": operation.id})
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -5873,12 +8803,17 @@ async def create_gopro_overlay_render_job(
     pip_file: UploadFile | None = File(None),
     layout_id: str | None = Form(None),
     output_filename: str | None = Form(None),
+    output_resolution: Literal["1080p", "4k"] = Form("4k"),
     gpx_offset: float = Form(0.0),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> GoproOverlayJob:
     """Create a GoPro overlay render job from uploaded video, GPX, and optional PIP video."""
     _validate_gpx_offset(gpx_offset)
     dependencies = check_gopro_overlay_dependencies()
-    missing = [name for name, available in dependencies.items() if not available]
+    missing = [
+        name for name, available in dependencies.items() if not available and name != "ffmpeg_vaapi"
+    ]
     if missing:
         raise HTTPException(
             status_code=503,
@@ -5892,9 +8827,21 @@ async def create_gopro_overlay_render_job(
             pip_file=pip_file,
             layout_id=layout_id,
             output_filename=output_filename,
+            output_resolution=output_resolution,
             gpx_offset=gpx_offset,
         )
-        return _with_gopro_overlay_job_token(job)
+        operation = _ensure_job_operation(
+            db,
+            user_id=user.id,
+            source_kind="gopro_overlay",
+            source_id=str(job["job_id"]),
+            operation_type="gopro_overlay",
+            title_key="operations.goproOverlay",
+            steps=["prepare", "render", "finalize"],
+            can_cancel=True,
+            can_retry=True,
+        )
+        return _with_gopro_overlay_job_token({**job, "operation_id": operation.id})
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -5938,7 +8885,10 @@ def cancel_gopro_overlay_render_job(job_id: str) -> GoproOverlayCancelResponse:
 
 
 @router.get("/gopro-overlays/jobs/{job_id}/download")
-def download_gopro_overlay_render_job(job_id: str) -> FileResponse:
+def download_gopro_overlay_render_job(
+    job_id: str,
+    browser_preview: bool = Query(False),
+) -> FileResponse:
     """Download the completed GoPro overlay video."""
     job = get_gopro_overlay_job(job_id)
     if not job:
@@ -5948,7 +8898,54 @@ def download_gopro_overlay_render_job(job_id: str) -> FileResponse:
     if not output_path:
         raise HTTPException(status_code=400, detail="GoPro overlay video is not ready")
 
-    return FileResponse(path=output_path, media_type="video/mp4", filename=output_path.name)
+    preview_path = (
+        gopro_overlay_browser_preview_path(output_path) if browser_preview else output_path
+    )
+    media_type = {
+        ".mov": "video/quicktime",
+        ".webm": "video/webm",
+        ".mp4": "video/mp4",
+    }.get(preview_path.suffix.lower(), "application/octet-stream")
+    return FileResponse(
+        path=preview_path,
+        media_type=media_type,
+        filename=preview_path.name,
+        content_disposition_type="inline",
+        headers={"Cache-Control": "no-store"} if browser_preview else None,
+    )
+
+
+@router.get("/gopro-overlays/jobs/{job_id}/thumbnail")
+def get_gopro_overlay_render_job_thumbnail(job_id: str) -> FileResponse:
+    """Return a thumbnail for a completed GoPro overlay job."""
+    job = get_gopro_overlay_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="GoPro overlay job not found")
+
+    output_path = gopro_overlay_output_path(job_id)
+    if not output_path:
+        raise HTTPException(status_code=400, detail="GoPro overlay video is not ready")
+    return _video_thumbnail_response(output_path)
+
+
+@router.delete("/gopro-overlays/jobs/{job_id}")
+def delete_gopro_overlay_render_job(job_id: str):
+    """Delete a terminal GoPro overlay job and every file owned by that job."""
+    result = delete_gopro_overlay_job(job_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="GoPro overlay job not found")
+    if result.get("error") == "active":
+        raise HTTPException(status_code=400, detail="Cannot delete an active overlay")
+    if result.get("errors"):
+        logger.error("Failed to delete GoPro overlay job %s: %s", job_id, result["errors"])
+        raise HTTPException(status_code=500, detail="Unable to delete overlay files")
+    return {
+        "job_id": result["job_id"],
+        "deleted": result["deleted"],
+        "files_deleted": result["files_deleted"],
+        "dirs_deleted": result["dirs_deleted"],
+        "bytes_deleted": result["bytes_deleted"],
+    }
 
 
 @router.delete("/gopro-overlays/jobs/{job_id}/video")
@@ -5993,10 +8990,14 @@ async def stream_gopro_overlay_status_with_job_token(
 
 
 @public_router.get("/job-access/gopro-overlays/jobs/{job_id}/download")
-def download_gopro_overlay_with_job_token(job_id: str, request: Request) -> FileResponse:
+def download_gopro_overlay_with_job_token(
+    job_id: str,
+    request: Request,
+    browser_preview: bool = Query(False),
+) -> FileResponse:
     """Download a completed GoPro overlay with a scoped job token."""
     _require_job_token(request, purpose="gopro_overlay", job_id=job_id)
-    return download_gopro_overlay_render_job(job_id)
+    return download_gopro_overlay_render_job(job_id, browser_preview=browser_preview)
 
 
 @public_router.delete(
@@ -6347,7 +9348,7 @@ _pending_emagram_analyses: set[str] = set()
 async def _run_emagram_analysis_with_admission(**kwargs: Any) -> dict[str, Any]:
     from emagram_multi_source import generate_multi_source_emagram_for_spot
 
-    with job_admission():
+    with job_admission("emagram_analysis"):
         return await generate_multi_source_emagram_for_spot(**kwargs)
 
 
@@ -6577,6 +9578,7 @@ async def get_emagram_hours(
                 EmagramAnalysis.analysis_status,
                 EmagramAnalysis.error_message,
                 EmagramAnalysis.id,
+                EmagramAnalysis.plafond_thermique_m,
                 EmagramAnalysis.analysis_datetime,
             )
             .filter(
@@ -6649,6 +9651,9 @@ async def get_emagram_hours(
                     "hour": hour,
                     "score": (
                         latest_by_hour[hour].score_volabilite if hour in latest_by_hour else None
+                    ),
+                    "ceiling_m": (
+                        latest_by_hour[hour].plafond_thermique_m if hour in latest_by_hour else None
                     ),
                     "status": (
                         latest_by_hour[hour].analysis_status
@@ -6854,7 +9859,10 @@ async def export_emagram_csv(
 @router.post("/emagram/analyze", response_model=EmagramAnalysisSchema, tags=["Emagram"])
 @_map_async_deployment_drain_rejection
 async def trigger_emagram_analysis(
-    request: EmagramTriggerRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+    request: EmagramTriggerRequest,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Trigger multi-source emagram analysis for closest spot
@@ -6878,6 +9886,16 @@ async def trigger_emagram_analysis(
           "force_refresh": false
         }
     """
+    operation = OperationReporter.create(
+        db,
+        user_id=user.id,
+        operation_type="emagram_analysis",
+        title_key="operations.emagramAnalysis",
+        steps=["find_site", "check_cache", "generate", "finalize"],
+        can_retry=False,
+    )
+    operation.start()
+    operation.start_step("find_site")
     try:
         # Step 1: Find target site
         if request.site_id:
@@ -6919,6 +9937,9 @@ async def trigger_emagram_analysis(
                 detail="Either site_id or user_latitude/user_longitude required",
             )
 
+        operation.complete_step("find_site", closest_site.name)
+        operation.start_step("check_cache")
+
         # Step 2: Check for recent analysis (unless force_refresh)
         forecast_date = (datetime.utcnow() + timedelta(days=request.day_index)).date()
         cutoff_time = None if request.force_refresh else get_emagram_cutoff_utc(db=db)
@@ -6955,6 +9976,8 @@ async def trigger_emagram_analysis(
                     await _cache_emagram_analysis_marker(
                         closest_site, existing, forecast_date, request.hour, db=db
                     )
+                    operation.complete_step("check_cache", "Résultat en cache")
+                    operation.complete({"analysis_id": existing.id})
                 return existing
 
         # Step 2b: Check cache for specific hour
@@ -6980,10 +10003,14 @@ async def trigger_emagram_analysis(
                 await _cache_emagram_analysis_marker(
                     closest_site, existing, forecast_date, request.hour, db=db
                 )
+                operation.complete_step("check_cache", "Résultat en cache")
+                operation.complete({"analysis_id": existing.id})
                 return existing
 
         # Step 3: Generate new analysis
         logger.info(f"Generating emagram for {closest_site.name} (hour={request.hour})...")
+        operation.complete_step("check_cache")
+        operation.start_step("generate")
 
         result = await _run_emagram_analysis_with_admission(
             site_id=closest_site.id,
@@ -7014,14 +10041,22 @@ async def trigger_emagram_analysis(
         await _cache_emagram_analysis_marker(
             closest_site, analysis, forecast_date, request.hour, db=db
         )
+        operation.complete_step("generate")
+        operation.start_step("finalize")
+        operation.complete_step("finalize")
+        operation.complete({"analysis_id": analysis.id})
 
         return analysis
 
     except DeploymentDrainActive:
+        operation.fail("Le déploiement est en cours")
         raise
     except HTTPException:
+        operation.fail("La demande d’analyse n’a pas pu aboutir")
         raise
     except Exception as e:
+        db.rollback()
+        operation.fail(str(e))
         logger.error(f"Failed to trigger emagram analysis: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -7115,7 +10150,7 @@ async def refresh_emagram_for_spot(
         raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
 
     # Add background task
-    with job_admission():
+    with job_admission("emagram_refresh_enqueue"):
         background_tasks.add_task(
             _run_emagram_analysis_with_admission,
             site_id=site_id,
@@ -7448,6 +10483,47 @@ def get_app_settings(db: Session = Depends(get_db)):
     from app_settings import get_all_settings
 
     return get_all_settings(db)
+
+
+@router.get("/settings/sportstracklive")
+def get_sportstracklive_settings(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return sportstracklive_connection_settings(db, user.id)
+
+
+@router.put("/settings/sportstracklive")
+def update_sportstracklive_settings(
+    settings: SportstrackLiveSettingsUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    upload_key = (settings.upload_key or "").strip() or None
+    if settings.upload_key is not None and upload_key is None:
+        raise HTTPException(status_code=400, detail="La clé d'envoi ne peut pas être vide.")
+    if len(upload_key or "") > 512:
+        raise HTTPException(status_code=400, detail="La clé d'envoi est trop longue.")
+    if settings.auto_upload and not config.SPORTSTRACKLIVE_SECRET_KEY:
+        raise HTTPException(
+            status_code=400,
+            detail="Configurez d'abord BACKEND_SPORTSTRACKLIVE_SECRET_KEY côté serveur.",
+        )
+    return save_sportstracklive_connection_settings(
+        db,
+        user.id,
+        upload_key=upload_key,
+        auto_upload=settings.auto_upload,
+    )
+
+
+@router.delete("/settings/sportstracklive", status_code=204, response_class=Response)
+def delete_sportstracklive_settings(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    remove_sportstracklive_connection_settings(db, user.id)
+    return Response(status_code=204)
 
 
 @router.put("/settings")

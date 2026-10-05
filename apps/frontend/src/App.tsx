@@ -4,8 +4,11 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@dashboard-parapente/design-system';
 import { queryClient } from './lib/queryClient';
 import { routeTree } from './routeTree.gen';
+import { JobNotifications } from './components/common/JobNotifications';
+import { clearPreloadErrorRecovery } from './lib/preloadErrorRecovery';
 
-const router = createRouter({ routeTree });
+const router = createRouter({ routeTree, basepath: import.meta.env.BASE_URL });
+router.subscribe('onResolved', clearPreloadErrorRecovery);
 
 declare module '@tanstack/react-router' {
   interface Register {
@@ -18,6 +21,7 @@ const App: React.FC = () => {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
+        <JobNotifications />
       </QueryClientProvider>
     </ErrorBoundary>
   );

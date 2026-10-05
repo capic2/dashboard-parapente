@@ -12,6 +12,7 @@ import {
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { Flight } from '../../types';
+import { parseApiLocalDate } from '../../lib/date';
 
 interface AltitudeChartProps {
   flights: Flight[];
@@ -25,13 +26,20 @@ export default function AltitudeChart({ flights }: AltitudeChartProps) {
       .filter((f) => f.max_altitude_m && f.flight_date)
       .sort(
         (a, b) =>
-          new Date(a.flight_date).getTime() - new Date(b.flight_date).getTime()
+          parseApiLocalDate(a.flight_date).getTime() -
+          parseApiLocalDate(b.flight_date).getTime()
       )
       .map((flight) => ({
-        date: format(new Date(flight.flight_date), 'dd MMM', { locale: fr }),
-        fullDate: format(new Date(flight.flight_date), 'dd MMMM yyyy', {
+        date: format(parseApiLocalDate(flight.flight_date), 'dd MMM', {
           locale: fr,
         }),
+        fullDate: format(
+          parseApiLocalDate(flight.flight_date),
+          'dd MMMM yyyy',
+          {
+            locale: fr,
+          }
+        ),
         altitude: flight.max_altitude_m,
         site: flight.site_name || flight.site_id,
       }));

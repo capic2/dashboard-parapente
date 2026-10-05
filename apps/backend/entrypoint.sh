@@ -9,10 +9,17 @@ if [ -f "$CODEX_HOME/auth.json" ]; then
 fi
 
 echo "Initializing database..."
-python -c "from database import Base, engine; Base.metadata.create_all(bind=engine); print('✅ Database tables created')"
-
-# SQL migrations are run automatically by run_migrations() in main.py at import time.
-# No need to run them manually here.
+if [ "${ENVIRONMENT:-production}" = "staging" ]; then
+    python init_database.py
+    python -c "from database_migrations import run_migrations; run_migrations()"
+    if [ "${BACKEND_SEED_SAMPLE_DATA:-true}" = "true" ]; then
+        python -c "from seed_flights import seed_flights; print(f'✅ Sample flights created: {seed_flights(include_media=True)}')"
+    else
+        echo "⏭️ Sample flight seeding disabled"
+    fi
+else
+    python -c "from database import Base, engine; Base.metadata.create_all(bind=engine); print('✅ Database tables created')"
+fi
 
 echo "Starting uvicorn server..."
 exec uvicorn main:app --host 0.0.0.0 --port 8001 --proxy-headers --forwarded-allow-ips "*"

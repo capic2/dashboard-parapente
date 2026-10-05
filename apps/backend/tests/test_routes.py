@@ -2,9 +2,9 @@
 Test API routes (integration tests)
 """
 
-from datetime import datetime
+from datetime import date, datetime
 
-from models import Flight, ParaglidingSpot, Site
+from models import Flight, ParaglidingSpot, Site, SiteLandingAssociation
 
 
 class TestSpotsEndpoints:
@@ -37,6 +37,51 @@ class TestSpotsEndpoints:
         data = response.json()
         assert len(data["sites"]) == 1
         assert data["sites"][0]["name"] == "Arguel"
+
+    def test_get_spots_counts_flights_at_associated_landing(self, client, db_session):
+        takeoff = Site(
+            id="site-takeoff",
+            name="Saint-Hilaire",
+            latitude=45.3,
+            longitude=5.9,
+            usage_type="takeoff",
+        )
+        landing = Site(
+            id="site-landing",
+            name="LZ Lumbin",
+            latitude=45.3,
+            longitude=5.9,
+            usage_type="landing",
+        )
+        db_session.add_all([takeoff, landing])
+        db_session.flush()
+        db_session.add(
+            SiteLandingAssociation(
+                id="association-takeoff-landing",
+                takeoff_site_id=takeoff.id,
+                landing_site_id=landing.id,
+            )
+        )
+        db_session.add_all(
+            [
+                Flight(
+                    id=f"flight-{index}",
+                    name=f"Flight {index}",
+                    flight_date=date(2026, 3, index),
+                    departure_time=datetime(2026, 3, index, 12),
+                    site_id=takeoff.id,
+                )
+                for index in (1, 2)
+            ]
+        )
+        db_session.commit()
+
+        response = client.get("/api/spots")
+
+        assert response.status_code == 200
+        sites = {site["id"]: site for site in response.json()["sites"]}
+        assert sites[takeoff.id]["flight_count"] == 2
+        assert sites[landing.id]["flight_count"] == 2
 
     def test_get_spot_by_id(self, client, db_session):
         """Get a specific spot"""
@@ -135,6 +180,40 @@ class TestFlightsEndpoints:
         assert "total_flights" in data
         assert "total_distance_km" in data
         assert data["total_flights"] >= 1
+
+    def test_flight_stats_follow_site_and_date_filters(self, client, db_session):
+        """Analytics aggregates only the flights selected by the page filters."""
+        site = Site(
+            id="site-analytics",
+            code="ANA",
+            name="Analytics site",
+            latitude=47.0,
+            longitude=6.0,
+        )
+        matching_flight = Flight(
+            id="flight-analytics-match",
+            site_id=site.id,
+            flight_date=datetime(2026, 6, 15).date(),
+            duration_minutes=75,
+            distance_km=12.5,
+        )
+        other_flight = Flight(
+            id="flight-analytics-other",
+            flight_date=datetime(2026, 7, 15).date(),
+            duration_minutes=180,
+            distance_km=50,
+        )
+        db_session.add_all([site, matching_flight, other_flight])
+        db_session.commit()
+
+        response = client.get(
+            "/api/flights/stats?site_id=site-analytics&date_from=2026-06-01&date_to=2026-06-30"
+        )
+
+        assert response.status_code == 200
+        assert response.json()["total_flights"] == 1
+        assert response.json()["total_duration_minutes"] == 75
+        assert response.json()["total_distance_km"] == 12.5
 
 
 class TestWeatherEndpoints:

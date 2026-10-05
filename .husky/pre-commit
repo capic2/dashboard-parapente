@@ -5,5 +5,16 @@ set -eu
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
-pnpm exec lint-staged
-pnpm knip
+PNPM_BIN="${PNPM_BIN:-}"
+if [ -z "$PNPM_BIN" ] && command -v pnpm >/dev/null 2>&1; then
+  PNPM_BIN=$(command -v pnpm)
+elif [ -z "$PNPM_BIN" ] && [ -x /home/capic/.local/share/pnpm/pnpm ]; then
+  PNPM_BIN=/home/capic/.local/share/pnpm/pnpm
+fi
+if [ -z "$PNPM_BIN" ]; then
+  echo "pnpm is required for pre-commit checks" >&2
+  exit 1
+fi
+
+"$PNPM_BIN" exec lint-staged
+"$PNPM_BIN" knip

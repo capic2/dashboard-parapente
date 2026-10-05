@@ -2,7 +2,7 @@
 Data fetcher for paragliding spots from external sources
 
 Fetches and merges data from:
-- OpenAIP: Free hang gliding database (JSON format)
+- OpenAIP: Hang gliding sites via the official API
 - ParaglidingSpots.com: Community database (JavaScript format)
 """
 
@@ -11,27 +11,32 @@ import json
 import logging
 import re
 from datetime import datetime
+from typing import Any
 
 import requests
 from sqlalchemy.orm import Session
 
+from config import OPENAIP_API_KEY
 from .distance import haversine_distance
 
 logger = logging.getLogger(__name__)
 
 # Data source URLs
-OPENAIP_FRANCE_URL = (
-    "https://storage.googleapis.com/29f98e10-a489-4c82-ae5e-489dbcd4912f/fr_hgl.json"
-)
+OPENAIP_HANG_GLIDINGS_URL = "https://api.core.openaip.net/api/hang-glidings"
+OPENAIP_PAGE_SIZE = 1000
 PARAGLIDINGSPOTS_URL = "https://paraglidingspots.com/online/js/pgs.siteslong.js?key=2602"
 
 # Duplicate detection threshold (meters)
 DUPLICATE_DISTANCE_THRESHOLD_M = 100
 
 
-def fetch_openaip_data() -> list[dict]:
+class OpenAIPFetchError(RuntimeError):
+    """Raised when OpenAIP data cannot be fetched completely."""
+
+
+def fetch_openaip_data(*, fail_on_error: bool = False) -> list[dict]:
     """
-    Fetch paragliding spots from OpenAIP France dataset.
+    Fetch French paragliding sites from the official OpenAIP API.
 
     Returns:
         List of spots in standardized format
@@ -50,74 +55,115 @@ def fetch_openaip_data() -> list[dict]:
             "raw_metadata": "{...}"
         }
     """
-    logger.info(f"Fetching OpenAIP data from {OPENAIP_FRANCE_URL}")
+    if not OPENAIP_API_KEY:
+        logger.warning("Skipping OpenAIP fetch because BACKEND_OPENAIP_API_KEY is not configured")
+        return []
 
     try:
-        response = requests.get(OPENAIP_FRANCE_URL, timeout=30)
-        response.raise_for_status()
-        data = response.json()
-
-        if not isinstance(data, list):
-            logger.error("OpenAIP response is not a list")
-            return []
-
         spots = []
-        for item in data:
-            try:
-                # Parse OpenAIP format
-                # Type: 0=takeoff, 1=landing
-                spot_type_code = item.get("type", 0)
-                spot_type = "landing" if spot_type_code == 1 else "takeoff"
+        page = 1
+        headers = {"x-openaip-api-key": OPENAIP_API_KEY}
 
-                # Coordinates: nested in geometry.coordinates [longitude, latitude]
-                geometry = item.get("geometry", {})
-                coords = geometry.get("coordinates", [])
-                if len(coords) < 2:
-                    logger.warning(f"Skipping spot with invalid coordinates: {item.get('name')}")
-                    continue
+        while True:
+            data = None
+            for attempt in range(2):
+                try:
+                    response = requests.get(
+                        OPENAIP_HANG_GLIDINGS_URL,
+                        headers=headers,
+                        params=[
+                            ("country", "FR"),
+                            ("page", str(page)),
+                            ("limit", str(OPENAIP_PAGE_SIZE)),
+                            ("type", "0"),  # Take-off
+                            ("type", "1"),  # Landing
+                            ("category", "0"),  # Paraglider
+                        ],
+                        timeout=30,
+                    )
+                    response.raise_for_status()
+                    page_data = response.json()
+                    if not isinstance(page_data, dict) or not isinstance(
+                        page_data.get("items"), list
+                    ):
+                        raise OpenAIPFetchError("OpenAIP response does not contain an items list")
+                    data = page_data
+                    break
+                except (OpenAIPFetchError, requests.RequestException) as e:
+                    if attempt == 0:
+                        logger.warning("OpenAIP page %s failed; retrying: %s", page, e)
+                        continue
+                    message = f"Failed to fetch OpenAIP page {page} after retry: {e}"
+                    if fail_on_error:
+                        raise OpenAIPFetchError(message) from e
+                    logger.error(message)
+                    return []
 
-                longitude, latitude = coords[0], coords[1]
+            if data is None:
+                raise OpenAIPFetchError(f"OpenAIP page {page} returned no data")
 
-                # Elevation: nested in elevation.value
-                elevation = item.get("elevation", {})
-                elevation_m = elevation.get("value") if isinstance(elevation, dict) else None
+            for item in data["items"]:
+                try:
+                    spot = _parse_openaip_spot(item)
+                    if spot is not None:
+                        spots.append(spot)
+                except (AttributeError, KeyError, TypeError, ValueError) as e:
+                    logger.warning("Failed to parse OpenAIP spot: %s", e)
 
-                # Generate unique ID from OpenAIP ID (use full ID, not truncated)
-                openaip_id = item.get("_id", "")
-                spot_id = (
-                    f"openaip_{openaip_id}"
-                    if openaip_id
-                    else f"openaip_{hashlib.md5(item.get('name', '').encode()).hexdigest()}"
-                )
-
-                spot = {
-                    "id": spot_id,
-                    "name": item.get("name", "").upper(),
-                    "type": spot_type,
-                    "latitude": float(latitude),
-                    "longitude": float(longitude),
-                    "elevation_m": elevation_m,
-                    "orientation": None,  # OpenAIP doesn't include orientation
-                    "rating": None,  # OpenAIP doesn't include rating
-                    "country": item.get("country", "FR"),
-                    "source": "openaip",
-                    "openaip_id": openaip_id,
-                    "paraglidingspots_id": None,
-                    "raw_metadata": json.dumps(item),
-                }
-
-                spots.append(spot)
-
-            except (KeyError, ValueError, TypeError) as e:
-                logger.warning(f"Failed to parse OpenAIP spot: {e}")
-                continue
+            next_page = data.get("nextPage")
+            if not isinstance(next_page, int) or next_page <= page:
+                break
+            page = next_page
 
         logger.info(f"✓ Fetched {len(spots)} spots from OpenAIP")
         return spots
-
-    except requests.RequestException as e:
-        logger.error(f"Failed to fetch OpenAIP data: {e}")
+    except OpenAIPFetchError as e:
+        if fail_on_error:
+            raise
+        logger.error("Failed to fetch OpenAIP data: %s", e)
         return []
+
+
+def _parse_openaip_spot(item: dict[str, Any]) -> dict[str, Any] | None:
+    """Convert an OpenAIP hang-gliding site to the internal spot shape."""
+    geometry = item.get("geometry") or {}
+    coords = geometry.get("coordinates") or []
+    if len(coords) < 2:
+        logger.warning("Skipping OpenAIP spot with invalid coordinates: %s", item.get("name"))
+        return None
+
+    longitude, latitude = coords[0], coords[1]
+    elevation = item.get("elevation")
+    elevation_m = elevation.get("value") if isinstance(elevation, dict) else None
+    openaip_id = item.get("_id") or ""
+    name = str(item.get("name") or "")
+    spot_type = "landing" if item.get("type") == 1 else "takeoff"
+
+    country = item.get("country", "FR")
+    if isinstance(country, list):
+        country = country[0] if country else "FR"
+
+    spot_id = (
+        f"openaip_{openaip_id}"
+        if openaip_id
+        else f"openaip_{hashlib.md5(name.encode()).hexdigest()}"
+    )
+
+    return {
+        "id": spot_id,
+        "name": name.upper(),
+        "type": spot_type,
+        "latitude": float(latitude),
+        "longitude": float(longitude),
+        "elevation_m": elevation_m,
+        "orientation": None,
+        "rating": None,
+        "country": country,
+        "source": "openaip",
+        "openaip_id": openaip_id,
+        "paraglidingspots_id": None,
+        "raw_metadata": json.dumps(item),
+    }
 
 
 def fetch_paraglidingspots_data() -> list[dict]:
@@ -340,7 +386,7 @@ def sync_to_database(db: Session) -> dict[str, int]:
     logger.info("Starting spots sync...")
 
     # Fetch data
-    openaip_spots = fetch_openaip_data()
+    openaip_spots = fetch_openaip_data(fail_on_error=True)
     pgs_spots = fetch_paraglidingspots_data()
 
     if not openaip_spots and not pgs_spots:

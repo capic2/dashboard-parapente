@@ -2,6 +2,7 @@ import { FigureWrapper } from '../../../../.storybook/FigureWrapper.tsx';
 import preview from '../../../../.storybook/preview.tsx';
 import {
   Default,
+  MediaThumbnails,
   WithoutGpx,
   MinimalFlight,
 } from './FlightDetails.stories.tsx';
@@ -25,6 +26,9 @@ export const FlightDetailsChromatic = meta.story({
       </FigureWrapper>
       <FigureWrapper title={WithoutGpx.composed.name}>
         <WithoutGpx.Component />
+      </FigureWrapper>
+      <FigureWrapper title={MediaThumbnails.composed.name}>
+        <MediaThumbnails.Component />
       </FigureWrapper>
       <FigureWrapper title={MinimalFlight.composed.name}>
         <MinimalFlight.Component />

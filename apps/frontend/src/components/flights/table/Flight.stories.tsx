@@ -18,7 +18,14 @@ const mockFlight: FlightSummary = {
   elevation_gain_m: 800,
   has_gpx: true,
   has_video: true,
+  has_camera: true,
+  has_youtube_video: false,
+  youtube_video_count: 0,
+  youtube_upload_status: null,
+  youtube_upload_progress: null,
   has_gopro_overlay: true,
+  has_pano_video: false,
+  has_highlight_video: false,
   video_export_job_id: null,
   video_export_status: null,
   video_export_progress: null,
@@ -45,12 +52,8 @@ export const Default = meta.story({
         isActive={false}
         isSelected={false}
         selectionMode={false}
-        downloadingMedia={null}
         onSelectFlight={() => undefined}
         onDeleteFlight={() => undefined}
-        onDownloadGpx={() => undefined}
-        onDownloadVideo={() => undefined}
-        onDownloadOverlay={() => undefined}
       />
     </div>
   ),
@@ -65,12 +68,8 @@ export const Active = meta.story({
         isActive
         isSelected={false}
         selectionMode={false}
-        downloadingMedia={null}
         onSelectFlight={() => undefined}
         onDeleteFlight={() => undefined}
-        onDownloadGpx={() => undefined}
-        onDownloadVideo={() => undefined}
-        onDownloadOverlay={() => undefined}
       />
     </div>
   ),
@@ -85,17 +84,14 @@ export const NoFile = meta.story({
           ...mockFlight,
           has_gpx: false,
           has_video: false,
+          has_camera: false,
           has_gopro_overlay: false,
         }}
         isActive={false}
         isSelected={false}
         selectionMode={false}
-        downloadingMedia={null}
         onSelectFlight={fn()}
         onDeleteFlight={fn()}
-        onDownloadGpx={fn()}
-        onDownloadOverlay={fn()}
-        onDownloadVideo={fn()}
       />
     </div>
   ),
@@ -114,12 +110,8 @@ export const WithGpx = meta.story({
         isActive={false}
         isSelected={false}
         selectionMode={false}
-        downloadingMedia={null}
         onSelectFlight={fn()}
         onDeleteFlight={fn()}
-        onDownloadGpx={fn()}
-        onDownloadOverlay={fn()}
-        onDownloadVideo={fn()}
       />
     </div>
   ),
@@ -134,12 +126,31 @@ export const WithGpxVideo = meta.story({
         isActive={false}
         isSelected={false}
         selectionMode={false}
-        downloadingMedia={null}
         onSelectFlight={fn()}
         onDeleteFlight={fn()}
-        onDownloadGpx={fn()}
-        onDownloadOverlay={fn()}
-        onDownloadVideo={fn()}
+      />
+    </div>
+  ),
+});
+
+export const WithYoutubeVideo = meta.story({
+  name: 'With YouTube Video',
+  render: () => (
+    <div className="max-w-sm">
+      <Flight
+        flight={{
+          ...mockFlight,
+          has_video: false,
+          has_youtube_video: true,
+          youtube_video_count: 2,
+          youtube_video_types: ['face', 'pano'],
+          has_gopro_overlay: false,
+        }}
+        isActive={false}
+        isSelected={false}
+        selectionMode={false}
+        onSelectFlight={fn()}
+        onDeleteFlight={fn()}
       />
     </div>
   ),
@@ -154,12 +165,8 @@ export const WithOverlay = meta.story({
         isActive={false}
         isSelected={false}
         selectionMode={false}
-        downloadingMedia={null}
         onSelectFlight={fn()}
         onDeleteFlight={fn()}
-        onDownloadGpx={fn()}
-        onDownloadOverlay={fn()}
-        onDownloadVideo={fn()}
       />
     </div>
   ),
@@ -181,12 +188,8 @@ export const VideoProcessing = meta.story({
         isActive={false}
         isSelected={false}
         selectionMode={false}
-        downloadingMedia={null}
         onSelectFlight={() => undefined}
         onDeleteFlight={() => undefined}
-        onDownloadGpx={() => undefined}
-        onDownloadVideo={() => undefined}
-        onDownloadOverlay={() => undefined}
       />
     </div>
   ),
@@ -206,12 +209,8 @@ export const OverlayProcessing = meta.story({
         isActive={false}
         isSelected={false}
         selectionMode={false}
-        downloadingMedia={null}
         onSelectFlight={() => undefined}
         onDeleteFlight={() => undefined}
-        onDownloadGpx={() => undefined}
-        onDownloadVideo={() => undefined}
-        onDownloadOverlay={() => undefined}
       />
     </div>
   ),
@@ -233,12 +232,8 @@ export const VideoError = meta.story({
         isActive={false}
         isSelected={false}
         selectionMode={false}
-        downloadingMedia={null}
         onSelectFlight={() => undefined}
         onDeleteFlight={() => undefined}
-        onDownloadGpx={() => undefined}
-        onDownloadVideo={() => undefined}
-        onDownloadOverlay={() => undefined}
       />
     </div>
   ),
@@ -259,12 +254,8 @@ export const OverlayError = meta.story({
         isActive={false}
         isSelected={false}
         selectionMode={false}
-        downloadingMedia={null}
         onSelectFlight={() => undefined}
         onDeleteFlight={() => undefined}
-        onDownloadGpx={() => undefined}
-        onDownloadVideo={() => undefined}
-        onDownloadOverlay={() => undefined}
       />
     </div>
   ),

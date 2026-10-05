@@ -15,6 +15,12 @@ def test_bounded_integer_environment_values_are_clamped(monkeypatch) -> None:
     assert config._int_env_at_least("TEST_LOOKBACK", 3, 0) == 0
 
 
+def test_integer_environment_value_is_capped(monkeypatch) -> None:
+    monkeypatch.setenv("TEST_WORKERS", "99")
+
+    assert config._int_env_between("TEST_WORKERS", 5, 1, 5) == 5
+
+
 def test_intervals_sync_is_disabled_when_api_key_is_missing(monkeypatch) -> None:
     monkeypatch.setenv("BACKEND_INTERVALS_ICU_SYNC_ENABLED", "true")
 

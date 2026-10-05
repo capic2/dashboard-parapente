@@ -24,11 +24,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from best_spot import (
+    _filter_sites_by_location,
+    _filter_sites_for_best_spot,
     FORECAST_TIME_ZONE,
     _get_current_forecast_hour,
     calculate_angle_difference,
     calculate_best_spot_from_cache,
     calculate_best_spot_from_db,
+    calculate_daily_wind_adjusted_score,
     calculate_hourly_best_spots_from_cache,
     calculate_wind_adjusted_score,
     degrees_to_cardinal,
@@ -41,6 +44,35 @@ from models import Site, WeatherForecast
 # ============================================================================
 # HELPER FUNCTION TESTS
 # ============================================================================
+
+
+def test_filter_sites_by_location_keeps_only_sites_in_radius(arguel_site, chalais_site):
+    """Nearby recommendations must not include sites outside the requested radius."""
+    nearby = _filter_sites_by_location(
+        [arguel_site, chalais_site],
+        latitude=arguel_site.latitude,
+        longitude=arguel_site.longitude,
+        radius_km=10,
+    )
+
+    assert [site.id for site in nearby] == [arguel_site.id]
+
+
+def test_filter_sites_by_location_without_position_keeps_all_sites(arguel_site, chalais_site):
+    """The existing all-sites behavior remains the fallback when GPS is unavailable."""
+    assert _filter_sites_by_location([arguel_site, chalais_site], None, None, 50) == [
+        arguel_site,
+        chalais_site,
+    ]
+
+
+def test_filter_sites_for_best_spot_excludes_landings_and_keeps_takeoffs():
+    """Best spot recommendations only include launch-capable sites."""
+    takeoff = Site(id="takeoff", name="Déco", usage_type="takeoff")
+    both = Site(id="both", name="Déco et atterro", usage_type="both")
+    landing = Site(id="landing", name="Atterro", usage_type="landing")
+
+    assert _filter_sites_for_best_spot([takeoff, both, landing]) == [takeoff, both]
 
 
 def test_parse_wind_direction_valid():
@@ -61,6 +93,30 @@ def test_get_current_forecast_hour_uses_forecast_timezone():
         assert _get_current_forecast_hour() == 16
 
     mock_datetime.now.assert_called_once_with(FORECAST_TIME_ZONE)
+
+
+def test_daily_score_is_the_average_of_hourly_wind_adjusted_scores() -> None:
+    """Daily score must not replace varying hourly wind with one daily average."""
+    hourly_data = [
+        {
+            "wind_speed": 15,
+            "wind_gust": 10,
+            "precipitation": 0,
+            "temperature": 20,
+            "lifted_index": 0,
+            "wind_direction": 225,
+        },
+        {
+            "wind_speed": 15,
+            "wind_gust": 10,
+            "precipitation": 0,
+            "temperature": 20,
+            "lifted_index": 0,
+            "wind_direction": 90,
+        },
+    ]
+
+    assert calculate_daily_wind_adjusted_score(hourly_data, "SW") == 68
 
 
 def test_parse_wind_direction_case_insensitive():

@@ -48,6 +48,14 @@ _Avoid_: Vol, flight record, safety certification, go/no-go order
 A completed flight activity kept in the pilot's history, whether entered manually or imported. A **Vol Enregistre** may exist without an associated **Site**, GPX trace, or video.
 _Avoid_: Decision de Vol, media file
 
+**Lecteur d'Overlay Dynamique**:
+The final interactive player shown after a synchronized transparent overlay layer is ready. It owns the camera-main, flight-main, and side-by-side views, with the non-primary video rendered as a clickable PiP. In code this semantic belongs to `FlightOverlayInteractivePreview`.
+_Avoid_: calibration player, synchronization preview
+
+**Lecteur de Synchronisation Overlay**:
+The calibration player used to align the camera video, GPX telemetry, and overlay timing before generating the reusable transparent layer. In code this semantic belongs to `GoproOverlaySyncPreview`.
+_Avoid_: dynamic overlay player, final interactive player
+
 **Vol Tranquille**:
 A flight objective that favors calm, manageable conditions over strong thermal performance. For the current pilot usage, weak thermals are neutral or positive, while strong thermals and instability require caution.
 _Avoid_: Performance flight, thermal optimization

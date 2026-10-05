@@ -146,6 +146,7 @@ export function FlightVideoExportControls({
   );
   const [videoExportMode, setVideoExportMode] =
     useState<VideoExportMode>('manual_fast');
+  const [directorStyle, setDirectorStyle] = useState('natural');
   const [isStartingVideoExport, setIsStartingVideoExport] = useState(false);
   const [isLogsOpen, setIsLogsOpen] = useState(
     () =>
@@ -172,8 +173,10 @@ export function FlightVideoExportControls({
   const canResumeVideoExport = Boolean(
     flight.video_export_job_id && exportStatus?.can_resume
   );
-  const canResumeFailedVideoExport = Boolean(
-    flight.video_export_status === 'failed' && canResumeVideoExport
+  const canResumeStoppedVideoExport = Boolean(
+    (flight.video_export_status === 'failed' ||
+      flight.video_export_status === 'cancelled') &&
+    canResumeVideoExport
   );
 
   useEffect(() => {
@@ -214,7 +217,10 @@ export function FlightVideoExportControls({
     try {
       const payload = await api
         .post(`flights/${flight.id}/export-video`, {
-          searchParams: { mode: videoExportMode },
+          searchParams: {
+            mode: videoExportMode,
+            director_style: directorStyle,
+          },
         })
         .json<{ job_token?: string | null }>();
       setVideoExportJobToken(payload.job_token ?? null);
@@ -222,7 +228,13 @@ export function FlightVideoExportControls({
     } finally {
       setIsStartingVideoExport(false);
     }
-  }, [flight.id, isStartingVideoExport, queryClient, videoExportMode]);
+  }, [
+    directorStyle,
+    flight.id,
+    isStartingVideoExport,
+    queryClient,
+    videoExportMode,
+  ]);
 
   const resumeVideoExport = useCallback(async () => {
     if (isStartingVideoExport || !flight.video_export_job_id) return;
@@ -245,16 +257,13 @@ export function FlightVideoExportControls({
       return;
     }
 
-    if (
-      hasGeneratedVideo ||
-      isCancelledVideoExport(flight.video_export_status)
-    ) {
+    if (hasGeneratedVideo) {
       await handleRegenerateVideo();
       return;
     }
 
     try {
-      if (canResumeFailedVideoExport) {
+      if (canResumeStoppedVideoExport) {
         await resumeVideoExport();
       } else {
         await startVideoExport();
@@ -319,11 +328,13 @@ export function FlightVideoExportControls({
     }
 
     if (isCancelledVideoExport(flight.video_export_status)) {
-      return t('flights.viewer.videoRegenerateTitle');
+      return canResumeStoppedVideoExport
+        ? t('flights.viewer.videoResumeTitle')
+        : t('flights.viewer.videoRegenerateTitle');
     }
 
     if (needsVideoExportRecovery(flight.video_export_status)) {
-      return canResumeFailedVideoExport
+      return canResumeStoppedVideoExport
         ? t('flights.viewer.videoResumeTitle')
         : t('flights.viewer.videoRegenerateTitle');
     }
@@ -346,13 +357,19 @@ export function FlightVideoExportControls({
         : t('flights.viewer.cancelGeneration');
     }
     if (isCancelledVideoExport(flight.video_export_status)) {
+      if (canResumeStoppedVideoExport) {
+        return compact
+          ? t('flights.viewer.resumeVideoShort')
+          : t('flights.viewer.resumeVideo');
+      }
+
       return compact
         ? t('flights.viewer.regenerateVideoShort')
         : t('flights.viewer.regenerateVideo');
     }
 
     if (needsVideoExportRecovery(flight.video_export_status)) {
-      if (canResumeFailedVideoExport) {
+      if (canResumeStoppedVideoExport) {
         return compact
           ? t('flights.viewer.resumeVideoShort')
           : t('flights.viewer.resumeVideo');
@@ -380,7 +397,7 @@ export function FlightVideoExportControls({
     }
 
     if (needsVideoExportRecovery(flight.video_export_status)) {
-      return canResumeFailedVideoExport ? Play : RotateCcw;
+      return canResumeStoppedVideoExport ? Play : RotateCcw;
     }
 
     if (hasGeneratedVideo) {
@@ -474,6 +491,18 @@ export function FlightVideoExportControls({
                 }
               )}
             </div>
+            <label className="mt-3 block text-xs font-semibold text-slate-700 dark:text-slate-200">
+              Style visuel
+              <select
+                value={directorStyle}
+                onChange={(event) => setDirectorStyle(event.target.value)}
+                className="mt-1 w-full rounded border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-800"
+              >
+                <option value="natural">Naturel</option>
+                <option value="cinematic">Cinématique</option>
+                <option value="dynamic">Dynamique</option>
+              </select>
+            </label>
           </div>
         )}
 
@@ -488,7 +517,7 @@ export function FlightVideoExportControls({
         {primaryButtonLabel}
       </Button>
 
-      {canResumeFailedVideoExport && !isExportActive && (
+      {canResumeStoppedVideoExport && !isExportActive && (
         <p
           className={`mt-2 text-xs text-blue-700 dark:text-blue-300 ${
             compact ? 'basis-full text-right' : ''

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Parapente video highlights"
+  short_description: "Sélectionner les meilleurs moments de vidéos pano"
+  default_prompt: "Analyse les vidéos pano du vol indiqué, propose les meilleurs moments et génère un montage en conservant le format d’origine."

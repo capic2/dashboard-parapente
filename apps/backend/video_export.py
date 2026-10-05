@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import config
@@ -15,11 +15,50 @@ from database import SessionLocal
 from deployment_drain import job_admission
 from flight_storage import get_video_output_path
 from models import Flight
+from video_acceleration import (
+    VideoAccelerator,
+    chromium_launch_args,
+    h264_encode_args,
+    select_video_accelerator,
+)
 
 # Storage for export jobs
 export_jobs: dict[str, dict] = {}
 
 _TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
+
+_WEBGL_RENDERER_SCRIPT = """
+    () => {
+        const canvas = document.querySelector('canvas');
+        if (!canvas) {
+            return { available: false, vendor: '', renderer: '' };
+        }
+
+        const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+        if (!gl) {
+            return { available: false, vendor: '', renderer: '' };
+        }
+
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        return {
+            available: true,
+            vendor: debugInfo
+                ? String(gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) || '')
+                : String(gl.getParameter(gl.VENDOR) || ''),
+            renderer: debugInfo
+                ? String(gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || '')
+                : String(gl.getParameter(gl.RENDERER) || ''),
+        };
+    }
+"""
+
+
+def _is_software_webgl_renderer(renderer: str) -> bool:
+    normalized = renderer.lower()
+    return any(
+        marker in normalized
+        for marker in ("swiftshader", "llvmpipe", "softpipe", "software rasterizer", "swrast")
+    )
 
 
 def _video_export_dir() -> Path:
@@ -75,6 +114,46 @@ def _cleanup_temp_dir(temp_dir: Path | None) -> None:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
+def _stream_transcode_command(
+    webm_file: Path,
+    output_file: Path,
+    accelerator: VideoAccelerator,
+) -> list[str]:
+    return [
+        "ffmpeg",
+        "-i",
+        str(webm_file),
+        *h264_encode_args(
+            accelerator,
+            quality="23",
+            cpu_preset="medium",
+            include_audio=False,
+        ),
+        "-y",
+        str(output_file),
+    ]
+
+
+async def _run_ffmpeg_process(job_id: str, command: list[str]) -> int:
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        while process.poll() is None:
+            if _is_cancelled(job_id):
+                process.kill()
+                process.wait()
+                raise RuntimeError("Export cancelled by user")
+            await asyncio.sleep(1)
+        return process.returncode
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+
+
 def _job_temp_dir(temp_root: Path, job_id: str) -> Path:
     return temp_root / job_id
 
@@ -121,7 +200,7 @@ def start_video_export_background(
     """
     Start video export in a background thread
     """
-    with job_admission():
+    with job_admission("video_export_background"):
         job_id = f"{flight_id}-{int(time.time())}"
 
         export_jobs[job_id] = {
@@ -130,9 +209,10 @@ def start_video_export_background(
             "status": "started",
             "progress": 0,
             "message": "Initializing...",
-            "started_at": datetime.now().isoformat(),
+            "started_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "video_path": None,
             "error": None,
+            "render_method": None,
         }
 
         # Start export in background thread
@@ -188,33 +268,17 @@ async def _export_video_playwright(
         # Resolution mapping
         resolutions = {"720p": (1280, 720), "1080p": (1920, 1080), "4K": (3840, 2160)}
         width, height = resolutions.get(quality, (1920, 1080))
+        accelerator = select_video_accelerator(config.VIDEO_ACCELERATOR)
+        if config.VIDEO_ACCELERATOR == "nvidia" and accelerator == "cpu":
+            print("NVIDIA NVENC unavailable; falling back to CPU")
+        else:
+            print(f"Video accelerator selected: {accelerator}")
 
         async with async_playwright() as p:
             # Launch browser with GPU acceleration and increased resources
             browser = await p.chromium.launch(
                 headless=True,
-                args=[
-                    # GPU acceleration
-                    "--enable-gpu",
-                    "--use-gl=egl",
-                    "--enable-webgl",
-                    "--enable-webgl2",
-                    "--ignore-gpu-blocklist",
-                    "--disable-gpu-vsync",
-                    # Performance optimizations
-                    "--disable-dev-shm-usage",  # Use /tmp instead of /dev/shm
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    # Increase memory and resources
-                    "--js-flags=--max-old-space-size=4096",  # 4GB heap for JS
-                    "--disable-background-timer-throttling",  # Don't throttle timers
-                    "--disable-backgrounding-occluded-windows",
-                    "--disable-renderer-backgrounding",
-                    # Better rendering
-                    "--force-device-scale-factor=1",
-                    "--high-dpi-support=1",
-                    "--disable-blink-features=AutomationControlled",  # Appear more like real browser
-                ],
+                args=chromium_launch_args(accelerator),
             )
             context = await browser.new_context(
                 viewport={"width": width, "height": height},
@@ -287,6 +351,13 @@ async def _export_video_playwright(
             # Give it a bit more time for initialization
             await asyncio.sleep(3)
             _raise_if_cancelled(job_id)
+
+            renderer_info = await page.evaluate(_WEBGL_RENDERER_SCRIPT)
+            renderer = str(renderer_info.get("renderer") or "unknown")
+            if not renderer_info.get("available") or _is_software_webgl_renderer(renderer):
+                export_jobs[job_id]["render_method"] = "cpu"
+            else:
+                export_jobs[job_id]["render_method"] = "gpu"
 
             # Wait for terrain textures to load by checking terrainReady state
             export_jobs[job_id]["message"] = "Waiting for terrain textures..."
@@ -548,44 +619,22 @@ async def _export_video_playwright(
 
             output_file = _video_output_path(flight_id, timestamp)
 
-            # Convert WebM to MP4
-            ffmpeg_cmd = [
-                "ffmpeg",
-                "-i",
-                str(webm_file),
-                "-c:v",
-                "libx264",
-                "-preset",
-                "medium",
-                "-crf",
-                "23",
-                "-pix_fmt",
-                "yuv420p",
-                "-c:a",
-                "aac",  # Audio codec (even if no audio)
-                "-y",  # Overwrite output file
-                str(output_file),
-            ]
+            ffmpeg_cmd = _stream_transcode_command(webm_file, output_file, accelerator)
 
             print(f"🎬 Converting WebM to MP4: {' '.join(ffmpeg_cmd)}")
-            process = subprocess.Popen(
-                ffmpeg_cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
             try:
-                while process.poll() is None:
-                    if _is_cancelled(job_id):
-                        process.kill()
-                        process.wait()
-                        raise RuntimeError("Export cancelled by user")
-                    await asyncio.sleep(1)
+                return_code = await _run_ffmpeg_process(job_id, ffmpeg_cmd)
             finally:
                 if _is_cancelled(job_id):
                     _cleanup_export_files(webm_file, output_file)
 
-            if process.returncode != 0:
-                raise Exception(f"FFmpeg conversion failed with code {process.returncode}")
+            if return_code != 0 and accelerator == "nvidia":
+                output_file.unlink(missing_ok=True)
+                ffmpeg_cmd = _stream_transcode_command(webm_file, output_file, "cpu")
+                print("NVENC conversion failed; retrying with CPU encoding")
+                return_code = await _run_ffmpeg_process(job_id, ffmpeg_cmd)
+            if return_code != 0:
+                raise Exception(f"FFmpeg conversion failed with code {return_code}")
 
             # Cleanup temporary WebM file
             if webm_file.exists():
@@ -598,7 +647,9 @@ async def _export_video_playwright(
             export_jobs[job_id]["progress"] = 100
             export_jobs[job_id]["message"] = f"Video ready! ({file_size_mb:.1f} MB)"
             export_jobs[job_id]["video_path"] = str(output_file)
-            export_jobs[job_id]["completed_at"] = datetime.now().isoformat()
+            export_jobs[job_id]["completed_at"] = (
+                datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            )
 
             print(f"✅ Video exported: {output_file} ({file_size_mb:.1f} MB)")
 
@@ -608,7 +659,9 @@ async def _export_video_playwright(
             _cleanup_export_files(webm_file, output_file)
             export_jobs[job_id]["message"] = "Export cancelled by user"
             export_jobs[job_id]["error"] = None
-            export_jobs[job_id]["cancelled_at"] = datetime.now().isoformat()
+            export_jobs[job_id]["cancelled_at"] = (
+                datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            )
             return
 
         export_jobs[job_id]["status"] = "failed"
@@ -636,7 +689,7 @@ def cancel_video_export(job_id: str) -> bool:
     job["status"] = "cancelled"
     job["message"] = "Export cancelled by user"
     job["error"] = None
-    job["cancelled_at"] = datetime.now().isoformat()
+    job["cancelled_at"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     _mark_flight_export_cancelled(job)
     return True
 

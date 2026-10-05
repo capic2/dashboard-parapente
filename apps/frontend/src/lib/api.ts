@@ -9,7 +9,8 @@ type ApiErrorPayload = {
 let _apiLogsEnabled = import.meta.env.DEV;
 
 const apiBaseUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
-const apiPrefix = apiBaseUrl ? `${apiBaseUrl}/api` : '/api';
+const appBasePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+const apiPrefix = apiBaseUrl ? `${apiBaseUrl}/api` : `${appBasePath}/api`;
 
 export function getApiUrl(path: string) {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
@@ -68,7 +69,7 @@ export let api = ky.create({
           const { isAuthenticated, logout } = useAuthStore.getState();
           if (isAuthenticated) {
             logout();
-            window.location.href = '/login';
+            window.location.href = `${appBasePath}/login`;
           }
         }
 
@@ -112,10 +113,13 @@ export async function getApiErrorMessage(error: unknown, fallback: string) {
       return payload.detail;
     }
   } catch {
-    // Keep the user-facing fallback when the response is not JSON.
+    // Keep the fallback and HTTP status when the response is not JSON.
   }
 
-  return fallback;
+  const status = response.statusText
+    ? `${response.status} ${response.statusText}`
+    : `${response.status}`;
+  return `${fallback} (HTTP ${status})`;
 }
 
 // Apply persisted timeout on load and react to changes

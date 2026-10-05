@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write
   contents: write
   issues: write
   packages: write
@@ -22,8 +23,32 @@ jobs:
     timeout-minutes: 120
 
     steps:
+      - name: Check deployment freshness
+        id: freshness
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { data } = await github.rest.repos.getBranch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: 'main',
+            });
+            const isCurrent = data.commit.sha === context.sha;
+            core.setOutput('is_current', String(isCurrent));
+            if (!isCurrent) {
+              core.notice('Skipping stale deployment ' + context.sha + '; main is now ' + data.commit.sha);
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'deploy-portainer.yml',
+                ref: 'main',
+              });
+              core.notice('Queued a deployment for current main ' + data.commit.sha);
+            }
+
       - name: Compute deployment version
         id: version
+        if: steps.freshness.outputs.is_current == 'true'
         uses: actions/github-script@v9
         with:
           script: |
@@ -117,6 +142,7 @@ jobs:
             }
 
       - name: Reserve deployment tag
+        if: steps.freshness.outputs.is_current == 'true'
         uses: actions/github-script@v9
         env:
           TAG_NAME: ${{ steps.version.outputs.tag_name }}
@@ -160,9 +186,11 @@ jobs:
             }
 
       - name: Checkout source for image build
+        if: steps.freshness.outputs.is_current == 'true'
         uses: actions/checkout@v7
 
       - name: Verify GoPro overlay build context
+        if: steps.freshness.outputs.is_current == 'true'
         env:
           GOPRO_OVERLAY_BUILD_CONTEXT: ${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT || 'https://github.com/capic2/gopro-dashboard-overlay.git#main' }}
         run: |
@@ -173,9 +201,11 @@ jobs:
           fi
 
       - name: Set up Docker Buildx
+        if: steps.freshness.outputs.is_current == 'true'
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to GitHub Container Registry
+        if: steps.freshness.outputs.is_current == 'true'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -184,6 +214,7 @@ jobs:
 
       - name: Build and push backend image
         id: build_image
+        if: steps.freshness.outputs.is_current == 'true'
         continue-on-error: true
         uses: docker/build-push-action@v7
         with:
@@ -191,9 +222,13 @@ jobs:
           file: Dockerfile
           push: true
           build-args: |
+            BACKEND_DEPLOY_VERSION=${{ steps.version.outputs.version }}
+          secrets: |
             VITE_CESIUM_ION_TOKEN=${{ secrets.VITE_CESIUM_ION_TOKEN }}
           build-contexts: |
-            gopro-overlay-src=${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT || 'https://github.com/capic2/gopro-dashboard-overlay.git#main' }}
+            gopro-overlay-src=${{ vars.GOPRO_OVERLAY_BUILD_CONTEXT || 'https://github.com/capic2/gopro-dashboard-overlay.git#7cbf7be6499ee3cc3c968f0c3dedc7fa62d893c7' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ghcr.io/${{ github.repository }}/backend:${{ steps.version.outputs.version }}
             ghcr.io/${{ github.repository }}/backend:main
@@ -226,29 +261,63 @@ jobs:
           fi
 
           payload=$(python -c 'import json, os; print(json.dumps({"deployment_id": os.environ["DEPLOYMENT_ID"], "target_version": os.environ["TARGET_VERSION"], "run_url": os.environ["RUN_URL"]}))')
-          response=$(curl --show-error --silent --fail-with-body \
-            --connect-timeout 5 --max-time 20 \
-            --request PUT \
-            --header "Authorization: Bearer $DRAIN_API_TOKEN" \
-            --header "Content-Type: application/json" \
-            --data "$payload" \
-            "$DRAIN_BASE_URL")
+          max_attempts=60
+          attempt=1
+          while [ "$attempt" -le "$max_attempts" ]; do
+            response_file=$(mktemp)
+            http_code=$(curl --show-error --silent --fail-with-body \
+              --connect-timeout 5 --max-time 20 \
+              --request PUT \
+              --header "Authorization: Bearer $DRAIN_API_TOKEN" \
+              --header "Content-Type: application/json" \
+              --data "$payload" \
+              --output "$response_file" \
+              --write-out '%{http_code}' \
+              "$DRAIN_BASE_URL" || true)
+            response=$(cat "$response_file")
+            rm -f "$response_file"
 
-          if ! parsed=$(python -c 'import json, sys; data=json.load(sys.stdin); phase=data["phase"]; ready=data["ready_for_deployment"]; active=data["active_jobs"]; admissions=data["admissions_in_progress"]; assert phase in ("waiting", "deploying") and type(ready) is bool and type(active) is int and active >= 0 and type(admissions) is int and admissions >= 0; print(f"{phase}\t{str(ready).lower()}\t{active}\t{admissions}")' <<< "$response" 2>/dev/null); then
+            if [ "$http_code" = "409" ]; then
+              echo "Deployment drain is owned by another deployment (attempt $attempt/$max_attempts); waiting before retry"
+              if [ "$attempt" -lt "$max_attempts" ]; then
+                sleep 5
+              fi
+              attempt=$((attempt + 1))
+              continue
+            fi
+
+            if [ "$http_code" = "502" ] || [ "$http_code" = "503" ] || [ "$http_code" = "504" ] || [ "$http_code" = "000" ]; then
+              echo "::warning::Deployment drain API is unavailable (HTTP $http_code); continuing with bootstrap deployment"
+              echo "drain_bootstrap=true" >> "$GITHUB_OUTPUT"
+              echo "drain_cleanup_required=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            break
+          done
+
+          if [ "$http_code" = "409" ]; then
+            echo "Deployment drain remained owned by another deployment after $max_attempts attempts"
+            exit 1
+          fi
+
+          if ! parsed=$(python -c 'import json, sys; data=json.load(sys.stdin); phase=data["phase"]; ready=data["ready_for_deployment"]; active=data["active_jobs"]; admissions=data["admissions_in_progress"]; jobs=json.dumps(data.get("blocking_jobs", []), separators=(",", ":")); active_admissions=json.dumps(data.get("active_admissions", []), separators=(",", ":")); assert phase in ("waiting", "deploying") and type(ready) is bool and type(active) is int and active >= 0 and type(admissions) is int and admissions >= 0; print(f"{phase}\t{str(ready).lower()}\t{active}\t{admissions}\t{jobs}\t{active_admissions}")' <<< "$response" 2>/dev/null); then
             echo "Deployment drain begin returned malformed JSON"
             exit 1
           fi
 
-          IFS=$'\t' read -r phase ready active_jobs admissions_in_progress <<< "$parsed"
+          IFS=$'\t' read -r phase ready active_jobs admissions_in_progress blocking_jobs active_admissions <<< "$parsed"
           echo "phase=$phase" >> "$GITHUB_OUTPUT"
           echo "ready_for_deployment=$ready" >> "$GITHUB_OUTPUT"
           echo "active_jobs=$active_jobs" >> "$GITHUB_OUTPUT"
           echo "admissions_in_progress=$admissions_in_progress" >> "$GITHUB_OUTPUT"
           echo "Deployment drain acquired: phase=$phase active_jobs=$active_jobs admissions_in_progress=$admissions_in_progress"
+          python -c 'import json, sys; jobs=json.load(sys.stdin); print("Blocking jobs: " + ("; ".join("{}/{} status={} progress={}% flight={} started={}".format(j.get("mode", "unknown"), j.get("job_id", "unknown"), j.get("status"), j.get("progress", "n/a"), j.get("flight_name") or "n/a", j.get("started_at") or "n/a") for j in jobs) or "none"))' <<< "$blocking_jobs"
+          python -c 'import json, sys; admissions=json.load(sys.stdin); print("Active admissions: " + ("; ".join("{} started={}".format(a.get("operation", "unknown"), a.get("started_at", "n/a")) for a in admissions) or "none"))' <<< "$active_admissions"
 
       - name: Wait for production jobs to drain
         id: wait_drain
-        if: steps.build_image.outcome == 'success' && vars.DEPLOY_DRAIN_ENABLED == 'true' && steps.begin_drain.outcome == 'success'
+        if: steps.build_image.outcome == 'success' && vars.DEPLOY_DRAIN_ENABLED == 'true' && steps.begin_drain.outcome == 'success' && steps.begin_drain.outputs.drain_bootstrap != 'true'
         continue-on-error: true
         env:
           DRAIN_BASE_URL: ${{ secrets.PRODUCTION_DEPLOY_DRAIN_URL }}
@@ -318,7 +387,7 @@ jobs:
               continue
             fi
 
-            if ! parsed=$(python -c 'import json, sys; data=json.load(sys.stdin); phase=data["phase"]; ready=data["ready_for_deployment"]; active=data["active_jobs"]; admissions=data["admissions_in_progress"]; assert phase in ("waiting", "deploying") and type(ready) is bool and type(active) is int and active >= 0 and type(admissions) is int and admissions >= 0; print(f"{phase}\t{str(ready).lower()}\t{active}\t{admissions}")' <<< "$response" 2>/dev/null); then
+            if ! parsed=$(python -c 'import json, sys; data=json.load(sys.stdin); phase=data["phase"]; ready=data["ready_for_deployment"]; active=data["active_jobs"]; admissions=data["admissions_in_progress"]; jobs=json.dumps(data.get("blocking_jobs", []), separators=(",", ":")); active_admissions=json.dumps(data.get("active_admissions", []), separators=(",", ":")); assert phase in ("waiting", "deploying") and type(ready) is bool and type(active) is int and active >= 0 and type(admissions) is int and admissions >= 0; print(f"{phase}\t{str(ready).lower()}\t{active}\t{admissions}\t{jobs}\t{active_admissions}")' <<< "$response" 2>/dev/null); then
               waited_seconds=$(( $(date +%s) - started_at ))
               echo "waited_seconds=$waited_seconds" >> "$GITHUB_OUTPUT"
               echo "::warning::$(date -u +'%Y-%m-%dT%H:%M:%SZ') attempt $attempt/$MAX_ATTEMPTS: drain status returned malformed JSON active_jobs=$last_active_jobs admissions_in_progress=$last_admissions_in_progress waited_seconds=$waited_seconds; treating it as not ready and retrying when attempts remain"
@@ -327,7 +396,7 @@ jobs:
               continue
             fi
 
-            IFS=$'\t' read -r phase ready active_jobs admissions_in_progress <<< "$parsed"
+            IFS=$'\t' read -r phase ready active_jobs admissions_in_progress blocking_jobs active_admissions <<< "$parsed"
             last_active_jobs=$active_jobs
             last_admissions_in_progress=$admissions_in_progress
             waited_seconds=$(( $(date +%s) - started_at ))
@@ -335,6 +404,8 @@ jobs:
             echo "last_admissions_in_progress=$admissions_in_progress" >> "$GITHUB_OUTPUT"
             echo "waited_seconds=$waited_seconds" >> "$GITHUB_OUTPUT"
             echo "$(date -u +'%Y-%m-%dT%H:%M:%SZ') attempt $attempt/$MAX_ATTEMPTS: phase=$phase active_jobs=$active_jobs admissions_in_progress=$admissions_in_progress waited_seconds=$waited_seconds"
+            python -c 'import json, sys; jobs=json.load(sys.stdin); print("Blocking jobs: " + ("; ".join("{}/{} status={} progress={}% flight={} started={}".format(j.get("mode", "unknown"), j.get("job_id", "unknown"), j.get("status"), j.get("progress", "n/a"), j.get("flight_name") or "n/a", j.get("started_at") or "n/a") for j in jobs) or "none"))' <<< "$blocking_jobs"
+            python -c 'import json, sys; admissions=json.load(sys.stdin); print("Active admissions: " + ("; ".join("{} started={}".format(a.get("operation", "unknown"), a.get("started_at", "n/a")) for a in admissions) or "none"))' <<< "$active_admissions"
 
             if [ "$ready" = "true" ]; then
               echo "Production is ready for deployment"
@@ -370,23 +441,51 @@ jobs:
             exit 1
           fi
 
-          response=$(curl --show-error --silent --fail-with-body \
-            --connect-timeout 5 --max-time 20 \
-            --request POST \
-            --header "Authorization: Bearer $DRAIN_API_TOKEN" \
-            "$DRAIN_BASE_URL/$DEPLOYMENT_ID/deploying")
+          max_attempts=6
+          attempt=1
+          while [ "$attempt" -le "$max_attempts" ]; do
+            if response=$(curl --show-error --silent --fail-with-body \
+              --connect-timeout 5 --max-time 20 \
+              --request POST \
+              --header "Authorization: Bearer $DRAIN_API_TOKEN" \
+              "$DRAIN_BASE_URL/$DEPLOYMENT_ID/deploying"); then
+              if phase=$(python -c 'import json, sys; data=json.load(sys.stdin); phase=data["phase"]; ready=data["ready_for_deployment"]; active=data["active_jobs"]; admissions=data["admissions_in_progress"]; assert phase == "deploying" and type(ready) is bool and type(active) is int and active >= 0 and type(admissions) is int and admissions >= 0; print(phase)' <<< "$response" 2>/dev/null); then
+                echo "Deployment drain phase: $phase"
+                exit 0
+              fi
+              echo "Mark-deploying attempt $attempt/$max_attempts returned malformed JSON"
+            else
+              curl_status=$?
+              echo "Mark-deploying attempt $attempt/$max_attempts failed (curl exit $curl_status); retrying when attempts remain"
+            fi
 
-          if ! phase=$(python -c 'import json, sys; data=json.load(sys.stdin); phase=data["phase"]; ready=data["ready_for_deployment"]; active=data["active_jobs"]; admissions=data["admissions_in_progress"]; assert phase == "deploying" and type(ready) is bool and type(active) is int and active >= 0 and type(admissions) is int and admissions >= 0; print(phase)' <<< "$response" 2>/dev/null); then
-            echo "Mark-deploying response returned malformed JSON"
-            exit 1
-          fi
-          echo "Deployment drain phase: $phase"
+            if [ "$attempt" -lt "$max_attempts" ]; then
+              sleep_seconds=$((attempt * 5))
+              sleep "$sleep_seconds"
+            fi
+            attempt=$((attempt + 1))
+          done
+
+          echo "Failed to mark production deployment drain as deploying after $max_attempts attempts"
+          exit 1
 
       - name: Deploy on production server
         id: trigger_deploy
-        if: steps.build_image.outcome == 'success' && (vars.DEPLOY_DRAIN_ENABLED != 'true' || (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success'))
+        if: steps.build_image.outcome == 'success' && (vars.DEPLOY_DRAIN_ENABLED != 'true' || steps.begin_drain.outputs.drain_bootstrap == 'true' || (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success'))
         continue-on-error: true
         uses: appleboy/ssh-action@v1.2.5
+        env:
+          REQUESTED_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
+          TARGET_SHA: ${{ github.sha }}
+          TARGET_VERSION: ${{ steps.version.outputs.version }}
+          REPO_SLUG: ${{ github.repository }}
+          COMPOSE_PROJECT_NAME: dashboard-parapente
+          BACKEND_IMAGE: ghcr.io/${{ github.repository }}/backend:${{ steps.version.outputs.version }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+          NVIDIA_GPU_ENABLED: ${{ vars.NVIDIA_GPU_ENABLED || 'false' }}
+          LOCAL_VERIFY_MAX_ATTEMPTS: ${{ vars.DEPLOY_LOCAL_VERIFY_MAX_ATTEMPTS || vars.DEPLOY_VERIFY_MAX_ATTEMPTS || '30' }}
+          LOCAL_VERIFY_SLEEP_SECONDS: ${{ vars.DEPLOY_LOCAL_VERIFY_SLEEP_SECONDS || vars.DEPLOY_VERIFY_SLEEP_SECONDS || '5' }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
@@ -394,239 +493,8 @@ jobs:
           fingerprint: ${{ secrets.SSH_FINGERPRINT }}
           port: ${{ secrets.SSH_PORT }}
           command_timeout: 15m
-          script: |
-            set -eu
-
-            REQUESTED_DEPLOY_PATH="${{ secrets.SSH_DEPLOY_PATH }}"
-            DEPLOY_PATH="$REQUESTED_DEPLOY_PATH"
-            STACK_ID=""
-            PORTAINER_VOLUME=""
-            TARGET_SHA="${{ github.sha }}"
-            TARGET_VERSION="${{ steps.version.outputs.version }}"
-            REPO_SLUG="${{ github.repository }}"
-            COMPOSE_PROJECT_NAME="dashboard-parapente"
-            BACKEND_IMAGE="ghcr.io/${{ github.repository }}/backend:${{ steps.version.outputs.version }}"
-            GHCR_USERNAME="${{ github.actor }}"
-            GHCR_TOKEN="${{ secrets.GHCR_READ_TOKEN }}"
-
-            if [ -z "$GHCR_TOKEN" ]; then
-              echo "Missing GHCR_READ_TOKEN secret for production image pull"
-              exit 1
-            fi
-
-            is_forbidden_deploy_path() {
-              path="$1"
-              case "$path" in
-                .codenomad|.codenomad/*|*/.codenomad|*/.codenomad/*|.agents|.agents/*|*/.agents|*/.agents/*|.opencode|.opencode/*|*/.opencode|*/.opencode/*)
-                  return 0
-                  ;;
-              esac
-
-              return 1
-            }
-
-            set_portainer_volume() {
-              for volume_name in portainer_data portainer; do
-                if docker volume inspect "$volume_name" >/dev/null 2>&1; then
-                  PORTAINER_VOLUME="$volume_name"
-                  return 0
-                fi
-              done
-
-              return 1
-            }
-
-            resolve_from_portainer_volume() {
-              if ! set_portainer_volume; then
-                return 1
-              fi
-
-              STACK_ID=$(docker run --rm \
-                -v "$PORTAINER_VOLUME:/data" \
-                docker:27-cli sh -ceu '
-                  for compose_file in /data/compose/*/docker-compose.yml /data/compose/*/compose.yml; do
-                    [ -f "$compose_file" ] || continue
-                    if grep -q "dashboard-parapente" "$compose_file" || grep -q "parapente-backend" "$compose_file"; then
-                      basename "$(dirname "$compose_file")"
-                      exit 0
-                    fi
-                  done
-                ' 2>/dev/null || true)
-
-              if [ -n "$STACK_ID" ]; then
-                echo "Resolved Portainer stack id from volume $PORTAINER_VOLUME: $STACK_ID"
-                return 0
-              fi
-
-              return 1
-            }
-
-            configure_compose_cmd() {
-              compose_files="-f docker-compose.yml"
-              if [ -f docker-compose.gpu.yml ]; then
-                compose_files="$compose_files -f docker-compose.gpu.yml"
-                echo "Using GPU compose override"
-              fi
-
-              if [ -f stack.env ]; then
-                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files --env-file stack.env "$@"; }
-                echo "Using stack.env for docker compose"
-              elif [ -f .env ]; then
-                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files --env-file .env "$@"; }
-                echo "Using .env for docker compose"
-              else
-                compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files "$@"; }
-                echo "No env file found (stack.env/.env), using shell environment"
-              fi
-            }
-
-            download_gpu_compose_override() {
-              gpu_url="https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.gpu.yml"
-              if ! gpu_status=$(curl --silent --show-error --location \
-                --output docker-compose.gpu.yml.tmp \
-                --write-out '%{http_code}' \
-                "$gpu_url"); then
-                rm -f docker-compose.gpu.yml.tmp
-                echo "Failed to download GPU compose override"
-                return 1
-              fi
-
-              case "$gpu_status" in
-                200)
-                  mv docker-compose.gpu.yml.tmp docker-compose.gpu.yml
-                  ;;
-                404)
-                  rm -f docker-compose.gpu.yml.tmp docker-compose.gpu.yml
-                  echo "GPU compose override not present at target commit; using CPU compose"
-                  ;;
-                *)
-                  rm -f docker-compose.gpu.yml.tmp
-                  echo "GPU compose override download returned HTTP $gpu_status"
-                  return 1
-                  ;;
-              esac
-            }
-
-            deploy_from_compose_path() {
-              path="$1"
-
-              if is_forbidden_deploy_path "$path"; then
-                echo "Refusing to deploy from forbidden path: $path"
-                return 1
-              fi
-
-              cd "$path"
-
-              if [ -d .git ]; then
-                echo "Refusing to deploy from a Git checkout: $path"
-                return 1
-              fi
-
-              echo "Updating production compose file from $REPO_SLUG@$TARGET_SHA"
-              curl -fsSL "https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.yml" -o docker-compose.yml.tmp
-              mv docker-compose.yml.tmp docker-compose.yml
-              download_gpu_compose_override
-
-              configure_compose_cmd
-
-              printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-
-              export BACKEND_IMAGE
-              export BACKEND_DEPLOY_VERSION="$TARGET_VERSION"
-
-              compose_cmd pull backend backend-worker gopro-overlay-worker redis
-              compose_cmd up -d --force-recreate --remove-orphans backend backend-worker gopro-overlay-worker redis
-            }
-
-            deploy_from_portainer_volume() {
-              docker run --rm \
-                -e BACKEND_IMAGE="$BACKEND_IMAGE" \
-                -e COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" \
-                -e GHCR_TOKEN="$GHCR_TOKEN" \
-                -e GHCR_USERNAME="$GHCR_USERNAME" \
-                -e REPO_SLUG="$REPO_SLUG" \
-                -e TARGET_SHA="$TARGET_SHA" \
-                -e TARGET_VERSION="$TARGET_VERSION" \
-                -e STACK_ID="$STACK_ID" \
-                -v /var/run/docker.sock:/var/run/docker.sock \
-                -v "$PORTAINER_VOLUME:/data" \
-                -w "/data/compose/$STACK_ID" \
-                docker:27-cli sh -ceu '
-                  apk add --no-cache curl >/dev/null
-                  work_dir="/data/compose/$STACK_ID"
-                  cd "$work_dir"
-
-                  curl -fsSL "https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.yml" -o docker-compose.yml.tmp
-                  mv docker-compose.yml.tmp docker-compose.yml
-
-                  gpu_url="https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.gpu.yml"
-                  if ! gpu_status=$(curl --silent --show-error --location \
-                    --output docker-compose.gpu.yml.tmp \
-                    --write-out "%{http_code}" \
-                    "$gpu_url"); then
-                    rm -f docker-compose.gpu.yml.tmp
-                    echo "Failed to download GPU compose override"
-                    exit 1
-                  fi
-                  case "$gpu_status" in
-                    200) mv docker-compose.gpu.yml.tmp docker-compose.gpu.yml ;;
-                    404)
-                      rm -f docker-compose.gpu.yml.tmp docker-compose.gpu.yml
-                      echo "GPU compose override not present at target commit; using CPU compose"
-                      ;;
-                    *)
-                      rm -f docker-compose.gpu.yml.tmp
-                      echo "GPU compose override download returned HTTP $gpu_status"
-                      exit 1
-                      ;;
-                  esac
-
-                  compose_files="-f docker-compose.yml"
-                  if [ -f docker-compose.gpu.yml ]; then
-                    compose_files="$compose_files -f docker-compose.gpu.yml"
-                  fi
-
-                  if [ -f stack.env ]; then
-                    compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files --env-file stack.env "$@"; }
-                  elif [ -f .env ]; then
-                    compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files --env-file .env "$@"; }
-                  else
-                    compose_cmd() { docker compose -p "$COMPOSE_PROJECT_NAME" $compose_files "$@"; }
-                  fi
-
-                  printf "%s" "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-
-                  export BACKEND_IMAGE
-                  export BACKEND_DEPLOY_VERSION="$TARGET_VERSION"
-
-                  compose_cmd pull backend backend-worker gopro-overlay-worker redis
-                  compose_cmd up -d --force-recreate --remove-orphans backend backend-worker gopro-overlay-worker redis
-                '
-            }
-
-            if [ -n "$DEPLOY_PATH" ] && [ -d "$DEPLOY_PATH" ]; then
-              echo "Deploying from configured compose path: $DEPLOY_PATH"
-              deploy_from_compose_path "$DEPLOY_PATH"
-              exit 0
-            fi
-
-            if [ -n "$DEPLOY_PATH" ]; then
-              echo "Configured deploy path not found: $DEPLOY_PATH"
-            fi
-
-            if resolve_from_portainer_volume; then
-              echo "Configured host path unavailable, deploying compose from Portainer volume $PORTAINER_VOLUME (stack $STACK_ID)"
-              deploy_from_portainer_volume
-              exit 0
-            fi
-
-            echo "Deploy path does not exist: $DEPLOY_PATH"
-            if [ -n "$REQUESTED_DEPLOY_PATH" ]; then
-              echo "Configured SSH_DEPLOY_PATH: $REQUESTED_DEPLOY_PATH"
-            fi
-            echo "Unable to access deploy path on host and no Portainer volume fallback available"
-            exit 1
-
+          envs: REQUESTED_DEPLOY_PATH,TARGET_SHA,TARGET_VERSION,REPO_SLUG,COMPOSE_PROJECT_NAME,BACKEND_IMAGE,GHCR_USERNAME,GHCR_TOKEN,NVIDIA_GPU_ENABLED,LOCAL_VERIFY_MAX_ATTEMPTS,LOCAL_VERIFY_SLEEP_SECONDS
+          script_path: .github/scripts/deploy-production.sh
       - name: Verify deployed version
         id: verify_deploy
         if: always() && steps.trigger_deploy.outcome == 'success'
@@ -637,6 +505,8 @@ jobs:
           MAX_ATTEMPTS: ${{ vars.DEPLOY_VERIFY_MAX_ATTEMPTS || '30' }}
           SLEEP_SECONDS: ${{ vars.DEPLOY_VERIFY_SLEEP_SECONDS || '10' }}
         run: |
+          set -u
+
           if [ -z "$VERSION_ENDPOINT_URL" ]; then
             echo "Missing PRODUCTION_VERSION_URL secret"
             exit 1
@@ -647,26 +517,73 @@ jobs:
             exit 1
           fi
 
+          response_file=$(mktemp)
+          headers_file=$(mktemp)
+          error_file=$(mktemp)
+          trap 'rm -f "$response_file" "$headers_file" "$error_file"' EXIT
+
+          describe_response() {
+            python3 - "$response_file" <<'PY'
+          import hashlib
+          import json
+          import re
+          import sys
+
+          path = sys.argv[1]
+          with open(path, "rb") as file:
+              body = file.read()
+
+          print(f"response_bytes={len(body)} response_sha256={hashlib.sha256(body).hexdigest()}")
+          try:
+              payload = json.loads(body)
+          except (json.JSONDecodeError, UnicodeDecodeError):
+              text = body.decode("utf-8", errors="replace")
+              title = re.search(r"<title[^>]*>(.*?)</title>", text, re.IGNORECASE | re.DOTALL)
+              if title:
+                  normalized_title = " ".join(title.group(1).split())[:200]
+                  print(f"response_kind=html title={normalized_title}")
+              else:
+                  print("response_kind=non_json")
+          else:
+              if isinstance(payload, dict):
+                  keys = json.dumps(sorted(str(key) for key in payload))
+                  version = json.dumps(str(payload.get("version", "")))
+                  print(f"response_kind=json_object keys={keys} version={version}")
+              else:
+                  print(f"response_kind=json_{type(payload).__name__}")
+          PY
+          }
+
           attempt=1
           while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
-            response=$(curl --show-error --silent --fail --max-time 10 "$VERSION_ENDPOINT_URL" 2>/tmp/version-check.err || true)
-            deployed_version=$(python -c "import json,sys; data=json.load(sys.stdin); print(data.get('version',''))" <<< "$response" 2>/dev/null || true)
+            : > "$response_file"
+            : > "$headers_file"
+            : > "$error_file"
+            if http_status=$(curl --silent --show-error --location \
+              --connect-timeout 5 --max-time 10 \
+              --header 'Accept: application/json' \
+              --header 'Cache-Control: no-cache' \
+              --header 'Pragma: no-cache' \
+              --output "$response_file" \
+              --dump-header "$headers_file" \
+              --write-out '%{http_code}' \
+              "$VERSION_ENDPOINT_URL" 2>"$error_file"); then
+              curl_status=0
+            else
+              curl_status=$?
+            fi
 
-            if [ "$deployed_version" = "$EXPECTED_VERSION" ]; then
+            content_type=$(awk 'tolower($0) ~ /^content-type:/ { value=$0 } END { sub(/^[^:]*:[[:space:]]*/, "", value); sub(/\r$/, "", value); print value }' "$headers_file")
+            deployed_version=$(python3 -c 'import json, re, sys; payload = json.load(sys.stdin); version = payload.get("version", "") if isinstance(payload, dict) else ""; print(version if isinstance(version, str) and re.fullmatch(r"\d{4}\.\d{2}\.\d{2}\.\d+", version) else "")' < "$response_file" 2>/dev/null || true)
+
+            if [ "$curl_status" -eq 0 ] && [ "$http_status" -ge 200 ] && [ "$http_status" -lt 300 ] && [ "$deployed_version" = "$EXPECTED_VERSION" ]; then
               echo "Deployment version verified: $deployed_version"
               exit 0
             fi
 
-            if [ -n "$deployed_version" ]; then
-              echo "Attempt $attempt/$MAX_ATTEMPTS: expected $EXPECTED_VERSION, got $deployed_version"
-            else
-              curl_error=$(tr -d '\n' </tmp/version-check.err)
-              if [ -n "$curl_error" ]; then
-                echo "Attempt $attempt/$MAX_ATTEMPTS: version endpoint unreachable ($curl_error)"
-              else
-                echo "Attempt $attempt/$MAX_ATTEMPTS: version endpoint not ready"
-              fi
-            fi
+            curl_error=$(tr -d '\n' < "$error_file")
+            echo "Attempt $attempt/$MAX_ATTEMPTS: curl_exit=$curl_status http_status=${http_status:-000} content_type=${content_type:-unknown} expected=$EXPECTED_VERSION actual=${deployed_version:-missing} error=${curl_error:-none}"
+            describe_response
 
             sleep "$SLEEP_SECONDS"
             attempt=$((attempt + 1))
@@ -677,7 +594,10 @@ jobs:
 
       - name: Release production deployment drain
         id: release_drain
-        if: always() && vars.DEPLOY_DRAIN_ENABLED == 'true' && steps.begin_drain.outcome != 'skipped'
+        if: >-
+          always() && vars.DEPLOY_DRAIN_ENABLED == 'true' &&
+          steps.begin_drain.outcome != 'skipped' &&
+          (steps.begin_drain.outputs.drain_bootstrap != 'true' || steps.begin_drain.outputs.drain_cleanup_required == 'true')
         continue-on-error: true
         env:
           DRAIN_BASE_URL: ${{ secrets.PRODUCTION_DEPLOY_DRAIN_URL }}
@@ -762,9 +682,16 @@ jobs:
                   continue
                 fi
 
+                if container_ids=$(docker ps -aq --filter "ancestor=$image_ref"); then
+                  if [ -n "$container_ids" ]; then
+                    echo "Skipping backend image still referenced by container(s): $image_ref ($container_ids)"
+                    continue
+                  fi
+                fi
+
                 echo "Removing old backend image tag: $image_ref"
                 if ! docker image rm "$image_ref"; then
-                  echo "Old backend image cleanup failed for $image_ref; deployment remains successful"
+                  echo "Unable to remove unreferenced backend image $image_ref; deployment remains successful"
                 fi
               done
             }
@@ -780,7 +707,7 @@ jobs:
 
       - name: Label merged PRs with deployed version
         id: label_deployed_prs
-        if: steps.trigger_deploy.outcome == 'success' && steps.verify_deploy.outcome == 'success' && (vars.DEPLOY_DRAIN_ENABLED != 'true' || (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success'))
+        if: steps.trigger_deploy.outcome == 'success' && steps.verify_deploy.outcome == 'success' && (vars.DEPLOY_DRAIN_ENABLED != 'true' || ((steps.begin_drain.outputs.drain_bootstrap == 'true') && (steps.begin_drain.outputs.drain_cleanup_required != 'true' || steps.release_drain.outcome == 'success')) || (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success'))
         uses: actions/github-script@v9
         env:
           VERSION_LABEL: ${{ steps.version.outputs.label_name }}
@@ -917,7 +844,7 @@ jobs:
             );
 
       - name: Mark deployment as successful
-        if: steps.trigger_deploy.outcome == 'success' && steps.verify_deploy.outcome == 'success' && steps.label_deployed_prs.outcome == 'success' && (vars.DEPLOY_DRAIN_ENABLED != 'true' || (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success'))
+        if: steps.trigger_deploy.outcome == 'success' && steps.verify_deploy.outcome == 'success' && steps.label_deployed_prs.outcome == 'success' && (vars.DEPLOY_DRAIN_ENABLED != 'true' || ((steps.begin_drain.outputs.drain_bootstrap == 'true') && (steps.begin_drain.outputs.drain_cleanup_required != 'true' || steps.release_drain.outcome == 'success')) || (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success'))
         uses: actions/github-script@v9
         env:
           TAG_NAME: ${{ steps.version.outputs.success_tag_name }}
@@ -962,15 +889,13 @@ jobs:
 
       - name: Label merged PRs as non deployed when deployment fails
         if: >-
-          always() && (
+          always() && steps.freshness.outputs.is_current == 'true' && (
             steps.build_image.outcome != 'success' ||
             steps.trigger_deploy.outcome != 'success' ||
             steps.verify_deploy.outcome != 'success' ||
-            (vars.DEPLOY_DRAIN_ENABLED == 'true' && (
-              steps.begin_drain.outcome != 'success' ||
-              steps.wait_drain.outcome != 'success' ||
-              steps.mark_drain_deploying.outcome != 'success' ||
-              steps.release_drain.outcome != 'success'
+            (vars.DEPLOY_DRAIN_ENABLED == 'true' && !(
+              (steps.begin_drain.outputs.drain_bootstrap == 'true' && steps.release_drain.outcome == 'success') ||
+              (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success')
             ))
           )
         uses: actions/github-script@v9
@@ -1110,15 +1035,13 @@ jobs:
 
       - name: Summarize deployment failure
         if: >-
-          always() && (
+          always() && steps.freshness.outputs.is_current == 'true' && (
             steps.build_image.outcome != 'success' ||
             steps.trigger_deploy.outcome != 'success' ||
             steps.verify_deploy.outcome != 'success' ||
-            (vars.DEPLOY_DRAIN_ENABLED == 'true' && (
-              steps.begin_drain.outcome != 'success' ||
-              steps.wait_drain.outcome != 'success' ||
-              steps.mark_drain_deploying.outcome != 'success' ||
-              steps.release_drain.outcome != 'success'
+            (vars.DEPLOY_DRAIN_ENABLED == 'true' && !(
+              (steps.begin_drain.outputs.drain_bootstrap == 'true' && steps.release_drain.outcome == 'success') ||
+              (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success')
             ))
           )
         run: |
@@ -1146,15 +1069,13 @@ jobs:
 
       - name: Notify deployment failure
         if: >-
-          always() && (
+          always() && steps.freshness.outputs.is_current == 'true' && (
             steps.build_image.outcome != 'success' ||
             steps.trigger_deploy.outcome != 'success' ||
             steps.verify_deploy.outcome != 'success' ||
-            (vars.DEPLOY_DRAIN_ENABLED == 'true' && (
-              steps.begin_drain.outcome != 'success' ||
-              steps.wait_drain.outcome != 'success' ||
-              steps.mark_drain_deploying.outcome != 'success' ||
-              steps.release_drain.outcome != 'success'
+            (vars.DEPLOY_DRAIN_ENABLED == 'true' && !(
+              (steps.begin_drain.outputs.drain_bootstrap == 'true' && steps.release_drain.outcome == 'success') ||
+              (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success')
             ))
           )
         continue-on-error: true
@@ -1237,15 +1158,13 @@ jobs:
 
       - name: Fail job when deployment failed
         if: >-
-          always() && (
+          always() && steps.freshness.outputs.is_current == 'true' && (
             steps.build_image.outcome != 'success' ||
             steps.trigger_deploy.outcome != 'success' ||
             steps.verify_deploy.outcome != 'success' ||
-            (vars.DEPLOY_DRAIN_ENABLED == 'true' && (
-              steps.begin_drain.outcome != 'success' ||
-              steps.wait_drain.outcome != 'success' ||
-              steps.mark_drain_deploying.outcome != 'success' ||
-              steps.release_drain.outcome != 'success'
+            (vars.DEPLOY_DRAIN_ENABLED == 'true' && !(
+              (steps.begin_drain.outputs.drain_bootstrap == 'true' && steps.release_drain.outcome == 'success') ||
+              (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success')
             ))
           )
         run: |

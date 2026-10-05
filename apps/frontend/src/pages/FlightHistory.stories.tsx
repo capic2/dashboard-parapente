@@ -165,7 +165,17 @@ const toSummary = (flight: Record<string, unknown>) => ({
   elevation_gain_m: flight.elevation_gain_m ?? null,
   has_gpx: Boolean(flight.gpx_file_path),
   has_video: Boolean(flight.video_file_path),
+  has_camera: flight.gopro_camera_file_exists === true,
+  has_youtube_video:
+    Array.isArray(flight.youtube_urls) && flight.youtube_urls.length > 0,
+  youtube_video_count: Array.isArray(flight.youtube_urls)
+    ? flight.youtube_urls.length
+    : 0,
+  youtube_upload_status: null,
+  youtube_upload_progress: null,
   has_gopro_overlay: Boolean(flight.gopro_overlay_file_path),
+  has_pano_video: Boolean(flight.pano_video_file_exists),
+  has_highlight_video: false,
   video_export_job_id: flight.video_export_job_id ?? null,
   video_export_status: flight.video_export_status ?? null,
   video_export_progress: flight.video_export_progress ?? null,
@@ -193,10 +203,18 @@ const mockGPXData = {
   ],
   max_altitude_m: 1850,
   min_altitude_m: 700,
+  altitude_range_m: 1150,
+  takeoff_altitude_m: 800,
+  landing_altitude_m: 760,
   elevation_gain_m: 1200,
-  elevation_loss_m: 300,
+  elevation_loss_m: 1240,
   total_distance_km: 18.5,
+  max_distance_from_takeoff_km: 8.4,
   flight_duration_seconds: 5700,
+  average_speed_kmh: 11.7,
+  max_speed_kmh: 52.3,
+  max_climb_rate_ms: 4.6,
+  max_sink_rate_ms: 3.2,
 };
 
 const resetFlightsDb = () => {
@@ -383,6 +401,11 @@ MobileFlow.test(
       await userEvent.click(
         canvas.getByRole('tab', { name: i18n.t('flights.replayTab') })
       );
+      await userEvent.click(
+        canvas.getByRole('button', {
+          name: i18n.t('flights.mediaReplayTitle'),
+        })
+      );
       await expect(
         await canvas.findByText(i18n.t('flights.replayUnavailable'))
       ).toBeInTheDocument();
@@ -418,7 +441,7 @@ export const MobileFlowWithReplay = meta.story({
 });
 
 MobileFlowWithReplay.test(
-  'loads GPX data only when Replay tab is selected',
+  'loads GPX data only when the 3D replay is opened',
   async ({ canvas, userEvent, step }) => {
     let requestsAfterOpeningFlight = 0;
 
@@ -443,20 +466,47 @@ MobileFlowWithReplay.test(
       expect(gpxRequestCount).toBe(requestsAfterOpeningFlight);
     });
 
-    await step('switches to Replay and shows loading state', async () => {
+    await step('switches to Media without loading the 3D replay', async () => {
       await userEvent.click(
         canvas.getByRole('tab', { name: i18n.t('flights.replayTab') })
       );
 
       await expect(
-        await canvas.findByText(i18n.t('flights.loading3dViewer'))
-      ).toBeInTheDocument();
+        canvas.getByRole('button', {
+          name: i18n.t('flights.mediaReplayTitle'),
+        })
+      ).toHaveAttribute('aria-expanded', 'false');
+      await expect(
+        canvas.queryByText(i18n.t('flights.loading3dViewer'))
+      ).not.toBeInTheDocument();
+      expect(gpxRequestCount).toBe(requestsAfterOpeningFlight);
     });
 
-    await step('triggers GPX loading once Replay is active', async () => {
+    await step('triggers GPX loading once the replay is opened', async () => {
+      await userEvent.click(
+        canvas.getByRole('button', {
+          name: i18n.t('flights.mediaReplayTitle'),
+        })
+      );
+
+      await expect(
+        await canvas.findByText(i18n.t('flights.loading3dViewer'))
+      ).toBeInTheDocument();
       await waitFor(() => {
         expect(gpxRequestCount).toBeGreaterThan(requestsAfterOpeningFlight);
       });
+    });
+
+    await step('unmounts the replay when it is collapsed', async () => {
+      const replayToggle = canvas.getByRole('button', {
+        name: i18n.t('flights.mediaReplayTitle'),
+      });
+      await userEvent.click(replayToggle);
+
+      await expect(replayToggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(
+        canvas.queryByText(i18n.t('flights.loading3dViewer'))
+      ).not.toBeInTheDocument();
     });
   }
 );

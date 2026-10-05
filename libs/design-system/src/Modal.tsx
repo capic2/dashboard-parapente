@@ -10,7 +10,7 @@ import { tv } from 'tailwind-variants';
 import type { ReactNode } from 'react';
 
 const modal = tv({
-  base: 'bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-h-[90vh] overflow-y-auto',
+  base: 'w-full max-h-[90vh] overflow-y-auto rounded-xl bg-white text-gray-900 shadow-2xl dark:bg-gray-800 dark:text-gray-100',
   variants: {
     size: {
       sm: 'max-w-md',

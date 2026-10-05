@@ -107,6 +107,14 @@ def calculate_para_index(consensus_hours: list[dict[str, Any]]) -> dict[str, Any
             "verdict": "DONNÉES INSUFFISANTES",
             "emoji": "❌",
             "explanation": "Pas de données pour les heures volables",
+            "metrics": {
+                "avg_wind_kmh": 0,
+                "max_gust_kmh": 0,
+                "total_rain_mm": 0,
+                "avg_temp_c": 0,
+                "avg_lifted_index": 0,
+                "thunderstorm_risk": "inconnu",
+            },
         }
 
     thresholds = get_para_index_thresholds()

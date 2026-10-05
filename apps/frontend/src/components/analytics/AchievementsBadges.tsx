@@ -1,5 +1,21 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  Award,
+  Bird,
+  Clock3,
+  Crown,
+  GraduationCap,
+  Hourglass,
+  MapPinned,
+  Medal,
+  Mountain,
+  MountainSnow,
+  Plane,
+  Route,
+  Timer,
+  TrendingUp,
+} from 'lucide-react';
 import { IconCard } from '@dashboard-parapente/design-system';
 import type { FlightStats } from '../../types';
 
@@ -7,7 +23,7 @@ interface AchievementBadge {
   id: string;
   title: string;
   description: string;
-  icon: string;
+  icon: ReactNode;
   unlocked: boolean;
   progress?: number; // 0-100
   threshold?: number;
@@ -33,6 +49,9 @@ export default function AchievementsBadges({ stats }: AchievementsBadgesProps) {
     const totalFlights = stats.total_flights ?? 0;
     const totalHours = stats.total_hours ?? 0;
     const maxAltitude = stats.max_altitude_m ?? 0;
+    const totalDistance = stats.total_distance_km ?? 0;
+    const totalElevationGain = stats.total_elevation_gain_m ?? 0;
+    const averageDuration = stats.avg_duration_minutes ?? 0;
 
     const allBadges: AchievementBadge[] = [
       // Badges de vols
@@ -40,14 +59,14 @@ export default function AchievementsBadges({ stats }: AchievementsBadgesProps) {
         id: 'first_flight',
         title: t('achievements.firstFlight'),
         description: t('achievements.firstFlightDesc'),
-        icon: '🪂',
+        icon: <Plane />,
         unlocked: totalFlights >= 1,
       },
       {
         id: 'rookie',
         title: t('achievements.beginner'),
         description: t('achievements.beginnerDesc'),
-        icon: '🎓',
+        icon: <GraduationCap />,
         unlocked: totalFlights >= 5,
         progress: Math.min(100, (totalFlights / 5) * 100),
         threshold: 5,
@@ -56,7 +75,7 @@ export default function AchievementsBadges({ stats }: AchievementsBadgesProps) {
         id: 'experienced',
         title: t('achievements.experienced'),
         description: t('achievements.experiencedDesc'),
-        icon: '🎖️',
+        icon: <Medal />,
         unlocked: totalFlights >= 20,
         progress: Math.min(100, (totalFlights / 20) * 100),
         threshold: 20,
@@ -65,7 +84,7 @@ export default function AchievementsBadges({ stats }: AchievementsBadgesProps) {
         id: 'veteran',
         title: t('achievements.veteran'),
         description: t('achievements.veteranDesc'),
-        icon: '🏅',
+        icon: <Award />,
         unlocked: totalFlights >= 50,
         progress: Math.min(100, (totalFlights / 50) * 100),
         threshold: 50,
@@ -74,7 +93,7 @@ export default function AchievementsBadges({ stats }: AchievementsBadgesProps) {
         id: 'master',
         title: t('achievements.skyMaster'),
         description: t('achievements.skyMasterDesc'),
-        icon: '👑',
+        icon: <Crown />,
         unlocked: totalFlights >= 100,
         progress: Math.min(100, (totalFlights / 100) * 100),
         threshold: 100,
@@ -85,7 +104,7 @@ export default function AchievementsBadges({ stats }: AchievementsBadgesProps) {
         id: 'ten_hours',
         title: t('achievements.tenHours'),
         description: t('achievements.tenHoursDesc'),
-        icon: '⏱️',
+        icon: <Timer />,
         unlocked: totalHours >= 10,
         progress: Math.min(100, (totalHours / 10) * 100),
         threshold: 10,
@@ -94,7 +113,7 @@ export default function AchievementsBadges({ stats }: AchievementsBadgesProps) {
         id: 'fifty_hours',
         title: t('achievements.fiftyHours'),
         description: t('achievements.fiftyHoursDesc'),
-        icon: '⌛',
+        icon: <Hourglass />,
         unlocked: totalHours >= 50,
         progress: Math.min(100, (totalHours / 50) * 100),
         threshold: 50,
@@ -103,7 +122,7 @@ export default function AchievementsBadges({ stats }: AchievementsBadgesProps) {
         id: 'hundred_hours',
         title: t('achievements.centurion'),
         description: t('achievements.centurionDesc'),
-        icon: '🕐',
+        icon: <Clock3 />,
         unlocked: totalHours >= 100,
         progress: Math.min(100, (totalHours / 100) * 100),
         threshold: 100,
@@ -111,31 +130,145 @@ export default function AchievementsBadges({ stats }: AchievementsBadgesProps) {
 
       // Badges d'altitude
       {
+        id: 'altitude_250',
+        title: t('achievements.firstThermal'),
+        description: t('achievements.firstThermalDesc'),
+        icon: <Mountain />,
+        unlocked: maxAltitude >= 250,
+        progress: Math.min(100, (maxAltitude / 250) * 100),
+        threshold: 250,
+      },
+      {
+        id: 'altitude_500',
+        title: t('achievements.ridgeRunner'),
+        description: t('achievements.ridgeRunnerDesc'),
+        icon: <Mountain />,
+        unlocked: maxAltitude >= 500,
+        progress: Math.min(100, (maxAltitude / 500) * 100),
+        threshold: 500,
+      },
+      {
+        id: 'altitude_750',
+        title: t('achievements.cloudChaser'),
+        description: t('achievements.cloudChaserDesc'),
+        icon: <Mountain />,
+        unlocked: maxAltitude >= 750,
+        progress: Math.min(100, (maxAltitude / 750) * 100),
+        threshold: 750,
+      },
+      {
         id: 'altitude_1000',
         title: t('achievements.climber'),
         description: t('achievements.climberDesc'),
-        icon: '⛰️',
+        icon: <Mountain />,
         unlocked: maxAltitude >= 1000,
         progress: Math.min(100, (maxAltitude / 1000) * 100),
         threshold: 1000,
       },
       {
+        id: 'altitude_1250',
+        title: t('achievements.skySeeker'),
+        description: t('achievements.skySeekerDesc'),
+        icon: <MountainSnow />,
+        unlocked: maxAltitude >= 1250,
+        progress: Math.min(100, (maxAltitude / 1250) * 100),
+        threshold: 1250,
+      },
+      {
+        id: 'altitude_1500',
+        title: t('achievements.thermalPilot'),
+        description: t('achievements.thermalPilotDesc'),
+        icon: <MountainSnow />,
+        unlocked: maxAltitude >= 1500,
+        progress: Math.min(100, (maxAltitude / 1500) * 100),
+        threshold: 1500,
+      },
+      {
+        id: 'altitude_1750',
+        title: t('achievements.summitSeeker'),
+        description: t('achievements.summitSeekerDesc'),
+        icon: <MountainSnow />,
+        unlocked: maxAltitude >= 1750,
+        progress: Math.min(100, (maxAltitude / 1750) * 100),
+        threshold: 1750,
+      },
+      {
         id: 'altitude_2000',
         title: t('achievements.mountaineer'),
         description: t('achievements.mountaineerDesc'),
-        icon: '🏔️',
+        icon: <MountainSnow />,
         unlocked: maxAltitude >= 2000,
         progress: Math.min(100, (maxAltitude / 2000) * 100),
         threshold: 2000,
       },
       {
+        id: 'altitude_2500',
+        title: t('achievements.highFlyer'),
+        description: t('achievements.highFlyerDesc'),
+        icon: <MountainSnow />,
+        unlocked: maxAltitude >= 2500,
+        progress: Math.min(100, (maxAltitude / 2500) * 100),
+        threshold: 2500,
+      },
+      {
         id: 'altitude_3000',
         title: t('achievements.eagle'),
         description: t('achievements.eagleDesc'),
-        icon: '🦅',
+        icon: <Bird />,
         unlocked: maxAltitude >= 3000,
         progress: Math.min(100, (maxAltitude / 3000) * 100),
         threshold: 3000,
+      },
+
+      // Badges de distance
+      {
+        id: 'distance_100',
+        title: t('achievements.explorer'),
+        description: t('achievements.explorerDesc'),
+        icon: <Route />,
+        unlocked: totalDistance >= 100,
+        progress: Math.min(100, (totalDistance / 100) * 100),
+        threshold: 100,
+      },
+      {
+        id: 'distance_500',
+        title: t('achievements.traveler'),
+        description: t('achievements.travelerDesc'),
+        icon: <MapPinned />,
+        unlocked: totalDistance >= 500,
+        progress: Math.min(100, (totalDistance / 500) * 100),
+        threshold: 500,
+      },
+
+      // Badges de dénivelé positif
+      {
+        id: 'elevation_10000',
+        title: t('achievements.elevationSeeker'),
+        description: t('achievements.elevationSeekerDesc'),
+        icon: <TrendingUp />,
+        unlocked: totalElevationGain >= 10000,
+        progress: Math.min(100, (totalElevationGain / 10000) * 100),
+        threshold: 10000,
+      },
+      {
+        id: 'elevation_50000',
+        title: t('achievements.elevationMaster'),
+        description: t('achievements.elevationMasterDesc'),
+        icon: <Mountain />,
+        unlocked: totalElevationGain >= 50000,
+        progress: Math.min(100, (totalElevationGain / 50000) * 100),
+        threshold: 50000,
+      },
+
+      // Badges d'endurance
+      {
+        id: 'average_duration_60',
+        title: t('achievements.endurance'),
+        description: t('achievements.enduranceDesc'),
+        icon: <Timer />,
+        unlocked: averageDuration >= 60,
+        progress: Math.min(100, (averageDuration / 60) * 100),
+        threshold: 60,
       },
     ] as const;
 

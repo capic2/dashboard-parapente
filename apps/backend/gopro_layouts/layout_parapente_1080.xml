@@ -1,0 +1,17 @@
+<layout width="3840" height="2160">
+  <!-- Keep a safe right margin so the title and metric units are not clipped
+       when GoPro's 3840x2160-authored layout is rendered at 1080p. -->
+  <frame x="2480" y="112" width="1240" height="1520" cr="64" bg="7,18,36,190" outline="210,235,255,220">
+    <component type="text" x="104" y="110" size="92">TÉLÉMÉTRIE DE VOL</component>
+    <component type="text" x="104" y="290" size="84">ALTITUDE</component>
+    <component type="metric" x="104" y="410" metric="alt" dp="0" size="224" />
+    <component type="metric_unit" x="630" y="490" metric="alt" units="m" size="96">m</component>
+    <component type="text" x="104" y="730" size="84">DISTANCE</component>
+    <component type="metric" x="104" y="850" metric="odo" units="km" dp="1" size="184" />
+    <component type="text" x="610" y="910" size="84">km</component>
+    <component type="text" x="104" y="1120" size="84">DÉNIVELÉ +</component>
+    <component type="custom_calc" x="104" y="1240" expression="precalc.get('total_gain', 0)" dp="0" size="184" />
+    <component type="text" x="610" y="1300" size="84">m</component>
+  </frame>
+  <component type="datetime" format="%H:%M:%S" x="140" y="144" size="128" />
+</layout>

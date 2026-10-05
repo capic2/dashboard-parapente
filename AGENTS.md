@@ -18,19 +18,28 @@ This file defines global rules for the entire monorepo.
 - Always limit changes to what is required by the task.
 - Follow existing conventions before introducing a new pattern.
 - Never modify out-of-scope files without an explicit reason.
-- Treat `origin/main` as the default source of truth for code analysis,
-  diagnostics, reviews, and functional behavior checks. Do not conclude from a
-  local `main` checkout until its alignment with `origin/main` has been checked.
-- If the local checkout is stale, dirty, or otherwise ambiguous, analyze
-  `origin/main` directly or use a clean worktree created from `origin/main`,
-  unless the user explicitly asks to inspect local uncommitted changes or a
-  specific branch/worktree.
+- When a pull request, branch, commit, worktree, or diff is supplied, analyze
+  that target. For pull-request reviews, always use the PR base, head, and diff.
+- When no target is supplied, treat the current `main` commit published by
+  GitHub as the default source of truth for code analysis, diagnostics, reviews,
+  and functional behavior checks. Resolve its SHA through GitHub before drawing
+  conclusions; do not assume the local `origin/main` tracking ref is current.
+- For read-only analysis, inspect files at that GitHub SHA. For implementation,
+  fetch `origin/main` and create or update a clean worktree from the freshly
+  fetched ref, unless the user explicitly asks to inspect local uncommitted
+  changes or a specific branch/worktree.
+- If GitHub cannot be reached, state clearly that the analysis uses a local ref
+  that may be stale.
 
 ## Git
 
 - Do not use destructive commands (`reset --hard`, `checkout --`, etc.).
 - Keep commits small and explicit.
 - Use Conventional Commits when a commit is requested.
+- Before every push or pull request, fetch the current `origin/main`, verify the
+  branch is based on that ref, and check for conflicts with `git merge-tree` or
+  an equivalent read-only comparison. Confirm that the final diff contains the
+  intended changes and that no expected commit was dropped before pushing.
 
 ## Security
 
@@ -44,6 +53,38 @@ This file defines global rules for the entire monorepo.
   - `pnpm lint`
   - `pnpm test`
   - or targeted commands: `pnpm nx lint <project>`, `pnpm nx test <project>`
+
+## Protected Calibration Player
+
+- The calibration player is protected functionality. Do not modify it,
+  refactor it, or change its player implementation without first asking the
+  user for explicit authorization in the current task.
+- This authorization is required even when the change appears to be a
+  regression fix or a necessary consequence of another overlay change.
+
+## Protected Telemetry Synchronization
+
+- The GPX/OSV merge, calibration offset, GPX start boundary, timeline mapping,
+  and interactive telemetry preview are protected synchronization behavior.
+- Do not modify, refactor, or change this mechanism without first asking the
+  user for explicit authorization in the current task.
+- This authorization is required for bug fixes, performance changes, schema or
+  endpoint changes, and changes made as a consequence of another overlay
+  change.
+
+### Calibration Timeline Contract
+
+- The calibration cards must resolve telemetry from the first coordinate
+  timestamp (`gpx.coordinates[0].timestamp`, falling back to GPX metadata),
+  then apply the combined automatic and manual offsets.
+- The dynamic interactive overlay must use that same GPX origin and combined
+  offset; it must pass source-video time through without replacing the mapping
+  with the video start timestamp or a manual-only offset.
+- Do not replace this with the video start timestamp or with the manual offset
+  alone: that changes the established synchronization behavior.
+- Before changing this formula, its regression tests, or the data source used
+  by the calibration panel, explicitly ask the user for authorization in the
+  current task and wait for that authorization.
 
 ## Local Rules
 

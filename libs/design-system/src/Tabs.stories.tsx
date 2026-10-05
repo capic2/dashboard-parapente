@@ -10,7 +10,7 @@ const meta = preview.meta({
     docs: {
       description: {
         component:
-          'Accessible tabs built on react-aria-components with a visible selected state, horizontal mobile scrolling, and dark mode support.',
+          'Accessible segmented tabs with a quiet navigation surface, a raised selected state, horizontal mobile scrolling, and dark mode support.',
       },
     },
   },

@@ -81,6 +81,7 @@ export const WithFavoriteSite = meta.story({
         latitude: 47.3267,
         longitude: 6.189,
         country: 'FR',
+        practical_info: {},
         camera_distance: 500,
         flight_count: 45,
         is_active: true,
