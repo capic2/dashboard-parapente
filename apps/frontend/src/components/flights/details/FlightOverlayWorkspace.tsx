@@ -16,6 +16,9 @@ interface FlightOverlayWorkspaceProps {
   onOffsetPreviewChange?: (offset: string) => void;
   onSaveOffset: (offset: string) => Promise<void>;
   youtubeUrls?: string[];
+  onCurrentYoutubePositionChange?: (
+    position: { videoId: string; seconds: number } | null
+  ) => void;
   showHeader?: boolean;
 }
 
@@ -41,6 +44,7 @@ export function FlightOverlayWorkspace({
   onOffsetPreviewChange,
   onSaveOffset,
   youtubeUrls,
+  onCurrentYoutubePositionChange,
   showHeader = true,
 }: FlightOverlayWorkspaceProps) {
   const { t } = useTranslation();
@@ -139,6 +143,7 @@ export function FlightOverlayWorkspace({
       <GoproOverlaySyncPreview
         flightId={flightId}
         youtubeUrls={youtubeUrls}
+        onCurrentYoutubePositionChange={onCurrentYoutubePositionChange}
         offset={offset}
         onOffsetChange={(nextOffset) => {
           setOffset(nextOffset);

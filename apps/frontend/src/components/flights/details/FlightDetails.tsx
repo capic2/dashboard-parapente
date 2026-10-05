@@ -138,6 +138,10 @@ export function FlightDetails({
     videoId: string;
     seconds: number;
   } | null>(null);
+  const [calibrationYoutubePosition, setCalibrationYoutubePosition] = useState<{
+    videoId: string;
+    seconds: number;
+  } | null>(null);
   const persistedVideoMarkersKey = JSON.stringify(flight.video_markers ?? []);
   const persistedVideoMarkers = useMemo(
     () => JSON.parse(persistedVideoMarkersKey) as FlightVideoMarker[],
@@ -1075,6 +1079,7 @@ export function FlightDetails({
               onOffsetPreviewChange={setGoproOverlayPreviewOffset}
               onSaveOffset={handleGoproOverlayOffsetChange}
               youtubeUrls={flight.youtube_urls ?? []}
+              onCurrentYoutubePositionChange={setCalibrationYoutubePosition}
               showHeader={false}
             />
           )}
@@ -1082,7 +1087,11 @@ export function FlightDetails({
             <div className="border-t border-cyan-200 p-4 dark:border-cyan-900">
               <FlightVideoMarkersEditor
                 value={videoMarkersDraft}
-                currentYoutubePosition={currentYoutubePosition}
+                currentYoutubePosition={
+                  hasGpx && hasYoutubeVideo
+                    ? calibrationYoutubePosition
+                    : currentYoutubePosition
+                }
                 onChange={setVideoMarkersDraft}
                 onValidityChange={setVideoMarkerTimesValid}
               />
