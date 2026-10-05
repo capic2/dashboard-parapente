@@ -6,8 +6,9 @@ import type {
   OnChangeFn,
   SortingState,
 } from '@tanstack/react-table';
+import { Button as AriaButton } from 'react-aria-components';
 import type { Selection } from 'react-aria-components';
-import { DataList } from '@dashboard-parapente/design-system';
+import { DataList, Select } from '@dashboard-parapente/design-system';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight } from 'lucide-react';
 import { Flight, formatFlightDate } from './Flight';
 import { useFlightsTable } from './useFlightsTable';
@@ -173,53 +174,43 @@ export function FlightsTable({
     [selectionMode, selectedFlightId, onSelectFlight, onDeleteFlight]
   );
 
+  const rawSort = sorting[0] ?? { id: 'flight_date', desc: true };
+  const currentSortColumn = sortableColumns.find(
+    (column) => column.id === rawSort.id
+  ) ?? { id: 'flight_date', label: t('flights.sortDate') };
+  const currentSort = { id: currentSortColumn.id, desc: rawSort.desc };
+
   const renderSortControls = () => (
-    <fieldset className="mb-3 flex flex-wrap gap-1.5">
-      <legend className="sr-only">{t('dataList.sortOptions')}</legend>
-      {sortableColumns.map((column) => {
-        const currentSort = sorting.find((sort) => sort.id === column.id);
-        return (
-          <button
-            key={column.id}
-            type="button"
-            aria-pressed={Boolean(currentSort)}
-            aria-label={
-              currentSort
-                ? t(
-                    currentSort.desc
-                      ? 'dataList.sortByDesc'
-                      : 'dataList.sortByAsc',
-                    { column: column.label }
-                  )
-                : t('dataList.sortBy', { column: column.label })
-            }
-            className={`rounded-md px-3 py-2 text-xs font-medium transition-colors sm:px-2 sm:py-1 ${
-              currentSort
-                ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
-            }`}
-            onClick={() => table.getColumn(column.id)?.toggleSorting()}
-          >
-            {column.label}
-            {currentSort && (
-              <span aria-hidden="true" className="ml-1">
-                {currentSort.desc ? (
-                  <ArrowDown
-                    aria-hidden="true"
-                    className="ml-1 inline h-3.5 w-3.5"
-                  />
-                ) : (
-                  <ArrowUp
-                    aria-hidden="true"
-                    className="ml-1 inline h-3.5 w-3.5"
-                  />
-                )}
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </fieldset>
+    <div className="mb-3 flex items-end gap-2 sm:max-w-sm">
+      <div className="min-w-0 flex-1">
+        <Select
+          label={t('flights.sortBy')}
+          options={sortableColumns}
+          value={currentSortColumn.id}
+          onChange={(value) => {
+            if (value == null) return;
+            table.setSorting([{ id: String(value), desc: currentSort.desc }]);
+          }}
+        />
+      </div>
+      <AriaButton
+        aria-label={t(
+          currentSort.desc ? 'dataList.sortByDesc' : 'dataList.sortByAsc',
+          { column: currentSortColumn.label }
+        )}
+        aria-pressed={currentSort.desc}
+        onPress={() =>
+          table.setSorting([{ ...currentSort, desc: !currentSort.desc }])
+        }
+        className="mb-px flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+      >
+        {currentSort.desc ? (
+          <ArrowDown aria-hidden="true" className="h-4 w-4" />
+        ) : (
+          <ArrowUp aria-hidden="true" className="h-4 w-4" />
+        )}
+      </AriaButton>
+    </div>
   );
 
   if (groupByDate) {
@@ -344,26 +335,29 @@ export function FlightsTable({
   }
 
   return (
-    <DataList
-      table={table}
-      renderItem={renderFlightCard}
-      sortableColumns={sortableColumns}
-      emptyMessage={emptyMessage ?? t('flights.noFlights')}
-      ariaLabel={t('flights.listAriaLabel')}
-      isVirtualized
-      className="flex flex-col"
-      itemsClassName="h-[calc(100vh-23rem)] min-h-72 overflow-y-auto pr-1 xl:h-[calc(100vh-19rem)]"
-      virtualizedLayoutOptions={{ estimatedRowSize: 132, gap: 8 }}
-      renderDependencies={[selectedFlightId, selectionMode, rowSelection]}
-      selectionMode={selectionMode ? 'multiple' : 'none'}
-      selectedKeys={selectedKeys}
-      onSelectionChange={handleSelectionChange}
-      onLoadMore={hasMoreFlights ? onLoadMore : undefined}
-      isLoadingMore={isLoadingMore}
-      loadingMoreMessage={t('flights.loadingMore')}
-      getTextValue={(row) =>
-        row.original.title || row.original.site_name || t('common.flight_one')
-      }
-    />
+    <div className="flex flex-col">
+      {renderSortControls()}
+      <DataList
+        table={table}
+        renderItem={renderFlightCard}
+        sortableColumns={[]}
+        emptyMessage={emptyMessage ?? t('flights.noFlights')}
+        ariaLabel={t('flights.listAriaLabel')}
+        isVirtualized
+        className="flex flex-col"
+        itemsClassName="h-[calc(100vh-23rem)] min-h-72 overflow-y-auto pr-1 xl:h-[calc(100vh-19rem)]"
+        virtualizedLayoutOptions={{ estimatedRowSize: 132, gap: 8 }}
+        renderDependencies={[selectedFlightId, selectionMode, rowSelection]}
+        selectionMode={selectionMode ? 'multiple' : 'none'}
+        selectedKeys={selectedKeys}
+        onSelectionChange={handleSelectionChange}
+        onLoadMore={hasMoreFlights ? onLoadMore : undefined}
+        isLoadingMore={isLoadingMore}
+        loadingMoreMessage={t('flights.loadingMore')}
+        getTextValue={(row) =>
+          row.original.title || row.original.site_name || t('common.flight_one')
+        }
+      />
+    </div>
   );
 }
