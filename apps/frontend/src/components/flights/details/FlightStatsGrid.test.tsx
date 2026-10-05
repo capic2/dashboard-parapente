@@ -143,6 +143,21 @@ describe('FlightStatsGrid', () => {
     expect(screen.queryAllByText(/flights\.metricAtTime/u)).toHaveLength(5);
   });
 
+  it('uses the stored speed when GPX metrics are excluded', () => {
+    render(
+      <FlightStatsGrid
+        flight={{
+          ...flight,
+          max_speed_kmh: 42,
+          gpx_metrics_excluded: true,
+        }}
+        sites={[]}
+      />
+    );
+
+    expect(screen.getByText('42 km/h')).toBeInTheDocument();
+  });
+
   it('shows the unavailable state for an empty track', () => {
     useFlightGPXMock.mockReturnValueOnce({
       isPending: false,

@@ -165,6 +165,7 @@ class GoproOverlayPreviewCoordinate(BaseModel):
     elevation: float
     timestamp: float
     heart_rate: int | None = None
+    speed_kmh: float | None = None
 
 
 class FlightTelemetryPoint(BaseModel):
@@ -866,6 +867,8 @@ class FlightSummary(BaseModel):
     gopro_overlay_progress: int | None = None
     has_gopro_overlay: bool
     has_pano_video: bool
+    has_face_video: bool = False
+    has_pilote_video: bool = False
     has_highlight_video: bool
 
 

@@ -9,6 +9,8 @@ describe('telemetry GPX preview', () => {
           <trk><trkseg>
             <trkpt lat="45" lon="5"><time>2026-09-22T10:00:00Z</time><ele>1000</ele><extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>120</gpxtpx:hr><gpxtpx:power>200</gpxtpx:power><gpxtpx:speed>10</gpxtpx:speed></gpxtpx:TrackPointExtension></extensions></trkpt>
             <trkpt lat="45.001" lon="5.001"><time>2026-09-22T10:00:01Z</time><ele>1001</ele><extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>126</gpxtpx:hr><gpxtpx:power>220</gpxtpx:power><gpxtpx:speed>12</gpxtpx:speed></gpxtpx:TrackPointExtension></extensions></trkpt>
+            <trkpt lat="45.002" lon="5.002"><time>2026-09-22T10:00:02Z</time><ele>1002</ele><extensions><gpxtpx:TrackPointExtension><gpxtpx:speed>50</gpxtpx:speed><gpxtpx:enhancedSpeed>4</gpxtpx:enhancedSpeed></gpxtpx:TrackPointExtension></extensions></trkpt>
+            <trkpt lat="45.003" lon="5.003"><time>2026-09-22T10:00:03Z</time><ele>1003</ele><extensions><gpxtpx:TrackPointExtension><gpxtpx:speed> </gpxtpx:speed><gpxtpx:enhancedSpeed>3</gpxtpx:enhancedSpeed></gpxtpx:TrackPointExtension></extensions></trkpt>
           </trkseg></trk>
         </gpx>`,
       ],
@@ -23,7 +25,7 @@ describe('telemetry GPX preview', () => {
     ]);
     expect(telemetry.points.map((point) => point.power)).toEqual([200, 220]);
     expect(telemetry.points.map((point) => point.speed_kmh)).toEqual([
-      36, 43.2,
+      36, 43.2, 14.4, 10.8,
     ]);
   });
 });

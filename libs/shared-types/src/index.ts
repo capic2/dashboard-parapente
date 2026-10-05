@@ -275,6 +275,8 @@ export const FlightSummarySchema = z.object({
   youtube_upload_progress: z.number().nullable(),
   has_gopro_overlay: z.boolean(),
   has_pano_video: z.boolean(),
+  has_face_video: z.boolean().optional(),
+  has_pilote_video: z.boolean().optional(),
   has_highlight_video: z.boolean(),
   highlight_video_job_id: z.string().nullable().optional(),
   highlight_video_status: z.string().nullable().optional(),
@@ -852,6 +854,7 @@ export const GeoPointSchema = z.object({
   lon: z.number(),
   elevation: z.number(),
   timestamp: z.number(),
+  speed_kmh: z.number().optional(),
 });
 
 export const GPXDataSchema = z.object({
