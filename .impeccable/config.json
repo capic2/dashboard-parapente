@@ -19,7 +19,7 @@
           "apps/frontend/src/pages/FlightHistory.tsx"
         ],
         "createdAt": "2026-10-04T07:52:50.969Z",
-        "reason": "Codex reviewed the three reported classes: the default slate text is on white or sky-50, while selected states use white on sky-600/rose-600 and slate-950 on sky-400/rose-400; these pairings are intentional and readable."
+        "reason": "Detector misreads the selected filter colors: white on sky-700/rose-700 and slate-950 on the light dark-theme variants have readable contrast."
       },
       {
         "rule": "gray-on-color",
