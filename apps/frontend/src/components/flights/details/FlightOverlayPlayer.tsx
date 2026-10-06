@@ -47,6 +47,11 @@ interface NativeFullscreenBridge {
   supportsOrientationReady?: () => boolean;
 }
 
+interface FullscreenPlaybackSnapshot {
+  currentTime: number;
+  wasPlaying: true;
+}
+
 let youtubeApiPromise: Promise<YoutubeApi> | null = null;
 
 function loadYoutubeApi(): Promise<YoutubeApi> {
@@ -212,6 +217,8 @@ export function FlightOverlayPlayer({
   const playerRef = useRef<HTMLDivElement>(null);
   const playerMountRef = useRef<HTMLDivElement>(null);
   const nativeFullscreenActiveRef = useRef(false);
+  const fullscreenPlaybackSnapshotRef =
+    useRef<FullscreenPlaybackSnapshot | null>(null);
   const syncMediaRef = useRef<((notify?: boolean) => void) | null>(null);
   // The calibration player keeps its existing camera/flight layout.
   const [layout, setLayout] = useState<FlightOverlayLayout>(
@@ -242,6 +249,74 @@ export function FlightOverlayPlayer({
   const [youtubeReady, setYoutubeReady] = useState(false);
   const [youtubeFailed, setYoutubeFailed] = useState(false);
   const [activePipId, setActivePipId] = useState<string | null>(null);
+  const youtubeId = youtubeUrl ? getYoutubeVideoId(youtubeUrl) : null;
+  const masterIsYoutube = Boolean(youtubeId) && !youtubeFailed;
+  const canSeekVideoMarkers = Boolean(
+    youtubeId && youtubeReady && masterIsYoutube
+  );
+
+  const captureFullscreenPlayback = useCallback(
+    (preserveExisting = false) => {
+      if (!isInteractive) return;
+
+      const player = youtubeRef.current;
+      const video = cameraRef.current;
+      let wasPlaying =
+        cameraIsPlayingRef.current || playbackRequestedRef.current;
+      let currentTime = cameraCurrentTimeRef.current;
+
+      try {
+        if (masterIsYoutube && player) {
+          wasPlaying ||= player.getPlayerState() === 1;
+          currentTime = player.getCurrentTime();
+        } else if (video) {
+          wasPlaying ||= !video.paused;
+          currentTime = video.currentTime;
+        }
+      } catch {
+        // Keep the latest time and playback state recorded by media events.
+      }
+
+      if (!wasPlaying || !Number.isFinite(currentTime)) {
+        if (!preserveExisting) fullscreenPlaybackSnapshotRef.current = null;
+        return;
+      }
+
+      fullscreenPlaybackSnapshotRef.current = {
+        currentTime,
+        wasPlaying: true,
+      };
+    },
+    [isInteractive, masterIsYoutube]
+  );
+
+  const restoreFullscreenPlayback = useCallback(() => {
+    const snapshot = fullscreenPlaybackSnapshotRef.current;
+    if (!snapshot) return;
+
+    try {
+      if (masterIsYoutube) {
+        const player = youtubeRef.current;
+        if (!player) return;
+
+        if (player.getPlayerState() !== 1) {
+          player.seekTo(snapshot.currentTime, true);
+          player.playVideo();
+        }
+      } else {
+        const video = cameraRef.current;
+        if (!video) return;
+
+        if (video.paused) {
+          video.currentTime = snapshot.currentTime;
+          void video.play().catch(() => undefined);
+        }
+      }
+      fullscreenPlaybackSnapshotRef.current = null;
+    } catch {
+      // A reloaded YouTube iframe will retry restoration from its onReady event.
+    }
+  }, [masterIsYoutube]);
 
   useLayoutEffect(() => {
     if (!isInteractive || !fullscreenPortalHost) return;
@@ -257,14 +332,17 @@ export function FlightOverlayPlayer({
     const target =
       isInteractive && isFullscreen ? document.body : playerMountRef.current;
     if (target && fullscreenPortalHost.parentElement !== target) {
+      captureFullscreenPlayback(true);
       target.appendChild(fullscreenPortalHost);
+      window.setTimeout(restoreFullscreenPlayback, 0);
     }
-  }, [fullscreenPortalHost, isFullscreen, isInteractive]);
-  const youtubeId = youtubeUrl ? getYoutubeVideoId(youtubeUrl) : null;
-  const masterIsYoutube = Boolean(youtubeId) && !youtubeFailed;
-  const canSeekVideoMarkers = Boolean(
-    youtubeId && youtubeReady && masterIsYoutube
-  );
+  }, [
+    captureFullscreenPlayback,
+    fullscreenPortalHost,
+    isFullscreen,
+    isInteractive,
+    restoreFullscreenPlayback,
+  ]);
   const hasPlaybackIntent = useCallback(
     () => !isInteractive || playbackRequestedRef.current,
     [isInteractive]
@@ -522,16 +600,18 @@ export function FlightOverlayPlayer({
 
   useEffect(() => {
     const handleFullscreenChange = () => {
+      captureFullscreenPlayback(true);
       setIsFullscreen(document.fullscreenElement === playerRef.current);
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () =>
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
+  }, [captureFullscreenPlayback]);
 
   useEffect(() => {
     const handleNativeFullscreenBack = () => {
+      captureFullscreenPlayback(true);
       nativeFullscreenActiveRef.current = false;
       const nativeFullscreen = (
         window as Window & { NativeFullscreen?: NativeFullscreenBridge }
@@ -546,6 +626,7 @@ export function FlightOverlayPlayer({
       const landscape = (event as CustomEvent<{ landscape: boolean }>).detail
         ?.landscape;
       if (typeof landscape !== 'boolean') return;
+      captureFullscreenPlayback(true);
       nativeFullscreenActiveRef.current = landscape;
       setIsFullscreen(landscape);
     };
@@ -565,7 +646,7 @@ export function FlightOverlayPlayer({
         handleNativeFullscreenOrientationChange
       );
     };
-  }, []);
+  }, [captureFullscreenPlayback]);
 
   useEffect(
     () => () => {
@@ -647,6 +728,7 @@ export function FlightOverlayPlayer({
             const duration = youtubeRef.current?.getDuration() ?? 0;
             setCameraDuration(duration);
             setYoutubeReady(true);
+            restoreFullscreenPlayback();
             const pendingSeek = seekRequestRef.current;
             if (pendingSeek) {
               if (isInteractive && youtubeId && !playbackRequestedRef.current) {
@@ -716,7 +798,13 @@ export function FlightOverlayPlayer({
       youtubeRef.current?.destroy();
       youtubeRef.current = null;
     };
-  }, [cueYoutubeAt, hasPlaybackIntent, isInteractive, youtubeId]);
+  }, [
+    cueYoutubeAt,
+    hasPlaybackIntent,
+    isInteractive,
+    restoreFullscreenPlayback,
+    youtubeId,
+  ]);
 
   const pipYoutubeSignature = pips
     .map(
@@ -853,6 +941,7 @@ export function FlightOverlayPlayer({
 
   const handleToggleFullscreen = () => {
     if (!playerRef.current) return;
+    captureFullscreenPlayback(true);
     const nativeFullscreen = (
       window as Window & { NativeFullscreen?: NativeFullscreenBridge }
     ).NativeFullscreen;
