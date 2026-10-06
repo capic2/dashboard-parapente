@@ -7,7 +7,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from sqlalchemy import String, and_, cast, exists, func, or_, select
+from sqlalchemy import Integer, String, and_, case, cast, exists, func, or_, select
 from sqlalchemy.orm import Query, Session, aliased
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -208,13 +208,54 @@ def _cursor_context(
     return context
 
 
-def _ordering(sort_by: FlightSortBy) -> list[ColumnElement[Any]]:
+def _effective_duration_expression() -> ColumnElement[Any]:
+    marker_json = case(
+        (func.json_valid(Flight.video_markers_json), Flight.video_markers_json),
+        else_="[]",
+    )
+    marker = func.json_each(marker_json).table_valued("value").alias("flight_duration_marker")
+    kind = func.json_extract(marker.c.value, "$.kind")
+    timestamp = func.json_extract(marker.c.value, "$.timestamp_seconds")
+    valid_timestamp = and_(
+        func.json_type(marker.c.value, "$.timestamp_seconds") == "integer",
+        cast(timestamp, Integer) >= 0,
+    )
+    takeoff_seconds = func.min(
+        case((and_(kind == "takeoff", valid_timestamp), cast(timestamp, Integer)))
+    )
+    landing_seconds = func.max(
+        case((and_(kind == "landing", valid_timestamp), cast(timestamp, Integer)))
+    )
+    marker_duration = (
+        select(
+            case(
+                (
+                    and_(
+                        takeoff_seconds.is_not(None),
+                        landing_seconds.is_not(None),
+                        landing_seconds > takeoff_seconds,
+                    ),
+                    cast(func.round((landing_seconds - takeoff_seconds) / 60.0), Integer),
+                )
+            )
+        )
+        .select_from(marker)
+        .correlate(Flight)
+        .scalar_subquery()
+    )
+    return func.coalesce(marker_duration, Flight.real_duration_minutes, Flight.duration_minutes)
+
+
+def _ordering(
+    sort_by: FlightSortBy,
+    duration_expression: ColumnElement[Any],
+) -> list[ColumnElement[Any]]:
     if sort_by == "flight_date":
         return [Flight.flight_date, Flight.departure_time, Flight.created_at, Flight.id]
     if sort_by == "site_name":
         return [func.lower(Site.name), Flight.id]
     if sort_by == "duration_minutes":
-        return [func.coalesce(Flight.real_duration_minutes, Flight.duration_minutes), Flight.id]
+        return [duration_expression, Flight.id]
     return [getattr(Flight, sort_by), Flight.id]
 
 
@@ -340,7 +381,8 @@ def list_flight_summaries(
     )
     total = base_query.with_entities(func.count(Flight.id)).scalar() or 0
 
-    expressions = _ordering(sort_by)
+    duration_expression = _effective_duration_expression()
+    expressions = _ordering(sort_by, duration_expression)
     completed_overlay_path = (
         select(GoproOverlayJob.output_path)
         .where(
@@ -410,9 +452,7 @@ def list_flight_summaries(
         Flight.flight_date,
         Flight.departure_time,
         Flight.created_at,
-        func.coalesce(Flight.real_duration_minutes, Flight.duration_minutes).label(
-            "duration_minutes"
-        ),
+        duration_expression.label("duration_minutes"),
         Flight.max_altitude_m,
         Flight.distance_km,
         Flight.elevation_gain_m,
