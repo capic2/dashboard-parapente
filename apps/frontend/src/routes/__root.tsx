@@ -104,14 +104,16 @@ function VersionBadge({ appVersion }: { appVersion: AppVersionPayload }) {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setIsOpen(true)}
-        aria-haspopup="dialog"
-        className="fixed bottom-3 right-3 z-30 cursor-pointer rounded-full border border-sky-200 bg-white/90 px-3 py-1 text-xs font-semibold text-sky-700 shadow-sm backdrop-blur transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-sky-800 dark:bg-gray-900/90 dark:text-sky-300 dark:hover:bg-gray-800"
-      >
-        {t('versionInfo.badge', { version: appVersion.version })}
-      </button>
+      <div className="flex justify-end py-2 lg:fixed lg:bottom-3 lg:right-3 lg:z-30 lg:py-0">
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          aria-haspopup="dialog"
+          className="cursor-pointer rounded-full border border-sky-200 bg-white/90 px-3 py-1 text-xs font-semibold text-sky-700 shadow-sm transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-sky-800 dark:bg-gray-900/90 dark:text-sky-300 dark:hover:bg-gray-800 lg:backdrop-blur"
+        >
+          {t('versionInfo.badge', { version: appVersion.version })}
+        </button>
+      </div>
       <ModalOverlay
         isOpen={isOpen}
         onOpenChange={setIsOpen}

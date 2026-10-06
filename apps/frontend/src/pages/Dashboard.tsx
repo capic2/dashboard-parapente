@@ -167,8 +167,6 @@ export default function Dashboard() {
       </section>
 
       <div className="space-y-4">
-        <StatsPanel />
-
         <BestSpotSuggestion
           bestSpot={bestSpot ?? null}
           hourlyBestSpots={hourlyBestSpots?.hours ?? []}
@@ -189,6 +187,8 @@ export default function Dashboard() {
           entries={siteWeatherEntries}
           onRefresh={refreshFailedWeather}
         />
+
+        <StatsPanel />
       </div>
     </div>
   );
