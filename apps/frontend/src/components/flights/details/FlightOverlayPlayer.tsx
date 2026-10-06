@@ -342,19 +342,6 @@ export function FlightOverlayPlayer({
     }
   }, [masterIsYoutube]);
 
-  const moveFullscreenPortalHost = useCallback(
-    (fullscreen: boolean) => {
-      if (!isInteractive || !fullscreenPortalHost) return;
-
-      // Move before fullscreen hides the inline mount to avoid blanking video.
-      const target = fullscreen ? document.body : playerMountRef.current;
-      if (target && fullscreenPortalHost.parentElement !== target) {
-        target.appendChild(fullscreenPortalHost);
-      }
-    },
-    [fullscreenPortalHost, isInteractive]
-  );
-
   useLayoutEffect(() => {
     if (!isInteractive || !fullscreenPortalHost) return;
     const mount = playerMountRef.current;
@@ -366,11 +353,8 @@ export function FlightOverlayPlayer({
 
   useLayoutEffect(() => {
     if (!fullscreenPortalHost) return;
+    if (!isFullscreen && !fullscreenPlaybackSnapshotRef.current) return;
     if (isInteractive && isFullscreen) captureFullscreenPlayback(true);
-    const previousParent = fullscreenPortalHost.parentElement;
-    moveFullscreenPortalHost(isInteractive && isFullscreen);
-    const portalMoved = previousParent !== fullscreenPortalHost.parentElement;
-    if (!portalMoved && !(isInteractive && isFullscreen)) return;
     if (fullscreenRestoreFrameRef.current !== null) {
       window.cancelAnimationFrame(fullscreenRestoreFrameRef.current);
     }
@@ -390,7 +374,6 @@ export function FlightOverlayPlayer({
     fullscreenPortalHost,
     isFullscreen,
     isInteractive,
-    moveFullscreenPortalHost,
     restoreFullscreenPlayback,
   ]);
   const hasPlaybackIntent = useCallback(
@@ -683,7 +666,6 @@ export function FlightOverlayPlayer({
       const entering = document.fullscreenElement === playerRef.current;
       if (entering) {
         captureFullscreenPlayback(true);
-        moveFullscreenPortalHost(true);
       }
       setIsFullscreen(entering);
     };
@@ -691,7 +673,7 @@ export function FlightOverlayPlayer({
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () =>
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, [captureFullscreenPlayback, moveFullscreenPortalHost]);
+  }, [captureFullscreenPlayback]);
 
   useEffect(() => {
     const handleNativeFullscreenBack = () => {
@@ -711,7 +693,6 @@ export function FlightOverlayPlayer({
       if (typeof landscape !== 'boolean') return;
       if (landscape) {
         captureFullscreenPlayback(true);
-        moveFullscreenPortalHost(true);
       }
       nativeFullscreenActiveRef.current = landscape;
       setIsFullscreen(landscape);
@@ -732,7 +713,7 @@ export function FlightOverlayPlayer({
         handleNativeFullscreenOrientationChange
       );
     };
-  }, [captureFullscreenPlayback, moveFullscreenPortalHost]);
+  }, [captureFullscreenPlayback]);
 
   useEffect(
     () => () => {
@@ -1061,7 +1042,6 @@ export function FlightOverlayPlayer({
         nativeFullscreen.supportsOrientationReady?.() === true;
       if (entering) {
         captureFullscreenPlayback(true);
-        if (!waitsForOrientation) moveFullscreenPortalHost(true);
       }
       nativeFullscreenActiveRef.current = entering;
       if (!waitsForOrientation) {
@@ -1076,7 +1056,6 @@ export function FlightOverlayPlayer({
       const entering = !isFullscreen;
       if (entering) {
         captureFullscreenPlayback();
-        moveFullscreenPortalHost(true);
       }
       setIsFullscreen(entering);
       if (document.fullscreenElement === playerRef.current) {
@@ -1514,10 +1493,7 @@ export function FlightOverlayPlayer({
   if (!isInteractive) return playerElement;
 
   return (
-    <div
-      ref={playerMountRef}
-      className={`min-w-0 w-full ${isFullscreen ? 'hidden' : ''}`}
-    >
+    <div ref={playerMountRef} className="min-w-0 w-full">
       {fullscreenPortalHost &&
         createPortal(playerElement, fullscreenPortalHost)}
     </div>
