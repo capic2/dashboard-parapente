@@ -31,13 +31,13 @@ const parisTimeFormatter = new Intl.DateTimeFormat('en-GB', {
   hourCycle: 'h23',
 });
 
-function parseFlightDepartureTime(value: string): number {
-  if (/[zZ]|[+-]\d{2}:?\d{2}$/u.test(value)) return Date.parse(value);
+function parseFlightDepartureTimes(value: string): number[] {
+  if (/[zZ]|[+-]\d{2}:?\d{2}$/u.test(value)) return [Date.parse(value)];
 
   const match = value.match(
     /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?$/u
   );
-  if (!match) return Date.parse(value);
+  if (!match) return [Date.parse(value)];
 
   const [, year, month, day, hour, minute, second, fraction = '0'] = match;
   const millis = Number(`0.${fraction}`) * 1000;
@@ -69,7 +69,12 @@ function parseFlightDepartureTime(value: string): number {
     );
     timestamp += localAsUtc - parisAsUtc;
   }
-  return timestamp;
+  // Flight.departure_time is stored without a timezone. Older GPX imports
+  // stored Paris wall time, while replacement uploads can store UTC after the
+  // timezone is dropped by the database. Try both interpretations so either
+  // kind of existing flight can be matched to the GPX's explicit timestamp.
+  const utcTimestamp = Date.parse(`${value.replace(' ', 'T')}Z`);
+  return [...new Set([timestamp, utcTimestamp].filter(Number.isFinite))];
 }
 
 function getTrackTimeRange(file: File): Promise<[number, number]> {
@@ -116,8 +121,10 @@ async function findMatchingFlight(startTime: number, endTime: number) {
   const candidates = flights
     .flatMap((flight) => {
       if (!flight.departure_time) return [];
-      const distance = Math.abs(
-        parseFlightDepartureTime(flight.departure_time) - startTime
+      const distance = Math.min(
+        ...parseFlightDepartureTimes(flight.departure_time).map((timestamp) =>
+          Math.abs(timestamp - startTime)
+        )
       );
       return Number.isFinite(distance) &&
         distance <= MAX_START_TIME_DIFFERENCE_MS
