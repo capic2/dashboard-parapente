@@ -197,7 +197,8 @@ function flightHasBadgeFilter(
       return (
         flight.has_youtube_video ||
         flight.youtube_upload_status === 'queued' ||
-        flight.youtube_upload_status === 'uploading'
+        flight.youtube_upload_status === 'uploading' ||
+        flight.youtube_upload_status === 'failed'
       );
   }
 }

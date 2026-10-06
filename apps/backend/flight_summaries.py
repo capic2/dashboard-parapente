@@ -426,6 +426,14 @@ def list_flight_summaries(
         .correlate(Flight)
         .scalar_subquery()
     )
+    latest_youtube_upload_status = (
+        select(YoutubeUploadJob.status)
+        .where(YoutubeUploadJob.flight_id == Flight.id)
+        .order_by(YoutubeUploadJob.created_at.desc(), YoutubeUploadJob.id.desc())
+        .limit(1)
+        .correlate(Flight)
+        .scalar_subquery()
+    )
     sequence_flight = aliased(Flight)
     flight_sequences = db.query(
         sequence_flight.id.label("flight_id"),
@@ -471,6 +479,7 @@ def list_flight_summaries(
         completed_overlay_path.label("completed_overlay_path"),
         completed_highlight_path.label("completed_highlight_path"),
         completed_youtube_uploads.label("completed_youtube_uploads"),
+        latest_youtube_upload_status.label("latest_youtube_upload_status"),
         exists()
         .where(
             GoproOverlayJob.flight_id == Flight.id,
@@ -564,7 +573,7 @@ def list_flight_summaries(
                 for video_id in associated_youtube_ids[row.id]
                 if video_id in uploaded_youtube_ids[row.id] and video_id in existing_youtube_ids
             ],
-            youtube_upload_status=None,
+            youtube_upload_status=row.latest_youtube_upload_status,
             youtube_upload_progress=None,
             gopro_overlay_job_id=row.gopro_overlay_job_id,
             gopro_overlay_status=row.gopro_overlay_status,
