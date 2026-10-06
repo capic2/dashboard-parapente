@@ -7,6 +7,7 @@ worker while keeping a small in-memory status snapshot for compatibility.
 """
 
 import asyncio
+import base64
 import json
 import logging
 import shutil
@@ -1016,6 +1017,19 @@ def _write_frame_file_atomic(frame_path: Path, frame_png: bytes) -> None:
     partial_path = frame_path.with_name(f"{frame_path.name}.part")
     partial_path.write_bytes(frame_png)
     partial_path.replace(frame_path)
+
+
+async def _capture_fast_frame_png(cdp_session: Any) -> bytes:
+    """Capture a lossless frame through Chromium's faster PNG encoder."""
+
+    result = await asyncio.wait_for(
+        cdp_session.send(
+            "Page.captureScreenshot",
+            {"format": "png", "fromSurface": True, "optimizeForSpeed": True},
+        ),
+        timeout=60,
+    )
+    return base64.b64decode(result["data"])
 
 
 def _job_resume_info(job: VideoExportJob) -> dict[str, Any]:
@@ -2031,6 +2045,7 @@ async def _export_video_manual_render(job_id: str):
                 java_script_enabled=True,
             )
             page = await context.new_page()
+            capture_cdp_session = await context.new_cdp_session(page) if is_fast_mode else None
 
             await page.add_init_script(_build_playwright_init_script(auth_token))
 
@@ -2235,6 +2250,7 @@ async def _export_video_manual_render(job_id: str):
                     "() => typeof window._setExportFrame === 'function'",
                     timeout=30000,
                 )
+                await page.evaluate("async () => { await document.fonts.ready; return true; }")
             else:
                 await _evaluate_export_page(
                     page,
@@ -2254,6 +2270,8 @@ async def _export_video_manual_render(job_id: str):
                 )
 
             frame_count = 0
+            screenshot_elapsed_seconds = 0.0
+            screenshot_count = 0
             ms_per_frame = (duration_seconds * 1000) / max(total_frames, 1)
             _log_job(job_id, f"Capturing 1 frame every {ms_per_frame:.1f}ms")
             resume_from_frame = _first_missing_frame_index(frames_dir, total_frames)
@@ -2361,7 +2379,11 @@ async def _export_video_manual_render(job_id: str):
 
                 frame_path = frames_dir / f"frame{i:05d}.png"
                 if is_fast_mode:
-                    frame_png = await page.screenshot(type="png", timeout=60000)
+                    assert capture_cdp_session is not None
+                    screenshot_started_at = time.monotonic()
+                    frame_png = await _capture_fast_frame_png(capture_cdp_session)
+                    screenshot_elapsed_seconds += time.monotonic() - screenshot_started_at
+                    screenshot_count += 1
                     if concurrent_encoding:
                         assert ffmpeg_process is not None
                         assert ffmpeg_process.stdin is not None
@@ -2404,6 +2426,12 @@ async def _export_video_manual_render(job_id: str):
                     fps_actual = _capture_fps(frame_count, resume_from_frame, elapsed)
                     eta_seconds = (total_frames - frame_count) / fps_actual if fps_actual > 0 else 0
                     eta_seconds_int = max(0, int(eta_seconds)) if eta_seconds > 0 else None
+                    screenshot_average = (
+                        screenshot_elapsed_seconds / screenshot_count if screenshot_count else 0.0
+                    )
+                    screenshot_metric = (
+                        f", avg screenshot: {screenshot_average:.2f}s" if is_fast_mode else ""
+                    )
 
                     _set_job_runtime(
                         job_id,
@@ -2423,7 +2451,8 @@ async def _export_video_manual_render(job_id: str):
                     _log_job(
                         job_id,
                         f"Captured {frame_count}/{total_frames} frames "
-                        f"({fps_actual:.1f} fps, ETA: {int(eta_seconds/60)}min)",
+                        f"({fps_actual:.1f} fps, ETA: {int(eta_seconds/60)}min"
+                        f"{screenshot_metric})",
                     )
 
                 if not is_fast_mode:
