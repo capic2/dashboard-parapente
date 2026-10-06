@@ -342,6 +342,19 @@ export function FlightOverlayPlayer({
     }
   }, [masterIsYoutube]);
 
+  const moveFullscreenPortalHost = useCallback(
+    (fullscreen: boolean) => {
+      if (!isInteractive || !fullscreenPortalHost) return;
+
+      // Move before fullscreen hides the inline mount to avoid blanking video.
+      const target = fullscreen ? document.body : playerMountRef.current;
+      if (target && fullscreenPortalHost.parentElement !== target) {
+        target.appendChild(fullscreenPortalHost);
+      }
+    },
+    [fullscreenPortalHost, isInteractive]
+  );
+
   useLayoutEffect(() => {
     if (!isInteractive || !fullscreenPortalHost) return;
     const mount = playerMountRef.current;
@@ -353,20 +366,19 @@ export function FlightOverlayPlayer({
 
   useLayoutEffect(() => {
     if (!fullscreenPortalHost) return;
-    const target =
-      isInteractive && isFullscreen ? document.body : playerMountRef.current;
-    if (target && fullscreenPortalHost.parentElement !== target) {
-      if (isFullscreen) captureFullscreenPlayback(true);
-      target.appendChild(fullscreenPortalHost);
-      if (fullscreenRestoreFrameRef.current !== null) {
-        window.cancelAnimationFrame(fullscreenRestoreFrameRef.current);
-      }
-      fullscreenRestoreFrameRef.current = window.requestAnimationFrame(() => {
-        fullscreenRestoreFrameRef.current = null;
-        if (!isFullscreen) restoreFullscreenPlayback();
-        syncMediaRef.current?.(true, true);
-      });
+    if (isInteractive && isFullscreen) captureFullscreenPlayback(true);
+    const previousParent = fullscreenPortalHost.parentElement;
+    moveFullscreenPortalHost(isInteractive && isFullscreen);
+    const portalMoved = previousParent !== fullscreenPortalHost.parentElement;
+    if (!portalMoved && !(isInteractive && isFullscreen)) return;
+    if (fullscreenRestoreFrameRef.current !== null) {
+      window.cancelAnimationFrame(fullscreenRestoreFrameRef.current);
     }
+    fullscreenRestoreFrameRef.current = window.requestAnimationFrame(() => {
+      fullscreenRestoreFrameRef.current = null;
+      if (!isFullscreen) restoreFullscreenPlayback();
+      syncMediaRef.current?.(true, true);
+    });
     return () => {
       if (fullscreenRestoreFrameRef.current !== null) {
         window.cancelAnimationFrame(fullscreenRestoreFrameRef.current);
@@ -378,6 +390,7 @@ export function FlightOverlayPlayer({
     fullscreenPortalHost,
     isFullscreen,
     isInteractive,
+    moveFullscreenPortalHost,
     restoreFullscreenPlayback,
   ]);
   const hasPlaybackIntent = useCallback(
@@ -668,14 +681,17 @@ export function FlightOverlayPlayer({
   useEffect(() => {
     const handleFullscreenChange = () => {
       const entering = document.fullscreenElement === playerRef.current;
-      if (entering) captureFullscreenPlayback(true);
+      if (entering) {
+        captureFullscreenPlayback(true);
+        moveFullscreenPortalHost(true);
+      }
       setIsFullscreen(entering);
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () =>
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, [captureFullscreenPlayback]);
+  }, [captureFullscreenPlayback, moveFullscreenPortalHost]);
 
   useEffect(() => {
     const handleNativeFullscreenBack = () => {
@@ -693,7 +709,10 @@ export function FlightOverlayPlayer({
       const landscape = (event as CustomEvent<{ landscape: boolean }>).detail
         ?.landscape;
       if (typeof landscape !== 'boolean') return;
-      if (landscape) captureFullscreenPlayback(true);
+      if (landscape) {
+        captureFullscreenPlayback(true);
+        moveFullscreenPortalHost(true);
+      }
       nativeFullscreenActiveRef.current = landscape;
       setIsFullscreen(landscape);
     };
@@ -713,7 +732,7 @@ export function FlightOverlayPlayer({
         handleNativeFullscreenOrientationChange
       );
     };
-  }, [captureFullscreenPlayback]);
+  }, [captureFullscreenPlayback, moveFullscreenPortalHost]);
 
   useEffect(
     () => () => {
@@ -1013,6 +1032,7 @@ export function FlightOverlayPlayer({
         youtubeRef.current.pauseVideo();
       } else {
         playbackRequestedRef.current = true;
+        setHasStartedMainPlayback(true);
         syncMediaRef.current?.();
         youtubeRef.current.playVideo();
       }
@@ -1037,9 +1057,14 @@ export function FlightOverlayPlayer({
 
     if (isInteractive && nativeFullscreen) {
       const entering = !nativeFullscreenActiveRef.current;
-      if (entering) captureFullscreenPlayback(true);
+      const waitsForOrientation =
+        nativeFullscreen.supportsOrientationReady?.() === true;
+      if (entering) {
+        captureFullscreenPlayback(true);
+        if (!waitsForOrientation) moveFullscreenPortalHost(true);
+      }
       nativeFullscreenActiveRef.current = entering;
-      if (nativeFullscreen.supportsOrientationReady?.() !== true) {
+      if (!waitsForOrientation) {
         setIsFullscreen(entering);
       }
       if (entering) nativeFullscreen.enter();
@@ -1049,7 +1074,10 @@ export function FlightOverlayPlayer({
 
     if (isInteractive) {
       const entering = !isFullscreen;
-      if (entering) captureFullscreenPlayback();
+      if (entering) {
+        captureFullscreenPlayback();
+        moveFullscreenPortalHost(true);
+      }
       setIsFullscreen(entering);
       if (document.fullscreenElement === playerRef.current) {
         if (!entering) void document.exitFullscreen().catch(() => undefined);
