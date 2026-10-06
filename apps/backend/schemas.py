@@ -838,6 +838,7 @@ class FlightSummary(BaseModel):
     max_altitude_m: int | None = None
     distance_km: float | None = None
     elevation_gain_m: int | None = None
+    external_provider: str | None = None
     has_gpx: bool
     sportstracklive_status: str | None = None
     sportstracklive_track_id: int | None = None

@@ -134,6 +134,9 @@ function FlightSearchInput({
 
 const FLIGHT_BADGE_FILTERS = [
   { id: 'gpx', label: 'flights.gpxBadge' },
+  { id: 'gpxIcu', label: 'flights.gpxIcuBadge' },
+  { id: 'gpxStrava', label: 'flights.gpxStravaBadge' },
+  { id: 'gpxZepp', label: 'flights.gpxZeppBadge' },
   { id: 'sportstracklive', label: 'flights.sportstrackliveBadge' },
   { id: 'video', label: 'flights.videoBadge' },
   { id: 'camera', label: 'flights.cameraBadge' },
@@ -162,6 +165,22 @@ function flightHasBadgeFilter(
   switch (filter) {
     case 'gpx':
       return flight.has_gpx;
+    case 'gpxIcu':
+      return (
+        flight.has_gpx &&
+        flight.external_provider?.toLowerCase() === 'intervals_icu'
+      );
+    case 'gpxStrava':
+      return (
+        flight.has_gpx && flight.external_provider?.toLowerCase() === 'strava'
+      );
+    case 'gpxZepp':
+      return (
+        flight.has_gpx &&
+        ['external', 'zepp'].includes(
+          flight.external_provider?.toLowerCase() ?? ''
+        )
+      );
     case 'sportstracklive':
       return (
         flight.sportstracklive_status === 'uploaded' &&
