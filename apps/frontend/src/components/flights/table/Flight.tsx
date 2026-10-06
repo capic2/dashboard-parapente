@@ -72,6 +72,7 @@ export function Flight({
   const isYoutubeUploadRunning =
     flight.youtube_upload_status === 'queued' ||
     flight.youtube_upload_status === 'uploading';
+  const isYoutubeUploadFailed = flight.youtube_upload_status === 'failed';
   const hasPanoVideo = flight.has_pano_video;
   const hasFaceVideo = flight.has_face_video === true;
   const hasPiloteVideo = flight.has_pilote_video === true;
@@ -151,6 +152,7 @@ export function Flight({
     hasCamera ||
     hasYoutubeVideo ||
     isYoutubeUploadRunning ||
+    isYoutubeUploadFailed ||
     hasPanoVideo ||
     hasFaceVideo ||
     hasPiloteVideo ||
@@ -285,13 +287,16 @@ export function Flight({
                 </span>
               ))}
               {((hasYoutubeVideo && youtubeVideoTypes.length === 0) ||
-                isYoutubeUploadRunning) && (
+                isYoutubeUploadRunning ||
+                isYoutubeUploadFailed) && (
                 <span
                   aria-live={isYoutubeUploadRunning ? 'polite' : undefined}
-                  className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${isYoutubeUploadFailed ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100' : 'border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200'}`}
                 >
                   <Play className="h-3 w-3" aria-hidden="true" />
-                  {youtubeLabel}
+                  {isYoutubeUploadFailed
+                    ? t('flights.temporarySourceFailed')
+                    : youtubeLabel}
                   {youtubeVideoTypes.length === 0 ? youtubeVideoCountLabel : ''}
                 </span>
               )}
