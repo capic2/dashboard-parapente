@@ -336,6 +336,50 @@ def test_summaries_only_report_completed_uploads_that_still_exist(client, db_ses
     verify_videos.assert_called_once_with({1: {"dQw4w9WgXcQ", "9bZkp7q19f0", "aaaaaaaaaaa"}})
 
 
+def test_summary_uses_newest_youtube_upload_even_when_older_job_updates_later(
+    client, db_session
+) -> None:
+    flight = Flight(
+        id="youtube-upload-status-order",
+        title="Upload status order",
+        flight_date=date(2026, 1, 1),
+    )
+    db_session.add(flight)
+    db_session.add_all(
+        [
+            YoutubeUploadJob(
+                id="youtube-upload-older",
+                flight_id=flight.id,
+                user_id=1,
+                status="completed",
+                progress=100,
+                title="Older upload",
+                description="",
+                created_at=datetime(2026, 1, 1),
+                updated_at=datetime(2026, 1, 3),
+            ),
+            YoutubeUploadJob(
+                id="youtube-upload-newer",
+                flight_id=flight.id,
+                user_id=1,
+                status="failed",
+                progress=25,
+                title="Newer upload",
+                description="",
+                created_at=datetime(2026, 1, 2),
+                updated_at=datetime(2026, 1, 2),
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(API_URL)
+
+    assert response.status_code == 200
+    flight_summary = next(item for item in response.json()["flights"] if item["id"] == flight.id)
+    assert flight_summary["youtube_upload_status"] == "failed"
+
+
 def test_completed_youtube_uploads_default_missing_source_type() -> None:
     assert _completed_youtube_uploads('[{"user_id": 1, "video_id": "dQw4w9WgXcQ"}]') == [
         (1, "dQw4w9WgXcQ", "gopro_overlay")
