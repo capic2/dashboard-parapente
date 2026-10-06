@@ -1,10 +1,16 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
+
+afterEach(() => {
+  delete (window as Window & { YT?: unknown }).YT;
+  delete (document as unknown as { fullscreenElement?: Element | null })
+    .fullscreenElement;
+});
 
 describe('FlightOverlayPlayer', () => {
   it('renders interactive controls inside the media stage', () => {
@@ -251,5 +257,252 @@ describe('FlightOverlayPlayer', () => {
     fireEvent.timeUpdate(camera);
 
     expect(flight.currentTime).toBeCloseTo(11.6, 5);
+  });
+
+  it('restores a paused seek and its PiP after exiting fullscreen', async () => {
+    const { container } = render(
+      <FlightOverlayPlayer
+        mode="interactive"
+        cameraUrl="camera.mp4"
+        cameraLabel="camera"
+        flightLabel="flight"
+        pips={[
+          {
+            id: 'flight-pip',
+            type: 'pip',
+            action: 'switch_video',
+            source: 'file:vol',
+            x: 0.1,
+            y: 0.2,
+            width: 0.3,
+            height: 0.25,
+            visible: true,
+            videoUrl: 'flight.mp4',
+            label: 'flight',
+          },
+        ]}
+      />
+    );
+    const player = container.querySelector(
+      '[data-testid="flight-overlay-media-stage"]'
+    )?.parentElement;
+    const camera = screen.getByLabelText('camera') as HTMLVideoElement;
+    const pipVideo = screen
+      .getByTestId('flight-overlay-pip-flight-pip')
+      .querySelector('video') as HTMLVideoElement;
+    if (!player) throw new Error('Expected the player container to render');
+
+    Object.defineProperty(player, 'requestFullscreen', {
+      configurable: true,
+      value: vi.fn(() => {
+        Object.defineProperty(document, 'fullscreenElement', {
+          configurable: true,
+          value: player,
+        });
+        document.dispatchEvent(new Event('fullscreenchange'));
+        return Promise.resolve();
+      }),
+    });
+    Object.defineProperty(document, 'exitFullscreen', {
+      configurable: true,
+      value: vi.fn(() => {
+        Object.defineProperty(document, 'fullscreenElement', {
+          configurable: true,
+          value: null,
+        });
+        document.dispatchEvent(new Event('fullscreenchange'));
+        return Promise.resolve();
+      }),
+    });
+
+    camera.currentTime = 51;
+    fireEvent.timeUpdate(camera);
+    expect(pipVideo.currentTime).toBe(51);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'flights.goproOverlayFullscreen' })
+    );
+    await waitFor(() => expect(document.fullscreenElement).toBe(player));
+
+    // Reproduce the browser losing the media position during the portal move.
+    camera.currentTime = 0;
+    fireEvent.timeUpdate(camera);
+    expect(camera.currentTime).toBe(51);
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'flights.goproOverlayExitFullscreen',
+      })
+    );
+
+    await waitFor(() => {
+      expect(camera.currentTime).toBe(51);
+      expect(pipVideo.currentTime).toBe(51);
+    });
+  });
+
+  it('resynchronizes a YouTube PiP when its buffering seek completes', async () => {
+    class MockYoutubePlayer {
+      static instances: MockYoutubePlayer[] = [];
+      currentTime = 0;
+      state = -1;
+      events: Record<string, (event?: { data: number }) => void>;
+      cueVideoById = vi.fn((_: string, time = 0) => {
+        this.currentTime = time;
+        this.state = 5;
+      });
+      seekTo = vi.fn((time: number) => {
+        this.currentTime = time;
+      });
+      getCurrentTime = () => this.currentTime;
+      getDuration = () => 300;
+      getPlayerState = () => this.state;
+      destroy = vi.fn();
+      mute = vi.fn();
+      pauseVideo = vi.fn();
+      playVideo = vi.fn();
+      setOption = vi.fn();
+
+      constructor(_host: HTMLElement, options: Record<string, unknown>) {
+        MockYoutubePlayer.instances.push(this);
+        this.events = options.events as MockYoutubePlayer['events'];
+        queueMicrotask(() => this.events.onReady?.());
+      }
+    }
+
+    Object.defineProperty(window, 'YT', {
+      configurable: true,
+      value: { Player: MockYoutubePlayer },
+    });
+    const { unmount } = render(
+      <FlightOverlayPlayer
+        mode="interactive"
+        cameraUrl="camera.mp4"
+        youtubeUrl="https://www.youtube.com/watch?v=mainVideo01"
+        cameraLabel="camera"
+        flightLabel="flight"
+        videoMarkers={[
+          {
+            id: 'interest',
+            kind: 'interest',
+            title: 'Point d’intérêt',
+            timestamp_seconds: 75,
+          },
+        ]}
+        pips={[
+          {
+            id: 'pilot-pip',
+            type: 'pip',
+            action: 'switch_video',
+            source: 'youtube:pilote',
+            x: 0.1,
+            y: 0.2,
+            width: 0.3,
+            height: 0.25,
+            visible: true,
+            youtubeUrl: 'https://www.youtube.com/watch?v=pipVideo001',
+            label: 'pilot',
+          },
+        ]}
+      />
+    );
+
+    await waitFor(() => expect(MockYoutubePlayer.instances).toHaveLength(2));
+    const pipPlayer = MockYoutubePlayer.instances[1];
+    pipPlayer.state = 3;
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'flights.overlayVideoMarkerAt' })
+    );
+    expect(pipPlayer.cueVideoById).not.toHaveBeenCalledWith('pipVideo001', 75);
+
+    pipPlayer.state = 5;
+    pipPlayer.events.onStateChange?.({ data: 5 });
+    await waitFor(() =>
+      expect(pipPlayer.cueVideoById).toHaveBeenCalledWith('pipVideo001', 75)
+    );
+
+    const requestFrame = vi.spyOn(window, 'requestAnimationFrame');
+    const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame');
+    pipPlayer.state = 3;
+    pipPlayer.events.onStateChange?.({ data: 3 });
+    pipPlayer.events.onStateChange?.({ data: 3 });
+    expect(requestFrame).toHaveBeenCalledTimes(1);
+
+    const pendingFrame = requestFrame.mock.results[0]?.value;
+    unmount();
+    expect(cancelFrame).toHaveBeenCalledWith(pendingFrame);
+  });
+
+  it('ignores delayed events from a replaced main YouTube player', async () => {
+    class MockYoutubePlayer {
+      static instances: MockYoutubePlayer[] = [];
+      events: Record<string, (event?: { data: number }) => void>;
+      cueVideoById = vi.fn();
+      seekTo = vi.fn();
+      getCurrentTime = () => 0;
+      getDuration = () => 300;
+      getPlayerState = () => -1;
+      destroy = vi.fn();
+      mute = vi.fn();
+      pauseVideo = vi.fn();
+      playVideo = vi.fn();
+      setOption = vi.fn();
+
+      constructor(_host: HTMLElement, options: Record<string, unknown>) {
+        MockYoutubePlayer.instances.push(this);
+        this.events = options.events as MockYoutubePlayer['events'];
+      }
+    }
+
+    Object.defineProperty(window, 'YT', {
+      configurable: true,
+      value: { Player: MockYoutubePlayer },
+    });
+    const initialProps = {
+      mode: 'interactive' as const,
+      cameraUrl: 'camera.mp4',
+      cameraLabel: 'camera',
+      flightLabel: 'flight',
+      videoMarkers: [
+        {
+          id: 'interest',
+          kind: 'interest' as const,
+          title: 'Point d’intérêt',
+          timestamp_seconds: 75,
+        },
+      ],
+    };
+    const { rerender } = render(
+      <FlightOverlayPlayer
+        {...initialProps}
+        youtubeUrl="https://www.youtube.com/watch?v=oldVideo001"
+      />
+    );
+    await waitFor(() => expect(MockYoutubePlayer.instances).toHaveLength(1));
+    const oldPlayer = MockYoutubePlayer.instances[0];
+
+    rerender(
+      <FlightOverlayPlayer
+        {...initialProps}
+        youtubeUrl="https://www.youtube.com/watch?v=newVideo001"
+      />
+    );
+    await waitFor(() => expect(MockYoutubePlayer.instances).toHaveLength(2));
+    const currentPlayer = MockYoutubePlayer.instances[1];
+    const marker = screen.getByRole('button', {
+      name: 'flights.overlayVideoMarkerAt',
+    });
+
+    oldPlayer.events.onReady?.();
+    expect(currentPlayer.setOption).not.toHaveBeenCalled();
+    expect(marker).toBeDisabled();
+
+    currentPlayer.events.onReady?.();
+    await waitFor(() => expect(marker).toBeEnabled());
+
+    oldPlayer.events.onError?.();
+    oldPlayer.events.onStateChange?.({ data: 1 });
+    expect(marker).toBeEnabled();
+    expect(currentPlayer.pauseVideo).not.toHaveBeenCalled();
   });
 });
