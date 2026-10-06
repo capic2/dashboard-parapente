@@ -49,7 +49,7 @@ interface NativeFullscreenBridge {
 
 interface FullscreenPlaybackSnapshot {
   currentTime: number;
-  wasPlaying: true;
+  wasPlaying: boolean;
 }
 
 let youtubeApiPromise: Promise<YoutubeApi> | null = null;
@@ -219,7 +219,15 @@ export function FlightOverlayPlayer({
   const nativeFullscreenActiveRef = useRef(false);
   const fullscreenPlaybackSnapshotRef =
     useRef<FullscreenPlaybackSnapshot | null>(null);
-  const syncMediaRef = useRef<((notify?: boolean) => void) | null>(null);
+  const syncMediaRef = useRef<
+    | ((
+        notify?: boolean,
+        forcePipSync?: boolean,
+        allowFullscreenSnapshotRewind?: boolean
+      ) => void)
+    | null
+  >(null);
+  const fullscreenRestoreFrameRef = useRef<number | null>(null);
   // The calibration player keeps its existing camera/flight layout.
   const [layout, setLayout] = useState<FlightOverlayLayout>(
     mode === 'calibration' && !youtubeUrl && flightUrl
@@ -258,6 +266,7 @@ export function FlightOverlayPlayer({
   const captureFullscreenPlayback = useCallback(
     (preserveExisting = false) => {
       if (!isInteractive) return;
+      if (preserveExisting && fullscreenPlaybackSnapshotRef.current) return;
 
       const player = youtubeRef.current;
       const video = cameraRef.current;
@@ -268,7 +277,7 @@ export function FlightOverlayPlayer({
       try {
         if (masterIsYoutube && player) {
           wasPlaying ||= player.getPlayerState() === 1;
-          currentTime = player.getCurrentTime();
+          currentTime = youtubeCuedTimeRef.current ?? player.getCurrentTime();
         } else if (video) {
           wasPlaying ||= !video.paused;
           currentTime = video.currentTime;
@@ -277,14 +286,11 @@ export function FlightOverlayPlayer({
         // Keep the latest time and playback state recorded by media events.
       }
 
-      if (!wasPlaying || !Number.isFinite(currentTime)) {
-        if (!preserveExisting) fullscreenPlaybackSnapshotRef.current = null;
-        return;
-      }
+      if (!Number.isFinite(currentTime)) return;
 
       fullscreenPlaybackSnapshotRef.current = {
         currentTime,
-        wasPlaying: true,
+        wasPlaying,
       };
     },
     [isInteractive, masterIsYoutube]
@@ -299,20 +305,38 @@ export function FlightOverlayPlayer({
         const player = youtubeRef.current;
         if (!player) return;
 
-        if (player.getPlayerState() !== 1) {
+        const playerIsPlaying = player.getPlayerState() === 1;
+        const playerTime = player.getCurrentTime();
+        if (Math.abs(playerTime - snapshot.currentTime) > 0.25) {
+          youtubeCuedTimeRef.current = snapshot.currentTime;
           player.seekTo(snapshot.currentTime, true);
+        }
+        playbackRequestedRef.current = snapshot.wasPlaying;
+        if (snapshot.wasPlaying && !playerIsPlaying) {
           player.playVideo();
+        } else if (!snapshot.wasPlaying && playerIsPlaying) {
+          player.pauseVideo();
         }
       } else {
         const video = cameraRef.current;
         if (!video) return;
 
-        if (video.paused) {
+        if (Math.abs(video.currentTime - snapshot.currentTime) > 0.25) {
           video.currentTime = snapshot.currentTime;
+        }
+        playbackRequestedRef.current = snapshot.wasPlaying;
+        if (snapshot.wasPlaying && video.paused) {
           void video.play().catch(() => undefined);
+        } else if (!snapshot.wasPlaying && !video.paused) {
+          video.pause();
         }
       }
+      cameraCurrentTimeRef.current = snapshot.currentTime;
+      cameraIsPlayingRef.current = snapshot.wasPlaying;
+      setCameraCurrentTime(snapshot.currentTime);
+      setCameraIsPlaying(snapshot.wasPlaying);
       fullscreenPlaybackSnapshotRef.current = null;
+      syncMediaRef.current?.(true, true, true);
     } catch {
       // A reloaded YouTube iframe will retry restoration from its onReady event.
     }
@@ -332,10 +356,23 @@ export function FlightOverlayPlayer({
     const target =
       isInteractive && isFullscreen ? document.body : playerMountRef.current;
     if (target && fullscreenPortalHost.parentElement !== target) {
-      captureFullscreenPlayback(true);
+      if (isFullscreen) captureFullscreenPlayback(true);
       target.appendChild(fullscreenPortalHost);
-      window.setTimeout(restoreFullscreenPlayback, 0);
+      if (fullscreenRestoreFrameRef.current !== null) {
+        window.cancelAnimationFrame(fullscreenRestoreFrameRef.current);
+      }
+      fullscreenRestoreFrameRef.current = window.requestAnimationFrame(() => {
+        fullscreenRestoreFrameRef.current = null;
+        if (!isFullscreen) restoreFullscreenPlayback();
+        syncMediaRef.current?.(true, true);
+      });
     }
+    return () => {
+      if (fullscreenRestoreFrameRef.current !== null) {
+        window.cancelAnimationFrame(fullscreenRestoreFrameRef.current);
+        fullscreenRestoreFrameRef.current = null;
+      }
+    };
   }, [
     captureFullscreenPlayback,
     fullscreenPortalHost,
@@ -354,14 +391,16 @@ export function FlightOverlayPlayer({
     if (
       player &&
       (playerState === -1 ||
-        (!playbackRequestedRef.current && [0, 5].includes(playerState)))
+        (playerState !== undefined &&
+          !playbackRequestedRef.current &&
+          [0, 5].includes(playerState)))
     ) {
       player.cueVideoById(videoId, time);
     } else {
       player?.seekTo(time, true);
     }
     cameraCurrentTimeRef.current = time;
-    syncMediaRef.current?.(true);
+    syncMediaRef.current?.(true, true, true);
     if (!syncMediaRef.current) {
       setCameraCurrentTime(time);
       onTimeChangeRef.current?.(time);
@@ -480,15 +519,37 @@ export function FlightOverlayPlayer({
     youtubeReady,
   ]);
 
-  const syncMedia = (notify = true) => {
+  const syncMedia = (
+    notify = true,
+    forcePipSync = false,
+    allowFullscreenSnapshotRewind = false
+  ) => {
     const camera = cameraRef.current;
-    const currentTime = masterIsYoutube
+    let currentTime = masterIsYoutube
       ? (youtubeCuedTimeRef.current ??
         youtubeRef.current?.getCurrentTime() ??
         0)
       : (camera?.currentTime ?? 0);
     if (!camera && !masterIsYoutube) return;
+    const fullscreenSnapshot =
+      isInteractive && isFullscreen
+        ? fullscreenPlaybackSnapshotRef.current
+        : null;
+    if (
+      fullscreenSnapshot &&
+      !allowFullscreenSnapshotRewind &&
+      currentTime < fullscreenSnapshot.currentTime - 1
+    ) {
+      currentTime = fullscreenSnapshot.currentTime;
+      if (masterIsYoutube) {
+        youtubeCuedTimeRef.current = currentTime;
+        youtubeRef.current?.seekTo(currentTime, true);
+      } else if (camera) {
+        camera.currentTime = currentTime;
+      }
+    }
     const pipSyncTick = ++pipSyncTickRef.current;
+    const mainIsPlaying = cameraIsPlayingRef.current;
     pips.forEach((pip) => {
       let pipOffset = pipOffsetSeconds;
       if (isInteractive) {
@@ -504,12 +565,13 @@ export function FlightOverlayPlayer({
         if (
           pipState !== 3 &&
           Math.abs(desiredPipTime - currentPipTime) > 0.75 &&
-          pipSyncTick - (lastPipSeekTickRef.current.get(pip.id) ?? -30) >= 30
+          (forcePipSync ||
+            pipSyncTick - (lastPipSeekTickRef.current.get(pip.id) ?? -30) >= 30)
         ) {
           const pipVideoId = pip.youtubeUrl
             ? getYoutubeVideoId(pip.youtubeUrl)
             : null;
-          const pipPlaybackRequested = hasPlaybackIntent() && cameraIsPlaying;
+          const pipPlaybackRequested = hasPlaybackIntent() && mainIsPlaying;
           if (
             !pipPlaybackRequested &&
             [-1, 0, 5].includes(pipState) &&
@@ -523,13 +585,13 @@ export function FlightOverlayPlayer({
         }
         if (
           hasPlaybackIntent() &&
-          cameraIsPlaying &&
+          mainIsPlaying &&
           [-1, 2, 5].includes(pipState) &&
           pipSyncTick - (lastPipPlayTickRef.current.get(pip.id) ?? -30) >= 30
         ) {
           pipYoutube.playVideo();
           lastPipPlayTickRef.current.set(pip.id, pipSyncTick);
-        } else if (!cameraIsPlaying && pipState === 1) {
+        } else if (!mainIsPlaying && pipState === 1) {
           pipYoutube.pauseVideo();
         }
       }
@@ -548,14 +610,9 @@ export function FlightOverlayPlayer({
       ) {
         pipVideo.currentTime = clamp(desiredVideoTime, pipVideo.duration);
       }
-      if (
-        pipVideo &&
-        hasPlaybackIntent() &&
-        cameraIsPlaying &&
-        pipVideo.paused
-      ) {
+      if (pipVideo && hasPlaybackIntent() && mainIsPlaying && pipVideo.paused) {
         playMedia(pipVideo);
-      } else if (pipVideo && !cameraIsPlaying && !pipVideo.paused)
+      } else if (pipVideo && !mainIsPlaying && !pipVideo.paused)
         pipVideo.pause();
     });
     const flight = flightRef.current;
@@ -566,7 +623,7 @@ export function FlightOverlayPlayer({
     }
     if (
       flight &&
-      cameraIsPlaying &&
+      mainIsPlaying &&
       flight.paused &&
       (!Number.isFinite(flight.duration) || flightTime < flight.duration)
     ) {
@@ -577,7 +634,7 @@ export function FlightOverlayPlayer({
     if (overlay && Math.abs(overlay.currentTime - overlayTime) > 0.08) {
       overlay.currentTime = clamp(overlayTime, overlay.duration);
     }
-    if (hasPlaybackIntent() && cameraIsPlaying && overlay?.paused) {
+    if (hasPlaybackIntent() && mainIsPlaying && overlay?.paused) {
       // The camera is the master clock. Browsers can leave a secondary muted
       // WebM paused when it finishes loading or after a seek, so retry it on
       // the next synchronization tick instead of letting the layer freeze.
@@ -587,9 +644,19 @@ export function FlightOverlayPlayer({
       setCameraCurrentTime(currentTime);
       onTimeChange?.(currentTime);
     }
+    if (isInteractive && isFullscreen) {
+      fullscreenPlaybackSnapshotRef.current = {
+        currentTime,
+        wasPlaying: mainIsPlaying || playbackRequestedRef.current,
+      };
+    }
   };
 
-  syncMediaRef.current = (notify = false) => syncMedia(notify);
+  syncMediaRef.current = (
+    notify = false,
+    forcePipSync = false,
+    allowFullscreenSnapshotRewind = false
+  ) => syncMedia(notify, forcePipSync, allowFullscreenSnapshotRewind);
 
   useEffect(() => {
     // Calibration changes the offset without changing the camera clock. Apply
@@ -600,8 +667,9 @@ export function FlightOverlayPlayer({
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      captureFullscreenPlayback(true);
-      setIsFullscreen(document.fullscreenElement === playerRef.current);
+      const entering = document.fullscreenElement === playerRef.current;
+      if (entering) captureFullscreenPlayback(true);
+      setIsFullscreen(entering);
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
@@ -611,7 +679,6 @@ export function FlightOverlayPlayer({
 
   useEffect(() => {
     const handleNativeFullscreenBack = () => {
-      captureFullscreenPlayback(true);
       nativeFullscreenActiveRef.current = false;
       const nativeFullscreen = (
         window as Window & { NativeFullscreen?: NativeFullscreenBridge }
@@ -626,7 +693,7 @@ export function FlightOverlayPlayer({
       const landscape = (event as CustomEvent<{ landscape: boolean }>).detail
         ?.landscape;
       if (typeof landscape !== 'boolean') return;
-      captureFullscreenPlayback(true);
+      if (landscape) captureFullscreenPlayback(true);
       nativeFullscreenActiveRef.current = landscape;
       setIsFullscreen(landscape);
     };
@@ -702,11 +769,12 @@ export function FlightOverlayPlayer({
     setYoutubeReady(false);
     setHasStartedMainPlayback(false);
     let cancelled = false;
+    let player: YoutubePlayer | null = null;
     const load = async () => {
       const api = await loadYoutubeApi();
       if (cancelled || !youtubeHostRef.current) return;
       setYoutubeFailed(false);
-      youtubeRef.current = new api.Player(youtubeHostRef.current, {
+      player = new api.Player(youtubeHostRef.current, {
         height: '100%',
         width: '100%',
         videoId: youtubeId,
@@ -722,10 +790,11 @@ export function FlightOverlayPlayer({
         },
         events: {
           onReady: () => {
+            if (cancelled || !player) return;
             // cc_load_policy follows the viewer's preference. Passing an
             // empty caption track clears that preference for this player.
-            youtubeRef.current?.setOption('captions', 'track', {});
-            const duration = youtubeRef.current?.getDuration() ?? 0;
+            player.setOption('captions', 'track', {});
+            const duration = player.getDuration();
             setCameraDuration(duration);
             setYoutubeReady(true);
             restoreFullscreenPlayback();
@@ -734,16 +803,18 @@ export function FlightOverlayPlayer({
               if (isInteractive && youtubeId && !playbackRequestedRef.current) {
                 cueYoutubeAt(youtubeId, pendingSeek.time);
               } else {
-                youtubeRef.current?.seekTo(pendingSeek.time, true);
+                player.seekTo(pendingSeek.time, true);
               }
             }
             syncMediaRef.current?.(true);
           },
           onApiChange: () => {
-            youtubeRef.current?.setOption('captions', 'track', {});
+            if (cancelled) return;
+            player?.setOption('captions', 'track', {});
           },
           onStateChange: ({ data }: { data: number }) => {
-            const duration = youtubeRef.current?.getDuration() ?? 0;
+            if (cancelled || !player) return;
+            const duration = player.getDuration();
             if (duration > 0) setCameraDuration(duration);
             if (data === 0 && isInteractive) {
               playbackRequestedRef.current = false;
@@ -751,7 +822,7 @@ export function FlightOverlayPlayer({
             const playing = data === 1;
             if (playing) youtubeCuedTimeRef.current = null;
             if (playing && isInteractive && !playbackRequestedRef.current) {
-              youtubeRef.current?.pauseVideo();
+              player.pauseVideo();
               cameraIsPlayingRef.current = false;
               setCameraIsPlaying(false);
               return;
@@ -778,9 +849,11 @@ export function FlightOverlayPlayer({
               flightRef.current?.pause();
               pipVideosRef.current.forEach((video) => video.pause());
               overlayRef.current?.pause();
+              syncMediaRef.current?.(true);
             }
           },
           onError: () => {
+            if (cancelled) return;
             playbackRequestedRef.current = false;
             youtubePipPlayersRef.current.forEach((player) =>
               player.pauseVideo()
@@ -791,12 +864,15 @@ export function FlightOverlayPlayer({
           },
         },
       });
+      youtubeRef.current = player;
     };
-    void load().catch(() => setYoutubeReady(false));
+    void load().catch(() => {
+      if (!cancelled) setYoutubeReady(false);
+    });
     return () => {
       cancelled = true;
-      youtubeRef.current?.destroy();
-      youtubeRef.current = null;
+      player?.destroy();
+      if (youtubeRef.current === player) youtubeRef.current = null;
     };
   }, [
     cueYoutubeAt,
@@ -818,15 +894,16 @@ export function FlightOverlayPlayer({
     const youtubePipPlayers = youtubePipPlayersRef.current;
     const youtubePipHosts = youtubePipHostsRef.current;
     let cancelled = false;
+    let pipSyncFrame: number | null = null;
     const load = async () => {
       const api = await loadYoutubeApi();
       if (cancelled) return;
-      for (const pip of pipsRef.current) {
+      pipsRef.current.forEach((pip) => {
         const videoId = pip.youtubeUrl
           ? getYoutubeVideoId(pip.youtubeUrl)
           : null;
         const host = youtubePipHosts.get(pip.id);
-        if (!videoId || !host) continue;
+        if (!videoId || !host) return;
         const playerHost = document.createElement('div');
         host.replaceChildren(playerHost);
         const player = new api.Player(playerHost, {
@@ -842,6 +919,7 @@ export function FlightOverlayPlayer({
           },
           events: {
             onReady: () => {
+              if (cancelled) return;
               player.mute();
               const currentPip = pipsRef.current.find(
                 ({ id }) => id === pip.id
@@ -867,14 +945,25 @@ export function FlightOverlayPlayer({
                 player.playVideo();
               }
             },
+            onStateChange: () => {
+              if (cancelled || pipSyncFrame !== null) return;
+              pipSyncFrame = window.requestAnimationFrame(() => {
+                pipSyncFrame = null;
+                if (!cancelled) syncMediaRef.current?.(true, true);
+              });
+            },
           },
         });
         youtubePipPlayers.set(pip.id, player);
-      }
+      });
     };
     void load().catch(() => undefined);
     return () => {
       cancelled = true;
+      if (pipSyncFrame !== null) {
+        window.cancelAnimationFrame(pipSyncFrame);
+        pipSyncFrame = null;
+      }
       youtubePipPlayers.forEach((player, id) => {
         player.destroy();
         youtubePipPlayers.delete(id);
@@ -892,6 +981,7 @@ export function FlightOverlayPlayer({
     flightRef.current?.pause();
     pipVideosRef.current.forEach((video) => video.pause());
     overlayRef.current?.pause();
+    syncMedia();
   };
 
   const handleOverlayReady = () => {
@@ -912,7 +1002,7 @@ export function FlightOverlayPlayer({
     if (!cameraRef.current) return;
     cameraRef.current.currentTime = time;
     setCameraCurrentTime(time);
-    syncMedia();
+    syncMedia(true, true, true);
   };
 
   const handleTogglePlay = () => {
@@ -941,13 +1031,13 @@ export function FlightOverlayPlayer({
 
   const handleToggleFullscreen = () => {
     if (!playerRef.current) return;
-    captureFullscreenPlayback(true);
     const nativeFullscreen = (
       window as Window & { NativeFullscreen?: NativeFullscreenBridge }
     ).NativeFullscreen;
 
     if (isInteractive && nativeFullscreen) {
       const entering = !nativeFullscreenActiveRef.current;
+      if (entering) captureFullscreenPlayback(true);
       nativeFullscreenActiveRef.current = entering;
       if (nativeFullscreen.supportsOrientationReady?.() !== true) {
         setIsFullscreen(entering);
@@ -959,6 +1049,7 @@ export function FlightOverlayPlayer({
 
     if (isInteractive) {
       const entering = !isFullscreen;
+      if (entering) captureFullscreenPlayback();
       setIsFullscreen(entering);
       if (document.fullscreenElement === playerRef.current) {
         if (!entering) void document.exitFullscreen().catch(() => undefined);
