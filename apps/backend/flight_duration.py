@@ -21,3 +21,17 @@ def calculate_real_flight_duration_minutes(markers: list[dict[str, Any]]) -> int
     if elapsed_seconds <= 0:
         return None
     return floor(elapsed_seconds / 60 + 0.5)
+
+
+def effective_flight_duration_minutes(
+    markers: list[dict[str, Any]],
+    real_duration_minutes: int | None,
+    duration_minutes: int | None,
+) -> int | None:
+    """Prefer the current takeoff/landing markers over stored duration values."""
+    marker_duration = calculate_real_flight_duration_minutes(markers)
+    if marker_duration is not None:
+        return marker_duration
+    if real_duration_minutes is not None:
+        return real_duration_minutes
+    return duration_minutes

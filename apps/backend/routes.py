@@ -61,7 +61,10 @@ from deployment_drain import (
 from emagram_freshness import get_emagram_cutoff_utc
 from flight_file_paths import resolve_flight_file_path as _resolve_flight_file_path
 from flight_decision import build_flight_decision, normalize_objective
-from flight_duration import calculate_real_flight_duration_minutes
+from flight_duration import (
+    calculate_real_flight_duration_minutes,
+    effective_flight_duration_minutes,
+)
 from flight_naming import format_automatic_flight_name
 from flight_summaries import (
     FlightGpxStatus,
@@ -4775,10 +4778,10 @@ def get_flights(
             "description": flight.description,
             "flight_date": flight.flight_date.isoformat() if flight.flight_date else None,
             "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
-            "duration_minutes": (
-                flight.real_duration_minutes
-                if flight.real_duration_minutes is not None
-                else flight.duration_minutes
+            "duration_minutes": effective_flight_duration_minutes(
+                flight.video_markers,
+                flight.real_duration_minutes,
+                flight.duration_minutes,
             ),
             "max_altitude_m": flight.max_altitude_m,
             "max_speed_kmh": flight.max_speed_kmh,
@@ -4882,9 +4885,13 @@ def get_flight_stats(
     # Calculate totals
     total_flights = len(flights)
     total_minutes = sum(
-        (f.real_duration_minutes if f.real_duration_minutes is not None else f.duration_minutes)
+        effective_flight_duration_minutes(
+            flight.video_markers,
+            flight.real_duration_minutes,
+            flight.duration_minutes,
+        )
         or 0
-        for f in flights
+        for flight in flights
     )
     total_hours = round(total_minutes / 60, 1)
     total_distance = sum(f.distance_km or 0 for f in flights)
@@ -4970,10 +4977,10 @@ def get_flight_records(
 
     # Filter out None values and find records
     def effective_duration(flight: Flight) -> int | None:
-        return (
-            flight.real_duration_minutes
-            if flight.real_duration_minutes is not None
-            else flight.duration_minutes
+        return effective_flight_duration_minutes(
+            flight.video_markers,
+            flight.real_duration_minutes,
+            flight.duration_minutes,
         )
 
     flights_with_duration = [f for f in flights if effective_duration(f) is not None]
@@ -5402,6 +5409,11 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         or previous_overlay_status != flight.gopro_overlay_status
         or previous_pano_path != flight.pano_video_file_path
     )
+    duration_minutes = effective_flight_duration_minutes(
+        flight.video_markers,
+        flight.real_duration_minutes,
+        flight.duration_minutes,
+    )
 
     # Build response with flight data
     flight_dict = {
@@ -5414,11 +5426,7 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "description": flight.description,
         "flight_date": flight.flight_date.isoformat() if flight.flight_date else None,
         "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
-        "duration_minutes": (
-            flight.real_duration_minutes
-            if flight.real_duration_minutes is not None
-            else flight.duration_minutes
-        ),
+        "duration_minutes": duration_minutes,
         "max_altitude_m": flight.max_altitude_m,
         "max_speed_kmh": flight.max_speed_kmh,
         "distance_km": flight.distance_km,
@@ -5546,7 +5554,7 @@ async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session =
     for field, value in update_data.items():
         setattr(flight, field, value)
 
-    if "video_markers" in update_data or "youtube_urls" in update_data:
+    if "video_markers" in update_data:
         flight.real_duration_minutes = calculate_real_flight_duration_minutes(flight.video_markers)
 
     # 4. updated_at is handled automatically by SQLAlchemy

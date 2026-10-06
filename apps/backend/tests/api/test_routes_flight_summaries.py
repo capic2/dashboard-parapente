@@ -86,6 +86,64 @@ def test_summaries_paginate_with_exact_total_and_opaque_cursor(client, db_sessio
     assert "summary-003" not in first["next_cursor"]
 
 
+def test_duration_sort_and_cursor_use_marker_derived_duration(client, db_session, arguel_site):
+    db_session.add_all(
+        [
+            Flight(
+                id="marker-duration-20",
+                site_id=arguel_site.id,
+                flight_date=date(2026, 1, 1),
+                duration_minutes=1,
+                real_duration_minutes=1,
+                video_markers=[
+                    {"id": "takeoff-20", "kind": "takeoff", "timestamp_seconds": 0},
+                    {"id": "landing-20", "kind": "landing", "timestamp_seconds": 1200},
+                ],
+            ),
+            Flight(
+                id="marker-duration-10",
+                site_id=arguel_site.id,
+                flight_date=date(2026, 1, 2),
+                duration_minutes=50,
+                real_duration_minutes=50,
+                video_markers=[
+                    {"id": "takeoff-10", "kind": "takeoff", "timestamp_seconds": 0},
+                    {"id": "landing-10", "kind": "landing", "timestamp_seconds": 600},
+                ],
+            ),
+            Flight(
+                id="marker-duration-5",
+                site_id=arguel_site.id,
+                flight_date=date(2026, 1, 3),
+                duration_minutes=5,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    first = client.get(
+        API_URL,
+        params={"page_size": 2, "sort_by": "duration_minutes", "sort_order": "desc"},
+    ).json()
+    second = client.get(
+        API_URL,
+        params={
+            "page_size": 2,
+            "sort_by": "duration_minutes",
+            "sort_order": "desc",
+            "cursor": first["next_cursor"],
+        },
+    ).json()
+
+    assert [(flight["id"], flight["duration_minutes"]) for flight in first["flights"]] == [
+        ("marker-duration-20", 20),
+        ("marker-duration-10", 10),
+    ]
+    assert [(flight["id"], flight["duration_minutes"]) for flight in second["flights"]] == [
+        ("marker-duration-5", 5)
+    ]
+
+
 def test_summaries_filter_search_sort_and_hide_paths(client, db_session, arguel_site):
     _add_flights(db_session, count=4)
 
