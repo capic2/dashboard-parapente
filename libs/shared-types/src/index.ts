@@ -247,6 +247,7 @@ export const FlightSummarySchema = z.object({
   max_altitude_m: z.number().nullable(),
   distance_km: z.number().nullable(),
   elevation_gain_m: z.number().nullable(),
+  external_provider: z.string().nullable().optional(),
   has_gpx: z.boolean(),
   sportstracklive_status: z
     .enum(['queued', 'uploading', 'uploaded', 'failed'])

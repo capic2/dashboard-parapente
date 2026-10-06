@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 import config
 from flight_summaries import _completed_youtube_uploads, _directory_file_exists
-from models import Flight, GoproOverlayJob, HighlightVideoJob, YoutubeUploadJob
+from models import Flight, GoproOverlayJob, HighlightVideoJob, Site, YoutubeUploadJob
 
 API_URL = "/api/flights/summaries"
 
@@ -177,6 +177,45 @@ def test_summaries_filter_search_sort_and_hide_paths(client, db_session, arguel_
     assert item["gopro_overlay_job_id"] == "overlay-job"
     assert not any("path" in key for key in item)
     assert body["flights"][1]["has_youtube_video"] is False
+
+
+def test_summaries_include_gpx_provider_and_null_provider(
+    client: TestClient,
+    db_session: Session,
+    arguel_site: Site,
+    tmp_path: Path,
+) -> None:
+    imported_gpx = tmp_path / "intervals.gpx"
+    manual_gpx = tmp_path / "manual.gpx"
+    imported_gpx.write_text("<gpx />")
+    manual_gpx.write_text("<gpx />")
+    db_session.add_all(
+        [
+            Flight(
+                id="summary-icu-provider",
+                site_id=arguel_site.id,
+                flight_date=date(2026, 1, 2),
+                external_provider="intervals_icu",
+                gpx_file_path=str(imported_gpx),
+            ),
+            Flight(
+                id="summary-null-provider",
+                site_id=arguel_site.id,
+                flight_date=date(2026, 1, 1),
+                gpx_file_path=str(manual_gpx),
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(API_URL)
+
+    assert response.status_code == 200
+    flights = {flight["id"]: flight for flight in response.json()["flights"]}
+    assert flights["summary-icu-provider"]["has_gpx"] is True
+    assert flights["summary-icu-provider"]["external_provider"] == "intervals_icu"
+    assert flights["summary-null-provider"]["has_gpx"] is True
+    assert flights["summary-null-provider"]["external_provider"] is None
 
 
 def test_summaries_default_query_does_not_require_a_tag(client: TestClient) -> None:
