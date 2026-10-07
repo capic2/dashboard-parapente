@@ -214,6 +214,7 @@ def test_summaries_include_gpx_provider_and_null_provider(
     flights = {flight["id"]: flight for flight in response.json()["flights"]}
     assert flights["summary-icu-provider"]["has_gpx"] is True
     assert flights["summary-icu-provider"]["external_provider"] == "intervals_icu"
+    assert flights["summary-icu-provider"]["gpx_provider"] is None
     assert flights["summary-null-provider"]["has_gpx"] is True
     assert flights["summary-null-provider"]["external_provider"] is None
 
