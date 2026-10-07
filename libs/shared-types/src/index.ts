@@ -152,6 +152,7 @@ export const FlightSchema = z
     id: z.string(),
     external_provider: z.string().trim().min(1).nullish(),
     external_activity_id: z.string().trim().min(1).nullish(),
+    gpx_provider: z.string().trim().min(1).nullish(),
     site_id: z.string().nullish(),
     site_name: z.string().nullish(),
     name: z.string().nullish(),
@@ -248,6 +249,7 @@ export const FlightSummarySchema = z.object({
   distance_km: z.number().nullable(),
   elevation_gain_m: z.number().nullable(),
   external_provider: z.string().nullable().optional(),
+  gpx_provider: z.string().nullable().optional(),
   has_gpx: z.boolean(),
   sportstracklive_status: z
     .enum(['queued', 'uploading', 'uploaded', 'failed'])
