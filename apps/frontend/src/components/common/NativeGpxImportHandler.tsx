@@ -264,8 +264,6 @@ export function NativeGpxImportHandler() {
   const { t } = useTranslation();
 
   useEffect(() => {
-    if (!window.NativeGpxShare) return;
-
     let handlingShare = false;
     const timer = window.setInterval(() => {
       if (handlingShare) return;
