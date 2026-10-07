@@ -47,6 +47,7 @@ import { api } from '../lib/api';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useFlight } from '../hooks/flights/useFlight';
 import { isGoproOverlayInProgress } from '../lib/flightMediaState';
+import { getFlightGpxProvider } from '../lib/flightGpxProvider';
 import {
   normalizeFlightsSearch,
   serializeFlightsSearch,
@@ -166,23 +167,13 @@ function flightHasBadgeFilter(
     case 'gpx':
       return flight.has_gpx;
     case 'gpxIcu':
-      return (
-        flight.has_gpx &&
-        (flight.gpx_provider ?? flight.external_provider)?.toLowerCase() ===
-          'intervals_icu'
-      );
+      return flight.has_gpx && getFlightGpxProvider(flight) === 'intervals_icu';
     case 'gpxStrava':
-      return (
-        flight.has_gpx &&
-        (flight.gpx_provider ?? flight.external_provider)?.toLowerCase() ===
-          'strava'
-      );
+      return flight.has_gpx && getFlightGpxProvider(flight) === 'strava';
     case 'gpxZepp':
       return (
         flight.has_gpx &&
-        ['external', 'zepp'].includes(
-          (flight.gpx_provider ?? flight.external_provider)?.toLowerCase() ?? ''
-        )
+        ['external', 'zepp'].includes(getFlightGpxProvider(flight) ?? '')
       );
     case 'sportstracklive':
       return (
