@@ -786,6 +786,7 @@ class Flight(FlightBase):
     external_provider: str | None = None
     external_activity_id: str | None = None
     gpx_file_path: str | None = None
+    gpx_provider: str | None = None
     gpx_metrics_excluded: bool = False
     external_url: str | None = None
     youtube_urls: list[str] = Field(default_factory=list)
@@ -839,6 +840,7 @@ class FlightSummary(BaseModel):
     distance_km: float | None = None
     elevation_gain_m: int | None = None
     external_provider: str | None = None
+    gpx_provider: str | None = None
     has_gpx: bool
     sportstracklive_status: str | None = None
     sportstracklive_track_id: int | None = None

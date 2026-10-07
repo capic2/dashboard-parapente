@@ -4771,6 +4771,7 @@ def get_flights(
             "id": flight.id,
             "external_provider": flight.external_provider,
             "external_activity_id": flight.external_activity_id,
+            "gpx_provider": flight.gpx_provider,
             "site_id": flight.site_id,
             "site_name": flight.site.name if flight.site else None,
             "name": flight.name,
@@ -5423,6 +5424,7 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "site_id": flight.site_id,
         "external_provider": flight.external_provider,
         "external_activity_id": flight.external_activity_id,
+        "gpx_provider": flight.gpx_provider,
         "description": flight.description,
         "flight_date": flight.flight_date.isoformat() if flight.flight_date else None,
         "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
@@ -6441,6 +6443,7 @@ def create_flight(flight_data: FlightCreate, db: Session = Depends(get_db)):
         "id": flight.id,
         "external_provider": flight.external_provider,
         "external_activity_id": flight.external_activity_id,
+        "gpx_provider": flight.gpx_provider,
         "site_id": flight.site_id,
         "site_name": site.name if site else None,
         "name": flight.name,
@@ -6483,6 +6486,7 @@ async def upload_gpx_to_flight(
     background_tasks: BackgroundTasks,
     flight_id: str,
     gpx_file: UploadFile = File(...),
+    gpx_provider: str | None = Form(default=None),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -6495,6 +6499,11 @@ async def upload_gpx_to_flight(
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
 
+    if gpx_provider is not None:
+        gpx_provider = gpx_provider.strip().lower()
+        if gpx_provider != "zepp":
+            raise HTTPException(status_code=422, detail="Unsupported GPX provider")
+
     try:
         # 2. Lire contenu GPX
         gpx_content = await gpx_file.read()
@@ -6505,6 +6514,8 @@ async def upload_gpx_to_flight(
 
         # Keep the upload successful even if historical/statistical data is malformed.
         flight.gpx_file_path = str(file_path)
+        if gpx_provider is not None:
+            flight.gpx_provider = gpx_provider
         # A replacement GPX is a new track; allow it to be sent again.
         flight.sportstracklive_status = None
         flight.sportstracklive_track_id = None

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import type { Flight } from '@dashboard-parapente/shared-types';
 import { api } from '../../lib/api';
@@ -261,6 +262,7 @@ function decodeSharedFile(shared: SharedGpx): File {
 
 export function NativeGpxImportHandler() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const addToast = useToastStore((state) => state.addToast);
   const { t } = useTranslation();
 
@@ -308,8 +310,13 @@ export function NativeGpxImportHandler() {
 
           const formData = new FormData();
           formData.append('gpx_file', file);
+          formData.append('gpx_provider', 'zepp');
           await api.post(`flights/${flight.id}/upload-gpx`, { body: formData });
-          await queryClient.invalidateQueries({ queryKey: ['flights'] });
+          void queryClient.invalidateQueries({ queryKey: ['flights'] });
+          await navigate({
+            to: '/flights/$flightId',
+            params: { flightId: flight.id },
+          });
           addToast({
             type: 'success',
             title: t('flights.sharedGpxSuccess', {
@@ -335,7 +342,7 @@ export function NativeGpxImportHandler() {
     }, 750);
 
     return () => window.clearInterval(timer);
-  }, [addToast, queryClient, t]);
+  }, [addToast, navigate, queryClient, t]);
 
   return null;
 }

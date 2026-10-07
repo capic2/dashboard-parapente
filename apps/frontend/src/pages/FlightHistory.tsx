@@ -168,17 +168,20 @@ function flightHasBadgeFilter(
     case 'gpxIcu':
       return (
         flight.has_gpx &&
-        flight.external_provider?.toLowerCase() === 'intervals_icu'
+        (flight.gpx_provider ?? flight.external_provider)?.toLowerCase() ===
+          'intervals_icu'
       );
     case 'gpxStrava':
       return (
-        flight.has_gpx && flight.external_provider?.toLowerCase() === 'strava'
+        flight.has_gpx &&
+        (flight.gpx_provider ?? flight.external_provider)?.toLowerCase() ===
+          'strava'
       );
     case 'gpxZepp':
       return (
         flight.has_gpx &&
         ['external', 'zepp'].includes(
-          flight.external_provider?.toLowerCase() ?? ''
+          (flight.gpx_provider ?? flight.external_provider)?.toLowerCase() ?? ''
         )
       );
     case 'sportstracklive':
