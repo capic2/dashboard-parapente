@@ -210,7 +210,7 @@ export function FlightMediaBadges({
               </p>
             )}
             <div className="mt-3">
-              {hasGpx && (
+              {hasGpx && !hasVideo && (
                 <FlightVideoExportControls
                   flight={flight}
                   buttonClassName="min-h-10 w-full px-3 py-2 text-sm"
