@@ -78,6 +78,10 @@ For long validation runs, run commands locally by default. Use a validation suba
 
 Use `gh` for all GitHub interactions: issues, PRs, checks, releases, comments, API calls, and GitHub URLs.
 
+Never add the `automerge` label or enable automatic merging by default. Do so only
+when the user explicitly requests automatic merging for that specific PR. A
+request to create, update, push, or release a PR does not authorize automerge.
+
 Before creating or updating a PR, check branch status, review commits and diff against the base branch, run impacted checks, and fix failures.
 
 Before pushing changes to a branch associated with a PR, check the PR state with
