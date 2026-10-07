@@ -41,7 +41,6 @@ import {
 import { sourceTimeAtPreviewTime } from './GoproOverlaySyncPreview';
 import { getYoutubeVideoId } from '../../../lib/youtube';
 import {
-  useStartYoutubeOverlayExport,
   useUploadYoutubeDownloadCookies,
   useYoutubeUpload,
   useYoutubeVideoAssociations,
@@ -78,15 +77,6 @@ function readYoutubeExportJobId(flightId: string): string | null {
   }
 }
 
-function storeYoutubeExportJobId(flightId: string, jobId: string): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.sessionStorage.setItem(youtubeExportJobStorageKey(flightId), jobId);
-  } catch {
-    // Keep the export usable when browser storage is unavailable.
-  }
-}
-
 function clearStoredYoutubeExportJobId(flightId: string, jobId: string): void {
   if (typeof window === 'undefined') return;
   try {
@@ -95,7 +85,7 @@ function clearStoredYoutubeExportJobId(flightId: string, jobId: string): void {
       window.sessionStorage.removeItem(key);
     }
   } catch {
-    // Keep the export usable when browser storage is unavailable.
+    // Keep showing the current job when browser storage is unavailable.
   }
 }
 
@@ -187,13 +177,9 @@ export function FlightTelemetryInteractivePreview({
   const telemetry = useFlightTelemetry(flightId, true);
   const layout = useTelemetryLayout(flightId);
   const [cameraTime, setCameraTime] = useState(0);
-  const [youtubeExportError, setYoutubeExportError] = useState<string | null>(
-    null
-  );
   const [youtubeExportJobId, setYoutubeExportJobId] = useState(() =>
     readYoutubeExportJobId(flightId)
   );
-  const startExport = useStartYoutubeOverlayExport(flightId);
   const youtubeAssociations = useYoutubeVideoAssociations(flightId);
   const uploadCookies = useUploadYoutubeDownloadCookies();
   const youtubeOverlayUpload = useYoutubeUpload(flightId, {
@@ -425,19 +411,7 @@ export function FlightTelemetryInteractivePreview({
     if (!youtubeUrl || pip.youtubeUrl !== youtubeUrl) return pip;
     return Object.assign({}, pip, { youtubeUrl: undefined });
   });
-  const exportPip =
-    playablePips.find((pip) => pip.youtubeUrl) ?? playablePips[0];
-  const pipLayout = exportPip;
-  const youtubePipUrl = exportPip?.youtubeUrl;
   const pipOffsetSeconds = calibrationOffsetSeconds;
-  const isYoutubeVideoAlreadyPublished = Boolean(
-    youtubeAssociations.data?.some(
-      (association) =>
-        association.url === youtubeUrl &&
-        association.can_delete_from_youtube &&
-        association.exists_on_youtube === true
-    )
-  );
   const hasYoutubeCarousel = youtubeMainUrls.length > 1;
   useEffect(() => {
     setYoutubeExportJobId(readYoutubeExportJobId(flightId));
@@ -506,14 +480,12 @@ export function FlightTelemetryInteractivePreview({
     youtubeExportStatusValue === 'initializing' ||
     youtubeExportStatusValue === 'capturing' ||
     youtubeExportStatusValue === 'encoding';
-  const isYoutubeExportBusy = startExport.isPending || isYoutubeExportActive;
   const shouldShowYoutubeExportProgress = Boolean(
     youtubeExportJobId &&
     (!isYoutubeOverlayPublished ||
       isYoutubeExportActive ||
       youtubeExportStatusValue === 'failed' ||
       youtubeExportStatusValue === 'cancelled' ||
-      startExport.isPending ||
       youtubeOverlayUpload.isFetching)
   );
   const isYoutubeExportStalled =
@@ -545,34 +517,15 @@ export function FlightTelemetryInteractivePreview({
   } else if (youtubeExportStatusValue === 'completed') {
     youtubeExportProgressClass = 'bg-emerald-500';
   }
-  const launchYoutubeExport = async () => {
-    if (!youtubeUrl) return;
-
-    setYoutubeExportError(null);
-    try {
-      const { job_id } = await startExport.mutateAsync({
-        youtube_url: youtubeUrl,
-        pip_apply_offset: pipLayout?.applyOffset !== false,
-        ...(youtubePipUrl ? { pip_youtube_url: youtubePipUrl } : {}),
-      });
-      setYoutubeExportJobId(job_id);
-      storeYoutubeExportJobId(flightId, job_id);
-    } catch (error) {
-      setYoutubeExportError(
-        await getApiErrorMessage(error, t('flights.youtubeOverlayExportError'))
+  const youtubeDownloadNeedsCookies = [youtubeExportStatus?.error].some(
+    (error) => {
+      const normalizedError = error?.toLowerCase() ?? '';
+      return (
+        normalizedError.includes('sign in to confirm') ||
+        normalizedError.includes('http error 403: forbidden')
       );
     }
-  };
-  const youtubeDownloadNeedsCookies = [
-    youtubeExportError,
-    youtubeExportStatus?.error,
-  ].some((error) => {
-    const normalizedError = error?.toLowerCase() ?? '';
-    return (
-      normalizedError.includes('sign in to confirm') ||
-      normalizedError.includes('http error 403: forbidden')
-    );
-  });
+  );
   const handleYoutubeCookieFile = async (
     event: ChangeEvent<HTMLInputElement>
   ) => {
@@ -616,41 +569,8 @@ export function FlightTelemetryInteractivePreview({
             <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
             {t('telemetryLayout.configure')}
           </Link>
-          {youtubeUrl && (
-            <Button
-              variant={isYoutubeExportBusy ? 'cyan' : 'secondary'}
-              isDisabled={isYoutubeExportBusy || isYoutubeVideoAlreadyPublished}
-              aria-busy={isYoutubeExportBusy}
-              className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
-                isYoutubeExportBusy
-                  ? 'border-cyan-400 disabled:opacity-100 dark:border-cyan-500'
-                  : 'border-cyan-200 text-cyan-700 dark:border-cyan-800 dark:text-cyan-300'
-              }`}
-              onPress={launchYoutubeExport}
-            >
-              {isYoutubeExportBusy && (
-                <LoaderCircle
-                  className="h-3.5 w-3.5 motion-safe:animate-spin"
-                  aria-hidden="true"
-                />
-              )}
-              {isYoutubeExportBusy
-                ? t('flights.youtubeOverlayExportInProgress')
-                : isYoutubeVideoAlreadyPublished
-                  ? t('flights.youtubeUploadPublished')
-                  : t('flights.youtubeOverlayExport')}
-            </Button>
-          )}
         </span>
       </div>
-      {(youtubeExportError || startExport.isError) && (
-        <p
-          className="border-t border-red-200 bg-red-50/70 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/20 dark:text-red-300 sm:px-5"
-          role="alert"
-        >
-          {youtubeExportError ?? t('flights.youtubeOverlayExportError')}
-        </p>
-      )}
       {youtubeDownloadNeedsCookies && (
         <div className="border-t border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900 dark:bg-amber-950/20 sm:px-5">
           <p className="text-sm font-semibold text-amber-950 dark:text-amber-100">
