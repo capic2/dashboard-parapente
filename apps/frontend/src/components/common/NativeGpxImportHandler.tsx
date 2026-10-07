@@ -131,6 +131,12 @@ function parseZeppFilenameTimestamp(filename: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function getZeppFilenameDate(filename: string): string | null {
+  const match = filename.match(/Zepp(\d{4})(\d{2})(\d{2})\d{6}/iu);
+  if (!match) return null;
+  return `${match[1]}-${match[2]}-${match[3]}`;
+}
+
 function getTrackTimeRange(
   file: File,
   filenameTimestamp: number | null
@@ -169,7 +175,8 @@ function dateOffset(timestamp: number, days: number): string {
 async function findMatchingFlight(
   startTime: number,
   endTime: number,
-  filenameTimestamp: number | null
+  filenameTimestamp: number | null,
+  filenameDate: string | null
 ) {
   const rangeStart = Math.min(startTime, filenameTimestamp ?? startTime);
   const rangeEnd = Math.max(endTime, filenameTimestamp ?? endTime);
@@ -220,8 +227,23 @@ async function findMatchingFlight(
   if (trackMatch) return trackMatch;
 
   if (filenameTimestamp !== null && filenameTimestamp !== startTime) {
-    return findUniqueMatch(filenameTimestamp);
+    const filenameMatch = findUniqueMatch(filenameTimestamp);
+    if (filenameMatch) return filenameMatch;
   }
+
+  // Some manually created flights have neither a departure time nor a
+  // generated name containing one. If the Zepp filename's local date points
+  // to exactly one flight, that is still a safe match for replacing its GPX.
+  if (filenameDate !== null) {
+    const flightsOnDate = flights.filter(
+      (flight) => flight.flight_date === filenameDate
+    );
+    if (flightsOnDate.length === 1) {
+      const [onlyFlight] = flightsOnDate;
+      if (onlyFlight) return onlyFlight;
+    }
+  }
+
   return null;
 }
 
@@ -262,6 +284,8 @@ export function NativeGpxImportHandler() {
           const shared = JSON.parse(serialized) as SharedGpx;
           const file = decodeSharedFile(shared);
           const filenameTimestamp = parseZeppFilenameTimestamp(file.name);
+          const filenameDate =
+            filenameTimestamp === null ? null : getZeppFilenameDate(file.name);
           const [startTime, endTime] = await getTrackTimeRange(
             file,
             filenameTimestamp
@@ -269,7 +293,8 @@ export function NativeGpxImportHandler() {
           const flight = await findMatchingFlight(
             startTime,
             endTime,
-            filenameTimestamp
+            filenameTimestamp,
+            filenameDate
           );
           if (!flight) {
             throw new Error('no-match');
