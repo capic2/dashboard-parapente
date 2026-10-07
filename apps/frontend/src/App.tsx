@@ -5,7 +5,6 @@ import { ErrorBoundary } from '@dashboard-parapente/design-system';
 import { queryClient } from './lib/queryClient';
 import { routeTree } from './routeTree.gen';
 import { JobNotifications } from './components/common/JobNotifications';
-import { NativeGpxImportHandler } from './components/common/NativeGpxImportHandler';
 import { clearPreloadErrorRecovery } from './lib/preloadErrorRecovery';
 
 const router = createRouter({ routeTree, basepath: import.meta.env.BASE_URL });
@@ -23,7 +22,6 @@ const App: React.FC = () => {
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
         <JobNotifications />
-        <NativeGpxImportHandler />
       </QueryClientProvider>
     </ErrorBoundary>
   );
