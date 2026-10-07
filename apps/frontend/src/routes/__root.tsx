@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Dialog, Heading, Modal, ModalOverlay } from 'react-aria-components';
 import { ExternalLink, X } from 'lucide-react';
 import Header from '../components/common/Header';
+import { NativeGpxImportHandler } from '../components/common/NativeGpxImportHandler';
 import AppUpdateBanner from '../components/common/AppUpdateBanner';
 import DeploymentStatusBanner from '../components/common/DeploymentStatusBanner';
 import { queryClient } from '../lib/queryClient';
@@ -66,11 +67,17 @@ function RootComponent() {
   );
 
   if (isLoginPage || isExportViewerPage || isPrivacyPage) {
-    return <Outlet />;
+    return (
+      <>
+        <NativeGpxImportHandler />
+        <Outlet />
+      </>
+    );
   }
 
   return (
     <div className="min-h-screen overflow-x-clip bg-gray-50 p-3 text-gray-900 transition-colors dark:bg-gray-900 dark:text-gray-100 md:p-4">
+      <NativeGpxImportHandler />
       <div className="max-w-7xl mx-auto">
         {latestVersion && (
           <AppUpdateBanner
