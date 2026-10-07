@@ -84,6 +84,43 @@ function parseFlightDepartureTimes(value: string): number[] {
   return [...new Set([parisTimestamp, utcTimestamp].filter(Number.isFinite))];
 }
 
+function parseFlightNameDepartureTime(flight: Flight): number | null {
+  const name = flight.name || flight.title || '';
+  const automaticName = name.match(
+    /^Vol du (\d{2})\/(\d{2})\/(\d{4}) à (\d{2}):(\d{2})(?:\s+\[[\da-f]{16}\])?$/iu
+  );
+  const manualName = name.match(/(?:^| )(\d{2})-(\d{2}) (\d{1,2})h(\d{2})$/u);
+  const [, year, month, day] =
+    flight.flight_date.match(/^(\d{4})-(\d{2})-(\d{2})$/u) ?? [];
+  if (!year || !month || !day) return null;
+
+  let hour: string | undefined;
+  let minute: string | undefined;
+  if (automaticName) {
+    if (
+      automaticName[1] !== day ||
+      automaticName[2] !== month ||
+      automaticName[3] !== year
+    ) {
+      return null;
+    }
+    hour = automaticName[4];
+    minute = automaticName[5];
+  } else if (manualName) {
+    if (manualName[1] !== day || manualName[2] !== month) return null;
+    hour = manualName[3];
+    minute = manualName[4];
+  } else {
+    return null;
+  }
+  if (!hour || !minute) return null;
+
+  const parsed = parseParisLocalTimestamp(
+    `${flight.flight_date}T${hour.padStart(2, '0')}:${minute}:00`
+  );
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function parseZeppFilenameTimestamp(filename: string): number | null {
   const match = filename.match(/Zepp(\d{14})/iu);
   if (!match) return null;
@@ -150,11 +187,15 @@ async function findMatchingFlight(
   const findUniqueMatch = (timestamp: number) => {
     const candidates = flights
       .flatMap((flight) => {
-        if (!flight.departure_time) return [];
+        const namedDepartureTime = parseFlightNameDepartureTime(flight);
+        let departureTimes: number[] = [];
+        if (namedDepartureTime !== null) {
+          departureTimes = [namedDepartureTime];
+        } else if (flight.departure_time) {
+          departureTimes = parseFlightDepartureTimes(flight.departure_time);
+        }
         const distance = Math.min(
-          ...parseFlightDepartureTimes(flight.departure_time).map((departure) =>
-            Math.abs(departure - timestamp)
-          )
+          ...departureTimes.map((departure) => Math.abs(departure - timestamp))
         );
         return Number.isFinite(distance) &&
           distance <= MAX_START_TIME_DIFFERENCE_MS
