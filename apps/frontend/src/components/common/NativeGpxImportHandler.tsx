@@ -93,7 +93,7 @@ function parseFlightNameDepartureTime(flight: Flight): number | null {
   );
   const manualName = name.match(/(?:^| )(\d{2})-(\d{2}) (\d{1,2})h(\d{2})$/u);
   const [, year, month, day] =
-    flight.flight_date.match(/^(\d{4})-(\d{2})-(\d{2})$/u) ?? [];
+    flight.flight_date?.match(/^(\d{4})-(\d{2})-(\d{2})$/u) ?? [];
   if (!year || !month || !day) return null;
 
   let hour: string | undefined;
