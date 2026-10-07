@@ -142,6 +142,8 @@ const FLIGHT_BADGE_FILTERS = [
   { id: 'video', label: 'flights.videoBadge' },
   { id: 'camera', label: 'flights.cameraBadge' },
   { id: 'pano', label: 'flights.panoBadge' },
+  { id: 'face', label: 'flights.faceBadge' },
+  { id: 'pilote', label: 'flights.piloteBadge' },
   { id: 'goproOverlay', label: 'flights.goproOverlayBadge' },
   { id: 'highlightVideo', label: 'flights.highlightVideoBadge' },
   { id: 'youtube', label: 'flights.youtubeBadge' },
@@ -191,6 +193,16 @@ function flightHasBadgeFilter(
       return flight.has_camera;
     case 'pano':
       return flight.has_pano_video;
+    case 'face':
+      return (
+        flight.has_face_video === true ||
+        flight.youtube_video_types?.includes('face') === true
+      );
+    case 'pilote':
+      return (
+        flight.has_pilote_video === true ||
+        flight.youtube_video_types?.includes('pilote') === true
+      );
     case 'goproOverlay':
       return (
         flight.has_gopro_overlay ||
