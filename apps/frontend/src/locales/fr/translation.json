@@ -1309,7 +1309,7 @@
     "youtubeUploadStarted": "L'envoi vers YouTube a démarré.",
     "youtubeUploadCompleted": "La vidéo est disponible sur YouTube.",
     "youtubeUploadError": "Impossible d'envoyer la vidéo sur YouTube",
-    "temporarySourcesTitle": "Sources temporaires à publier",
+    "temporarySourcesTitle": "Vidéos et sources du vol",
     "temporarySourceBadge": "Fichier temporaire",
     "temporarySourceReady": "À publier sur YouTube",
     "temporarySourceUploading": "Envoi YouTube en cours · {{progress}} %",

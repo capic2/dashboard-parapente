@@ -1305,7 +1305,7 @@
     "youtubeUploadStarted": "The YouTube upload has started.",
     "youtubeUploadCompleted": "The video is now available on YouTube.",
     "youtubeUploadError": "Unable to upload the video to YouTube",
-    "temporarySourcesTitle": "Temporary sources to publish",
+    "temporarySourcesTitle": "Flight videos and sources",
     "temporarySourceBadge": "Temporary file",
     "temporarySourceReady": "Ready to publish on YouTube",
     "temporarySourceUploading": "Uploading to YouTube · {{progress}}%",

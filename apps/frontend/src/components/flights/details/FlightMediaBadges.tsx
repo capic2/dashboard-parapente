@@ -74,8 +74,6 @@ export function FlightMediaBadges({
     videoStatusLabel = t('flights.mediaFileAvailable');
   } else if (isVideoExportRunning) {
     videoStatusLabel = videoProcessingLabel;
-  } else if (isVideoExportFailed) {
-    videoStatusLabel = t('flights.videoErrorBadge');
   }
 
   return (
@@ -147,143 +145,145 @@ export function FlightMediaBadges({
             </Button>
           </div>
         </div>
-        <div className="order-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
-          {hasVideo && (
-            <FlightMediaThumbnail
-              path={`/flights/${flightId}/video/thumbnail`}
-              videoPath={`/flights/${flightId}/video`}
-              alt={t('flights.videoThumbnailAlt')}
+        <section
+          aria-labelledby="flight-temporary-sources-title"
+          className="order-2 col-span-full rounded-xl border border-amber-200 bg-amber-50/50 p-3 dark:border-amber-900 dark:bg-amber-950/10 sm:p-4"
+        >
+          <div className="mb-3 flex items-center gap-2">
+            <Clock3
+              className="h-4 w-4 text-amber-800 dark:text-amber-200"
+              aria-hidden="true"
             />
-          )}
-          <div className="p-3">
-            <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
-                <Video className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-semibold text-slate-950 dark:text-white">
-                  {t('flights.videoBadge')}
-                </span>
-                <span className="block text-xs text-slate-600 dark:text-slate-300">
-                  {videoStatusLabel}
-                </span>
-              </span>
-              {hasVideo && (
-                <button
-                  type="button"
-                  className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-300 dark:hover:bg-indigo-950/50 dark:hover:text-indigo-300"
-                  onClick={onDownloadVideo}
-                  disabled={isDownloadingAnyMedia}
-                  aria-label={t('flights.viewer.downloadVideo')}
-                >
-                  <Download className="h-4 w-4" aria-hidden="true" />
-                </button>
-              )}
-            </div>
-            {isVideoExportRunning && (
-              <div className="mt-3" aria-label={videoProcessingLabel}>
-                <div className="mb-1 flex items-center justify-between text-xs font-semibold text-blue-800 dark:text-blue-200">
-                  <span className="flex items-center gap-1.5">
-                    <LoaderCircle
-                      className="h-3.5 w-3.5 motion-safe:animate-spin"
-                      aria-hidden="true"
-                    />
-                    {t('flights.mediaExportInProgress')}
-                  </span>
-                  <span>{videoProgress}%</span>
-                </div>
-                <progress
-                  aria-label={videoProcessingLabel}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={videoProgress}
-                  value={videoProgress}
-                  max={100}
-                  className="h-2 w-full accent-blue-600 dark:accent-blue-400"
-                />
-              </div>
-            )}
-            {isVideoExportFailed && (
-              <p className="mt-3 flex items-center gap-2 rounded-lg bg-red-50 p-2 text-xs font-semibold text-red-800 dark:bg-red-950/40 dark:text-red-200">
-                <CircleAlert className="h-4 w-4" aria-hidden="true" />
-                {t('flights.videoErrorBadge')}
-              </p>
-            )}
-            <div className="mt-3">
-              {hasGpx && !hasVideo && (
-                <FlightVideoExportControls
-                  flight={flight}
-                  buttonClassName="min-h-10 w-full px-3 py-2 text-sm"
-                  compact
-                  showModeSelector={false}
-                  showCancelAction={false}
-                  showLogsPanel={false}
-                />
-              )}
-              {hasVideo && (
-                <FlightYoutubeUploadControls
-                  flight={flight}
-                  source={{ source_type: 'video' }}
-                />
-              )}
-              {!hasGpx && !hasVideo && (
-                <>
-                  <p className="mb-3 rounded-lg bg-amber-50 p-2 text-xs font-medium text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                    {t(
-                      'flights.videoNeedsGpx',
-                      'Ajoutez un GPX pour générer cette vidéo.'
-                    )}
-                  </p>
-                  <Button
-                    variant="outline"
-                    className="min-h-10 w-full rounded-lg px-3 py-2 text-sm"
-                    isDisabled
-                    title={t('flights.replayUnavailable')}
-                  >
-                    <Video className="h-4 w-4" aria-hidden="true" />
-                    {t('flights.viewer.generateVideoShort')}
-                  </Button>
-                </>
-              )}
-            </div>
+            <h4
+              id="flight-temporary-sources-title"
+              className="text-sm font-semibold text-slate-950 dark:text-white"
+            >
+              {t('flights.temporarySourcesTitle')}
+            </h4>
           </div>
-        </div>
-        {(hasGoproCameraVideo ||
-          hasPanoVideo ||
-          hasFaceVideo ||
-          hasPiloteVideo) && (
-          <section
-            aria-labelledby="flight-temporary-sources-title"
-            className="order-3 col-span-full rounded-xl border border-amber-200 bg-amber-50/50 p-3 dark:border-amber-900 dark:bg-amber-950/10 sm:p-4"
-          >
-            <div className="mb-3 flex items-center gap-2">
-              <Clock3
-                className="h-4 w-4 text-amber-800 dark:text-amber-200"
-                aria-hidden="true"
-              />
-              <h4
-                id="flight-temporary-sources-title"
-                className="text-sm font-semibold text-slate-950 dark:text-white"
-              >
-                {t('flights.temporarySourcesTitle')}
-              </h4>
-            </div>
-            <div className="space-y-2">
-              {hasGoproCameraVideo && (
-                <FlightTemporaryMediaCard flight={flight} sourceType="camera" />
-              )}
-              {hasPanoVideo && (
-                <FlightTemporaryMediaCard flight={flight} sourceType="pano" />
-              )}
-              {hasFaceVideo && (
-                <FlightTemporaryMediaCard flight={flight} sourceType="face" />
-              )}
-              {hasPiloteVideo && (
-                <FlightTemporaryMediaCard flight={flight} sourceType="pilote" />
-              )}
-            </div>
-          </section>
-        )}
+          <div className="space-y-2">
+            <article className="grid grid-cols-[5rem_minmax(0,1fr)] gap-3 rounded-xl border border-amber-200 bg-white p-3 dark:border-amber-900 dark:bg-slate-900/60 sm:grid-cols-[7rem_minmax(0,1fr)_auto] sm:items-center sm:gap-4">
+              <div className="row-span-2 overflow-hidden rounded-lg sm:row-span-1">
+                {hasVideo ? (
+                  <FlightMediaThumbnail
+                    path={`/flights/${flightId}/video/thumbnail`}
+                    videoPath={`/flights/${flightId}/video`}
+                    alt={t('flights.videoThumbnailAlt')}
+                  />
+                ) : (
+                  <div className="flex aspect-video items-center justify-center bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                    <Video className="h-6 w-6" aria-hidden="true" />
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 self-center">
+                <div className="flex items-center gap-2">
+                  <h5 className="font-semibold text-slate-950 dark:text-white">
+                    {t('flights.videoBadge')}
+                  </h5>
+                  {hasVideo && (
+                    <button
+                      type="button"
+                      className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-300 dark:hover:bg-indigo-950/50 dark:hover:text-indigo-300"
+                      onClick={onDownloadVideo}
+                      disabled={isDownloadingAnyMedia}
+                      aria-label={t('flights.viewer.downloadVideo')}
+                    >
+                      <Download className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
+                {!(
+                  isVideoExportFailed &&
+                  !hasVideo &&
+                  !isVideoExportRunning
+                ) && (
+                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                    {videoStatusLabel}
+                  </p>
+                )}
+                {isVideoExportRunning && (
+                  <div className="mt-2">
+                    <div className="mb-1 flex items-center justify-between text-xs font-semibold text-blue-800 dark:text-blue-200">
+                      <span className="flex items-center gap-1.5">
+                        <LoaderCircle
+                          className="h-3.5 w-3.5 motion-safe:animate-spin"
+                          aria-hidden="true"
+                        />
+                        {t('flights.mediaExportInProgress')}
+                      </span>
+                      <span>{videoProgress}%</span>
+                    </div>
+                    <progress
+                      aria-label={videoProcessingLabel}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={videoProgress}
+                      value={videoProgress}
+                      max={100}
+                      className="h-2 w-full accent-blue-600 dark:accent-blue-400"
+                    />
+                  </div>
+                )}
+                {isVideoExportFailed && (
+                  <p className="mt-2 flex items-center gap-2 rounded-lg bg-red-50 p-2 text-xs font-semibold text-red-800 dark:bg-red-950/40 dark:text-red-200">
+                    <CircleAlert className="h-4 w-4" aria-hidden="true" />
+                    {t('flights.videoErrorBadge')}
+                  </p>
+                )}
+              </div>
+              <div className="col-span-2 grid gap-2 sm:col-span-1 sm:flex sm:flex-col">
+                {hasGpx && !hasVideo && (
+                  <FlightVideoExportControls
+                    flight={flight}
+                    buttonClassName="min-h-10 w-full px-3 py-2 text-sm"
+                    compact
+                    showModeSelector={false}
+                    showCancelAction={false}
+                    showLogsPanel={false}
+                  />
+                )}
+                {hasVideo && (
+                  <FlightYoutubeUploadControls
+                    flight={flight}
+                    source={{ source_type: 'video' }}
+                  />
+                )}
+                {!hasGpx && !hasVideo && (
+                  <>
+                    <p className="rounded-lg bg-amber-50 p-2 text-xs font-medium text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                      {t(
+                        'flights.videoNeedsGpx',
+                        'Ajoutez un GPX pour générer cette vidéo.'
+                      )}
+                    </p>
+                    <Button
+                      variant="outline"
+                      className="min-h-10 w-full rounded-lg px-3 py-2 text-sm"
+                      isDisabled
+                      title={t('flights.replayUnavailable')}
+                    >
+                      <Video className="h-4 w-4" aria-hidden="true" />
+                      {t('flights.viewer.generateVideoShort')}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </article>
+            {hasGoproCameraVideo && (
+              <FlightTemporaryMediaCard flight={flight} sourceType="camera" />
+            )}
+            {hasPanoVideo && (
+              <FlightTemporaryMediaCard flight={flight} sourceType="pano" />
+            )}
+            {hasFaceVideo && (
+              <FlightTemporaryMediaCard flight={flight} sourceType="face" />
+            )}
+            {hasPiloteVideo && (
+              <FlightTemporaryMediaCard flight={flight} sourceType="pilote" />
+            )}
+          </div>
+        </section>
         {showPersistedOverlayBadge && (
           <div className="order-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
             <FlightMediaThumbnail
