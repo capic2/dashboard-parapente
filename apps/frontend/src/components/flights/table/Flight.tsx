@@ -23,6 +23,7 @@ import {
   useAppSettingsStore,
 } from '../../../stores/appSettingsStore';
 import { isGoproOverlayInProgress } from '../../../lib/flightMediaState';
+import { getFlightGpxProvider } from '../../../lib/flightGpxProvider';
 
 interface FlightProps {
   flight: FlightSummary;
@@ -66,13 +67,13 @@ export function Flight({
   const units = useAppSettingsStore((state) => state.settings.units);
   const isHighlighted = isActive || isSelected;
   const hasGpx = flight.has_gpx;
-  const gpxProvider = flight.gpx_provider ?? flight.external_provider;
+  const gpxProvider = getFlightGpxProvider(flight);
   const gpxProviderBadgeKey: Record<string, string> = {
     intervals_icu: 'flights.gpxIcuBadge',
     strava: 'flights.gpxStravaBadge',
     external: 'flights.gpxZeppBadge',
     zepp: 'flights.gpxZeppBadge',
-  }[gpxProvider?.toLowerCase() ?? ''];
+  }[gpxProvider ?? ''];
   const hasVideo = flight.has_video;
   const hasCamera = flight.has_camera;
   const hasYoutubeVideo = flight.has_youtube_video;
