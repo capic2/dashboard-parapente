@@ -79,14 +79,6 @@ vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
   useYoutubeVideoAssociations: () => ({ data: hooks.youtubeAssociations }),
   useUploadYoutubeDownloadCookies: () => ({ mutateAsync: vi.fn() }),
   useYoutubeUpload: () => ({ data: null }),
-  useStartYoutubeOverlayExport: () => ({
-    isPending: false,
-    isError: false,
-    mutateAsync: vi.fn().mockResolvedValue({
-      job_id: 'export-job-1',
-      status: 'queued',
-    }),
-  }),
 }));
 
 vi.mock('../../../stores/authStore', () => ({
