@@ -7,6 +7,7 @@ import { useToastStore } from '../../hooks/useToast';
 
 declare global {
   interface Window {
+    __pendingNativeGpxShare?: SharedGpx | null;
     NativeGpxShare?: {
       consumeSharedGpx: () => string | null;
     };
@@ -268,18 +269,25 @@ export function NativeGpxImportHandler() {
     const timer = window.setInterval(() => {
       if (handlingShare) return;
 
-      let serialized: string | null;
-      try {
-        serialized = window.NativeGpxShare?.consumeSharedGpx() ?? null;
-      } catch {
-        return;
+      const sharedFromPage = window.__pendingNativeGpxShare ?? null;
+      if (sharedFromPage) {
+        window.__pendingNativeGpxShare = null;
       }
-      if (!serialized) return;
+      let serialized: string | null = null;
+      if (!sharedFromPage) {
+        try {
+          serialized = window.NativeGpxShare?.consumeSharedGpx() ?? null;
+        } catch {
+          return;
+        }
+        if (!serialized) return;
+      }
 
       handlingShare = true;
       void (async () => {
         try {
-          const shared = JSON.parse(serialized) as SharedGpx;
+          const shared =
+            sharedFromPage ?? (JSON.parse(serialized ?? 'null') as SharedGpx);
           const file = decodeSharedFile(shared);
           const filenameTimestamp = parseZeppFilenameTimestamp(file.name);
           const filenameDate =
