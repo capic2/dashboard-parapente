@@ -31,13 +31,11 @@ const parisTimeFormatter = new Intl.DateTimeFormat('en-GB', {
   hourCycle: 'h23',
 });
 
-function parseFlightDepartureTime(value: string): number {
-  if (/[zZ]|[+-]\d{2}:?\d{2}$/u.test(value)) return Date.parse(value);
-
+function parseParisLocalTimestamp(value: string): number {
   const match = value.match(
     /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?$/u
   );
-  if (!match) return Date.parse(value);
+  if (!match) return Number.NaN;
 
   const [, year, month, day, hour, minute, second, fraction = '0'] = match;
   const millis = Number(`0.${fraction}`) * 1000;
@@ -72,7 +70,34 @@ function parseFlightDepartureTime(value: string): number {
   return timestamp;
 }
 
-function getTrackTimeRange(file: File): Promise<[number, number]> {
+function parseFlightDepartureTimes(value: string): number[] {
+  if (/[zZ]|[+-]\d{2}:?\d{2}$/u.test(value)) return [Date.parse(value)];
+
+  const parisTimestamp = parseParisLocalTimestamp(value);
+  if (!Number.isFinite(parisTimestamp)) return [Date.parse(value)];
+
+  // Flight.departure_time is stored without a timezone. Older GPX imports
+  // stored Paris wall time, while replacement uploads can store UTC after the
+  // timezone is dropped by the database. Try both interpretations so either
+  // kind of existing flight can be matched to the GPX's explicit timestamp.
+  const utcTimestamp = Date.parse(`${value.replace(' ', 'T')}Z`);
+  return [...new Set([parisTimestamp, utcTimestamp].filter(Number.isFinite))];
+}
+
+function parseZeppFilenameTimestamp(filename: string): number | null {
+  const match = filename.match(/Zepp(\d{14})/iu);
+  if (!match) return null;
+
+  const [, timestamp] = match;
+  const localTimestamp = `${timestamp.slice(0, 4)}-${timestamp.slice(4, 6)}-${timestamp.slice(6, 8)}T${timestamp.slice(8, 10)}:${timestamp.slice(10, 12)}:${timestamp.slice(12, 14)}`;
+  const parsed = parseParisLocalTimestamp(localTimestamp);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getTrackTimeRange(
+  file: File,
+  filenameTimestamp: number | null
+): Promise<[number, number]> {
   return file.text().then((text) => {
     const document = new DOMParser().parseFromString(text, 'application/xml');
     if (document.querySelector('parsererror')) {
@@ -89,6 +114,9 @@ function getTrackTimeRange(file: File): Promise<[number, number]> {
       .sort((left, right) => left - right);
 
     if (timestamps.length === 0) {
+      if (filenameTimestamp !== null) {
+        return [filenameTimestamp, filenameTimestamp];
+      }
       throw new Error('no-timestamps');
     }
     return [timestamps[0], timestamps[timestamps.length - 1]];
@@ -101,41 +129,59 @@ function dateOffset(timestamp: number, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-async function findMatchingFlight(startTime: number, endTime: number) {
+async function findMatchingFlight(
+  startTime: number,
+  endTime: number,
+  filenameTimestamp: number | null
+) {
+  const rangeStart = Math.min(startTime, filenameTimestamp ?? startTime);
+  const rangeEnd = Math.max(endTime, filenameTimestamp ?? endTime);
   const flights = await api
     .get('flights', {
       searchParams: {
-        date_from: dateOffset(startTime, -1),
-        date_to: dateOffset(endTime, 1),
+        date_from: dateOffset(rangeStart, -1),
+        date_to: dateOffset(rangeEnd, 1),
         limit: '500',
       },
     })
     .json<{ flights: Flight[] }>()
     .then((response) => response.flights);
 
-  const candidates = flights
-    .flatMap((flight) => {
-      if (!flight.departure_time) return [];
-      const distance = Math.abs(
-        parseFlightDepartureTime(flight.departure_time) - startTime
-      );
-      return Number.isFinite(distance) &&
-        distance <= MAX_START_TIME_DIFFERENCE_MS
-        ? [{ flight, distance }]
-        : [];
-    })
-    .sort((left, right) => left.distance - right.distance);
+  const findUniqueMatch = (timestamp: number) => {
+    const candidates = flights
+      .flatMap((flight) => {
+        if (!flight.departure_time) return [];
+        const distance = Math.min(
+          ...parseFlightDepartureTimes(flight.departure_time).map((departure) =>
+            Math.abs(departure - timestamp)
+          )
+        );
+        return Number.isFinite(distance) &&
+          distance <= MAX_START_TIME_DIFFERENCE_MS
+          ? [{ flight, distance }]
+          : [];
+      })
+      .sort((left, right) => left.distance - right.distance);
 
-  const best = candidates[0];
-  const secondBest = candidates[1];
-  if (
-    !best ||
-    (secondBest &&
-      secondBest.distance - best.distance < MIN_MATCH_SEPARATION_MS)
-  ) {
-    return null;
+    const best = candidates[0];
+    const secondBest = candidates[1];
+    if (
+      !best ||
+      (secondBest &&
+        secondBest.distance - best.distance < MIN_MATCH_SEPARATION_MS)
+    ) {
+      return null;
+    }
+    return best.flight;
+  };
+
+  const trackMatch = findUniqueMatch(startTime);
+  if (trackMatch) return trackMatch;
+
+  if (filenameTimestamp !== null && filenameTimestamp !== startTime) {
+    return findUniqueMatch(filenameTimestamp);
   }
-  return best.flight;
+  return null;
 }
 
 function decodeSharedFile(shared: SharedGpx): File {
@@ -174,8 +220,16 @@ export function NativeGpxImportHandler() {
         try {
           const shared = JSON.parse(serialized) as SharedGpx;
           const file = decodeSharedFile(shared);
-          const [startTime, endTime] = await getTrackTimeRange(file);
-          const flight = await findMatchingFlight(startTime, endTime);
+          const filenameTimestamp = parseZeppFilenameTimestamp(file.name);
+          const [startTime, endTime] = await getTrackTimeRange(
+            file,
+            filenameTimestamp
+          );
+          const flight = await findMatchingFlight(
+            startTime,
+            endTime,
+            filenameTimestamp
+          );
           if (!flight) {
             throw new Error('no-match');
           }
