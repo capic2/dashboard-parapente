@@ -147,6 +147,13 @@ const FLIGHT_BADGE_FILTERS = [
   { id: 'goproOverlay', label: 'flights.goproOverlayBadge' },
   { id: 'highlightVideo', label: 'flights.highlightVideoBadge' },
   { id: 'youtube', label: 'flights.youtubeBadge' },
+  { id: 'youtubeOverlay', label: 'flights.youtubeOverlayFilter' },
+  { id: 'youtubeCamera', label: 'flights.youtubeCameraFilter' },
+  { id: 'youtubeVideo', label: 'flights.youtubeVideoFilter' },
+  { id: 'youtubePano', label: 'flights.youtubePanoFilter' },
+  { id: 'youtubeFace', label: 'flights.youtubeFaceFilter' },
+  { id: 'youtubePilote', label: 'flights.youtubePiloteFilter' },
+  { id: 'youtubeHighlight', label: 'flights.youtubeHighlightFilter' },
 ] as const;
 const PRIMARY_FLIGHT_BADGE_FILTERS = FLIGHT_BADGE_FILTERS.filter(
   ({ id }) => id === 'gpx' || id === 'video'
@@ -156,10 +163,20 @@ const ADVANCED_FLIGHT_BADGE_FILTERS = FLIGHT_BADGE_FILTERS.filter(
 );
 
 type FlightBadgeFilter = (typeof FLIGHT_BADGE_FILTERS)[number]['id'];
+type YoutubeVideoType = NonNullable<
+  FlightSummary['youtube_video_types']
+>[number];
 type BadgeFilterSelection = {
   included: FlightBadgeFilter[];
   excluded: FlightBadgeFilter[];
 };
+
+function hasYoutubeVideoType(
+  flight: FlightSummary,
+  ...types: YoutubeVideoType[]
+) {
+  return types.some((type) => flight.youtube_video_types?.includes(type));
+}
 
 function flightHasBadgeFilter(
   flight: FlightSummary,
@@ -185,33 +202,35 @@ function flightHasBadgeFilter(
     case 'video':
       return (
         flight.has_video ||
+        hasYoutubeVideoType(flight, 'video') ||
         (flight.video_export_status != null &&
           (VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(flight.video_export_status) ||
             flight.video_export_status === 'failed'))
       );
     case 'camera':
-      return flight.has_camera;
+      return flight.has_camera || hasYoutubeVideoType(flight, 'camera');
     case 'pano':
-      return flight.has_pano_video;
+      return flight.has_pano_video || hasYoutubeVideoType(flight, 'pano');
     case 'face':
       return (
-        flight.has_face_video === true ||
-        flight.youtube_video_types?.includes('face') === true
+        flight.has_face_video === true || hasYoutubeVideoType(flight, 'face')
       );
     case 'pilote':
       return (
         flight.has_pilote_video === true ||
-        flight.youtube_video_types?.includes('pilote') === true
+        hasYoutubeVideoType(flight, 'pilote')
       );
     case 'goproOverlay':
       return (
         flight.has_gopro_overlay ||
+        hasYoutubeVideoType(flight, 'gopro_overlay', 'youtube_overlay') ||
         isGoproOverlayInProgress(flight.gopro_overlay_status) ||
         flight.gopro_overlay_status === 'failed'
       );
     case 'highlightVideo':
       return (
         flight.has_highlight_video ||
+        hasYoutubeVideoType(flight, 'highlight') ||
         (flight.highlight_video_status != null &&
           (VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(
             flight.highlight_video_status
@@ -221,10 +240,25 @@ function flightHasBadgeFilter(
     case 'youtube':
       return (
         flight.has_youtube_video ||
+        (flight.youtube_video_types?.length ?? 0) > 0 ||
         flight.youtube_upload_status === 'queued' ||
         flight.youtube_upload_status === 'uploading' ||
         flight.youtube_upload_status === 'failed'
       );
+    case 'youtubeOverlay':
+      return hasYoutubeVideoType(flight, 'gopro_overlay', 'youtube_overlay');
+    case 'youtubeCamera':
+      return hasYoutubeVideoType(flight, 'camera');
+    case 'youtubeVideo':
+      return hasYoutubeVideoType(flight, 'video');
+    case 'youtubePano':
+      return hasYoutubeVideoType(flight, 'pano');
+    case 'youtubeFace':
+      return hasYoutubeVideoType(flight, 'face');
+    case 'youtubePilote':
+      return hasYoutubeVideoType(flight, 'pilote');
+    case 'youtubeHighlight':
+      return hasYoutubeVideoType(flight, 'highlight');
   }
 }
 
