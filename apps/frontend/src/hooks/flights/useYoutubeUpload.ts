@@ -53,6 +53,7 @@ type YoutubeUploadSourceFilter =
   | { source_type: 'youtube_overlay' };
 
 export type TemporaryFlightMediaSource = 'camera' | 'pano' | 'face' | 'pilote';
+type DeletableFlightMediaSource = 'video' | TemporaryFlightMediaSource;
 
 type YoutubeUploadInput = YoutubeUploadSource & {
   title: string;
@@ -184,7 +185,7 @@ export function useDeleteFlightTemporaryMedia(flightId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (sourceType: TemporaryFlightMediaSource) => {
+    mutationFn: async (sourceType: DeletableFlightMediaSource) => {
       await api.delete(`flights/${flightId}/temporary-media/${sourceType}`);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['flights'] }),

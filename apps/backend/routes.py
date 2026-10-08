@@ -6006,7 +6006,7 @@ def stream_flight_pano(flight_id: str, db: Session = Depends(get_db)) -> FileRes
 )
 def delete_flight_temporary_media(
     flight_id: str,
-    source_type: Literal["camera", "pano", "face", "pilote"],
+    source_type: Literal["video", "camera", "pano", "face", "pilote"],
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Response:
@@ -6038,6 +6038,18 @@ def delete_flight_temporary_media(
 
     if source_type == "camera":
         media_path = _flight_gopro_camera_path(db, flight)
+    elif source_type == "video":
+        source_path = _resolve_flight_file_path(flight.video_file_path)
+        if source_path is None or source_path.is_symlink() or not source_path.is_file():
+            raise HTTPException(status_code=404, detail="Video not found")
+        resolved_source_path = source_path.resolve()
+        storage_root = flight_storage_root().resolve()
+        if storage_root not in resolved_source_path.parents:
+            raise HTTPException(
+                status_code=409,
+                detail="Video is outside flight storage",
+            )
+        media_path = resolved_source_path
     else:
         source_path = _resolve_flight_file_path(str(temporary_video_path(db, flight, source_type)))
         if source_path is None or source_path.is_symlink() or not source_path.is_file():
@@ -6061,7 +6073,10 @@ def delete_flight_temporary_media(
         )
         raise HTTPException(status_code=500, detail="Unable to delete temporary video") from exc
 
-    if source_type == "pano":
+    if source_type == "video":
+        flight.video_file_path = None
+        db.commit()
+    elif source_type == "pano":
         flight.pano_video_file_path = None
         db.commit()
     return Response(status_code=204)

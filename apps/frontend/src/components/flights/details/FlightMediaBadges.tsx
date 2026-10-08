@@ -17,6 +17,7 @@ import { FlightVideoExportControls } from '../video-export/FlightVideoExportCont
 import { FlightMediaThumbnail } from './FlightMediaThumbnail';
 import { FlightGpxThumbnail } from './FlightGpxThumbnail';
 import { FlightTemporaryMediaCard } from './FlightTemporaryMediaCard';
+import { FlightVideoLocalDeleteButton } from './FlightVideoLocalDeleteButton';
 import { FlightYoutubeUploadControls } from './FlightYoutubeUploadControls';
 
 interface FlightMediaBadgesProps {
@@ -244,10 +245,13 @@ export function FlightMediaBadges({
                   />
                 )}
                 {hasVideo && (
-                  <FlightYoutubeUploadControls
-                    flight={flight}
-                    source={{ source_type: 'video' }}
-                  />
+                  <>
+                    <FlightYoutubeUploadControls
+                      flight={flight}
+                      source={{ source_type: 'video' }}
+                    />
+                    <FlightVideoLocalDeleteButton flight={flight} />
+                  </>
                 )}
                 {!hasGpx && !hasVideo && (
                   <>
