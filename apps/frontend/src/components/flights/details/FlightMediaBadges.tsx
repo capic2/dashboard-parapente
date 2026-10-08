@@ -68,10 +68,12 @@ export function FlightMediaBadges({
   const { t } = useTranslation();
   const showPersistedOverlayBadge =
     hasPersistedGoproOverlay && !hasCompletedGoproOverlayJob;
-  const hasTemporarySources =
-    hasGpx ||
+  const hasVisibleVideoSource =
     hasVideo ||
-    hasYoutubeVideoOnYoutube ||
+    (!hasYoutubeVideoOnYoutube &&
+      (hasGpx || isVideoExportRunning || isVideoExportFailed));
+  const hasTemporarySources =
+    hasVisibleVideoSource ||
     hasPanoVideo ||
     hasGoproCameraVideo ||
     hasFaceVideo ||
