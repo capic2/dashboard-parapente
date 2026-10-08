@@ -68,6 +68,16 @@ export function FlightMediaBadges({
   const { t } = useTranslation();
   const showPersistedOverlayBadge =
     hasPersistedGoproOverlay && !hasCompletedGoproOverlayJob;
+  const hasTemporarySources =
+    hasGpx ||
+    hasVideo ||
+    hasYoutubeVideoOnYoutube ||
+    hasPanoVideo ||
+    hasGoproCameraVideo ||
+    hasFaceVideo ||
+    hasPiloteVideo ||
+    isVideoExportRunning ||
+    isVideoExportFailed;
   const videoProgress = Math.max(
     0,
     Math.min(100, Math.round(flight.video_export_progress ?? 0))
@@ -150,6 +160,7 @@ export function FlightMediaBadges({
         </div>
         <section
           aria-labelledby="flight-temporary-sources-title"
+          hidden={!hasTemporarySources}
           className="order-2 col-span-full rounded-xl border border-amber-200 bg-amber-50/50 p-3 dark:border-amber-900 dark:bg-amber-950/10 sm:p-4"
         >
           <div className="mb-3 flex items-center gap-2">
