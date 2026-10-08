@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { addDays } from 'date-fns';
 import { Button } from '@dashboard-parapente/design-system';
+import { useCurrentTime } from '../../hooks/useCurrentTime';
 
 interface DaySelectorProps {
   selectedDayIndex: number;
@@ -12,12 +13,13 @@ export default function DaySelector({
   onSelectDay,
 }: DaySelectorProps) {
   const { t, i18n } = useTranslation();
+  const currentTime = useCurrentTime();
 
   const getDayLabel = (index: number): string => {
     if (index === 0) return t('common.today');
     if (index === 1) return t('common.tomorrow');
 
-    const date = addDays(new Date(), index);
+    const date = addDays(new Date(currentTime), index);
     return date.toLocaleDateString(
       i18n.language.startsWith('en') ? 'en-US' : 'fr-FR',
       { weekday: 'short', day: 'numeric', month: 'short' }
