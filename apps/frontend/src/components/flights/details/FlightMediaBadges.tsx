@@ -77,9 +77,7 @@ export function FlightMediaBadges({
     hasPanoVideo ||
     hasGoproCameraVideo ||
     hasFaceVideo ||
-    hasPiloteVideo ||
-    isVideoExportRunning ||
-    isVideoExportFailed;
+    hasPiloteVideo;
   const videoProgress = Math.max(
     0,
     Math.min(100, Math.round(flight.video_export_progress ?? 0))
