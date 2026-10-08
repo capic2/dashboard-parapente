@@ -63,6 +63,7 @@ function renderMedia(
       flightId="flight-1"
       hasGpx={false}
       hasVideo={false}
+      hasYoutubeVideoOnYoutube={false}
       hasPanoVideo={hasPanoVideo}
       hasGoproCameraVideo={hasGoproCameraVideo}
       hasFaceVideo={hasFaceVideo}
