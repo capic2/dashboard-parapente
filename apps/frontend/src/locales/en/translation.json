@@ -1460,7 +1460,7 @@
     "overlayInteractiveSectionTitle": "Interactive telemetry preview",
     "overlayInteractiveSectionDescription": "Experimental interactive view. The existing overlay workflow remains unchanged.",
     "overlayInteractivePreviewReady": "The flight telemetry is ready for interactive playback.",
-    "overlayInteractivePreviewUnavailable": "Telemetry data is not available for this flight.",
+    "overlayInteractivePreviewUnavailable": "The interactive preview cannot be displayed. This may be caused by a loading error or missing telemetry, video, or configuration.",
     "telemetryChangeMetric": "Change telemetry metric",
     "telemetryAltitude": "Altitude",
     "telemetrySpeed": "Speed",
