@@ -274,7 +274,7 @@ class Flight(Base):
     gopro_overlay_job_id = Column(String, nullable=True)
     gopro_overlay_status = Column(String, nullable=True)
     gopro_overlay_file_path = Column(String, nullable=True)
-    gopro_overlay_gpx_offset = Column(Float, nullable=False, default=0.0)
+    gopro_overlay_gpx_offset = Column(Float, nullable=True, default=None)
     sportstracklive_status = Column(String, nullable=True)
     sportstracklive_track_id = Column(Integer, nullable=True)
     sportstracklive_error = Column(Text, nullable=True)

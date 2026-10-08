@@ -197,6 +197,7 @@ def test_summaries_include_gpx_provider_and_null_provider(
                 flight_date=date(2026, 1, 2),
                 external_provider="intervals_icu",
                 gpx_file_path=str(imported_gpx),
+                gopro_overlay_gpx_offset=2.5,
             ),
             Flight(
                 id="summary-null-provider",
@@ -215,8 +216,10 @@ def test_summaries_include_gpx_provider_and_null_provider(
     assert flights["summary-icu-provider"]["has_gpx"] is True
     assert flights["summary-icu-provider"]["external_provider"] == "intervals_icu"
     assert flights["summary-icu-provider"]["gpx_provider"] is None
+    assert flights["summary-icu-provider"]["gopro_overlay_gpx_offset"] == 2.5
     assert flights["summary-null-provider"]["has_gpx"] is True
     assert flights["summary-null-provider"]["external_provider"] is None
+    assert flights["summary-null-provider"]["gopro_overlay_gpx_offset"] is None
 
 
 def test_summaries_default_query_does_not_require_a_tag(client: TestClient) -> None:
