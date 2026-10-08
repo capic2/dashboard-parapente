@@ -841,6 +841,7 @@ class FlightSummary(BaseModel):
     elevation_gain_m: int | None = None
     external_provider: str | None = None
     gpx_provider: str | None = None
+    gopro_overlay_gpx_offset: float | None = None
     has_gpx: bool
     sportstracklive_status: str | None = None
     sportstracklive_track_id: int | None = None

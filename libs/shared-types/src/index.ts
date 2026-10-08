@@ -250,6 +250,7 @@ export const FlightSummarySchema = z.object({
   elevation_gain_m: z.number().nullable(),
   external_provider: z.string().nullable().optional(),
   gpx_provider: z.string().nullable().optional(),
+  gopro_overlay_gpx_offset: z.number().nullable().optional(),
   has_gpx: z.boolean(),
   sportstracklive_status: z
     .enum(['queued', 'uploading', 'uploaded', 'failed'])
