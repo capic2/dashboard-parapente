@@ -175,11 +175,12 @@ export const SiteCard: React.FC<SiteCardProps> = ({
         </Button>
         <Button
           onClick={() => onDelete(site)}
-          className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2.5 text-sm text-white transition-colors hover:bg-red-700 sm:px-3 sm:py-1.5"
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 py-2.5 text-sm text-white transition-colors hover:bg-red-700 sm:px-3 sm:py-1.5"
           title={t('sites.deleteSite')}
           aria-label={t('sites.deleteSite')}
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
+          <span>{t('common.delete')}</span>
         </Button>
       </div>
     </div>

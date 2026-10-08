@@ -19,6 +19,7 @@ import type { Site } from '@dashboard-parapente/shared-types';
 import { SiteCard } from '../components/sites/SiteCard';
 import { EditSiteModal } from '../components/sites/EditSiteModal';
 import { getSiteDisplayName } from '../lib/siteDisplay';
+import { getApiErrorMessage } from '../lib/api';
 
 const columnHelper = createColumnHelper<Site>();
 
@@ -46,9 +47,9 @@ const columns = [
 ];
 
 const SITE_SORTABLE_COLUMNS = [
-  { id: 'name', label: 'Nom' },
-  { id: 'region', label: 'Localité' },
-  { id: 'elevation_m', label: 'Altitude' },
+  { id: 'name', labelKey: 'editSite.siteName' },
+  { id: 'region', labelKey: 'editSite.region' },
+  { id: 'elevation_m', labelKey: 'editSite.elevation' },
 ];
 
 interface SiteGroup {
@@ -79,6 +80,7 @@ export const Sites: React.FC = () => {
   const [editingSite, setEditingSite] = useState<Site | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [siteToDelete, setSiteToDelete] = useState<Site | null>(null);
+  const [deleteError, setDeleteError] = useState('');
 
   // Filter logic (search + type filter only, sorting handled by TanStack)
   const filteredSites = useMemo(() => {
@@ -100,6 +102,10 @@ export const Sites: React.FC = () => {
   }, [sites, deferredSearchQuery, typeFilter]);
 
   const hasActiveFilters = searchQuery.trim() !== '' || typeFilter !== 'all';
+  const emptyMessage =
+    sites.length === 0 && !hasActiveFilters
+      ? t('sites.noSitesYet')
+      : t('sites.noSiteFound');
 
   const handleResetFilters = () => {
     setSearchQuery('');
@@ -156,6 +162,7 @@ export const Sites: React.FC = () => {
   };
 
   const handleDelete = (site: Site) => {
+    setDeleteError('');
     setSiteToDelete(site);
   };
 
@@ -164,8 +171,8 @@ export const Sites: React.FC = () => {
     try {
       await deleteSite.mutateAsync(siteToDelete.id);
       setSiteToDelete(null);
-    } catch {
-      // Keep the confirmation open so the user can retry.
+    } catch (error) {
+      setDeleteError(await getApiErrorMessage(error, t('sites.deleteError')));
     }
   };
 
@@ -194,13 +201,15 @@ export const Sites: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <h1 className="text-3xl font-bold">{t('sites.management')}</h1>
-        <Button
-          onPress={handleOpenCreateModal}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-white transition-colors hover:bg-sky-700 sm:w-auto"
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          {t('sites.newSite')}
-        </Button>
+        {(sites.length > 0 || hasActiveFilters) && (
+          <Button
+            onPress={handleOpenCreateModal}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-white transition-colors hover:bg-sky-700 sm:w-auto"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {t('sites.newSite')}
+          </Button>
+        )}
       </div>
 
       {/* Filters Bar */}
@@ -284,14 +293,14 @@ export const Sites: React.FC = () => {
                         currentSort.desc
                           ? 'dataList.sortByDesc'
                           : 'dataList.sortByAsc',
-                        { column: col.label }
+                        { column: t(col.labelKey) }
                       )
-                    : t('dataList.sortBy', { column: col.label })
+                    : t('dataList.sortBy', { column: t(col.labelKey) })
                 }
                 aria-pressed={isActive}
                 onPress={() => table.getColumn(col.id)?.toggleSorting()}
               >
-                {col.label}
+                {t(col.labelKey)}
                 {currentSort &&
                   (currentSort.desc ? (
                     <ArrowDown
@@ -341,10 +350,10 @@ export const Sites: React.FC = () => {
             })}
           </div>
         ) : (
-          <output aria-label={t('sites.noSiteFound')}>
+          <output aria-label={emptyMessage}>
             <div className="rounded-xl bg-white p-8 text-center shadow-md dark:bg-gray-800">
               <p className="font-medium text-gray-700 dark:text-gray-300">
-                {t('sites.noSiteFound')}
+                {emptyMessage}
               </p>
             </div>
           </output>
@@ -366,7 +375,7 @@ export const Sites: React.FC = () => {
       )}
 
       {/* Create button when no sites and no filters */}
-      {filteredSites.length === 0 && !searchQuery && typeFilter === 'all' && (
+      {sites.length === 0 && !hasActiveFilters && (
         <div className="text-center mt-4">
           <Button
             onPress={handleOpenCreateModal}
@@ -403,6 +412,17 @@ export const Sites: React.FC = () => {
             name: siteToDelete ? getSiteDisplayName(siteToDelete) : undefined,
           })}
         </p>
+        {deleteError && (
+          <div
+            className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200"
+            role="alert"
+            aria-live="assertive"
+            aria-atomic="true"
+          >
+            <p>{deleteError}</p>
+            <p className="mt-1">{t('sites.deleteErrorHelp')}</p>
+          </div>
+        )}
         <div className="flex flex-col sm:flex-row gap-3 pt-4">
           <Button
             initialFocus
