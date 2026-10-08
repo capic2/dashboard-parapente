@@ -24,6 +24,7 @@ interface FlightMediaBadgesProps {
   flightId: string;
   hasGpx: boolean;
   hasVideo: boolean;
+  hasYoutubeVideoOnYoutube: boolean;
   hasPanoVideo: boolean;
   hasGoproCameraVideo: boolean;
   hasFaceVideo: boolean;
@@ -46,6 +47,7 @@ export function FlightMediaBadges({
   flightId,
   hasGpx,
   hasVideo,
+  hasYoutubeVideoOnYoutube,
   hasPanoVideo,
   hasGoproCameraVideo,
   hasFaceVideo,
@@ -163,7 +165,10 @@ export function FlightMediaBadges({
             </h4>
           </div>
           <div className="space-y-2">
-            <article className="grid grid-cols-[5rem_minmax(0,1fr)] gap-3 rounded-xl border border-amber-200 bg-white p-3 dark:border-amber-900 dark:bg-slate-900/60 sm:grid-cols-[7rem_minmax(0,1fr)_auto] sm:items-center sm:gap-4">
+            <article
+              hidden={!hasVideo && hasYoutubeVideoOnYoutube}
+              className="grid grid-cols-[5rem_minmax(0,1fr)] gap-3 rounded-xl border border-amber-200 bg-white p-3 dark:border-amber-900 dark:bg-slate-900/60 sm:grid-cols-[7rem_minmax(0,1fr)_auto] sm:items-center sm:gap-4"
+            >
               <div className="row-span-2 overflow-hidden rounded-lg sm:row-span-1">
                 {hasVideo ? (
                   <FlightMediaThumbnail
