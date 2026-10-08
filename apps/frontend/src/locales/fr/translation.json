@@ -1465,7 +1465,7 @@
     "overlayInteractiveSectionTitle": "Prévisualisation de la télémétrie interactive",
     "overlayInteractiveSectionDescription": "Vue interactive expérimentale. Le workflow d'overlay existant reste inchangé.",
     "overlayInteractivePreviewReady": "La télémétrie du vol est disponible pour la lecture interactive.",
-    "overlayInteractivePreviewUnavailable": "Les données de télémétrie ne sont pas disponibles pour ce vol.",
+    "overlayInteractivePreviewUnavailable": "Impossible d’afficher l’aperçu interactif. Une erreur de chargement ou l’absence de télémétrie, de vidéo ou de configuration peut en être la cause.",
     "telemetryChangeMetric": "Changer la métrique de télémétrie",
     "telemetryAltitude": "Altitude",
     "telemetrySpeed": "Vitesse",
