@@ -138,6 +138,7 @@ const FLIGHT_BADGE_FILTERS = [
   { id: 'gpxIcu', label: 'flights.gpxIcuBadge' },
   { id: 'gpxStrava', label: 'flights.gpxStravaBadge' },
   { id: 'gpxZepp', label: 'flights.gpxZeppBadge' },
+  { id: 'gpxNoSync', label: 'flights.gpxNoSyncBadge' },
   { id: 'sportstracklive', label: 'flights.sportstrackliveBadge' },
   { id: 'video', label: 'flights.videoBadge' },
   { id: 'camera', label: 'flights.cameraBadge' },
@@ -194,6 +195,8 @@ function flightHasBadgeFilter(
         flight.has_gpx &&
         ['external', 'zepp'].includes(getFlightGpxProvider(flight) ?? '')
       );
+    case 'gpxNoSync':
+      return flight.has_gpx && flight.gopro_overlay_gpx_offset == null;
     case 'sportstracklive':
       return (
         flight.sportstracklive_status === 'uploaded' &&
