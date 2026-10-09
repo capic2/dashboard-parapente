@@ -352,8 +352,6 @@
       "selectedSearchResult": "Selected search result",
       "advancedTitle": "Landings and advanced analysis",
       "advancedSummary": "Additional details about the selected site",
-      "spotairLinkTitle": "Open the SpotAir weather analysis",
-      "spotairLinkDescription": "SpotAir will open with the map centered on this location. Select the weather point to view its analysis.",
       "otherSitesTitle": "Explore other sites",
       "otherSitesSummary": "Suggestions based on weather and the selected radius"
     },
