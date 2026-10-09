@@ -687,6 +687,12 @@ class YoutubeAuthUrlRequest(BaseModel):
         return value
 
 
+class YoutubePlaylistPreparationResponse(BaseModel):
+    title: str
+    url: str
+    created: bool
+
+
 class YoutubeUploadCreate(BaseModel):
     source_type: Literal[
         "gopro_overlay", "camera", "video", "pano", "face", "pilote", "highlight"

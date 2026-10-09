@@ -2,15 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, Modal } from '@dashboard-parapente/design-system';
-import { Tv, Upload, X } from 'lucide-react';
+import { Clipboard, Tv, Upload, X } from 'lucide-react';
 import type { Flight } from '../../../types';
 import {
   useCancelYoutubeUpload,
+  usePrepareYoutubePlaylist,
   useStartYoutubeUpload,
   useYoutubeAuthorizationUrl,
   useYoutubeSourcePublicationStatus,
   useYoutubeStatus,
   youtubeVideoAssociationsQueryKey,
+  type YoutubePlaylistPreparation,
   type YoutubeUploadSource,
 } from '../../../hooks/flights/useYoutubeUpload';
 import { useToast } from '../../../hooks/useToast';
@@ -63,6 +65,7 @@ export function FlightYoutubeUploadControls({
     flight.youtube_urls ?? []
   );
   const startUpload = useStartYoutubeUpload(flight.id);
+  const preparePlaylist = usePrepareYoutubePlaylist(flight.id);
   const cancelUpload = useCancelYoutubeUpload(flight.id);
   const authorizationUrl = useYoutubeAuthorizationUrl();
   const previousStatus = useRef(upload.data?.status);
@@ -74,6 +77,8 @@ export function FlightYoutubeUploadControls({
     flight.description ?? flight.notes ?? ''
   );
   const [privacyStatus, setPrivacyStatus] = useState<PrivacyStatus>('unlisted');
+  const [manualPreparation, setManualPreparation] =
+    useState<YoutubePlaylistPreparation | null>(null);
 
   const isActive =
     upload.data?.status === 'preparing' ||
@@ -139,6 +144,30 @@ export function FlightYoutubeUploadControls({
       toast.error(
         await getApiErrorMessage(error, t('flights.youtubeUploadError'))
       );
+    }
+  };
+
+  const handlePrepareManualUpload = async () => {
+    try {
+      const preparation = await preparePlaylist.mutateAsync();
+      setManualPreparation(preparation);
+      toast.success(t('flights.youtubeManualPreparationReady'));
+    } catch (error) {
+      toast.error(
+        await getApiErrorMessage(
+          error,
+          t('flights.youtubeManualPreparationError')
+        )
+      );
+    }
+  };
+
+  const copyManualValue = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(t('flights.youtubeManualCopied'));
+    } catch {
+      toast.error(t('flights.youtubeManualCopyError'));
     }
   };
 
@@ -273,6 +302,72 @@ export function FlightYoutubeUploadControls({
           <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
             {t('flights.youtubeUploadPrivacyHint')}
           </p>
+          <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              {t('flights.youtubeManualPreparationTitle')}
+            </p>
+            <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+              {t('flights.youtubeManualPreparationDescription')}
+            </p>
+            <Button
+              className="mt-3 w-full"
+              variant="outline"
+              onPress={() => void handlePrepareManualUpload()}
+              isDisabled={preparePlaylist.isPending}
+            >
+              {preparePlaylist.isPending
+                ? t('flights.youtubeManualPreparing')
+                : t('flights.youtubeManualPrepare')}
+            </Button>
+            {manualPreparation && (
+              <div className="mt-3 space-y-3 border-t border-gray-200 pt-3 dark:border-gray-700">
+                <p className="text-xs text-gray-600 dark:text-gray-300">
+                  {t('flights.youtubeManualPlaylistLabel')}
+                </p>
+                <div className="flex items-center gap-2">
+                  <a
+                    className="min-w-0 flex-1 break-words text-sm font-medium text-blue-700 underline dark:text-blue-300"
+                    href={manualPreparation.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {manualPreparation.title}
+                  </a>
+                  <Button
+                    variant="ghost"
+                    onPress={() =>
+                      void copyManualValue(manualPreparation.title)
+                    }
+                    aria-label={t('flights.youtubeManualCopyPlaylist')}
+                  >
+                    <Clipboard className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    onPress={() => void copyManualValue(title)}
+                  >
+                    {t('flights.youtubeManualCopyTitle')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onPress={() => void copyManualValue(description)}
+                  >
+                    {t('flights.youtubeManualCopyDescription')}
+                  </Button>
+                  <a
+                    className="inline-flex min-h-10 items-center justify-center rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+                    href="https://www.youtube.com/upload"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {t('flights.youtubeManualOpenUpload')}
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onPress={() => setIsOpen(false)}>
               {t('common.cancel')}

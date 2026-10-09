@@ -180,6 +180,7 @@ from schemas import (
     IntervalsStatus,
     IntervalsSyncRequest,
     YoutubeAuthUrlRequest,
+    YoutubePlaylistPreparationResponse,
     YoutubeVideoAssociation,
     YoutubeVideoRemoveRequest,
     YoutubeUploadCreate,
@@ -259,6 +260,7 @@ from youtube_upload import (
     remove_youtube_video,
     store_download_cookies as store_youtube_download_cookies,
     migrate_flight_playlists,
+    prepare_flight_playlist,
     upload_source_key as youtube_upload_source_key,
     youtube_video_availability,
     youtube_video_associations,
@@ -1546,6 +1548,29 @@ def migrate_youtube_playlists(
     if not is_youtube_connected(db, user.id):
         raise HTTPException(status_code=409, detail="Connect YouTube before migrating playlists")
     return migrate_flight_playlists(user_id=user.id)
+
+
+@router.post(
+    "/flights/{flight_id}/youtube-playlist/prepare",
+    response_model=YoutubePlaylistPreparationResponse,
+)
+def prepare_flight_youtube_playlist(
+    flight_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Prepare the flight playlist for a video uploaded manually on YouTube."""
+    if not is_youtube_connected(db, user.id):
+        raise HTTPException(status_code=409, detail="Connect YouTube before preparing a playlist")
+    flight = db.get(Flight, flight_id)
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    try:
+        return prepare_flight_playlist(db, flight=flight, user_id=user.id)
+    except YoutubeOAuthError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.get(

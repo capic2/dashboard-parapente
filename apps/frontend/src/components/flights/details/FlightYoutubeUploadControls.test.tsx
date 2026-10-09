@@ -8,10 +8,12 @@ import { FlightYoutubeUploadControls } from './FlightYoutubeUploadControls';
 
 const {
   cancelUpload,
+  preparePlaylist,
   startUpload,
   toastError,
   toastSuccess,
   useCancelYoutubeUpload,
+  usePrepareYoutubePlaylist,
   useStartYoutubeUpload,
   useYoutubeAuthorizationUrl,
   useYoutubeStatus,
@@ -20,10 +22,12 @@ const {
   useYoutubeSourcePublicationStatus,
 } = vi.hoisted(() => ({
   cancelUpload: vi.fn(),
+  preparePlaylist: vi.fn(),
   startUpload: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
   useCancelYoutubeUpload: vi.fn(),
+  usePrepareYoutubePlaylist: vi.fn(),
   useStartYoutubeUpload: vi.fn(),
   useYoutubeAuthorizationUrl: vi.fn(),
   useYoutubeStatus: vi.fn(),
@@ -57,6 +61,7 @@ vi.mock('../../../hooks/useToast', () => ({
 
 vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
   useCancelYoutubeUpload,
+  usePrepareYoutubePlaylist,
   useStartYoutubeUpload,
   useYoutubeAuthorizationUrl,
   useYoutubeStatus,
@@ -73,6 +78,11 @@ describe('FlightYoutubeUploadControls', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     cancelUpload.mockResolvedValue({ status: 'cancelled' });
+    preparePlaylist.mockResolvedValue({
+      title: 'Parapente - Vol 1 du 19/08/2026',
+      url: 'https://www.youtube.com/playlist?list=playlist-id',
+      created: true,
+    });
     startUpload.mockResolvedValue({ status: 'queued' });
     useYoutubeStatus.mockReturnValue({
       data: { configured: true, connected: true },
@@ -80,6 +90,7 @@ describe('FlightYoutubeUploadControls', () => {
     });
     useYoutubeUpload.mockReturnValue({
       data: {
+        job_id: 'youtube-job-1',
         status: 'uploading',
         progress: 42,
         gopro_overlay_job_id: 'overlay-1080p',
@@ -109,6 +120,10 @@ describe('FlightYoutubeUploadControls', () => {
     });
     useCancelYoutubeUpload.mockReturnValue({
       mutateAsync: cancelUpload,
+      isPending: false,
+    });
+    usePrepareYoutubePlaylist.mockReturnValue({
+      mutateAsync: preparePlaylist,
       isPending: false,
     });
     useYoutubeAuthorizationUrl.mockReturnValue({
@@ -499,6 +514,54 @@ describe('FlightYoutubeUploadControls', () => {
       expect(invalidateQueries).toHaveBeenCalledWith({
         queryKey: ['youtube-video-associations', flight.id],
       })
+    );
+  });
+
+  it('prepares a playlist and displays the manual upload details', async () => {
+    useYoutubeUpload.mockReturnValue({ data: null, isLoading: false });
+    const flight = {
+      id: 'flight-1',
+      flight_date: '2026-08-19',
+      name: 'Vol test',
+    } as Flight;
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <FlightYoutubeUploadControls
+          flight={flight}
+          source={{ source_type: 'pano' }}
+        />
+      </QueryClientProvider>
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Publier sur YouTube' })
+    );
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'flights.youtubeUploadTitleLabel' }),
+      { target: { value: '' } }
+    );
+    expect(
+      screen.getByRole('button', { name: 'flights.youtubeManualPrepare' })
+    ).toBeEnabled();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'flights.youtubeManualPrepare' })
+    );
+
+    expect(preparePlaylist).toHaveBeenCalledOnce();
+    expect(
+      await screen.findByRole('link', {
+        name: 'Parapente - Vol 1 du 19/08/2026',
+      })
+    ).toHaveAttribute(
+      'href',
+      'https://www.youtube.com/playlist?list=playlist-id'
+    );
+    expect(
+      screen.getByRole('link', { name: 'flights.youtubeManualOpenUpload' })
+    ).toHaveAttribute('href', 'https://www.youtube.com/upload');
+    expect(toastSuccess).toHaveBeenCalledWith(
+      'flights.youtubeManualPreparationReady'
     );
   });
 });
