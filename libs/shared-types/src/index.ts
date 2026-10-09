@@ -200,8 +200,11 @@ export const FlightSchema = z
     video_file_path: z.string().nullish(),
     video_file_exists: z.boolean().nullish(),
     pano_video_file_exists: z.boolean().nullish(),
+    pano_video_filename: z.string().nullish(),
     face_video_file_exists: z.boolean().nullish(),
+    face_video_filename: z.string().nullish(),
     pilote_video_file_exists: z.boolean().nullish(),
+    pilote_video_filename: z.string().nullish(),
     gopro_camera_file_exists: z.boolean().nullish(),
     gopro_overlay_job_id: z.string().nullish(),
     gopro_overlay_status: z

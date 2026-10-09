@@ -56,6 +56,14 @@ export function FlightTemporaryMediaCard({
     thumbnailAltKey = 'flights.panoThumbnailAlt';
   }
   const title = t(titleKey);
+  const filename =
+    sourceType === 'pano'
+      ? flight.pano_video_filename
+      : sourceType === 'face'
+        ? flight.face_video_filename
+        : sourceType === 'pilote'
+          ? flight.pilote_video_filename
+          : undefined;
 
   let publicationStatus = t('flights.temporarySourceReady');
   let publicationStatusStyle =
@@ -99,9 +107,19 @@ export function FlightTemporaryMediaCard({
           />
         </div>
         <div className="min-w-0 self-center">
-          <h4 className="font-semibold text-slate-950 dark:text-white">
-            {title}
-          </h4>
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+            <h4 className="font-semibold text-slate-950 dark:text-white">
+              {title}
+            </h4>
+            {filename && (
+              <span
+                className="max-w-full truncate text-xs text-slate-600 dark:text-slate-300"
+                title={filename}
+              >
+                {filename}
+              </span>
+            )}
+          </div>
           <p
             className={`mt-1 inline-flex min-h-7 items-center rounded-md border px-2 py-1 text-xs font-semibold ${publicationStatusStyle}`}
             aria-live={isUploading ? 'polite' : undefined}
