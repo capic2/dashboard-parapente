@@ -352,6 +352,8 @@
       "selectedSearchResult": "Résultat de recherche sélectionné",
       "advancedTitle": "Atterrissages et analyse avancée",
       "advancedSummary": "Détails complémentaires sur le site sélectionné",
+      "spotairLinkTitle": "Ouvrir l’analyse météo sur SpotAir",
+      "spotairLinkDescription": "SpotAir s’ouvrira sur la carte centrée sur ce lieu. Sélectionnez ensuite le point météo.",
       "otherSitesTitle": "Explorer d’autres sites",
       "otherSitesSummary": "Suggestions selon la météo et le rayon choisi"
     },
