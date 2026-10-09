@@ -11,7 +11,7 @@ from sqlalchemy import Integer, String, and_, case, cast, exists, func, or_, sel
 from sqlalchemy.orm import Query, Session, aliased
 from sqlalchemy.sql.elements import ColumnElement
 
-from flight_storage import flight_storage_root
+from flight_storage import flight_storage_root, resolve_temporary_video_path
 import config
 from models import Flight, GoproOverlayJob, HighlightVideoJob, Site, YoutubeUploadJob
 from schemas import FlightSummariesResponse, FlightSummary, youtube_video_id_from_url
@@ -536,9 +536,11 @@ def list_flight_summaries(
             / f"{row.flight_sequence:02d}"
             / "pano.mp4"
         )
-        pano_flags[row.id] = _directory_file_exists(path)
-        face_flags[row.id] = _directory_file_exists(path.with_name("face.mp4"))
-        pilote_flags[row.id] = _directory_file_exists(path.with_name("pilote.mp4"))
+        pano_flags[row.id] = _directory_file_exists(resolve_temporary_video_path(path, "pano"))
+        face_flags[row.id] = _directory_file_exists(resolve_temporary_video_path(path, "face"))
+        pilote_flags[row.id] = _directory_file_exists(
+            resolve_temporary_video_path(path, "pilote")
+        )
         if pano_flags[row.id] and not row.pano_video_file_path:
             detected_pano_paths.append({"id": row.id, "pano_video_file_path": str(path.resolve())})
     if detected_pano_paths:
