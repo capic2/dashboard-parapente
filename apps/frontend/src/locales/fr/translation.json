@@ -1083,6 +1083,8 @@
     "dayGroupCount_other": "{{count}} vols",
     "expandDayFlights": "Afficher les vols du {{date}}",
     "collapseDayFlights": "Masquer les vols du {{date}}",
+    "expandAllDays": "Tout développer",
+    "collapseAllDays": "Tout réduire",
     "noFlights": "Aucun vol enregistré",
     "listAriaLabel": "Liste des vols",
     "deleteAriaLabel": "Supprimer le vol {{title}}",
