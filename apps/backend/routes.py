@@ -4796,12 +4796,14 @@ def get_flights(
             "video_export_progress": video_export["progress"],
             "video_file_path": flight.video_file_path,
             "video_file_exists": _flight_video_file_exists(flight),
-            "pano_video_file_exists": _directory_file_exists(pano_paths[flight.id]),
+            "pano_video_file_exists": _directory_file_exists(
+                temporary_video_path(db, flight, "pano")
+            ),
             "face_video_file_exists": _directory_file_exists(
-                pano_paths[flight.id].with_name("face.mp4")
+                temporary_video_path(db, flight, "face")
             ),
             "pilote_video_file_exists": _directory_file_exists(
-                pano_paths[flight.id].with_name("pilote.mp4")
+                temporary_video_path(db, flight, "pilote")
             ),
             "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
             "gopro_overlay_job_id": flight.gopro_overlay_job_id,
@@ -5449,9 +5451,15 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "video_export_progress": video_export["progress"],
         "video_file_path": flight.video_file_path,
         "video_file_exists": _flight_video_file_exists(flight),
-        "pano_video_file_exists": _directory_file_exists(pano_path),
-        "face_video_file_exists": _directory_file_exists(pano_path.with_name("face.mp4")),
-        "pilote_video_file_exists": _directory_file_exists(pano_path.with_name("pilote.mp4")),
+        "pano_video_file_exists": _directory_file_exists(
+            temporary_video_path(db, flight, "pano")
+        ),
+        "face_video_file_exists": _directory_file_exists(
+            temporary_video_path(db, flight, "face")
+        ),
+        "pilote_video_file_exists": _directory_file_exists(
+            temporary_video_path(db, flight, "pilote")
+        ),
         "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
         "gopro_overlay_job_id": flight.gopro_overlay_job_id,
         "gopro_overlay_status": gopro_overlay["status"],

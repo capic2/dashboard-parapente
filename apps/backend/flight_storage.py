@@ -50,11 +50,42 @@ def temporary_video_path(
     flight: Flight,
     source_type: Literal["pano", "face", "pilote"],
 ) -> Path:
-    """Resolve a temporary YouTube source beside the flight's panorama video."""
+    """Resolve a temporary video by its role anywhere in the filename."""
     pano_path = pano_video_path(db, flight)
-    if source_type == "pano":
-        return pano_path
-    return pano_path.with_name(f"{source_type}.mp4")
+    return resolve_temporary_video_path(pano_path, source_type)
+
+
+def resolve_temporary_video_path(
+    pano_path: Path,
+    source_type: Literal["pano", "face", "pilote"],
+) -> Path:
+    """Prefer the canonical filename, then find an MP4 containing the role name."""
+    canonical_path = (
+        pano_path if source_type == "pano" else pano_path.with_name(f"{source_type}.mp4")
+    )
+    try:
+        entries = list(canonical_path.parent.iterdir())
+    except OSError:
+        return canonical_path
+
+    if any(
+        entry.name == canonical_path.name and not entry.is_symlink() and entry.is_file()
+        for entry in entries
+    ):
+        return canonical_path
+
+    matching_paths = sorted(
+        (
+            entry
+            for entry in entries
+            if entry.suffix.lower() == ".mp4"
+            and source_type in entry.stem.casefold()
+            and not entry.is_symlink()
+            and entry.is_file()
+        ),
+        key=lambda entry: (entry.name.casefold(), entry.name),
+    )
+    return matching_paths[0] if matching_paths else canonical_path
 
 
 def pano_video_paths(db: Session, flights: Iterable[Flight]) -> dict[str, Path]:
