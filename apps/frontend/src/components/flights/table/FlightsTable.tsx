@@ -9,7 +9,14 @@ import type {
 import { Button as AriaButton } from 'react-aria-components';
 import type { Selection } from 'react-aria-components';
 import { DataList, Select } from '@dashboard-parapente/design-system';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  ChevronRight,
+  ChevronsDown,
+  ChevronsUp,
+} from 'lucide-react';
 import { Flight, formatFlightDate } from './Flight';
 import { useFlightsTable } from './useFlightsTable';
 import type { FlightSummary } from '@dashboard-parapente/shared-types';
@@ -57,6 +64,7 @@ export function FlightsTable({
   const [expandedDays, setExpandedDays] = useState<Set<string>>(
     () => new Set()
   );
+  const [expandAllDays, setExpandAllDays] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const loadMoreRequestedRef = useRef(false);
   const wasLoadingMoreRef = useRef(isLoadingMore);
@@ -86,6 +94,15 @@ export function FlightsTable({
       });
     }
   }, [dayGroups, groupByDate, selectedFlightId]);
+
+  useEffect(() => {
+    if (!expandAllDays) return;
+    setExpandedDays((previous) => {
+      const next = new Set(previous);
+      for (const [date] of dayGroups) next.add(date);
+      return next;
+    });
+  }, [dayGroups, expandAllDays]);
 
   useEffect(() => {
     if (isLoadingMore) {
@@ -214,9 +231,42 @@ export function FlightsTable({
   );
 
   if (groupByDate) {
+    const hasExpandedDays = dayGroups.some(([date]) => expandedDays.has(date));
+    const allDaysExpanded =
+      dayGroups.length > 0 &&
+      dayGroups.every(([date]) => expandedDays.has(date));
+
     return (
       <div className="flex flex-col">
         {renderSortControls()}
+        {dayGroups.length > 0 && (
+          <div className="mb-1 flex justify-end gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                setExpandAllDays(true);
+                setExpandedDays(new Set(dayGroups.map(([date]) => date)));
+              }}
+              disabled={allDaysExpanded}
+              className="flex min-h-9 cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-default disabled:opacity-50 dark:text-sky-300 dark:hover:bg-slate-800"
+            >
+              <ChevronsDown aria-hidden="true" className="h-3.5 w-3.5" />
+              {t('flights.expandAllDays')}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setExpandAllDays(false);
+                setExpandedDays(new Set());
+              }}
+              disabled={!hasExpandedDays}
+              className="flex min-h-9 cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-default disabled:opacity-50 dark:text-sky-300 dark:hover:bg-slate-800"
+            >
+              <ChevronsUp aria-hidden="true" className="h-3.5 w-3.5" />
+              {t('flights.collapseAllDays')}
+            </button>
+          </div>
+        )}
         <section
           aria-label={t('flights.listAriaLabel')}
           className="h-[calc(100vh-23rem)] min-h-72 overflow-y-auto pr-1 xl:h-[calc(100vh-19rem)]"
@@ -257,6 +307,7 @@ export function FlightsTable({
                       )}
                       className="flex min-h-16 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none transition-colors hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 dark:hover:bg-gray-800"
                       onClick={() => {
+                        setExpandAllDays(false);
                         setExpandedDays((previous) => {
                           const next = new Set(previous);
                           if (next.has(date)) next.delete(date);

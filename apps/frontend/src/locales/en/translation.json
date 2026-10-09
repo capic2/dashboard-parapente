@@ -1079,6 +1079,8 @@
     "dayGroupCount_other": "{{count}} flights",
     "expandDayFlights": "Show flights from {{date}}",
     "collapseDayFlights": "Hide flights from {{date}}",
+    "expandAllDays": "Expand all",
+    "collapseAllDays": "Collapse all",
     "noFlights": "No flights recorded",
     "listAriaLabel": "Flight list",
     "deleteAriaLabel": "Delete flight {{title}}",
