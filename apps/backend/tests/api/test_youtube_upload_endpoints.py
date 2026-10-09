@@ -14,7 +14,12 @@ from fastapi.testclient import TestClient
 from models import Flight, GoproOverlayJob, YoutubeCredential, YoutubeUploadJob
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from youtube_upload import decode_oauth_state, encrypt_secret, playlist_title_for_flight
+from youtube_upload import (
+    decode_oauth_state,
+    encrypt_secret,
+    playlist_title_for_flight,
+    prepare_flight_playlist,
+)
 
 API_PREFIX = "/api"
 
@@ -27,6 +32,78 @@ def test_playlist_title_uses_daily_sequence_and_date(db_session: Session) -> Non
 
     assert playlist_title_for_flight(db_session, first) == "Parapente - Vol 1 du 24/09/2026"
     assert playlist_title_for_flight(db_session, second) == "Parapente - Vol 2 du 24/09/2026"
+
+
+@pytest.mark.parametrize(
+    ("created", "expected_created"),
+    [(True, True), (False, False)],
+)
+def test_prepare_flight_playlist_returns_playlist_link_and_creation_state(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch, created: bool, expected_created: bool
+) -> None:
+    flight = Flight(id="playlist-flight", flight_date=date(2026, 9, 24))
+    db_session.add(flight)
+    db_session.flush()
+    find_or_create = Mock(return_value=("playlist-id", created))
+    monkeypatch.setattr(youtube_upload, "_find_or_create_playlist", find_or_create)
+
+    result = prepare_flight_playlist(db_session, flight=flight, user_id=1)
+
+    assert result == {
+        "title": "Parapente - Vol 1 du 24/09/2026",
+        "url": "https://www.youtube.com/playlist?list=playlist-id",
+        "created": expected_created,
+    }
+    find_or_create.assert_called_once_with(user_id=1, title=result["title"])
+
+
+def test_prepare_youtube_playlist_endpoint_returns_playlist_details(
+    client: TestClient,
+    db_session: Session,
+    sample_flight: Flight,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_session.add(
+        YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
+    )
+    db_session.commit()
+    monkeypatch.setattr(
+        youtube_upload,
+        "_find_or_create_playlist",
+        Mock(return_value=("playlist-id", True)),
+    )
+
+    response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/youtube-playlist/prepare")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "title": "Parapente - Vol 1 du 15/03/2026",
+        "url": "https://www.youtube.com/playlist?list=playlist-id",
+        "created": True,
+    }
+
+
+def test_prepare_youtube_playlist_endpoint_requires_connection(
+    client: TestClient, sample_flight: Flight
+) -> None:
+    response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/youtube-playlist/prepare")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Connect YouTube before preparing a playlist"
+
+
+def test_prepare_youtube_playlist_endpoint_returns_not_found_for_missing_flight(
+    client: TestClient, db_session: Session
+) -> None:
+    db_session.add(
+        YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
+    )
+    db_session.commit()
+
+    response = client.post(f"{API_PREFIX}/flights/missing/youtube-playlist/prepare")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Flight not found"
 
 
 def _configure_youtube(monkeypatch) -> None:

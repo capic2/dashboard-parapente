@@ -11,6 +11,12 @@ export interface YoutubeConnectionStatus {
   connected: boolean;
 }
 
+export interface YoutubePlaylistPreparation {
+  title: string;
+  url: string;
+  created: boolean;
+}
+
 export interface YoutubeUploadJob {
   job_id: string;
   flight_id: string;
@@ -91,6 +97,15 @@ export function useYoutubeStatus() {
     queryKey: ['youtube', 'status'],
     queryFn: () => api.get('youtube/status').json<YoutubeConnectionStatus>(),
     staleTime: 60_000,
+  });
+}
+
+export function usePrepareYoutubePlaylist(flightId: string) {
+  return useMutation({
+    mutationFn: () =>
+      api
+        .post(`flights/${flightId}/youtube-playlist/prepare`)
+        .json<YoutubePlaylistPreparation>(),
   });
 }
 
