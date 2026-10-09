@@ -101,6 +101,12 @@ class YoutubeVideoMetadataPayload(TypedDict):
     title: str | None
 
 
+class YoutubePlaylistPreparationPayload(TypedDict):
+    title: str
+    url: str
+    created: bool
+
+
 def _youtube_upload_log_path(job_id: str) -> Path:
     return Path(config.VIDEO_EXPORT_DIR) / ".logs" / "youtube-uploads" / f"{job_id}.log"
 
@@ -410,6 +416,19 @@ def _find_or_create_playlist(*, user_id: int, title: str) -> tuple[str, bool]:
     if not isinstance(playlist_id, str) or not playlist_id:
         raise RuntimeError("YouTube did not return a playlist identifier")
     return playlist_id, True
+
+
+def prepare_flight_playlist(
+    db: Session, *, flight: Flight, user_id: int
+) -> YoutubePlaylistPreparationPayload:
+    """Create or find the flight playlist before a manual YouTube upload."""
+    title = playlist_title_for_flight(db, flight)
+    playlist_id, created = _find_or_create_playlist(user_id=user_id, title=title)
+    return {
+        "title": title,
+        "url": f"https://www.youtube.com/playlist?list={playlist_id}",
+        "created": created,
+    }
 
 
 def add_video_to_flight_playlist(*, user_id: int, playlist_title: str, video_id: str) -> bool:
