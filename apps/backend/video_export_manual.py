@@ -1372,6 +1372,15 @@ def _capture_progress_percent(frame_count: int, total_frames: int) -> int:
     return min(80, max(5, int(5 + ratio * 75)))
 
 
+def _initial_capture_progress(frames_dir: Path, total_frames: int) -> tuple[int, int]:
+    """Restore visible capture progress from frames saved before a restart."""
+    resume_from_frame = _first_missing_frame_index(frames_dir, total_frames)
+    progress = (
+        _capture_progress_percent(resume_from_frame, total_frames) if resume_from_frame > 0 else 5
+    )
+    return resume_from_frame, progress
+
+
 def _capture_fps(frame_count: int, resume_from_frame: int, elapsed: float) -> float:
     """Return capture throughput excluding frames restored from disk."""
     captured_since_start = max(0, frame_count - resume_from_frame)
@@ -2218,18 +2227,21 @@ async def _export_video_manual_render(job_id: str):
 
             _log_job(job_id, f"Will capture {total_frames} frames at {fps} FPS")
 
+            temp_dir = _job_temp_dir_for_export(job)
+            frames_dir = temp_dir / "frames"
+            _prepare_export_dirs(export_root, temp_dir, frames_dir)
+            resume_from_frame, initial_progress = _initial_capture_progress(
+                frames_dir, total_frames
+            )
+
             _update_job(
                 job_id,
                 status=_STATUS_INITIALIZING,
-                progress=5,
+                progress=initial_progress,
                 total_frames=total_frames,
                 message=f"Preparing to capture {total_frames} frames",
             )
             _set_job_runtime(job_id, phase=_STATUS_INITIALIZING)
-
-            temp_dir = _job_temp_dir_for_export(job)
-            frames_dir = temp_dir / "frames"
-            _prepare_export_dirs(export_root, temp_dir, frames_dir)
 
             _log_job(job_id, f"Frames directory: {frames_dir}")
 
@@ -2274,7 +2286,6 @@ async def _export_video_manual_render(job_id: str):
             screenshot_count = 0
             ms_per_frame = (duration_seconds * 1000) / max(total_frames, 1)
             _log_job(job_id, f"Capturing 1 frame every {ms_per_frame:.1f}ms")
-            resume_from_frame = _first_missing_frame_index(frames_dir, total_frames)
             if resume_from_frame > 0:
                 frame_count = resume_from_frame
                 progress = _capture_progress_percent(frame_count, total_frames)

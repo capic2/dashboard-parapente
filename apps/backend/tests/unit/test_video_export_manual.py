@@ -5,6 +5,7 @@ import os
 import time
 from collections import deque
 from datetime import datetime
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 from urllib.error import URLError
@@ -260,6 +261,26 @@ def test_capture_progress_percent_spans_capture_phase_range():
     assert video_export_manual._capture_progress_percent(0, 100) == 5
     assert video_export_manual._capture_progress_percent(50, 100) == 42
     assert video_export_manual._capture_progress_percent(100, 100) == 80
+
+
+def test_initial_capture_progress_restores_progress_from_saved_frames(
+    tmp_path: Path,
+) -> None:
+    frames_dir = tmp_path / "frames"
+    frames_dir.mkdir()
+    for frame_index in range(50):
+        (frames_dir / f"frame{frame_index:05d}.png").write_bytes(b"frame")
+
+    assert video_export_manual._initial_capture_progress(frames_dir, 100) == (50, 42)
+
+
+def test_initial_capture_progress_starts_at_five_percent_without_saved_frames(
+    tmp_path: Path,
+) -> None:
+    frames_dir = tmp_path / "frames"
+    frames_dir.mkdir()
+
+    assert video_export_manual._initial_capture_progress(frames_dir, 100) == (0, 5)
 
 
 def test_capture_fps_excludes_frames_restored_during_resume():
