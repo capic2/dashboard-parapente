@@ -12,6 +12,7 @@ type WeatherPageMobileProps = {
   stickySelectionBar: ReactNode;
   bestSpotSuggestion: ReactNode;
   forceRefreshControl?: ReactNode;
+  spotairAnalysisLink?: ReactNode;
   decisionPanel?: ReactNode;
   searchResultPanel?: ReactNode;
   emptyPanel?: ReactNode;
@@ -69,6 +70,7 @@ export default function WeatherPageMobileLayout({
   stickySelectionBar,
   bestSpotSuggestion,
   forceRefreshControl,
+  spotairAnalysisLink,
   decisionPanel,
   searchResultPanel,
   emptyPanel,
@@ -95,6 +97,7 @@ export default function WeatherPageMobileLayout({
       />
 
       {forceRefreshControl}
+      {spotairAnalysisLink}
 
       {emptyPanel}
       {decisionPanel}
