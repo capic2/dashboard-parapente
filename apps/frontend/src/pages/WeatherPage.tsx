@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { ChevronRight, ExternalLink, RefreshCw } from 'lucide-react';
+import { ChevronRight, RefreshCw } from 'lucide-react';
 import CurrentConditions from '../components/weather/CurrentConditions';
 import Forecast7Day from '../components/weather/Forecast7Day';
 import HourlyForecast from '../components/weather/HourlyForecast';
@@ -382,38 +382,6 @@ export default function WeatherPage() {
   const activeWeatherName = selectedSearchTarget
     ? selectedSearchTitle
     : selectedSiteDisplayName;
-  const spotairCoordinates = selectedSearchLocation ?? selectedSite;
-  const spotairHref =
-    spotairCoordinates &&
-    Number.isFinite(spotairCoordinates.latitude) &&
-    Number.isFinite(spotairCoordinates.longitude)
-      ? `https://www.spotair.mobi/?${new URLSearchParams({
-          lat: spotairCoordinates.latitude.toString(),
-          lng: spotairCoordinates.longitude.toString(),
-          zoom: '13',
-        }).toString()}`
-      : undefined;
-  const spotairAnalysisLink = spotairHref ? (
-    <a
-      href={spotairHref}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50/70 p-3 transition-colors hover:border-orange-300 hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 dark:border-orange-900/50 dark:bg-orange-950/20 dark:hover:border-orange-800 dark:hover:bg-orange-950/35"
-    >
-      <span className="min-w-0">
-        <span className="block text-sm font-bold text-slate-900 dark:text-white">
-          {t('weather.page.spotairLinkTitle')}
-        </span>
-        <span className="mt-0.5 block text-xs leading-5 text-slate-600 dark:text-slate-300">
-          {t('weather.page.spotairLinkDescription')}
-        </span>
-      </span>
-      <ExternalLink
-        aria-hidden="true"
-        className="h-4 w-4 shrink-0 text-orange-700 dark:text-orange-300"
-      />
-    </a>
-  ) : undefined;
   const sourceLabel = selectedSearchTarget
     ? t('weather.source.search')
     : t('weather.source.favoriteSite');
@@ -714,7 +682,6 @@ export default function WeatherPage() {
         forecastPanel={forecastDaySelector}
         bestSpotSuggestion={bestSpotSuggestion}
         forceRefreshControl={forceRefreshControl}
-        spotairAnalysisLink={spotairAnalysisLink}
         decisionPanel={mobileDecisionPanel}
         searchResultPanel={mobileSearchResultPanel}
         emptyPanel={mobileEmptyPanel}
@@ -734,7 +701,6 @@ export default function WeatherPage() {
 
       <div className="min-w-0 space-y-4">
         {forceRefreshControl}
-        {spotairAnalysisLink}
 
         {!currentLocation.isLoading &&
           !selectedSearchTarget &&
