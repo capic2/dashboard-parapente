@@ -81,7 +81,8 @@ class TestFlightsListEndpoint:
         pilote_dir = tmp_path / "20260315" / "02"
         face_dir.mkdir(parents=True)
         pilote_dir.mkdir(parents=True)
-        (face_dir / "face.mp4").write_bytes(b"face")
+        (face_dir / "pano.mp4").write_bytes(b"pano")
+        (face_dir / "gopro-face-camera.mp4").write_bytes(b"face")
         (pilote_dir / "pilote.mp4").write_bytes(b"pilote")
 
         response = client.get(f"{API_PREFIX}/flights")
@@ -89,16 +90,23 @@ class TestFlightsListEndpoint:
         assert response.status_code == 200
         returned = {item["id"]: item for item in response.json()["flights"]}
         assert returned[flights[0].id]["face_video_file_exists"] is True
+        assert returned[flights[0].id]["pano_video_file_exists"] is True
+        assert returned[flights[0].id]["pano_video_filename"] == "pano.mp4"
+        assert returned[flights[0].id]["face_video_filename"] == "gopro-face-camera.mp4"
         assert returned[flights[0].id]["pilote_video_file_exists"] is False
         assert returned[flights[1].id]["face_video_file_exists"] is False
         assert returned[flights[1].id]["pilote_video_file_exists"] is True
+        assert returned[flights[1].id]["pilote_video_filename"] == "pilote.mp4"
 
         face_detail = client.get(f"{API_PREFIX}/flights/{flights[0].id}")
         pilote_detail = client.get(f"{API_PREFIX}/flights/{flights[1].id}")
         assert face_detail.json()["face_video_file_exists"] is True
+        assert face_detail.json()["pano_video_filename"] == "pano.mp4"
+        assert face_detail.json()["face_video_filename"] == "gopro-face-camera.mp4"
         assert face_detail.json()["pilote_video_file_exists"] is False
         assert pilote_detail.json()["face_video_file_exists"] is False
         assert pilote_detail.json()["pilote_video_file_exists"] is True
+        assert pilote_detail.json()["pilote_video_filename"] == "pilote.mp4"
 
     def test_get_flights_returns_video_overlays_but_excludes_overlay_layer(
         self, client, db_session, arguel_site

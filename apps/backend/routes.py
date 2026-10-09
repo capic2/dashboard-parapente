@@ -4747,7 +4747,7 @@ def get_flights(
 
     flights = query.order_by(Flight.flight_date.desc()).limit(limit).all()
     previous_pano_paths = {flight.id: flight.pano_video_file_path for flight in flights}
-    pano_paths = pano_video_paths(db, flights)
+    pano_video_paths(db, flights)
 
     # Convert to dict (user_id removed - not needed for single-user app)
     flights_data = []
@@ -4767,6 +4767,12 @@ def get_flights(
             or previous_overlay_job_id != flight.gopro_overlay_job_id
             or previous_overlay_status != flight.gopro_overlay_status
         )
+        pano_video = temporary_video_path(db, flight, "pano")
+        face_video = temporary_video_path(db, flight, "face")
+        pilote_video = temporary_video_path(db, flight, "pilote")
+        pano_video_exists = _directory_file_exists(pano_video)
+        face_video_exists = _directory_file_exists(face_video)
+        pilote_video_exists = _directory_file_exists(pilote_video)
         flight_dict = {
             "id": flight.id,
             "external_provider": flight.external_provider,
@@ -4796,15 +4802,12 @@ def get_flights(
             "video_export_progress": video_export["progress"],
             "video_file_path": flight.video_file_path,
             "video_file_exists": _flight_video_file_exists(flight),
-            "pano_video_file_exists": _directory_file_exists(
-                temporary_video_path(db, flight, "pano")
-            ),
-            "face_video_file_exists": _directory_file_exists(
-                temporary_video_path(db, flight, "face")
-            ),
-            "pilote_video_file_exists": _directory_file_exists(
-                temporary_video_path(db, flight, "pilote")
-            ),
+            "pano_video_file_exists": pano_video_exists,
+            "pano_video_filename": pano_video.name if pano_video_exists else None,
+            "face_video_file_exists": face_video_exists,
+            "face_video_filename": face_video.name if face_video_exists else None,
+            "pilote_video_file_exists": pilote_video_exists,
+            "pilote_video_filename": pilote_video.name if pilote_video_exists else None,
             "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
             "gopro_overlay_job_id": flight.gopro_overlay_job_id,
             "gopro_overlay_status": gopro_overlay["status"],
@@ -5402,9 +5405,15 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
     previous_overlay_job_id = flight.gopro_overlay_job_id
     previous_overlay_status = flight.gopro_overlay_status
     previous_pano_path = flight.pano_video_file_path
-    pano_path = pano_video_path(db, flight)
+    pano_video_path(db, flight)
     video_export = _flight_video_export_state(db, flight)
     gopro_overlay = _flight_gopro_overlay_state(db, flight)
+    pano_video = temporary_video_path(db, flight, "pano")
+    face_video = temporary_video_path(db, flight, "face")
+    pilote_video = temporary_video_path(db, flight, "pilote")
+    pano_video_exists = _directory_file_exists(pano_video)
+    face_video_exists = _directory_file_exists(face_video)
+    pilote_video_exists = _directory_file_exists(pilote_video)
     export_state_changed = (
         previous_video_job_id != flight.video_export_job_id
         or previous_video_status != flight.video_export_status
@@ -5451,15 +5460,12 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "video_export_progress": video_export["progress"],
         "video_file_path": flight.video_file_path,
         "video_file_exists": _flight_video_file_exists(flight),
-        "pano_video_file_exists": _directory_file_exists(
-            temporary_video_path(db, flight, "pano")
-        ),
-        "face_video_file_exists": _directory_file_exists(
-            temporary_video_path(db, flight, "face")
-        ),
-        "pilote_video_file_exists": _directory_file_exists(
-            temporary_video_path(db, flight, "pilote")
-        ),
+        "pano_video_file_exists": pano_video_exists,
+        "pano_video_filename": pano_video.name if pano_video_exists else None,
+        "face_video_file_exists": face_video_exists,
+        "face_video_filename": face_video.name if face_video_exists else None,
+        "pilote_video_file_exists": pilote_video_exists,
+        "pilote_video_filename": pilote_video.name if pilote_video_exists else None,
         "gopro_camera_file_exists": _flight_gopro_camera_file_exists(db, flight),
         "gopro_overlay_job_id": flight.gopro_overlay_job_id,
         "gopro_overlay_status": gopro_overlay["status"],

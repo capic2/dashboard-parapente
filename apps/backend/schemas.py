@@ -797,8 +797,11 @@ class Flight(FlightBase):
     video_file_path: str | None = None
     video_file_exists: bool = False
     pano_video_file_exists: bool = False
+    pano_video_filename: str | None = None
     face_video_file_exists: bool = False
+    face_video_filename: str | None = None
     pilote_video_file_exists: bool = False
+    pilote_video_filename: str | None = None
     gopro_camera_file_exists: bool = False
     gopro_overlay_job_id: str | None = None
     gopro_overlay_status: str | None = None
