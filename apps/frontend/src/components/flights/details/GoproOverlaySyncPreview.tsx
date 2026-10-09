@@ -19,7 +19,6 @@ import {
 } from './goproSyncTelemetry';
 import type { GoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { getYoutubeVideoId } from '../../../lib/youtube';
-import { getYoutubeVideoRoleFromTitle } from './flightTelemetryLayout';
 
 interface YoutubePlayer {
   destroy: () => void;
@@ -76,6 +75,20 @@ interface GoproOverlaySyncPreviewProps {
 }
 
 type GpxAlignmentTarget = 'start' | 'end';
+type CalibrationYoutubeRole = 'face' | 'pilote' | 'pano';
+
+const CALIBRATION_YOUTUBE_ROLE_PRIORITY: CalibrationYoutubeRole[] = [
+  'pilote',
+  'face',
+  'pano',
+];
+
+function getCalibrationYoutubeRole(
+  title?: string | null
+): CalibrationYoutubeRole | undefined {
+  const match = title?.trim().match(/[-–—]\s*(face|pilote|pano)$/iu);
+  return match?.[1]?.toLowerCase() as CalibrationYoutubeRole | undefined;
+}
 
 function formatSeconds(seconds: number) {
   const sign = seconds < 0 ? '-' : '';
@@ -152,17 +165,15 @@ export function GoproOverlaySyncPreview({
   const token = useAuthStore((state) => state.token);
   const queryClient = useQueryClient();
   const youtubeAssociations = useYoutubeVideoAssociations(flightId);
-  const pilotYoutubeUrl = youtubeUrls.find(
-    (url) =>
-      getYoutubeVideoId(url) &&
-      youtubeAssociations.data?.some(
-        (association) =>
-          association.url === url &&
-          getYoutubeVideoRoleFromTitle(association.title) === 'pilote'
-      )
-  );
-  const preferredYoutubeUrl =
-    pilotYoutubeUrl ?? youtubeUrls.find((url) => getYoutubeVideoId(url));
+  const preferredYoutubeUrl = CALIBRATION_YOUTUBE_ROLE_PRIORITY.map((role) =>
+    youtubeUrls.find((url) => {
+      if (!getYoutubeVideoId(url)) return false;
+      const association = youtubeAssociations.data?.find(
+        (item) => item.url === url
+      );
+      return getCalibrationYoutubeRole(association?.title) === role;
+    })
+  ).find((url): url is string => Boolean(url));
   const youtubeId = preferredYoutubeUrl
     ? getYoutubeVideoId(preferredYoutubeUrl)
     : null;
@@ -176,6 +187,7 @@ export function GoproOverlaySyncPreview({
   const generateMerge = useGenerateGoproMerge(flightId);
   const automaticallyRequestedTarget = useRef<string | null>(null);
   const [videoTime, setVideoTime] = useState(0);
+  const selectedYoutubeUrlRef = useRef(preferredYoutubeUrl);
   const cameraRef = useRef<HTMLVideoElement>(null);
   const [youtubeHostElement, setYoutubeHostElement] =
     useState<HTMLDivElement | null>(null);
@@ -186,6 +198,13 @@ export function GoproOverlaySyncPreview({
   const [requestedMinutes, setRequestedMinutes] = useState(3);
   const [alignmentTarget, setAlignmentTarget] =
     useState<GpxAlignmentTarget>('start');
+
+  useEffect(() => {
+    if (selectedYoutubeUrlRef.current === preferredYoutubeUrl) return;
+    selectedYoutubeUrlRef.current = preferredYoutubeUrl;
+    setVideoTime(0);
+    setYoutubeFailed(false);
+  }, [preferredYoutubeUrl]);
   const parsedOffset = Number(offset);
   const manualOffset = Number.isFinite(parsedOffset) ? parsedOffset : 0;
   const [displayOffset, setDisplayOffset] = useState(manualOffset);
