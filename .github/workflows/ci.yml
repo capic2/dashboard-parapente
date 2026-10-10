@@ -95,7 +95,6 @@ jobs:
         if: github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'merge queue:')
         run: bash .github/scripts/run-full-nx-validation.sh
         env:
-          NODE_OPTIONS: --preserve-symlinks
           TESTING: true
           BACKEND_DATABASE_URL: sqlite:///./test.db
           BACKEND_WEATHERAPI_KEY: test_key
@@ -119,7 +118,6 @@ jobs:
             pnpm exec nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e
           fi
         env:
-          NODE_OPTIONS: --preserve-symlinks
           TESTING: true
           BACKEND_DATABASE_URL: sqlite:///./test.db
           BACKEND_WEATHERAPI_KEY: test_key
