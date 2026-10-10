@@ -326,7 +326,7 @@ export default function FlightHistory() {
 
   const selectedFlightId = params.flightId ?? null;
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [isTagFilterExpanded, setIsTagFilterExpanded] = useState(true);
+  const [isTagFilterExpanded, setIsTagFilterExpanded] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [flightToDelete, setFlightToDelete] = useState<FlightSummary | null>(
     null
@@ -773,12 +773,24 @@ export default function FlightHistory() {
                       type="button"
                       aria-expanded={isTagFilterExpanded}
                       aria-controls="flight-tag-filter-options"
+                      aria-label={
+                        activeBadgeFilterCount > 0
+                          ? t('flights.tagFilterActive', {
+                              count: activeBadgeFilterCount,
+                            })
+                          : undefined
+                      }
                       onClick={() =>
                         setIsTagFilterExpanded((expanded) => !expanded)
                       }
                       className="flex min-h-9 min-w-0 items-center gap-2 text-left text-xs font-semibold text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-gray-300 lg:min-h-8"
                     >
                       {t('flights.tagFilter')}
+                      {activeBadgeFilterCount > 0 && (
+                        <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-sky-800 dark:bg-sky-900 dark:text-sky-100">
+                          {activeBadgeFilterCount}
+                        </span>
+                      )}
                       <ChevronDown
                         className={`h-4 w-4 shrink-0 transition-transform ${
                           isTagFilterExpanded ? 'rotate-180' : ''
