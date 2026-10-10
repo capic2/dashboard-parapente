@@ -80,7 +80,9 @@ function RootComponent() {
   return (
     <div
       className={`min-h-screen overflow-x-clip bg-gray-50 p-3 text-gray-900 transition-colors dark:bg-gray-900 dark:text-gray-100 md:p-4 ${
-        isFlightHistoryPage ? 'lg:h-dvh lg:min-h-0 lg:overflow-hidden' : ''
+        isFlightHistoryPage
+          ? 'lg:fixed lg:inset-0 lg:h-dvh lg:min-h-0 lg:overflow-hidden'
+          : ''
       }`}
     >
       <NativeGpxImportHandler />
