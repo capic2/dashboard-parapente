@@ -170,7 +170,7 @@ const mockGPXData = {
   max_sink_rate_ms: 3.2,
 };
 
-const defaultHandlers = [
+export const defaultHandlers = [
   http.get('*/api/flights/:id/video/thumbnail', () =>
     HttpResponse.text(
       '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="#312e81"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs><rect width="640" height="360" fill="url(#g)"/><path d="M0 290 170 145 280 245 420 100 640 290V360H0Z" fill="#e0f2fe"/><circle cx="505" cy="78" r="32" fill="#fef3c7"/></svg>',

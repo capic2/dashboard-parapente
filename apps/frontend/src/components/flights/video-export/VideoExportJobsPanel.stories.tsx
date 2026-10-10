@@ -1,6 +1,7 @@
 import preview from '../../../../.storybook/preview';
 import { expect, userEvent, within } from 'storybook/test';
 import { VideoExportJobsPanel } from './VideoExportJobsPanel';
+import i18n from 'i18next';
 import {
   defaultHandlers,
   resetMockVideoJobs,
@@ -36,7 +37,9 @@ Default.test('opens logs in a modal', async ({ canvasElement }) => {
   if (!actionsButton) throw new Error('Job actions button not found');
   await userEvent.click(actionsButton);
   await userEvent.click(
-    await within(document.body).findByRole('menuitem', { name: 'Afficher' })
+    await within(document.body).findByRole('menuitem', {
+      name: i18n.t('videoJobs.liveLogs.show', 'Afficher'),
+    })
   );
   await expect(
     within(document.body).getAllByText(/Capture completed/u).length

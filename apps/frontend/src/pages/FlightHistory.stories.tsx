@@ -246,10 +246,6 @@ const createHandlers = (gpxDelayMs = 0) => [
     gpxRequestCount += 1;
     return HttpResponse.json({ data: mockGPXData });
   }),
-  http.get('*/api/flights/$flightId/gpx-data', () =>
-    HttpResponse.json({ data: mockGPXData })
-  ),
-  http.get('*/api/flights/$flightId', () => HttpResponse.json(mockFlights[0])),
   http.get('*/api/flights/:id/overlay-layer', () =>
     HttpResponse.json({ status: 'missing', job: null })
   ),

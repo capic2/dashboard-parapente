@@ -5,6 +5,7 @@ import {
   MediaThumbnails,
   WithoutGpx,
   MinimalFlight,
+  defaultHandlers,
 } from './FlightDetails.stories.tsx';
 
 const meta = preview.meta({
@@ -16,6 +17,9 @@ const meta = preview.meta({
     },
   },
   tags: ['!autodocs'],
+  beforeEach: ({ msw }) => {
+    msw.use(...defaultHandlers);
+  },
 });
 
 export const FlightDetailsChromatic = meta.story({

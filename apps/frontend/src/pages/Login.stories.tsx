@@ -20,10 +20,10 @@ export const Default = meta.story({
   name: 'Default',
   beforeEach: async (context) => {
     context.msw.use(...[successHandler]);
-    return (() => {
+    return () => {
       useAuthStore.setState({ token: null, isAuthenticated: false });
       localStorage.removeItem('parapente-auth');
-    })();
+    };
   },
 });
 
@@ -44,10 +44,10 @@ export const Loading = meta.story({
         }),
       ]
     );
-    return (() => {
+    return () => {
       useAuthStore.setState({ token: null, isAuthenticated: false });
       localStorage.removeItem('parapente-auth');
-    })();
+    };
   },
 });
 
@@ -79,10 +79,10 @@ export const InvalidCredentials = meta.story({
         }),
       ]
     );
-    return (() => {
+    return () => {
       useAuthStore.setState({ token: null, isAuthenticated: false });
       localStorage.removeItem('parapente-auth');
-    })();
+    };
   },
 });
 
@@ -111,10 +111,10 @@ export const SubmitSuccess = meta.story({
   name: 'Submit Success',
   beforeEach: async (context) => {
     context.msw.use(...[successHandler]);
-    return (() => {
+    return () => {
       useAuthStore.setState({ token: null, isAuthenticated: false });
       localStorage.removeItem('parapente-auth');
-    })();
+    };
   },
 });
 
