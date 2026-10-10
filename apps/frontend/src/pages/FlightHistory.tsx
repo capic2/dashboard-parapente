@@ -326,7 +326,7 @@ export default function FlightHistory() {
 
   const selectedFlightId = params.flightId ?? null;
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [isTagFilterExpanded, setIsTagFilterExpanded] = useState(false);
+  const [isTagFilterExpanded, setIsTagFilterExpanded] = useState(true);
   const [selectionMode, setSelectionMode] = useState(false);
   const [flightToDelete, setFlightToDelete] = useState<FlightSummary | null>(
     null
@@ -431,7 +431,7 @@ export default function FlightHistory() {
     }
 
     return (
-      <div className="flex min-h-72 flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center dark:border-slate-700 dark:bg-gray-800">
+      <div className="flex min-h-72 flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center dark:border-slate-700 dark:bg-gray-800 lg:min-h-full">
         <Mountain
           aria-hidden="true"
           className="mb-4 h-8 w-8 text-sky-700 dark:text-sky-300"
@@ -487,6 +487,7 @@ export default function FlightHistory() {
         }}
         hasMoreFlights={hasNextPage}
         isLoadingMore={isFetchingNextPage}
+        desktopPaneLayout
         onLoadMore={() => void fetchNextPage()}
         emptyMessage={
           activeBadgeFilterCount > 0
@@ -701,7 +702,7 @@ export default function FlightHistory() {
   ]);
 
   return (
-    <div>
+    <div className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
       <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-950 dark:text-white">
@@ -755,12 +756,12 @@ export default function FlightHistory() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(22rem,26rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(22rem,26rem)_minmax(0,1fr)] lg:grid-rows-1">
         {/* Flight List */}
         {(!isMobile || !showMobileDetail) && (
-          <aside className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/40">
+          <aside className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/40 lg:flex lg:min-h-0 lg:flex-col">
             {!selectionMode ? (
-              <div className="mb-3 space-y-2 border-b border-slate-200 pb-3 dark:border-slate-700">
+              <div className="mb-3 space-y-2 border-b border-slate-200 pb-3 dark:border-slate-700 lg:max-h-[55%] lg:shrink-0 lg:overflow-y-auto">
                 <FlightSearchInput
                   key={search.q ?? ''}
                   initialQuery={search.q ?? ''}
@@ -843,7 +844,7 @@ export default function FlightHistory() {
                 </div>
               </div>
             ) : (
-              <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-800 dark:bg-sky-950/30">
+              <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-800 dark:bg-sky-950/30 lg:max-h-[55%] lg:shrink-0 lg:overflow-y-auto">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold text-sky-900 dark:text-sky-100">
                     {t('flights.selected', { count: selectedCount })}
@@ -891,7 +892,9 @@ export default function FlightHistory() {
 
         {/* Detail Panel + 3D Viewer (desktop) */}
         {!isMobile && (
-          <main className="min-w-0 space-y-4">{renderDetailPanel(false)}</main>
+          <main className="min-h-0 min-w-0 space-y-4 overflow-y-auto pr-1">
+            {renderDetailPanel(false)}
+          </main>
         )}
 
         {/* Detail Panel + 3D Viewer (mobile) */}
