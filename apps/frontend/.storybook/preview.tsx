@@ -66,7 +66,7 @@ const defaultMswHandlers = [
 const setupMsw = async () => {
   const { setupWorker } = await import('msw/browser');
   const worker = setupWorker(...defaultMswHandlers);
-  await worker.start({ onUnhandledRequest: 'error', quiet: true });
+  await worker.start({ onUnhandledFrame: 'error', quiet: true });
   return worker;
 };
 

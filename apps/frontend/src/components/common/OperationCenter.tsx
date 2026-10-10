@@ -219,7 +219,6 @@ export function OperationCenter() {
                           onPress={() => void cancelOperation(operation)}
                           isDisabled={isCancelling}
                           aria-label={`${t('operations.cancel', 'Stopper')} ${title}`}
-                          title={t('operations.cancel', 'Stopper')}
                           className="inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center rounded-md border border-red-200 text-red-700 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-wait disabled:opacity-60 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"
                         >
                           <Square className="h-4 w-4" aria-hidden="true" />
@@ -230,7 +229,6 @@ export function OperationCenter() {
                           onPress={() => void removeOperation(operation)}
                           isDisabled={isDeleting}
                           aria-label={`${t('operations.delete', 'Supprimer')} ${title}`}
-                          title={t('operations.delete', 'Supprimer')}
                           className="inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center rounded-md border border-slate-300 text-slate-600 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-wait disabled:opacity-60 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
                         >
                           <Trash2 className="h-4 w-4" aria-hidden="true" />

@@ -9,7 +9,7 @@ import { overrideApi } from '../lib/api';
 overrideApi({ logs: false });
 
 // Setup MSW
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
 afterEach(() => {
   server.resetHandlers();
   cleanup();
