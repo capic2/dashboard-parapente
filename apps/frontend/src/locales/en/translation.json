@@ -1094,6 +1094,8 @@
     "searchPlaceholder": "Search by title, site or date...",
     "gpxFilter": "Filter by GPX status",
     "tagFilter": "Filter by tag",
+    "tagFilterActive_one": "Filter by tag, {{count}} active filter",
+    "tagFilterActive_other": "Filter by tag, {{count}} active filters",
     "tagFilterInstructions": "Click to include, click again to exclude, and click once more to clear.",
     "moreTagFilters": "More tags",
     "moreTagFiltersActive_one": "More tags ({{count}} active)",

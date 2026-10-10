@@ -1098,6 +1098,8 @@
     "searchPlaceholder": "Rechercher par titre, site ou date...",
     "gpxFilter": "Filtrer par statut GPX",
     "tagFilter": "Filtrer par tag",
+    "tagFilterActive_one": "Filtrer par tag, {{count}} filtre actif",
+    "tagFilterActive_other": "Filtrer par tag, {{count}} filtres actifs",
     "tagFilterInstructions": "Cliquez pour inclure, une seconde fois pour exclure, puis encore pour effacer.",
     "moreTagFilters": "Plus de tags",
     "moreTagFiltersActive_one": "Plus de tags ({{count}} actif)",
