@@ -257,7 +257,7 @@ def test_render_method_is_available_before_worker_starts() -> None:
     assert video_export_manual._render_method_for_accelerator("nvidia") == "gpu"
 
 
-def test_capture_progress_percent_spans_capture_phase_range():
+def test_capture_progress_percent_spans_capture_phase_range() -> None:
     assert video_export_manual._capture_progress_percent(0, 100) == 5
     assert video_export_manual._capture_progress_percent(50, 100) == 42
     assert video_export_manual._capture_progress_percent(100, 100) == 80
@@ -782,12 +782,20 @@ def test_start_video_export_worker_enqueues_pending_jobs_with_rq(test_db, monkey
 
 def test_worker_restart_immediately_recovers_active_job(test_db, monkeypatch):
     enqueued_job_ids: list[str] = []
+    cleared_rq_job_ids: list[tuple[str, str | None]] = []
     monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
     monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
     monkeypatch.setattr(
         video_export_manual,
         "_enqueue_video_export_job_in_rq",
         lambda job_id: enqueued_job_ids.append(job_id),
+    )
+    monkeypatch.setattr(
+        "job_queue.delete_stale_started_job",
+        lambda job_id, stale_before, queue_name=None: cleared_rq_job_ids.append(
+            (job_id, queue_name)
+        )
+        or True,
     )
 
     with test_db() as db_session:
@@ -815,8 +823,49 @@ def test_worker_restart_immediately_recovers_active_job(test_db, monkeypatch):
         job = db_session.get(VideoExportJob, "job-active-rq")
         assert job is not None
         assert job.status == "queued"
+        assert job.progress == 50
         assert job.message == "Recovered after worker restart"
     assert enqueued_job_ids == ["job-active-rq"]
+    assert cleared_rq_job_ids == [("video-export-job-active-rq", "video_exports")]
+
+
+def test_video_export_reconciliation_clears_stale_rq_before_requeue(
+    test_db: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    enqueued_job_ids: list[str] = []
+    cleared_rq_job_ids: list[tuple[str, str | None]] = []
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(
+        video_export_manual,
+        "_enqueue_video_export_job_in_rq",
+        lambda job_id: enqueued_job_ids.append(job_id),
+    )
+    monkeypatch.setattr(
+        "job_queue.delete_stale_started_job",
+        lambda job_id, stale_before, queue_name=None: cleared_rq_job_ids.append(
+            (job_id, queue_name)
+        )
+        or True,
+    )
+
+    with test_db() as db_session:
+        db_session.add(
+            VideoExportJob(
+                id="job-queued-rq",
+                flight_id="flight-test-001",
+                status="queued",
+                mode="manual_fast",
+                progress=26,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+        )
+        db_session.commit()
+
+    assert video_export_manual.enqueue_pending_video_export_jobs() == 1
+    assert cleared_rq_job_ids == [("video-export-job-queued-rq", "video_exports")]
+    assert enqueued_job_ids == ["job-queued-rq"]
 
 
 def test_process_video_export_job_runs_only_requested_queued_job(test_db, monkeypatch):
