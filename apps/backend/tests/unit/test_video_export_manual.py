@@ -959,6 +959,8 @@ def test_youtube_overlay_worker_cleans_temp_files_after_success(tmp_path, monkey
     output = tmp_path / "exports" / f"youtube-overlay-{job_id}.mp4"
     job = SimpleNamespace(
         youtube_url="https://www.youtube.com/watch?v=test",
+        pip_youtube_url=None,
+        pip_apply_offset=True,
         overlay_job_id="saved-overlay-job",
         overlay_offset_seconds=0,
         youtube_upload_job_id="upload-job",
@@ -970,6 +972,7 @@ def test_youtube_overlay_worker_cleans_temp_files_after_success(tmp_path, monkey
     monkeypatch.setattr(video_export_manual, "_log_job", lambda *args: None)
     monkeypatch.setattr(video_export_manual, "_update_job", lambda *args, **kwargs: job)
     monkeypatch.setattr(video_export_manual, "_clear_job_cancel_requested", lambda _: None)
+    monkeypatch.setattr("youtube_upload.download_cookies_for_upload_job", lambda _: None)
     monkeypatch.setattr(youtube_overlay_export, "new_work_dir", lambda _: work_dir)
     monkeypatch.setattr(youtube_overlay_export, "output_path", lambda _: output)
 

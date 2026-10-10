@@ -148,12 +148,20 @@ export const Default = meta.story({
     />
   ),
 });
+
+const getVisibleNames = (canvas: {
+  getAllByRole: (role: string) => HTMLElement[];
+}) =>
+  canvas
+    .getAllByRole('option')
+    .map((row) => row.textContent?.split('Valeur:')[0]?.trim() ?? '');
+
 Default.test(
   'It can be sorted',
   async ({ canvas, userEvent, context }: DataListContext) => {
     const pageSize = context.parameters.dataList?.pageSize ?? 5;
     let names = [...mockData].map((data) => data.name).slice(0, pageSize);
-    let rowNames = canvas.getAllByRole('option').map((row) => row.ariaLabel);
+    let rowNames = getVisibleNames(canvas);
 
     await expect(rowNames).toEqual(names);
 
@@ -165,7 +173,7 @@ Default.test(
       .sort((d1, d2) => d2.value - d1.value)
       .map((data) => data.name)
       .slice(0, pageSize);
-    rowNames = canvas.getAllByRole('option').map((row) => row.ariaLabel);
+    rowNames = getVisibleNames(canvas);
 
     await expect(rowNames).toEqual(names);
   }
@@ -173,21 +181,21 @@ Default.test(
 Default.test('It is paginated', async ({ canvas, context, userEvent }) => {
   const pageSize = context.parameters.dataList?.pageSize ?? 5;
   let names = [...mockData].map((data) => data.name).slice(0, pageSize);
-  let rowNames = canvas.getAllByRole('option').map((row) => row.ariaLabel);
+  let rowNames = getVisibleNames(canvas);
 
   await expect(rowNames).toEqual(names);
 
   await userEvent.click(canvas.getByRole('button', { name: 'Page suivante' }));
 
   names = [...mockData].map((data) => data.name).slice(pageSize, pageSize * 2);
-  rowNames = canvas.getAllByRole('option').map((row) => row.ariaLabel);
+  rowNames = getVisibleNames(canvas);
 
   await expect(rowNames).toEqual(names);
 });
 Default.test(
   'triggers the onselectionchange callback',
   async ({ canvas, args, userEvent }) => {
-    await userEvent.click(canvas.getByRole('option', { name: 'Alpha' }));
+    await userEvent.click(canvas.getByRole('option', { name: /Alpha/u }));
     await expect(args.onSelectionChange).toHaveBeenCalled();
   }
 );
