@@ -105,13 +105,10 @@ export const defaultHandlers = [
 
 export const Default = meta.story({
   name: 'Default',
-  parameters: {
-    msw: { handlers: defaultHandlers },
-    /*router: {
-      routes: [{ path: '/flights', children: [] }],
-    },*/
+  beforeEach: async (context) => {
+    context.msw.use(...defaultHandlers);
+    return resetSitesDb();
   },
-  beforeEach: resetSitesDb,
 });
 
 Default.test('filters by landing type', async ({ canvas, userEvent }) => {
@@ -254,24 +251,22 @@ Default.test(
 
 export const EmptyState = meta.story({
   name: 'Empty State',
-  parameters: {
-    msw: {
-      handlers: [
-        http.get('*/api/spots', () => HttpResponse.json({ sites: [] })),
-      ],
-    },
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[http.get('*/api/spots', () => HttpResponse.json({ sites: [] }))]
+    );
   },
 });
 
 export const Loading = meta.story({
   name: 'Loading',
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/spots', async () => {
           await new Promise(() => {});
         }),
-      ],
-    },
+      ]
+    );
   },
 });

@@ -95,17 +95,17 @@ export const FlightModal = meta.story({
     onClose: fn(),
     onCreateComplete: fn(),
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.post('*/api/flights', () => {
           return HttpResponse.json(mockManualFlight);
         }),
         http.post('*/api/flights/create-from-gpx', () => {
           return HttpResponse.json(mockFlightResult);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -118,14 +118,14 @@ export const FileImport = meta.story({
     onClose: fn(),
     onCreateComplete: fn(),
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.post('*/api/flights/create-from-gpx', () => {
           return HttpResponse.json(mockFlightResult);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 

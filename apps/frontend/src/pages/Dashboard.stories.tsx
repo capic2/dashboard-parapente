@@ -237,7 +237,6 @@ const defaultHandlers = [
 export const Default = meta.story({
   name: 'Default',
   parameters: {
-    msw: { handlers: defaultHandlers },
     router: {
       initialPath: 'dashboard',
       renderRootRoute: () => (
@@ -258,6 +257,9 @@ export const Default = meta.story({
         },
       ],
     },
+  },
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
   },
 });
 
@@ -293,38 +295,38 @@ Default.test(
 
 export const Loading = meta.story({
   name: 'Loading',
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/spots', async () => {
           await new Promise(() => {});
         }),
         ...defaultHandlers.slice(1),
-      ],
-    },
+      ]
+    );
   },
 });
 
 export const Empty = meta.story({
   name: 'Empty',
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/spots', () => HttpResponse.json({ sites: [] })),
         ...defaultHandlers.slice(1),
-      ],
-    },
+      ]
+    );
   },
 });
 
 export const Error = meta.story({
   name: 'Error',
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/spots', () => new HttpResponse(null, { status: 500 })),
         ...defaultHandlers.slice(1),
-      ],
-    },
+      ]
+    );
   },
 });

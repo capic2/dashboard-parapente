@@ -175,17 +175,17 @@ export const GoodConditions = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherGood);
         }),
         http.get('*/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -195,17 +195,17 @@ export const ModerateConditions = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherModerate);
         }),
         http.get('*/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -229,17 +229,17 @@ export const LimiteConditions = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherLimite);
         }),
         http.get('*/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -263,17 +263,17 @@ export const BadConditions = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherBad);
         }),
         http.get('*/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -296,17 +296,17 @@ export const NoGustsData = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherNoGusts);
         }),
         http.get('*/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -316,17 +316,17 @@ export const Loading = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('http://localhost:5000/api/weather/:spotId', async () => {
           await new Promise(() => {}); // Never resolves
         }),
         http.get('*/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -336,17 +336,17 @@ export const Error = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId', () => {
           return new HttpResponse(null, { status: 500 });
         }),
         http.get('*/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -356,17 +356,17 @@ export const NoSiteOrientation = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherGood);
         }),
         http.get('*/api/spots/:id', () => {
           return HttpResponse.json({ ...mockSite, orientation: null });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 

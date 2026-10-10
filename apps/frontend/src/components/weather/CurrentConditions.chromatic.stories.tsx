@@ -29,8 +29,12 @@ const meta = preview.meta({
     chromatic: {
       disableSnapshot: false,
     },
-    msw: {
-      handlers: [
+  },
+  tags: ['!autodocs'],
+
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/spots/:id', () => HttpResponse.json(mockSite)),
         http.get('*/api/weather/:spotId', () =>
           HttpResponse.json({
@@ -57,10 +61,9 @@ const meta = preview.meta({
             ],
           })
         ),
-      ],
-    },
+      ]
+    );
   },
-  tags: ['!autodocs'],
 });
 
 export const CurrentConditionsChromatic = meta.story({

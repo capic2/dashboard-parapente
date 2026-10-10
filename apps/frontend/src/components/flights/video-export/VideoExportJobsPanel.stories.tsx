@@ -9,17 +9,21 @@ import {
 const meta = preview.meta({
   title: 'Components/Infrastructure/Video Export Jobs',
   component: VideoExportJobsPanel,
-  parameters: {
-    layout: 'padded',
-    msw: { handlers: defaultHandlers },
-  },
+  parameters: { layout: 'padded' },
   tags: ['autodocs'],
+
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
+  },
 });
 
 export const Default = meta.story({
   name: 'Operational list',
   args: { limit: null },
-  beforeEach: resetMockVideoJobs,
+  beforeEach: ({ msw }) => {
+    msw.use(...defaultHandlers);
+    resetMockVideoJobs();
+  },
 });
 
 Default.test('opens logs in a modal', async ({ canvasElement }) => {

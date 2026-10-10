@@ -246,6 +246,10 @@ const createHandlers = (gpxDelayMs = 0) => [
     gpxRequestCount += 1;
     return HttpResponse.json({ data: mockGPXData });
   }),
+  http.get('*/api/flights/$flightId/gpx-data', () =>
+    HttpResponse.json({ data: mockGPXData })
+  ),
+  http.get('*/api/flights/$flightId', () => HttpResponse.json(mockFlights[0])),
   http.get('*/api/flights/:id', ({ params }) => {
     const flight = flightsDb.find((f) => f.id === params.id);
     return flight
@@ -275,14 +279,16 @@ const defaultHandlers = createHandlers();
 
 export const Default = meta.story({
   name: 'Default',
-  parameters: { msw: { handlers: defaultHandlers } },
-  beforeEach: resetStoryState,
+  beforeEach: ({ msw }) => {
+    msw.use(...defaultHandlers);
+    resetStoryState();
+  },
 });
 
 Default.test(
   'Can cancel a simple flight deletion',
   async ({ canvas, userEvent, step }) => {
-    const flightList = await canvas.findByRole('listbox', {
+    const flightList = await canvas.findByRole('region', {
       name: i18n.t('flights.listAriaLabel'),
     });
 
@@ -295,6 +301,9 @@ Default.test(
     });
 
     await step('want to delete a flight', async () => {
+      await userEvent.click(
+        canvas.getByRole('button', { name: i18n.t('flights.expandAllDays') })
+      );
       const deleteButton = canvas.getByRole('button', {
         name: i18n.t('flights.deleteAriaLabel', {
           title: 'Vol thermique Arguel',
@@ -325,7 +334,7 @@ Default.test(
 Default.test(
   'can delete a simple flight',
   async ({ canvas, userEvent, step }) => {
-    const flightList = await canvas.findByRole('listbox', {
+    const flightList = await canvas.findByRole('region', {
       name: i18n.t('flights.listAriaLabel'),
     });
 
@@ -338,6 +347,9 @@ Default.test(
     });
 
     await step('want to delete a flight', async () => {
+      await userEvent.click(
+        canvas.getByRole('button', { name: i18n.t('flights.expandAllDays') })
+      );
       const deleteButton = canvas.getByRole('button', {
         name: i18n.t('flights.deleteAriaLabel', {
           title: 'Vol thermique Arguel',
@@ -370,8 +382,8 @@ Default.test(
 );
 export const MobileFlow = meta.story({
   name: 'Mobile Flow',
-  parameters: { msw: { handlers: defaultHandlers } },
-  beforeEach: () => {
+  beforeEach: ({ msw }) => {
+    msw.use(...defaultHandlers);
     resetStoryState();
     return installMatchMediaMock(true);
   },
@@ -381,10 +393,15 @@ MobileFlow.test(
   'opens a flight, switches tabs, and returns to list on mobile',
   async ({ canvas, userEvent, step }) => {
     await step('has the flight list', async () => {
-      const flightList = await canvas.findByRole('listbox', {
-        name: i18n.t('flights.listAriaLabel'),
-      });
-      await expect(flightList).toBeInTheDocument();
+      await userEvent.click(
+        await canvas.findByRole('button', {
+          name: i18n.t('flights.backToList'),
+        })
+      );
+      await canvas.findByText(i18n.t('flights.expandAllDays'));
+      await userEvent.click(
+        canvas.getByRole('button', { name: i18n.t('flights.expandAllDays') })
+      );
       gpxRequestCount = 0;
     });
 
@@ -416,7 +433,7 @@ MobileFlow.test(
         canvas.getByRole('button', { name: i18n.t('flights.backToList') })
       );
       await expect(
-        await canvas.findByRole('listbox', {
+        await canvas.findByRole('region', {
           name: i18n.t('flights.listAriaLabel'),
         })
       ).toBeInTheDocument();
@@ -429,12 +446,8 @@ MobileFlow.test(
 
 export const MobileFlowWithReplay = meta.story({
   name: 'Mobile Flow With Replay',
-  parameters: {
-    msw: {
-      handlers: createHandlers(150),
-    },
-  },
-  beforeEach: () => {
+  beforeEach: ({ msw }) => {
+    msw.use(...createHandlers(150));
     resetStoryState();
     return installMatchMediaMock(true);
   },
@@ -446,10 +459,15 @@ MobileFlowWithReplay.test(
     let requestsAfterOpeningFlight = 0;
 
     await step('has the flight list', async () => {
-      const flightList = await canvas.findByRole('listbox', {
-        name: i18n.t('flights.listAriaLabel'),
-      });
-      await expect(flightList).toBeInTheDocument();
+      await userEvent.click(
+        await canvas.findByRole('button', {
+          name: i18n.t('flights.backToList'),
+        })
+      );
+      await canvas.findByText(i18n.t('flights.expandAllDays'));
+      await userEvent.click(
+        canvas.getByRole('button', { name: i18n.t('flights.expandAllDays') })
+      );
     });
 
     await step('opens a flight with GPX', async () => {
@@ -517,26 +535,24 @@ MobileFlowWithReplay.test(
 
 export const EmptyState = meta.story({
   name: 'Empty State',
-  parameters: {
-    msw: {
-      handlers: [
-        http.get('*/api/flights/summaries', () =>
-          HttpResponse.json({ flights: [], total: 0, next_cursor: null })
-        ),
-        http.get('*/api/video-export-jobs', () =>
-          HttpResponse.json({ jobs: [] })
-        ),
-        http.get('*/api/spots', () => HttpResponse.json(mockSites)),
-      ],
-    },
+  beforeEach: ({ msw }) => {
+    msw.use(
+      http.get('*/api/flights/summaries', () =>
+        HttpResponse.json({ flights: [], total: 0, next_cursor: null })
+      ),
+      http.get('*/api/video-export-jobs', () =>
+        HttpResponse.json({ jobs: [] })
+      ),
+      http.get('*/api/spots', () => HttpResponse.json(mockSites))
+    );
   },
 });
 
 export const Loading = meta.story({
   name: 'Loading',
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/flights/summaries', async () => {
           await new Promise(() => {});
         }),
@@ -544,7 +560,7 @@ export const Loading = meta.story({
           HttpResponse.json({ jobs: [] })
         ),
         http.get('*/api/spots', () => HttpResponse.json(mockSites)),
-      ],
-    },
+      ]
+    );
   },
 });

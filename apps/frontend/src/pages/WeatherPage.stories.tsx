@@ -710,9 +710,9 @@ const weatherRouteConfig = {
 
 export const Default = meta.story({
   name: 'Default',
-  parameters: {
-    router: weatherRouteConfig,
-    msw: { handlers: defaultHandlers },
+  parameters: { router: weatherRouteConfig },
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
   },
 });
 
@@ -743,7 +743,9 @@ export const WithSelectedSite = meta.story({
       ...weatherRouteConfig,
       initialPath: '/weather?siteId=site-chalais',
     },
-    msw: { handlers: defaultHandlers },
+  },
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
   },
 });
 
@@ -764,7 +766,9 @@ export const WithCityQueryParam = meta.story({
       initialPath:
         '/weather?target=city&city=Besan%C3%A7on&displayName=Besan%C3%A7on%2C%20Doubs&lat=47.238&lon=6.024&country=FR',
     },
-    msw: { handlers: defaultHandlers },
+  },
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
   },
 });
 
@@ -786,7 +790,9 @@ export const WithSpotQueryParam = meta.story({
       initialPath:
         '/weather?target=takeoff&spotId=merged-takeoff-arguel&spotName=Arguel%20d%C3%A9co&spotType=takeoff&lat=47.205&lon=6.005&elevation=427&orientation=SW&country=FR&source=merged',
     },
-    msw: { handlers: defaultHandlers },
+  },
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
   },
 });
 
@@ -804,9 +810,9 @@ WithSpotQueryParam.test(
 
 export const WithCitySearch = meta.story({
   name: 'With City Search',
-  parameters: {
-    router: weatherRouteConfig,
-    msw: { handlers: defaultHandlers },
+  parameters: { router: weatherRouteConfig },
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
   },
 });
 
@@ -850,14 +856,14 @@ WithCitySearch.test(
 
 export const NoSites = meta.story({
   name: 'No Sites',
-  parameters: {
-    router: weatherRouteConfig,
-    msw: {
-      handlers: [
+  parameters: { router: weatherRouteConfig },
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/spots', () => HttpResponse.json({ sites: [] })),
         ...defaultHandlersWithoutSpots,
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -867,25 +873,25 @@ NoSites.test('shows no sites message', async ({ canvas }) => {
 
 export const Loading = meta.story({
   name: 'Loading',
-  parameters: {
-    router: weatherRouteConfig,
-    msw: {
-      handlers: [
+  parameters: { router: weatherRouteConfig },
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/spots', async () => {
           await new Promise(() => {});
         }),
         ...defaultHandlersWithoutSpots,
-      ],
-    },
+      ]
+    );
   },
 });
 
 export const WeatherError = meta.story({
   name: 'Weather Error',
-  parameters: {
-    router: weatherRouteConfig,
-    msw: {
-      handlers: [
+  parameters: { router: weatherRouteConfig },
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         hourlyBestSpotsHandler,
         http.get('*/api/spots/best', () => HttpResponse.json(mockBestSpot)),
         http.get('*/api/spots', () => HttpResponse.json(mockSites)),
@@ -921,8 +927,8 @@ export const WeatherError = meta.story({
         ),
         http.get('*/api/emagram/latest', () => HttpResponse.json(null)),
         http.get('*/api/emagram/history', () => HttpResponse.json([])),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -937,10 +943,10 @@ WeatherError.test(
 
 export const SingleSite = meta.story({
   name: 'Single Site',
-  parameters: {
-    router: weatherRouteConfig,
-    msw: {
-      handlers: [
+  parameters: { router: weatherRouteConfig },
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/spots', () =>
           HttpResponse.json({ sites: [mockSites.sites[0]] })
         ),
@@ -948,8 +954,8 @@ export const SingleSite = meta.story({
           HttpResponse.json(mockSites.sites[0])
         ),
         ...defaultHandlersWithoutSpotsAndDetails,
-      ],
-    },
+      ]
+    );
   },
 });
 

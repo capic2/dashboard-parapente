@@ -277,6 +277,10 @@ const defaultHandlers = [
   ),
   http.get('*/api/flights/:id/youtube-upload', () => HttpResponse.json(null)),
   http.get('*/api/flights/:id/youtube-videos', () => HttpResponse.json([])),
+  http.get('*/api/flights/:id/highlight-videos', () => HttpResponse.json([])),
+  http.get('*/api/flights/:id/overlay-layer', () =>
+    HttpResponse.json({ status: 'missing', job: null })
+  ),
   http.get('*/api/flights/:id', () => HttpResponse.json(fullFlight)),
   http.patch('*/api/flights/:id', async ({ request }) => {
     const body = await request.json();
@@ -320,13 +324,13 @@ const meta = preview.meta({
   title: 'Components/Flights/FlightDetails',
   component: FlightDetails,
   decorators: [ToastDecorator],
-  beforeEach: () => {
-    useToastStore.setState({ toasts: [] });
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
+    return () => {
+      useToastStore.setState({ toasts: [] });
+    };
   },
-  parameters: {
-    layout: 'padded',
-    msw: { handlers: defaultHandlers },
-  },
+  parameters: { layout: 'padded' },
   tags: ['autodocs'],
   args: {
     sites: mockSites,
@@ -337,6 +341,9 @@ const meta = preview.meta({
 export const Default = meta.story({
   name: 'Default',
   args: { flight: fullFlight, mobileMode: true },
+  beforeEach: ({ msw }) => {
+    msw.use(...defaultHandlers);
+  },
 });
 Default.test('The stored track file name is displayed', async ({ canvas }) => {
   await expect(canvas.getByText('arguel-001.gpx')).toBeInTheDocument();
@@ -423,6 +430,9 @@ export const Mobile = meta.story({
 export const MediaThumbnails = meta.story({
   name: 'Media thumbnails',
   args: { flight: flightWithMediaThumbnails, mobileMode: true },
+  beforeEach: ({ msw }) => {
+    msw.use(...defaultHandlers);
+  },
 });
 
 MediaThumbnails.test(
@@ -475,6 +485,9 @@ Mobile.test('shows compact mobile infos tab by default', async ({ canvas }) => {
 export const WithGenerationLogs = meta.story({
   name: 'With Generation Logs',
   args: { flight: flightWithGenerationLogs },
+  beforeEach: ({ msw }) => {
+    msw.use(...defaultHandlers);
+  },
 });
 
 WithGenerationLogs.test(

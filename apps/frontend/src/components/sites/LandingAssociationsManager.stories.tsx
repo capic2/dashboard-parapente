@@ -31,8 +31,6 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-
-
 // Mock data
 const mockAssociations = [
   {
@@ -173,8 +171,8 @@ export const WithAssociations = meta.story({
   args: {
     takeoffSiteId: 'site-arguel',
   },
-  parameters: {
-    msw: { handlers: defaultHandlers },
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
   },
 });
 
@@ -194,9 +192,9 @@ export const Empty = meta.story({
   args: {
     takeoffSiteId: 'site-arguel',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/sites/:siteId/landings', () => {
           return HttpResponse.json([]);
         }),
@@ -204,8 +202,8 @@ export const Empty = meta.story({
           return HttpResponse.json(mockSites);
         }),
         ...defaultHandlers.slice(2),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -222,9 +220,9 @@ export const AddingAssociation = meta.story({
   args: {
     takeoffSiteId: 'site-arguel',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/sites/:siteId/landings', () => {
           return HttpResponse.json([]);
         }),
@@ -232,8 +230,8 @@ export const AddingAssociation = meta.story({
           return HttpResponse.json(mockSites);
         }),
         ...defaultHandlers.slice(2),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -261,8 +259,8 @@ export const WithNotes = meta.story({
   args: {
     takeoffSiteId: 'site-arguel',
   },
-  parameters: {
-    msw: { handlers: defaultHandlers },
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
   },
 });
 
@@ -277,16 +275,16 @@ export const Loading = meta.story({
   args: {
     takeoffSiteId: 'site-arguel',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/sites/:siteId/landings', async () => {
           await new Promise(() => {}); // Never resolves
         }),
         http.get('*/api/spots', () => {
           return HttpResponse.json(mockSites);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
