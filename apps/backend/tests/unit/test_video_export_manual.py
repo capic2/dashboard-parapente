@@ -749,6 +749,7 @@ def test_start_video_export_worker_enqueues_pending_jobs_with_rq(test_db, monkey
     enqueued_job_ids: list[str] = []
     monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
     monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr("job_queue.delete_stale_started_job", lambda *args, **kwargs: False)
     monkeypatch.setattr(
         video_export_manual,
         "_enqueue_video_export_job_in_rq",
@@ -1316,6 +1317,9 @@ def test_resume_video_export_drain_rejection_preserves_cancelled_job(
         lambda: tmp_path / "temp-images",
     )
     monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(
+        video_export_manual, "_is_rq_video_export_job_started", lambda _job_id: False
+    )
     monkeypatch.setattr(
         video_export_manual,
         "_enqueue_video_export_job_in_rq",

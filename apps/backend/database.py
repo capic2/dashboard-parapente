@@ -1,8 +1,11 @@
+import sqlite3
+import unicodedata
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from config import DATABASE_URL
@@ -25,6 +28,25 @@ else:
     DB_PATH = Path(__file__).parent / "db" / "dashboard.db"
 
 _SQLITE_BUSY_TIMEOUT_MS = 30_000
+
+
+def _fold_search_text(value: str | None) -> str:
+    if value is None:
+        return ""
+    return "".join(
+        character
+        for character in unicodedata.normalize("NFKD", value)
+        if not unicodedata.combining(character)
+    ).lower()
+
+
+@event.listens_for(Engine, "connect")
+def _register_sqlite_search_function(dbapi_connection: Any, _connection_record: Any) -> None:
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        dbapi_connection.create_function(
+            "fold_search_text", 1, _fold_search_text, deterministic=True
+        )
+
 
 connect_args = {"check_same_thread": False}
 if DATABASE_URL.startswith("sqlite"):
