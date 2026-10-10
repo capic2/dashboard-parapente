@@ -59,6 +59,8 @@ function RootComponent() {
     to: '/infrastructure',
     fuzzy: true,
   });
+  const isFlightHistoryPage =
+    matchRoute({ to: '/flights' }) || matchRoute({ to: '/flights/$flightId' });
   const appVersion = Route.useLoaderData();
   const version = appVersion?.version ?? null;
   const stagingPrNumber = getStagingPrNumber(version);
@@ -76,9 +78,17 @@ function RootComponent() {
   }
 
   return (
-    <div className="min-h-screen overflow-x-clip bg-gray-50 p-3 text-gray-900 transition-colors dark:bg-gray-900 dark:text-gray-100 md:p-4">
+    <div
+      className={`min-h-screen overflow-x-clip bg-gray-50 p-3 text-gray-900 transition-colors dark:bg-gray-900 dark:text-gray-100 md:p-4 ${
+        isFlightHistoryPage ? 'lg:h-dvh lg:min-h-0 lg:overflow-hidden' : ''
+      }`}
+    >
       <NativeGpxImportHandler />
-      <div className="max-w-7xl mx-auto">
+      <div
+        className={`max-w-7xl mx-auto ${
+          isFlightHistoryPage ? 'lg:flex lg:h-full lg:min-h-0 lg:flex-col' : ''
+        }`}
+      >
         {latestVersion && (
           <AppUpdateBanner
             title={t('appUpdate.title')}
@@ -93,7 +103,13 @@ function RootComponent() {
         )}
         {!isInfrastructurePage && <DeploymentStatusBanner />}
         <Header />
-        <main>
+        <main
+          className={
+            isFlightHistoryPage
+              ? 'lg:flex lg:min-h-0 lg:flex-1 lg:flex-col'
+              : undefined
+          }
+        >
           <Suspense>
             <Outlet />
           </Suspense>

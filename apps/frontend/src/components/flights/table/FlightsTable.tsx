@@ -35,6 +35,7 @@ interface FlightsTableProps {
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
   emptyMessage?: string;
+  desktopPaneLayout?: boolean;
 }
 
 export function FlightsTable({
@@ -51,6 +52,7 @@ export function FlightsTable({
   isLoadingMore = false,
   onLoadMore,
   emptyMessage,
+  desktopPaneLayout = false,
 }: FlightsTableProps) {
   const { t, i18n } = useTranslation();
   const { table } = useFlightsTable({
@@ -237,7 +239,11 @@ export function FlightsTable({
       dayGroups.every(([date]) => expandedDays.has(date));
 
     return (
-      <div className="flex flex-col">
+      <div
+        className={`flex flex-col ${
+          desktopPaneLayout ? 'lg:min-h-0 lg:flex-1' : ''
+        }`}
+      >
         {renderSortControls()}
         {dayGroups.length > 0 && (
           <div className="mb-1 flex justify-end gap-1">
@@ -269,7 +275,11 @@ export function FlightsTable({
         )}
         <section
           aria-label={t('flights.listAriaLabel')}
-          className="h-[calc(100vh-23rem)] min-h-72 overflow-y-auto pr-1 xl:h-[calc(100vh-19rem)]"
+          className={`min-h-72 overflow-y-auto pr-1 ${
+            desktopPaneLayout
+              ? 'lg:min-h-0 lg:flex-1'
+              : 'h-[calc(100vh-23rem)] xl:h-[calc(100vh-19rem)]'
+          }`}
         >
           {dayGroups.length === 0 ? (
             <div className="rounded-xl bg-white p-8 text-center shadow-sm dark:bg-gray-800">
@@ -386,7 +396,11 @@ export function FlightsTable({
   }
 
   return (
-    <div className="flex flex-col">
+    <div
+      className={`flex flex-col ${
+        desktopPaneLayout ? 'lg:min-h-0 lg:flex-1' : ''
+      }`}
+    >
       {renderSortControls()}
       <DataList
         table={table}
@@ -395,8 +409,14 @@ export function FlightsTable({
         emptyMessage={emptyMessage ?? t('flights.noFlights')}
         ariaLabel={t('flights.listAriaLabel')}
         isVirtualized
-        className="flex flex-col"
-        itemsClassName="h-[calc(100vh-23rem)] min-h-72 overflow-y-auto pr-1 xl:h-[calc(100vh-19rem)]"
+        className={`flex flex-col ${
+          desktopPaneLayout ? 'lg:min-h-0 lg:flex-1' : ''
+        }`}
+        itemsClassName={`min-h-72 overflow-y-auto pr-1 ${
+          desktopPaneLayout
+            ? 'lg:min-h-0 lg:flex-1'
+            : 'h-[calc(100vh-23rem)] xl:h-[calc(100vh-19rem)]'
+        }`}
         virtualizedLayoutOptions={{ estimatedRowSize: 132, gap: 8 }}
         renderDependencies={[selectedFlightId, selectionMode, rowSelection]}
         selectionMode={selectionMode ? 'multiple' : 'none'}
