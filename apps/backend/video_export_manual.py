@@ -110,6 +110,7 @@ _ACTIVE_STATUSES = {
     _STATUS_INITIALIZING,
 }
 _FLIGHT_ACTIVE_STATUSES = {*_ACTIVE_STATUSES, "processing"}
+VIDEO_EXPORT_JOB_LEASE_SECONDS: int = 300
 
 _TERMINAL_STATUSES = {_STATUS_COMPLETED, _STATUS_FAILED, _STATUS_CANCELLED}
 
@@ -808,6 +809,18 @@ def enqueue_pending_video_export_jobs(*, recover_active: bool = False) -> int:
     else:
         _mark_stale_jobs_as_queued()
     job_ids = _queued_job_ids()
+    from job_queue import delete_stale_started_job
+
+    stale_before = datetime.utcnow() - timedelta(seconds=VIDEO_EXPORT_JOB_LEASE_SECONDS)
+    for job_id in job_ids:
+        # A recovered database job can still have an orphaned RQ execution
+        # marked started. Remove it only after its heartbeat lease expires so
+        # enqueue_once can create a fresh execution without interrupting a live worker.
+        delete_stale_started_job(
+            _rq_job_id(job_id),
+            stale_before=stale_before,
+            queue_name=config.JOB_QUEUE_NAME,
+        )
     for job_id in job_ids:
         _enqueue_video_export_job_in_rq(job_id)
     return len(job_ids)
