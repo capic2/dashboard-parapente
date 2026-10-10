@@ -219,6 +219,7 @@ export function FlightOverlayPlayer({
   const nativeFullscreenActiveRef = useRef(false);
   const fullscreenPlaybackSnapshotRef =
     useRef<FullscreenPlaybackSnapshot | null>(null);
+  const fullscreenSeekTargetRef = useRef<number | null>(null);
   const syncMediaRef = useRef<
     | ((
         notify?: boolean,
@@ -527,6 +528,19 @@ export function FlightOverlayPlayer({
         0)
       : (camera?.currentTime ?? 0);
     if (!camera && !masterIsYoutube) return;
+    const fullscreenSeekTarget = fullscreenSeekTargetRef.current;
+    if (isInteractive && isFullscreen && fullscreenSeekTarget !== null) {
+      if (Math.abs(currentTime - fullscreenSeekTarget) <= 1) {
+        fullscreenSeekTargetRef.current = null;
+      } else {
+        // YouTube may report its old playback position for a short time after
+        // seekTo(). Keep the requested position authoritative until the seek
+        // completes so the fullscreen recovery snapshot cannot undo it.
+        currentTime = fullscreenSeekTarget;
+      }
+    } else {
+      fullscreenSeekTargetRef.current = null;
+    }
     const fullscreenSnapshot =
       isInteractive && isFullscreen
         ? fullscreenPlaybackSnapshotRef.current
@@ -1408,6 +1422,15 @@ export function FlightOverlayPlayer({
                 value={Math.min(cameraCurrentTime, cameraDuration || 0)}
                 onChange={(event) => {
                   const time = Number(event.target.value);
+                  if (isFullscreen) {
+                    fullscreenSeekTargetRef.current = time;
+                    fullscreenPlaybackSnapshotRef.current = {
+                      currentTime: time,
+                      wasPlaying:
+                        cameraIsPlayingRef.current ||
+                        playbackRequestedRef.current,
+                    };
+                  }
                   if (masterIsYoutube) {
                     if (
                       isInteractive &&
