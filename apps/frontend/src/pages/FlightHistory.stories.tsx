@@ -250,6 +250,11 @@ const createHandlers = (gpxDelayMs = 0) => [
     HttpResponse.json({ data: mockGPXData })
   ),
   http.get('*/api/flights/$flightId', () => HttpResponse.json(mockFlights[0])),
+  http.get('*/api/flights/:id/overlay-layer', () =>
+    HttpResponse.json({ status: 'missing', job: null })
+  ),
+  http.get('*/api/flights/:id/highlight-videos', () => HttpResponse.json([])),
+  http.get('*/api/flights/:id/youtube-videos', () => HttpResponse.json([])),
   http.get('*/api/flights/:id', ({ params }) => {
     const flight = flightsDb.find((f) => f.id === params.id);
     return flight

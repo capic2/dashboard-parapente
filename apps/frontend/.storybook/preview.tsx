@@ -20,6 +20,21 @@ const defaultMswHandlers = [
   http.get('*/api/flights/records', () => HttpResponse.json({ records: {} })),
   http.get('*/api/flights/:id', () => HttpResponse.json({})),
   http.get('*/api/flights/:id/youtube-upload', () => HttpResponse.json(null)),
+  http.get('*/api/flights/:id/youtube-videos', () => HttpResponse.json([])),
+  http.get('*/api/flights/:id/highlight-videos', () => HttpResponse.json([])),
+  http.get('*/api/flights/:id/overlay-layer', () =>
+    HttpResponse.json({ status: 'missing', job: null })
+  ),
+  http.get('*/api/flights/:id/gopro-overlay/preview', () =>
+    HttpResponse.json({ status: 'missing', job: null })
+  ),
+  http.get('*/api/youtube/status', () =>
+    HttpResponse.json({ configured: true, connected: false })
+  ),
+  http.get('*/api/video-export-jobs', () => HttpResponse.json({ jobs: [] })),
+  http.get('*/api/video-export-jobs/stream', () =>
+    new Response(null, { status: 204 })
+  ),
   http.get('*/api/spots', () => HttpResponse.json({ sites: [] })),
   http.get('*/api/spots/:id', () => HttpResponse.json({})),
   http.get('*/api/weather/:spotId/daily-summary', () =>
@@ -39,7 +54,94 @@ const defaultMswHandlers = [
       slots_summary: '',
     })
   ),
+  http.get('*/api/flight-decision/:siteId', ({ params }) =>
+    HttpResponse.json({
+      site: {
+        id: String(params.siteId),
+        name: '',
+        usage_type: null,
+        orientation: null,
+      },
+      objective: 'tranquille',
+      timezone: 'Europe/Paris',
+      day_index: 0,
+      summary: {
+        level: 'unavailable',
+        translation_key: '',
+        score_objectif: 0,
+        title_key: '',
+        message_key: '',
+        message_params: {},
+        has_recommended_window: false,
+      },
+      best_window: null,
+      least_unfavorable_window: null,
+      hourly: [],
+      risks: [],
+      confidence: {
+        level: 'low',
+        score: 0,
+        translation_key: '',
+        source_count: 0,
+        expected_source_count: 0,
+        freshness: { status: 'unknown' },
+        diagnostics: [],
+      },
+      landing_safety: {
+        status: 'unavailable',
+        level: 'unavailable',
+        translation_key: '',
+        summary_key: '',
+        summary_params: {},
+        landings: [],
+      },
+      live_wind: {
+        status: 'unavailable',
+        influences_confidence: false,
+        stations: [],
+        diagnostics: [],
+      },
+      alternatives: [],
+    })
+  ),
+  http.get('*/api/sites/:siteId/airspace/azba', ({ params }) =>
+    HttpResponse.json({
+      site_id: String(params.siteId),
+      site_name: '',
+      status: 'unknown',
+      source: 'storybook',
+      source_url: '',
+      retrieved_at: '2026-10-10T00:00:00Z',
+      valid_from: '2026-10-10T00:00:00Z',
+      valid_to: '2026-10-11T00:00:00Z',
+      radius_km: 30,
+      constraints: [],
+    })
+  ),
+  http.get('*/api/sites/:siteId/live-wind', ({ params }) =>
+    HttpResponse.json({
+      site_id: String(params.siteId),
+      site_name: '',
+      source: 'storybook',
+      radius_km: 30,
+      stations: [],
+    })
+  ),
+  http.get('*/api/sites/:siteId/landings/weather', () =>
+    HttpResponse.json({ landings: [] })
+  ),
   http.get('*/api/sites/:siteId/landings', () => HttpResponse.json([])),
+  http.get('*/api/admin/intervals/status', () =>
+    HttpResponse.json({ configured: false, activity_types: [] })
+  ),
+  http.get('*/api/video-export-gpu-status', () =>
+    HttpResponse.json({ available: false, devices: [] })
+  ),
+  http.get('*/api/flights/:id/overlay-layer', () =>
+    HttpResponse.json({ status: 'missing', job: null })
+  ),
+  http.get('*/api/flights/:id/highlight-videos', () => HttpResponse.json([])),
+  http.get('*/api/flights/:id/youtube-videos', () => HttpResponse.json([])),
   http.get('*/api/emagram/latest', () => HttpResponse.json(null)),
   http.get('*/api/emagram/hours', () =>
     HttpResponse.json({ site_id: '', forecast_date: '', hours: [] })
