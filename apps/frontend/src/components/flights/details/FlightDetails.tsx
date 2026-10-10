@@ -1159,25 +1159,6 @@ export function FlightDetails({
       <div className="min-w-0 space-y-4">
         {(hasYoutubeVideo || hasVideo || videoMarkersDraft.length > 0) &&
           overlayWorkspacePanel}
-        {hasGpx && (hasYoutubeVideo || hasFaceVideo || hasPiloteVideo) && (
-          <FlightTelemetryInteractivePreview
-            flightId={flight.id}
-            hasFlightVideo={hasVideo}
-            hasFaceVideo={hasFaceVideo}
-            hasPiloteVideo={hasPiloteVideo}
-            manualOffsetSeconds={Number(goproOverlayPreviewOffset)}
-            youtubeUrls={flight.youtube_urls ?? []}
-            videoMarkers={flight.video_markers ?? []}
-            onCurrentYoutubePositionChange={(position) =>
-              setCurrentYoutubePosition((current) =>
-                current?.videoId === position?.videoId &&
-                current?.seconds === position?.seconds
-                  ? current
-                  : position
-              )
-            }
-          />
-        )}
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
           <button
             type="button"
@@ -1214,6 +1195,26 @@ export function FlightDetails({
             </div>
           )}
         </section>
+
+        {hasGpx && (hasYoutubeVideo || hasFaceVideo || hasPiloteVideo) && (
+          <FlightTelemetryInteractivePreview
+            flightId={flight.id}
+            hasFlightVideo={hasVideo}
+            hasFaceVideo={hasFaceVideo}
+            hasPiloteVideo={hasPiloteVideo}
+            manualOffsetSeconds={Number(goproOverlayPreviewOffset)}
+            youtubeUrls={flight.youtube_urls ?? []}
+            videoMarkers={flight.video_markers ?? []}
+            onCurrentYoutubePositionChange={(position) =>
+              setCurrentYoutubePosition((current) =>
+                current?.videoId === position?.videoId &&
+                current?.seconds === position?.seconds
+                  ? current
+                  : position
+              )
+            }
+          />
+        )}
 
         <FlightMediaBadges
           flight={flight}
