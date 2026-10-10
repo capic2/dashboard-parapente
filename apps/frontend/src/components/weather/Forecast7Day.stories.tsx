@@ -35,8 +35,6 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-
-
 // Mock daily summary data
 const mockDailySummaryGood = {
   site_id: '1',
@@ -196,14 +194,14 @@ export const MixedConditions = meta.story({
     spotId: '1',
     selectedDayIndex: 0,
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryGood);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -248,14 +246,14 @@ export const AllGoodConditions = meta.story({
     spotId: '1',
     selectedDayIndex: 0,
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryAllGood);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -289,14 +287,14 @@ export const AllBadConditions = meta.story({
     spotId: '1',
     selectedDayIndex: 0,
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryAllBad);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -330,14 +328,14 @@ export const SecondDaySelected = meta.story({
     spotId: '1',
     selectedDayIndex: 1,
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryGood);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -347,14 +345,14 @@ export const NoSelection = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryGood);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -366,14 +364,14 @@ export const WithCallback = meta.story({
     selectedDayIndex: 0,
     onSelectDay: fn(),
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryGood);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -383,14 +381,14 @@ export const Loading = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/daily-summary/:spotId', async () => {
           await new Promise(() => {}); // Never resolves
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -400,14 +398,14 @@ export const Error = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return new HttpResponse(null, { status: 500 });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -417,14 +415,14 @@ export const EmptyDays = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json({ days: [] });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -434,14 +432,14 @@ export const NoDaysField = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json({});
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -487,14 +485,14 @@ export const ShowsLoadingState = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/daily-summary/:spotId', async () => {
           await new Promise(() => {});
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -509,14 +507,14 @@ export const ShowsErrorState = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return new HttpResponse(null, { status: 500 });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 

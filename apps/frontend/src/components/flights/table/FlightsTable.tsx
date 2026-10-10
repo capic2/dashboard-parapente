@@ -6,12 +6,9 @@ import type {
   OnChangeFn,
   SortingState,
 } from '@tanstack/react-table';
-import { Button as AriaButton } from 'react-aria-components';
 import type { Selection } from 'react-aria-components';
-import { DataList, Select } from '@dashboard-parapente/design-system';
+import { DataList } from '@dashboard-parapente/design-system';
 import {
-  ArrowDown,
-  ArrowUp,
   ChevronDown,
   ChevronRight,
   ChevronsDown,
@@ -114,17 +111,6 @@ export function FlightsTable({
       loadMoreRequestedRef.current = false;
     }
   }, [isLoadingMore]);
-  const sortableColumns = useMemo(
-    () => [
-      { id: 'flight_date', label: t('flights.sortDate') },
-      { id: 'site_name', label: t('flights.sortSite') },
-      { id: 'duration_minutes', label: t('flights.sortDuration') },
-      { id: 'max_altitude_m', label: t('flights.sortAltitude') },
-      { id: 'distance_km', label: t('flights.sortDistance') },
-    ],
-    [t]
-  );
-
   // Convert TanStack RowSelectionState to react-aria Selection
   const selectedKeys = useMemo<Selection>(
     () => new Set(Object.keys(rowSelection).filter((k) => rowSelection[k])),
@@ -193,45 +179,6 @@ export function FlightsTable({
     [selectionMode, selectedFlightId, onSelectFlight, onDeleteFlight]
   );
 
-  const rawSort = sorting[0] ?? { id: 'flight_date', desc: true };
-  const currentSortColumn = sortableColumns.find(
-    (column) => column.id === rawSort.id
-  ) ?? { id: 'flight_date', label: t('flights.sortDate') };
-  const currentSort = { id: currentSortColumn.id, desc: rawSort.desc };
-
-  const renderSortControls = () => (
-    <div className="mb-3 flex items-end gap-2 sm:max-w-sm lg:mb-2">
-      <div className="min-w-0 flex-1">
-        <Select
-          label={t('flights.sortBy')}
-          options={sortableColumns}
-          value={currentSortColumn.id}
-          onChange={(value) => {
-            if (value == null) return;
-            table.setSorting([{ id: String(value), desc: currentSort.desc }]);
-          }}
-        />
-      </div>
-      <AriaButton
-        aria-label={t(
-          currentSort.desc ? 'dataList.sortByDesc' : 'dataList.sortByAsc',
-          { column: currentSortColumn.label }
-        )}
-        aria-pressed={currentSort.desc}
-        onPress={() =>
-          table.setSorting([{ ...currentSort, desc: !currentSort.desc }])
-        }
-        className="mb-px flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700 lg:min-h-10 lg:min-w-10"
-      >
-        {currentSort.desc ? (
-          <ArrowDown aria-hidden="true" className="h-4 w-4" />
-        ) : (
-          <ArrowUp aria-hidden="true" className="h-4 w-4" />
-        )}
-      </AriaButton>
-    </div>
-  );
-
   if (groupByDate) {
     const hasExpandedDays = dayGroups.some(([date]) => expandedDays.has(date));
     const allDaysExpanded =
@@ -244,7 +191,6 @@ export function FlightsTable({
           desktopPaneLayout ? 'lg:min-h-0 lg:flex-1' : ''
         }`}
       >
-        {renderSortControls()}
         {dayGroups.length > 0 && (
           <div className="mb-1 flex justify-end gap-1">
             <button
@@ -401,7 +347,6 @@ export function FlightsTable({
         desktopPaneLayout ? 'lg:min-h-0 lg:flex-1' : ''
       }`}
     >
-      {renderSortControls()}
       <DataList
         table={table}
         renderItem={renderFlightCard}
