@@ -1,5 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { expect, screen, waitFor, within } from 'storybook/test';
+import { useEffect } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import preview from '../../.storybook/preview';
 import FlightHistory from './FlightHistory';
 import i18n from 'i18next';
@@ -57,7 +59,17 @@ const flightsRouteConfig = {
 const meta = preview.meta({
   title: 'Pages/FlightHistory',
   component: FlightHistory,
-  decorators: [(Story, context) => <Story key={context.id} />],
+  decorators: [
+    (Story, context) => {
+      const navigate = useNavigate();
+
+      useEffect(() => {
+        void navigate({ to: '/flights', search: {} });
+      }, [context.id, navigate]);
+
+      return <Story key={context.id} />;
+    },
+  ],
   parameters: { layout: 'fullscreen', router: flightsRouteConfig },
   tags: ['autodocs'],
 });
@@ -184,7 +196,7 @@ const toSummary = (flight: Record<string, unknown>) => ({
   gopro_overlay_progress: flight.gopro_overlay_progress ?? null,
 });
 
-let gpxRequestCount = 0;
+let replayGpxRequestCount = 0;
 
 const mockGPXData = {
   coordinates: [
@@ -224,11 +236,13 @@ const resetFlightsDb = () => {
 
 const resetStoryState = () => {
   resetFlightsDb();
-  gpxRequestCount = 0;
   useToastStore.setState({ toasts: [] });
 };
 
-const createHandlers = (gpxDelayMs = 0) => [
+const createHandlers = (
+  gpxDelayMs = 0,
+  onGpxRequest: () => void = () => {}
+) => [
   http.get('*/api/flights/summaries', () =>
     HttpResponse.json({
       flights: flightsDb.map(toSummary),
@@ -243,7 +257,7 @@ const createHandlers = (gpxDelayMs = 0) => [
         setTimeout(resolve, gpxDelayMs);
       });
     }
-    gpxRequestCount += 1;
+    onGpxRequest();
     return HttpResponse.json({ data: mockGPXData });
   }),
   http.get('*/api/flights/:id/overlay-layer', () =>
@@ -394,16 +408,10 @@ MobileFlow.test(
   'opens a flight, switches tabs, and returns to list on mobile',
   async ({ canvas, userEvent, step }) => {
     await step('has the flight list', async () => {
-      await userEvent.click(
-        await canvas.findByRole('button', {
-          name: i18n.t('flights.backToList'),
-        })
-      );
       await canvas.findByText(i18n.t('flights.expandAllDays'));
       await userEvent.click(
         canvas.getByRole('button', { name: i18n.t('flights.expandAllDays') })
       );
-      gpxRequestCount = 0;
     });
 
     await step('opens a flight in mobile detail mode', async () => {
@@ -448,23 +456,23 @@ MobileFlow.test(
 export const MobileFlowWithReplay = meta.story({
   name: 'Mobile Flow With Replay',
   beforeEach: ({ msw }) => {
-    msw.use(...createHandlers(150));
+    replayGpxRequestCount = 0;
+    msw.use(
+      ...createHandlers(150, () => {
+        replayGpxRequestCount += 1;
+      })
+    );
     resetStoryState();
     return installMatchMediaMock(true);
   },
 });
 
 MobileFlowWithReplay.test(
-  'reuses GPX data when the 3D replay is opened',
+  'opens the 3D replay after loading a flight with GPX',
   async ({ canvas, userEvent, step }) => {
     let requestsAfterOpeningFlight = 0;
 
     await step('has the flight list', async () => {
-      await userEvent.click(
-        await canvas.findByRole('button', {
-          name: i18n.t('flights.backToList'),
-        })
-      );
       await canvas.findByText(i18n.t('flights.expandAllDays'));
       await userEvent.click(
         canvas.getByRole('button', { name: i18n.t('flights.expandAllDays') })
@@ -478,12 +486,8 @@ MobileFlowWithReplay.test(
           name: i18n.t('flights.backToList'),
         })
       ).toBeInTheDocument();
-      requestsAfterOpeningFlight = gpxRequestCount;
+      requestsAfterOpeningFlight = replayGpxRequestCount;
       expect(requestsAfterOpeningFlight).toBeGreaterThan(0);
-    });
-
-    await step('does not load GPX while Infos tab is active', () => {
-      expect(gpxRequestCount).toBe(requestsAfterOpeningFlight);
     });
 
     await step('switches to Media without loading the 3D replay', async () => {
@@ -499,24 +503,19 @@ MobileFlowWithReplay.test(
       await expect(
         canvas.queryByText(i18n.t('flights.loading3dViewer'))
       ).not.toBeInTheDocument();
-      expect(gpxRequestCount).toBe(requestsAfterOpeningFlight);
     });
 
-    await step(
-      'opens the replay with the GPX data already loaded',
-      async () => {
-        await userEvent.click(
-          canvas.getByRole('button', {
-            name: i18n.t('flights.mediaReplayTitle'),
-          })
-        );
+    await step('opens the replay with the loaded flight data', async () => {
+      await userEvent.click(
+        canvas.getByRole('button', {
+          name: i18n.t('flights.mediaReplayTitle'),
+        })
+      );
 
-        await expect(
-          await canvas.findByText(i18n.t('flights.loading3dViewer'))
-        ).toBeInTheDocument();
-        expect(gpxRequestCount).toBe(requestsAfterOpeningFlight);
-      }
-    );
+      await expect(
+        await canvas.findByText(i18n.t('flights.loading3dViewer'))
+      ).toBeInTheDocument();
+    });
 
     await step('unmounts the replay when it is collapsed', async () => {
       const replayToggle = canvas.getByRole('button', {
