@@ -137,6 +137,17 @@ def _directory_file_exists(path: Path) -> bool:
         return False
 
 
+def _directory_has_osv_files(directory: Path) -> bool:
+    """Check for GoPro OSV source files without following symlinks."""
+    try:
+        return any(
+            entry.suffix.lower() == ".osv" and entry.is_file() and not entry.is_symlink()
+            for entry in directory.iterdir()
+        )
+    except OSError:
+        return False
+
+
 def _null_safe_equal(left: Any, right: Any) -> ColumnElement[bool]:
     return or_(left == right, and_(left.is_(None), right.is_(None)))
 
@@ -527,6 +538,7 @@ def list_flight_summaries(
     pano_flags: dict[str, bool] = {}
     face_flags: dict[str, bool] = {}
     pilote_flags: dict[str, bool] = {}
+    osv_flags: dict[str, bool] = {}
     for row in rows:
         path = (
             Path(row.pano_video_file_path)
@@ -538,8 +550,9 @@ def list_flight_summaries(
         )
         pano_flags[row.id] = _directory_file_exists(resolve_temporary_video_path(path, "pano"))
         face_flags[row.id] = _directory_file_exists(resolve_temporary_video_path(path, "face"))
-        pilote_flags[row.id] = _directory_file_exists(
-            resolve_temporary_video_path(path, "pilote")
+        pilote_flags[row.id] = _directory_file_exists(resolve_temporary_video_path(path, "pilote"))
+        osv_flags[row.id] = _directory_has_osv_files(
+            _flight_directory(row.flight_date, row.flight_sequence)
         )
         if pano_flags[row.id] and not row.pano_video_file_path:
             detected_pano_paths.append({"id": row.id, "pano_video_file_path": str(path.resolve())})
@@ -597,6 +610,7 @@ def list_flight_summaries(
                 )
             ),
             has_pano_video=pano_flags[row.id],
+            has_osv=osv_flags[row.id],
             has_face_video=face_flags[row.id],
             has_pilote_video=pilote_flags[row.id],
             has_highlight_video=bool(_file_exists(row.completed_highlight_path)),

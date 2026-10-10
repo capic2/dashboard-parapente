@@ -69,12 +69,13 @@ export function Flight({
   const hasGpx = flight.has_gpx;
   const gpxProvider = getFlightGpxProvider(flight);
   const isGpxUnsynced = flight.gopro_overlay_gpx_offset == null;
-  const gpxProviderBadgeKey: Record<string, string> = {
+  const gpxProviderBadgeKeys: Record<string, string> = {
     intervals_icu: 'flights.gpxIcuBadge',
     strava: 'flights.gpxStravaBadge',
     external: 'flights.gpxZeppBadge',
     zepp: 'flights.gpxZeppBadge',
-  }[gpxProvider ?? ''];
+  };
+  const gpxProviderBadgeKey = gpxProviderBadgeKeys[gpxProvider ?? ''];
   const hasVideo = flight.has_video;
   const hasCamera = flight.has_camera;
   const hasYoutubeVideo = flight.has_youtube_video;
@@ -83,6 +84,7 @@ export function Flight({
     flight.youtube_upload_status === 'uploading';
   const isYoutubeUploadFailed = flight.youtube_upload_status === 'failed';
   const hasPanoVideo = flight.has_pano_video;
+  const hasOsv = flight.has_osv;
   const hasFaceVideo = flight.has_face_video === true;
   const hasPiloteVideo = flight.has_pilote_video === true;
   const hasHighlightVideo = flight.has_highlight_video;
@@ -163,6 +165,7 @@ export function Flight({
     isYoutubeUploadRunning ||
     isYoutubeUploadFailed ||
     hasPanoVideo ||
+    hasOsv ||
     hasFaceVideo ||
     hasPiloteVideo ||
     hasHighlightVideo ||
@@ -266,6 +269,12 @@ export function Flight({
                 <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
                   <Orbit className="h-3 w-3" aria-hidden="true" />
                   {t('flights.panoBadge')}
+                </span>
+              )}
+              {hasOsv && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200">
+                  <Video className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.osvSourcesBadge')}
                 </span>
               )}
               {hasFaceVideo && (

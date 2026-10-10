@@ -42,6 +42,7 @@ import { Flight } from './Flight';
 
 const flight = {
   id: 'flight-1',
+  tags: [],
   flight_date: '2024-03-15',
   title: 'Vol thermique',
   name: 'Vol thermique',
@@ -62,6 +63,7 @@ const flight = {
   youtube_upload_progress: null,
   has_gopro_overlay: false,
   has_pano_video: false,
+  has_osv: false,
   has_highlight_video: false,
   video_export_job_id: null,
   video_export_status: null,
@@ -95,10 +97,10 @@ test('does not render the selected flight badge', () => {
   expect(screen.getByText('Besançon - Puy de Dôme')).toBeInTheDocument();
 });
 
-test('renders media as a passive status in the flight list', () => {
+test('renders media and OSV sources as passive statuses in the flight list', () => {
   render(
     <Flight
-      flight={{ ...flight, has_gpx: true }}
+      flight={{ ...flight, has_gpx: true, has_osv: true }}
       isActive={false}
       isSelected={false}
       selectionMode={false}
@@ -108,6 +110,7 @@ test('renders media as a passive status in the flight list', () => {
   );
 
   expect(screen.getByText('flights.gpxBadge')).toBeInTheDocument();
+  expect(screen.getByText('flights.osvSourcesBadge')).toBeInTheDocument();
   expect(
     screen.queryByRole('button', { name: 'flights.downloadGpx' })
   ).not.toBeInTheDocument();
