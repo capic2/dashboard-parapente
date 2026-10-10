@@ -3,7 +3,8 @@ set -euo pipefail
 
 targets=(build lint type-check test)
 targets_csv=$(IFS=,; echo "${targets[*]}")
-projects=$(pnpm exec nx show projects --exclude=e2e --sep=,)
+projects_json=$(env -u CI pnpm exec nx show projects --exclude=e2e --json)
+projects=$(node -e 'console.log(JSON.parse(process.argv[1]).join(","))' "$projects_json")
 
 if [[ -z "$projects" ]]; then
   echo "Nx found no projects to validate."
