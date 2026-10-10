@@ -445,10 +445,20 @@ def calculate_track_stats(points: list[TrackPoint]) -> dict[str, Any]:
         }
 
     elevations = [point.get("elevation", 0.0) for point in points]
-    distance = sum(
-        haversine_distance(previous["lat"], previous["lon"], current["lat"], current["lon"])
+    track_segments = [
+        (previous, current)
         for previous, current in zip(points, points[1:], strict=False)
         if previous.get("segment", 0) == current.get("segment", 0)
+    ]
+    distance = sum(
+        haversine_distance(previous["lat"], previous["lon"], current["lat"], current["lon"])
+        for previous, current in track_segments
+    )
+    precise_distance = sum(
+        _precise_haversine_distance(
+            previous["lat"], previous["lon"], current["lat"], current["lon"]
+        )
+        for previous, current in track_segments
     )
     gain = sum(
         max(0.0, current.get("elevation", 0.0) - previous.get("elevation", 0.0))
@@ -562,7 +572,7 @@ def calculate_track_stats(points: list[TrackPoint]) -> dict[str, Any]:
     ):
         average_speed = weighted_speed_total / weighted_speed_duration
     elif duration_seconds > 0:
-        average_speed = distance / (duration_seconds / 3600)
+        average_speed = precise_distance / (duration_seconds / 3600)
     else:
         average_speed = 0.0
     return {

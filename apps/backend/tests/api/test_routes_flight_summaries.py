@@ -331,6 +331,26 @@ def test_summaries_search_is_case_and_accent_insensitive(client, db_session) -> 
     assert [item["id"] for item in response.json()["flights"]] == ["accented-flight"]
 
 
+def test_summaries_search_folds_accents_in_site_name(
+    client: TestClient, db_session: Session, arguel_site: Site
+) -> None:
+    arguel_site.name = "École du ciel"
+    db_session.add(
+        Flight(
+            id="site-accented-flight",
+            site_id=arguel_site.id,
+            title="Parapente",
+            flight_date=date(2026, 1, 1),
+        )
+    )
+    db_session.commit()
+
+    response = client.get(API_URL, params={"q": "ecole"})
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["flights"]] == ["site-accented-flight"]
+
+
 def test_summaries_only_report_completed_uploads_that_still_exist(client, db_session) -> None:
     uploaded = Flight(
         id="youtube-uploaded",

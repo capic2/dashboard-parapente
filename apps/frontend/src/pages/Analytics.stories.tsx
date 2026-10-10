@@ -185,9 +185,9 @@ const analyticsRouteConfig = {
 
 export const Default = meta.story({
   name: 'Default',
-  parameters: {
-    router: analyticsRouteConfig,
-    msw: { handlers: defaultHandlers },
+  parameters: { router: analyticsRouteConfig },
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
   },
 });
 
@@ -197,10 +197,10 @@ Default.test('renders analytics page with title', async ({ canvas }) => {
 
 export const Loading = meta.story({
   name: 'Loading',
-  parameters: {
-    router: analyticsRouteConfig,
-    msw: {
-      handlers: [
+  parameters: { router: analyticsRouteConfig },
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/flights/stats', async () => {
           await new Promise(() => {});
         }),
@@ -211,7 +211,7 @@ export const Loading = meta.story({
           await new Promise(() => {});
         }),
         http.get('*/api/spots', () => HttpResponse.json({ sites: [] })),
-      ],
-    },
+      ]
+    );
   },
 });

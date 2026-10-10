@@ -282,8 +282,10 @@ def _fold_search_term(value: str) -> str:
     ).lower()
 
 
-def _fold_search_column(expression: ColumnElement[Any]) -> ColumnElement[Any]:
+def _fold_search_column(expression: ColumnElement[Any], dialect_name: str) -> ColumnElement[Any]:
     folded = func.coalesce(expression, "")
+    if dialect_name == "sqlite":
+        return func.fold_search_text(folded)
     for source, replacement in _SEARCH_REPLACEMENTS.items():
         folded = func.replace(folded, source, replacement)
     return func.lower(folded)
@@ -343,11 +345,12 @@ def _apply_filters(
             _fold_search_term(q).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         )
         pattern = f"%{escaped_q}%"
+        dialect_name = query.session.get_bind().dialect.name
         query = query.filter(
             or_(
-                _fold_search_column(Flight.title).like(pattern, escape="\\"),
-                _fold_search_column(Flight.name).like(pattern, escape="\\"),
-                _fold_search_column(Site.name).like(pattern, escape="\\"),
+                _fold_search_column(Flight.title, dialect_name).like(pattern, escape="\\"),
+                _fold_search_column(Flight.name, dialect_name).like(pattern, escape="\\"),
+                _fold_search_column(Site.name, dialect_name).like(pattern, escape="\\"),
                 cast(Flight.flight_date, String).like(pattern, escape="\\"),
             )
         )

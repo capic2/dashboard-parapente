@@ -52,8 +52,8 @@ def test_backfill_recalculates_existing_values_and_is_idempotent(
         ]
     )
     (tmp_path / "no-speed.gpx").write_text(
-        "<gpx><trk><trkseg><trkpt lat=\"47.2\" lon=\"6.0\"/>"
-        "<trkpt lat=\"47.201\" lon=\"6.001\"/></trkseg></trk></gpx>"
+        '<gpx><trk><trkseg><trkpt lat="47.2" lon="6.0"/>'
+        '<trkpt lat="47.201" lon="6.001"/></trkseg></trk></gpx>'
     )
     db_session.commit()
 
@@ -69,11 +69,7 @@ def test_backfill_recalculates_existing_values_and_is_idempotent(
         updated = {
             flight.id: flight.max_speed_kmh
             for flight in verification.query(Flight)
-            .filter(
-                Flight.id.in_(
-                    ["backfill-a", "backfill-b", "already-set", "no-speed-evidence"]
-                )
-            )
+            .filter(Flight.id.in_(["backfill-a", "backfill-b", "already-set", "no-speed-evidence"]))
             .all()
         }
     assert updated["backfill-a"] is not None and updated["backfill-a"] > 0

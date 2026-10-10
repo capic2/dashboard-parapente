@@ -237,7 +237,6 @@ const defaultHandlers = [
 export const Default = meta.story({
   name: 'Default',
   parameters: {
-    msw: { handlers: defaultHandlers },
     router: {
       initialPath: 'dashboard',
       renderRootRoute: () => (
@@ -259,16 +258,52 @@ export const Default = meta.story({
       ],
     },
   },
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
+    const geolocationDescriptor = Object.getOwnPropertyDescriptor(
+      navigator,
+      'geolocation'
+    );
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition: (onSuccess: PositionCallback) =>
+          onSuccess({
+            coords: {
+              latitude: 47.2,
+              longitude: 6,
+              accuracy: 10,
+              altitude: null,
+              altitudeAccuracy: null,
+              heading: null,
+              speed: null,
+            },
+            timestamp: Date.now(),
+          } as GeolocationPosition),
+      } as Geolocation,
+    });
+
+    return () => {
+      if (geolocationDescriptor) {
+        Object.defineProperty(navigator, 'geolocation', geolocationDescriptor);
+      } else {
+        Reflect.deleteProperty(navigator, 'geolocation');
+      }
+    };
+  },
 });
 
 Default.test(
   'it redirects to weather page, when click on view forecast',
   async ({ canvas, userEvent }) => {
-    await userEvent.click(
-      await canvas.findByRole('button', {
-        name: i18n.t('weather.viewForecast'),
-      })
-    );
+    const forecastButtons = await canvas.findAllByRole('button', {
+      name: i18n.t('weather.viewForecast'),
+    });
+    const forecastButton = forecastButtons[0];
+    if (!forecastButton) {
+      throw new globalThis.Error('Forecast button not found');
+    }
+    await userEvent.click(forecastButton);
 
     await canvas.findByText('Weather page');
   }
@@ -293,38 +328,38 @@ Default.test(
 
 export const Loading = meta.story({
   name: 'Loading',
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/spots', async () => {
           await new Promise(() => {});
         }),
         ...defaultHandlers.slice(1),
-      ],
-    },
+      ]
+    );
   },
 });
 
 export const Empty = meta.story({
   name: 'Empty',
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/spots', () => HttpResponse.json({ sites: [] })),
         ...defaultHandlers.slice(1),
-      ],
-    },
+      ]
+    );
   },
 });
 
 export const Error = meta.story({
   name: 'Error',
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/spots', () => new HttpResponse(null, { status: 500 })),
         ...defaultHandlers.slice(1),
-      ],
-    },
+      ]
+    );
   },
 });
