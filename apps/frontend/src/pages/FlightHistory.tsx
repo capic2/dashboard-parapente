@@ -126,7 +126,7 @@ function FlightSearchInput({
         <Input
           maxLength={200}
           placeholder={t('flights.searchPlaceholder')}
-          className="min-h-11 w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+          className="min-h-11 w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 lg:min-h-10 lg:py-1.5"
         />
       </div>
     </TextField>
@@ -372,7 +372,7 @@ export default function FlightHistory() {
         aria-pressed={isSelected}
         aria-label={t(accessibleStateKey, { tag: t(filter.label) })}
         onClick={() => toggleBadgeFilter(filter.id)}
-        className={`min-h-9 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${stateClassName}`}
+        className={`min-h-9 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 lg:min-h-8 lg:px-2.5 ${stateClassName}`}
       >
         {isIncluded && (
           <Check aria-hidden="true" className="mr-1 inline h-3.5 w-3.5" />
@@ -759,16 +759,16 @@ export default function FlightHistory() {
       <div className="grid grid-cols-1 gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(22rem,26rem)_minmax(0,1fr)] lg:grid-rows-1">
         {/* Flight List */}
         {(!isMobile || !showMobileDetail) && (
-          <aside className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/40 lg:flex lg:min-h-0 lg:flex-col">
+          <aside className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/40 lg:flex lg:min-h-0 lg:flex-col lg:p-2.5">
             {!selectionMode ? (
-              <div className="mb-3 space-y-2 border-b border-slate-200 pb-3 dark:border-slate-700 lg:max-h-[55%] lg:shrink-0 lg:overflow-y-auto">
+              <div className="mb-3 space-y-2 border-b border-slate-200 pb-3 dark:border-slate-700 lg:mb-2 lg:space-y-1.5 lg:pb-2 lg:max-h-[55%] lg:shrink-0 lg:overflow-y-auto">
                 <FlightSearchInput
                   key={search.q ?? ''}
                   initialQuery={search.q ?? ''}
                   onQueryChange={handleSearchQueryChange}
                 />
-                <fieldset className="min-w-0 space-y-2">
-                  <legend className="w-full">
+                <fieldset className="min-w-0 space-y-2 lg:space-y-1">
+                  <legend className="flex w-full items-center justify-between gap-2">
                     <button
                       type="button"
                       aria-expanded={isTagFilterExpanded}
@@ -776,7 +776,7 @@ export default function FlightHistory() {
                       onClick={() =>
                         setIsTagFilterExpanded((expanded) => !expanded)
                       }
-                      className="flex min-h-9 w-full items-center justify-between gap-2 text-left text-xs font-semibold text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-gray-300"
+                      className="flex min-h-9 min-w-0 items-center gap-2 text-left text-xs font-semibold text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-gray-300 lg:min-h-8"
                     >
                       {t('flights.tagFilter')}
                       <ChevronDown
@@ -786,17 +786,25 @@ export default function FlightHistory() {
                         aria-hidden="true"
                       />
                     </button>
+                    <Button
+                      variant="ghost"
+                      onClick={handleToggleSelectionMode}
+                      className="min-h-10 shrink-0 rounded-lg px-2 py-1 text-xs sm:text-sm lg:min-h-8"
+                    >
+                      <CheckSquare className="h-4 w-4" aria-hidden="true" />
+                      {t('flights.select')}
+                    </Button>
                   </legend>
                   <div
                     id="flight-tag-filter-options"
                     hidden={!isTagFilterExpanded}
-                    className="space-y-2"
+                    className="space-y-2 lg:space-y-1"
                   >
                     <div className="flex flex-wrap gap-1.5">
                       {PRIMARY_FLIGHT_BADGE_FILTERS.map(renderBadgeFilter)}
                     </div>
                     <details className="group rounded-lg">
-                      <summary className="flex min-h-9 cursor-pointer list-none items-center gap-1 rounded-md text-xs font-medium text-sky-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-sky-300">
+                      <summary className="flex min-h-9 cursor-pointer list-none items-center gap-1 rounded-md text-xs font-medium text-sky-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-sky-300 lg:min-h-8">
                         {advancedBadgeFilterCount > 0
                           ? t('flights.moreTagFiltersActive', {
                               count: advancedBadgeFilterCount,
@@ -832,16 +840,6 @@ export default function FlightHistory() {
                     )}
                   </div>
                 </fieldset>
-                <div className="flex justify-end">
-                  <Button
-                    variant="ghost"
-                    onClick={handleToggleSelectionMode}
-                    className="min-h-10 rounded-lg px-3 py-2 text-sm"
-                  >
-                    <CheckSquare className="h-4 w-4" aria-hidden="true" />
-                    {t('flights.select')}
-                  </Button>
-                </div>
               </div>
             ) : (
               <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-800 dark:bg-sky-950/30 lg:max-h-[55%] lg:shrink-0 lg:overflow-y-auto">

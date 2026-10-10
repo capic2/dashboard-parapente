@@ -200,7 +200,7 @@ export function FlightsTable({
   const currentSort = { id: currentSortColumn.id, desc: rawSort.desc };
 
   const renderSortControls = () => (
-    <div className="mb-3 flex items-end gap-2 sm:max-w-sm">
+    <div className="mb-3 flex items-end gap-2 sm:max-w-sm lg:mb-2">
       <div className="min-w-0 flex-1">
         <Select
           label={t('flights.sortBy')}
@@ -221,7 +221,7 @@ export function FlightsTable({
         onPress={() =>
           table.setSorting([{ ...currentSort, desc: !currentSort.desc }])
         }
-        className="mb-px flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+        className="mb-px flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700 lg:min-h-10 lg:min-w-10"
       >
         {currentSort.desc ? (
           <ArrowDown aria-hidden="true" className="h-4 w-4" />
@@ -254,7 +254,7 @@ export function FlightsTable({
                 setExpandedDays(new Set(dayGroups.map(([date]) => date)));
               }}
               disabled={allDaysExpanded}
-              className="flex min-h-9 cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-default disabled:opacity-50 dark:text-sky-300 dark:hover:bg-slate-800"
+              className="flex min-h-9 cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-default disabled:opacity-50 dark:text-sky-300 dark:hover:bg-slate-800 lg:min-h-8 lg:px-1.5"
             >
               <ChevronsDown aria-hidden="true" className="h-3.5 w-3.5" />
               {t('flights.expandAllDays')}
@@ -266,7 +266,7 @@ export function FlightsTable({
                 setExpandedDays(new Set());
               }}
               disabled={!hasExpandedDays}
-              className="flex min-h-9 cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-default disabled:opacity-50 dark:text-sky-300 dark:hover:bg-slate-800"
+              className="flex min-h-9 cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-default disabled:opacity-50 dark:text-sky-300 dark:hover:bg-slate-800 lg:min-h-8 lg:px-1.5"
             >
               <ChevronsUp aria-hidden="true" className="h-3.5 w-3.5" />
               {t('flights.collapseAllDays')}
