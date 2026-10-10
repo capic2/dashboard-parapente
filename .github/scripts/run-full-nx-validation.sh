@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Avoid reusing an Nx daemon started with the runner's CI environment.
+export NX_DAEMON=false
+
 targets=(build lint type-check test)
 targets_csv=$(IFS=,; echo "${targets[*]}")
-projects_json=$(env -u CI pnpm exec nx show projects --exclude=e2e --json)
+projects_json=$(pnpm exec nx show projects --exclude=e2e --json)
 projects=$(node -e 'console.log(JSON.parse(process.argv[1]).join(","))' "$projects_json")
 
 if [[ -z "$projects" ]]; then
