@@ -7,16 +7,17 @@ import type { Site } from '@dashboard-parapente/shared-types';
 const meta = preview.meta({
   title: 'Components/Forms/EditSiteModal',
   component: EditSiteModal,
-  parameters: {
-    layout: 'centered',
-    msw: {
-      handlers: [
+  parameters: { layout: 'centered' },
+  tags: ['autodocs'],
+
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/sites/:siteId/landings', () => HttpResponse.json([])),
         http.get('*/api/spots', () => HttpResponse.json({ sites: [] })),
-      ],
-    },
+      ]
+    );
   },
-  tags: ['autodocs'],
 });
 
 // Mock site data

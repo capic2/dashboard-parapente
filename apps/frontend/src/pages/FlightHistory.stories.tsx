@@ -1,5 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { expect, screen, waitFor, within } from 'storybook/test';
+import { useEffect } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import preview from '../../.storybook/preview';
 import FlightHistory from './FlightHistory';
 import i18n from 'i18next';
@@ -57,7 +59,17 @@ const flightsRouteConfig = {
 const meta = preview.meta({
   title: 'Pages/FlightHistory',
   component: FlightHistory,
-  decorators: [(Story, context) => <Story key={context.id} />],
+  decorators: [
+    (Story, context) => {
+      const navigate = useNavigate();
+
+      useEffect(() => {
+        void navigate({ to: '/flights', search: {} });
+      }, [context.id, navigate]);
+
+      return <Story key={context.id} />;
+    },
+  ],
   parameters: { layout: 'fullscreen', router: flightsRouteConfig },
   tags: ['autodocs'],
 });
@@ -184,7 +196,7 @@ const toSummary = (flight: Record<string, unknown>) => ({
   gopro_overlay_progress: flight.gopro_overlay_progress ?? null,
 });
 
-let gpxRequestCount = 0;
+let replayGpxRequestCount = 0;
 
 const mockGPXData = {
   coordinates: [
@@ -224,11 +236,13 @@ const resetFlightsDb = () => {
 
 const resetStoryState = () => {
   resetFlightsDb();
-  gpxRequestCount = 0;
   useToastStore.setState({ toasts: [] });
 };
 
-const createHandlers = (gpxDelayMs = 0) => [
+const createHandlers = (
+  gpxDelayMs = 0,
+  onGpxRequest: () => void = () => {}
+) => [
   http.get('*/api/flights/summaries', () =>
     HttpResponse.json({
       flights: flightsDb.map(toSummary),
@@ -243,9 +257,14 @@ const createHandlers = (gpxDelayMs = 0) => [
         setTimeout(resolve, gpxDelayMs);
       });
     }
-    gpxRequestCount += 1;
+    onGpxRequest();
     return HttpResponse.json({ data: mockGPXData });
   }),
+  http.get('*/api/flights/:id/overlay-layer', () =>
+    HttpResponse.json({ status: 'missing', job: null })
+  ),
+  http.get('*/api/flights/:id/highlight-videos', () => HttpResponse.json([])),
+  http.get('*/api/flights/:id/youtube-videos', () => HttpResponse.json([])),
   http.get('*/api/flights/:id', ({ params }) => {
     const flight = flightsDb.find((f) => f.id === params.id);
     return flight
@@ -275,14 +294,16 @@ const defaultHandlers = createHandlers();
 
 export const Default = meta.story({
   name: 'Default',
-  parameters: { msw: { handlers: defaultHandlers } },
-  beforeEach: resetStoryState,
+  beforeEach: ({ msw }) => {
+    msw.use(...defaultHandlers);
+    resetStoryState();
+  },
 });
 
 Default.test(
   'Can cancel a simple flight deletion',
   async ({ canvas, userEvent, step }) => {
-    const flightList = await canvas.findByRole('listbox', {
+    const flightList = await canvas.findByRole('region', {
       name: i18n.t('flights.listAriaLabel'),
     });
 
@@ -295,6 +316,9 @@ Default.test(
     });
 
     await step('want to delete a flight', async () => {
+      await userEvent.click(
+        canvas.getByRole('button', { name: i18n.t('flights.expandAllDays') })
+      );
       const deleteButton = canvas.getByRole('button', {
         name: i18n.t('flights.deleteAriaLabel', {
           title: 'Vol thermique Arguel',
@@ -325,7 +349,7 @@ Default.test(
 Default.test(
   'can delete a simple flight',
   async ({ canvas, userEvent, step }) => {
-    const flightList = await canvas.findByRole('listbox', {
+    const flightList = await canvas.findByRole('region', {
       name: i18n.t('flights.listAriaLabel'),
     });
 
@@ -338,6 +362,9 @@ Default.test(
     });
 
     await step('want to delete a flight', async () => {
+      await userEvent.click(
+        canvas.getByRole('button', { name: i18n.t('flights.expandAllDays') })
+      );
       const deleteButton = canvas.getByRole('button', {
         name: i18n.t('flights.deleteAriaLabel', {
           title: 'Vol thermique Arguel',
@@ -370,8 +397,8 @@ Default.test(
 );
 export const MobileFlow = meta.story({
   name: 'Mobile Flow',
-  parameters: { msw: { handlers: defaultHandlers } },
-  beforeEach: () => {
+  beforeEach: ({ msw }) => {
+    msw.use(...defaultHandlers);
     resetStoryState();
     return installMatchMediaMock(true);
   },
@@ -381,11 +408,10 @@ MobileFlow.test(
   'opens a flight, switches tabs, and returns to list on mobile',
   async ({ canvas, userEvent, step }) => {
     await step('has the flight list', async () => {
-      const flightList = await canvas.findByRole('listbox', {
-        name: i18n.t('flights.listAriaLabel'),
-      });
-      await expect(flightList).toBeInTheDocument();
-      gpxRequestCount = 0;
+      await canvas.findByText(i18n.t('flights.expandAllDays'));
+      await userEvent.click(
+        canvas.getByRole('button', { name: i18n.t('flights.expandAllDays') })
+      );
     });
 
     await step('opens a flight in mobile detail mode', async () => {
@@ -416,7 +442,7 @@ MobileFlow.test(
         canvas.getByRole('button', { name: i18n.t('flights.backToList') })
       );
       await expect(
-        await canvas.findByRole('listbox', {
+        await canvas.findByRole('region', {
           name: i18n.t('flights.listAriaLabel'),
         })
       ).toBeInTheDocument();
@@ -429,27 +455,28 @@ MobileFlow.test(
 
 export const MobileFlowWithReplay = meta.story({
   name: 'Mobile Flow With Replay',
-  parameters: {
-    msw: {
-      handlers: createHandlers(150),
-    },
-  },
-  beforeEach: () => {
+  beforeEach: ({ msw }) => {
+    replayGpxRequestCount = 0;
+    msw.use(
+      ...createHandlers(150, () => {
+        replayGpxRequestCount += 1;
+      })
+    );
     resetStoryState();
     return installMatchMediaMock(true);
   },
 });
 
 MobileFlowWithReplay.test(
-  'loads GPX data only when the 3D replay is opened',
+  'opens the 3D replay after loading a flight with GPX',
   async ({ canvas, userEvent, step }) => {
     let requestsAfterOpeningFlight = 0;
 
     await step('has the flight list', async () => {
-      const flightList = await canvas.findByRole('listbox', {
-        name: i18n.t('flights.listAriaLabel'),
-      });
-      await expect(flightList).toBeInTheDocument();
+      await canvas.findByText(i18n.t('flights.expandAllDays'));
+      await userEvent.click(
+        canvas.getByRole('button', { name: i18n.t('flights.expandAllDays') })
+      );
     });
 
     await step('opens a flight with GPX', async () => {
@@ -459,11 +486,8 @@ MobileFlowWithReplay.test(
           name: i18n.t('flights.backToList'),
         })
       ).toBeInTheDocument();
-      requestsAfterOpeningFlight = gpxRequestCount;
-    });
-
-    await step('does not load GPX while Infos tab is active', () => {
-      expect(gpxRequestCount).toBe(requestsAfterOpeningFlight);
+      requestsAfterOpeningFlight = replayGpxRequestCount;
+      expect(requestsAfterOpeningFlight).toBeGreaterThan(0);
     });
 
     await step('switches to Media without loading the 3D replay', async () => {
@@ -479,10 +503,9 @@ MobileFlowWithReplay.test(
       await expect(
         canvas.queryByText(i18n.t('flights.loading3dViewer'))
       ).not.toBeInTheDocument();
-      expect(gpxRequestCount).toBe(requestsAfterOpeningFlight);
     });
 
-    await step('triggers GPX loading once the replay is opened', async () => {
+    await step('opens the replay with the loaded flight data', async () => {
       await userEvent.click(
         canvas.getByRole('button', {
           name: i18n.t('flights.mediaReplayTitle'),
@@ -492,9 +515,6 @@ MobileFlowWithReplay.test(
       await expect(
         await canvas.findByText(i18n.t('flights.loading3dViewer'))
       ).toBeInTheDocument();
-      await waitFor(() => {
-        expect(gpxRequestCount).toBeGreaterThan(requestsAfterOpeningFlight);
-      });
     });
 
     await step('unmounts the replay when it is collapsed', async () => {
@@ -517,26 +537,24 @@ MobileFlowWithReplay.test(
 
 export const EmptyState = meta.story({
   name: 'Empty State',
-  parameters: {
-    msw: {
-      handlers: [
-        http.get('*/api/flights/summaries', () =>
-          HttpResponse.json({ flights: [], total: 0, next_cursor: null })
-        ),
-        http.get('*/api/video-export-jobs', () =>
-          HttpResponse.json({ jobs: [] })
-        ),
-        http.get('*/api/spots', () => HttpResponse.json(mockSites)),
-      ],
-    },
+  beforeEach: ({ msw }) => {
+    msw.use(
+      http.get('*/api/flights/summaries', () =>
+        HttpResponse.json({ flights: [], total: 0, next_cursor: null })
+      ),
+      http.get('*/api/video-export-jobs', () =>
+        HttpResponse.json({ jobs: [] })
+      ),
+      http.get('*/api/spots', () => HttpResponse.json(mockSites))
+    );
   },
 });
 
 export const Loading = meta.story({
   name: 'Loading',
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/flights/summaries', async () => {
           await new Promise(() => {});
         }),
@@ -544,7 +562,7 @@ export const Loading = meta.story({
           HttpResponse.json({ jobs: [] })
         ),
         http.get('*/api/spots', () => HttpResponse.json(mockSites)),
-      ],
-    },
+      ]
+    );
   },
 });
