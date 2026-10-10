@@ -260,17 +260,50 @@ export const Default = meta.story({
   },
   beforeEach: (context) => {
     context.msw.use(...defaultHandlers);
+    const geolocationDescriptor = Object.getOwnPropertyDescriptor(
+      navigator,
+      'geolocation'
+    );
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition: (onSuccess: PositionCallback) =>
+          onSuccess({
+            coords: {
+              latitude: 47.2,
+              longitude: 6,
+              accuracy: 10,
+              altitude: null,
+              altitudeAccuracy: null,
+              heading: null,
+              speed: null,
+            },
+            timestamp: Date.now(),
+          } as GeolocationPosition),
+      } as Geolocation,
+    });
+
+    return () => {
+      if (geolocationDescriptor) {
+        Object.defineProperty(navigator, 'geolocation', geolocationDescriptor);
+      } else {
+        Reflect.deleteProperty(navigator, 'geolocation');
+      }
+    };
   },
 });
 
 Default.test(
   'it redirects to weather page, when click on view forecast',
   async ({ canvas, userEvent }) => {
-    await userEvent.click(
-      await canvas.findByRole('button', {
-        name: i18n.t('weather.viewForecast'),
-      })
-    );
+    const forecastButtons = await canvas.findAllByRole('button', {
+      name: i18n.t('weather.viewForecast'),
+    });
+    const forecastButton = forecastButtons[0];
+    if (!forecastButton) {
+      throw new globalThis.Error('Forecast button not found');
+    }
+    await userEvent.click(forecastButton);
 
     await canvas.findByText('Weather page');
   }

@@ -246,7 +246,9 @@ AddingAssociation.test(
       await canvas.findByText('Choisir un site...')
     ).toBeInTheDocument();
     await expect(
-      canvas.getByPlaceholderText('Notes (optionnel)')
+      canvas.getByPlaceholderText(
+        /Commentaire \(localité ajoutée automatiquement\)/u
+      )
     ).toBeInTheDocument();
     await expect(canvas.getByText('Ajouter')).toBeInTheDocument();
     await expect(canvas.getByText('Annuler')).toBeInTheDocument();

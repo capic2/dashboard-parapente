@@ -217,8 +217,8 @@ ModerateConditions.test(
 
     await expect(canvas.getByText(/MOYEN/)).toBeInTheDocument();
     await expect(canvas.getByText('18°C')).toBeInTheDocument();
-    await expect(canvas.getByText(/20 km\/h NE/)).toBeInTheDocument();
-    await expect(canvas.getByText(/28 km\/h/)).toBeInTheDocument();
+    await expect(canvas.getByText(/20\.0 km\/h NE/)).toBeInTheDocument();
+    await expect(canvas.getByText(/28\.0 km\/h/)).toBeInTheDocument();
     await expect(canvas.getByText(/50% nuages, Sec/)).toBeInTheDocument();
   }
 );
@@ -251,8 +251,8 @@ LimiteConditions.test(
 
     await expect(canvas.getByText(/LIMITE/)).toBeInTheDocument();
     await expect(canvas.getByText('15°C')).toBeInTheDocument();
-    await expect(canvas.getByText(/28 km\/h S/)).toBeInTheDocument();
-    await expect(canvas.getByText(/35 km\/h/)).toBeInTheDocument();
+    await expect(canvas.getByText(/28\.0 km\/h S/)).toBeInTheDocument();
+    await expect(canvas.getByText(/35\.0 km\/h/)).toBeInTheDocument();
     await expect(canvas.getByText(/75% nuages, Sec/)).toBeInTheDocument();
   }
 );
@@ -283,8 +283,8 @@ BadConditions.test('displays bad conditions correctly', async ({ canvas }) => {
 
   await expect(canvas.getByText(/MAUVAIS/)).toBeInTheDocument();
   await expect(canvas.getByText('10°C')).toBeInTheDocument();
-  await expect(canvas.getByText(/35 km\/h E/)).toBeInTheDocument();
-  await expect(canvas.getByText(/45 km\/h/)).toBeInTheDocument();
+  await expect(canvas.getByText(/35\.0 km\/h E/)).toBeInTheDocument();
+  await expect(canvas.getByText(/45\.0 km\/h/)).toBeInTheDocument();
   await expect(
     canvas.getByText(/90% nuages, 5\.0mm pluie/)
   ).toBeInTheDocument();

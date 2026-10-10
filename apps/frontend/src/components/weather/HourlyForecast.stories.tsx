@@ -333,7 +333,7 @@ GoodConditions.test('it renders the correct values', async ({ canvas }) => {
   await expect(getByText('Temp (°C)')).toBeInTheDocument();
   await expect(getByText('Vent (km/h)')).toBeInTheDocument();
   await expect(getByText('Rafales (km/h)')).toBeInTheDocument();
-  await expect(getByText('Direction')).toBeInTheDocument();
+  await expect(getAllByText('Direction').length).toBeGreaterThanOrEqual(1);
   await expect(getByText('Précip. (mm)')).toBeInTheDocument();
   await expect(getByText('Nuages (%)')).toBeInTheDocument();
   await expect(getByText('CAPE (J/kg)')).toBeInTheDocument();
@@ -356,9 +356,9 @@ GoodConditions.test('it renders the correct values', async ({ canvas }) => {
   await expect(getByText('25')).toBeInTheDocument(); // 12:00
 
   // Verify wind speeds (units now in headers, some values may appear in multiple columns)
-  await expect(getAllByText('10').length).toBeGreaterThanOrEqual(1); // 10:00 (also cloud cover)
-  await expect(getAllByText('11').length).toBeGreaterThanOrEqual(1); // 11:00
-  await expect(getAllByText('12').length).toBeGreaterThanOrEqual(1); // 12:00
+  await expect(getAllByText('10.0').length).toBeGreaterThanOrEqual(1); // 10:00
+  await expect(getAllByText('11.0').length).toBeGreaterThanOrEqual(1); // 11:00
+  await expect(getAllByText('12.0').length).toBeGreaterThanOrEqual(1); // 12:00
 
   // Verify wind gusts (units now in headers)
   await expect(getByText('15.0')).toBeInTheDocument(); // 10:00
@@ -424,9 +424,9 @@ MixedConditions.test(
     await expect(getByText('14')).toBeInTheDocument(); // 12:00
 
     // Verify wind speeds (units now in headers)
-    await expect(getAllByText('18').length).toBeGreaterThanOrEqual(1); // 10:00
-    await expect(getAllByText('25').length).toBeGreaterThanOrEqual(1); // 11:00
-    await expect(getAllByText('32').length).toBeGreaterThanOrEqual(1); // 12:00
+    await expect(getAllByText('18.0').length).toBeGreaterThanOrEqual(1); // 10:00
+    await expect(getAllByText('25.0').length).toBeGreaterThanOrEqual(1); // 11:00
+    await expect(getAllByText('32.0').length).toBeGreaterThanOrEqual(1); // 12:00
 
     // Verify different verdicts appear
     await expect(getAllByText(/MOYEN/).length).toBeGreaterThanOrEqual(1);

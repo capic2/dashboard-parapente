@@ -1,5 +1,5 @@
 import preview from '../../../../.storybook/preview';
-import { expect, within } from 'storybook/test';
+import { expect, userEvent, within } from 'storybook/test';
 import { VideoExportJobsPanel } from './VideoExportJobsPanel';
 import {
   defaultHandlers,
@@ -28,11 +28,17 @@ export const Default = meta.story({
 
 Default.test('opens logs in a modal', async ({ canvasElement }) => {
   const canvas = within(canvasElement);
+  const actionsButton = (
+    await canvas.findAllByRole('button', {
+      name: 'Actions',
+    })
+  )[0];
+  if (!actionsButton) throw new Error('Job actions button not found');
+  await userEvent.click(actionsButton);
+  await userEvent.click(
+    await within(document.body).findByRole('menuitem', { name: 'Afficher' })
+  );
   await expect(
-    canvas.getByRole('button', { name: 'Logs' })
-  ).toBeInTheDocument();
-  await canvas.getByRole('button', { name: 'Logs' }).click();
-  await expect(
-    within(document.body).getByText('Opening viewer')
-  ).toBeInTheDocument();
+    within(document.body).getAllByText(/Capture completed/u).length
+  ).toBeGreaterThanOrEqual(1);
 });

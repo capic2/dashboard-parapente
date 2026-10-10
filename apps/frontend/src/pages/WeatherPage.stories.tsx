@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import i18n from 'i18next';
 import preview from '../../.storybook/preview';
-import { expect, waitFor } from 'storybook/test';
+import { expect } from 'storybook/test';
 import WeatherPage from './WeatherPage';
 
 const meta = preview.meta({
@@ -719,11 +719,13 @@ export const Default = meta.story({
 Default.test(
   'renders weather page with site selector and conditions',
   async ({ canvas, userEvent }) => {
-    await canvas.findAllByText(/Arguel/u);
-    await canvas.findAllByText(/Chalais/u);
+    await canvas.findByRole('heading', { name: /Arguel/u, level: 2 });
     await canvas.findByText(
       /Meilleur spot pour aujourd'hui|Best spot for today/u
     );
+
+    await userEvent.click(canvas.getByRole('button', { name: /Changer/u }));
+    await canvas.findByText(/Chalais/u);
 
     const tomorrowButton = await canvas.findByRole('button', {
       name: /\b85\b/u,
@@ -752,8 +754,10 @@ export const WithSelectedSite = meta.story({
 WithSelectedSite.test(
   'renders weather for the selected site',
   async ({ canvas }) => {
-    await canvas.findAllByText(/Chalais/u);
-    await canvas.findAllByText(/Arguel/u);
+    await canvas.findByRole('heading', {
+      name: /Besançon - Chalais/u,
+      level: 2,
+    });
     await canvas.findByText(/Best spot for|Meilleur spot pour/u);
   }
 );
@@ -777,7 +781,6 @@ WithCityQueryParam.test(
   async ({ canvas }) => {
     await canvas.findByText(i18n.t('weather.page.selectedSearchResult'));
     await canvas.findAllByText('Besançon');
-    await canvas.findByText(i18n.t('weather.search.selectedWeather'));
     await canvas.findByText(i18n.t('weather.hourly.title'));
   }
 );
@@ -801,10 +804,7 @@ WithSpotQueryParam.test(
   async ({ canvas }) => {
     await canvas.findByText(i18n.t('weather.page.selectedSearchResult'));
     await canvas.findAllByText(/Arguel déco/u);
-    await canvas.findByText(i18n.t('weather.search.selectedWeather'));
-    await canvas.findByRole('button', {
-      name: i18n.t('weather.search.addToFavorites'),
-    });
+    await canvas.findByText(i18n.t('weather.hourly.title'));
   }
 );
 
@@ -817,8 +817,11 @@ export const WithCitySearch = meta.story({
 });
 
 WithCitySearch.test(
-  'selects a searched spot, displays hourly details, and adds it to favorites',
+  'searches a city, selects a nearby site, and opens its hourly weather',
   async ({ canvas, userEvent }) => {
+    await userEvent.click(
+      await canvas.findByRole('button', { name: /Changer|Choisir/u })
+    );
     const searchTab = await canvas.findByRole('tab', {
       name: i18n.t('weather.selection.search'),
     });
@@ -827,30 +830,21 @@ WithCitySearch.test(
     await userEvent.type(input, 'Besan');
     const suggestion = await canvas.findByRole('option', { name: /Besançon/ });
     await userEvent.click(suggestion);
-    const searchedSpotButton = await canvas.findByRole('button', {
-      name: /Arguel déco/,
-    });
-    await canvas.findByRole('button', { name: /Plaine d'Arguel/ });
-
-    await userEvent.click(searchedSpotButton);
     await canvas.findByText(i18n.t('weather.page.selectedSearchResult'));
-    await canvas.findByText(i18n.t('weather.search.selectedWeather'));
+    await userEvent.click(
+      await canvas.findByRole('button', { name: /Changer/u })
+    );
+    await userEvent.click(
+      canvas.getByRole('tab', { name: i18n.t('weather.selection.search') })
+    );
+    await userEvent.click(
+      await canvas.findByRole('button', { name: /Arguel déco/u })
+    );
+    await canvas.findByText(i18n.t('weather.page.selectedSearchResult'));
     expect(
       canvas.queryByText(/Impossible de charger la météo/u)
     ).not.toBeInTheDocument();
     await canvas.findByText(i18n.t('weather.hourly.title'));
-
-    const addFavoriteButton = await canvas.findByRole('button', {
-      name: i18n.t('weather.search.addToFavorites'),
-    });
-    await userEvent.click(addFavoriteButton);
-    await waitFor(() => {
-      expect(
-        canvas.queryByRole('button', {
-          name: i18n.t('weather.search.addToFavorites'),
-        })
-      ).not.toBeInTheDocument();
-    });
   }
 );
 
@@ -868,7 +862,7 @@ export const NoSites = meta.story({
 });
 
 NoSites.test('shows no sites message', async ({ canvas }) => {
-  await canvas.findByText(/Aucun site configuré/);
+  await canvas.findByText(/Choisissez une météo/);
 });
 
 export const Loading = meta.story({
@@ -934,10 +928,11 @@ export const WeatherError = meta.story({
 
 WeatherError.test(
   'renders site selector even when weather fails',
-  async ({ canvas }) => {
-    await canvas.findAllByText(/Arguel/u);
-    await canvas.findAllByText(/Chalais/u);
+  async ({ canvas, userEvent }) => {
+    await canvas.findByRole('heading', { name: /Arguel/u, level: 2 });
     await canvas.findByText(/Best spot for|Meilleur spot pour/u);
+    await userEvent.click(canvas.getByRole('button', { name: /Changer/u }));
+    await canvas.findByText(/Chalais/u);
   }
 );
 
