@@ -340,6 +340,93 @@ describe('FlightOverlayPlayer', () => {
     });
   });
 
+  it('keeps a backward YouTube seek while fullscreen until the player catches up', async () => {
+    class MockYoutubePlayer {
+      static instances: MockYoutubePlayer[] = [];
+      currentTime = 0;
+      state = -1;
+      events: Record<string, (event?: { data: number }) => void>;
+      cueVideoById = vi.fn();
+      seekTo = vi.fn();
+      getCurrentTime = () => this.currentTime;
+      getDuration = () => 300;
+      getPlayerState = () => this.state;
+      destroy = vi.fn();
+      mute = vi.fn();
+      pauseVideo = vi.fn();
+      playVideo = vi.fn();
+      setOption = vi.fn();
+
+      constructor(_host: HTMLElement, options: Record<string, unknown>) {
+        MockYoutubePlayer.instances.push(this);
+        this.events = options.events as MockYoutubePlayer['events'];
+        queueMicrotask(() => this.events.onReady?.());
+      }
+    }
+
+    Object.defineProperty(window, 'YT', {
+      configurable: true,
+      value: { Player: MockYoutubePlayer },
+    });
+    const { container } = render(
+      <FlightOverlayPlayer
+        mode="interactive"
+        cameraUrl="camera.mp4"
+        youtubeUrl="https://www.youtube.com/watch?v=mainVideo01"
+        cameraLabel="camera"
+        flightLabel="flight"
+      />
+    );
+
+    await waitFor(() => expect(MockYoutubePlayer.instances).toHaveLength(1));
+    const youtube = MockYoutubePlayer.instances[0];
+    await waitFor(() =>
+      expect(
+        screen.getByRole('slider', { name: 'flights.goproOverlayTimeline' })
+      ).toBeEnabled()
+    );
+
+    youtube.currentTime = 50;
+    fireEvent.click(
+      screen.getByTestId('flight-overlay-controls').querySelector('button')!
+    );
+    youtube.state = 1;
+    youtube.events.onStateChange?.({ data: 1 });
+
+    const player = container.querySelector(
+      '[data-testid="flight-overlay-media-stage"]'
+    )?.parentElement;
+    if (!player) throw new Error('Expected the player container to render');
+    Object.defineProperty(player, 'requestFullscreen', {
+      configurable: true,
+      value: vi.fn(() => {
+        Object.defineProperty(document, 'fullscreenElement', {
+          configurable: true,
+          value: player,
+        });
+        document.dispatchEvent(new Event('fullscreenchange'));
+        return Promise.resolve();
+      }),
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'flights.goproOverlayFullscreen' })
+    );
+    await waitFor(() => expect(document.fullscreenElement).toBe(player));
+
+    fireEvent.change(
+      screen.getByRole('slider', { name: 'flights.goproOverlayTimeline' }),
+      { target: { value: '20' } }
+    );
+    expect(youtube.seekTo).toHaveBeenCalledWith(20, true);
+
+    // The YouTube iframe reports the old time until its seek finishes.
+    youtube.events.onStateChange?.({ data: 1 });
+    youtube.currentTime = 20;
+    youtube.events.onStateChange?.({ data: 1 });
+
+    expect(youtube.seekTo).not.toHaveBeenCalledWith(50, true);
+  });
+
   it('resynchronizes a YouTube PiP when its buffering seek completes', async () => {
     class MockYoutubePlayer {
       static instances: MockYoutubePlayer[] = [];
