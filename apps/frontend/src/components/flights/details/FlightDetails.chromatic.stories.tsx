@@ -5,8 +5,8 @@ import {
   MediaThumbnails,
   WithoutGpx,
   MinimalFlight,
-  defaultHandlers,
 } from './FlightDetails.stories.tsx';
+import { defaultHandlers } from './FlightDetails.story-mocks';
 
 const meta = preview.meta({
   title: 'Components/Flights/FlightDetails/Chromatic',
