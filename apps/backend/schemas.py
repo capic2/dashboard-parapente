@@ -880,6 +880,7 @@ class FlightSummary(BaseModel):
     gopro_overlay_progress: int | None = None
     has_gopro_overlay: bool
     has_pano_video: bool
+    has_osv: bool = False
     has_face_video: bool = False
     has_pilote_video: bool = False
     has_highlight_video: bool

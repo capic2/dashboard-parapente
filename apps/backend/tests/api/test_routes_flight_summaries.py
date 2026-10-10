@@ -529,7 +529,13 @@ def test_summaries_require_completed_generations_and_existing_files(
     gpx_path = available_dir / "track.gpx"
     video_path = available_dir / "video.mp4"
     overlay_path = available_dir / "final.mp4"
-    for path in (gpx_path, video_path, overlay_path, available_dir / "camera.mp4"):
+    for path in (
+        gpx_path,
+        video_path,
+        overlay_path,
+        available_dir / "camera.mp4",
+        available_dir / "telemetry.OSV",
+    ):
         path.write_bytes(b"media")
 
     available = Flight(
@@ -579,17 +585,25 @@ def test_summaries_require_completed_generations_and_existing_files(
     assert response.status_code == 200
     assert {
         key: summaries["media-available"][key]
-        for key in ("has_gpx", "has_video", "has_camera", "has_gopro_overlay")
+        for key in (
+            "has_gpx",
+            "has_video",
+            "has_camera",
+            "has_gopro_overlay",
+            "has_osv",
+        )
     } == {
         "has_gpx": True,
         "has_video": True,
         "has_camera": True,
         "has_gopro_overlay": True,
+        "has_osv": True,
     }
     assert summaries["media-incomplete"]["has_gpx"] is False
     assert summaries["media-incomplete"]["has_video"] is False
     assert summaries["media-incomplete"]["has_camera"] is False
     assert summaries["media-incomplete"]["has_gopro_overlay"] is False
+    assert summaries["media-incomplete"]["has_osv"] is False
 
 
 def test_summaries_put_nulls_last_and_keyset_ties_by_id(client, db_session, arguel_site):
