@@ -6,7 +6,7 @@ export NX_DAEMON=false
 
 targets=(build lint type-check test)
 targets_csv=$(IFS=,; echo "${targets[*]}")
-projects_json=$(pnpm exec nx show projects --exclude=e2e --json)
+projects_json=$(env -u NODE_OPTIONS pnpm exec nx show projects --exclude=e2e --json)
 projects=$(node -e 'console.log(JSON.parse(process.argv[1]).join(","))' "$projects_json")
 
 if [[ -z "$projects" ]]; then
