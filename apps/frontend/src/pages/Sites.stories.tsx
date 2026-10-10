@@ -119,7 +119,7 @@ const findSiteCard = (
     level: 3,
     name: siteName,
   });
-  const card = heading?.closest('div.flex.h-full.flex-col');
+  const card = heading?.closest<HTMLDivElement>('div.flex.h-full.flex-col');
 
   if (!card) {
     throw new Error(`Could not find the site card for "${siteName}"`);

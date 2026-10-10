@@ -1,9 +1,10 @@
 import { http, HttpResponse } from 'msw';
 import preview from '../../../../.storybook/preview';
-import { expect, fn, userEvent, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { FlightDetails } from './FlightDetails';
 import { ToastContainer } from '@dashboard-parapente/design-system';
 import { useToastStore } from '../../../hooks/useToast';
+import { serializeTelemetryLayoutXml } from './flightTelemetryLayout';
 import type { Flight, Site } from '../../../types';
 import i18n from 'i18next';
 
@@ -60,6 +61,7 @@ const fullFlight: Flight = {
   video_file_exists: true,
   gopro_camera_file_exists: true,
   gopro_overlay_file_path: '/data/flights/final.mp4',
+  gopro_overlay_gpx_offset: 0,
 };
 
 const flightWithMediaThumbnails: Flight = {
@@ -252,6 +254,32 @@ const defaultHandlers = [
         manual_offset_seconds: 0,
         effective_offset_seconds: 8,
       },
+      overlay: { status: 'missing', job: null },
+    })
+  ),
+  http.get('*/api/flights/:id/telemetry', () =>
+    HttpResponse.json({
+      points: mockGPXData.coordinates.map((point) => ({
+        ...point,
+        segment: 0,
+      })),
+      source: 'gpx',
+      has_osv: false,
+      enrichment_status: 'ready',
+      enrichment_error: null,
+      start_time: '2026-03-18T10:00:00Z',
+      end_time: '2026-03-18T11:39:00Z',
+      duration_seconds: 5940,
+    })
+  ),
+  http.get('*/api/flights/:id/telemetry-layout', () =>
+    HttpResponse.json({
+      id: null,
+      scope: 'flight',
+      flight_id: 'flight-001',
+      xml_content: serializeTelemetryLayoutXml([]),
+      format_version: 1,
+      is_override: false,
     })
   ),
   http.get('*/api/flights/:id/gpx-data', () =>
@@ -279,7 +307,7 @@ const defaultHandlers = [
   http.get('*/api/flights/:id/youtube-videos', () => HttpResponse.json([])),
   http.get('*/api/flights/:id/highlight-videos', () => HttpResponse.json([])),
   http.get('*/api/flights/:id/overlay-layer', () =>
-    HttpResponse.json({ status: 'missing', job: null })
+    HttpResponse.json({ status: 'completed', job: null })
   ),
   http.get('*/api/flights/:id', () => HttpResponse.json(fullFlight)),
   http.patch('*/api/flights/:id', async ({ request }) => {
@@ -441,26 +469,33 @@ MediaThumbnails.test(
     await userEvent.click(
       canvas.getByRole('tab', { name: i18n.t('flights.replayTab') })
     );
+    await userEvent.click(
+      await canvas.findByRole('button', {
+        name: i18n.t('flights.goproOverlayStackExpand'),
+      })
+    );
     await expect(
       await canvas.findByAltText(i18n.t('flights.videoThumbnailAlt'))
     ).toBeVisible();
     await expect(
       await canvas.findByAltText(i18n.t('flights.panoThumbnailAlt'))
     ).toBeVisible();
-    await expect(
-      await canvas.findByAltText(
-        i18n.t('flights.goproOverlayJobThumbnailAlt', {
-          name: 'vol-arguel-1080p.mp4',
-        })
-      )
-    ).toBeVisible();
-    await expect(
-      await canvas.findByAltText(
-        i18n.t('flights.goproOverlayJobThumbnailAlt', {
-          name: 'vol-arguel-4k.mp4',
-        })
-      )
-    ).toBeVisible();
+    await waitFor(() => {
+      expect(
+        canvas.getByAltText(
+          i18n.t('flights.goproOverlayJobThumbnailAlt', {
+            name: 'vol-arguel-1080p.mp4',
+          })
+        )
+      ).toBeVisible();
+      expect(
+        canvas.getByAltText(
+          i18n.t('flights.goproOverlayJobThumbnailAlt', {
+            name: 'vol-arguel-4k.mp4',
+          })
+        )
+      ).toBeVisible();
+    });
   }
 );
 
