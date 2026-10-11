@@ -1892,6 +1892,7 @@ class TestHighlightVideoEndpoints:
             flight_date=date(2026, 3, 15),
             site_id="site-arguel",
             pano_video_file_path=str(pano_path) if pano_path else None,
+            gopro_overlay_gpx_offset=0.0,
         )
         db_session.add(flight)
         db_session.commit()

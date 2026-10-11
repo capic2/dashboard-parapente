@@ -15,9 +15,22 @@ const meta = preview.meta({
 });
 
 export const SitesChromatic = meta.story({
-  parameters: {
-    msw: {
-      handlers: [
+  render: () => (
+    <div className="flex flex-col gap-2">
+      <FigureWrapper title={Default.composed.name}>
+        <Default.Component />
+      </FigureWrapper>
+      <FigureWrapper title={EmptyState.composed.name}>
+        <EmptyState.Component />
+      </FigureWrapper>
+      <FigureWrapper title={Loading.composed.name}>
+        <Loading.Component />
+      </FigureWrapper>
+    </div>
+  ),
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('/api/spots', () => HttpResponse.json(mockSites), {
           once: true,
         }),
@@ -38,20 +51,7 @@ export const SitesChromatic = meta.story({
           () => HttpResponse.json({ success: true }),
           { once: true }
         ),
-      ],
-    },
+      ]
+    );
   },
-  render: () => (
-    <div className="flex flex-col gap-2">
-      <FigureWrapper title={Default.composed.name}>
-        <Default.Component />
-      </FigureWrapper>
-      <FigureWrapper title={EmptyState.composed.name}>
-        <EmptyState.Component />
-      </FigureWrapper>
-      <FigureWrapper title={Loading.composed.name}>
-        <Loading.Component />
-      </FigureWrapper>
-    </div>
-  ),
 });
