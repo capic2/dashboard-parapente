@@ -36,11 +36,12 @@ Default.test('opens logs in a modal', async ({ canvasElement }) => {
   if (!actionsButton) throw new Error('Job actions button not found');
   await userEvent.click(actionsButton);
   await userEvent.click(
-    await within(document.body).findByRole('menuitem', {
+    await within(canvasElement.ownerDocument.body).findByRole('menuitem', {
       name: /logs|show|afficher/iu,
     })
   );
   await expect(
-    within(document.body).getAllByText(/Capture completed/u).length
+    within(canvasElement.ownerDocument.body).getAllByText(/Capture completed/u)
+      .length
   ).toBeGreaterThanOrEqual(1);
 });
