@@ -70,6 +70,28 @@ def test_legacy_shared_queue_job_is_removed_before_requeue(monkeypatch) -> None:
     )
 
 
+def test_source_video_path_refresh_finds_regular_file(tmp_path: Path) -> None:
+    video_path = tmp_path / "pano.mp4"
+    video_path.write_bytes(b"video")
+
+    assert youtube_upload._refresh_source_video_path(video_path) == video_path
+
+
+def test_source_video_path_refresh_returns_none_when_file_is_missing(
+    tmp_path: Path,
+) -> None:
+    assert youtube_upload._refresh_source_video_path(tmp_path / "missing.mp4") is None
+
+
+def test_source_video_path_refresh_ignores_symlink(tmp_path: Path) -> None:
+    target_path = tmp_path / "target.mp4"
+    target_path.write_bytes(b"video")
+    video_path = tmp_path / "pano.mp4"
+    video_path.symlink_to(target_path)
+
+    assert youtube_upload._refresh_source_video_path(video_path) is None
+
+
 def test_worker_recovers_uploads_and_listens_only_to_dedicated_queue(
     monkeypatch,
 ) -> None:
