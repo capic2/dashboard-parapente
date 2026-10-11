@@ -32,6 +32,7 @@ export default defineConfig({
       {
         test: {
           name: 'unit',
+          sequence: { groupOrder: 0 },
           environment: 'happy-dom',
           setupFiles: ['./src/test/setup.ts'],
           include: ['src/**/*.{test,spec}.{ts,tsx}'],
@@ -50,6 +51,7 @@ export default defineConfig({
         ],
         test: {
           name: 'storybook',
+          sequence: { groupOrder: 1 },
           globals: true,
           maxWorkers: 2,
           browser: {
