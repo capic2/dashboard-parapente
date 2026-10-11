@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BackgroundOperation } from '@dashboard-parapente/shared-types';
@@ -101,7 +101,7 @@ describe('OperationCenter', () => {
     ).toContain('1');
   });
 
-  it('removes completed jobs from the operation center', () => {
+  it('removes completed jobs from the operation center', async () => {
     const deleteOperation = vi.fn().mockResolvedValue(undefined);
     operationMocks.useOperations.mockReturnValue({
       data: [makeOperation('terminé', 'completed', false)],
@@ -117,7 +117,8 @@ describe('OperationCenter', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Supprimer Export terminé' })
     );
-
-    expect(deleteOperation).toHaveBeenCalledWith('terminé');
+    await waitFor(() =>
+      expect(deleteOperation).toHaveBeenCalledWith('terminé')
+    );
   });
 });

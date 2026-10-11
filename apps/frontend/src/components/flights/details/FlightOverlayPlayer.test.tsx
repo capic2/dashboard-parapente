@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FlightOverlayPlayer } from './FlightOverlayPlayer';
 
@@ -391,7 +397,7 @@ describe('FlightOverlayPlayer', () => {
       screen.getByTestId('flight-overlay-controls').querySelector('button')!
     );
     youtube.state = 1;
-    youtube.events.onStateChange?.({ data: 1 });
+    act(() => youtube.events.onStateChange?.({ data: 1 }));
 
     const player = container.querySelector(
       '[data-testid="flight-overlay-media-stage"]'
@@ -420,9 +426,9 @@ describe('FlightOverlayPlayer', () => {
     expect(youtube.seekTo).toHaveBeenCalledWith(20, true);
 
     // The YouTube iframe reports the old time until its seek finishes.
-    youtube.events.onStateChange?.({ data: 1 });
+    act(() => youtube.events.onStateChange?.({ data: 1 }));
     youtube.currentTime = 20;
-    youtube.events.onStateChange?.({ data: 1 });
+    act(() => youtube.events.onStateChange?.({ data: 1 }));
 
     expect(youtube.seekTo).not.toHaveBeenCalledWith(50, true);
   });
@@ -503,7 +509,7 @@ describe('FlightOverlayPlayer', () => {
     expect(pipPlayer.cueVideoById).not.toHaveBeenCalledWith('pipVideo001', 75);
 
     pipPlayer.state = 5;
-    pipPlayer.events.onStateChange?.({ data: 5 });
+    act(() => pipPlayer.events.onStateChange?.({ data: 5 }));
     await waitFor(() =>
       expect(pipPlayer.cueVideoById).toHaveBeenCalledWith('pipVideo001', 75)
     );
@@ -511,8 +517,10 @@ describe('FlightOverlayPlayer', () => {
     const requestFrame = vi.spyOn(window, 'requestAnimationFrame');
     const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame');
     pipPlayer.state = 3;
-    pipPlayer.events.onStateChange?.({ data: 3 });
-    pipPlayer.events.onStateChange?.({ data: 3 });
+    act(() => {
+      pipPlayer.events.onStateChange?.({ data: 3 });
+      pipPlayer.events.onStateChange?.({ data: 3 });
+    });
     expect(requestFrame).toHaveBeenCalledTimes(1);
 
     const pendingFrame = requestFrame.mock.results[0]?.value;
@@ -580,15 +588,17 @@ describe('FlightOverlayPlayer', () => {
       name: 'flights.overlayVideoMarkerAt',
     });
 
-    oldPlayer.events.onReady?.();
+    act(() => oldPlayer.events.onReady?.());
     expect(currentPlayer.setOption).not.toHaveBeenCalled();
     expect(marker).toBeDisabled();
 
-    currentPlayer.events.onReady?.();
+    act(() => currentPlayer.events.onReady?.());
     await waitFor(() => expect(marker).toBeEnabled());
 
-    oldPlayer.events.onError?.();
-    oldPlayer.events.onStateChange?.({ data: 1 });
+    act(() => {
+      oldPlayer.events.onError?.();
+      oldPlayer.events.onStateChange?.({ data: 1 });
+    });
     expect(marker).toBeEnabled();
     expect(currentPlayer.pauseVideo).not.toHaveBeenCalled();
   });

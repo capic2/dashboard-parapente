@@ -513,14 +513,13 @@ export function FlightEditForm({
 
       {/* Notes */}
       <div>
-        <label htmlFor="flight-notes" className={md.label() + ' mb-2 block'}>
-          {t('flights.notesLabel')}
-        </label>
         <form.Field name="notes">
           {(field) => (
             <TextField value={field.state.value} onChange={field.handleChange}>
+              <Label className={md.label() + ' mb-2 block'}>
+                {t('flights.notesLabel')}
+              </Label>
               <TextArea
-                id="flight-notes"
                 placeholder={t('flights.notesPlaceholder')}
                 rows={4}
                 className={s.textarea()}
