@@ -17,11 +17,12 @@ import {
 const meta = preview.meta({
   title: 'Pages/Infrastructure',
   component: InfrastructurePage,
-  parameters: {
-    layout: 'padded',
-    msw: { handlers: defaultHandlers },
-  },
+  parameters: { layout: 'padded' },
   tags: ['autodocs'],
+
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
+  },
 });
 
 export const Default = meta.story({
@@ -48,25 +49,23 @@ export const VideoExports = meta.story({
 
 export const AwaitingActivityType = meta.story({
   name: 'No Activity Types',
-  beforeEach: resetCacheDb,
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: async (context) => {
+    context.msw.use(
+      ...[
         ...intervalsNoActivityTypesHandlers,
         ...cacheHandlers,
         ...deploymentDrainHandlers,
-      ],
-    },
+      ]
+    );
+    return resetCacheDb();
   },
 });
 
 export const DeploymentWaiting = meta.story({
   name: 'Deployment Waiting',
-  beforeEach: resetCacheDb,
-  parameters: {
-    msw: {
-      handlers: deploymentWaitingHandlers,
-    },
+  beforeEach: async (context) => {
+    context.msw.use(...deploymentWaitingHandlers);
+    return resetCacheDb();
   },
 });
 

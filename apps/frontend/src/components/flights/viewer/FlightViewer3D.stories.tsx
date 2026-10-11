@@ -63,9 +63,9 @@ export const Default = meta.story({
   args: {
     flightId: 'flight-1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/flights/:id/gpx-data', () => {
           return HttpResponse.json({ data: mockGPXData });
         }),
@@ -76,8 +76,8 @@ export const Default = meta.story({
             site_id: '1',
           });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -86,14 +86,14 @@ export const Loading = meta.story({
   args: {
     flightId: 'flight-1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/flights/:id/gpx-data', async () => {
           await new Promise(() => {});
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -102,13 +102,13 @@ export const Error = meta.story({
   args: {
     flightId: 'flight-1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/flights/:id/gpx-data', () => {
           return new HttpResponse(null, { status: 500 });
         }),
-      ],
-    },
+      ]
+    );
   },
 });

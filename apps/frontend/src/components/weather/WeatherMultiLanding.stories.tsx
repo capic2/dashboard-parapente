@@ -29,8 +29,6 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-
-
 // Mock associations
 const mockAssociations = [
   {
@@ -177,17 +175,17 @@ export const MixedConditions = meta.story({
     spotId: 'site-arguel',
     dayIndex: 0,
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/sites/:siteId/landings', () => {
           return HttpResponse.json(mockAssociations);
         }),
         http.get('*/api/sites/:siteId/landings/weather', () => {
           return HttpResponse.json(mockWeatherGood);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -211,17 +209,17 @@ export const AllGoodConditions = meta.story({
     spotId: 'site-arguel',
     dayIndex: 0,
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/sites/:siteId/landings', () => {
           return HttpResponse.json(mockAssociations);
         }),
         http.get('*/api/sites/:siteId/landings/weather', () => {
           return HttpResponse.json(mockWeatherAllGood);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -232,17 +230,17 @@ export const AllBadConditions = meta.story({
     spotId: 'site-arguel',
     dayIndex: 0,
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/sites/:siteId/landings', () => {
           return HttpResponse.json(mockAssociations);
         }),
         http.get('*/api/sites/:siteId/landings/weather', () => {
           return HttpResponse.json(mockWeatherAllBad);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -253,17 +251,17 @@ export const WithWeatherError = meta.story({
     spotId: 'site-arguel',
     dayIndex: 0,
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/sites/:siteId/landings', () => {
           return HttpResponse.json(mockAssociations);
         }),
         http.get('*/api/sites/:siteId/landings/weather', () => {
           return HttpResponse.json(mockWeatherWithError);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -284,17 +282,17 @@ export const SingleLanding = meta.story({
     spotId: 'site-arguel',
     dayIndex: 0,
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/sites/:siteId/landings', () => {
           return HttpResponse.json([mockAssociations[0]]);
         }),
         http.get('*/api/sites/:siteId/landings/weather', () => {
           return HttpResponse.json([mockWeatherGood[0]]);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -305,17 +303,17 @@ export const NoAssociations = meta.story({
     spotId: 'site-arguel',
     dayIndex: 0,
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/sites/:siteId/landings', () => {
           return HttpResponse.json([]);
         }),
         http.get('*/api/sites/:siteId/landings/weather', () => {
           return HttpResponse.json([]);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -326,16 +324,16 @@ export const Loading = meta.story({
     spotId: 'site-arguel',
     dayIndex: 0,
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/sites/:siteId/landings', () => {
           return HttpResponse.json(mockAssociations);
         }),
         http.get('*/api/sites/:siteId/landings/weather', async () => {
           await new Promise(() => {}); // Never resolves
         }),
-      ],
-    },
+      ]
+    );
   },
 });

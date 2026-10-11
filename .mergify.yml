@@ -5,6 +5,7 @@ queue_rules:
     merge_method: squash
     update_method: merge
     batch_size: 5
+    checks_timeout: 30 min
     # Queue PRs before CI completes; validate the updated queue batch before merge.
     branch_protection_injection_mode: merge
     commit_message_format:
