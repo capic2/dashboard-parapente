@@ -95,6 +95,11 @@ print_backend_diagnostics() {
     docker inspect \
       --format 'status={{.State.Status}} exit_code={{.State.ExitCode}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
       "$container_name" || true
+    if [ "$container_name" = "parapente-redis" ]; then
+      docker inspect \
+        --format '{{range .State.Health.Log}}{{printf "%s exit=%d output=%s\n" .Start .ExitCode .Output}}{{end}}' \
+        "$container_name" || true
+    fi
   done
 
   echo "Recent backend logs"
@@ -131,6 +136,49 @@ verify_gpu_prerequisites() {
     compose_files="-f docker-compose.yml -f docker-compose.production.yml"
     return 0
   fi
+}
+
+ensure_redis_healthy() {
+  redis_container_id=$(compose_cmd ps --all --quiet redis | sed -n '1p')
+  if [ -z "$redis_container_id" ]; then
+    echo "Redis container is missing; starting Redis before replacing backend services"
+    compose_cmd up -d redis || return 1
+    redis_container_id=$(compose_cmd ps --all --quiet redis | sed -n '1p')
+  fi
+
+  if [ -z "$redis_container_id" ]; then
+    echo "Redis container was not created by docker compose"
+    return 1
+  fi
+
+  redis_state=$(docker inspect --format '{{.State.Status}}' "$redis_container_id" 2>/dev/null || true)
+  redis_health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$redis_container_id" 2>/dev/null || true)
+  if [ "$redis_state" != "running" ]; then
+    echo "Redis is not running (state=${redis_state:-unknown}); starting the existing container before replacing backend services"
+    docker start "$redis_container_id" >/dev/null || return 1
+  elif [ "$redis_health" = "unhealthy" ]; then
+    echo "Redis is unhealthy; restarting only Redis before replacing backend services"
+    docker restart "$redis_container_id" >/dev/null || return 1
+  fi
+
+  attempt=1
+  max_attempts=18
+  while [ "$attempt" -le "$max_attempts" ]; do
+    redis_state=$(docker inspect --format '{{.State.Status}}' "$redis_container_id" 2>/dev/null || true)
+    redis_health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$redis_container_id" 2>/dev/null || true)
+    if [ "$redis_state" = "running" ] && [ "$redis_health" = "healthy" ]; then
+      echo "Redis is healthy; continuing production deployment"
+      return 0
+    fi
+
+    echo "Waiting for Redis readiness: attempt $attempt/$max_attempts state=${redis_state:-unknown} health=${redis_health:-unknown}"
+    [ "$attempt" -lt "$max_attempts" ] && sleep 5
+    attempt=$((attempt + 1))
+  done
+
+  echo "Redis did not become healthy; backend services were not replaced"
+  print_backend_diagnostics
+  return 1
 }
 
 verify_workers_started() {
@@ -374,9 +422,10 @@ deploy_from_compose_path() {
   export CI_BACKEND_IMAGE="$BACKEND_IMAGE"
 
   # Redis is not part of the backend image update. Keep it running
-  # so deployments do not pull and recreate the stateful service.
+  # so deployments do not pull or recreate the stateful service.
+  ensure_redis_healthy || return 1
   if ! compose_cmd pull backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker gopro-preview-worker database-backup ||
-    ! compose_cmd up -d --remove-orphans --scale youtube-upload-worker=3 backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker gopro-preview-worker database-backup redis; then
+    ! compose_cmd up -d --no-deps --remove-orphans --scale youtube-upload-worker=3 backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker gopro-preview-worker database-backup; then
     print_backend_diagnostics
     return 1
   fi
@@ -493,9 +542,46 @@ deploy_from_portainer_volume() {
       printf "%s" "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
       # Redis is not part of the backend image update. Keep it running
-      # so deployments do not pull and recreate the stateful service.
+      # so deployments do not pull or recreate the stateful service.
+      redis_container_id=$(compose_cmd ps --all --quiet redis | sed -n "1p")
+      if [ -z "$redis_container_id" ]; then
+        echo "Redis container is missing; starting Redis before replacing backend services"
+        compose_cmd up -d redis || exit 1
+        redis_container_id=$(compose_cmd ps --all --quiet redis | sed -n "1p")
+      fi
+      if [ -z "$redis_container_id" ]; then
+        echo "Redis container was not created by docker compose"
+        exit 1
+      fi
+      redis_state=$(docker inspect --format "{{.State.Status}}" "$redis_container_id" 2>/dev/null || true)
+      redis_health=$(docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" "$redis_container_id" 2>/dev/null || true)
+      if [ "$redis_state" != "running" ]; then
+        echo "Redis is not running (state=${redis_state:-unknown}); starting the existing container before replacing backend services"
+        docker start "$redis_container_id" >/dev/null || exit 1
+      elif [ "$redis_health" = "unhealthy" ]; then
+        echo "Redis is unhealthy; restarting only Redis before replacing backend services"
+        docker restart "$redis_container_id" >/dev/null || exit 1
+      fi
+      readiness_attempt=1
+      redis_ready=0
+      while [ "$readiness_attempt" -le 18 ]; do
+        redis_state=$(docker inspect --format "{{.State.Status}}" "$redis_container_id" 2>/dev/null || true)
+        redis_health=$(docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" "$redis_container_id" 2>/dev/null || true)
+        if [ "$redis_state" = "running" ] && [ "$redis_health" = "healthy" ]; then
+          redis_ready=1
+          break
+        fi
+        echo "Waiting for Redis readiness: attempt $readiness_attempt/18 state=${redis_state:-unknown} health=${redis_health:-unknown}"
+        [ "$readiness_attempt" -lt 18 ] && sleep 5
+        readiness_attempt=$((readiness_attempt + 1))
+      done
+      if [ "$redis_ready" -ne 1 ]; then
+        echo "Redis did not become healthy; backend services were not replaced"
+        exit 1
+      fi
+      echo "Redis is healthy; continuing production deployment"
       compose_cmd pull backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker gopro-preview-worker database-backup
-      compose_cmd up -d --remove-orphans --scale youtube-upload-worker=3 backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker gopro-preview-worker database-backup redis
+      compose_cmd up -d --no-deps --remove-orphans --scale youtube-upload-worker=3 backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker gopro-preview-worker database-backup
       readiness_attempt=1
       readiness_ok=0
       while [ "$readiness_attempt" -le "$LOCAL_VERIFY_MAX_ATTEMPTS" ]; do
