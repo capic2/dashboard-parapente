@@ -18,16 +18,19 @@ const meta = preview.meta({
     chromatic: {
       disableSnapshot: false,
     },
-    msw: {
-      handlers: [
+  },
+  tags: ['!autodocs'],
+
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/sites/:siteId/landings', () => HttpResponse.json([])),
         http.get('*/api/sites/:siteId/landings/weather', () =>
           HttpResponse.json([])
         ),
-      ],
-    },
+      ]
+    );
   },
-  tags: ['!autodocs'],
 });
 
 export const WeatherMultiLandingChromatic = meta.story({

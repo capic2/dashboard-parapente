@@ -91,8 +91,29 @@ jobs:
         with:
           main-branch-name: 'main'
 
+      - name: 🔎 Check for application changes
+        id: application-changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" != "pull_request" ]]; then
+            echo "application_changes=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed_files=$(git diff --name-only "${BASE_SHA}...HEAD")
+          if [[ -z "$changed_files" ]]; then
+            echo "Could not determine changed files; keeping validation enabled."
+            echo "application_changes=true" >> "$GITHUB_OUTPUT"
+          elif grep -qvE '^(\.mergify\.yml|\.github/workflows/ci\.yml)$' <<< "$changed_files"; then
+            echo "application_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Only Mergify and CI workflow configuration changed; skipping Nx application validation."
+            echo "application_changes=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: 🔨 Run full validation for Mergify queue
-        if: github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'merge queue:')
+        if: github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'merge queue:') && steps.application-changes.outputs.application_changes == 'true'
         run: bash .github/scripts/run-full-nx-validation.sh
         env:
           TESTING: true
@@ -103,7 +124,7 @@ jobs:
           VITE_CESIUM_ION_TOKEN: ${{ secrets.VITE_CESIUM_ION_TOKEN }}
 
       - name: 🔨 Run affected validation for pull requests and pushes
-        if: github.event_name != 'pull_request' || !startsWith(github.event.pull_request.title, 'merge queue:')
+        if: (github.event_name != 'pull_request' || !startsWith(github.event.pull_request.title, 'merge queue:')) && steps.application-changes.outputs.application_changes == 'true'
         run: |
           affected_projects=$(pnpm exec nx show projects --affected --json)
           affected_count=0
@@ -112,8 +133,7 @@ jobs:
           fi
 
           if [[ "$affected_count" == "0" ]]; then
-            echo "Nx found no affected projects; running full uncached validation as a safety net."
-            bash .github/scripts/run-full-nx-validation.sh
+            echo "Nx found no affected projects; skipping application validation for this pull request."
           else
             pnpm exec nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e
           fi

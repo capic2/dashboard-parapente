@@ -97,10 +97,10 @@ const mockEmagramHistory = [
 ];
 
 const PLACEHOLDER_PNG = new Uint8Array([
-  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1,
-  0, 0, 0, 1, 8, 2, 0, 0, 0, 144, 119, 83, 222, 0, 0, 0, 12, 73, 68,
-  65, 84, 8, 215, 99, 104, 104, 248, 15, 0, 1, 1, 0, 5, 24, 217, 38, 57,
-  0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0,
+  0, 0, 1, 8, 2, 0, 0, 0, 144, 119, 83, 222, 0, 0, 0, 12, 73, 68, 65, 84, 8,
+  215, 99, 104, 104, 248, 15, 0, 1, 1, 0, 5, 24, 217, 38, 57, 0, 0, 0, 0, 73,
+  69, 78, 68, 174, 66, 96, 130,
 ]);
 
 const screenshotHandler = http.get(
@@ -118,8 +118,12 @@ const meta = preview.meta({
     chromatic: {
       disableSnapshot: false,
     },
-    msw: {
-      handlers: [
+  },
+  tags: ['!autodocs'],
+
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         // Default story handlers (consumed first, once: true)
         http.get('/api/spots/:id', () => HttpResponse.json(mockSite), {
           once: true,
@@ -206,10 +210,9 @@ const meta = preview.meta({
         http.get('/api/emagram/history', async () => {
           await new Promise(() => {});
         }),
-      ],
-    },
+      ]
+    );
   },
-  tags: ['!autodocs'],
 });
 
 export const ThermalAnalysisChromatic = meta.story({

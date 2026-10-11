@@ -19,9 +19,12 @@ import {
   MenuItem,
   MenuTrigger,
   Popover,
+  Separator,
   TextField,
 } from 'react-aria-components';
 import {
+  ArrowDown,
+  ArrowUp,
   CheckSquare,
   Check,
   ChevronDown,
@@ -130,6 +133,93 @@ function FlightSearchInput({
         />
       </div>
     </TextField>
+  );
+}
+
+function FlightSortMenu({
+  sort,
+  order,
+  onChange,
+}: {
+  sort: FlightsSearch['sort'];
+  order: FlightsSearch['order'];
+  onChange: (
+    sort: FlightsSearch['sort'],
+    order: FlightsSearch['order']
+  ) => void;
+}) {
+  const { t } = useTranslation();
+  const sortableColumns = [
+    { id: 'flight_date', label: t('flights.sortDate') },
+    { id: 'site_name', label: t('flights.sortSite') },
+    { id: 'duration_minutes', label: t('flights.sortDuration') },
+    { id: 'max_altitude_m', label: t('flights.sortAltitude') },
+    { id: 'distance_km', label: t('flights.sortDistance') },
+  ] as const;
+  const currentSortColumn =
+    sortableColumns.find((column) => column.id === sort) ?? sortableColumns[0];
+  const isDescending = order === 'desc';
+
+  return (
+    <MenuTrigger>
+      <AriaButton
+        aria-label={t(
+          isDescending ? 'dataList.sortByDesc' : 'dataList.sortByAsc',
+          { column: currentSortColumn.label }
+        )}
+        className="flex min-h-11 min-w-0 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700 lg:min-h-10"
+      >
+        <span className="max-w-20 truncate">{currentSortColumn.label}</span>
+        {isDescending ? (
+          <ArrowDown aria-hidden="true" className="h-4 w-4 shrink-0" />
+        ) : (
+          <ArrowUp aria-hidden="true" className="h-4 w-4 shrink-0" />
+        )}
+        <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+      </AriaButton>
+      <Popover
+        placement="bottom end"
+        className="z-40 mt-2 w-56 rounded-xl border border-gray-200 bg-white p-1 shadow-xl dark:border-gray-700 dark:bg-gray-800"
+      >
+        <Menu aria-label={t('flights.sortBy')} className="outline-none">
+          {sortableColumns.map((column) => {
+            const isCurrentColumn = column.id === currentSortColumn.id;
+            return (
+              <MenuItem
+                key={column.id}
+                aria-label={
+                  isCurrentColumn
+                    ? `${column.label}, ${t('flights.currentSort')}`
+                    : column.label
+                }
+                onAction={() => onChange(column.id, order)}
+                className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+              >
+                <Check
+                  aria-hidden="true"
+                  className={`h-4 w-4 shrink-0 ${isCurrentColumn ? '' : 'invisible'}`}
+                />
+                {column.label}
+              </MenuItem>
+            );
+          })}
+          <Separator className="my-1 border-t border-gray-200 dark:border-gray-700" />
+          <MenuItem
+            onAction={() => onChange(sort, isDescending ? 'asc' : 'desc')}
+            className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+          >
+            {isDescending ? (
+              <ArrowUp aria-hidden="true" className="h-4 w-4 shrink-0" />
+            ) : (
+              <ArrowDown aria-hidden="true" className="h-4 w-4 shrink-0" />
+            )}
+            {t(
+              isDescending ? 'flights.sortAscending' : 'flights.sortDescending'
+            )}
+          </MenuItem>
+        </Menu>
+      </Popover>
+    </MenuTrigger>
   );
 }
 
@@ -762,11 +852,22 @@ export default function FlightHistory() {
           <aside className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/40 lg:flex lg:min-h-0 lg:flex-col lg:p-2.5">
             {!selectionMode ? (
               <div className="mb-3 space-y-2 border-b border-slate-200 pb-3 dark:border-slate-700 lg:mb-2 lg:space-y-1.5 lg:pb-2 lg:max-h-[55%] lg:shrink-0 lg:overflow-y-auto">
-                <FlightSearchInput
-                  key={search.q ?? ''}
-                  initialQuery={search.q ?? ''}
-                  onQueryChange={handleSearchQueryChange}
-                />
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <FlightSearchInput
+                      key={search.q ?? ''}
+                      initialQuery={search.q ?? ''}
+                      onQueryChange={handleSearchQueryChange}
+                    />
+                  </div>
+                  <FlightSortMenu
+                    sort={search.sort}
+                    order={search.order}
+                    onChange={(sort, order) =>
+                      void navigateWithSearch({ ...search, sort, order })
+                    }
+                  />
+                </div>
                 <fieldset className="min-w-0 space-y-2 lg:space-y-1">
                   <legend className="flex w-full items-center justify-between gap-2">
                     <button
@@ -855,10 +956,17 @@ export default function FlightHistory() {
               </div>
             ) : (
               <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-800 dark:bg-sky-950/30 lg:max-h-[55%] lg:shrink-0 lg:overflow-y-auto">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <span className="text-sm font-semibold text-sky-900 dark:text-sky-100">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-sky-900 dark:text-sky-100">
                     {t('flights.selected', { count: selectedCount })}
                   </span>
+                  <FlightSortMenu
+                    sort={search.sort}
+                    order={search.order}
+                    onChange={(sort, order) =>
+                      void navigateWithSearch({ ...search, sort, order })
+                    }
+                  />
                   <Button
                     variant="ghost"
                     size="icon"
