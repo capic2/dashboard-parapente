@@ -6016,8 +6016,8 @@ def get_flight_pano_thumbnail(flight_id: str, db: Session = Depends(get_db)) -> 
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
 
-    pano_path = _resolve_flight_file_path(flight.pano_video_file_path)
-    if not pano_path or not pano_path.is_file():
+    pano_path = temporary_video_path(db, flight, "pano")
+    if not pano_path.is_file():
         raise HTTPException(status_code=404, detail="No Pano video available for this flight")
     return _video_thumbnail_response(pano_path)
 
@@ -6028,8 +6028,8 @@ def stream_flight_pano(flight_id: str, db: Session = Depends(get_db)) -> FileRes
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
-    pano_path = _resolve_flight_file_path(flight.pano_video_file_path)
-    if not pano_path or not pano_path.is_file():
+    pano_path = temporary_video_path(db, flight, "pano")
+    if not pano_path.is_file():
         raise HTTPException(status_code=404, detail="No Pano video available for this flight")
     return FileResponse(
         path=pano_path,
