@@ -6,11 +6,11 @@ type SiteDisplayFields = {
 function normalizeForDisplayMatch(value: string): string {
   return value
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u0300-\u036f]/gu, '')
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/[^a-z0-9]+/gu, ' ')
     .trim()
-    .replace(/\s+/g, ' ');
+    .replace(/\s+/gu, ' ');
 }
 
 function siteNameContainsLocality(site: SiteDisplayFields): boolean {

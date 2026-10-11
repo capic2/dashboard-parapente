@@ -215,11 +215,11 @@ ModerateConditions.test(
     await canvas.findByText('65', { selector: 'span' });
     await canvas.findByText('/100', { selector: 'span' });
 
-    await expect(canvas.getByText(/MOYEN/)).toBeInTheDocument();
+    await expect(canvas.getByText(/MOYEN/u)).toBeInTheDocument();
     await expect(canvas.getByText('18°C')).toBeInTheDocument();
-    await expect(canvas.getByText(/20\.0 km\/h NE/)).toBeInTheDocument();
-    await expect(canvas.getByText(/28\.0 km\/h/)).toBeInTheDocument();
-    await expect(canvas.getByText(/50% nuages, Sec/)).toBeInTheDocument();
+    await expect(canvas.getByText(/20\.0 km\/h NE/u)).toBeInTheDocument();
+    await expect(canvas.getByText(/28\.0 km\/h/u)).toBeInTheDocument();
+    await expect(canvas.getByText(/50% nuages, Sec/u)).toBeInTheDocument();
   }
 );
 
@@ -249,11 +249,11 @@ LimiteConditions.test(
     await canvas.findByText('45', { selector: 'span' });
     await canvas.findByText('/100', { selector: 'span' });
 
-    await expect(canvas.getByText(/LIMITE/)).toBeInTheDocument();
+    await expect(canvas.getByText(/LIMITE/u)).toBeInTheDocument();
     await expect(canvas.getByText('15°C')).toBeInTheDocument();
-    await expect(canvas.getByText(/28\.0 km\/h S/)).toBeInTheDocument();
-    await expect(canvas.getByText(/35\.0 km\/h/)).toBeInTheDocument();
-    await expect(canvas.getByText(/75% nuages, Sec/)).toBeInTheDocument();
+    await expect(canvas.getByText(/28\.0 km\/h S/u)).toBeInTheDocument();
+    await expect(canvas.getByText(/35\.0 km\/h/u)).toBeInTheDocument();
+    await expect(canvas.getByText(/75% nuages, Sec/u)).toBeInTheDocument();
   }
 );
 
@@ -281,12 +281,12 @@ BadConditions.test('displays bad conditions correctly', async ({ canvas }) => {
   await canvas.findByText('25', { selector: 'span' });
   await canvas.findByText('/100', { selector: 'span' });
 
-  await expect(canvas.getByText(/MAUVAIS/)).toBeInTheDocument();
+  await expect(canvas.getByText(/MAUVAIS/u)).toBeInTheDocument();
   await expect(canvas.getByText('10°C')).toBeInTheDocument();
-  await expect(canvas.getByText(/35\.0 km\/h E/)).toBeInTheDocument();
-  await expect(canvas.getByText(/45\.0 km\/h/)).toBeInTheDocument();
+  await expect(canvas.getByText(/35\.0 km\/h E/u)).toBeInTheDocument();
+  await expect(canvas.getByText(/45\.0 km\/h/u)).toBeInTheDocument();
   await expect(
-    canvas.getByText(/90% nuages, 5\.0mm pluie/)
+    canvas.getByText(/90% nuages, 5\.0mm pluie/u)
   ).toBeInTheDocument();
 });
 

@@ -1264,6 +1264,57 @@ export function FlightOverlayPlayer({
             const sourceAvailable = pip.youtubeUrl
               ? Boolean(youtubePipId)
               : Boolean(pip.videoUrl);
+            let pipPreview: ReactNode;
+            if (pip.youtubeUrl && youtubePipId) {
+              pipPreview = (
+                <>
+                  <div
+                    ref={(node) => {
+                      if (node) youtubePipHostsRef.current.set(pip.id, node);
+                      else youtubePipHostsRef.current.delete(pip.id);
+                    }}
+                    className="h-full w-full"
+                  />
+                  {!hasStartedMainPlayback && (
+                    <img
+                      src={`https://i.ytimg.com/vi/${youtubePipId}/mqdefault.jpg`}
+                      alt=""
+                      className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+                    />
+                  )}
+                </>
+              );
+            } else if (pip.videoUrl) {
+              pipPreview = (
+                <video
+                  ref={(node) => {
+                    if (node) pipVideosRef.current.set(pip.id, node);
+                    else pipVideosRef.current.delete(pip.id);
+                  }}
+                  src={pip.videoUrl}
+                  playsInline
+                  preload="metadata"
+                  muted
+                  onLoadedMetadata={() => syncMedia()}
+                  onTimeUpdate={() => syncMedia()}
+                  onSeeked={() => syncMedia()}
+                  className="h-full w-full object-cover"
+                  aria-label={pip.label}
+                >
+                  <track kind="captions" />
+                </video>
+              );
+            } else {
+              pipPreview = (
+                <output className="flex h-full items-center justify-center p-2 text-center text-xs font-medium text-white">
+                  {pip.source?.startsWith('youtube:')
+                    ? t('flights.goproOverlayYoutubePipMissing', {
+                        role: pip.source?.replace('youtube:', ''),
+                      })
+                    : t('flights.overlayInteractivePreviewUnavailable')}
+                </output>
+              );
+            }
             return (
               <div
                 key={pip.id}
@@ -1272,50 +1323,7 @@ export function FlightOverlayPlayer({
                 style={pipStyle}
                 aria-label={pip.label}
               >
-                {pip.youtubeUrl && youtubePipId ? (
-                  <>
-                    <div
-                      ref={(node) => {
-                        if (node) youtubePipHostsRef.current.set(pip.id, node);
-                        else youtubePipHostsRef.current.delete(pip.id);
-                      }}
-                      className="h-full w-full"
-                    />
-                    {!hasStartedMainPlayback && (
-                      <img
-                        src={`https://i.ytimg.com/vi/${youtubePipId}/mqdefault.jpg`}
-                        alt=""
-                        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-                      />
-                    )}
-                  </>
-                ) : pip.videoUrl ? (
-                  <video
-                    ref={(node) => {
-                      if (node) pipVideosRef.current.set(pip.id, node);
-                      else pipVideosRef.current.delete(pip.id);
-                    }}
-                    src={pip.videoUrl}
-                    playsInline
-                    preload="metadata"
-                    muted
-                    onLoadedMetadata={() => syncMedia()}
-                    onTimeUpdate={() => syncMedia()}
-                    onSeeked={() => syncMedia()}
-                    className="h-full w-full object-cover"
-                    aria-label={pip.label}
-                  >
-                    <track kind="captions" />
-                  </video>
-                ) : (
-                  <output className="flex h-full items-center justify-center p-2 text-center text-xs font-medium text-white">
-                    {pip.source?.startsWith('youtube:')
-                      ? t('flights.goproOverlayYoutubePipMissing', {
-                          role: pip.source?.replace('youtube:', ''),
-                        })
-                      : t('flights.overlayInteractivePreviewUnavailable')}
-                  </output>
-                )}
+                {pipPreview}
                 <button
                   type="button"
                   className="absolute inset-0 cursor-pointer bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-400"

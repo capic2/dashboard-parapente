@@ -17,7 +17,7 @@ def mock_redis():
     """Create a mock Redis client."""
     redis = AsyncMock()
     redis.get = AsyncMock(return_value=None)
-    redis.setex = AsyncMock()
+    redis.set = AsyncMock()
     return redis
 
 

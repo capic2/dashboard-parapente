@@ -1,6 +1,6 @@
 """Tests for the durable treatment progress model."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from models import BackgroundOperation
 from operations import (
@@ -36,8 +36,8 @@ def test_operation_payload_exposes_timeline_and_unread_state() -> None:
         current_step_progress=25,
         current_step_detail="Frame 25 / 100",
         steps_json='[{"key":"render","status":"running","progress":25,"detail":null}]',
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(UTC).replace(tzinfo=None),
+        updated_at=datetime.now(UTC).replace(tzinfo=None),
         can_cancel=True,
         can_retry=False,
     )
@@ -60,9 +60,9 @@ def test_reporter_reopen_resets_terminal_state() -> None:
         progress=40,
         error_detail="render failed",
         steps_json='[{"key":"render","status":"failed","progress":40}]',
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
-        completed_at=datetime.utcnow(),
+        created_at=datetime.now(UTC).replace(tzinfo=None),
+        updated_at=datetime.now(UTC).replace(tzinfo=None),
+        completed_at=datetime.now(UTC).replace(tzinfo=None),
     )
 
     class FakeSession:
@@ -97,8 +97,8 @@ def test_snapshot_projects_specialized_status_to_current_timeline_step() -> None
             '{"key":"render","status":"pending"},'
             '{"key":"finalize","status":"pending"}]'
         ),
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(UTC).replace(tzinfo=None),
+        updated_at=datetime.now(UTC).replace(tzinfo=None),
     )
 
     class FakeSession:

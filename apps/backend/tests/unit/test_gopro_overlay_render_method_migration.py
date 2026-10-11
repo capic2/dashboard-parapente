@@ -37,3 +37,4 @@ def test_migration_adds_render_method_without_losing_existing_jobs() -> None:
 
     assert "render_method" in columns
     assert job == ("overlay-job", "queued", None)
+    connection.close()

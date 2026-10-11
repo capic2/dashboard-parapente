@@ -74,7 +74,7 @@ export function useCancelFlightHighlightVideo(_flightId: string) {
 export function useDeleteFlightHighlightVideo(_flightId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({
+    mutationFn: ({
       targetFlightId,
       jobId,
     }: {

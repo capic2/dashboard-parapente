@@ -105,7 +105,7 @@ export const defaultHandlers = [
 
 export const Default = meta.story({
   name: 'Default',
-  beforeEach: async (context) => {
+  beforeEach: (context) => {
     context.msw.use(...defaultHandlers);
     return resetSitesDb();
   },
@@ -129,7 +129,7 @@ const findSiteCard = (
 };
 
 Default.test('filters by landing type', async ({ canvas, userEvent }) => {
-  await waitForElementToBeRemoved(canvas.getByText(/Loading.*/i));
+  await waitForElementToBeRemoved(canvas.getByText(/Loading.*/iu));
   await expect(canvas.getAllByRole('heading', { level: 3 })).toHaveLength(3);
 
   const typeSelect = await canvas.findByDisplayValue('Tous les types');
@@ -144,7 +144,7 @@ Default.test('filters by landing type', async ({ canvas, userEvent }) => {
   ).toBeInTheDocument();
 });
 Default.test('filters by name', async ({ canvas, userEvent }) => {
-  await waitForElementToBeRemoved(canvas.getByText(/Loading.*/i));
+  await waitForElementToBeRemoved(canvas.getByText(/Loading.*/iu));
   await expect(canvas.getAllByRole('heading', { level: 3 })).toHaveLength(3);
   await userEvent.type(
     await canvas.findByPlaceholderText(
@@ -161,28 +161,31 @@ Default.test(
   'it is possible to create a site',
   async ({ canvas, userEvent, step }) => {
     await step('Wait for page loaded', async () => {
-      await waitForElementToBeRemoved(canvas.getByText(/Loading.*/i));
+      await waitForElementToBeRemoved(canvas.getByText(/Loading.*/iu));
     });
 
     await step('Create a site', async () => {
       await userEvent.click(
-        await canvas.findByRole('button', { name: /.*Nouveau site/ })
+        await canvas.findByRole('button', { name: /.*Nouveau site/u })
       );
       const dialog = within(screen.getByRole('dialog'));
 
       // Fill required fields
-      await userEvent.type(dialog.getByLabelText(/Nom du site/), 'Mont Poupet');
-      await userEvent.type(dialog.getByLabelText(/Code/), 'POUPET');
-      await userEvent.clear(dialog.getByLabelText(/Latitude/));
-      await userEvent.type(dialog.getByLabelText(/Latitude/), '47.238');
-      await userEvent.clear(dialog.getByLabelText(/Longitude/));
-      await userEvent.type(dialog.getByLabelText(/Longitude/), '6.024');
+      await userEvent.type(
+        dialog.getByLabelText(/Nom du site/u),
+        'Mont Poupet'
+      );
+      await userEvent.type(dialog.getByLabelText(/Code/u), 'POUPET');
+      await userEvent.clear(dialog.getByLabelText(/Latitude/u));
+      await userEvent.type(dialog.getByLabelText(/Latitude/u), '47.238');
+      await userEvent.clear(dialog.getByLabelText(/Longitude/u));
+      await userEvent.type(dialog.getByLabelText(/Longitude/u), '6.024');
 
       // Select usage type
       await userEvent.click(dialog.getByLabelText('Décollage uniquement'));
 
       // Submit
-      await userEvent.click(dialog.getByText(/Enregistrer/));
+      await userEvent.click(dialog.getByText(/Enregistrer/u));
     });
 
     await step('Site is created', async () => {
@@ -200,7 +203,7 @@ Default.test(
   'it is possible to update a site',
   async ({ canvas, userEvent, step }) => {
     await step('Wait for page loaded', async () => {
-      await waitForElementToBeRemoved(canvas.getByText(/Loading.*/i));
+      await waitForElementToBeRemoved(canvas.getByText(/Loading.*/iu));
     });
     await step('Update a site', async () => {
       await userEvent.click(
@@ -212,14 +215,14 @@ Default.test(
       const dialog = within(screen.getByRole('dialog'));
 
       // Fill required fields
-      await userEvent.clear(dialog.getByLabelText(/Nom du site/));
+      await userEvent.clear(dialog.getByLabelText(/Nom du site/u));
       await userEvent.type(
-        dialog.getByLabelText(/Nom du site/),
+        dialog.getByLabelText(/Nom du site/u),
         'Arguel updated'
       );
 
       // Submit
-      await userEvent.click(dialog.getByText(/Enregistrer/));
+      await userEvent.click(dialog.getByText(/Enregistrer/u));
     });
 
     await step('Site is updated', async () => {
@@ -240,7 +243,7 @@ Default.test(
   'it is possible to delete a site',
   async ({ canvas, userEvent, step }) => {
     await step('Wait for page loaded', async () => {
-      await waitForElementToBeRemoved(canvas.getByText(/Loading.*/i));
+      await waitForElementToBeRemoved(canvas.getByText(/Loading.*/iu));
     });
     await step('Delete a site', async () => {
       await userEvent.click(

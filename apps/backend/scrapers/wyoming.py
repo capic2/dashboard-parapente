@@ -4,7 +4,7 @@ Fetches real atmospheric soundings (TEXT:LIST format) for thermal analysis
 """
 
 import math
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -215,7 +215,7 @@ async def fetch_wyoming_sounding(
         Dict with success status, parsed data, and raw text
     """
     if date is None:
-        date = datetime.utcnow()
+        date = datetime.now(UTC).replace(tzinfo=None)
 
     # Try cache first
     if use_cache:

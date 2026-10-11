@@ -11,7 +11,7 @@ import subprocess
 import uuid
 import xml.etree.ElementTree as ET
 from dataclasses import asdict
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -1201,7 +1201,7 @@ def _spots_data_is_recent(last_sync_value: Any, *, now: datetime | None = None) 
         last_sync = datetime.fromisoformat(str(last_sync_value))
     except (TypeError, ValueError):
         return False
-    reference = now or datetime.utcnow()
+    reference = now or datetime.now(UTC).replace(tzinfo=None)
     if last_sync.tzinfo and reference.tzinfo is None:
         reference = reference.replace(tzinfo=last_sync.tzinfo)
     elif last_sync.tzinfo is None and reference.tzinfo is not None:
@@ -1223,8 +1223,8 @@ def _cancel_operation_source(db: Session, operation: BackgroundOperationModel) -
         if job is not None and job.status in {HIGHLIGHT_STATUS_QUEUED, "running"}:
             job.status = "cancelled"
             job.message = "Rendu des meilleurs moments annulé"
-            job.completed_at = datetime.utcnow()
-            job.cancelled_at = datetime.utcnow()
+            job.completed_at = datetime.now(UTC).replace(tzinfo=None)
+            job.cancelled_at = datetime.now(UTC).replace(tzinfo=None)
             db.commit()
     elif operation.source_kind == "youtube_upload":
         cancel_youtube_upload(db, job_id=source_id, user_id=operation.user_id)
@@ -1312,7 +1312,7 @@ def mark_background_operation_read(
     operation = get_user_operation(db, operation_id, user.id)
     if operation is None:
         raise HTTPException(status_code=404, detail="Operation not found")
-    operation.read_at = datetime.utcnow()
+    operation.read_at = datetime.now(UTC).replace(tzinfo=None)
     db.commit()
     db.refresh(operation)
     return BackgroundOperation.model_validate(operation_payload(operation))
@@ -2713,7 +2713,7 @@ def update_site_orientation(site_id: str, orientation: str, db: Session = Depend
 
     old_orientation = site.orientation
     site.orientation = orientation_upper
-    site.updated_at = datetime.utcnow()
+    site.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
     try:
         db.commit()
@@ -2794,7 +2794,7 @@ def update_site_camera(
             )
         site.camera_transition_percent = transition_percent
 
-    site.updated_at = datetime.utcnow()
+    site.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
     try:
         db.commit()
@@ -2839,7 +2839,7 @@ def update_site(site_id: str, site_data: SiteUpdate, db: Session = Depends(get_d
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
 
-    update_data = site_data.dict(exclude_unset=True)
+    update_data = site_data.model_dump(exclude_unset=True)
 
     # If code is being changed, check uniqueness
     if "code" in update_data and update_data["code"] != site.code:
@@ -2853,7 +2853,7 @@ def update_site(site_id: str, site_data: SiteUpdate, db: Session = Depends(get_d
     for field, value in update_data.items():
         setattr(site, field, value)
 
-    site.updated_at = datetime.utcnow()
+    site.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
     try:
         db.commit()
@@ -3409,7 +3409,7 @@ async def seed_sites_endpoint(db: Session = Depends(get_db)):
         ]
 
         created_sites = []
-        now = datetime.utcnow()
+        now = datetime.now(UTC).replace(tzinfo=None)
 
         for site_data in sites_data:
             # Check if site exists
@@ -3719,7 +3719,7 @@ async def _cache_emagram_analysis_marker(
         }
 
         redis_client = await get_redis()
-        await redis_client.setex(cache_key, cache_ttl, json.dumps(cache_value))
+        await redis_client.set(cache_key, json.dumps(cache_value), ex=cache_ttl)
     except Exception as cache_error:
         logger.warning("Failed to write emagram analysis cache marker: %s", cache_error)
 
@@ -5572,7 +5572,7 @@ async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session =
             )
 
     # 3. Update only provided fields (exclude_unset skips None values)
-    update_data = flight_data.dict(exclude_unset=True)
+    update_data = flight_data.model_dump(exclude_unset=True)
 
     gpx_metrics_excluded = update_data.get("gpx_metrics_excluded")
     if (
@@ -6245,7 +6245,7 @@ def cancel_flight_highlight_video(
         raise HTTPException(status_code=409, detail="Highlight video cannot be cancelled")
     job.status = "cancelled"
     job.message = "Rendu des meilleurs moments annulé"
-    job.completed_at = datetime.utcnow()
+    job.completed_at = datetime.now(UTC).replace(tzinfo=None)
     db.commit()
     db.refresh(job)
     return _highlight_job_payload(job)
@@ -6578,7 +6578,7 @@ async def upload_gpx_to_flight(
         flight.sportstracklive_uploaded_at = None
         flight.max_climb_rate_ms = None
         flight.max_sink_rate_ms = None
-        flight.updated_at = datetime.utcnow()
+        flight.updated_at = datetime.now(UTC).replace(tzinfo=None)
         try:
             _, points = normalize_track(gpx_content, "gpx")
             stats = calculate_track_stats(points)
@@ -6769,8 +6769,8 @@ async def create_flight_from_gpx(
             max_speed_kmh=stats.get("max_speed_kmh", 0),
             max_climb_rate_ms=vertical_stats["max_climb_rate_ms"],
             max_sink_rate_ms=vertical_stats["max_sink_rate_ms"],
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
+            updated_at=datetime.now(UTC).replace(tzinfo=None),
         )
 
         db.add(flight)
@@ -6904,8 +6904,10 @@ def get_alerts(spot_id: str | None = None, active: bool = False, db: Session = D
                             "title": "Poor Flying Conditions",
                             "message": f"{site.name}: Para-Index {recent_forecast.para_index}/100 - {recent_forecast.verdict}",
                             "spot_id": spot_id,
-                            "created_at": datetime.utcnow().isoformat(),
-                            "expires_at": (datetime.utcnow() + timedelta(hours=6)).isoformat(),
+                            "created_at": datetime.now(UTC).replace(tzinfo=None).isoformat(),
+                            "expires_at": (
+                                datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=6)
+                            ).isoformat(),
                         }
                     )
 
@@ -6918,8 +6920,10 @@ def get_alerts(spot_id: str | None = None, active: bool = False, db: Session = D
                             "title": "Strong Wind Warning",
                             "message": f"{site.name}: Wind gusts up to {recent_forecast.wind_max_kmh} km/h expected",
                             "spot_id": spot_id,
-                            "created_at": datetime.utcnow().isoformat(),
-                            "expires_at": (datetime.utcnow() + timedelta(hours=6)).isoformat(),
+                            "created_at": datetime.now(UTC).replace(tzinfo=None).isoformat(),
+                            "expires_at": (
+                                datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=6)
+                            ).isoformat(),
                         }
                     )
 
@@ -9203,7 +9207,7 @@ def create_weather_source(source_data: WeatherSourceConfigCreate, db: Session = 
         )
 
     # Create source
-    new_source = WeatherSourceConfig(id=str(uuid.uuid4()), **source_data.dict())
+    new_source = WeatherSourceConfig(id=str(uuid.uuid4()), **source_data.model_dump())
 
     db.add(new_source)
     db.commit()
@@ -9249,11 +9253,11 @@ def update_weather_source(
             )
 
     # Apply updates
-    update_data = source_data.dict(exclude_unset=True)
+    update_data = source_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(source, field, value)
 
-    source.updated_at = datetime.utcnow()
+    source.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
     db.commit()
     db.refresh(source)
@@ -9386,7 +9390,7 @@ async def test_weather_source(
                 response_time_ms=response_time_ms,
                 error=None,
                 sample_data=sample_data,
-                tested_at=datetime.utcnow(),
+                tested_at=datetime.now(UTC).replace(tzinfo=None),
             )
         else:
             return WeatherSourceTestResult(
@@ -9394,7 +9398,7 @@ async def test_weather_source(
                 response_time_ms=response_time_ms,
                 error=result.get("error", "Unknown error"),
                 sample_data=None,
-                tested_at=datetime.utcnow(),
+                tested_at=datetime.now(UTC).replace(tzinfo=None),
             )
 
     except Exception as e:
@@ -9406,7 +9410,7 @@ async def test_weather_source(
             response_time_ms=response_time_ms,
             error=str(e),
             sample_data=None,
-            tested_at=datetime.utcnow(),
+            tested_at=datetime.now(UTC).replace(tzinfo=None),
         )
 
 
@@ -9550,7 +9554,7 @@ async def get_latest_emagram(
             )
 
         # Filter by forecast target date
-        target_date = (datetime.utcnow() + timedelta(days=day_index)).date()
+        target_date = (datetime.now(UTC).replace(tzinfo=None) + timedelta(days=day_index)).date()
         cutoff_time = get_emagram_cutoff_utc(db=db)
 
         analysis_filters = [
@@ -9641,7 +9645,7 @@ async def get_emagram_hours(
     Returns a list of hours with their scores, used to populate the hour slider.
     """
     try:
-        target_date = (datetime.utcnow() + timedelta(days=day_index)).date()
+        target_date = (datetime.now(UTC).replace(tzinfo=None) + timedelta(days=day_index)).date()
         cutoff_time = get_emagram_cutoff_utc(db=db)
 
         analyses = (
@@ -9776,7 +9780,7 @@ async def get_emagram_history(
         GET /api/emagram/history?user_lat=45.76&user_lon=4.84&days=7
     """
     try:
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
 
         analyses = (
             db.query(EmagramAnalysis)
@@ -9830,7 +9834,7 @@ async def export_emagram_csv(
 
         from fastapi.responses import StreamingResponse
 
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
 
         analyses = (
             db.query(EmagramAnalysis)
@@ -10014,7 +10018,9 @@ async def trigger_emagram_analysis(
         operation.start_step("check_cache")
 
         # Step 2: Check for recent analysis (unless force_refresh)
-        forecast_date = (datetime.utcnow() + timedelta(days=request.day_index)).date()
+        forecast_date = (
+            datetime.now(UTC).replace(tzinfo=None) + timedelta(days=request.day_index)
+        ).date()
         cutoff_time = None if request.force_refresh else get_emagram_cutoff_utc(db=db)
 
         # Step 2a: If no specific hour, trigger hourly batch in background
@@ -10381,7 +10387,7 @@ async def _regenerate_emagram_screenshot(
         screenshot_topmeteo,
     )
 
-    day_index = (emagram.forecast_date - datetime.utcnow().date()).days
+    day_index = (emagram.forecast_date - datetime.now(UTC).replace(tzinfo=None).date()).days
     hour = emagram.forecast_hour
     if day_index < 0:
         return None
@@ -10498,13 +10504,13 @@ async def debug_gemini_api():
     Test Gemini API configuration and connectivity
     """
     try:
-        import google.generativeai as genai
+        from google import genai
     except ImportError:
         return {
             "success": False,
-            "error": "google-generativeai package not installed (optional dependency)",
+            "error": "google-genai package not installed (optional dependency)",
             "error_type": "ImportError",
-            "message": "Install with: pip install google-generativeai",
+            "message": "Install with: pip install google-genai",
         }
 
     try:
@@ -10518,11 +10524,13 @@ async def debug_gemini_api():
             return {"success": False, "error": "BACKEND_GOOGLE_API_KEY not set in environment"}
 
         # Configure and test
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(model_name)
+        client = genai.Client(api_key=api_key)
 
         # Simple test prompt
-        response = model.generate_content('Say hello in JSON format: {"message": "..."}')
+        response = client.models.generate_content(
+            model=model_name,
+            contents='Say hello in JSON format: {"message": "..."}',
+        )
 
         return {
             "success": True,

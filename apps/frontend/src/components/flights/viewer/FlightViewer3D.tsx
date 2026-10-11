@@ -733,8 +733,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       if (scene.light) {
         scene.light.intensity = lightIntensity;
       }
-    } catch (error) {
-      console.error('Error configuring terrain rendering:', error);
+    } catch {
+      // Keep the viewer usable when optional terrain settings are unsupported.
     }
   }, [terrainShadows, ambientOcclusion, sunTime, lightIntensity, viewerReady]);
 
@@ -927,8 +927,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       cameraTimers.push(setTimeout(() => positionCamera(), 500));
       // Re-position après calcul de l'offset (1.5s + 500ms)
       cameraTimers.push(setTimeout(() => positionCamera(), 2500));
-    } catch (err) {
-      console.error('Error loading GPX data:', err);
+    } catch {
+      // Missing flight data is surfaced through the existing viewer state.
     }
 
     return () => {
@@ -971,8 +971,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         ) {
           currentViewer.entities.remove(startEntityRef.current);
         }
-      } catch (e) {
-        console.debug('Cleanup warning:', e);
+      } catch {
+        // The viewer may already be disposed during component cleanup.
       }
 
       cursorEntityRef.current = null;
@@ -1146,8 +1146,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         }
         // Le flyTo se fera automatiquement via le useEffect qui dépend de elevationOffset
       }
-    } catch (error) {
-      console.error("Erreur lors du calcul de l'offset d'élévation:", error);
+    } catch {
+      // Keep the current offset when optional elevation data cannot be computed.
     } finally {
       if (isMountedRef.current && isActiveViewer(viewer)) {
         setIsCalculatingOffset(false);
@@ -1196,13 +1196,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     setIsPanelCollapsed(compact);
   }, [compact]);
 
-  const panelClassName = compact
-    ? isPanelCollapsed
-      ? 'p-1.5'
-      : 'p-2 max-w-[220px]'
-    : isPanelCollapsed
-      ? 'p-2'
-      : 'p-4 max-w-xs';
+  let panelClassName: string;
+  if (compact && isPanelCollapsed) panelClassName = 'p-1.5';
+  else if (compact) panelClassName = 'p-2 max-w-[220px]';
+  else if (isPanelCollapsed) panelClassName = 'p-2';
+  else panelClassName = 'p-4 max-w-xs';
 
   const fullscreenButtonClassName = compact
     ? 'px-2 py-1.5 text-xs'
@@ -1223,18 +1221,25 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const rootClassName = exportOnly
     ? 'flight-viewer-export-only absolute inset-0 h-full w-full overflow-hidden bg-black'
     : 'relative w-full overflow-hidden bg-gray-900';
+  let cameraDirectionLabel = '';
+  if (tempCameraAngle === 0)
+    cameraDirectionLabel = `(${t('flights.viewer.north')})`;
+  else if (tempCameraAngle === 90)
+    cameraDirectionLabel = `(${t('flights.viewer.east')})`;
+  else if (tempCameraAngle === 180)
+    cameraDirectionLabel = `(${t('flights.viewer.south')})`;
+  else if (tempCameraAngle === 270)
+    cameraDirectionLabel = `(${t('flights.viewer.west')})`;
 
   const toggleFullscreen = () => {
     if (!containerDivRef.current) return;
 
-    if (!isFullscreen) {
-      if (containerDivRef.current.requestFullscreen) {
-        containerDivRef.current.requestFullscreen();
-      }
-    } else {
+    if (isFullscreen) {
       if (document.exitFullscreen) {
         document.exitFullscreen();
       }
+    } else {
+      containerDivRef.current.requestFullscreen?.();
     }
   };
 
@@ -1722,8 +1727,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       // Refresh flight data to get updated site
       await queryClient.invalidateQueries({ queryKey: ['flights', flightId] });
-    } catch (error) {
-      console.error('❌ Failed to update orientation:', error);
+    } catch {
+      // The user receives the localized error toast below.
       toast.error(t('flights.viewer.orientationUpdateError'));
     } finally {
       setIsUpdatingOrientation(false);
@@ -1737,7 +1742,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     transitionPercent: number
   ): Promise<boolean> => {
     if (!flight?.site?.id) {
-      console.error('No site ID available');
       return false;
     }
 
@@ -1777,11 +1781,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       );
 
       // Keep playback stable and do not trigger a full viewer reload.
-      console.log(
-        `✅ Camera settings saved for site "${flight?.site?.name}": ${angle}° / ${distance}m`
-      );
-    } catch (error) {
-      console.error('Failed to update camera settings:', error);
+    } catch {
       toast.error(t('flights.viewer.cameraUpdateError'));
       return false;
     } finally {
@@ -2231,15 +2231,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                       <div className="mb-2">
                         <label className="block text-xs text-gray-600 dark:text-gray-300 mb-1">
                           {t('editSite.angle')}: {tempCameraAngle}°{' '}
-                          {tempCameraAngle === 0
-                            ? `(${t('flights.viewer.north')})`
-                            : tempCameraAngle === 90
-                              ? `(${t('flights.viewer.east')})`
-                              : tempCameraAngle === 180
-                                ? `(${t('flights.viewer.south')})`
-                                : tempCameraAngle === 270
-                                  ? `(${t('flights.viewer.west')})`
-                                  : ''}
+                          {cameraDirectionLabel}
                         </label>
                         <input
                           type="range"

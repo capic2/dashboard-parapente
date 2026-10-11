@@ -209,7 +209,7 @@ MixedConditions.test(
   'displays mixed conditions correctly',
   async ({ canvas }) => {
     // Wait for data to load
-    await canvas.findByText(/85/);
+    await canvas.findByText(/85/u);
 
     // Verify para_index values for all 7 days (these are unique identifiers)
     await expect(canvas.getByText('85')).toBeInTheDocument();
@@ -224,7 +224,7 @@ MixedConditions.test(
     await expect(canvas.getByText('15° - 25°')).toBeInTheDocument();
 
     // Verify wind speed for first day
-    await expect(canvas.getByText(/12 km\/h/)).toBeInTheDocument();
+    await expect(canvas.getByText(/12 km\/h/u)).toBeInTheDocument();
 
     // Verify mixed verdicts exist (multiple instances expected)
     const bonElements = canvas.getAllByText('bon');
@@ -261,7 +261,7 @@ AllGoodConditions.test(
   'displays all good conditions correctly',
   async ({ canvas }) => {
     // Wait for data to load
-    await canvas.findByText(/85/);
+    await canvas.findByText(/85/u);
 
     // Verify all days show "bon" verdict (should appear 3 times)
     const bonElements = canvas.getAllByText('bon');
@@ -276,7 +276,7 @@ AllGoodConditions.test(
     await expect(canvas.getByText('18° - 28°')).toBeInTheDocument();
 
     // Verify wind speed for first day
-    await expect(canvas.getByText(/12 km\/h/)).toBeInTheDocument();
+    await expect(canvas.getByText(/12 km\/h/u)).toBeInTheDocument();
   }
 );
 
@@ -302,7 +302,7 @@ AllBadConditions.test(
   'displays all bad conditions correctly',
   async ({ canvas }) => {
     // Wait for data to load
-    await canvas.findByText(/25/);
+    await canvas.findByText(/25/u);
 
     // Verify all days show "mauvais" verdict (should appear 3 times)
     const mauvaisElements = canvas.getAllByText('mauvais');
@@ -317,7 +317,7 @@ AllBadConditions.test(
     await expect(canvas.getByText('8° - 15°')).toBeInTheDocument();
 
     // Verify wind speed for first day
-    await expect(canvas.getByText(/40 km\/h/)).toBeInTheDocument();
+    await expect(canvas.getByText(/40 km\/h/u)).toBeInTheDocument();
   }
 );
 
@@ -498,7 +498,7 @@ export const ShowsLoadingState = meta.story({
 
 ShowsLoadingState.test('shows loading state', async ({ canvas }) => {
   await waitFor(() => {
-    expect(canvas.getByText(/Chargement\.\.\./)).toBeInTheDocument();
+    expect(canvas.getByText(/Chargement\.\.\./u)).toBeInTheDocument();
   });
 });
 
@@ -520,7 +520,7 @@ export const ShowsErrorState = meta.story({
 
 ShowsErrorState.test('shows error state', async ({ canvas }) => {
   await waitFor(() => {
-    expect(canvas.getByText(/Données non disponibles/)).toBeInTheDocument();
+    expect(canvas.getByText(/Données non disponibles/u)).toBeInTheDocument();
   });
 });
 

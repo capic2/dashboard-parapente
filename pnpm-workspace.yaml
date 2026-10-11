@@ -5,6 +5,10 @@ packages:
 enableGlobalVirtualStore: false
 minimumReleaseAge: 0
 
+overrides:
+  react: 19.3.0
+  react-dom: 19.3.0
+
 allowBuilds:
   core-js: true
   esbuild: true

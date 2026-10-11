@@ -48,7 +48,7 @@ export function getHeadingFromOrientation(orientation?: string): number | null {
   if (!orientation) return null;
 
   const heading = ORIENTATION_TO_HEADING[orientation.toUpperCase()];
-  return heading !== undefined ? heading : null;
+  return heading === undefined ? null : heading;
 }
 
 /**

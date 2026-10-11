@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Dialog, Modal, ModalOverlay, Button } from 'react-aria-components';
+import {
+  Dialog,
+  Modal,
+  ModalOverlay,
+  Button,
+  Heading,
+} from 'react-aria-components';
 import { tv } from 'tailwind-variants';
 
 const lightbox = tv({
@@ -162,10 +168,10 @@ export function Lightbox({
                   {prevIcon}
                 </Button>
               )}
-              <span className={styles.caption()}>
+              <Heading slot="title" className={styles.caption()}>
                 {current.alt}
                 {multi && ` (${safeIndex + 1}/${images.length})`}
-              </span>
+              </Heading>
               {multi && (
                 <Button
                   aria-label="Image suivante"

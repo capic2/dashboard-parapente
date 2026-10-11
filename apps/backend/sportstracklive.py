@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import requests
@@ -99,7 +99,7 @@ def upload_flight(
 
     upload_key, secret_key = _credential_for_upload(db, user_id)
     if not already_claimed:
-        now = datetime.utcnow()
+        now = datetime.now(UTC).replace(tzinfo=None)
         stale_upload_before = now - _STALE_UPLOAD_AFTER
         claimed = (
             db.query(Flight)
@@ -141,7 +141,7 @@ def upload_flight(
             raise HTTPException(status_code=409, detail=detail)
         flight.sportstracklive_status = "uploading"
         flight.sportstracklive_error = None
-        flight.sportstracklive_upload_started_at = datetime.utcnow()
+        flight.sportstracklive_upload_started_at = datetime.now(UTC).replace(tzinfo=None)
         db.commit()
 
     else:
@@ -202,7 +202,7 @@ def upload_flight(
     flight.sportstracklive_track_id = track_id
     flight.sportstracklive_error = None
     flight.sportstracklive_upload_started_at = None
-    flight.sportstracklive_uploaded_at = datetime.utcnow()
+    flight.sportstracklive_uploaded_at = datetime.now(UTC).replace(tzinfo=None)
     db.commit()
     return {
         "success": True,
@@ -242,8 +242,10 @@ def _run_automatic_upload(flight_id: str, user_id: int) -> None:
             .update(
                 {
                     Flight.sportstracklive_status: "uploading",
-                    Flight.sportstracklive_upload_started_at: datetime.utcnow(),
-                    Flight.updated_at: datetime.utcnow(),
+                    Flight.sportstracklive_upload_started_at: datetime.now(UTC).replace(
+                        tzinfo=None
+                    ),
+                    Flight.updated_at: datetime.now(UTC).replace(tzinfo=None),
                 },
                 synchronize_session=False,
             )

@@ -19,7 +19,7 @@ permissions:
 jobs:
   main:
     name: main
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -43,20 +43,21 @@ jobs:
             nx-${{ runner.os }}-
 
       - name: 📦 Setup pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: 🔧 Setup Node.js
-        uses: actions/setup-node@v7
+        uses: pnpm/setup@v3
         with:
-          node-version: '24'
-          cache: 'pnpm'
+          runtime: node@24
+          cache: true
+          cache-dependency-path: pnpm-lock.yaml
+          install: false
 
       - name: 🐍 Setup Python
         uses: actions/setup-python@v7
         with:
-          python-version: "3.15"
-          cache: "pip"
-          cache-dependency-path: apps/backend/requirements.txt
+          python-version: '3.15'
+          cache: 'pip'
+          cache-dependency-path: |
+            apps/backend/requirements.txt
+            apps/backend/constraints.txt
 
       - name: 📦 Install dependencies
         run: pnpm install --frozen-lockfile
@@ -64,7 +65,7 @@ jobs:
       - name: 📦 Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          cd apps/backend && pip install -r requirements.txt
+          cd apps/backend && pip install -c constraints.txt -r requirements.txt
 
       - name: 💾 Cache Playwright browsers
         id: playwright-cache-main
@@ -208,7 +209,7 @@ jobs:
 
   e2e:
     name: E2E Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     if: github.event_name == 'pull_request'
     env:
@@ -229,20 +230,21 @@ jobs:
             nx-${{ runner.os }}-
 
       - name: 📦 Setup pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: 🔧 Setup Node.js
-        uses: actions/setup-node@v7
+        uses: pnpm/setup@v3
         with:
-          node-version: '24'
-          cache: 'pnpm'
+          runtime: node@24
+          cache: true
+          cache-dependency-path: pnpm-lock.yaml
+          install: false
 
       - name: 🐍 Setup Python
         uses: actions/setup-python@v7
         with:
-          python-version: "3.15"
-          cache: "pip"
-          cache-dependency-path: apps/backend/requirements.txt
+          python-version: '3.15'
+          cache: 'pip'
+          cache-dependency-path: |
+            apps/backend/requirements.txt
+            apps/backend/constraints.txt
 
       - name: 📦 Install dependencies
         run: pnpm install --frozen-lockfile
@@ -250,7 +252,7 @@ jobs:
       - name: 📦 Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          cd apps/backend && pip install -r requirements.txt
+          cd apps/backend && pip install -c constraints.txt -r requirements.txt
 
       - name: 💾 Cache Playwright browsers
         id: playwright-cache-e2e

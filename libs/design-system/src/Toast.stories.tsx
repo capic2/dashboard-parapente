@@ -56,7 +56,7 @@ Success.test(
 
     // Find and click the close button
     const closeButton = canvas.getByRole('button', {
-      name: /fermer la notification/i,
+      name: /fermer la notification/iu,
     });
     await userEvent.click(closeButton);
 

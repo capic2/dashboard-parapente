@@ -218,6 +218,7 @@ vi.mock('@dashboard-parapente/design-system', () => ({
 }));
 
 vi.mock('react-aria-components', () => ({
+  Heading: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
   Disclosure: ({
     children,
   }: {

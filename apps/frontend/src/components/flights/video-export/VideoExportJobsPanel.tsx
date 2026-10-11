@@ -451,14 +451,12 @@ function getLastLogMetrics(job: VideoExportJob) {
     ? Number.parseFloat(etaMatch[1].replace(',', '.'))
     : undefined;
   const etaUnit = etaMatch?.[2]?.toLowerCase();
-  const etaSeconds =
-    typeof etaValue === 'number' && Number.isFinite(etaValue)
-      ? etaUnit === 'h'
-        ? etaValue * 3600
-        : etaUnit === 'min'
-          ? etaValue * 60
-          : etaValue
-      : undefined;
+  let etaSeconds: number | undefined;
+  if (typeof etaValue === 'number' && Number.isFinite(etaValue)) {
+    etaSeconds = etaValue;
+    if (etaUnit === 'h') etaSeconds *= 3600;
+    else if (etaUnit === 'min') etaSeconds *= 60;
+  }
 
   return { fps, etaSeconds };
 }
@@ -773,11 +771,14 @@ export function VideoExportJobsPanel({
   const handleDownload = useCallback(
     async (job: VideoExportJob) => {
       try {
-        const endpoint = isGoproOverlayJob(job)
-          ? `gopro-overlays/jobs/${job.job_id}/download`
-          : isHighlightJob(job)
-            ? `flights/${job.flight_id}/highlight-videos/${job.job_id}/download`
-            : `exports/${job.job_id}/download`;
+        let endpoint: string;
+        if (isGoproOverlayJob(job)) {
+          endpoint = `gopro-overlays/jobs/${job.job_id}/download`;
+        } else if (isHighlightJob(job)) {
+          endpoint = `flights/${job.flight_id}/highlight-videos/${job.job_id}/download`;
+        } else {
+          endpoint = `exports/${job.job_id}/download`;
+        }
         const response = await api.get(endpoint, { timeout: false });
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);

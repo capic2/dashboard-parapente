@@ -76,7 +76,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
   const handleCreate = async () => {
     const lat = parseFloat(latitude);
     const lon = parseFloat(longitude);
-    const elev = elevation ? parseInt(elevation) : undefined;
+    const elev = elevation ? parseInt(elevation, 10) : undefined;
 
     if (!siteName.trim()) {
       setError(t('createSite.nameRequired'));

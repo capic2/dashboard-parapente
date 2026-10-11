@@ -72,6 +72,6 @@ export const WithTooltip = meta.story({
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.hover(await canvas.findByText(/15\s+janv\.?/i));
+    await userEvent.hover(await canvas.findByText(/15\s+janv\.?/iu));
   },
 });

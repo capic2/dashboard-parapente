@@ -5,11 +5,8 @@ type ApiErrorPayload = {
   detail?: unknown;
 };
 
-// API logging: enabled in dev, disabled in tests via overrideApi({ logs: false })
-let _apiLogsEnabled = import.meta.env.DEV;
-
-const apiBaseUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
-const appBasePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+const apiBaseUrl = import.meta.env.VITE_API_URL?.replace(/\/$/u, '');
+const appBasePath = import.meta.env.BASE_URL.replace(/\/$/u, '');
 const apiPrefix = apiBaseUrl ? `${apiBaseUrl}/api` : `${appBasePath}/api`;
 
 export function getApiUrl(path: string) {
@@ -55,15 +52,10 @@ export let api = ky.create({
         if (token) {
           request.headers.set('Authorization', `Bearer ${token}`);
         }
-
-        // Log requêtes en dev (désactivé en test via overrideApi)
-        if (_apiLogsEnabled) {
-          console.log(`[API] ${request.method} ${request.url}`);
-        }
       },
     ],
     afterResponse: [
-      async ({ request, response }) => {
+      ({ response }) => {
         // On 401, clear auth and redirect to login
         if (response.status === 401) {
           const { isAuthenticated, logout } = useAuthStore.getState();
@@ -73,28 +65,15 @@ export let api = ky.create({
           }
         }
 
-        // Log des erreurs en dev (désactivé en test via overrideApi)
-        if (!response.ok && _apiLogsEnabled) {
-          console.error(
-            `[API Error] ${request.method} ${request.url}:`,
-            response.status
-          );
-        }
         return response;
       },
     ],
   },
 });
 
-// Override api configuration (used by test setup to disable retry and logs)
-export function overrideApi(
-  options: Parameters<typeof api.extend>[0] & { logs?: boolean }
-) {
-  const { logs, ...kyOptions } = options;
-  if (logs !== undefined) {
-    _apiLogsEnabled = logs;
-  }
-  api = api.extend(kyOptions);
+// Override API configuration in tests.
+export function overrideApi(options: Parameters<typeof api.extend>[0]) {
+  api = api.extend(options);
 }
 
 export async function getApiErrorMessage(error: unknown, fallback: string) {

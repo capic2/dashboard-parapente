@@ -129,7 +129,7 @@ Default.test(
 
     const canvas = within(canvasElement);
     const economyButton = await canvas.findByRole('button', {
-      name: /Économie/,
+      name: /Économie/u,
     });
     await userEvent.click(economyButton);
 
@@ -146,7 +146,7 @@ Default.test(
 
     const canvas = within(canvasElement);
     const autoRefreshCheckbox = await canvas.findByRole('checkbox', {
-      name: /Rafraîchissement automatique de la météo/,
+      name: /Rafraîchissement automatique de la météo/u,
     });
     await userEvent.click(autoRefreshCheckbox);
     await expect(useCacheSettingsStore.getState().autoRefreshWeather).toBe(

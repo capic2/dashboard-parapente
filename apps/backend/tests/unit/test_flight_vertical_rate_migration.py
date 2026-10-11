@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 from datetime import date
 from pathlib import Path
 
@@ -24,14 +25,14 @@ def apply_migration(connection: sqlite3.Connection) -> None:
 
 
 def test_migration_adds_vertical_rate_columns_idempotently() -> None:
-    connection = sqlite3.connect(":memory:")
-    connection.execute("CREATE TABLE flights (id VARCHAR PRIMARY KEY)")
+    with closing(sqlite3.connect(":memory:")) as connection:
+        connection.execute("CREATE TABLE flights (id VARCHAR PRIMARY KEY)")
 
-    apply_migration(connection)
-    apply_migration(connection)
+        apply_migration(connection)
+        apply_migration(connection)
 
-    columns = {row[1] for row in connection.execute("PRAGMA table_info(flights)")}
-    assert {"max_climb_rate_ms", "max_sink_rate_ms"} <= columns
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(flights)")}
+        assert {"max_climb_rate_ms", "max_sink_rate_ms"} <= columns
 
 
 def test_backfill_refreshes_all_persisted_vertical_rates(

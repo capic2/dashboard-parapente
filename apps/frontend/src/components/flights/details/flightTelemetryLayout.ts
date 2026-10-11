@@ -381,40 +381,37 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
       visible: element.getAttribute('visible') !== 'false',
     };
     const groupId = element.getAttribute('group');
-    const grouping = groupId
-      ? {
-          groupId,
-          ...(groupNames.get(groupId)
-            ? { groupName: groupNames.get(groupId) ?? undefined }
-            : {}),
-        }
-      : {};
+    const grouping: Record<string, unknown> = {};
+    if (groupId) {
+      grouping.groupId = groupId;
+      const groupName = groupNames.get(groupId);
+      if (groupName) grouping.groupName = groupName;
+    }
     const name = element.getAttribute('label');
     const naming = name ? { name } : {};
     const backgroundAttribute = element.getAttribute('background');
     const borderAttribute = element.getAttribute('border');
-    const styling = {
-      ...(backgroundAttribute === 'transparent'
-        ? { transparent: true }
-        : backgroundAttribute === 'solid'
-          ? { transparent: false }
-          : {}),
-      ...(borderAttribute === 'true'
-        ? { border: true }
-        : borderAttribute === 'false'
-          ? { border: false }
-          : {}),
-      ...(element.getAttribute('label-visible') === 'false'
-        ? { showLabel: false }
-        : {}),
-      ...(type === 'widget' && element.getAttribute('unit-visible') === 'false'
-        ? { showUnit: false }
-        : {}),
-      ...(element.getAttribute('font-size') !== null &&
-      Number.isFinite(Number(element.getAttribute('font-size')))
-        ? { fontSize: Number(element.getAttribute('font-size')) }
-        : {}),
-    };
+    const styling: Record<string, unknown> = {};
+    if (backgroundAttribute === 'transparent') {
+      styling.transparent = true;
+    } else if (backgroundAttribute === 'solid') {
+      styling.transparent = false;
+    }
+    if (borderAttribute === 'true') {
+      styling.border = true;
+    } else if (borderAttribute === 'false') {
+      styling.border = false;
+    }
+    if (element.getAttribute('label-visible') === 'false') {
+      styling.showLabel = false;
+    }
+    if (type === 'widget' && element.getAttribute('unit-visible') === 'false') {
+      styling.showUnit = false;
+    }
+    const rawFontSize = element.getAttribute('font-size');
+    if (rawFontSize !== null && Number.isFinite(Number(rawFontSize))) {
+      styling.fontSize = Number(rawFontSize);
+    }
     const interactions =
       type === 'widget'
         ? {
@@ -468,50 +465,56 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
           }
         : {};
     if (type === 'icon') {
-      return {
-        ...common,
-        ...grouping,
-        ...naming,
-        ...styling,
-        ...interactions,
-        ...variant,
-        ...valueAlign,
-        type: 'icon' as const,
-        icon: ICONS.includes(element.getAttribute('name') as TelemetryIconName)
-          ? (element.getAttribute('name') as TelemetryIconName)
-          : 'gauge',
-      };
+      return Object.assign(
+        {},
+        common,
+        grouping,
+        naming,
+        styling,
+        interactions,
+        variant,
+        valueAlign,
+        {
+          type: 'icon' as const,
+          icon: ICONS.includes(
+            element.getAttribute('name') as TelemetryIconName
+          )
+            ? (element.getAttribute('name') as TelemetryIconName)
+            : 'gauge',
+        }
+      ) as FlightTelemetryLayoutItem;
     }
     if (type === 'text') {
-      return {
-        ...common,
-        ...grouping,
-        ...naming,
-        ...styling,
-        ...interactions,
-        ...variant,
-        ...textAlign,
-        type: 'text' as const,
-        content: element.getAttribute('content') ?? '',
-      };
+      return Object.assign(
+        {},
+        common,
+        grouping,
+        naming,
+        styling,
+        interactions,
+        variant,
+        textAlign,
+        {
+          type: 'text' as const,
+          content: element.getAttribute('content') ?? '',
+        }
+      ) as FlightTelemetryLayoutItem;
     }
     if (type === 'pip') {
       const rawSource = element.getAttribute('source');
-      const source: TelemetryPipVideoSource =
-        rawSource === 'camera'
-          ? 'file:face'
-          : rawSource === 'flight'
-            ? 'file:vol'
-            : TELEMETRY_PIP_VIDEO_SOURCES.includes(
-                  rawSource as TelemetryPipVideoSource
-                )
-              ? (rawSource as TelemetryPipVideoSource)
-              : DEFAULT_TELEMETRY_PIP_VIDEO_SOURCE;
-      return {
-        ...common,
-        ...grouping,
-        ...naming,
-        ...styling,
+      let source = DEFAULT_TELEMETRY_PIP_VIDEO_SOURCE;
+      if (rawSource === 'camera') {
+        source = 'file:face';
+      } else if (rawSource === 'flight') {
+        source = 'file:vol';
+      } else if (
+        TELEMETRY_PIP_VIDEO_SOURCES.includes(
+          rawSource as TelemetryPipVideoSource
+        )
+      ) {
+        source = rawSource as TelemetryPipVideoSource;
+      }
+      return Object.assign({}, common, grouping, naming, styling, {
         type: 'pip' as const,
         action: PIP_ACTIONS.includes(
           element.getAttribute('action') as TelemetryPipAction
@@ -520,19 +523,22 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
           : 'switch_video',
         source,
         applyOffset: element.getAttribute('apply-offset') !== 'false',
-      };
+      }) as FlightTelemetryLayoutItem;
     }
-    return {
-      ...common,
-      ...grouping,
-      ...naming,
-      ...styling,
-      ...interactions,
-      ...variant,
-      ...valueAlign,
-      type: 'widget' as const,
-      metric: METRIC_KEYS.includes(metric) ? metric : fallback.metric,
-    };
+    return Object.assign(
+      {},
+      common,
+      grouping,
+      naming,
+      styling,
+      interactions,
+      variant,
+      valueAlign,
+      {
+        type: 'widget' as const,
+        metric: METRIC_KEYS.includes(metric) ? metric : fallback.metric,
+      }
+    ) as FlightTelemetryLayoutItem;
   });
   return withLayoutMetadata(
     parsed,
@@ -577,18 +583,18 @@ export function serializeTelemetryLayoutXml(
     .map((item) => {
       const name = item.name ? ` label="${escapeXml(item.name)}"` : '';
       const group = item.groupId ? ` group="${escapeXml(item.groupId)}"` : '';
-      const background =
-        item.transparent === true
-          ? ' background="transparent"'
-          : item.transparent === false
-            ? ' background="solid"'
-            : '';
-      const border =
-        item.border === true
-          ? ' border="true"'
-          : item.border === false
-            ? ' border="false"'
-            : '';
+      let background = '';
+      if (item.transparent === true) {
+        background = ' background="transparent"';
+      } else if (item.transparent === false) {
+        background = ' background="solid"';
+      }
+      let border = '';
+      if (item.border === true) {
+        border = ' border="true"';
+      } else if (item.border === false) {
+        border = ' border="false"';
+      }
       const labelVisibility =
         item.showLabel === false ? ' label-visible="false"' : '';
       const unitVisibility =
@@ -666,7 +672,7 @@ function withLayoutMetadata(
 
 function escapeXml(value: string) {
   return value.replace(
-    /[<>&'"]/g,
+    /[<>&'"]/gu,
     (character) =>
       ({
         '<': '&lt;',

@@ -5,7 +5,7 @@ Coordinates verified from paragliding_spots database (merged OpenAIP + Paraglidi
 """
 
 import sqlite3
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "db" / "dashboard.db"
@@ -22,7 +22,7 @@ def seed_sites():
     cursor = conn.cursor()
 
     try:
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(UTC).replace(tzinfo=None).isoformat()
 
         # Define the 6 sites with precise coordinates
         sites = [

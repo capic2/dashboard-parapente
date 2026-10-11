@@ -1,5 +1,6 @@
 import logging
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 from database import DB_PATH
@@ -21,7 +22,7 @@ def run_migrations(migrations_dir: Path | None = None) -> None:
         return
 
     logger.info("Running %d migration(s)...", len(migration_files))
-    with sqlite3.connect(str(DB_PATH)) as conn:
+    with closing(sqlite3.connect(str(DB_PATH))) as conn:
         cursor = conn.cursor()
         for migration_file in migration_files:
             logger.info("Applying migration: %s", migration_file.name)

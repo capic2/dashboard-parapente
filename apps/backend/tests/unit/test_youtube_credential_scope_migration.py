@@ -18,3 +18,4 @@ def test_migration_marks_existing_credentials_with_legacy_upload_scope() -> None
         "SELECT oauth_scope FROM youtube_credentials WHERE user_id = 1"
     ).fetchone()
     assert credential == ("https://www.googleapis.com/auth/youtube.upload",)
+    connection.close()

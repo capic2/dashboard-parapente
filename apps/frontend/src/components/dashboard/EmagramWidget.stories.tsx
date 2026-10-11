@@ -151,17 +151,17 @@ export const Default = meta.story({
 
 Default.test('displays emagram score and metrics', async ({ canvas }) => {
   await userEvent.click(
-    await canvas.findByRole('button', { name: /Analyse 14h/ })
+    await canvas.findByRole('button', { name: /Analyse 14h/u })
   );
-  await canvas.findByText(/75/);
-  await expect(canvas.getByText(/Arguel/)).toBeInTheDocument();
-  const explanationButton = canvas.getByLabelText(/Comment l'IA a analysé/);
+  await canvas.findByText(/75/u);
+  await expect(canvas.getByText(/Arguel/u)).toBeInTheDocument();
+  const explanationButton = canvas.getByLabelText(/Comment l'IA a analysé/u);
   await expect(explanationButton).toBeInTheDocument();
 
   await userEvent.click(explanationButton);
 
   await expect(
-    await within(document.body).findByText(/Lecture par émagramme/)
+    await within(document.body).findByText(/Lecture par émagramme/u)
   ).toBeInTheDocument();
 });
 
@@ -200,9 +200,9 @@ export const AnalysisInProgress = meta.story({
 
 AnalysisInProgress.test('shows analysis in progress', async ({ canvas }) => {
   await userEvent.click(
-    await canvas.findByRole('button', { name: /Analyse 12h en attente/ })
+    await canvas.findByRole('button', { name: /Analyse 12h en attente/u })
   );
-  await canvas.findByText(/Analyse en cours/);
+  await canvas.findByText(/Analyse en cours/u);
 });
 
 export const Error = meta.story({
@@ -238,9 +238,9 @@ export const Error = meta.story({
 
 Error.test('displays error message', async ({ canvas }) => {
   await userEvent.click(
-    await canvas.findByRole('button', { name: /Analyse 12h en attente/ })
+    await canvas.findByRole('button', { name: /Analyse 12h en attente/u })
   );
-  await canvas.findByText(/Erreur/);
+  await canvas.findByText(/Erreur/u);
 });
 
 export const DifferentDay = meta.story({
@@ -254,11 +254,11 @@ export const DifferentDay = meta.story({
 DifferentDay.test(
   'asks to choose an hour before analysis',
   async ({ canvas }) => {
-    await canvas.findByText(/Choisissez une heure/);
-    await expect(canvas.getByText(/11h/)).toBeInTheDocument();
-    await expect(canvas.getByText(/14h/)).toBeInTheDocument();
+    await canvas.findByText(/Choisissez une heure/u);
+    await expect(canvas.getByText(/11h/u)).toBeInTheDocument();
+    await expect(canvas.getByText(/14h/u)).toBeInTheDocument();
     await expect(
-      canvas.queryByRole('button', { name: /Afficher l'émagramme/ })
+      canvas.queryByRole('button', { name: /Afficher l'émagramme/u })
     ).not.toBeInTheDocument();
   }
 );
@@ -272,7 +272,7 @@ export const NoSite = meta.story({
 });
 
 NoSite.test('shows no site message', async ({ canvas }) => {
-  await canvas.findByText(/Aucun site/);
+  await canvas.findByText(/Aucun site/u);
 });
 
 export const Loading = meta.story({
@@ -305,9 +305,9 @@ export const Loading = meta.story({
 
 Loading.test('shows loading after choosing an hour', async ({ canvas }) => {
   await userEvent.click(
-    await canvas.findByRole('button', { name: /Analyse 12h en attente/ })
+    await canvas.findByRole('button', { name: /Analyse 12h en attente/u })
   );
-  await canvas.findByText(/Analyse en cours/);
+  await canvas.findByText(/Analyse en cours/u);
 });
 
 export const HoursWithoutAnalysis = meta.story({
@@ -326,16 +326,16 @@ export const HoursWithoutAnalysis = meta.story({
 HoursWithoutAnalysis.test(
   'starts analysis only after choosing an hour',
   async ({ canvas }) => {
-    await canvas.findByText(/9h/);
-    await expect(canvas.getByText(/12h/)).toBeInTheDocument();
-    await expect(canvas.getByText(/15h/)).toBeInTheDocument();
-    await expect(canvas.getByText(/Choisissez une heure/)).toBeInTheDocument();
+    await canvas.findByText(/9h/u);
+    await expect(canvas.getByText(/12h/u)).toBeInTheDocument();
+    await expect(canvas.getByText(/15h/u)).toBeInTheDocument();
+    await expect(canvas.getByText(/Choisissez une heure/u)).toBeInTheDocument();
     await expect(
-      canvas.queryByText(/Analyse en cours/)
+      canvas.queryByText(/Analyse en cours/u)
     ).not.toBeInTheDocument();
 
-    await userEvent.click(canvas.getByRole('button', { name: /Analyse 12h/ }));
-    await canvas.findByText(/Analyse en cours/);
+    await userEvent.click(canvas.getByRole('button', { name: /Analyse 12h/u }));
+    await canvas.findByText(/Analyse en cours/u);
   }
 );
 
@@ -388,13 +388,13 @@ export const HourFailedTooltip = meta.story({
 
 HourFailedTooltip.test('shows tooltip for failed hour', async ({ canvas }) => {
   const failedHourButton = await canvas.findByRole('button', {
-    name: /Échec analyse 14h : Timeout fournisseur LLM/,
+    name: /Échec analyse 14h : Timeout fournisseur LLM/u,
   });
 
   await userEvent.hover(failedHourButton);
 
   const tooltip = await within(document.body).findByText(
-    /Échec analyse 14h : Timeout fournisseur LLM/
+    /Échec analyse 14h : Timeout fournisseur LLM/u
   );
 
   await expect(tooltip).toBeInTheDocument();
