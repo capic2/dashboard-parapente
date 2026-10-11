@@ -951,6 +951,25 @@ jobs:
               core.info(`Published release summary: ${created.data.html_url}`);
             }
 
+      - name: Clean old deployment version labels
+        if: steps.mark_deployment_successful.outcome == 'success'
+        id: cleanup_deployment_version_labels
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_LABELS_TO_KEEP: '500'
+        run: bash .github/scripts/cleanup-deployment-version-labels.sh
+
+      - name: Report deployment label cleanup warning
+        if: steps.mark_deployment_successful.outcome == 'success' && steps.cleanup_deployment_version_labels.outcome == 'failure'
+        run: |
+          echo "::warning::Production deployment succeeded, but old deployment version labels could not be cleaned."
+          {
+            echo "### Deployment label cleanup needs attention"
+            echo
+            echo "The production deployment succeeded, but pruning old version labels failed. Run the **Clean old deployment version labels** workflow to retry."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Label merged PRs as non deployed when deployment fails
         if: >-
           always() && steps.freshness.outputs.is_current == 'true' && (

@@ -1,0 +1,30 @@
+name: Clean old deployment version labels
+
+on:
+  schedule:
+    - cron: '41 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Keep deployment labels below the Mergify limit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout cleanup script
+        uses: actions/checkout@v7
+
+      - name: Prune old deployment version labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_LABELS_TO_KEEP: '500'
+        run: bash .github/scripts/cleanup-deployment-version-labels.sh

@@ -145,6 +145,46 @@ jobs:
           BACKEND_JWT_SECRET: ci-test-secret-not-for-production
           VITE_CESIUM_ION_TOKEN: ${{ secrets.VITE_CESIUM_ION_TOKEN }}
 
+      - name: 📋 Summarize backend test results
+        if: always() && hashFiles('coverage/apps/backend/junit.xml') != ''
+        run: |
+          python - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          report = ET.parse("coverage/apps/backend/junit.xml")
+          test_cases = report.findall(".//testcase")
+          failures = [
+              case
+              for case in test_cases
+              if case.find("failure") is not None or case.find("error") is not None
+          ]
+          skipped = sum(case.find("skipped") is not None for case in test_cases)
+          passed = len(test_cases) - len(failures) - skipped
+
+          lines = [
+              "## Backend test results",
+              "",
+              "| Passed | Failed | Skipped | Total |",
+              "| ---: | ---: | ---: | ---: |",
+              f"| {passed} | {len(failures)} | {skipped} | {len(test_cases)} |",
+          ]
+
+          if failures:
+              lines.extend(["", "### Failed tests", ""])
+              for case in failures:
+                  name = f"{case.get('classname', '')}::{case.get('name', 'unknown')}"
+                  detail = case.find("failure")
+                  if detail is None:
+                      detail = case.find("error")
+                  message = (detail.get("message") or "").strip() if detail is not None else ""
+                  lines.append(f"- `{name}`" + (f": {message}" if message else ""))
+
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
+              summary.write("\n".join(lines) + "\n")
+          PY
+
       - name: 📊 Upload frontend coverage
         if: always() && env.CODECOV_TOKEN != ''
         uses: codecov/codecov-action@v7
