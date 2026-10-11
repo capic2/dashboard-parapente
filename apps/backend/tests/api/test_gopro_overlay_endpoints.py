@@ -2043,7 +2043,7 @@ def test_create_flight_gopro_overlay_job_resolves_relative_paths(
         "created_at": "2026-01-01T00:00:00+00:00",
         "updated_at": "2026-01-01T00:00:00+00:00",
     }
-    monkeypatch.setattr(routes, "__file__", str(backend_root / "routes.py"))
+    monkeypatch.setattr("flight_file_paths.__file__", str(backend_root / "flight_file_paths.py"))
 
     with (
         patch(

@@ -110,11 +110,20 @@ def test_export_youtube_overlay_renders_saved_overlay_directly_onto_source(tmp_p
         offset_seconds,
         output_directory,
         progress,
+        pip_video_path=None,
+        pip_apply_offset=True,
     ):
         calls.append(
             (
                 "render",
-                (overlay_job_id, source_video_path, offset_seconds, output_directory),
+                (
+                    overlay_job_id,
+                    source_video_path,
+                    offset_seconds,
+                    output_directory,
+                    pip_video_path,
+                    pip_apply_offset,
+                ),
             )
         )
         return overlay
@@ -131,7 +140,7 @@ def test_export_youtube_overlay_renders_saved_overlay_directly_onto_source(tmp_p
     )
 
     assert calls == [
-        ("render", ("saved-overlay-job", source, 25.8, tmp_path / "work")),
+        ("render", ("saved-overlay-job", source, 25.8, tmp_path / "work", None, True)),
     ]
     assert output.read_bytes() == b"overlay"
 
@@ -166,7 +175,10 @@ def test_export_youtube_overlay_cleans_work_dir_after_failure(
         offset_seconds: float,
         output_directory: Path,
         progress: youtube_overlay_export.ProgressCallback,
+        pip_video_path: Path | None = None,
+        pip_apply_offset: bool = True,
     ) -> Path:
+        del pip_video_path, pip_apply_offset
         (output_directory / "overlay.part").write_bytes(b"temporary")
         if failure_stage == "render":
             raise youtube_overlay_export.YoutubeExportError("render failed")
@@ -282,4 +294,5 @@ def test_render_saved_overlay_preserves_manual_timeline_and_pip(gpx_mode, tmp_pa
         "flight_id": None,
         "overlay_only": False,
         "video_start_override": gpx_start,
+        "pip_offset_seconds": 0.0,
     }

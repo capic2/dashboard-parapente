@@ -67,14 +67,14 @@ export const Modal = meta.story({
     onClose: fn(),
     onSiteCreated: fn(),
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/spots/geocode', () => {
           return HttpResponse.json(mockGeocodeResult);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -126,15 +126,15 @@ export const SearchLoading = meta.story({
     onClose: fn(),
     onSiteCreated: fn(),
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/spots/geocode', async () => {
           await delay('infinite');
           return HttpResponse.json(mockGeocodeResult);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 

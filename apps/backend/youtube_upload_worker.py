@@ -22,7 +22,7 @@ def main() -> None:
         raise RuntimeError("YouTube upload worker requires BACKEND_JOB_QUEUE_BACKEND=rq")
 
     queued_count = enqueue_pending_youtube_uploads(
-        recover_active=False,
+        recover_active=True,
         migrate_legacy_queue=True,
     )
     if queued_count:

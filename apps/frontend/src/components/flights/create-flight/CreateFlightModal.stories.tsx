@@ -95,17 +95,17 @@ export const FlightModal = meta.story({
     onClose: fn(),
     onCreateComplete: fn(),
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.post('*/api/flights', () => {
           return HttpResponse.json(mockManualFlight);
         }),
         http.post('*/api/flights/create-from-gpx', () => {
           return HttpResponse.json(mockFlightResult);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -118,14 +118,14 @@ export const FileImport = meta.story({
     onClose: fn(),
     onCreateComplete: fn(),
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.post('*/api/flights/create-from-gpx', () => {
           return HttpResponse.json(mockFlightResult);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -252,31 +252,20 @@ FlightModal.test(
 
 FlightModal.test(
   'shows error message when upload fails',
-  {
-    parameters: {
-      msw: {
-        handlers: [
-          http.post('*/api/flights/create-from-gpx', async () => {
-            await delay(100);
-            return new HttpResponse(
-              JSON.stringify({
-                error: 'Fichier GPX invalide',
-                message:
-                  'Le fichier GPX ne contient pas de données de vol valides',
-              }),
-              {
-                status: 400,
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-              }
-            );
-          }),
-        ],
-      },
-    },
-  },
-  async ({ args }) => {
+  async ({ args, msw }) => {
+    msw.use(
+      http.post('*/api/flights/create-from-gpx', async () => {
+        await delay(100);
+        return HttpResponse.json(
+          {
+            error: 'Fichier GPX invalide',
+            message: 'Le fichier GPX ne contient pas de données de vol valides',
+          },
+          { status: 400 }
+        );
+      })
+    );
+
     await userEvent.click(
       screen.getByRole('tab', { name: /Importer un fichier/u })
     );

@@ -4,6 +4,10 @@ import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore } from '../../stores/themeStore';
 import Header from './Header';
 
+vi.mock('./OperationCenter', () => ({
+  OperationCenter: () => null,
+}));
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, fallback?: string) => {
