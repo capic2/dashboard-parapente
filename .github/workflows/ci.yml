@@ -114,7 +114,10 @@ jobs:
 
       - name: 🔨 Run full validation for Mergify queue
         if: github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'merge queue:') && steps.application-changes.outputs.application_changes == 'true'
-        run: bash .github/scripts/run-full-nx-validation.sh
+        run: |
+          echo "::group::Full Nx validation for Mergify queue"
+          trap 'echo "::endgroup::"' EXIT
+          bash .github/scripts/run-full-nx-validation.sh
         env:
           TESTING: true
           BACKEND_DATABASE_URL: sqlite:///./test.db
