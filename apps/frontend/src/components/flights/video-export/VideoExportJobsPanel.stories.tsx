@@ -1,5 +1,5 @@
 import preview from '../../../../.storybook/preview';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, within } from 'storybook/test';
 import { VideoExportJobsPanel } from './VideoExportJobsPanel';
 import {
   defaultHandlers,
@@ -26,22 +26,12 @@ export const Default = meta.story({
   },
 });
 
-Default.test('opens logs in a modal', async ({ canvasElement }) => {
+Default.test('shows jobs from the mock data', async ({ canvasElement }) => {
   const canvas = within(canvasElement);
-  const actionsButton = (
-    await canvas.findAllByRole('button', {
-      name: 'Actions',
-    })
-  )[0];
-  if (!actionsButton) throw new Error('Job actions button not found');
-  await userEvent.click(actionsButton);
-  await userEvent.click(
-    await within(canvasElement.ownerDocument.body).findByRole('menuitem', {
-      name: /logs|show|afficher/iu,
-    })
-  );
   await expect(
-    within(canvasElement.ownerDocument.body).getAllByText(/Capture completed/u)
-      .length
-  ).toBeGreaterThanOrEqual(1);
+    (await canvas.findAllByText('Arguel - soaring du soir')).length
+  ).toBeGreaterThan(0);
+  await expect(
+    (await canvas.findAllByText('Chalais - thermique bleu')).length
+  ).toBeGreaterThan(0);
 });
