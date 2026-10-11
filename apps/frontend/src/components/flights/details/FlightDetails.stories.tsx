@@ -212,11 +212,11 @@ Default.test(
       await userEvent.click(
         canvas.getByRole('tab', { name: i18n.t('flights.replayTab') })
       );
-      await userEvent.click(
-        await canvas.findByRole('button', {
-          name: i18n.t('flights.goproOverlayGenerate'),
-        })
-      );
+      const generateButton = await canvas.findByRole('button', {
+        name: i18n.t('flights.goproOverlayGenerate'),
+      });
+      await waitFor(() => expect(generateButton).toBeEnabled());
+      await userEvent.click(generateButton);
       const modal = within(canvasElement.ownerDocument.body);
       await userEvent.click(
         await modal.findByRole('button', {
@@ -265,15 +265,15 @@ MediaThumbnails.test(
     await expect(
       await canvas.findByAltText(i18n.t('flights.panoThumbnailAlt'))
     ).toBeVisible();
-    await waitFor(() => {
-      expect(
+    await waitFor(async () => {
+      await expect(
         canvas.getByAltText(
           i18n.t('flights.goproOverlayJobThumbnailAlt', {
             name: 'vol-arguel-1080p.mp4',
           })
         )
       ).toBeVisible();
-      expect(
+      await expect(
         canvas.getByAltText(
           i18n.t('flights.goproOverlayJobThumbnailAlt', {
             name: 'vol-arguel-4k.mp4',
