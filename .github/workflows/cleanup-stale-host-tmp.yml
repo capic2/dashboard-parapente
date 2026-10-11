@@ -1,0 +1,34 @@
+name: Clean stale production temporary directories
+
+on:
+  schedule:
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cleanup-production-tmp
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Clean stale /tmp directories on production host
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout maintenance script
+        uses: actions/checkout@v7
+
+      - name: Remove stale temporary directories
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          fingerprint: ${{ secrets.SSH_FINGERPRINT }}
+          port: ${{ secrets.SSH_PORT }}
+          command_timeout: 5m
+          script_path: .github/scripts/cleanup-stale-host-tmp.sh
