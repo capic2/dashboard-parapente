@@ -582,6 +582,32 @@ class TestFlightsListEndpoint:
         assert response.headers["cache-control"] == "no-cache"
         get_thumbnail.assert_called_once_with(pano_path)
 
+    def test_get_flight_pano_thumbnail_resolves_prefixed_filename(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        flight_dir = tmp_path / "20260315" / "01"
+        flight_dir.mkdir(parents=True)
+        pano_path = flight_dir / "20260315_1_pano.mp4"
+        pano_path.write_bytes(b"pano")
+        thumbnail_path = tmp_path / "pano-thumbnail.jpg"
+        thumbnail_path.write_bytes(b"jpeg")
+        flight = Flight(
+            id="flight-prefixed-pano-thumbnail",
+            name="Flight with prefixed Pano filename",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            pano_video_file_path=str(flight_dir / "pano.mp4"),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        with patch("routes.get_video_thumbnail", return_value=thumbnail_path) as get_thumbnail:
+            response = client.get(f"{API_PREFIX}/flights/{flight.id}/pano/thumbnail")
+
+        assert response.status_code == 200
+        assert response.content == b"jpeg"
+        get_thumbnail.assert_called_once_with(pano_path)
+
     def test_get_flight_pano_thumbnail_returns_404_when_unavailable(
         self, client: TestClient, db_session: Session, tmp_path: Path
     ) -> None:
@@ -690,6 +716,29 @@ class TestFlightsListEndpoint:
         assert response.content == b"pano"
         assert response.headers["content-type"] == "video/mp4"
         assert response.headers["content-disposition"].startswith("inline")
+
+    def test_stream_flight_pano_resolves_prefixed_filename(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
+        flight_dir = tmp_path / "20260315" / "01"
+        flight_dir.mkdir(parents=True)
+        pano_path = flight_dir / "20260315_1_pano.mp4"
+        pano_path.write_bytes(b"pano")
+        flight = Flight(
+            id="flight-prefixed-pano-stream",
+            name="Flight with prefixed Pano filename",
+            flight_date=date(2026, 3, 15),
+            site_id="site-arguel",
+            pano_video_file_path=str(flight_dir / "pano.mp4"),
+        )
+        db_session.add(flight)
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/{flight.id}/pano")
+
+        assert response.status_code == 200
+        assert response.content == b"pano"
+        assert response.headers["content-type"] == "video/mp4"
 
     def test_stream_flight_pano_returns_404_when_unavailable(self, client, db_session, tmp_path):
         response = client.get(f"{API_PREFIX}/flights/missing-flight/pano")
