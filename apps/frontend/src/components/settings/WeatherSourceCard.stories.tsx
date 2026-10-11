@@ -206,9 +206,10 @@ export const Default = meta.story({
     source: { ...mockOpenMeteo, source_name: 'other' },
     isLastActive: true,
   },
-  parameters: {
-    msw: {
-      handlers: [
+  tags: ['!autodocs'],
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.post('*/api/weather-sources/other/test', () => {
           return HttpResponse.json<WeatherSourceTestResult>({
             success: true,
@@ -216,10 +217,9 @@ export const Default = meta.story({
             tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
-      ],
-    },
+      ]
+    );
   },
-  tags: ['!autodocs'],
 });
 Default.test('It calls the onDelete function', async ({ canvasElement }) => {
   const canvas = within(canvasElement);
@@ -249,9 +249,9 @@ export const ActiveAPISource = meta.story({
     isLastActive: false,
     onDelete: undefined,
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         // PATCH /api/weather-sources/{sourceName}
         http.patch('*/api/weather-sources/:sourceName', async () => {
           await delay(300);
@@ -269,8 +269,8 @@ export const ActiveAPISource = meta.story({
             tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -284,9 +284,9 @@ export const WithAPIKey = meta.story({
     isLastActive: false,
     onDelete: (source) => console.log('Delete:', source.source_name),
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.patch('*/api/weather-sources/:sourceName', async ({ request }) => {
           await delay(300);
           const body = (await request.json()) as any;
@@ -307,8 +307,8 @@ export const WithAPIKey = meta.story({
             tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -322,9 +322,9 @@ export const PlaywrightScraper = meta.story({
     isLastActive: false,
     onDelete: (source) => console.log('Delete:', source.source_name),
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.patch('*/api/weather-sources/:sourceName', async () => {
           await delay(300);
           return HttpResponse.json({
@@ -349,8 +349,8 @@ export const PlaywrightScraper = meta.story({
             tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -364,9 +364,9 @@ export const DisabledSource = meta.story({
     isLastActive: false,
     onDelete: (source) => console.log('Delete:', source.source_name),
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.patch('*/api/weather-sources/:sourceName', async ({ request }) => {
           await delay(300);
           const body = (await request.json()) as any;
@@ -377,8 +377,8 @@ export const DisabledSource = meta.story({
             updated_at: '2025-06-15T10:00:00.000Z',
           });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -392,9 +392,9 @@ export const ErrorSource = meta.story({
     isLastActive: false,
     onDelete: (source) => console.log('Delete:', source.source_name),
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.patch('*/api/weather-sources/:sourceName', async ({ request }) => {
           await delay(300);
           const body = (await request.json()) as any;
@@ -417,8 +417,8 @@ export const ErrorSource = meta.story({
             tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -432,9 +432,9 @@ export const UnknownSource = meta.story({
     isLastActive: false,
     onDelete: (source) => console.log('Delete:', source.source_name),
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.patch('*/api/weather-sources/:sourceName', async () => {
           await delay(300);
           return HttpResponse.json({
@@ -450,8 +450,8 @@ export const UnknownSource = meta.story({
             tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -472,8 +472,10 @@ export const LastActiveSource = meta.story({
           'When this is the last active source, the toggle is protected to prevent disabling all sources.',
       },
     },
-    msw: {
-      handlers: [
+  },
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.patch('*/api/weather-sources/:sourceName', async () => {
           await delay(300);
           // Should not reach here as the UI prevents toggling
@@ -490,8 +492,8 @@ export const LastActiveSource = meta.story({
             tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -511,9 +513,9 @@ export const LowSuccessRate = meta.story({
     },
     isLastActive: false,
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.patch('*/api/weather-sources/:sourceName', async () => {
           await delay(300);
           return HttpResponse.json({
@@ -539,8 +541,8 @@ export const LowSuccessRate = meta.story({
             tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -554,9 +556,9 @@ export const StealthScraper = meta.story({
     isLastActive: false,
     onDelete: (source) => console.log('Delete:', source.source_name),
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.patch('*/api/weather-sources/:sourceName', async ({ request }) => {
           await delay(300);
           const body = (await request.json()) as any;
@@ -575,8 +577,8 @@ export const StealthScraper = meta.story({
             tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -592,9 +594,9 @@ export const HighResponseTime = meta.story({
     },
     isLastActive: false,
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.patch('*/api/weather-sources/:sourceName', async () => {
           await delay(300);
           return HttpResponse.json({
@@ -611,8 +613,8 @@ export const HighResponseTime = meta.story({
             tested_at: '2025-06-15T10:00:00.000Z',
           });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -661,8 +663,10 @@ export const AllSourceTypes = meta.story({
         story: 'Comparison of all weather source types and statuses',
       },
     },
-    msw: {
-      handlers: [
+  },
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.patch(
           '*/api/weather-sources/:sourceName',
           async ({ params, request }) => {
@@ -710,7 +714,7 @@ export const AllSourceTypes = meta.story({
             });
           }
         ),
-      ],
-    },
+      ]
+    );
   },
 });

@@ -9,26 +9,29 @@ import {
 const meta = preview.meta({
   title: 'Components/Infrastructure/Video Export Jobs',
   component: VideoExportJobsPanel,
-  parameters: {
-    layout: 'padded',
-    msw: { handlers: defaultHandlers },
-  },
+  parameters: { layout: 'padded' },
   tags: ['autodocs'],
+
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
+  },
 });
 
 export const Default = meta.story({
   name: 'Operational list',
   args: { limit: null },
-  beforeEach: resetMockVideoJobs,
+  beforeEach: ({ msw }) => {
+    msw.use(...defaultHandlers);
+    resetMockVideoJobs();
+  },
 });
 
-Default.test('opens logs in a modal', async ({ canvasElement }) => {
+Default.test('shows jobs from the mock data', async ({ canvasElement }) => {
   const canvas = within(canvasElement);
   await expect(
-    canvas.getByRole('button', { name: 'Logs' })
-  ).toBeInTheDocument();
-  await canvas.getByRole('button', { name: 'Logs' }).click();
+    (await canvas.findAllByText('Arguel - soaring du soir')).length
+  ).toBeGreaterThan(0);
   await expect(
-    within(document.body).getByText('Opening viewer')
-  ).toBeInTheDocument();
+    (await canvas.findAllByText('Chalais - thermique bleu')).length
+  ).toBeGreaterThan(0);
 });

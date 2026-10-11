@@ -84,15 +84,6 @@ const meta = preview.meta({
           'Site selector component for choosing paragliding sites. Uses React Query for data fetching.',
       },
     },
-    msw: {
-      handlers: [
-        http.get('/api/spots', () => {
-          return HttpResponse.json({
-            sites: mockSites,
-          });
-        }),
-      ],
-    },
   },
   tags: ['autodocs'],
   decorators: [
@@ -115,9 +106,19 @@ const meta = preview.meta({
       description: 'Callback when a site is selected',
     },
   },
+
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
+        http.get('/api/spots', () => {
+          return HttpResponse.json({
+            sites: mockSites,
+          });
+        }),
+      ]
+    );
+  },
 });
-
-
 
 /**
  * Default story showing Arguel selected
