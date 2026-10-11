@@ -65,14 +65,14 @@ export const Default = meta.story({
   args: {
     siteId: 'site-arguel',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/sites/site-arguel/live-wind', () =>
           HttpResponse.json(mockLiveWind)
         ),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -87,9 +87,9 @@ export const Empty = meta.story({
   args: {
     siteId: 'site-arguel',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/sites/site-arguel/live-wind', () =>
           HttpResponse.json({
             site_id: 'site-arguel',
@@ -99,8 +99,8 @@ export const Empty = meta.story({
             stations: [],
           })
         ),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -108,14 +108,14 @@ export const Loading = meta.story({
   args: {
     siteId: 'site-arguel',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/sites/site-arguel/live-wind', async () => {
           await new Promise(() => {});
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -124,14 +124,14 @@ export const ErrorState = meta.story({
   args: {
     siteId: 'site-arguel',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get(
           '*/api/sites/site-arguel/live-wind',
           () => new HttpResponse(null, { status: 502 })
         ),
-      ],
-    },
+      ]
+    );
   },
 });

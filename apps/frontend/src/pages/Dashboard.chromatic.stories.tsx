@@ -43,8 +43,12 @@ const meta = preview.meta({
     chromatic: {
       disableSnapshot: false,
     },
-    msw: {
-      handlers: [
+  },
+  tags: ['!autodocs'],
+
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('/api/spots', () => HttpResponse.json(mockSites)),
         http.get('/api/spots/best', () =>
           HttpResponse.json({
@@ -120,10 +124,9 @@ const meta = preview.meta({
         ),
         http.get('/api/emagram/latest', () => HttpResponse.json(null)),
         http.get('/api/emagram/history', () => HttpResponse.json([])),
-      ],
-    },
+      ]
+    );
   },
-  tags: ['!autodocs'],
 });
 
 export const DashboardChromatic = meta.story({

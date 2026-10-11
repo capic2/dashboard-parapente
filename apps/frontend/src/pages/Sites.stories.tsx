@@ -105,42 +105,57 @@ export const defaultHandlers = [
 
 export const Default = meta.story({
   name: 'Default',
-  parameters: {
-    msw: { handlers: defaultHandlers },
-    /*router: {
-      routes: [{ path: '/flights', children: [] }],
-    },*/
+  beforeEach: async (context) => {
+    context.msw.use(...defaultHandlers);
+    return resetSitesDb();
   },
-  beforeEach: resetSitesDb,
 });
+
+const findSiteCard = (
+  canvas: { getByRole: typeof screen.getByRole },
+  siteName: string
+) => {
+  const heading = canvas.getByRole('heading', {
+    level: 3,
+    name: siteName,
+  });
+  const card = heading?.closest<HTMLDivElement>('div.flex.h-full.flex-col');
+
+  if (!card) {
+    throw new Error(`Could not find the site card for "${siteName}"`);
+  }
+
+  return within(card);
+};
 
 Default.test('filters by landing type', async ({ canvas, userEvent }) => {
   await waitForElementToBeRemoved(canvas.getByText(/Loading.*/i));
-  const siteList = canvas.getByRole('listbox', { name: 'Liste des sites' });
-  await expect(within(siteList).getAllByRole('option')).toHaveLength(3);
+  await expect(canvas.getAllByRole('heading', { level: 3 })).toHaveLength(3);
 
   const typeSelect = await canvas.findByDisplayValue('Tous les types');
   await userEvent.selectOptions(typeSelect, 'landing');
 
-  await expect(within(siteList).getAllByRole('option')).toHaveLength(1);
+  await expect(canvas.getAllByRole('heading', { level: 3 })).toHaveLength(1);
   await expect(
-    within(within(siteList).getByRole('option')).getByRole('heading')
-  ).toHaveTextContent("Besançon - Plaine d'Arguel");
+    canvas.getByRole('heading', {
+      level: 3,
+      name: "Besançon - Plaine d'Arguel",
+    })
+  ).toBeInTheDocument();
 });
 Default.test('filters by name', async ({ canvas, userEvent }) => {
   await waitForElementToBeRemoved(canvas.getByText(/Loading.*/i));
-  const siteList = canvas.getByRole('listbox', { name: 'Liste des sites' });
-  await expect(within(siteList).getAllByRole('option')).toHaveLength(3);
+  await expect(canvas.getAllByRole('heading', { level: 3 })).toHaveLength(3);
   await userEvent.type(
     await canvas.findByPlaceholderText(
       'Rechercher par nom, code ou localité...'
     ),
     'cha'
   );
-  await expect(within(siteList).getAllByRole('option')).toHaveLength(1);
+  await expect(canvas.getAllByRole('heading', { level: 3 })).toHaveLength(1);
   await expect(
-    within(within(siteList).getByRole('option')).getByRole('heading')
-  ).toHaveTextContent('Besançon - Chalais');
+    canvas.getByRole('heading', { level: 3, name: 'Besançon - Chalais' })
+  ).toBeInTheDocument();
 });
 Default.test(
   'it is possible to create a site',
@@ -176,7 +191,7 @@ Default.test(
         await expect(screen.queryByRole('dialog')).toBeNull();
       });
       await expect(
-        await canvas.findByRole('option', { name: 'Mont Poupet' })
+        await canvas.findByRole('heading', { level: 3, name: 'Mont Poupet' })
       ).toBeInTheDocument();
     });
   }
@@ -189,9 +204,9 @@ Default.test(
     });
     await step('Update a site', async () => {
       await userEvent.click(
-        within(
-          await canvas.findByRole('option', { name: /Besançon - Arguel/u })
-        ).getByRole('button', { name: /.*Éditer/u })
+        findSiteCard(canvas, 'Besançon - Arguel').getByRole('button', {
+          name: /.*Éditer/u,
+        })
       );
 
       const dialog = within(screen.getByRole('dialog'));
@@ -213,7 +228,8 @@ Default.test(
         await expect(screen.queryByRole('dialog')).toBeNull();
       });
       await expect(
-        await canvas.findByRole('option', {
+        await canvas.findByRole('heading', {
+          level: 3,
           name: /Besançon - Arguel updated/u,
         })
       ).toBeInTheDocument();
@@ -228,9 +244,9 @@ Default.test(
     });
     await step('Delete a site', async () => {
       await userEvent.click(
-        within(
-          await canvas.findByRole('option', { name: /Besançon - Arguel/u })
-        ).getByRole('button', { name: 'Supprimer le site' })
+        findSiteCard(canvas, 'Besançon - Arguel').getByRole('button', {
+          name: 'Supprimer le site',
+        })
       );
       await userEvent.click(
         within(await screen.findByRole('alertdialog')).getByRole('button', {
@@ -245,7 +261,10 @@ Default.test(
       });
       await waitFor(async () => {
         await expect(
-          canvas.queryByRole('option', { name: /Besançon - Arguel/u })
+          canvas.queryByRole('heading', {
+            level: 3,
+            name: /Besançon - Arguel/u,
+          })
         ).not.toBeInTheDocument();
       });
     });
@@ -254,24 +273,22 @@ Default.test(
 
 export const EmptyState = meta.story({
   name: 'Empty State',
-  parameters: {
-    msw: {
-      handlers: [
-        http.get('*/api/spots', () => HttpResponse.json({ sites: [] })),
-      ],
-    },
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[http.get('*/api/spots', () => HttpResponse.json({ sites: [] }))]
+    );
   },
 });
 
 export const Loading = meta.story({
   name: 'Loading',
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/spots', async () => {
           await new Promise(() => {});
         }),
-      ],
-    },
+      ]
+    );
   },
 });

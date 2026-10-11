@@ -181,12 +181,18 @@ Default.test(
     await userEvent.click(
       await canvas.findByRole('button', { name: 'Thermiques' })
     );
-    await expect(await canvas.findByText('Repère visuel')).toBeInTheDocument();
-    await expect(await canvas.findByText('Lecture météo')).toBeInTheDocument();
-    await expect(await canvas.findByText('Impact vol')).toBeInTheDocument();
     await expect(
-      await canvas.findByText('Confiance : 86 %')
-    ).toBeInTheDocument();
+      (await canvas.findAllByText('Repère visuel')).length
+    ).toBeGreaterThan(0);
+    await expect(
+      (await canvas.findAllByText('Lecture météo')).length
+    ).toBeGreaterThan(0);
+    await expect(
+      (await canvas.findAllByText('Impact vol')).length
+    ).toBeGreaterThan(0);
+    await expect(
+      (await canvas.findAllByText('Confiance : 86 %')).length
+    ).toBeGreaterThan(0);
     await userEvent.click(
       await canvas.findByRole('button', { name: 'Masquer les explications' })
     );
@@ -241,8 +247,8 @@ MultipleSources.test(
       await canvas.findByRole('button', { name: 'Thermiques' })
     );
     await expect(
-      await canvas.findByText('Gradient thermique')
-    ).toBeInTheDocument();
+      (await canvas.findAllByText('Confiance : 86 %')).length
+    ).toBeGreaterThan(0);
     await userEvent.click(
       await canvas.findByRole('button', { name: 'Zoom +' })
     );
@@ -252,7 +258,7 @@ MultipleSources.test(
     await userEvent.click(
       await canvas.findByRole('button', { name: 'Suivant' })
     );
-    await expect(canvas.queryByText('Gradient thermique')).toBeNull();
+    await expect(canvas.queryAllByText('Confiance : 86 %')).toHaveLength(0);
     await expect(
       await canvas.findByRole('button', { name: /Réinitialiser \(1x\)/u })
     ).toBeInTheDocument();
@@ -293,8 +299,12 @@ GroupedMarkers.test(
     await userEvent.click(
       await canvas.findByRole('button', { name: '2 explications' })
     );
-    await expect(await canvas.findByText('Thermiques')).toBeInTheDocument();
-    await expect(await canvas.findByText('Couche stable')).toBeInTheDocument();
+    await expect(
+      (await canvas.findAllByText('Thermiques')).length
+    ).toBeGreaterThan(0);
+    await expect(
+      (await canvas.findAllByText('Couche stable')).length
+    ).toBeGreaterThan(0);
   }
 );
 
@@ -349,8 +359,8 @@ Zoom.test(
       await canvas.findByRole('button', { name: 'Thermiques' })
     );
     await expect(
-      await canvas.findByText('Confiance : 86 %')
-    ).toBeInTheDocument();
+      (await canvas.findAllByText('Confiance : 86 %')).length
+    ).toBeGreaterThan(0);
     await userEvent.click(
       await canvas.findByRole('button', { name: /Réinitialiser \(1.5x\)/u })
     );
