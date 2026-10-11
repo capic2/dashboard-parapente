@@ -690,6 +690,35 @@ def test_worker_resolves_panorama_from_the_flight_directory(
     assert youtube_upload._source_video_path(db_session, job) == pano_path
 
 
+def test_worker_resolves_prefixed_panorama_filename(
+    db_session: Session,
+    sample_flight: Flight,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    pano_path = (
+        tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01" / "20261001_1_pano.mp4"
+    )
+    pano_path.parent.mkdir(parents=True)
+    pano_path.write_bytes(b"panorama")
+    job = YoutubeUploadJob(
+        id="youtube-prefixed-pano-source",
+        flight_id=sample_flight.id,
+        user_id=1,
+        source_type="pano",
+        status="queued",
+        progress=0,
+        title="Panorama",
+        description="",
+        privacy_status="private",
+    )
+    db_session.add(job)
+    db_session.commit()
+
+    assert youtube_upload._source_video_path(db_session, job) == pano_path
+
+
 @pytest.mark.parametrize("source_type", ["face", "pilote"])
 def test_worker_resolves_face_and_pilote_from_the_flight_directory(
     source_type: str,
