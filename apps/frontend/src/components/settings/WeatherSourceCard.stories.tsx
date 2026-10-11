@@ -282,7 +282,7 @@ export const WithAPIKey = meta.story({
   args: {
     source: mockWeatherAPI,
     isLastActive: false,
-    onDelete: (source) => console.log('Delete:', source.source_name),
+    onDelete: () => undefined,
   },
   beforeEach: (context) => {
     context.msw.use(
@@ -320,7 +320,7 @@ export const PlaywrightScraper = meta.story({
   args: {
     source: mockMeteoParapente,
     isLastActive: false,
-    onDelete: (source) => console.log('Delete:', source.source_name),
+    onDelete: () => undefined,
   },
   beforeEach: (context) => {
     context.msw.use(
@@ -362,7 +362,7 @@ export const DisabledSource = meta.story({
   args: {
     source: mockDisabledSource,
     isLastActive: false,
-    onDelete: (source) => console.log('Delete:', source.source_name),
+    onDelete: () => undefined,
   },
   beforeEach: (context) => {
     context.msw.use(
@@ -390,7 +390,7 @@ export const ErrorSource = meta.story({
   args: {
     source: mockErrorSource,
     isLastActive: false,
-    onDelete: (source) => console.log('Delete:', source.source_name),
+    onDelete: () => undefined,
   },
   beforeEach: (context) => {
     context.msw.use(
@@ -430,7 +430,7 @@ export const UnknownSource = meta.story({
   args: {
     source: mockUnknownSource,
     isLastActive: false,
-    onDelete: (source) => console.log('Delete:', source.source_name),
+    onDelete: () => undefined,
   },
   beforeEach: (context) => {
     context.msw.use(
@@ -554,7 +554,7 @@ export const StealthScraper = meta.story({
   args: {
     source: mockDisabledSource,
     isLastActive: false,
-    onDelete: (source) => console.log('Delete:', source.source_name),
+    onDelete: () => undefined,
   },
   beforeEach: (context) => {
     context.msw.use(

@@ -5,6 +5,7 @@ import {
   Button as AriaButton,
   Dialog,
   DialogTrigger,
+  Heading,
   Menu,
   MenuItem,
   MenuTrigger,
@@ -240,9 +241,12 @@ export default function Header() {
                 {({ close }: { close: () => void }) => (
                   <>
                     <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-                      <span className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+                      <Heading
+                        slot="title"
+                        className="text-lg font-semibold text-gray-800 dark:text-gray-100"
+                      >
                         {t('header.menu', 'Menu')}
-                      </span>
+                      </Heading>
                       <AriaButton
                         onPress={close}
                         aria-label={t('header.closeMenu', 'Fermer le menu')}

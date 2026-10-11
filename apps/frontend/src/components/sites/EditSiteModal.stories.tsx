@@ -171,7 +171,9 @@ export const SavingState = meta.story({
     isOpen: true,
     onClose: fn(),
     onUpdate: fn(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 10000));
+      await new Promise((resolve) => {
+        setTimeout(resolve, 10000);
+      });
     }),
     onCreate: fn(),
   },
@@ -179,7 +181,7 @@ export const SavingState = meta.story({
 
 SavingState.test('interaction test', async ({ userEvent }) => {
   const dialog = within(screen.getByRole('dialog'));
-  const saveButton = dialog.getByRole('button', { name: /Enregistrer/ });
+  const saveButton = dialog.getByRole('button', { name: /Enregistrer/u });
   await userEvent.click(saveButton);
 });
 
@@ -381,7 +383,9 @@ export const SavesSuccessfully = meta.story({
     isOpen: true,
     onClose: fn(),
     onUpdate: fn(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => {
+        setTimeout(resolve, 100);
+      });
     }),
     onCreate: fn(),
   },
@@ -414,7 +418,9 @@ export const ShowsSavingState = meta.story({
     isOpen: true,
     onClose: fn(),
     onUpdate: fn(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => {
+        setTimeout(resolve, 100);
+      });
     }),
     onCreate: fn(),
   },

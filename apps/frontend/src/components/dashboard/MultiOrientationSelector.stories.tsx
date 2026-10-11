@@ -321,7 +321,7 @@ DisplaysWeatherData.test(
     await userEvent.click(button);
 
     await waitFor(() => {
-      expect(canvas.getByText(/Conditions de vol: 85/)).toBeInTheDocument();
+      expect(canvas.getByText(/Conditions de vol: 85/u)).toBeInTheDocument();
     });
   }
 );

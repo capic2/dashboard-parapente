@@ -1,23 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignore": [
-    "apps/e2e/**",
-    "apps/frontend/.storybook/main.ts",
-    "apps/frontend/vitest.shims.d.ts",
-    "libs/design-system/.storybook/main.ts",
-    ".agents/skills/**/scripts/**",
-    ".github/skills/**/scripts/**"
-  ],
-  "ignoreBinaries": ["eslint", ".venv/bin/ruff", ".venv/bin/black"],
-  "ignoreDependencies": [
-    "@chromatic-com/storybook",
-    "@storybook/addon-a11y",
-    "@storybook/addon-docs",
-    "@storybook/addon-vitest",
-    "@storybook/react-vite",
-    "chromatic",
-    "storybook-react-i18next",
-    "lint-staged"
-  ],
+  "ignore": ["apps/e2e/**", ".agents/skills/**/scripts/**"],
+  "ignoreBinaries": [],
+  "ignoreDependencies": ["chromatic", "lint-staged"],
   "ignoreExportsUsedInFile": true
 }

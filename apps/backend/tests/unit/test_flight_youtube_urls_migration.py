@@ -13,3 +13,4 @@ def test_flight_youtube_urls_migration_adds_empty_json_array_by_default() -> Non
     row = connection.execute("SELECT youtube_urls FROM flights WHERE id = 'flight-1'").fetchone()
 
     assert row == ("[]",)
+    connection.close()

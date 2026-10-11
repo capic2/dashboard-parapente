@@ -63,7 +63,7 @@ SingleImage.test('should display image and close button', async () => {
   const img = await screen.findByAltText('Meteo Parapente');
   await expect(img).toBeInTheDocument();
 
-  const closeButton = screen.getByRole('button', { name: /fermer/i });
+  const closeButton = screen.getByRole('button', { name: /fermer/iu });
   await expect(closeButton).toBeInTheDocument();
 });
 
@@ -81,9 +81,9 @@ MultipleImages.test(
   'should display navigation buttons for multiple images',
   async () => {
     const nextButton = await screen.findByRole('button', {
-      name: /suivante/i,
+      name: /suivante/iu,
     });
-    const prevButton = screen.getByRole('button', { name: /précédente/i });
+    const prevButton = screen.getByRole('button', { name: /précédente/iu });
 
     await expect(nextButton).toBeInTheDocument();
     await expect(prevButton).toBeInTheDocument();
@@ -104,7 +104,7 @@ StartAtSecond.test('should start at second image', async () => {
   const img = await screen.findByAltText('Meteociel');
   await expect(img).toBeInTheDocument();
 
-  const caption = screen.getByText(/Meteociel \(2\/3\)/);
+  const caption = screen.getByText(/Meteociel \(2\/3\)/u);
   await expect(caption).toBeInTheDocument();
 });
 
@@ -123,7 +123,7 @@ NavigateForward.test(
   async () => {
     await screen.findByAltText('Meteo Parapente');
 
-    const nextButton = screen.getByRole('button', { name: /suivante/i });
+    const nextButton = screen.getByRole('button', { name: /suivante/iu });
     await userEvent.click(nextButton);
 
     const img = await screen.findByAltText('Meteociel');

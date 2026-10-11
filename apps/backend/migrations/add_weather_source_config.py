@@ -6,7 +6,7 @@ Description: Adds weather source configuration table with statistics and default
 
 from sqlalchemy import create_engine, text
 import os
-from datetime import datetime
+from datetime import UTC, datetime
 import uuid
 import logging
 
@@ -91,8 +91,8 @@ def upgrade():
             "success_count": 0,
             "error_count": 0,
             "total_response_time_ms": 0,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(UTC).replace(tzinfo=None).isoformat(),
+            "updated_at": datetime.now(UTC).replace(tzinfo=None).isoformat(),
         },
         {
             "id": str(uuid.uuid4()),
@@ -109,8 +109,8 @@ def upgrade():
             "success_count": 0,
             "error_count": 0,
             "total_response_time_ms": 0,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(UTC).replace(tzinfo=None).isoformat(),
+            "updated_at": datetime.now(UTC).replace(tzinfo=None).isoformat(),
         },
         {
             "id": str(uuid.uuid4()),
@@ -127,8 +127,8 @@ def upgrade():
             "success_count": 0,
             "error_count": 0,
             "total_response_time_ms": 0,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(UTC).replace(tzinfo=None).isoformat(),
+            "updated_at": datetime.now(UTC).replace(tzinfo=None).isoformat(),
         },
         {
             "id": str(uuid.uuid4()),
@@ -145,8 +145,8 @@ def upgrade():
             "success_count": 0,
             "error_count": 0,
             "total_response_time_ms": 0,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(UTC).replace(tzinfo=None).isoformat(),
+            "updated_at": datetime.now(UTC).replace(tzinfo=None).isoformat(),
         },
         {
             "id": str(uuid.uuid4()),
@@ -163,8 +163,8 @@ def upgrade():
             "success_count": 0,
             "error_count": 0,
             "total_response_time_ms": 0,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(UTC).replace(tzinfo=None).isoformat(),
+            "updated_at": datetime.now(UTC).replace(tzinfo=None).isoformat(),
         },
     ]
 

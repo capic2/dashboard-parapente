@@ -21,3 +21,4 @@ def test_youtube_upload_migration_creates_credentials_and_jobs() -> None:
     }
     assert "youtube_credentials" in tables
     assert "youtube_upload_jobs" in tables
+    connection.close()

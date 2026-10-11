@@ -78,16 +78,25 @@ vi.mock('react-aria-components', async () => {
   const Button = ({
     children,
     onPress,
+    isDisabled,
     ...props
   }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
     onPress?: () => void;
+    isDisabled?: boolean;
   }) => (
-    <button type="button" onClick={onPress} {...props}>
+    <button type="button" disabled={isDisabled} onClick={onPress} {...props}>
       {children}
     </button>
   );
 
-  return { Button, TooltipTrigger, Tooltip };
+  return {
+    Button,
+    Heading: ({ children }: { children: React.ReactNode }) => (
+      <h2>{children}</h2>
+    ),
+    TooltipTrigger,
+    Tooltip,
+  };
 });
 
 vi.mock('../../hooks/weather/useWeather', () => ({

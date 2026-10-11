@@ -77,9 +77,9 @@ export const Default = meta.story({
 });
 
 Default.test('renders nearest station', async ({ canvas }) => {
-  await canvas.findByText(/Arguel Nord/);
+  await canvas.findByText(/Arguel Nord/u);
   await expect(
-    canvas.getByText(/SpotAiR Live Wind|Vent live SpotAiR/)
+    canvas.getByText(/SpotAiR Live Wind|Vent live SpotAiR/u)
   ).toBeInTheDocument();
 });
 

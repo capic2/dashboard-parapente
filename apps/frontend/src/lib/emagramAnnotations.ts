@@ -268,11 +268,10 @@ function parseLegacyObservations(
   const parSource = rawExplanation.par_source;
   if (!isObject(parSource)) return [];
   const observations = parSource[source];
-  const values = Array.isArray(observations)
-    ? observations
-    : isString(observations)
-      ? [observations]
-      : [];
+  let values: unknown[];
+  if (Array.isArray(observations)) values = observations;
+  else if (isString(observations)) values = [observations];
+  else values = [];
   return values.filter(isString).map((text, index) => ({
     id: `${source}-legacy-${index}`,
     source,

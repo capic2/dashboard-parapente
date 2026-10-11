@@ -43,3 +43,4 @@ def test_migration_uses_shared_timeline_and_only_integer_timestamps() -> None:
         "invalid-timestamp": 58,
         "invalid-json": None,
     }
+    connection.close()

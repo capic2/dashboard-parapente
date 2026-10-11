@@ -15,9 +15,20 @@ vi.mock('@dashboard-parapente/design-system', () => ({
   Card: ({
     children,
     selected,
+    interactive,
+    borderWidth,
     ...props
-  }: React.HTMLAttributes<HTMLDivElement> & { selected?: boolean }) => (
-    <div data-selected={selected ? 'true' : 'false'} {...props}>
+  }: React.HTMLAttributes<HTMLDivElement> & {
+    selected?: boolean;
+    interactive?: boolean;
+    borderWidth?: string;
+  }) => (
+    <div
+      data-selected={selected ? 'true' : 'false'}
+      data-interactive={interactive ? 'true' : 'false'}
+      data-border-width={borderWidth}
+      {...props}
+    >
       {children}
     </div>
   ),

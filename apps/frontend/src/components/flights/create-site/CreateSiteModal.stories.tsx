@@ -80,26 +80,26 @@ export const Modal = meta.story({
 
 Modal.test('The creation button is disabled if no data', async () => {
   await expect(
-    screen.getByRole('button', { name: /créer le site/i })
+    screen.getByRole('button', { name: /créer le site/iu })
   ).toBeDisabled();
 });
 
 Modal.test(
   'It is possible to search for a site',
   async ({ step, userEvent }) => {
-    const input = screen.getByPlaceholderText(/Ex: Besançon/);
+    const input = screen.getByPlaceholderText(/Ex: Besançon/u);
     await userEvent.type(input, 'Besançon');
 
     const searchButton = screen.getByText('Rechercher');
     await userEvent.click(searchButton);
 
-    await expect(await screen.findByText(/✓ Trouvé !/)).toBeInTheDocument();
+    await expect(await screen.findByText(/✓ Trouvé !/u)).toBeInTheDocument();
 
     // Verify the location details are shown
     await expect(
-      await screen.findByText(/Besançon, Doubs, France/)
+      await screen.findByText(/Besançon, Doubs, France/u)
     ).toBeInTheDocument();
-    await expect(await screen.findByText(/47.23800/)).toBeInTheDocument();
+    await expect(await screen.findByText(/47.23800/u)).toBeInTheDocument();
 
     await step('it fills the form fields', async () => {
       await expect(
@@ -139,7 +139,7 @@ export const SearchLoading = meta.story({
 });
 
 SearchLoading.test('interaction test', async ({ userEvent }) => {
-  const input = screen.getByPlaceholderText(/Ex: Besançon/);
+  const input = screen.getByPlaceholderText(/Ex: Besançon/u);
   await userEvent.type(input, 'Besançon');
 
   const searchButton = screen.getByText('Rechercher');

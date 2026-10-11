@@ -421,11 +421,13 @@ export default function CityWeatherSearch({
                 role="listbox"
                 className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
               >
-                {locationSearch.isLoading ? (
+                {locationSearch.isLoading && (
                   <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
                     {t('weather.search.loadingCities')}
                   </div>
-                ) : suggestions.length ? (
+                )}
+                {!locationSearch.isLoading &&
+                  suggestions.length > 0 &&
                   suggestions.map((location, index) => (
                     <button
                       id={`${listboxId}-${location.id}`}
@@ -449,8 +451,8 @@ export default function CityWeatherSearch({
                         {location.display_name}
                       </span>
                     </button>
-                  ))
-                ) : (
+                  ))}
+                {!locationSearch.isLoading && suggestions.length === 0 && (
                   <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
                     {t('weather.search.noCityFound')}
                   </div>
@@ -509,21 +511,23 @@ export default function CityWeatherSearch({
               </Button>
             </div>
 
-            {nearbyOptions.isError ? (
+            {nearbyOptions.isError && (
               <div
                 className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
                 role="alert"
               >
                 {t('weather.search.nearbyLoadError')}
               </div>
-            ) : nearbyOptions.isLoading ? (
+            )}
+            {!nearbyOptions.isError && nearbyOptions.isLoading && (
               <div
                 className="rounded-xl border border-gray-200 p-4 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300"
                 aria-live="polite"
               >
                 {t('weather.search.loadingNearby')}
               </div>
-            ) : (
+            )}
+            {!nearbyOptions.isError && !nearbyOptions.isLoading && (
               <div className="grid gap-4 lg:grid-cols-2">
                 <div>
                   <h3 className="mb-2 font-semibold text-gray-950 dark:text-white">
@@ -585,14 +589,15 @@ export default function CityWeatherSearch({
               </div>
             )}
 
-            {weatherTitle && isWeatherError ? (
+            {weatherTitle && isWeatherError && (
               <div
                 className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
                 role="alert"
               >
                 {t('weather.search.weatherLoadError', { title: weatherTitle })}
               </div>
-            ) : weatherTitle ? (
+            )}
+            {weatherTitle && !isWeatherError && (
               <div className="space-y-3">
                 <WeatherSummaryCard
                   title={weatherTitle}
@@ -626,7 +631,7 @@ export default function CityWeatherSearch({
                   </div>
                 )}
               </div>
-            ) : null}
+            )}
           </div>
         )}
       </div>

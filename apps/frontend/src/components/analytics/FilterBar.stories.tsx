@@ -133,7 +133,7 @@ Default.test(
   'calls reset handler on reset button click',
   async ({ canvas, userEvent, args }) => {
     await userEvent.click(
-      canvas.getByRole('button', { name: /(réinitialiser|reset)/i })
+      canvas.getByRole('button', { name: /(réinitialiser|reset)/iu })
     );
     await expect(args.onResetFilters).toHaveBeenCalledTimes(1);
   }

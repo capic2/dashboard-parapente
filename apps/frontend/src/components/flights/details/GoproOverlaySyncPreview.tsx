@@ -76,6 +76,7 @@ interface GoproOverlaySyncPreviewProps {
 
 type GpxAlignmentTarget = 'start' | 'end';
 type CalibrationYoutubeRole = 'face' | 'pilote' | 'pano';
+const EMPTY_YOUTUBE_URLS: string[] = [];
 
 const CALIBRATION_YOUTUBE_ROLE_PRIORITY: CalibrationYoutubeRole[] = [
   'pilote',
@@ -158,7 +159,7 @@ export function GoproOverlaySyncPreview({
   offset,
   onOffsetChange,
   onOffsetSave,
-  youtubeUrls = [],
+  youtubeUrls = EMPTY_YOUTUBE_URLS,
   onCurrentYoutubePositionChange,
 }: GoproOverlaySyncPreviewProps) {
   const { t } = useTranslation();
@@ -207,24 +208,35 @@ export function GoproOverlaySyncPreview({
   }, [preferredYoutubeUrl]);
   const parsedOffset = Number(offset);
   const manualOffset = Number.isFinite(parsedOffset) ? parsedOffset : 0;
-  const [displayOffset, setDisplayOffset] = useState(manualOffset);
+  const [displayOffsetState, setDisplayOffsetState] = useState({
+    manualOffset,
+    value: manualOffset,
+  });
+  if (displayOffsetState.manualOffset !== manualOffset) {
+    setDisplayOffsetState({ manualOffset, value: manualOffset });
+  }
+  const displayOffset = displayOffsetState.value;
+  const setDisplayOffset = (value: number) =>
+    setDisplayOffsetState({ manualOffset, value });
   const automaticOffset = isYoutubeCalibration
     ? 0
     : (preview.data?.alignment.automatic_offset_seconds ?? 0);
   const gpxDuration = isYoutubeCalibration
     ? (flightTelemetry.data?.duration_seconds ?? 0)
     : (preview.data?.gpx.duration_seconds ?? 0);
-  const previewSegments = isYoutubeCalibration
-    ? youtubeDuration > 0
-      ? [
-          {
-            preview_start_seconds: 0,
-            source_start_seconds: 0,
-            duration_seconds: youtubeDuration,
-          },
-        ]
-      : []
-    : (preview.data?.video.preview_segments ?? []);
+  let previewSegments = preview.data?.video.preview_segments ?? [];
+  if (isYoutubeCalibration) {
+    previewSegments =
+      youtubeDuration > 0
+        ? [
+            {
+              preview_start_seconds: 0,
+              source_start_seconds: 0,
+              duration_seconds: youtubeDuration,
+            },
+          ]
+        : [];
+  }
   const sourceVideoTime = youtubeId
     ? videoTime
     : sourceTimeAtPreviewTime(videoTime, previewSegments);
@@ -250,10 +262,6 @@ export function GoproOverlaySyncPreview({
             )
         );
 
-  useEffect(() => {
-    setDisplayOffset(manualOffset);
-  }, [manualOffset]);
-
   const gpxCoordinates: GeoPoint[] = isYoutubeCalibration
     ? (flightTelemetry.data?.points ?? []).map(
         ({ speed_kmh, heart_rate, ...point }): GeoPoint => {
@@ -270,15 +278,18 @@ export function GoproOverlaySyncPreview({
         }
       )
     : (preview.data?.gpx.coordinates ?? []);
-  const gpxStartTimestamp = isYoutubeCalibration
-    ? (gpxCoordinates[0]?.timestamp ??
+  let gpxStartTimestamp = 0;
+  if (isYoutubeCalibration) {
+    gpxStartTimestamp =
+      gpxCoordinates[0]?.timestamp ??
       (flightTelemetry.data?.start_time
         ? parseApiUtcDate(flightTelemetry.data.start_time).getTime()
-        : 0))
-    : preview.data
-      ? (preview.data.gpx.coordinates[0]?.timestamp ??
-        parseApiUtcDate(preview.data.gpx.start_time).getTime())
-      : 0;
+        : 0);
+  } else if (preview.data) {
+    gpxStartTimestamp =
+      preview.data.gpx.coordinates[0]?.timestamp ??
+      parseApiUtcDate(preview.data.gpx.start_time).getTime();
+  }
   const telemetry = gpxCoordinates.length
     ? telemetryAtTimestamp(
         gpxCoordinates,
@@ -450,13 +461,11 @@ export function GoproOverlaySyncPreview({
 
   const selectAlignmentTarget = (target: GpxAlignmentTarget) => {
     setAlignmentTarget(target);
-    seekToPreviewBoundary(
-      target === 'start'
-        ? 0
-        : youtubeId && youtubeDuration > 0
-          ? youtubeDuration
-          : endPreviewStartTime
-    );
+    let previewBoundary = endPreviewStartTime;
+    if (target === 'start') previewBoundary = 0;
+    else if (youtubeId && youtubeDuration > 0)
+      previewBoundary = youtubeDuration;
+    seekToPreviewBoundary(previewBoundary);
   };
 
   const alignGpxAtCurrentVideoTime = async () => {

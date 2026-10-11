@@ -113,6 +113,14 @@ function getAnalysisProgressStep(elapsedSeconds: number): string {
   return 'Toujours en cours, la vérification continue automatiquement';
 }
 
+function getThermalCeilingColor(
+  ceilingMeters: number
+): 'green' | 'amber' | 'gray' {
+  if (ceilingMeters >= 2000) return 'green';
+  if (ceilingMeters >= 1200) return 'amber';
+  return 'gray';
+}
+
 function AnalysisProgress({ elapsedSeconds }: { elapsedSeconds: number }) {
   const progress = getEstimatedProgress(elapsedSeconds);
 
@@ -193,23 +201,29 @@ function HourSlider({
           const percent =
             hours.length > 1 ? (idx / (hours.length - 1)) * 100 : 50;
 
-          const buttonClassName = isActive
-            ? isFailed
-              ? 'font-bold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/30'
-              : isPending
-                ? 'font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30'
-                : 'font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30'
-            : isFailed
-              ? 'text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300'
-              : isPending
-                ? 'text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300'
-                : 'text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300';
+          let buttonClassName: string;
+          if (isActive && isFailed)
+            buttonClassName =
+              'font-bold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/30';
+          else if (isActive && isPending)
+            buttonClassName =
+              'font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30';
+          else if (isActive)
+            buttonClassName =
+              'font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30';
+          else if (isFailed)
+            buttonClassName =
+              'text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300';
+          else if (isPending)
+            buttonClassName =
+              'text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300';
+          else
+            buttonClassName =
+              'text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300';
 
-          const label = isFailed
-            ? `Échec analyse ${h.hour}h : ${errorText}`
-            : isPending
-              ? `Analyse ${h.hour}h en attente`
-              : `Analyse ${h.hour}h`;
+          let label = `Analyse ${h.hour}h`;
+          if (isFailed) label = `Échec analyse ${h.hour}h : ${errorText}`;
+          else if (isPending) label = `Analyse ${h.hour}h en attente`;
 
           if (!isFailed && !isPending) {
             return (
@@ -340,6 +354,12 @@ export default function EmagramWidget({
   ) : null;
 
   const triggerMutation = useTriggerEmagram();
+  let emptyHoursMessage: string;
+  if (!siteId) emptyHoursMessage = 'Aucun site sélectionné';
+  else if (isLoadingHours) emptyHoursMessage = 'Chargement des heures...';
+  else if (hasHourlyData)
+    emptyHoursMessage = 'Choisissez une heure pour lancer l’analyse.';
+  else emptyHoursMessage = 'Aucun créneau horaire disponible.';
 
   const handleRefresh = async () => {
     if (!siteId || isRefreshing) return;
@@ -368,13 +388,7 @@ export default function EmagramWidget({
         </div>
         {hourSlider}
         <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
-          {!siteId
-            ? 'Aucun site sélectionné'
-            : isLoadingHours
-              ? 'Chargement des heures...'
-              : hasHourlyData
-                ? 'Choisissez une heure pour lancer l’analyse.'
-                : 'Aucun créneau horaire disponible.'}
+          {emptyHoursMessage}
         </div>
       </div>
     );
@@ -439,12 +453,12 @@ export default function EmagramWidget({
           </Button>
         </div>
         {hourSlider}
-        {!siteId ? (
+        {siteId ? (
+          <AnalysisProgress elapsedSeconds={elapsedAnalysisSeconds} />
+        ) : (
           <div className="py-5 text-center text-gray-500 dark:text-gray-400 text-sm">
             Aucun site sélectionné
           </div>
-        ) : (
-          <AnalysisProgress elapsedSeconds={elapsedAnalysisSeconds} />
         )}
       </div>
     );
@@ -587,13 +601,7 @@ export default function EmagramWidget({
             <ThermalBadge
               icon="☁️"
               label={`Plafond ${emagram.plafond_thermique_m}m`}
-              color={
-                emagram.plafond_thermique_m >= 2000
-                  ? 'green'
-                  : emagram.plafond_thermique_m >= 1200
-                    ? 'amber'
-                    : 'gray'
-              }
+              color={getThermalCeilingColor(emagram.plafond_thermique_m)}
             />
           )}
         {emagram.stabilite_atmospherique && (

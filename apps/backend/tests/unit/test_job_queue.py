@@ -1,6 +1,6 @@
 """Unit tests for RQ queue helpers."""
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import job_queue
 
@@ -148,7 +148,7 @@ def test_enqueue_once_ignores_incomplete_rq_execution_metadata(monkeypatch):
 
 
 def test_delete_stale_started_job_preserves_live_heartbeat(monkeypatch) -> None:
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     existing_job = FakeJob("started", last_heartbeat=now)
     queue = FakeQueue(existing_job)
     monkeypatch.setattr(job_queue, "get_queue", lambda _name=None: queue)
@@ -164,7 +164,7 @@ def test_delete_stale_started_job_preserves_live_heartbeat(monkeypatch) -> None:
 
 
 def test_delete_stale_started_job_removes_expired_heartbeat(monkeypatch) -> None:
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     existing_job = FakeJob("started", last_heartbeat=now - timedelta(minutes=10))
     queue = FakeQueue(existing_job)
     monkeypatch.setattr(job_queue, "get_queue", lambda _name=None: queue)

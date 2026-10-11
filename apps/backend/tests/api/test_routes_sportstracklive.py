@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -116,7 +116,9 @@ def test_sportstracklive_manual_upload_recovers_stale_uploading_flight(
     gpx_path.write_text("<gpx />", encoding="utf-8")
     sample_flight.gpx_file_path = str(gpx_path)
     sample_flight.sportstracklive_status = "uploading"
-    sample_flight.sportstracklive_upload_started_at = datetime.utcnow() - timedelta(hours=1)
+    sample_flight.sportstracklive_upload_started_at = datetime.now(UTC).replace(
+        tzinfo=None
+    ) - timedelta(hours=1)
     db_session.add(
         SportstrackLiveCredential(
             user_id=1,

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Flight } from '../../../types';
@@ -171,7 +171,7 @@ describe('FlightTemporaryMediaCard', () => {
     expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
   });
 
-  it('requires confirmation and keeps the YouTube video when deleting a published source', () => {
+  it('requires confirmation and keeps the YouTube video when deleting a published source', async () => {
     publicationMock.isPublished = true;
     render(<FlightTemporaryMediaCard flight={flight} sourceType="pano" />);
 
@@ -185,7 +185,6 @@ describe('FlightTemporaryMediaCard', () => {
       name: 'Delete local file',
     });
     fireEvent.click(deleteButtons[deleteButtons.length - 1]);
-
-    expect(mutateAsyncMock).toHaveBeenCalledWith('pano');
+    await waitFor(() => expect(mutateAsyncMock).toHaveBeenCalledWith('pano'));
   });
 });

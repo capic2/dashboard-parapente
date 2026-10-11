@@ -17,7 +17,7 @@ import traceback
 import time
 from collections import deque
 from collections.abc import Collection
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -389,7 +389,7 @@ def _set_job_render_method(job_id: str, render_method: str | None) -> None:
         job = db.query(VideoExportJob).filter(VideoExportJob.id == job_id).first()
         if job:
             job.render_method = normalized_method
-            job.updated_at = datetime.utcnow()
+            job.updated_at = datetime.now(UTC).replace(tzinfo=None)
             db.commit()
 
 
@@ -444,7 +444,7 @@ def _set_job_auth_token(job_id: str, token: str | None):
             return
 
         job.auth_token = token
-        job.updated_at = datetime.utcnow()
+        job.updated_at = datetime.now(UTC).replace(tzinfo=None)
         db.commit()
 
 
@@ -529,7 +529,7 @@ def _update_job(
     allowed_statuses = (
         set(allowed_current_statuses) if allowed_current_statuses is not None else _ACTIVE_STATUSES
     )
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     changes = {**kwargs, "updated_at": now}
     target_status = changes.get("status")
 
@@ -596,7 +596,7 @@ def _is_cancelled(job_id: str) -> bool:
 
 def _mark_stale_jobs_as_queued():
     with SessionLocal() as db:
-        cutoff = datetime.utcnow() - timedelta(minutes=2)
+        cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=2)
         stale_job_ids = [
             job_id
             for (job_id,) in (
@@ -610,7 +610,7 @@ def _mark_stale_jobs_as_queued():
         if not stale_job_ids:
             return
 
-        now = datetime.utcnow()
+        now = datetime.now(UTC).replace(tzinfo=None)
         (
             db.query(VideoExportJob)
             .filter(VideoExportJob.id.in_(stale_job_ids))
@@ -651,7 +651,7 @@ def _recover_active_jobs_after_worker_restart() -> None:
                 {
                     "status": _STATUS_QUEUED,
                     "message": "Recovered after worker restart",
-                    "updated_at": datetime.utcnow(),
+                    "updated_at": datetime.now(UTC).replace(tzinfo=None),
                 },
                 synchronize_session=False,
             )
@@ -675,7 +675,7 @@ def _acquire_next_job() -> str | None:
 
 
 def _acquire_job(job_id: str) -> str | None:
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     with SessionLocal() as db:
         updated_rows = (
             db.query(VideoExportJob)
@@ -811,7 +811,9 @@ def enqueue_pending_video_export_jobs(*, recover_active: bool = False) -> int:
     job_ids = _queued_job_ids()
     from job_queue import delete_stale_started_job
 
-    stale_before = datetime.utcnow() - timedelta(seconds=VIDEO_EXPORT_JOB_LEASE_SECONDS)
+    stale_before = datetime.now(UTC).replace(tzinfo=None) - timedelta(
+        seconds=VIDEO_EXPORT_JOB_LEASE_SECONDS
+    )
     for job_id in job_ids:
         # A recovered database job can still have an orphaned RQ execution
         # marked started. Remove it only after its heartbeat lease expires so
@@ -1860,7 +1862,7 @@ def _enqueue_video_export_job(
 
     with job_admission("video_export_create"):
         job_id = str(uuid.uuid4())
-        now = datetime.utcnow()
+        now = datetime.now(UTC).replace(tzinfo=None)
 
         with SessionLocal() as db:
             job = VideoExportJob(
@@ -2596,7 +2598,7 @@ async def _export_video_manual_render(job_id: str):
             if not encoding_completed:
                 return
 
-            timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+            timestamp = datetime.now(UTC).replace(tzinfo=None).strftime("%Y%m%d-%H%M%S")
             output_file = _video_output_path(flight_id, timestamp)
             await asyncio.to_thread(shutil.move, str(encoding_output_file), str(output_file))
             _log_job(job_id, f"Video encoded: {output_file}")
