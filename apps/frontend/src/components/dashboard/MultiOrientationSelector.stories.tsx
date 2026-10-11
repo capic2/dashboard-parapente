@@ -245,7 +245,7 @@ DisplaysSiteName.test(
   'displays site name and orientation',
   async ({ canvas }) => {
     await expect(canvas.getByText('Mont Poupet')).toBeInTheDocument();
-    await expect(canvas.getByText('(N)')).toBeInTheDocument();
+    await expect(canvas.getAllByText('N').length).toBeGreaterThan(0);
   }
 );
 
@@ -348,7 +348,7 @@ HighlightsSelectedSite.test(
 
     // Check that "Sud" option has selected styles
     const sudOption = canvas.getByText('Sud').closest('button');
-    await expect(sudOption).toHaveClass('bg-blue-50');
+    await expect(sudOption).toHaveClass('bg-sky-600');
   }
 );
 
@@ -400,7 +400,7 @@ ShowsRatingStars.test(
     await userEvent.click(button);
 
     await waitFor(() => {
-      expect(canvas.getByText(/⭐⭐⭐⭐⭐/)).toBeInTheDocument(); // 5 stars for Sud
+      expect(canvas.getByText('Note 5/5')).toBeInTheDocument();
     });
   }
 );

@@ -211,6 +211,18 @@ def test_falls_back_to_track_average_when_recorded_speeds_cannot_form_interval()
     assert calculate_track_stats(points)["average_speed_kmh"] == pytest.approx(40, abs=1)
 
 
+def test_track_average_uses_unrounded_distance_for_short_intervals() -> None:
+    points = [
+        {"lat": 47.2, "lon": 6.0, "elevation": 500, "timestamp": 1_000},
+        {"lat": 47.200001, "lon": 6.0, "elevation": 500, "timestamp": 2_000},
+    ]
+
+    stats = calculate_track_stats(points)
+
+    assert stats["distance_km"] == 0
+    assert stats["average_speed_kmh"] == pytest.approx(0.4, abs=0.01)
+
+
 def test_falls_back_to_track_average_when_recorded_speeds_cover_only_part_of_track() -> None:
     points = [
         {"lat": 47.2, "lon": 6.0, "elevation": 500, "timestamp": 1_000, "speed_kmh": 0},

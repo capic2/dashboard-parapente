@@ -27,15 +27,18 @@ const meta = preview.meta({
           'Statistics panel displaying flight metrics including total flights, hours, distance, averages, favorite spot, and last flight date. Fetches data using useFlightStats hook.',
       },
     },
-    msw: {
-      handlers: [
+  },
+  tags: ['autodocs'],
+
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('/api/flights/stats', () => {
           return HttpResponse.json(mockStats);
         }),
-      ],
-    },
+      ]
+    );
   },
-  tags: ['autodocs'],
 });
 
 // Default with stats
@@ -46,38 +49,38 @@ export const Default = meta.story({
 // Loading state
 export const Loading = meta.story({
   name: 'Loading',
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('/api/flights/stats', async () => {
           await new Promise((resolve) => setTimeout(resolve, 100000));
           return HttpResponse.json(mockStats);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
 // Error state
 export const Error = meta.story({
   name: 'Error',
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('/api/flights/stats', () => {
           return new HttpResponse(null, { status: 500 });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
 // No flights yet
 export const NoFlights = meta.story({
   name: 'No Flights',
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('/api/flights/stats', () => {
           return HttpResponse.json({
             total_flights: 0,
@@ -93,17 +96,17 @@ export const NoFlights = meta.story({
             last_flight_date: null,
           });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
 // Many flights
 export const ManyFlights = meta.story({
   name: 'Many Flights',
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('/api/flights/stats', () => {
           return HttpResponse.json({
             total_flights: 256,
@@ -119,7 +122,7 @@ export const ManyFlights = meta.story({
             last_flight_date: '2024-03-17T10:15:00Z',
           });
         }),
-      ],
-    },
+      ]
+    );
   },
 });

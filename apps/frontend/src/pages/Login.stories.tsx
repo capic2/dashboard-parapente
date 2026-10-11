@@ -18,14 +18,12 @@ const successHandler = http.post('*/api/auth/login', async () => {
 
 export const Default = meta.story({
   name: 'Default',
-  beforeEach: () => {
-    useAuthStore.setState({ token: null, isAuthenticated: false });
-    localStorage.removeItem('parapente-auth');
-  },
-  parameters: {
-    msw: {
-      handlers: [successHandler],
-    },
+  beforeEach: async (context) => {
+    context.msw.use(...[successHandler]);
+    return () => {
+      useAuthStore.setState({ token: null, isAuthenticated: false });
+      localStorage.removeItem('parapente-auth');
+    };
   },
 });
 
@@ -38,18 +36,18 @@ Default.test('renders login form', async ({ canvasElement }) => {
 
 export const Loading = meta.story({
   name: 'Loading',
-  beforeEach: () => {
-    useAuthStore.setState({ token: null, isAuthenticated: false });
-    localStorage.removeItem('parapente-auth');
-  },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: async (context) => {
+    context.msw.use(
+      ...[
         http.post('*/api/auth/login', async () => {
           await new Promise(() => {});
         }),
-      ],
-    },
+      ]
+    );
+    return () => {
+      useAuthStore.setState({ token: null, isAuthenticated: false });
+      localStorage.removeItem('parapente-auth');
+    };
   },
 });
 
@@ -73,18 +71,18 @@ Loading.test('shows pending state after submit', async ({ canvasElement }) => {
 
 export const InvalidCredentials = meta.story({
   name: 'Invalid Credentials',
-  beforeEach: () => {
-    useAuthStore.setState({ token: null, isAuthenticated: false });
-    localStorage.removeItem('parapente-auth');
-  },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: async (context) => {
+    context.msw.use(
+      ...[
         http.post('*/api/auth/login', () => {
           return new HttpResponse(null, { status: 401 });
         }),
-      ],
-    },
+      ]
+    );
+    return () => {
+      useAuthStore.setState({ token: null, isAuthenticated: false });
+      localStorage.removeItem('parapente-auth');
+    };
   },
 });
 
@@ -111,14 +109,12 @@ InvalidCredentials.test(
 
 export const SubmitSuccess = meta.story({
   name: 'Submit Success',
-  beforeEach: () => {
-    useAuthStore.setState({ token: null, isAuthenticated: false });
-    localStorage.removeItem('parapente-auth');
-  },
-  parameters: {
-    msw: {
-      handlers: [successHandler],
-    },
+  beforeEach: async (context) => {
+    context.msw.use(...[successHandler]);
+    return () => {
+      useAuthStore.setState({ token: null, isAuthenticated: false });
+      localStorage.removeItem('parapente-auth');
+    };
   },
 });
 

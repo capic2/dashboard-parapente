@@ -24,4 +24,3 @@ def test_parse_gemini_response_repairs_truncated_string() -> None:
     assert result["force_thermique_ms"] == 2.1
     assert result["score_volabilite"] == 70
     assert result["details_analyse"].startswith("L'inversion")
-

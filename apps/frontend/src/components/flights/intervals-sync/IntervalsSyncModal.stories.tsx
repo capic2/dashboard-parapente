@@ -58,9 +58,9 @@ const baseArgs = {
 
 export const Preview = meta.story({
   args: baseArgs,
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/admin/intervals/status', () =>
           HttpResponse.json(readyStatus)
         ),
@@ -77,32 +77,32 @@ export const Preview = meta.story({
             flights: [],
           })
         ),
-      ],
-    },
+      ]
+    );
   },
 });
 
 export const Empty = meta.story({
   args: baseArgs,
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/admin/intervals/status', () =>
           HttpResponse.json(readyStatus)
         ),
         http.get('*/api/flights/sync-intervals/preview', () =>
           HttpResponse.json({ activities: [], activity_types: [] })
         ),
-      ],
-    },
+      ]
+    );
   },
 });
 
 export const Unconfigured = meta.story({
   args: baseArgs,
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/admin/intervals/status', () =>
           HttpResponse.json({
             ...readyStatus,
@@ -110,37 +110,37 @@ export const Unconfigured = meta.story({
             activity_types: [],
           })
         ),
-      ],
-    },
+      ]
+    );
   },
 });
 
 export const Loading = meta.story({
   args: baseArgs,
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/admin/intervals/status', async () => {
           await delay('infinite');
           return HttpResponse.json(readyStatus);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
 export const Error = meta.story({
   args: baseArgs,
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/admin/intervals/status', () =>
           HttpResponse.json(
             { detail: 'Intervals.icu unavailable' },
             { status: 503 }
           )
         ),
-      ],
-    },
+      ]
+    );
   },
 });

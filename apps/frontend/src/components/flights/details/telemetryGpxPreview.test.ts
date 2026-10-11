@@ -21,9 +21,17 @@ describe('telemetry GPX preview', () => {
     const telemetry = await parseTelemetryGpxFile(file);
 
     expect(telemetry.points.map((point) => point.heart_rate)).toEqual([
-      120, 126,
+      120,
+      126,
+      undefined,
+      undefined,
     ]);
-    expect(telemetry.points.map((point) => point.power)).toEqual([200, 220]);
+    expect(telemetry.points.map((point) => point.power)).toEqual([
+      200,
+      220,
+      undefined,
+      undefined,
+    ]);
     expect(telemetry.points.map((point) => point.speed_kmh)).toEqual([
       36, 43.2, 14.4, 10.8,
     ]);
