@@ -1,6 +1,6 @@
 """Helpers for configurable emagram freshness windows."""
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -15,7 +15,9 @@ def get_emagram_max_age_minutes(db: Session | None = None) -> int:
 
 def get_emagram_cutoff_utc(db: Session | None = None) -> datetime:
     """Return UTC cutoff datetime used to consider an emagram as fresh."""
-    return datetime.utcnow() - timedelta(minutes=get_emagram_max_age_minutes(db=db))
+    return datetime.now(UTC).replace(tzinfo=None) - timedelta(
+        minutes=get_emagram_max_age_minutes(db=db)
+    )
 
 
 def get_emagram_next_update_utc(analysis_datetime: datetime, db: Session | None = None) -> datetime:

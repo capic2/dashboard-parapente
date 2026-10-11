@@ -3,7 +3,7 @@
 Test script for Google Gemini Vision integration.
 
 This script tests the complete Gemini workflow:
-1. Check if google-generativeai is installed
+1. Check if google-genai is installed
 2. Check if GOOGLE_API_KEY is configured
 3. Create test screenshots
 4. Analyze with Gemini Vision
@@ -23,17 +23,17 @@ logger = logging.getLogger(__name__)
 
 
 def check_gemini_package():
-    """Check if google-generativeai package is installed."""
-    logger.info("Checking if google-generativeai is installed...")
+    """Check if google-genai package is installed."""
+    logger.info("Checking if google-genai is installed...")
 
     try:
-        import google.generativeai as _genai  # noqa: F401 - import check only
+        from google import genai as _genai  # noqa: F401 - import check only
 
-        logger.info("✅ google-generativeai package is installed")
+        logger.info("✅ google-genai package is installed")
         return True
     except ImportError:
-        logger.error("❌ google-generativeai package not found")
-        logger.info("💡 Install with: pip install google-generativeai")
+        logger.error("❌ google-genai package not found")
+        logger.info("💡 Install with: pip install google-genai")
         return False
 
 
@@ -176,9 +176,9 @@ def main():
 
     # Check prerequisites
     if not check_gemini_package():
-        logger.error("\n❌ Test failed: google-generativeai not installed")
+        logger.error("\n❌ Test failed: google-genai not installed")
         logger.info("\nTo install:")
-        logger.info("  pip install google-generativeai")
+        logger.info("  pip install google-genai")
         return False
 
     api_key = check_api_key()

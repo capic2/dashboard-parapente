@@ -149,6 +149,12 @@ vi.mock('@dashboard-parapente/design-system', async () => {
 });
 
 vi.mock('react-aria-components', () => ({
+  Heading: ({
+    children,
+    ...props
+  }: React.HTMLAttributes<HTMLHeadingElement>) => (
+    <h2 {...props}>{children}</h2>
+  ),
   Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => (
     <input {...props} />
   ),
@@ -836,7 +842,7 @@ describe('FlightDetails GoPro overlay action', () => {
     openTab('Processing');
     expect(screen.getByText('Best moments')).toBeInTheDocument();
     fireEvent.click(
-      screen.getByRole('button', { name: /Best moments Completed/ })
+      screen.getByRole('button', { name: /Best moments Completed/u })
     );
     expect(screen.getByText('Best moments ready')).toBeInTheDocument();
   });
@@ -1803,7 +1809,7 @@ describe('FlightDetails GoPro overlay action', () => {
     expect(videoToggle).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('regenerates overlay after cancellation', () => {
+  it('regenerates overlay after cancellation', async () => {
     mockFlight.gopro_overlay_job_id = 'job-overlay';
     mockFlight.gopro_overlay_status = 'cancelled';
 
@@ -1825,7 +1831,7 @@ describe('FlightDetails GoPro overlay action', () => {
       screen.getByRole('button', { name: 'flights.goproOverlayLaunch' })
     );
 
-    expect(createOverlayMock).toHaveBeenCalled();
+    await waitFor(() => expect(createOverlayMock).toHaveBeenCalled());
   });
 
   it('shows every persisted overlay resolution', () => {
@@ -1932,7 +1938,7 @@ describe('FlightDetails GoPro overlay action', () => {
     expect(confirmMock).toHaveBeenCalledWith('Confirm delete overlay');
   });
 
-  it('regenerates an existing overlay after confirmation', () => {
+  it('regenerates an existing overlay after confirmation', async () => {
     mockFlight.gopro_overlay_job_id = 'job-overlay';
     mockFlight.gopro_overlay_status = 'completed';
     mockFlight.gopro_overlay_file_path = '/exports/final.mp4';
@@ -1956,7 +1962,7 @@ describe('FlightDetails GoPro overlay action', () => {
       screen.getByRole('button', { name: 'flights.goproOverlayLaunch' })
     );
 
-    expect(createOverlayMock).toHaveBeenCalled();
+    await waitFor(() => expect(createOverlayMock).toHaveBeenCalled());
   });
 
   it('keeps an existing overlay when regeneration is not confirmed', () => {

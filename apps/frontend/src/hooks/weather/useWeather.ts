@@ -73,14 +73,14 @@ export const transformWeatherResponse = (
   const hourToVerdict = new Map<number, string>();
   if (data.slots) {
     data.slots.forEach((slot: Slot) => {
-      const verdictText =
-        slot.verdict === '🟢'
-          ? 'BON'
-          : slot.verdict === '🟡'
-            ? 'MOYEN'
-            : slot.verdict === '🟠'
-              ? 'LIMITE'
-              : 'MAUVAIS';
+      let verdictText = 'MAUVAIS';
+      if (slot.verdict === '🟢') {
+        verdictText = 'BON';
+      } else if (slot.verdict === '🟡') {
+        verdictText = 'MOYEN';
+      } else if (slot.verdict === '🟠') {
+        verdictText = 'LIMITE';
+      }
       for (let h = slot.start_hour; h <= slot.end_hour; h++) {
         hourToVerdict.set(h, verdictText);
       }
@@ -100,9 +100,9 @@ export const transformWeatherResponse = (
       wind_direction: formatWindDirection(hour.wind_direction),
       wind_direction_deg: hour.wind_direction ?? null,
       conditions:
-        hour.cloud_cover !== null
-          ? `${Math.round(hour.cloud_cover)}% nuages`
-          : 'N/A',
+        hour.cloud_cover === null
+          ? 'N/A'
+          : `${Math.round(hour.cloud_cover)}% nuages`,
       precipitation: hour.precipitation ?? null,
       para_index: hour.para_index ?? 0,
       verdict: hour.verdict ?? hourToVerdict.get(hour.hour) ?? 'N/A',
@@ -208,10 +208,6 @@ export const createWeatherQueryFn =
     const todayValidation =
       BackendWeatherResponseSchema.safeParse(todayResponse);
     if (!todayValidation.success) {
-      console.error(
-        '❌ Today weather validation failed:',
-        todayValidation.error
-      );
       throw new Error(
         `Invalid today weather: ${todayValidation.error.message}`
       );

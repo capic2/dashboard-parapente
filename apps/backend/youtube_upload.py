@@ -11,7 +11,7 @@ import time
 import uuid
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, TypedDict
 from urllib.parse import urlencode, urlparse
@@ -320,7 +320,7 @@ def store_download_cookies(db: Session, *, user_id: int, cookies: str) -> None:
     if credential is None:
         raise YoutubeOAuthError("Connect YouTube before adding download cookies")
     credential.download_cookies_encrypted = encrypt_secret(cookies)
-    credential.updated_at = datetime.utcnow()
+    credential.updated_at = datetime.now(UTC).replace(tzinfo=None)
     db.commit()
 
 
@@ -806,7 +806,7 @@ def enqueue_youtube_overlay_upload(job_id: str, source_path: Path) -> None:
                 {
                     "source_path": str(source_path),
                     "status": "queued",
-                    "updated_at": datetime.utcnow(),
+                    "updated_at": datetime.now(UTC).replace(tzinfo=None),
                 }
             )
         )
@@ -832,7 +832,7 @@ def fail_youtube_overlay_upload(job_id: str, error: str) -> None:
             {
                 "status": "failed",
                 "error": error[:1000],
-                "updated_at": datetime.utcnow(),
+                "updated_at": datetime.now(UTC).replace(tzinfo=None),
             }
         )
         db.commit()
@@ -853,7 +853,7 @@ def _update_active_job(job_id: str, **changes: Any) -> bool:
                 YoutubeUploadJob.id == job_id,
                 YoutubeUploadJob.status.in_(_ACTIVE_STATUSES),
             )
-            .update({**changes, "updated_at": datetime.utcnow()})
+            .update({**changes, "updated_at": datetime.now(UTC).replace(tzinfo=None)})
         )
         db.commit()
         return updated == 1
@@ -893,7 +893,7 @@ def cancel_upload(db: Session, *, job_id: str, user_id: int) -> YoutubeUploadJob
                 "status": _CANCELLED_STATUS,
                 "upload_session_encrypted": None,
                 "error": None,
-                "updated_at": datetime.utcnow(),
+                "updated_at": datetime.now(UTC).replace(tzinfo=None),
             }
         )
     )
@@ -1017,9 +1017,9 @@ def _finish_upload(job_id: str, video_id: str) -> None:
                     "youtube_video_id": video_id,
                     "youtube_url": youtube_url,
                     "upload_session_encrypted": None,
-                    "completed_at": datetime.utcnow(),
+                    "completed_at": datetime.now(UTC).replace(tzinfo=None),
                     "error": None,
-                    "updated_at": datetime.utcnow(),
+                    "updated_at": datetime.now(UTC).replace(tzinfo=None),
                 }
             )
         )
@@ -1315,9 +1315,11 @@ def process_youtube_upload(job_id: str) -> None:
                 .update(
                     {
                         "status": "uploading",
-                        "started_at": func.coalesce(YoutubeUploadJob.started_at, datetime.utcnow()),
+                        "started_at": func.coalesce(
+                            YoutubeUploadJob.started_at, datetime.now(UTC).replace(tzinfo=None)
+                        ),
                         "error": None,
-                        "updated_at": datetime.utcnow(),
+                        "updated_at": datetime.now(UTC).replace(tzinfo=None),
                     }
                 )
             )

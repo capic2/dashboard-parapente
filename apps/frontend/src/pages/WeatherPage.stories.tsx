@@ -631,7 +631,7 @@ const defaultHandlersWithoutSpotsAndDetails = defaultHandlers.filter(
   (handler) => handler !== spotsHandler && handler !== spotDetailsHandler
 );
 
-const DAY_SEARCH_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const DAY_SEARCH_DATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const parseLocalDate = (value: string) => {
@@ -826,9 +826,9 @@ WithCitySearch.test(
       name: i18n.t('weather.selection.search'),
     });
     await userEvent.click(searchTab);
-    const input = await canvas.findByPlaceholderText(/Besançon/);
+    const input = await canvas.findByPlaceholderText(/Besançon/u);
     await userEvent.type(input, 'Besan');
-    const suggestion = await canvas.findByRole('option', { name: /Besançon/ });
+    const suggestion = await canvas.findByRole('option', { name: /Besançon/u });
     await userEvent.click(suggestion);
     await canvas.findByText(i18n.t('weather.page.selectedSearchResult'));
     await userEvent.click(
@@ -862,7 +862,7 @@ export const NoSites = meta.story({
 });
 
 NoSites.test('shows no sites message', async ({ canvas }) => {
-  await canvas.findByText(/Choisissez une météo/);
+  await canvas.findByText(/Choisissez une météo/u);
 });
 
 export const Loading = meta.story({

@@ -6,7 +6,7 @@ import json
 import logging
 import uuid
 from collections.abc import Iterable
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -22,7 +22,7 @@ RETENTION_DAYS = 30
 
 
 def _utcnow() -> datetime:
-    return datetime.utcnow()
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def _clamp_progress(value: int | float | None) -> int | None:

@@ -253,12 +253,11 @@ const mockBackendWeatherGood = {
     total_rain_mm: 0,
   },
   consensus: mockHourlyForecastGood.map((hour) => ({
-    hour: parseInt(hour.hour.split(':')[0]),
+    hour: parseInt(hour.hour.split(':')[0], 10),
     temperature: hour.temp,
     wind_speed: hour.wind_speed,
     wind_gust: hour.wind_gust,
-    wind_direction:
-      hour.direction === 'NW' ? 315 : hour.direction === 'W' ? 270 : 315,
+    wind_direction: hour.direction === 'W' ? 270 : 315,
     precipitation: hour.precipitation,
     cloud_cover: hour.sources['open-meteo'].cloud_cover,
     cape: hour.cape,
@@ -288,12 +287,11 @@ const mockBackendWeatherMixed = {
     total_rain_mm: 1.5,
   },
   consensus: mockHourlyForecastMixed.map((hour) => ({
-    hour: parseInt(hour.hour.split(':')[0]),
+    hour: parseInt(hour.hour.split(':')[0], 10),
     temperature: hour.temp,
     wind_speed: hour.wind_speed,
     wind_gust: hour.wind_gust,
-    wind_direction:
-      hour.direction === 'NE' ? 45 : hour.direction === 'E' ? 90 : 90,
+    wind_direction: hour.direction === 'NE' ? 45 : 90,
     precipitation: hour.precipitation,
     cloud_cover: hour.sources['open-meteo'].cloud_cover,
     cape: hour.cape,
@@ -366,7 +364,7 @@ GoodConditions.test('it renders the correct values', async ({ canvas }) => {
   await expect(getByText('17.0')).toBeInTheDocument(); // 12:00
 
   // Verify wind direction arrows are rendered (SVG elements with aria-label)
-  const directionArrows = canvas.getAllByLabelText(/Vent \d+°/);
+  const directionArrows = canvas.getAllByLabelText(/Vent \d+°/u);
   await expect(directionArrows.length).toBeGreaterThanOrEqual(3);
 
   // Verify cloud cover values (units now in headers)
@@ -383,7 +381,7 @@ GoodConditions.test('it renders the correct values', async ({ canvas }) => {
   await expect(getAllByText('fort').length).toBeGreaterThanOrEqual(3); // All hours have "fort"
 
   // Verify all hours show "BON" verdict (since all have verdict: 'bon')
-  const bonVerdicts = getAllByText(/BON/);
+  const bonVerdicts = getAllByText(/BON/u);
   await expect(bonVerdicts.length).toBeGreaterThanOrEqual(3); // At least one for each hour
 });
 
@@ -429,9 +427,9 @@ MixedConditions.test(
     await expect(getAllByText('32.0').length).toBeGreaterThanOrEqual(1); // 12:00
 
     // Verify different verdicts appear
-    await expect(getAllByText(/MOYEN/).length).toBeGreaterThanOrEqual(1);
-    await expect(getAllByText(/LIMITE/).length).toBeGreaterThanOrEqual(1);
-    await expect(getAllByText(/MAUVAIS/).length).toBeGreaterThanOrEqual(1);
+    await expect(getAllByText(/MOYEN/u).length).toBeGreaterThanOrEqual(1);
+    await expect(getAllByText(/LIMITE/u).length).toBeGreaterThanOrEqual(1);
+    await expect(getAllByText(/MAUVAIS/u).length).toBeGreaterThanOrEqual(1);
 
     // Verify thermal strength is "Faible" for all (bad conditions)
     await expect(getAllByText('faible').length).toBeGreaterThanOrEqual(3);

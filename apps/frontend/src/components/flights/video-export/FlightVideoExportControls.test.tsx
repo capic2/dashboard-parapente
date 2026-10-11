@@ -24,11 +24,13 @@ vi.mock('@dashboard-parapente/design-system', () => ({
   Button: ({
     children,
     isDisabled,
+    onPress,
     ...props
   }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
     isDisabled?: boolean;
+    onPress?: () => void;
   }) => (
-    <button type="button" disabled={isDisabled} {...props}>
+    <button type="button" disabled={isDisabled} onClick={onPress} {...props}>
       {children}
     </button>
   ),

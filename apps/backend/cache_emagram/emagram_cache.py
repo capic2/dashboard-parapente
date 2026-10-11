@@ -79,7 +79,7 @@ class EmagramCache:
             if isinstance(sounding_data, dict):
                 sounding_data["cached_at"] = datetime.now(timezone.utc).isoformat()
             redis_client = await self._get_client()
-            await redis_client.setex(key, ttl_seconds, json.dumps(sounding_data))
+            await redis_client.set(key, json.dumps(sounding_data), ex=ttl_seconds)
 
             return True
 

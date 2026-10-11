@@ -76,15 +76,16 @@ function SiteMeta({
   isActive: boolean;
   forceLightSurface?: boolean;
 }) {
+  let textColor = 'text-slate-500 dark:text-slate-400';
+  if (isActive) {
+    textColor = 'text-sky-100';
+  } else if (forceLightSurface) {
+    textColor = 'text-slate-600';
+  }
+
   return (
     <span
-      className={`mt-1 flex flex-wrap items-center gap-2 text-xs ${
-        isActive
-          ? 'text-sky-100'
-          : forceLightSurface
-            ? 'text-slate-600'
-            : 'text-slate-500 dark:text-slate-400'
-      }`}
+      className={`mt-1 flex flex-wrap items-center gap-2 text-xs ${textColor}`}
     >
       {site.orientation && (
         <span className="inline-flex items-center gap-1">

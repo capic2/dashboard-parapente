@@ -49,7 +49,7 @@ export const VideoExports = meta.story({
 
 export const AwaitingActivityType = meta.story({
   name: 'No Activity Types',
-  beforeEach: async (context) => {
+  beforeEach: (context) => {
     context.msw.use(
       ...[
         ...intervalsNoActivityTypesHandlers,
@@ -63,7 +63,7 @@ export const AwaitingActivityType = meta.story({
 
 export const DeploymentWaiting = meta.story({
   name: 'Deployment Waiting',
-  beforeEach: async (context) => {
+  beforeEach: (context) => {
     context.msw.use(...deploymentWaitingHandlers);
     return resetCacheDb();
   },

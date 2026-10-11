@@ -110,7 +110,10 @@ export function DatePicker({ label, value, onChange }: DatePickerProps) {
                   />
                 </svg>
               </Button>
-              <Heading className="text-sm font-medium text-gray-900 dark:text-gray-100" />
+              <Heading
+                slot="title"
+                className="text-sm font-medium text-gray-900 dark:text-gray-100"
+              />
               <Button
                 slot="next"
                 className="w-8 h-8 flex cursor-pointer items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"

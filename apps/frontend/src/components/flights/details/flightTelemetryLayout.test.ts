@@ -24,7 +24,9 @@ describe('flight telemetry layout XML', () => {
     expect(
       parseTelemetryLayoutXml(serializeTelemetryLayoutXml(layout))
     ).toEqual(
-      layout.map((widget) => ({ ...widget, x: Number(widget.x.toFixed(4)) }))
+      layout.map((widget) =>
+        Object.assign({}, widget, { x: Number(widget.x.toFixed(4)) })
+      )
     );
   });
 

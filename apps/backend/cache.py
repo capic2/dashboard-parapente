@@ -137,7 +137,7 @@ async def close_redis():
     """Close Redis connection pool."""
     global _redis_pool
     if _redis_pool:
-        await _redis_pool.close()
+        await _redis_pool.aclose()
         _redis_pool = None
         logger.info("Redis connection closed")
 
@@ -214,7 +214,7 @@ async def set_cached(key: str, data: Any, ttl: int):
             data["cached_at"] = datetime.now(timezone.utc).isoformat()
         redis_client = await get_redis()
         serialized = json.dumps(data)
-        await redis_client.setex(key, ttl, serialized)
+        await redis_client.set(key, serialized, ex=ttl)
         logger.debug(f"Cache SET: {key} (TTL: {ttl}s)")
         inc_cache_operation("set", "ok")
 

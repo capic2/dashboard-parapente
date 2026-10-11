@@ -180,9 +180,9 @@ WithAssociations.test(
   'displays existing landing associations',
   async ({ canvas }) => {
     await canvas.findByText("Plaine d'Arguel");
-    await expect(canvas.getByText(/1\.34 km/)).toBeInTheDocument();
+    await expect(canvas.getByText(/1\.34 km/u)).toBeInTheDocument();
     await expect(canvas.getByText('Terrain de secours')).toBeInTheDocument();
-    await expect(canvas.getByText(/2\.1 km/)).toBeInTheDocument();
+    await expect(canvas.getByText(/2\.1 km/u)).toBeInTheDocument();
   }
 );
 
@@ -267,8 +267,8 @@ export const WithNotes = meta.story({
 });
 
 WithNotes.test('displays notes for associations', async ({ canvas }) => {
-  await canvas.findByText(/grand champ/);
-  await expect(canvas.getByText(/vent fort du nord/)).toBeInTheDocument();
+  await canvas.findByText(/grand champ/u);
+  await expect(canvas.getByText(/vent fort du nord/u)).toBeInTheDocument();
 });
 
 // Story: Loading state

@@ -36,6 +36,7 @@ def test_migration_backfills_legacy_identity_and_is_idempotent():
     indexes = connection.execute("PRAGMA index_list(flights)").fetchall()
     assert row == ("strava", "123")
     assert any(index[1] == "uq_flights_external_activity" and index[2] for index in indexes)
+    connection.close()
 
 
 def test_migration_tolerates_fresh_schema_columns_and_index():
@@ -53,3 +54,4 @@ def test_migration_tolerates_fresh_schema_columns_and_index():
 
     columns = {row[1] for row in connection.execute("PRAGMA table_info(flights)")}
     assert {"external_provider", "external_activity_id"} <= columns
+    connection.close()

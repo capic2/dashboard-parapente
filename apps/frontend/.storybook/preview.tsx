@@ -18,6 +18,19 @@ const defaultMswHandlers = [
   http.get('*/api/flights', () => HttpResponse.json({ flights: [] })),
   http.get('*/api/flights/stats', () => HttpResponse.json({})),
   http.get('*/api/flights/records', () => HttpResponse.json({ records: {} })),
+  http.get('*/api/flights/:flightId/gpx-data', () =>
+    HttpResponse.json({
+      data: {
+        coordinates: [],
+        max_altitude_m: 0,
+        min_altitude_m: 0,
+        elevation_gain_m: 0,
+        elevation_loss_m: 0,
+        total_distance_km: 0,
+        flight_duration_seconds: 0,
+      },
+    })
+  ),
   http.get('*/api/flights/:id', () => HttpResponse.json({})),
   http.get('*/api/flights/:id/youtube-upload', () => HttpResponse.json(null)),
   http.get('*/api/flights/:id/youtube-videos', () => HttpResponse.json([])),
@@ -32,8 +45,13 @@ const defaultMswHandlers = [
     HttpResponse.json({ configured: true, connected: false })
   ),
   http.get('*/api/video-export-jobs', () => HttpResponse.json({ jobs: [] })),
-  http.get('*/api/video-export-jobs/stream', () =>
-    new Response(null, { status: 204 })
+  http.get(
+    '*/api/video-export-jobs/stream',
+    () => new Response(null, { status: 204 })
+  ),
+  http.get(
+    '*/api/job-access/gopro-overlays/jobs/:jobId/stream',
+    () => new Response(null, { status: 204 })
   ),
   http.get('*/api/spots', () => HttpResponse.json({ sites: [] })),
   http.get('*/api/spots/:id', () => HttpResponse.json({})),

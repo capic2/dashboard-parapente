@@ -177,9 +177,7 @@ export function FlightTelemetryInteractivePreview({
   const telemetry = useFlightTelemetry(flightId, true);
   const layout = useTelemetryLayout(flightId);
   const [cameraTime, setCameraTime] = useState(0);
-  const [youtubeExportJobId, setYoutubeExportJobId] = useState(() =>
-    readYoutubeExportJobId(flightId)
-  );
+  const youtubeExportJobId = readYoutubeExportJobId(flightId);
   const youtubeAssociations = useYoutubeVideoAssociations(flightId);
   const uploadCookies = useUploadYoutubeDownloadCookies();
   const youtubeOverlayUpload = useYoutubeUpload(flightId, {
@@ -331,8 +329,7 @@ export function FlightTelemetryInteractivePreview({
     } else if (role === 'pilote' || pip.source === 'file:pilote') {
       label = t('flights.piloteBadge');
     }
-    return {
-      ...pip,
+    return Object.assign({}, pip, {
       x: pip.x / TELEMETRY_CANVAS_WIDTH,
       y: pip.y / TELEMETRY_CANVAS_HEIGHT,
       width: pip.width / TELEMETRY_CANVAS_WIDTH,
@@ -340,7 +337,7 @@ export function FlightTelemetryInteractivePreview({
       videoUrl,
       youtubeUrl: youtubePipUrl,
       label,
-    };
+    });
   });
   const assignedYoutubePipUrls = new Set(
     playerPips.flatMap((pip) => (pip.youtubeUrl ? [pip.youtubeUrl] : []))
@@ -354,14 +351,16 @@ export function FlightTelemetryInteractivePreview({
       >)
     : undefined;
   const explicitMainYoutubeUrl = youtubeUrlForRole(mainYoutubeRole);
-  const youtubeMainUrls =
-    mainVideoSource === 'auto'
-      ? unassignedYoutubeUrls.length
-        ? unassignedYoutubeUrls
-        : validYoutubeUrls
-      : mainYoutubeRole && explicitMainYoutubeUrl
-        ? [explicitMainYoutubeUrl]
-        : [];
+  let youtubeMainUrls: string[];
+  if (mainVideoSource === 'auto') {
+    youtubeMainUrls = unassignedYoutubeUrls.length
+      ? unassignedYoutubeUrls
+      : validYoutubeUrls;
+  } else if (mainYoutubeRole && explicitMainYoutubeUrl) {
+    youtubeMainUrls = [explicitMainYoutubeUrl];
+  } else {
+    youtubeMainUrls = [];
+  }
   const activeYoutubeIndex = youtubeMainUrls.length
     ? selectedYoutubeIndex % youtubeMainUrls.length
     : 0;
@@ -382,40 +381,38 @@ export function FlightTelemetryInteractivePreview({
   } else {
     mainVideoRole = mainVideoSource.split(':')[1] as TelemetryPipVideoRole;
   }
-  const explicitMainFileUrl =
-    mainVideoSource === 'file:face'
-      ? faceUrl
-      : mainVideoSource === 'file:pilote'
-        ? piloteUrl
-        : mainVideoSource === 'file:vol'
-          ? flightUrl
-          : undefined;
+  let explicitMainFileUrl: string | undefined;
+  if (mainVideoSource === 'file:face') explicitMainFileUrl = faceUrl;
+  else if (mainVideoSource === 'file:pilote') explicitMainFileUrl = piloteUrl;
+  else if (mainVideoSource === 'file:vol') explicitMainFileUrl = flightUrl;
   const isExplicitFileMain = mainVideoSource.startsWith('file:');
-  const mainCameraUrl = isExplicitFileMain
-    ? (explicitMainFileUrl ?? '')
-    : mainVideoSource.startsWith('youtube:') && !youtubeUrl
-      ? ''
-      : cameraUrl;
-  const isMainSourceUnavailable =
-    mainVideoSource !== 'auto' &&
-    (isExplicitFileMain ? !explicitMainFileUrl : !youtubeUrl);
-  const mainVideoLabel = mainVideoSource.endsWith(':face')
-    ? t('flights.faceBadge')
-    : mainVideoSource.endsWith(':pilote')
-      ? t('flights.piloteBadge')
-      : t('flights.goproOverlayFlightVideo');
+  let mainCameraUrl = cameraUrl;
+  if (isExplicitFileMain) mainCameraUrl = explicitMainFileUrl ?? '';
+  else if (mainVideoSource.startsWith('youtube:') && !youtubeUrl) {
+    mainCameraUrl = '';
+  }
+  let isMainSourceUnavailable = false;
+  if (mainVideoSource !== 'auto') {
+    isMainSourceUnavailable = isExplicitFileMain
+      ? !explicitMainFileUrl
+      : !youtubeUrl;
+  }
+  let mainVideoLabel = t('flights.goproOverlayFlightVideo');
+  if (mainVideoSource.endsWith(':face'))
+    mainVideoLabel = t('flights.faceBadge');
+  else if (mainVideoSource.endsWith(':pilote')) {
+    mainVideoLabel = t('flights.piloteBadge');
+  }
   // Flight markers share one source-video timeline across associated videos.
   // The existing overlay offset continues to align the GPX track separately.
   const activeVideoMarkers = videoMarkers;
-  const playablePips = playerPips.map((pip) => {
-    if (!youtubeUrl || pip.youtubeUrl !== youtubeUrl) return pip;
-    return Object.assign({}, pip, { youtubeUrl: undefined });
-  });
+  const playablePips = playerPips.map((pip) =>
+    !youtubeUrl || pip.youtubeUrl !== youtubeUrl
+      ? pip
+      : Object.assign({}, pip, { youtubeUrl: undefined })
+  );
   const pipOffsetSeconds = calibrationOffsetSeconds;
   const hasYoutubeCarousel = youtubeMainUrls.length > 1;
-  useEffect(() => {
-    setYoutubeExportJobId(readYoutubeExportJobId(flightId));
-  }, [flightId]);
   useEffect(() => {
     if (
       youtubeExportJobId &&

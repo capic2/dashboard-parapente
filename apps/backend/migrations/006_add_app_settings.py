@@ -5,7 +5,7 @@ Description: Adds key-value settings table for configurable cache, scheduler, an
 """
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import create_engine, text
 
@@ -46,7 +46,7 @@ def upgrade():
         """))
 
         # Insert default settings
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(UTC).replace(tzinfo=None).isoformat()
         for key, value in DEFAULT_SETTINGS.items():
             conn.execute(
                 text("""

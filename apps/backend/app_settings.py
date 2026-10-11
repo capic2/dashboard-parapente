@@ -6,7 +6,7 @@ Settings are cached in memory to avoid DB queries on every call (e.g., cache TTL
 """
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -123,9 +123,9 @@ def set_setting(db: Session, key: str, value: str) -> None:
     row = db.query(AppSetting).filter(AppSetting.key == key).first()
     if row:
         row.value = value
-        row.updated_at = datetime.utcnow()
+        row.updated_at = datetime.now(UTC).replace(tzinfo=None)
     else:
-        row = AppSetting(key=key, value=value, updated_at=datetime.utcnow())
+        row = AppSetting(key=key, value=value, updated_at=datetime.now(UTC).replace(tzinfo=None))
         db.add(row)
     db.commit()
     _settings_cache[key] = value

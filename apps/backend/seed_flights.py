@@ -8,7 +8,7 @@ import random
 import subprocess
 import sys
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -181,7 +181,9 @@ def create_sample_gpx(
     # Generate track points (one every 10 seconds)
     num_points = (duration_min * 60) // 10
 
-    base_time = start_time or datetime.utcnow() - timedelta(minutes=duration_min)
+    base_time = start_time or datetime.now(UTC).replace(tzinfo=None) - timedelta(
+        minutes=duration_min
+    )
     gpx_content = """<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Dashboard Parapente" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata>
@@ -330,7 +332,7 @@ def seed_flights(force: bool = False, include_media: bool = False) -> int:
             flight_id = str(uuid.uuid4())
             flight_date = date.today() - timedelta(days=flight_data["days_ago"])
             site = flight_data["site"]
-            created_at = datetime.utcnow()
+            created_at = datetime.now(UTC).replace(tzinfo=None)
 
             if not site:
                 continue

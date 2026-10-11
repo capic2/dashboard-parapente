@@ -99,17 +99,17 @@ WithError.test(
 
     // Verify error message is displayed
     await expect(
-      canvas.getByText(/Une erreur est survenue/i)
+      canvas.getByText(/Une erreur est survenue/iu)
     ).toBeInTheDocument();
 
     // Verify reset button is present
     await expect(
-      canvas.getByRole('button', { name: /Réessayer/i })
+      canvas.getByRole('button', { name: /Réessayer/iu })
     ).toBeInTheDocument();
 
     // Verify home button is present
     await expect(
-      canvas.getByRole('button', { name: /Retour à l'accueil/i })
+      canvas.getByRole('button', { name: /Retour à l'accueil/iu })
     ).toBeInTheDocument();
   }
 );

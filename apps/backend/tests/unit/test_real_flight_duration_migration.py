@@ -56,3 +56,4 @@ def test_migration_backfills_real_duration_and_is_idempotent() -> None:
         ).fetchone()[0]
         is None
     )
+    connection.close()

@@ -6,7 +6,7 @@ function parseVersion(version: string): number[] | null {
 
   const parts = trimmed.split('.');
   const parsed = parts.map((part) => {
-    if (!/^\d+$/.test(part)) {
+    if (!/^\d+$/u.test(part)) {
       return Number.NaN;
     }
     return Number.parseInt(part, 10);

@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -9,7 +10,7 @@ def test_seed_sites_populates_required_practical_info(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     db_path = tmp_path / "dashboard.db"
-    with sqlite3.connect(db_path) as connection:
+    with closing(sqlite3.connect(db_path)) as connection, connection:
         connection.execute("""
             CREATE TABLE sites (
                 id TEXT PRIMARY KEY,
@@ -33,7 +34,7 @@ def test_seed_sites_populates_required_practical_info(
 
     assert seed_sites.seed_sites() is True
 
-    with sqlite3.connect(db_path) as connection:
+    with closing(sqlite3.connect(db_path)) as connection, connection:
         connection.execute(
             "UPDATE sites SET practical_info = ? WHERE id = 'site-arguel'",
             ('{"access": "private"}',),
@@ -42,7 +43,7 @@ def test_seed_sites_populates_required_practical_info(
 
     assert seed_sites.seed_sites() is True
 
-    with sqlite3.connect(db_path) as connection:
+    with closing(sqlite3.connect(db_path)) as connection, connection:
         count, practical_info = connection.execute(
             "SELECT COUNT(*), practical_info FROM sites WHERE id = 'site-arguel'"
         ).fetchone()

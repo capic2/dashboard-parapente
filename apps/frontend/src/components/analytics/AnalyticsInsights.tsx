@@ -261,11 +261,10 @@ export default function AnalyticsInsights({
       const periodDurations = periodFlights
         .map((flight) => flight.duration_minutes)
         .filter((value): value is number => value != null);
-      return {
-        ...period,
+      return Object.assign({}, period, {
         count: periodFlights.length,
         medianDuration: median(periodDurations),
-      };
+      });
     });
 
     const calendarEnd = lastFlightDate ?? new Date(currentTime);

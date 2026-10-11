@@ -14,7 +14,7 @@ ARGUEL_LON = 6.0
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="API key may be missing or API down", strict=False)
+@pytest.mark.integration
 @pytest.mark.skipif(not METEOBLUE_API_KEY, reason="METEOBLUE_API_KEY not configured")
 async def test_fetch_meteoblue_success():
     result = await fetch_meteoblue(ARGUEL_LAT, ARGUEL_LON)
@@ -26,6 +26,7 @@ async def test_fetch_meteoblue_success():
 
 
 @pytest.mark.asyncio
+@pytest.mark.integration
 @pytest.mark.skipif(not METEOBLUE_API_KEY, reason="METEOBLUE_API_KEY not configured")
 async def test_fetch_meteoblue_timeout():
     import time

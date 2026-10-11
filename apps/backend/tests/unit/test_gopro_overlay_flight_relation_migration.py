@@ -39,3 +39,4 @@ def test_migration_links_existing_overlay_jobs_to_their_flights() -> None:
         "SELECT id, flight_id FROM gopro_overlay_jobs WHERE id = 'overlay-1080p'"
     ).fetchone()
     assert linked_job == ("overlay-1080p", "flight-1")
+    connection.close()

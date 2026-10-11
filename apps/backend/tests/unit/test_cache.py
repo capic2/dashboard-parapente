@@ -14,7 +14,7 @@ def mock_redis():
     """Create a mock Redis client."""
     redis = AsyncMock()
     redis.get = AsyncMock(return_value=None)
-    redis.setex = AsyncMock()
+    redis.set = AsyncMock()
     return redis
 
 
@@ -38,10 +38,10 @@ async def test_set_cached_injects_cached_at(mock_redis):
     assert parsed.tzinfo is not None  # timezone-aware
 
     # Verify Redis was called with the data including cached_at
-    mock_redis.setex.assert_called_once()
+    mock_redis.set.assert_called_once()
     import json
 
-    stored_data = json.loads(mock_redis.setex.call_args[0][2])
+    stored_data = json.loads(mock_redis.set.call_args.args[1])
     assert "cached_at" in stored_data
     assert stored_data["temperature"] == 15
     assert 'dashboard_cache_operations_total{operation="set",result="ok"} 1' in render_metrics()
@@ -56,7 +56,7 @@ async def test_set_cached_does_not_break_non_dict(mock_redis):
         await set_cached("test:key", data_list, ttl=3600)
 
     # Should still store the data
-    mock_redis.setex.assert_called_once()
+    mock_redis.set.assert_called_once()
     assert 'dashboard_cache_operations_total{operation="set",result="ok"} 1' in render_metrics()
 
 
@@ -99,7 +99,7 @@ async def test_close_redis_resets_pool():
 
     await close_redis()
 
-    mock_pool.close.assert_called_once()
+    mock_pool.aclose.assert_called_once()
     assert cache._redis_pool is None
 
 

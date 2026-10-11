@@ -27,11 +27,15 @@ interface MultiOrientationSelectorProps {
   baseName?: string; // Display name (e.g., "Mont Poupet")
 }
 
+const EMPTY_WEATHER_DATA: NonNullable<
+  MultiOrientationSelectorProps['weatherData']
+> = new Map();
+
 export function MultiOrientationSelector({
   sites,
   selectedSiteId,
   onSelectSite,
-  weatherData = new Map(),
+  weatherData = EMPTY_WEATHER_DATA,
   className = '',
   baseName,
 }: MultiOrientationSelectorProps) {

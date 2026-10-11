@@ -67,7 +67,7 @@ SingleToast.test(
 
     // Find and click the close button
     const closeButton = canvas.getByRole('button', {
-      name: /fermer la notification/i,
+      name: /fermer la notification/iu,
     });
     await userEvent.click(closeButton);
 
@@ -108,10 +108,10 @@ MultipleToasts.test('should render all toasts', async ({ canvasElement }) => {
 
   // Verify all three toasts are present
   await expect(
-    canvas.getByText(/File uploaded successfully/i)
+    canvas.getByText(/File uploaded successfully/iu)
   ).toBeInTheDocument();
-  await expect(canvas.getByText(/Connection lost/i)).toBeInTheDocument();
-  await expect(canvas.getByText(/New message received/i)).toBeInTheDocument();
+  await expect(canvas.getByText(/Connection lost/iu)).toBeInTheDocument();
+  await expect(canvas.getByText(/New message received/iu)).toBeInTheDocument();
 });
 
 // Container with many toasts (stacking)

@@ -6,7 +6,7 @@ import { server } from '../../mocks/server';
 import { overrideApi } from '../lib/api';
 
 // Disable API logs in tests
-overrideApi({ logs: false });
+overrideApi({});
 
 // Setup MSW
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));

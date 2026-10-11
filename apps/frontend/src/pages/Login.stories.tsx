@@ -18,7 +18,7 @@ const successHandler = http.post('*/api/auth/login', async () => {
 
 export const Default = meta.story({
   name: 'Default',
-  beforeEach: async (context) => {
+  beforeEach: (context) => {
     context.msw.use(...[successHandler]);
     return () => {
       useAuthStore.setState({ token: null, isAuthenticated: false });
@@ -36,7 +36,7 @@ Default.test('renders login form', async ({ canvasElement }) => {
 
 export const Loading = meta.story({
   name: 'Loading',
-  beforeEach: async (context) => {
+  beforeEach: (context) => {
     context.msw.use(
       ...[
         http.post('*/api/auth/login', async () => {
@@ -71,7 +71,7 @@ Loading.test('shows pending state after submit', async ({ canvasElement }) => {
 
 export const InvalidCredentials = meta.story({
   name: 'Invalid Credentials',
-  beforeEach: async (context) => {
+  beforeEach: (context) => {
     context.msw.use(
       ...[
         http.post('*/api/auth/login', () => {
@@ -109,7 +109,7 @@ InvalidCredentials.test(
 
 export const SubmitSuccess = meta.story({
   name: 'Submit Success',
-  beforeEach: async (context) => {
+  beforeEach: (context) => {
     context.msw.use(...[successHandler]);
     return () => {
       useAuthStore.setState({ token: null, isAuthenticated: false });
