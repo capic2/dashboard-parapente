@@ -38,9 +38,6 @@ export function ViewerExport() {
     if (typeof window !== 'undefined') {
       window._exportMode = 'manual_render';
 
-      console.log('🎥 Export mode: manual_render');
-      console.log('📍 Flight ID:', flightId);
-
       // Expose flight data when viewer is ready
       // This will be set by FlightViewer3D component
     }

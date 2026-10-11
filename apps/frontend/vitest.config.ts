@@ -35,11 +35,7 @@ export default defineConfig({
           environment: 'happy-dom',
           setupFiles: ['./src/test/setup.ts'],
           include: ['src/**/*.{test,spec}.{ts,tsx}'],
-          exclude: [
-            'node_modules',
-            'dist',
-            '.storybook',
-          ],
+          exclude: ['node_modules', 'dist', '.storybook'],
           env: {
             VITE_API_URL: 'http://localhost:8001',
             VITE_ENABLE_MSW: 'false',
@@ -48,8 +44,6 @@ export default defineConfig({
       },
       {
         plugins: [
-          react(),
-          tailwindcss(),
           storybookTest({
             configDir: path.join(dirname, '.storybook'),
           }),
@@ -57,6 +51,7 @@ export default defineConfig({
         test: {
           name: 'storybook',
           globals: true,
+          maxWorkers: 2,
           browser: {
             enabled: true,
             headless: true,

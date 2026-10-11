@@ -4,7 +4,7 @@ import asyncio
 import os
 import time
 from collections import deque
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -181,8 +181,8 @@ def test_job_auth_token_storage_roundtrip(test_db, monkeypatch):
             progress=0,
             message="test",
             frontend_url="http://localhost:5173",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
+            updated_at=datetime.now(UTC).replace(tzinfo=None),
         )
     )
     db_session.commit()
@@ -213,8 +213,8 @@ def test_set_job_auth_token_removes_value_when_none(test_db, monkeypatch):
             progress=0,
             message="test",
             frontend_url="http://localhost:5173",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
+            updated_at=datetime.now(UTC).replace(tzinfo=None),
         )
     )
     db_session.commit()
@@ -238,8 +238,8 @@ def test_job_render_method_is_persisted_for_other_processes(test_db, monkeypatch
                 status="capturing",
                 mode="manual_fast",
                 render_method=None,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(UTC).replace(tzinfo=None),
+                updated_at=datetime.now(UTC).replace(tzinfo=None),
             )
         )
         db_session.commit()
@@ -769,8 +769,8 @@ def test_start_video_export_worker_enqueues_pending_jobs_with_rq(test_db, monkey
             progress=0,
             message="queued",
             frontend_url="http://localhost:5173",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
+            updated_at=datetime.now(UTC).replace(tzinfo=None),
         )
     )
     db_session.commit()
@@ -812,8 +812,8 @@ def test_worker_restart_immediately_recovers_active_job(test_db, monkeypatch):
                 progress=50,
                 message="capturing",
                 frontend_url="http://localhost:5173",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(UTC).replace(tzinfo=None),
+                updated_at=datetime.now(UTC).replace(tzinfo=None),
             )
         )
         db_session.commit()
@@ -858,8 +858,8 @@ def test_video_export_reconciliation_clears_stale_rq_before_requeue(
                 status="queued",
                 mode="manual_fast",
                 progress=26,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(UTC).replace(tzinfo=None),
+                updated_at=datetime.now(UTC).replace(tzinfo=None),
             )
         )
         db_session.commit()
@@ -891,8 +891,8 @@ def test_process_video_export_job_runs_only_requested_queued_job(test_db, monkey
             progress=0,
             message="queued",
             frontend_url="http://localhost:5173",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
+            updated_at=datetime.now(UTC).replace(tzinfo=None),
         )
     )
     db_session.commit()
@@ -923,8 +923,8 @@ def test_thread_worker_dispatches_youtube_overlay_jobs(test_db, monkeypatch):
                 progress=0,
                 message="queued",
                 frontend_url="",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(UTC).replace(tzinfo=None),
+                updated_at=datetime.now(UTC).replace(tzinfo=None),
             )
         )
         db_session.commit()
@@ -1144,9 +1144,9 @@ def test_resume_video_export_requeues_cancelled_job_with_frames(test_db, tmp_pat
             total_frames=10,
             message="cancelled",
             frontend_url="http://localhost:5173",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
-            cancelled_at=datetime.utcnow(),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
+            updated_at=datetime.now(UTC).replace(tzinfo=None),
+            cancelled_at=datetime.now(UTC).replace(tzinfo=None),
         )
     )
     db_session.commit()
@@ -1169,7 +1169,7 @@ def test_resume_video_export_requeues_cancelled_job_with_frames(test_db, tmp_pat
 
 def test_stale_worker_update_does_not_overwrite_cancelled_job(test_db, monkeypatch):
     job_id = "job-cancelled-cross-process"
-    cancelled_at = datetime.utcnow()
+    cancelled_at = datetime.now(UTC).replace(tzinfo=None)
     monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
 
     with test_db() as db_session:
@@ -1182,8 +1182,8 @@ def test_stale_worker_update_does_not_overwrite_cancelled_job(test_db, monkeypat
                 progress=42,
                 message="Export cancelled by user",
                 cancelled_at=cancelled_at,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(UTC).replace(tzinfo=None),
+                updated_at=datetime.now(UTC).replace(tzinfo=None),
             )
         )
         db_session.commit()
@@ -1216,7 +1216,7 @@ def test_youtube_overlay_worker_does_not_update_flight_cesium_video(
         db_session.add(
             Flight(
                 id="flight-youtube-overlay-state",
-                flight_date=datetime.utcnow().date(),
+                flight_date=datetime.now(UTC).replace(tzinfo=None).date(),
                 video_export_job_id="existing-cesium-job",
                 video_export_status="completed",
                 video_file_path="/exports/cesium-flight.mp4",
@@ -1234,8 +1234,8 @@ def test_youtube_overlay_worker_does_not_update_flight_cesium_video(
                 progress=0,
                 message="queued",
                 frontend_url="",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(UTC).replace(tzinfo=None),
+                updated_at=datetime.now(UTC).replace(tzinfo=None),
             )
         )
         db_session.commit()
@@ -1285,9 +1285,9 @@ def test_resume_waits_for_started_rq_job_without_local_cancel_flag(test_db, tmp_
                 progress=42,
                 total_frames=10,
                 message="Export cancelled by user",
-                cancelled_at=datetime.utcnow(),
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                cancelled_at=datetime.now(UTC).replace(tzinfo=None),
+                created_at=datetime.now(UTC).replace(tzinfo=None),
+                updated_at=datetime.now(UTC).replace(tzinfo=None),
             )
         )
         db_session.commit()
@@ -1340,9 +1340,9 @@ def test_resume_video_export_drain_rejection_preserves_cancelled_job(
                 total_frames=10,
                 message="cancelled",
                 frontend_url="http://localhost:5173",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-                cancelled_at=datetime.utcnow(),
+                created_at=datetime.now(UTC).replace(tzinfo=None),
+                updated_at=datetime.now(UTC).replace(tzinfo=None),
+                cancelled_at=datetime.now(UTC).replace(tzinfo=None),
             )
         )
         db_session.commit()
@@ -1384,9 +1384,9 @@ def test_resume_video_export_waits_for_running_cancel_to_finish(test_db, tmp_pat
             total_frames=10,
             message="cancelled",
             frontend_url="http://localhost:5173",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
-            cancelled_at=datetime.utcnow(),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
+            updated_at=datetime.now(UTC).replace(tzinfo=None),
+            cancelled_at=datetime.now(UTC).replace(tzinfo=None),
         )
     )
     db_session.commit()
@@ -1438,9 +1438,9 @@ def test_resume_video_export_clears_stale_api_cancel_flag_for_finished_rq_job(
             total_frames=10,
             message="cancelled",
             frontend_url="http://backend:8001",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
-            cancelled_at=datetime.utcnow(),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
+            updated_at=datetime.now(UTC).replace(tzinfo=None),
+            cancelled_at=datetime.now(UTC).replace(tzinfo=None),
         )
     )
     db_session.commit()
@@ -1474,8 +1474,8 @@ def test_cancel_queued_video_export_removes_rq_job(test_db, monkeypatch):
             progress=0,
             message="queued",
             frontend_url="http://localhost:5173",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
+            updated_at=datetime.now(UTC).replace(tzinfo=None),
         )
     )
     db_session.commit()
@@ -1508,8 +1508,8 @@ def test_delete_video_export_job_removes_started_rq_job(test_db, monkeypatch):
             progress=10,
             message="capturing",
             frontend_url="http://localhost:5173",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
+            updated_at=datetime.now(UTC).replace(tzinfo=None),
         )
     )
     db_session.commit()
@@ -1537,7 +1537,7 @@ def test_reconcile_video_export_flight_refs_clears_missing_active_job(test_db, m
     db_session.add(
         Flight(
             id="flight-orphan-video",
-            flight_date=datetime.utcnow().date(),
+            flight_date=datetime.now(UTC).replace(tzinfo=None).date(),
             video_export_job_id="missing-job",
             video_export_status="processing",
         )
@@ -1582,14 +1582,14 @@ def test_delete_video_export_job_clears_flight_reference(test_db, monkeypatch):
             progress=100,
             message="failed",
             frontend_url="http://localhost:5173",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
+            updated_at=datetime.now(UTC).replace(tzinfo=None),
         )
     )
     db_session.add(
         Flight(
             id="flight-delete-clears-job",
-            flight_date=datetime.utcnow().date(),
+            flight_date=datetime.now(UTC).replace(tzinfo=None).date(),
             video_export_job_id="job-delete-clears-flight",
             video_export_status="processing",
         )

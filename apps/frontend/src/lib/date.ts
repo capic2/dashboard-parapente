@@ -1,4 +1,4 @@
-const ISO_TZ_SUFFIX_RE = /(Z|[+-]\d{2}:?\d{2})$/;
+const ISO_TZ_SUFFIX_RE = /(Z|[+-]\d{2}:?\d{2})$/u;
 
 /**
  * Parses API datetimes that may be serialized without timezone offset.

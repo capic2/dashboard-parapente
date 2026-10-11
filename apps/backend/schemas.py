@@ -4,7 +4,7 @@ from datetime import date, datetime, time
 from typing import Any, Literal
 from urllib.parse import parse_qs, urlparse
 
-from pydantic import BaseModel, Field, model_validator, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 VALID_SITE_ORIENTATIONS = {
     "",
@@ -378,7 +378,7 @@ class SiteBase(BaseModel):
 class SiteCreate(SiteBase):
     orientation: str | None = None
 
-    @validator("orientation")
+    @field_validator("orientation")
     def validate_orientation(cls, v):
         if v is None:
             return v
@@ -410,43 +410,43 @@ class SiteUpdate(BaseModel):
     usage_type: Literal["takeoff", "landing", "both"] | None = None
     practical_info: dict[str, str] | None = None
 
-    @validator("latitude")
+    @field_validator("latitude")
     def validate_latitude(cls, v):
         if v is not None and not -90 <= v <= 90:
             raise ValueError("Latitude must be between -90 and 90")
         return v
 
-    @validator("longitude")
+    @field_validator("longitude")
     def validate_longitude(cls, v):
         if v is not None and not -180 <= v <= 180:
             raise ValueError("Longitude must be between -180 and 180")
         return v
 
-    @validator("camera_angle")
+    @field_validator("camera_angle")
     def validate_camera_angle(cls, v):
         if v is not None and not 0 <= v <= 360:
             raise ValueError("Camera angle must be between 0 and 360")
         return v
 
-    @validator("camera_distance")
+    @field_validator("camera_distance")
     def validate_camera_distance(cls, v):
         if v is not None and not 50 <= v <= 5000:
             raise ValueError("Camera distance must be between 50 and 5000 meters")
         return v
 
-    @validator("camera_close_zoom_percent")
+    @field_validator("camera_close_zoom_percent")
     def validate_camera_close_zoom_percent(cls, v):
         if v is not None and not 30 <= v <= 100:
             raise ValueError("Camera close zoom percent must be between 30 and 100")
         return v
 
-    @validator("camera_transition_percent")
+    @field_validator("camera_transition_percent")
     def validate_camera_transition_percent(cls, v):
         if v is not None and not 1 <= v <= 40:
             raise ValueError("Camera transition percent must be between 1 and 40")
         return v
 
-    @validator("orientation")
+    @field_validator("orientation")
     def validate_orientation(cls, v):
         if v is None:
             return v
@@ -502,8 +502,7 @@ class Site(SiteBase):
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AzbaConstraint(BaseModel):
@@ -555,8 +554,7 @@ class LandingAssociation(BaseModel):
     landing_site: Site | None = None
     created_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Flights
@@ -580,19 +578,19 @@ class FlightCreate(FlightBase):
     name: str | None = None
     site_id: str | None = None
 
-    @validator("duration_minutes", "max_altitude_m", "elevation_gain_m")
+    @field_validator("duration_minutes", "max_altitude_m", "elevation_gain_m")
     def positive_values(cls, value):
         if value is not None and value < 0:
             raise ValueError("Value must be positive or zero")
         return value
 
-    @validator("distance_km", "max_speed_kmh")
+    @field_validator("distance_km", "max_speed_kmh")
     def positive_floats(cls, value):
         if value is not None and value < 0:
             raise ValueError("Value must be positive or zero")
         return value
 
-    @validator("flight_date")
+    @field_validator("flight_date")
     def date_not_future(cls, value):
         if value > date.today():
             raise ValueError("Flight date cannot be in the future")
@@ -636,7 +634,7 @@ class FlightUpdate(BaseModel):
     gopro_overlay_gpx_offset: float | None = None
     gpx_metrics_excluded: bool | None = None
 
-    @validator("youtube_urls")
+    @field_validator("youtube_urls")
     def valid_youtube_urls(cls, value):
         return normalize_youtube_urls(value) if value is not None else None
 
@@ -650,27 +648,27 @@ class FlightUpdate(BaseModel):
                 raise ValueError("A flight cannot have more than 100 video markers")
         return self
 
-    @validator("duration_minutes", "max_altitude_m", "elevation_gain_m")
+    @field_validator("duration_minutes", "max_altitude_m", "elevation_gain_m")
     def positive_values(cls, v):
         """Validate that numeric values are positive"""
         if v is not None and v < 0:
             raise ValueError("Value must be positive or zero")
         return v
 
-    @validator("gopro_overlay_gpx_offset")
+    @field_validator("gopro_overlay_gpx_offset")
     def finite_gopro_overlay_offset(cls, value):
         if value is not None and not math.isfinite(value):
             raise ValueError("gopro_overlay_gpx_offset must be finite")
         return value
 
-    @validator("distance_km", "max_speed_kmh")
+    @field_validator("distance_km", "max_speed_kmh")
     def positive_floats(cls, v):
         """Validate that float values are positive"""
         if v is not None and v < 0:
             raise ValueError("Value must be positive or zero")
         return v
 
-    @validator("flight_date")
+    @field_validator("flight_date")
     def date_not_future(cls, v):
         """Validate that flight date is not in the future"""
         if v and v > date.today():
@@ -681,7 +679,7 @@ class FlightUpdate(BaseModel):
 class YoutubeAuthUrlRequest(BaseModel):
     return_to: str = "/flights"
 
-    @validator("return_to")
+    @field_validator("return_to")
     def valid_return_to(cls, value: str) -> str:
         if not value.startswith("/") or value.startswith("//"):
             raise ValueError("return_to must be a local application path")
@@ -704,7 +702,7 @@ class YoutubeUploadCreate(BaseModel):
     description: str = Field(default="", max_length=5000)
     privacy_status: Literal["private", "unlisted", "public"] = "private"
 
-    @validator("gopro_overlay_job_id")
+    @field_validator("gopro_overlay_job_id")
     def trimmed_overlay_job_id(cls, value: str | None) -> str | None:
         if value is None:
             return None
@@ -725,7 +723,7 @@ class YoutubeUploadCreate(BaseModel):
             raise ValueError("highlight_video_job_id must be omitted for this upload")
         return self
 
-    @validator("title")
+    @field_validator("title")
     def trimmed_title(cls, value: str) -> str:
         title = value.strip()
         if not title:
@@ -781,8 +779,7 @@ class SiteInFlight(BaseModel):
     region: str | None = None
     country: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Flight(FlightBase):
@@ -831,8 +828,7 @@ class Flight(FlightBase):
             )
         return self
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FlightSummary(BaseModel):
@@ -999,8 +995,7 @@ class WeatherForecast(WeatherForecastBase):
     site_id: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # API Responses
@@ -1046,8 +1041,7 @@ class ParaglidingSpotBase(BaseModel):
     country: str = "FR"
     source: str  # "openaip", "paraglidingspots", "merged"
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ParaglidingSpotDetail(ParaglidingSpotBase):
@@ -1256,7 +1250,7 @@ class WeatherSourceConfigBase(BaseModel):
     base_url: str | None = None
     documentation_url: str | None = None
 
-    @validator("source_name")
+    @field_validator("source_name")
     def validate_source_name(cls, v):
         """Source name must be lowercase alphanumeric with hyphens"""
         import re
@@ -1269,8 +1263,8 @@ class WeatherSourceConfigBase(BaseModel):
             raise ValueError("Source name must be between 2 and 50 characters")
         return v
 
-    @validator("api_key")
-    def validate_api_key(cls, v, values):
+    @field_validator("api_key")
+    def validate_api_key(cls, v):
         """Warn if requires_api_key=True but api_key is missing (don't block serialization)"""
         # Don't raise - allow response serialization even if key is missing in DB
         return v
@@ -1316,8 +1310,7 @@ class WeatherSourceConfig(WeatherSourceConfigBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WeatherSourceStats(BaseModel):
@@ -1437,8 +1430,7 @@ class EmagramAnalysis(EmagramAnalysisBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EmagramAnalysisListItem(BaseModel):
@@ -1459,8 +1451,7 @@ class EmagramAnalysisListItem(BaseModel):
     forecast_hour: int | None = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EmagramTriggerRequest(BaseModel):
@@ -1474,19 +1465,19 @@ class EmagramTriggerRequest(BaseModel):
     hour: int | None = None
     locale: str | None = None
 
-    @validator("user_latitude")
+    @field_validator("user_latitude")
     def validate_latitude(cls, v):
         if v is not None and not -90 <= v <= 90:
             raise ValueError("Latitude must be between -90 and 90")
         return v
 
-    @validator("user_longitude")
+    @field_validator("user_longitude")
     def validate_longitude(cls, v):
         if v is not None and not -180 <= v <= 180:
             raise ValueError("Longitude must be between -180 and 180")
         return v
 
-    @validator("locale")
+    @field_validator("locale")
     def validate_locale(cls, v):
         if v is None:
             return v

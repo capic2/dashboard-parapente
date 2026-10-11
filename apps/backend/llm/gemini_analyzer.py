@@ -15,14 +15,12 @@ from llm.emagram_prompt import build_emagram_analysis_prompt, normalize_analysis
 from llm.screenshot_inputs import ScreenshotInput, normalize_screenshot_inputs
 
 try:
-    import google.generativeai as genai
+    from google import genai
 
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
-    logging.warning(
-        "google-generativeai not installed. Install with: pip install google-generativeai"
-    )
+    logging.warning("google-genai not installed. Install with: pip install google-genai")
 
 logger = logging.getLogger(__name__)
 
@@ -62,14 +60,12 @@ def analyze_emagram_with_gemini(
 
     if not GEMINI_AVAILABLE:
         raise RuntimeError(
-            "google-generativeai package not installed. "
-            "Install with: pip install google-generativeai"
+            "google-genai package not installed. " "Install with: pip install google-genai"
         )
 
     logger.info(f"Analyzing emagram for {spot_name} using Gemini {model_name}")
 
-    # Configure Gemini
-    genai.configure(api_key=api_key)
+    client = genai.Client(api_key=api_key)
 
     # Build prompt with images
     prompt_parts = _build_analysis_prompt(screenshot_paths, spot_name, coordinates, locale)
@@ -79,13 +75,12 @@ def analyze_emagram_with_gemini(
     for attempt in range(max_retries):
         try:
             # Create model
-            model = genai.GenerativeModel(model_name)
-
             # Generate content
             logger.debug(f"Sending request to Gemini (attempt {attempt + 1}/{max_retries})")
-            response = model.generate_content(
-                prompt_parts,
-                generation_config={
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt_parts,
+                config={
                     "temperature": 0.2,  # Low temperature for consistent structured output
                     "top_p": 0.8,
                     "top_k": 40,

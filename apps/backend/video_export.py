@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import config
@@ -186,7 +186,7 @@ def _mark_flight_export_cancelled(job: dict):
             return
 
         flight.video_export_status = "cancelled"
-        flight.updated_at = datetime.utcnow()
+        flight.updated_at = datetime.now(UTC).replace(tzinfo=None)
         db.commit()
 
 

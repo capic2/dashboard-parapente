@@ -127,7 +127,7 @@ export const Default = meta.story({
   name: 'Default',
   args: {
     selectedSiteId: 'site-arguel',
-    onSelectSite: (siteId: string) => console.log('Site selected:', siteId),
+    onSelectSite: () => undefined,
   },
 });
 
@@ -139,7 +139,7 @@ export const MontPoupetSelected = meta.story({
   name: 'Mont Poupet Selected',
   args: {
     selectedSiteId: 'mont-poupet-nord',
-    onSelectSite: (siteId: string) => console.log('Site selected:', siteId),
+    onSelectSite: () => undefined,
   },
 });
 
@@ -150,7 +150,7 @@ export const LaCoteSelected = meta.story({
   name: 'La Cote Selected',
   args: {
     selectedSiteId: 'site-la-cote',
-    onSelectSite: (siteId: string) => console.log('Site selected:', siteId),
+    onSelectSite: () => undefined,
   },
 });
 
@@ -158,7 +158,7 @@ export const MobileCompact = meta.story({
   name: 'Mobile Compact',
   args: {
     selectedSiteId: 'mont-poupet-nord',
-    onSelectSite: (siteId: string) => console.log('Site selected:', siteId),
+    onSelectSite: () => undefined,
   },
   parameters: {
     chromatic: {

@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import tempfile
 
+from anyio.from_thread import start_blocking_portal
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -103,7 +104,15 @@ def test_db():
 @pytest.fixture(scope="function")
 def client(test_db):
     """FastAPI TestClient with test database (authenticated)"""
-    return TestClient(app)
+    from cache import close_redis
+
+    with start_blocking_portal() as portal:
+        test_client = TestClient(app)
+        test_client.portal = portal
+        yield test_client
+        portal.call(close_redis)
+        test_client.portal = None
+        test_client.close()
 
 
 @pytest.fixture(scope="function")

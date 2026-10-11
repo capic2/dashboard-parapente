@@ -28,10 +28,10 @@ WithReleaseNotes.test(
     const canvas = within(canvasElement);
 
     await expect(
-      canvas.getByText(/Une nouvelle version \(2026\.04\.22\.1\) est prete\./i)
+      canvas.getByText(/Une nouvelle version \(2026\.04\.22\.1\) est prete\./iu)
     ).toBeInTheDocument();
     await expect(
-      canvas.getByRole('link', { name: /Voir les nouveautes/i })
+      canvas.getByRole('link', { name: /Voir les nouveautes/iu })
     ).toBeInTheDocument();
   }
 );
@@ -41,7 +41,7 @@ WithReleaseNotes.test(
   async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByRole('button', { name: /Rafraichir/i }));
+    await userEvent.click(canvas.getByRole('button', { name: /Rafraichir/iu }));
     await expect(args.onRefresh).toHaveBeenCalledTimes(1);
   }
 );
@@ -64,7 +64,7 @@ WithoutReleaseNotes.test(
 
     await expect(canvas.queryByRole('link')).not.toBeInTheDocument();
     await expect(
-      canvas.getByRole('button', { name: /Refresh/i })
+      canvas.getByRole('button', { name: /Refresh/iu })
     ).toBeInTheDocument();
   }
 );

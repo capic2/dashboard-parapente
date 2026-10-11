@@ -28,9 +28,13 @@ vi.mock('react-aria-components', () => {
     Button: ({
       children,
       onPress,
+      isDisabled,
       ...props
-    }: ComponentProps<'button'> & { onPress?: () => void }) => (
-      <button onClick={onPress} {...props}>
+    }: ComponentProps<'button'> & {
+      onPress?: () => void;
+      isDisabled?: boolean;
+    }) => (
+      <button disabled={isDisabled} onClick={onPress} {...props}>
         {children}
       </button>
     ),

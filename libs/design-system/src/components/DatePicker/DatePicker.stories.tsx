@@ -70,11 +70,11 @@ Empty.test(
   'it is possible to select a date',
   async ({ canvas, userEvent, args }) => {
     await userEvent.click(
-      canvas.getByRole('button', { name: /ouvrir le calendrier/i })
+      canvas.getByRole('button', { name: /ouvrir le calendrier/iu })
     );
     // Calendar popover renders in a portal outside canvasElement
     const body = within(document.body);
-    await userEvent.click(body.getByRole('button', { name: /15/ }));
+    await userEvent.click(body.getByRole('button', { name: /15/u }));
     await expect(args.onChange).toHaveBeenCalledWith('2026-01-15');
   }
 );

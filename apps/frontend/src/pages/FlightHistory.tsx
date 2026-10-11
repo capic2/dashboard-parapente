@@ -850,7 +850,56 @@ export default function FlightHistory() {
         {/* Flight List */}
         {(!isMobile || !showMobileDetail) && (
           <aside className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/40 lg:flex lg:min-h-0 lg:flex-col lg:p-2.5">
-            {!selectionMode ? (
+            {selectionMode ? (
+              <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-800 dark:bg-sky-950/30 lg:max-h-[55%] lg:shrink-0 lg:overflow-y-auto">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-sky-900 dark:text-sky-100">
+                    {t('flights.selected', { count: selectedCount })}
+                  </span>
+                  <FlightSortMenu
+                    sort={search.sort}
+                    order={search.order}
+                    onChange={(sort, order) =>
+                      void navigateWithSearch({ ...search, sort, order })
+                    }
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleToggleSelectionMode}
+                    aria-label={t('flights.cancel')}
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleSelectAll}
+                  >
+                    {t('flights.selectAll')}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleDeselectAll}
+                  >
+                    {t('flights.deselectAll')}
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => setShowMultiDeleteConfirm(true)}
+                    isDisabled={selectedCount === 0}
+                    className="ml-auto"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    {t('flights.deleteCount', { count: selectedCount })}
+                  </Button>
+                </div>
+              </div>
+            ) : (
               <div className="mb-3 space-y-2 border-b border-slate-200 pb-3 dark:border-slate-700 lg:mb-2 lg:space-y-1.5 lg:pb-2 lg:max-h-[55%] lg:shrink-0 lg:overflow-y-auto">
                 <div className="flex min-w-0 items-center gap-2">
                   <div className="min-w-0 flex-1">
@@ -953,55 +1002,6 @@ export default function FlightHistory() {
                     )}
                   </div>
                 </fieldset>
-              </div>
-            ) : (
-              <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-800 dark:bg-sky-950/30 lg:max-h-[55%] lg:shrink-0 lg:overflow-y-auto">
-                <div className="mb-3 flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-sky-900 dark:text-sky-100">
-                    {t('flights.selected', { count: selectedCount })}
-                  </span>
-                  <FlightSortMenu
-                    sort={search.sort}
-                    order={search.order}
-                    onChange={(sort, order) =>
-                      void navigateWithSearch({ ...search, sort, order })
-                    }
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleToggleSelectionMode}
-                    aria-label={t('flights.cancel')}
-                  >
-                    <X className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleSelectAll}
-                  >
-                    {t('flights.selectAll')}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleDeselectAll}
-                  >
-                    {t('flights.deselectAll')}
-                  </Button>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => setShowMultiDeleteConfirm(true)}
-                    isDisabled={selectedCount === 0}
-                    className="ml-auto"
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    {t('flights.deleteCount', { count: selectedCount })}
-                  </Button>
-                </div>
               </div>
             )}
             {renderListPanel()}

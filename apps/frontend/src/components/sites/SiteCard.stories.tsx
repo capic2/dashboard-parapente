@@ -77,11 +77,11 @@ Default.test(
     const canvas = within(canvasElement);
 
     // Click edit button
-    await userEvent.click(canvas.getByText(/Éditer/i));
+    await userEvent.click(canvas.getByText(/Éditer/iu));
     await expect(args.onEdit).toHaveBeenCalledWith(mockSiteArguel);
 
     // Click view flights button
-    await userEvent.click(canvas.getByRole('button', { name: /Vols/i }));
+    await userEvent.click(canvas.getByRole('button', { name: /Vols/iu }));
     await expect(args.onViewFlights).toHaveBeenCalledWith(mockSiteArguel);
   }
 );

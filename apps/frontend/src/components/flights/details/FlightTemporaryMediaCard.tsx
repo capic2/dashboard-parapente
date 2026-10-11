@@ -56,14 +56,14 @@ export function FlightTemporaryMediaCard({
     thumbnailAltKey = 'flights.panoThumbnailAlt';
   }
   const title = t(titleKey);
-  const filename =
-    sourceType === 'pano'
-      ? flight.pano_video_filename
-      : sourceType === 'face'
-        ? flight.face_video_filename
-        : sourceType === 'pilote'
-          ? flight.pilote_video_filename
-          : undefined;
+  let filename: string | null | undefined;
+  if (sourceType === 'pano') {
+    filename = flight.pano_video_filename;
+  } else if (sourceType === 'face') {
+    filename = flight.face_video_filename;
+  } else if (sourceType === 'pilote') {
+    filename = flight.pilote_video_filename;
+  }
 
   let publicationStatus = t('flights.temporarySourceReady');
   let publicationStatusStyle =

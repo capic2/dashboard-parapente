@@ -222,7 +222,7 @@ const parseLaunchOrientations = (
 
   return value
     .toUpperCase()
-    .replace(/[/; ]+/g, ',')
+    .replace(/[/; ]+/gu, ',')
     .split(',')
     .map((part: string) => part.trim())
     .filter(Boolean)
@@ -258,10 +258,11 @@ const getLaunchWindEvaluation = (
   }
 
   const selected = orientations
-    .map((candidate) => ({
-      ...candidate,
-      deviation: angleDelta(windDirectionDeg, candidate.degrees),
-    }))
+    .map((candidate) =>
+      Object.assign({}, candidate, {
+        deviation: angleDelta(windDirectionDeg, candidate.degrees),
+      })
+    )
     .sort((left, right) => left.deviation - right.deviation)[0];
 
   if (!selected) {
@@ -769,13 +770,14 @@ const SourceDataTooltip = ({
           const sourceData = sources[sourceKey];
           const sourceName = SOURCE_NAMES[sourceKey] || sourceKey;
           const freshness = sourceFreshness?.[sourceKey];
-          const staleLabel = freshness?.is_stale
-            ? freshness.cached_at
+          let staleLabel = '';
+          if (freshness?.is_stale) {
+            staleLabel = freshness.cached_at
               ? ` (${t('weather.staleSourceDataWithDate', {
                   date: formatTooltipDate(freshness.cached_at, i18n.language),
                 })})`
-              : ` (${t('weather.staleSourceData')})`
-            : '';
+              : ` (${t('weather.staleSourceData')})`;
+          }
 
           if (!sourceData) {
             return (
@@ -1435,7 +1437,7 @@ export default function HourlyForecast({
                       {t('weather.hourly.ceiling')}
                     </span>
                     <div className="font-bold text-slate-950 dark:text-white">
-                      {thermalCeiling !== null ? `${thermalCeiling} m` : '—'}
+                      {thermalCeiling === null ? '—' : `${thermalCeiling} m`}
                     </div>
                   </div>
                 </div>
@@ -1764,7 +1766,7 @@ export default function HourlyForecast({
                     </td>
 
                     <td className="py-2.5 px-2 text-center font-semibold text-emerald-700 dark:text-emerald-300">
-                      {thermalCeiling !== null ? `${thermalCeiling} m` : '—'}
+                      {thermalCeiling === null ? '—' : `${thermalCeiling} m`}
                     </td>
                   </tr>
                 );

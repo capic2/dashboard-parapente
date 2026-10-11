@@ -2,7 +2,7 @@
 Unit tests for emagram analysis system
 """
 
-from datetime import date, time
+from datetime import UTC, date, time
 
 import pytest
 
@@ -355,21 +355,21 @@ class TestCleanupOldScreenshots:
         }
         morning_analysis = EmagramAnalysis(
             id="fresh-hour-9",
-            analysis_datetime=datetime.utcnow() - timedelta(hours=2),
+            analysis_datetime=datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=2),
             forecast_hour=9,
             screenshot_paths=json.dumps({"meteo-parapente": str(morning_file)}),
             **common,
         )
         noon_analysis = EmagramAnalysis(
             id="fresh-hour-12",
-            analysis_datetime=datetime.utcnow() - timedelta(hours=1),
+            analysis_datetime=datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=1),
             forecast_hour=12,
             screenshot_paths=json.dumps({"meteo-parapente": str(noon_file)}),
             **common,
         )
         stale_analysis = EmagramAnalysis(
             id="stale-hour-15",
-            analysis_datetime=datetime.utcnow() - timedelta(hours=4),
+            analysis_datetime=datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=4),
             forecast_hour=15,
             screenshot_paths=json.dumps({"meteo-parapente": str(stale_file)}),
             **common,

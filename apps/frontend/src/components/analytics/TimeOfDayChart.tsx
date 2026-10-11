@@ -62,7 +62,7 @@ export default function TimeOfDayChart({ flights }: TimeOfDayChartProps) {
           timeSlots['Soirée (18h-24h)']++;
         }
       } catch {
-        console.warn('Invalid departure_time format:', flight.departure_time);
+        // Ignore malformed dates so they do not affect the chart.
       }
     });
 

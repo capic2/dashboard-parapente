@@ -46,7 +46,6 @@ export const useSite = (siteId: string) => {
       // Validate API response with Zod
       const validation = SiteSchema.safeParse(data);
       if (!validation.success) {
-        console.error('❌ Site validation failed:', validation.error);
         throw new Error(`Invalid site data: ${validation.error.message}`);
       }
 

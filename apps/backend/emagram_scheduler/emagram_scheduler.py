@@ -204,12 +204,6 @@ def setup_emagram_scheduler(app):
     logger.info(f"  - Multi-source refresh: Every {interval} minutes")
     logger.info("  - Screenshot cleanup: Every hour at :05")
 
-    # Register shutdown event
-    @app.on_event("shutdown")
-    async def shutdown_scheduler():
-        logger.info("Shutting down emagram scheduler...")
-        scheduler.shutdown()
-
     return scheduler
 
 
@@ -235,3 +229,12 @@ def start_scheduler(scheduler):
     """
     scheduler.start()
     logger.info("✅ Emagram scheduler started")
+
+
+def stop_scheduler():
+    """Stop the configured emagram scheduler during application shutdown."""
+    global _scheduler
+    if _scheduler is not None and _scheduler.running:
+        logger.info("Shutting down emagram scheduler...")
+        _scheduler.shutdown()
+    _scheduler = None

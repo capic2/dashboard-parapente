@@ -1,6 +1,6 @@
 """API and adapter tests for user-visible background operations."""
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import routes
 from models import BackgroundOperation
@@ -16,7 +16,7 @@ def _operation(
     can_cancel: bool = False,
     can_retry: bool = False,
 ) -> BackgroundOperation:
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     return BackgroundOperation(
         id=operation_id,
         user_id=user_id,

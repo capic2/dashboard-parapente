@@ -160,7 +160,6 @@ export const useUpdateFlight = (
       // Validate API response with Zod
       const validation = ApiResponseSchema(FlightSchema).safeParse(data);
       if (!validation.success) {
-        console.error('❌ Update flight validation failed:', validation.error);
         throw new Error(
           `Invalid flight update response: ${validation.error.message}`
         );

@@ -53,7 +53,9 @@ export const Loading = meta.story({
     context.msw.use(
       ...[
         http.get('/api/flights/stats', async () => {
-          await new Promise((resolve) => setTimeout(resolve, 100000));
+          await new Promise((resolve) => {
+            setTimeout(resolve, 100000);
+          });
           return HttpResponse.json(mockStats);
         }),
       ]

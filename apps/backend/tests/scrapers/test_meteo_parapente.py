@@ -11,7 +11,7 @@ ARGUEL_LON = 6.0
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="Website may be down or HTML changed", strict=False)
+@pytest.mark.integration
 async def test_fetch_meteo_parapente_success():
     result = await fetch_meteo_parapente(ARGUEL_LAT, ARGUEL_LON)
     assert "success" in result
@@ -20,7 +20,7 @@ async def test_fetch_meteo_parapente_success():
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="Website may be down or HTML changed", strict=False)
+@pytest.mark.integration
 @pytest.mark.slow
 async def test_fetch_meteo_parapente_timeout():
     import time

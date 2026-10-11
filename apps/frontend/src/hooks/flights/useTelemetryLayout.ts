@@ -90,5 +90,7 @@ export function useResetTelemetryLayout(flightId: string) {
 }
 
 export function defaultTelemetryLayout() {
-  return DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget) => ({ ...widget }));
+  return DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget) =>
+    Object.assign({}, widget)
+  );
 }

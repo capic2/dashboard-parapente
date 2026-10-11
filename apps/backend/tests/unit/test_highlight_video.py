@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -364,7 +364,7 @@ def test_worker_restart_recovers_and_requeues_active_highlight_jobs(test_db, mon
         "job_queue.delete_stale_started_job",
         lambda job_id, stale_before, queue_name=None: deleted.append((job_id, queue_name)) or True,
     )
-    stale_at = datetime.utcnow() - timedelta(
+    stale_at = datetime.now(UTC).replace(tzinfo=None) - timedelta(
         seconds=highlight_video_worker.HIGHLIGHT_JOB_LEASE_SECONDS + 1
     )
     with test_db() as db:
@@ -429,7 +429,7 @@ def test_worker_restart_keeps_live_highlight_job_running(test_db, monkeypatch) -
                 status="running",
                 progress=40,
                 source_video_path="/tmp/pano.mp4",
-                updated_at=datetime.utcnow(),
+                updated_at=datetime.now(UTC).replace(tzinfo=None),
             )
         )
         db.commit()
@@ -447,10 +447,10 @@ def test_worker_restart_keeps_live_highlight_job_running(test_db, monkeypatch) -
 
 def test_atomic_recovery_rechecks_lease_after_candidate_selection(test_db, monkeypatch) -> None:
     monkeypatch.setattr(highlight_video_worker, "SessionLocal", test_db)
-    stale_at = datetime.utcnow() - timedelta(
+    stale_at = datetime.now(UTC).replace(tzinfo=None) - timedelta(
         seconds=highlight_video_worker.HIGHLIGHT_JOB_LEASE_SECONDS + 1
     )
-    heartbeat_at = datetime.utcnow()
+    heartbeat_at = datetime.now(UTC).replace(tzinfo=None)
     with test_db() as db:
         db.add(Flight(id="flight-race", name="Race", flight_date=date(2026, 9, 1)))
         db.add(
@@ -488,8 +488,8 @@ def test_atomic_recovery_rechecks_lease_after_candidate_selection(test_db, monke
 
 def test_old_execution_cannot_update_reclaimed_job(test_db, monkeypatch) -> None:
     monkeypatch.setattr(highlight_video_worker, "SessionLocal", test_db)
-    old_started_at = datetime.utcnow() - timedelta(minutes=10)
-    new_started_at = datetime.utcnow()
+    old_started_at = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=10)
+    new_started_at = datetime.now(UTC).replace(tzinfo=None)
     with test_db() as db:
         db.add(Flight(id="flight-fenced", name="Fenced", flight_date=date(2026, 9, 1)))
         db.add(

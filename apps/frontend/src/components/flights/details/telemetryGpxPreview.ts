@@ -98,23 +98,22 @@ export async function parseTelemetryGpxFile(
       'course',
       'track',
     ]);
-    return {
+    const point: FlightTelemetryPoint = {
       timestamp,
       lat: Number(trackPoint.getAttribute('lat') ?? 0),
       lon: Number(trackPoint.getAttribute('lon') ?? 0),
       elevation: Number(trackPoint.querySelector('ele')?.textContent ?? 0),
       segment: 0,
       distance_km: 0,
-      ...(heartRate !== undefined ? { heart_rate: heartRate } : {}),
-      ...(power !== undefined ? { power } : {}),
-      ...(speedMps !== undefined && speedMps >= 0
-        ? { speed_kmh: speedMps * 3.6 }
-        : {}),
-      ...(recordedVario !== undefined ? { vario_ms: recordedVario } : {}),
-      ...(recordedHeading !== undefined
-        ? { heading_deg: recordedHeading }
-        : {}),
     };
+    if (heartRate !== undefined) point.heart_rate = heartRate;
+    if (power !== undefined) point.power = power;
+    if (speedMps !== undefined && speedMps >= 0) {
+      point.speed_kmh = speedMps * 3.6;
+    }
+    if (recordedVario !== undefined) point.vario_ms = recordedVario;
+    if (recordedHeading !== undefined) point.heading_deg = recordedHeading;
+    return point;
   });
 
   for (let index = 1; index < points.length; index += 1) {

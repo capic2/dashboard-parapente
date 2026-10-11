@@ -12,7 +12,7 @@ ARGUEL_LON = 6.0
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="API key may be missing or API down", strict=False)
+@pytest.mark.integration
 @pytest.mark.skipif(not WEATHERAPI_KEY, reason="WEATHERAPI_KEY not configured")
 async def test_fetch_weatherapi_success():
     result = await fetch_weatherapi(ARGUEL_LAT, ARGUEL_LON, days=2)
@@ -25,6 +25,7 @@ async def test_fetch_weatherapi_success():
 
 
 @pytest.mark.asyncio
+@pytest.mark.integration
 @pytest.mark.skipif(not WEATHERAPI_KEY, reason="WEATHERAPI_KEY not configured")
 async def test_fetch_weatherapi_timeout():
     import time

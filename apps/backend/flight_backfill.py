@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -41,7 +41,7 @@ def calculate_and_persist_missing_max_speed(
             return False
 
         flight.max_speed_kmh = max_speed_kmh
-        flight.updated_at = datetime.utcnow()
+        flight.updated_at = datetime.now(UTC).replace(tzinfo=None)
         return True
     except Exception as exc:
         logger.warning(
