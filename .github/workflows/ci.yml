@@ -113,7 +113,7 @@ jobs:
           fi
 
       - name: 🔨 Run full validation for Mergify queue
-        if: github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'merge queue:') && steps.application-changes.outputs.application_changes == 'true'
+        if: github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'merge queue:')
         run: bash .github/scripts/run-full-nx-validation.sh
         env:
           TESTING: true
@@ -133,8 +133,7 @@ jobs:
           fi
 
           if [[ "$affected_count" == "0" ]]; then
-            echo "Nx found no affected projects; running full uncached validation as a safety net."
-            bash .github/scripts/run-full-nx-validation.sh
+            echo "Nx found no affected projects; skipping application validation for this pull request."
           else
             pnpm exec nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e
           fi
