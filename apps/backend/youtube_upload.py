@@ -1060,6 +1060,17 @@ def _delete_generated_overlay_source(path: Path) -> None:
         logger.warning("Unable to remove generated YouTube overlay source %s", path)
 
 
+def _refresh_source_video_path(path: Path) -> Path | None:
+    """Recheck a source through its parent directory to refresh stale NFS dentries."""
+    try:
+        for entry in path.parent.iterdir():
+            if entry.name == path.name and not entry.is_symlink() and entry.is_file():
+                return entry
+    except OSError:
+        return None
+    return None
+
+
 def _source_video_path(db: Session, job: YoutubeUploadJob) -> Path:
     if job.source_type == "youtube_overlay":
         if not job.source_path:
@@ -1328,7 +1339,10 @@ def process_youtube_upload(job_id: str) -> None:
             db.expunge(job)
 
         if not video_path.is_file():
-            raise RuntimeError("Source video is no longer available")
+            refreshed_path = _refresh_source_video_path(video_path)
+            if refreshed_path is None:
+                raise RuntimeError("Source video is no longer available")
+            video_path = refreshed_path
         source_size = video_path.stat().st_size
         if source_size <= 0:
             raise RuntimeError("Source video is empty")
