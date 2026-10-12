@@ -178,6 +178,10 @@ const defaultMswHandlers = [
   http.put('*/api/settings', () =>
     HttpResponse.json({ success: true, updated: {} })
   ),
+  http.get('*/api/operations', () => HttpResponse.json([])),
+  http.get('*/api/operations/stream', () =>
+    new Response(null, { status: 204 })
+  ),
   http.get(/approximateTerrainHeights\.json(?:\?.*)?$/, () =>
     HttpResponse.json({})
   ),

@@ -1421,7 +1421,10 @@ export default function Settings() {
         className="space-y-4"
       >
         {/* Tabs Navigation */}
-        <TabList className="mb-4 grid-cols-2 sm:flex">
+        <TabList
+          aria-label={t('settings.title')}
+          className="mb-4 grid-cols-2 sm:flex"
+        >
           {settingsTabs.map((tabKey) => (
             <Tab key={tabKey} id={tabKey} className="flex-1">
               {tabKey === 'general' && (
