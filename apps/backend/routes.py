@@ -9358,6 +9358,7 @@ async def test_weather_source(
             lon,
             site_name="Test Site",
             elevation_m=1000,
+            api_key=source.api_key,
         )
 
         response_time_ms = int((time.time() - start_time) * 1000)
