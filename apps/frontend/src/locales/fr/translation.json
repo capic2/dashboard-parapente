@@ -1648,6 +1648,7 @@
     "deleteButtonCount_one": "Supprimer {{count}} vol",
     "deleteButtonCount_other": "Supprimer {{count}} vols",
     "gpxFileInput": "Fichier GPX",
+    "detailsSections": "Sections du détail du vol",
     "infoTab": "Résumé",
     "replayTab": "Médias",
     "logsTab": "Traitements",

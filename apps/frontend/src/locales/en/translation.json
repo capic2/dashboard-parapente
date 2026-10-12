@@ -1643,6 +1643,7 @@
     "deleteButtonCount_one": "Delete {{count}} flight",
     "deleteButtonCount_other": "Delete {{count}} flights",
     "gpxFileInput": "GPX file",
+    "detailsSections": "Flight details sections",
     "infoTab": "Summary",
     "replayTab": "Media",
     "logsTab": "Processing",

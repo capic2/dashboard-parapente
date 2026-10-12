@@ -4,6 +4,8 @@ import { cleanup } from '@testing-library/react';
 import { afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { server } from '../../mocks/server';
 import { overrideApi } from '../lib/api';
+// oxlint-disable-next-line import/no-unassigned-import
+import '../i18n';
 
 // Disable API logs in tests
 overrideApi({});
