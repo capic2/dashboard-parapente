@@ -8,7 +8,6 @@ import type { Flight, Site } from '../../../types';
 const {
   apiDelete,
   confirmMock,
-  createOverlayMock,
   generateMergeMock,
   generatePreviewMutateMock,
   generatePreviewMock,
@@ -18,7 +17,6 @@ const {
   overlayJobStreamMock,
   previewMock,
   removeYoutubeAssociationMock,
-  resetOverlayMock,
   updateFlightMock,
   videoStatusMock,
   youtubeUploadMock,
@@ -26,12 +24,10 @@ const {
 } = vi.hoisted(() => ({
   apiDelete: vi.fn(),
   confirmMock: vi.fn(),
-  createOverlayMock: vi.fn(),
   generateMergeMock: vi.fn(),
   generatePreviewMutateMock: vi.fn(),
   generatePreviewMock: vi.fn(),
   highlightVideoMock: { current: null as unknown },
-  resetOverlayMock: vi.fn(),
   updateFlightMock: vi.fn(),
   overlayJobStreamMock: { current: null as unknown },
   previewMock: { current: null as unknown },
@@ -336,12 +332,6 @@ vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
 }));
 
 vi.mock('../../../hooks/gopro/useGoproOverlay', () => ({
-  useCreateFlightGoproOverlayJob: () => ({
-    data: null,
-    isPending: false,
-    mutateAsync: createOverlayMock,
-    reset: resetOverlayMock,
-  }),
   useGoproOverlayJobStream: () => ({ job: overlayJobStreamMock.current }),
   useFlightOverlayLayer: () => ({
     data: overlayLayerMock.current,
@@ -486,13 +476,11 @@ describe('FlightDetails GoPro overlay action', () => {
       )
     );
     apiDelete.mockReset();
-    createOverlayMock.mockReset();
     updateFlightMock.mockReset();
     updateFlightMock.mockResolvedValue(mockFlight);
     generatePreviewMutateMock.mockReset();
     generatePreviewMock.mockReset();
     generatePreviewMock.mockResolvedValue({ status: 'generating' });
-    createOverlayMock.mockResolvedValue({ job_id: 'job-new', job_token: null });
     confirmMock.mockReset();
     confirmMock.mockReturnValue(true);
     vi.stubGlobal('confirm', confirmMock);
@@ -797,13 +785,10 @@ describe('FlightDetails GoPro overlay action', () => {
       })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Generate overlay' })
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: 'Generate overlay' })
+    ).not.toBeInTheDocument();
     expect(screen.getByText('Video thumbnail')).toBeInTheDocument();
-    expect(screen.getByText('New GoPro overlay')).toBeInTheDocument();
-    expect(
-      screen.getByText('New GoPro overlay').closest('.order-5')
-    ).toBeInTheDocument();
+    expect(screen.queryByText('New GoPro overlay')).not.toBeInTheDocument();
   });
 
   it('shows completed best moments in the available files and processing tabs', () => {
@@ -931,58 +916,6 @@ describe('FlightDetails GoPro overlay action', () => {
     ).toBeDisabled();
   });
 
-  it('allows providing the camera video when it is not on the server', () => {
-    mockFlight.gopro_camera_file_exists = false;
-
-    render(
-      <FlightDetails
-        flight={mockFlight}
-        sites={sites}
-        onShowCreateSiteModal={() => undefined}
-      />
-    );
-
-    openTab('Media');
-
-    const generateButton = screen.getByRole('button', {
-      name: /Generate overlay/u,
-    });
-    expect(generateButton).toBeEnabled();
-    fireEvent.click(generateButton);
-    expect(
-      screen.getByLabelText('Onboard camera video (MP4/MOV)')
-    ).toBeInTheDocument();
-  });
-
-  it('turns the overlay button into cancel while generation is running', async () => {
-    mockFlight.gopro_overlay_job_id = 'job-overlay';
-    mockFlight.gopro_overlay_status = 'running';
-    mockFlight.gopro_overlay_progress = 42;
-
-    render(
-      <FlightDetails
-        flight={mockFlight}
-        sites={sites}
-        onShowCreateSiteModal={() => undefined}
-      />
-    );
-
-    openTab('Media');
-
-    expect(
-      screen.queryByRole('progressbar', { name: 'Overlay progress' })
-    ).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /Cancel overlay/u }));
-
-    await waitFor(() => {
-      expect(apiDelete).toHaveBeenCalledWith(
-        'gopro-overlays/jobs/job-overlay/cancel',
-        { searchParams: undefined }
-      );
-    });
-  });
-
   it('keeps a legacy overlay available while a new overlay is running', () => {
     mockFlight.gopro_overlay_file_path = '/exports/legacy-overlay.mp4';
     mockFlight.gopro_overlay_file_exists = true;
@@ -1093,88 +1026,6 @@ describe('FlightDetails GoPro overlay action', () => {
     expect(
       screen.getByRole('button', { name: 'Hide overlay versions' })
     ).toHaveAttribute('aria-expanded', 'true');
-  });
-
-  it('starts overlay generation after manual calibration is saved', async () => {
-    mockFlight.gopro_overlay_gpx_offset = 2.5;
-    previewMock.current = {
-      isPending: false,
-      data: {
-        video: {
-          duration_seconds: 60,
-          start_time: '2026-03-15T14:00:00Z',
-          preview_target_end_seconds: 60,
-          preview_segments: [
-            {
-              preview_start_seconds: 0,
-              source_start_seconds: 0,
-              duration_seconds: 60,
-            },
-          ],
-          preview_status: 'ready',
-          preview_available_duration_seconds: 60,
-          preview_requested_duration_seconds: 60,
-          preview_max_duration_seconds: 180,
-        },
-        gpx: {
-          start_time: '2026-03-15T14:00:00Z',
-          end_time: '2026-03-15T14:01:00Z',
-          duration_seconds: 60,
-          coordinates: [
-            {
-              lat: 45.0,
-              lon: 6.0,
-              elevation: 1000,
-              speedKmh: 35,
-              time: '2026-03-15T14:00:00Z',
-            },
-          ],
-        },
-        alignment: {
-          automatic_offset_seconds: 8,
-          manual_offset_seconds: 0,
-          effective_offset_seconds: 8,
-        },
-      },
-    };
-
-    render(
-      <FlightDetails
-        flight={mockFlight}
-        sites={sites}
-        onShowCreateSiteModal={() => undefined}
-      />
-    );
-
-    openTab('Media');
-
-    fireEvent.click(screen.getByRole('button', { name: /Generate overlay/u }));
-
-    expect(
-      screen.getByRole('dialog', {
-        name: 'flights.goproOverlayGenerateTitle',
-      })
-    ).toBeInTheDocument();
-    const resolutionSelect = screen.getByLabelText('Output resolution');
-    expect(resolutionSelect).toHaveValue('4k');
-    expect(resolutionSelect).toHaveTextContent('1080p (1920 × 1080)');
-    expect(resolutionSelect).toHaveTextContent('4K (3840 × 2160)');
-    expect(resolutionSelect).not.toHaveTextContent('Auto');
-    expect(resolutionSelect).not.toHaveTextContent('Source');
-
-    fireEvent.change(resolutionSelect, {
-      target: { value: '4k' },
-    });
-    fireEvent.click(
-      screen.getByRole('button', { name: 'flights.goproOverlayLaunch' })
-    );
-
-    await waitFor(() => {
-      expect(createOverlayMock).toHaveBeenCalled();
-    });
-    const formData = createOverlayMock.mock.calls[0][0] as FormData;
-    expect(formData.get('gpx_offset')).toBeNull();
-    expect(formData.get('output_resolution')).toBe('4k');
   });
 
   it('keeps the automatic alignment separate from the manual GPX offset', () => {
@@ -1689,8 +1540,8 @@ describe('FlightDetails GoPro overlay action', () => {
     ).not.toBeInTheDocument();
     openTab('Media');
     expect(
-      screen.getByRole('button', { name: 'Generate overlay' })
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: 'Generate overlay' })
+    ).not.toBeInTheDocument();
   });
 
   it('keeps the logs tab available while a job status is loading', () => {
@@ -1809,31 +1660,6 @@ describe('FlightDetails GoPro overlay action', () => {
     expect(videoToggle).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('regenerates overlay after cancellation', async () => {
-    mockFlight.gopro_overlay_job_id = 'job-overlay';
-    mockFlight.gopro_overlay_status = 'cancelled';
-
-    render(
-      <FlightDetails
-        flight={mockFlight}
-        sites={sites}
-        onShowCreateSiteModal={() => undefined}
-      />
-    );
-
-    openTab('Media');
-
-    fireEvent.click(
-      screen.getByRole('button', { name: /Regenerate overlay/u })
-    );
-
-    fireEvent.click(
-      screen.getByRole('button', { name: 'flights.goproOverlayLaunch' })
-    );
-
-    await waitFor(() => expect(createOverlayMock).toHaveBeenCalled());
-  });
-
   it('shows every persisted overlay resolution', () => {
     const baseOverlay = {
       flight_id: mockFlight.id,
@@ -1890,7 +1716,7 @@ describe('FlightDetails GoPro overlay action', () => {
       screen.getByRole('button', { name: 'YouTube upload overlay-1080p' })
     ).toBeInTheDocument();
     expect(screen.getAllByText('Overlay thumbnail')).toHaveLength(2);
-    expect(screen.getByText('New GoPro overlay')).toBeInTheDocument();
+    expect(screen.queryByText('New GoPro overlay')).not.toBeInTheDocument();
   });
 
   it('deletes an overlay and removes its card', async () => {
@@ -1936,55 +1762,5 @@ describe('FlightDetails GoPro overlay action', () => {
       expect(screen.queryByText('test-flight-4k.mp4')).not.toBeInTheDocument();
     });
     expect(confirmMock).toHaveBeenCalledWith('Confirm delete overlay');
-  });
-
-  it('regenerates an existing overlay after confirmation', async () => {
-    mockFlight.gopro_overlay_job_id = 'job-overlay';
-    mockFlight.gopro_overlay_status = 'completed';
-    mockFlight.gopro_overlay_file_path = '/exports/final.mp4';
-    mockFlight.gopro_overlay_file_exists = true;
-
-    render(
-      <FlightDetails
-        flight={mockFlight}
-        sites={sites}
-        onShowCreateSiteModal={() => undefined}
-      />
-    );
-
-    openTab('Media');
-
-    fireEvent.click(
-      screen.getByRole('button', { name: /Regenerate overlay/u })
-    );
-
-    fireEvent.click(
-      screen.getByRole('button', { name: 'flights.goproOverlayLaunch' })
-    );
-
-    await waitFor(() => expect(createOverlayMock).toHaveBeenCalled());
-  });
-
-  it('keeps an existing overlay when regeneration is not confirmed', () => {
-    mockFlight.gopro_overlay_job_id = 'job-overlay';
-    mockFlight.gopro_overlay_status = 'completed';
-    mockFlight.gopro_overlay_file_path = '/exports/final.mp4';
-    mockFlight.gopro_overlay_file_exists = true;
-
-    render(
-      <FlightDetails
-        flight={mockFlight}
-        sites={sites}
-        onShowCreateSiteModal={() => undefined}
-      />
-    );
-
-    openTab('Media');
-
-    fireEvent.click(
-      screen.getByRole('button', { name: /Regenerate overlay/u })
-    );
-
-    expect(createOverlayMock).not.toHaveBeenCalled();
   });
 });

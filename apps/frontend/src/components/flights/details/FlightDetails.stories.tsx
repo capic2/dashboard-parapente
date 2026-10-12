@@ -1,5 +1,5 @@
 import preview from '../../../../.storybook/preview';
-import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor } from 'storybook/test';
 import { FlightDetails } from './FlightDetails';
 import { ToastContainer } from '@dashboard-parapente/design-system';
 import { useToastStore } from '../../../hooks/useToast';
@@ -204,31 +204,6 @@ Default.test('The GPX can be replaced', async ({ canvas, step }) => {
     ).toBeInTheDocument();
   });
 });
-
-Default.test(
-  'The GoPro overlay action starts with default values',
-  async ({ canvas, canvasElement, userEvent, step }) => {
-    await step('start the GoPro overlay generation', async () => {
-      await userEvent.click(
-        canvas.getByRole('tab', { name: i18n.t('flights.replayTab') })
-      );
-      const generateButton = await canvas.findByRole('button', {
-        name: i18n.t('flights.goproOverlayGenerate'),
-      });
-      await waitFor(() => expect(generateButton).toBeEnabled());
-      await userEvent.click(generateButton);
-      const modal = within(canvasElement.ownerDocument.body);
-      await userEvent.click(
-        await modal.findByRole('button', {
-          name: i18n.t('flights.goproOverlayLaunch'),
-        })
-      );
-      await expect(
-        await canvas.findByText(i18n.t('flights.goproOverlayStarted'))
-      ).toBeInTheDocument();
-    });
-  }
-);
 
 export const WithoutGpx = meta.story({
   name: 'Without GPX',

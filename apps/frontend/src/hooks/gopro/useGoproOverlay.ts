@@ -137,19 +137,6 @@ export function useGenerateGoproMerge(flightId: string) {
   });
 }
 
-export function useCreateFlightGoproOverlayJob(flightId: string) {
-  return useMutation({
-    mutationFn: async (formData: FormData) => {
-      return await api
-        .post(`flights/${flightId}/gopro-overlay`, {
-          body: formData,
-          timeout: false,
-        })
-        .json<GoproOverlayJob>();
-    },
-  });
-}
-
 const initialState = {
   job: null as GoproOverlayJob | null,
   isConnected: false,
