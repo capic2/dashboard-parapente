@@ -1026,7 +1026,10 @@ export default function InfrastructurePage() {
           navigateToInfrastructure(normalizeInfrastructureTab(key))
         }
       >
-        <TabList className="grid-cols-1 sm:grid-cols-3">
+        <TabList
+          aria-label={t('infrastructure.title')}
+          className="grid-cols-1 sm:grid-cols-3"
+        >
           <Tab id="intervals">
             <span className="flex items-center justify-center gap-2">
               {t('infrastructure.tabs.intervals')}

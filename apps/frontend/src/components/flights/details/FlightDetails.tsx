@@ -1042,6 +1042,7 @@ export function FlightDetails({
           className="space-y-4"
         >
           <TabList
+            aria-label={t('flights.detailsSections')}
             className={`mb-4 ${hasGenerationLogs ? 'grid-cols-3' : 'grid-cols-2'}`}
           >
             <Tab id="infos" className="rounded-md px-3 py-2 text-sm">
@@ -1083,6 +1084,7 @@ export function FlightDetails({
       className="space-y-4"
     >
       <TabList
+        aria-label={t('flights.detailsSections')}
         className="mb-4"
         style={{
           gridTemplateColumns: `repeat(${hasGenerationLogs ? 3 : 2}, minmax(0, 1fr))`,

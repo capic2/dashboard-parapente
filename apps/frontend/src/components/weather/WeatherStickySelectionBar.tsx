@@ -231,7 +231,10 @@ export default function WeatherStickySelectionBar({
               onSelectionTabChange(key as WeatherSelectionTab)
             }
           >
-            <TabList className="grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 shadow-none dark:bg-slate-950/70">
+            <TabList
+              aria-labelledby="weather-selection-panel-title"
+              className="grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 shadow-none dark:bg-slate-950/70"
+            >
               <Tab id="favorites" isDisabled={sites.length === 0}>
                 <span className="inline-flex items-center gap-2">
                   <MapPin className="h-4 w-4" aria-hidden="true" />
