@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, Layers3 } from 'lucide-react';
 import type { GoproOverlayJob } from '../../../hooks/gopro/useGoproOverlay';
@@ -14,7 +13,6 @@ interface GoproOverlayJobStackProps {
   deletingJobId: string | null;
   onDownload: (job: GoproOverlayJob) => void;
   onDelete: (job: GoproOverlayJob) => void;
-  generationCard: ReactNode;
 }
 
 const previewCardClasses = [
@@ -30,7 +28,6 @@ export function GoproOverlayJobStack({
   deletingJobId,
   onDownload,
   onDelete,
-  generationCard,
 }: GoproOverlayJobStackProps) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -117,7 +114,6 @@ export function GoproOverlayJobStack({
               onDelete={() => onDelete(job)}
             />
           ))}
-          {generationCard}
         </div>
       )}
     </div>

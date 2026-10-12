@@ -1424,8 +1424,6 @@
     "goproOverlayStackExpand": "Afficher les versions d’overlay",
     "goproOverlayStackCollapse": "Masquer les versions d’overlay",
     "videoNotGenerated": "À générer",
-    "goproOverlayAddCardTitle": "Nouvel overlay GoPro",
-    "goproOverlayAddCardDescription": "Générez une autre version ou résolution sans supprimer les overlays existants.",
     "mediaCreationTitle": "Créer et publier",
     "mediaCreationDescription": "Générez une vidéo, ajoutez un overlay ou publiez sur YouTube.",
     "mediaGeneratedOverlaysTitle": "Overlays générés",
