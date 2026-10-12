@@ -87,6 +87,8 @@ export function Flight({
   const hasOsv = flight.has_osv;
   const hasFaceVideo = flight.has_face_video === true;
   const hasPiloteVideo = flight.has_pilote_video === true;
+  const shouldShowGpxUnsyncedBadge =
+    hasGpx && isGpxUnsynced && (hasFaceVideo || hasPiloteVideo);
   const hasHighlightVideo = flight.has_highlight_video;
   const hasSportstrackliveTrack =
     flight.sportstracklive_status === 'uploaded' &&
@@ -241,7 +243,7 @@ export function Flight({
                   {t(gpxProviderBadgeKey ?? 'flights.gpxBadge')}
                 </span>
               )}
-              {hasGpx && isGpxUnsynced && (
+              {shouldShowGpxUnsyncedBadge && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
                   <Clock3 className="h-3 w-3" aria-hidden="true" />
                   {t('flights.gpxNoSyncBadge')}
