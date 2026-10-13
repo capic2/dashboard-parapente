@@ -36,7 +36,7 @@ RUN --mount=type=secret,id=VITE_CESIUM_ION_TOKEN,env=VITE_CESIUM_ION_TOKEN,requi
 # ============================================
 # Stage 2: Backend Python avec Playwright
 # ============================================
-FROM python:3.15-slim
+FROM python:3.14-slim
 
 WORKDIR /app
 
