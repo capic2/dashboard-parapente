@@ -198,6 +198,13 @@ export function FlightDetails({
       youtubeAssociations.find((association) => association.url === url)
         ?.exists_on_youtube !== false
   );
+  const hasYoutubeSyncVideo = youtubeAssociations.some(
+    (association) =>
+      (flight.youtube_urls ?? []).includes(association.url) &&
+      getYoutubeVideoId(association.url) &&
+      association.exists_on_youtube !== false &&
+      /[-–—]\s*(face|pano|pilote)$/iu.test(association.title ?? '')
+  );
   const removeYoutubeAssociation = useRemoveYoutubeVideoAssociation(flight.id);
   const isVideoExportRunning = Boolean(
     flight.video_export_status &&
@@ -860,7 +867,7 @@ export function FlightDetails({
           )}
         </section>
 
-        {hasGpx && (hasYoutubeVideo || hasFaceVideo || hasPiloteVideo) && (
+        {hasGpx && hasYoutubeSyncVideo && (
           <FlightTelemetryInteractivePreview
             flightId={flight.id}
             hasFlightVideo={hasVideo}
