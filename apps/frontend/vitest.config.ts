@@ -12,6 +12,9 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 process.env.NODE_ENV = 'test';
 
 export default defineConfig({
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
+  },
   plugins: [react(), tailwindcss()],
   test: {
     globals: true,
