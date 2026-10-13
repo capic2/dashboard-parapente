@@ -470,8 +470,6 @@ export const MobileFlowWithReplay = meta.story({
 MobileFlowWithReplay.test(
   'opens the 3D replay after loading a flight with GPX',
   async ({ canvas, userEvent, step }) => {
-    let requestsAfterOpeningFlight = 0;
-
     await step('has the flight list', async () => {
       await canvas.findByText(i18n.t('flights.expandAllDays'));
       await userEvent.click(
@@ -486,8 +484,9 @@ MobileFlowWithReplay.test(
           name: i18n.t('flights.backToList'),
         })
       ).toBeInTheDocument();
-      requestsAfterOpeningFlight = replayGpxRequestCount;
-      expect(requestsAfterOpeningFlight).toBeGreaterThan(0);
+      await waitFor(() => {
+        expect(replayGpxRequestCount).toBeGreaterThan(0);
+      });
     });
 
     await step('switches to Media without loading the 3D replay', async () => {
