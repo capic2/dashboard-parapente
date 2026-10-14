@@ -24,6 +24,7 @@ interface FlightMediaBadgesProps {
   flightId: string;
   hasGpx: boolean;
   hasVideo: boolean;
+  hasYoutubeGeneratedVideo?: boolean;
   hasPanoVideo: boolean;
   hasGoproCameraVideo: boolean;
   hasFaceVideo: boolean;
@@ -46,6 +47,7 @@ export function FlightMediaBadges({
   flightId,
   hasGpx,
   hasVideo,
+  hasYoutubeGeneratedVideo = false,
   hasPanoVideo,
   hasGoproCameraVideo,
   hasFaceVideo,
@@ -67,7 +69,8 @@ export function FlightMediaBadges({
   const showPersistedOverlayBadge =
     hasPersistedGoproOverlay && !hasCompletedGoproOverlayJob;
   const hasVideoExportStatus = isVideoExportRunning || isVideoExportFailed;
-  const hasVisibleVideoSource = hasVideo || hasVideoExportStatus || hasGpx;
+  const hasVisibleVideoSource =
+    hasVideo || hasVideoExportStatus || (hasGpx && !hasYoutubeGeneratedVideo);
   const hasTemporarySources =
     hasVisibleVideoSource ||
     hasPanoVideo ||
