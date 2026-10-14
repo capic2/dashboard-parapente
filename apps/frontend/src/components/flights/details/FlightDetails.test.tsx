@@ -868,6 +868,40 @@ describe('FlightDetails GoPro overlay action', () => {
     ).toBeInTheDocument();
   });
 
+  it.each(['face', 'pano', 'pilote', 'vol'])(
+    'offers GPX video regeneration after local deletion with a YouTube %s video remaining',
+    (role) => {
+      mockFlight.video_file_path = null;
+      mockFlight.video_file_exists = false;
+      mockFlight.video_export_status = 'completed';
+      const url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+      mockFlight.youtube_urls = [url];
+      youtubeAssociationsMock.current = [
+        {
+          url,
+          video_id: 'dQw4w9WgXcQ',
+          can_delete_from_youtube: true,
+          exists_on_youtube: true,
+          title: `Test flight - ${role}`,
+        },
+      ];
+
+      render(
+        <FlightDetails
+          flight={mockFlight}
+          sites={sites}
+          onShowCreateSiteModal={() => undefined}
+        />
+      );
+
+      openTab('Media');
+
+      expect(
+        screen.getByRole('button', { name: 'Video action' })
+      ).toBeVisible();
+    }
+  );
+
   it('shows video generation progress in the video card', () => {
     mockFlight.video_file_path = null;
     mockFlight.video_file_exists = false;
