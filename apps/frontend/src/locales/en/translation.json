@@ -1473,7 +1473,7 @@
     "goproOverlayInteractiveTitle": "Interactive overlay",
     "goproOverlayInteractiveDescription": "Calibrate the camera against the GPX telemetry panel while watching the synchronized overlay.",
     "overlayWorkspaceTitle": "Synchronization and overlay layer",
-    "overlayWorkspaceDescription": "Calibrate telemetry, then generate a transparent layer reusable by exports.",
+    "overlayWorkspaceDescription": "Calibrate telemetry and align the video with the GPX.",
     "overlayInteractivePreview": "Interactive dynamic overlay",
     "overlayInteractivePreviewLoading": "Loading telemetry data…",
     "overlayInteractiveSectionTitle": "Interactive telemetry preview",

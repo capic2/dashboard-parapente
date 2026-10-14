@@ -63,15 +63,6 @@ export function useFlightOverlayLayer(flightId: string) {
   });
 }
 
-export function useGenerateFlightOverlayLayer(flightId: string) {
-  return useMutation({
-    mutationFn: () =>
-      api
-        .post(`flights/${flightId}/overlay-layer`, { timeout: false })
-        .json<GoproOverlayJob>(),
-  });
-}
-
 export function goproPreviewRefetchInterval(
   status?: GoproOverlayPreview['video']['preview_status']
 ) {
