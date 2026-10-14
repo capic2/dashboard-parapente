@@ -14,6 +14,10 @@ launch-templates:
             python=3.15
       - name: Install Node Modules
         uses: nrwl/nx-cloud-workflows/v6/workflow-steps/install-node-modules/main.yaml
+      - name: Install Playwright browsers
+        script: |
+          pnpm exec playwright install --with-deps chromium
+          python -m playwright install chromium
       - name: Install backend Python dependencies
         script: |
           python -m venv .venv
