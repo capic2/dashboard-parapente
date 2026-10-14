@@ -95,8 +95,14 @@ jobs:
         id: application-changes
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          IS_MERGE_QUEUE: ${{ github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'merge queue:') }}
         run: |
           if [[ "$GITHUB_EVENT_NAME" != "pull_request" ]]; then
+            echo "application_changes=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$IS_MERGE_QUEUE" == "true" ]]; then
             echo "application_changes=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
