@@ -79,6 +79,10 @@ vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
   useYoutubeVideoAssociations: () => ({ data: hooks.youtubeAssociations }),
   useUploadYoutubeDownloadCookies: () => ({ mutateAsync: vi.fn() }),
   useYoutubeUpload: () => ({ data: null }),
+  useStartYoutubeTelemetryLayoutExport: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
 }));
 
 vi.mock('../../../stores/authStore', () => ({

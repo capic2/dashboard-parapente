@@ -21,6 +21,7 @@ from routes import (
     _video_export_can_delete,
     serialize_sse_event,
 )
+from youtube_upload import YoutubeUploadAlreadyActiveError
 
 
 class TestHighlightExportLifecycleRules:
@@ -250,6 +251,81 @@ class TestVideoExportStartEndpoint:
         assert response.json()["operation_id"]
         assert mock_start.call_args.kwargs["overlay_job_id"] == "saved-legacy-overlay"
         assert mock_start.call_args.kwargs["overlay_offset_seconds"] == 12.5
+
+    def test_youtube_telemetry_layout_export_rejects_active_upload(
+        self, client, db_session, sample_flight, monkeypatch
+    ):
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        sample_flight.youtube_urls = [youtube_url]
+        db_session.add(
+            YoutubeUploadJob(
+                id="active-layout-upload",
+                flight_id=sample_flight.id,
+                user_id=1,
+                source_type="youtube_overlay",
+                status="preparing",
+                progress=0,
+                title="Layout en préparation",
+                description="",
+                privacy_status="unlisted",
+            )
+        )
+        db_session.commit()
+        monkeypatch.setattr("routes.is_youtube_configured", lambda: True)
+        monkeypatch.setattr("routes.is_youtube_connected", lambda db, user_id: True)
+
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/youtube-telemetry-layout-export",
+            json={"youtube_url": youtube_url, "offset_seconds": 3.5},
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 409
+
+    def test_youtube_telemetry_layout_export_starts_successfully(
+        self, client, db_session, sample_flight, monkeypatch
+    ):
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        sample_flight.youtube_urls = [youtube_url]
+        db_session.commit()
+        monkeypatch.setattr("routes.is_youtube_configured", lambda: True)
+        monkeypatch.setattr("routes.is_youtube_connected", lambda db, user_id: True)
+
+        with patch(
+            "routes.start_youtube_telemetry_layout_export", return_value="layout-export-1"
+        ) as mock_start:
+            response = client.post(
+                f"{API_PREFIX}/flights/{sample_flight.id}/youtube-telemetry-layout-export",
+                json={"youtube_url": youtube_url, "offset_seconds": 3.5},
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        assert response.status_code == 202
+        assert response.json()["job_id"] == "layout-export-1"
+        assert response.json()["status"] == "queued"
+        assert response.json()["operation_id"]
+        assert mock_start.call_args.kwargs["offset_seconds"] == 3.5
+
+    def test_youtube_telemetry_layout_export_maps_concurrent_duplicate_to_conflict(
+        self, client, db_session, sample_flight, monkeypatch
+    ):
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        sample_flight.youtube_urls = [youtube_url]
+        db_session.commit()
+        monkeypatch.setattr("routes.is_youtube_configured", lambda: True)
+        monkeypatch.setattr("routes.is_youtube_connected", lambda db, user_id: True)
+
+        with patch(
+            "routes.start_youtube_telemetry_layout_export",
+            side_effect=YoutubeUploadAlreadyActiveError("already active"),
+        ):
+            response = client.post(
+                f"{API_PREFIX}/flights/{sample_flight.id}/youtube-telemetry-layout-export",
+                json={"youtube_url": youtube_url, "offset_seconds": 3.5},
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        assert response.status_code == 409
 
     def test_start_video_export_prefers_manual_when_available(
         self, client: TestClient, sample_flight

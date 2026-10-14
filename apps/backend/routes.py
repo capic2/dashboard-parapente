@@ -186,6 +186,7 @@ from schemas import (
     YoutubeUploadCreate,
     YoutubeUploadJobResponse,
     YoutubeOverlayExportCreate,
+    YoutubeTelemetryLayoutExportCreate,
 )
 from schemas import LandingAssociation as LandingAssociationSchema
 from schemas import (
@@ -237,10 +238,12 @@ from video_export_manual import (
     start_video_export_manual,
     start_video_export_manual_fast,
     start_youtube_overlay_export,
+    start_youtube_telemetry_layout_export,
 )
 from weather_pipeline import filter_remaining_hours, get_daily_aggregate, get_normalized_forecast
 from weather_sources import ensure_weather_source_configs
 from youtube_upload import (
+    YoutubeUploadAlreadyActiveError,
     YoutubeConfigurationError,
     YoutubeOAuthError,
     YoutubeRemoteDeletionError,
@@ -8039,6 +8042,56 @@ def get_export_viewer_gpx_data(job_id: str, request: Request, db: Session = Depe
     return get_flight_gpx_data(flight_id, db)
 
 
+@public_router.get("/export-viewer/jobs/{job_id}/telemetry")
+def get_export_viewer_telemetry(job_id: str, request: Request, db: Session = Depends(get_db)):
+    """Return normalized telemetry to a scoped headless video export page."""
+    payload = _require_job_token(request, purpose="video_export", job_id=job_id)
+    flight_id = payload.get("flight_id")
+    if not isinstance(flight_id, str):
+        raise HTTPException(status_code=401, detail="Invalid job token")
+    return get_flight_telemetry(flight_id, db).model_dump(mode="json")
+
+
+@public_router.get("/export-viewer/jobs/{job_id}/telemetry-layout")
+def get_export_viewer_telemetry_layout(
+    job_id: str, request: Request, db: Session = Depends(get_db)
+):
+    """Return the saved layout for a scoped headless video export page."""
+    payload = _require_job_token(request, purpose="video_export", job_id=job_id)
+    flight_id = payload.get("flight_id")
+    if not isinstance(flight_id, str):
+        raise HTTPException(status_code=401, detail="Invalid job token")
+    export_job = db.get(VideoExportJob, job_id)
+    if (
+        export_job is None
+        or export_job.flight_id != flight_id
+        or not export_job.youtube_upload_job_id
+    ):
+        raise HTTPException(status_code=404, detail="Export job not found")
+    upload_job = db.get(YoutubeUploadJob, export_job.youtube_upload_job_id)
+    if upload_job is None or upload_job.flight_id != flight_id:
+        raise HTTPException(status_code=404, detail="Export job not found")
+    user_id = upload_job.user_id
+    layout = (
+        db.query(TelemetryLayout)
+        .filter(TelemetryLayout.user_id == user_id, TelemetryLayout.flight_id == flight_id)
+        .first()
+    )
+    is_override = layout is not None
+    if layout is None:
+        layout = (
+            db.query(TelemetryLayout)
+            .filter(TelemetryLayout.user_id == user_id, TelemetryLayout.flight_id.is_(None))
+            .first()
+        )
+    return _telemetry_layout_response(
+        layout,
+        flight_id=flight_id,
+        default_xml=DEFAULT_TELEMETRY_LAYOUT_XML,
+        is_override=is_override,
+    )
+
+
 @router.get("/flights/{flight_id}/exports")
 def list_flight_exports(flight_id: str, db: Session = Depends(get_db)):
     """
@@ -8324,6 +8377,63 @@ def create_youtube_overlay_export(
             status_code=503,
             detail="The video export queue is unavailable. Try again later.",
         ) from exc
+    operation = _ensure_job_operation(
+        db,
+        user_id=user.id,
+        source_kind="video_export",
+        source_id=job_id,
+        operation_type="youtube_overlay_export",
+        title_key="operations.youtubeOverlayExport",
+        steps=["prepare", "render", "finalize"],
+        can_cancel=True,
+        can_retry=True,
+    )
+    return {"job_id": job_id, "operation_id": operation.id, "status": "queued"}
+
+
+@router.post("/flights/{flight_id}/youtube-telemetry-layout-export", status_code=202)
+def create_youtube_telemetry_layout_export(
+    flight_id: str,
+    payload: YoutubeTelemetryLayoutExportCreate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Render the saved interactive telemetry layout over an associated YouTube video."""
+    flight = db.get(Flight, flight_id)
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    if payload.youtube_url not in (flight.youtube_urls or []):
+        raise HTTPException(
+            status_code=400, detail="YouTube video is not associated with this flight"
+        )
+    if not is_youtube_configured():
+        raise HTTPException(status_code=503, detail="YouTube upload is not configured")
+    if not is_youtube_connected(db, user.id):
+        raise HTTPException(status_code=409, detail="Connect YouTube before exporting")
+    if active_youtube_upload_job(db, flight.id, source_type="youtube_overlay") is not None:
+        raise HTTPException(status_code=409, detail="A YouTube upload is already in progress")
+
+    try:
+        job_id = start_youtube_telemetry_layout_export(
+            flight_id=flight_id,
+            youtube_url=payload.youtube_url,
+            offset_seconds=payload.offset_seconds,
+            youtube_user_id=user.id,
+            frontend_url=resolve_frontend_url(config.FRONTEND_URL),
+        )
+    except YoutubeUploadAlreadyActiveError as exc:
+        raise HTTPException(
+            status_code=409, detail="A YouTube upload is already in progress"
+        ) from exc
+    except DeploymentDrainActive:
+        raise
+    except Exception as exc:
+        logger.exception("Unable to queue telemetry-layout export for flight %s", flight_id)
+        raise HTTPException(
+            status_code=503,
+            detail="The video export queue is unavailable. Try again later.",
+        ) from exc
+
     operation = _ensure_job_operation(
         db,
         user_id=user.id,
