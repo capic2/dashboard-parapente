@@ -1,0 +1,21 @@
+launch-templates:
+  linux-medium-python:
+    resource-class: docker_linux_amd64/medium
+    image: ubuntu22.04-node24.14-v1
+    init-steps:
+      - name: Checkout
+        uses: nrwl/nx-cloud-workflows/v6/workflow-steps/checkout/main.yaml
+      - name: Install mise
+        uses: nrwl/nx-cloud-workflows/v6/workflow-steps/install-mise/main.yaml
+        inputs:
+          mise-version: v2026.7.7
+          tools: |
+            python=3.15
+      - name: Install Node Modules
+        uses: nrwl/nx-cloud-workflows/v6/workflow-steps/install-node-modules/main.yaml
+      - name: Install backend Python dependencies
+        script: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/pip install -c apps/backend/constraints.txt -r apps/backend/requirements.txt
+          echo "PATH=$PWD/.venv/bin:$PATH" >> "$NX_CLOUD_ENV"
