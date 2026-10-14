@@ -192,12 +192,6 @@ export function FlightDetails({
   const { data: youtubeAssociations = [] } = useYoutubeVideoAssociations(
     flight.id
   );
-  const hasYoutubeVideoOnYoutube = (flight.youtube_urls ?? []).some(
-    (url) =>
-      getYoutubeVideoId(url) &&
-      youtubeAssociations.find((association) => association.url === url)
-        ?.exists_on_youtube !== false
-  );
   const hasYoutubeSyncVideo = youtubeAssociations.some(
     (association) =>
       (flight.youtube_urls ?? []).includes(association.url) &&
@@ -891,7 +885,6 @@ export function FlightDetails({
           flightId={flight.id}
           hasGpx={hasGpx}
           hasVideo={hasVideo}
-          hasYoutubeVideoOnYoutube={hasYoutubeVideoOnYoutube}
           hasPanoVideo={hasPanoVideo}
           hasGoproCameraVideo={hasGoproCameraVideo}
           hasFaceVideo={hasFaceVideo}

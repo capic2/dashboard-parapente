@@ -63,7 +63,6 @@ function renderMedia(
       flightId="flight-1"
       hasGpx={false}
       hasVideo={false}
-      hasYoutubeVideoOnYoutube={false}
       hasPanoVideo={hasPanoVideo}
       hasGoproCameraVideo={hasGoproCameraVideo}
       hasFaceVideo={hasFaceVideo}
@@ -103,6 +102,15 @@ describe('FlightMediaBadges temporary sources', () => {
 
     expect(
       screen.queryByRole('heading', { name: 'Temporary sources to publish' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides the GPX-video card when only a temporary video source is available', () => {
+    renderMedia(true, false, false);
+
+    expect(screen.getByTestId('temporary-pano')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Video' })
     ).not.toBeInTheDocument();
   });
 });
