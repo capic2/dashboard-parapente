@@ -31,8 +31,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Reuse valid local Nx task results between runs. The Mergify queue
-      # validation explicitly skips this cache below.
+      # Keep local Nx task results available for CI runs that do not use Nx Cloud.
       - name: 💾 Setup NX Cache
         uses: actions/cache@v6
         with:
@@ -96,8 +95,14 @@ jobs:
         id: application-changes
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          IS_MERGE_QUEUE: ${{ github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'merge queue:') }}
         run: |
           if [[ "$GITHUB_EVENT_NAME" != "pull_request" ]]; then
+            echo "application_changes=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$IS_MERGE_QUEUE" == "true" ]]; then
             echo "application_changes=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -118,8 +123,14 @@ jobs:
         run: |
           echo "::group::Full Nx validation for Mergify queue"
           trap 'echo "::endgroup::"' EXIT
+          # Start Nx Cloud before the validation script's first Nx command.
+          pnpm dlx nx-cloud start-ci-run \
+            --distribute-on="3 linux-medium-python" \
+            --stop-agents-after="build,lint,type-check,test" \
+            --with-env-vars="TESTING,BACKEND_DATABASE_URL,BACKEND_WEATHERAPI_KEY,BACKEND_METEOBLUE_API_KEY,BACKEND_JWT_SECRET,VITE_CESIUM_ION_TOKEN"
           bash .github/scripts/run-full-nx-validation.sh
         env:
+          NX_NO_CLOUD: 'false'
           TESTING: true
           BACKEND_DATABASE_URL: sqlite:///./test.db
           BACKEND_WEATHERAPI_KEY: test_key
