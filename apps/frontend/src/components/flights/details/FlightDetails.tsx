@@ -21,6 +21,7 @@ import {
 import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
 import {
   useRemoveYoutubeVideoAssociation,
+  useYoutubeSourcePublicationStatus,
   useYoutubeUpload,
   useYoutubeVideoAssociations,
 } from '../../../hooks/flights/useYoutubeUpload';
@@ -189,6 +190,12 @@ export function FlightDetails({
     Boolean(flight.video_export_job_id)
   );
   const { data: youtubeUploadJob = null } = useYoutubeUpload(flight.id);
+  const { isPublished: hasYoutubeGeneratedVideo } =
+    useYoutubeSourcePublicationStatus(
+      flight.id,
+      { source_type: 'video' },
+      flight.youtube_urls ?? []
+    );
   const { data: youtubeAssociations = [] } = useYoutubeVideoAssociations(
     flight.id
   );
@@ -885,6 +892,7 @@ export function FlightDetails({
           flightId={flight.id}
           hasGpx={hasGpx}
           hasVideo={hasVideo}
+          hasYoutubeGeneratedVideo={hasYoutubeGeneratedVideo}
           hasPanoVideo={hasPanoVideo}
           hasGoproCameraVideo={hasGoproCameraVideo}
           hasFaceVideo={hasFaceVideo}
