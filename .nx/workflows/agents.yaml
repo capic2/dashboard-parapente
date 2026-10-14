@@ -20,3 +20,7 @@ launch-templates:
           .venv/bin/python -m pip install --upgrade pip
           .venv/bin/pip install -c apps/backend/constraints.txt -r apps/backend/requirements.txt
           echo "PATH=$PWD/.venv/bin:$PATH" >> "$NX_CLOUD_ENV"
+      - name: Install Playwright browsers
+        script: |
+          pnpm exec playwright install --with-deps chromium
+          .venv/bin/python -m playwright install chromium

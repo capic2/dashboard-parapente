@@ -828,8 +828,7 @@ export function FlightDetails({
       </header>
 
       <div className="min-w-0 space-y-4">
-        {(hasYoutubeVideo || hasVideo || videoMarkersDraft.length > 0) &&
-          overlayWorkspacePanel}
+        {hasYoutubeSyncVideo && overlayWorkspacePanel}
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
           <button
             type="button"
