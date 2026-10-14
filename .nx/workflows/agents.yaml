@@ -2,6 +2,7 @@ launch-templates:
   linux-medium-python:
     resource-class: docker_linux_amd64/medium
     image: ubuntu22.04-node24.14-v1
+    no-output-timeout: 30m
     init-steps:
       - name: Checkout
         uses: nrwl/nx-cloud-workflows/v6/workflow-steps/checkout/main.yaml
