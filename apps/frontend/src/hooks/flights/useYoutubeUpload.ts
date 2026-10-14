@@ -258,6 +258,23 @@ export function useStartYoutubeUpload(flightId: string) {
   });
 }
 
+export function useStartYoutubeTelemetryLayoutExport(flightId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { youtube_url: string; offset_seconds: number }) =>
+      api
+        .post(`flights/${flightId}/youtube-telemetry-layout-export`, {
+          json: payload,
+        })
+        .json<{ job_id: string; operation_id: string; status: string }>(),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['youtube-upload', flightId],
+      });
+    },
+  });
+}
+
 export function useCancelYoutubeUpload(flightId: string) {
   const queryClient = useQueryClient();
   return useMutation({

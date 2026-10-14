@@ -573,7 +573,10 @@ def _update_job(
         # the flight's Cesium export state. The per-process update flag is not
         # available to a separate RQ worker, so enforce this from persisted job
         # metadata as well.
-        if should_update_flight and job.mode != "youtube_overlay":
+        if should_update_flight and job.mode not in {
+            "youtube_overlay",
+            "youtube_telemetry_layout",
+        }:
             _update_flight_from_job(db, job)
         db.commit()
 
@@ -838,6 +841,9 @@ def process_video_export_job(job_id: str) -> None:
     if job and job.mode == "youtube_overlay":
         _export_youtube_overlay_job(acquired_job_id)
         return
+    if job and job.mode == "youtube_telemetry_layout":
+        _export_youtube_telemetry_layout_job(acquired_job_id)
+        return
     asyncio.run(_export_video_manual_render(acquired_job_id))
 
 
@@ -932,6 +938,119 @@ def _export_youtube_overlay_job(job_id: str) -> None:
         _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
     finally:
         _log_job(job_id, "Nettoyage des fichiers temporaires YouTube")
+        cleanup_work_dir(work_dir)
+        if not upload_started:
+            destination.unlink(missing_ok=True)
+
+
+def _export_youtube_telemetry_layout_job(job_id: str) -> None:
+    """Render the interactive telemetry layout over an associated YouTube video."""
+    try:
+        _run_youtube_telemetry_layout_job(job_id)
+    finally:
+        _clear_job_auth_token(job_id)
+
+
+def _run_youtube_telemetry_layout_job(job_id: str) -> None:
+    """Run the render while the public wrapper guarantees token cleanup."""
+    from gopro_overlay_export import first_gpx_timestamp
+    from youtube_overlay_export import (
+        YoutubeExportError,
+        cleanup_work_dir,
+        new_work_dir,
+        output_path,
+    )
+    from youtube_telemetry_layout_export import export_youtube_telemetry_layout
+    from youtube_upload import (
+        download_cookies_for_upload_job,
+        enqueue_youtube_overlay_upload,
+        fail_youtube_overlay_upload,
+    )
+
+    job = _get_job(job_id)
+    if not job or not job.youtube_url or not job.youtube_upload_job_id:
+        _log_job(job_id, "Export YouTube échoué: paramètres d’export incomplets")
+        _update_job(job_id, status=_STATUS_FAILED, error="Paramètres d’export incomplets")
+        return
+
+    with SessionLocal() as db:
+        flight = db.get(Flight, job.flight_id)
+        gpx_path = Path(flight.gpx_file_path) if flight and flight.gpx_file_path else None
+    timeline_start = first_gpx_timestamp(gpx_path) if gpx_path and gpx_path.is_file() else None
+    if timeline_start is None:
+        error = "L’origine temporelle du GPX est introuvable"
+        _update_job(job_id, status=_STATUS_FAILED, error=error, message="Export YouTube échoué")
+        fail_youtube_overlay_upload(job.youtube_upload_job_id, error)
+        return
+
+    work_dir = new_work_dir(job_id)
+    destination = output_path(job_id)
+    upload_started = False
+
+    def progress(message: str, download_percent: int | None = None) -> None:
+        if _is_cancelled(job_id):
+            raise YoutubeExportError("Export annulé")
+        _log_job(job_id, message)
+        progress_percent = None
+        if download_percent is not None:
+            if message.startswith("Capture du layout:"):
+                progress_percent = 40 + round(download_percent * 45 / 100)
+            elif message.startswith("yt-dlp:") or message.startswith("Téléchargement YouTube"):
+                progress_percent = 1 + round(download_percent * 39 / 100)
+        _update_job(
+            job_id,
+            status=_STATUS_RUNNING,
+            message=message,
+            **({"progress": progress_percent} if progress_percent is not None else {}),
+        )
+
+    try:
+        _log_job(job_id, "Préparation de l’export avec le layout de télémétrie")
+        _update_job(
+            job_id, status=_STATUS_RUNNING, message="Préparation de l’export YouTube", progress=1
+        )
+        download_cookies = download_cookies_for_upload_job(job.youtube_upload_job_id)
+        export_youtube_telemetry_layout(
+            url=job.youtube_url,
+            output_path=destination,
+            offset_seconds=float(job.overlay_offset_seconds or 0),
+            timeline_start_timestamp=timeline_start.timestamp(),
+            frontend_url=job.frontend_url,
+            job_id=job_id,
+            job_token=get_video_export_job_token(job_id),
+            work_dir=work_dir,
+            progress=progress,
+            is_cancelled=lambda: _is_cancelled(job_id),
+            cookies=download_cookies,
+        )
+        if _is_cancelled(job_id):
+            raise YoutubeExportError("Export annulé")
+        enqueue_youtube_overlay_upload(job.youtube_upload_job_id, destination)
+        upload_started = True
+        _log_job(job_id, "Vidéo composée et upload YouTube lancé")
+        try:
+            _update_job(
+                job_id,
+                status=_STATUS_COMPLETED,
+                progress=100,
+                message="Vidéo composée, envoi YouTube en cours",
+                video_path=str(destination),
+            )
+        except Exception as exc:
+            logger.exception("Unable to finalize telemetry-layout export %s", job_id)
+            _log_job(job_id, f"Upload YouTube lancé, statut d’export non mis à jour: {exc}")
+    except YoutubeExportError as exc:
+        _log_job(job_id, f"Export YouTube échoué: {exc}")
+        if not upload_started:
+            fail_youtube_overlay_upload(job.youtube_upload_job_id, str(exc))
+        _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
+    except Exception as exc:
+        logger.exception("Unexpected telemetry-layout export error for %s", job_id)
+        _log_job(job_id, f"Export YouTube échoué avec une erreur inattendue: {exc}")
+        if not upload_started:
+            fail_youtube_overlay_upload(job.youtube_upload_job_id, str(exc))
+        _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
+    finally:
         cleanup_work_dir(work_dir)
         if not upload_started:
             destination.unlink(missing_ok=True)
@@ -1786,6 +1905,8 @@ def _worker_loop():
             job = _get_job(job_id)
             if job and job.mode == "youtube_overlay":
                 _export_youtube_overlay_job(job_id)
+            elif job and job.mode == "youtube_telemetry_layout":
+                _export_youtube_telemetry_layout_job(job_id)
             else:
                 asyncio.run(_export_video_manual_render(job_id))
         except Exception as e:
@@ -1958,6 +2079,51 @@ def start_youtube_overlay_export(
             pip_apply_offset=pip_apply_offset,
             overlay_job_id=overlay_job_id,
             overlay_offset_seconds=overlay_offset_seconds,
+            youtube_upload_job_id=upload_job.id,
+        )
+    except Exception as exc:
+        fail_youtube_overlay_upload(upload_job.id, str(exc))
+        raise
+
+
+def start_youtube_telemetry_layout_export(
+    *,
+    flight_id: str,
+    youtube_url: str,
+    offset_seconds: float,
+    youtube_user_id: int,
+    frontend_url: str,
+    auth_token: str | None = None,
+) -> str:
+    """Queue a custom telemetry-layout render followed by YouTube publication."""
+    from youtube_upload import create_youtube_overlay_upload_job, fail_youtube_overlay_upload
+
+    with SessionLocal() as db:
+        flight = db.get(Flight, flight_id)
+        if flight is None:
+            raise RuntimeError("Flight not found")
+        flight_date = flight.flight_date.strftime("%d/%m/%Y") if flight.flight_date else "sans date"
+        title = flight.name or f"Vol du {flight_date}"
+        upload_job = create_youtube_overlay_upload_job(
+            db,
+            flight_id=flight.id,
+            user_id=youtube_user_id,
+            title=f"{title} - télémétrie",
+            description=flight.notes or "",
+        )
+    try:
+        return _enqueue_video_export_job(
+            flight_id=flight_id,
+            mode="youtube_telemetry_layout",
+            quality="1080p",
+            fps=30,
+            speed=1,
+            frontend_url=frontend_url,
+            update_db=False,
+            auth_token=auth_token,
+            source_type="youtube",
+            youtube_url=youtube_url,
+            overlay_offset_seconds=offset_seconds,
             youtube_upload_job_id=upload_job.id,
         )
     except Exception as exc:

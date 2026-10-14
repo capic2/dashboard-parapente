@@ -737,6 +737,11 @@ class YoutubeOverlayExportCreate(BaseModel):
     pip_apply_offset: bool = True
 
 
+class YoutubeTelemetryLayoutExportCreate(BaseModel):
+    youtube_url: str = Field(min_length=1)
+    offset_seconds: float = Field(ge=-86_400, le=86_400)
+
+
 class YoutubeUploadJobResponse(BaseModel):
     operation_id: str | None = None
     job_id: str

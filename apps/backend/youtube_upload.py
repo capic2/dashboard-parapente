@@ -82,6 +82,10 @@ class YoutubeRemoteDeletionError(RuntimeError):
     pass
 
 
+class YoutubeUploadAlreadyActiveError(RuntimeError):
+    pass
+
+
 def playlist_title_for_flight(db: Session, flight: Flight) -> str:
     """Return the YouTube playlist name for a flight's daily sequence."""
     sequence = flight_sequence_number(db, flight)
@@ -765,7 +769,9 @@ def create_youtube_overlay_upload_job(
         )
         is not None
     ):
-        raise RuntimeError("A YouTube upload for this source is already in progress")
+        raise YoutubeUploadAlreadyActiveError(
+            "A YouTube upload for this source is already in progress"
+        )
     job = YoutubeUploadJob(
         id=str(uuid.uuid4()),
         flight_id=flight_id,
@@ -784,7 +790,9 @@ def create_youtube_overlay_upload_job(
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise RuntimeError("A YouTube upload for this source is already in progress") from exc
+        raise YoutubeUploadAlreadyActiveError(
+            "A YouTube upload for this source is already in progress"
+        ) from exc
     db.refresh(job)
     return job
 

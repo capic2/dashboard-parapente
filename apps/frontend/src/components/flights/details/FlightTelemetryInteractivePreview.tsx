@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react';
 import type { FlightVideoMarker } from '@dashboard-parapente/shared-types';
 import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button, Modal } from '@dashboard-parapente/design-system';
 import {
   ChevronLeft,
   ChevronRight,
@@ -44,6 +44,7 @@ import {
   useUploadYoutubeDownloadCookies,
   useYoutubeUpload,
   useYoutubeVideoAssociations,
+  useStartYoutubeTelemetryLayoutExport,
 } from '../../../hooks/flights/useYoutubeUpload';
 
 interface FlightTelemetryInteractivePreviewProps {
@@ -149,6 +150,12 @@ function getYoutubeExportPhase(
       fallback: 'Génération de l’overlay synchronisé',
     };
   }
+  if (value.includes('layout') || value.includes('capture du layout')) {
+    return {
+      key: 'flights.youtubeOverlayExportPhaseOverlay',
+      fallback: 'Génération de l’overlay synchronisé',
+    };
+  }
   if (value.includes('fusion') || value.includes('ffmpeg')) {
     return {
       key: 'flights.youtubeOverlayExportPhaseCompose',
@@ -177,7 +184,17 @@ export function FlightTelemetryInteractivePreview({
   const telemetry = useFlightTelemetry(flightId, true);
   const layout = useTelemetryLayout(flightId);
   const [cameraTime, setCameraTime] = useState(0);
-  const youtubeExportJobId = readYoutubeExportJobId(flightId);
+  const [youtubeExportJobId, setYoutubeExportJobId] = useState(() =>
+    readYoutubeExportJobId(flightId)
+  );
+  const [isYoutubeExportDialogOpen, setIsYoutubeExportDialogOpen] =
+    useState(false);
+  const [hasYoutubeReuseRights, setHasYoutubeReuseRights] = useState(false);
+  const [youtubeExportStartError, setYoutubeExportStartError] = useState<
+    string | null
+  >(null);
+  const startYoutubeTelemetryExport =
+    useStartYoutubeTelemetryLayoutExport(flightId);
   const youtubeAssociations = useYoutubeVideoAssociations(flightId);
   const uploadCookies = useUploadYoutubeDownloadCookies();
   const youtubeOverlayUpload = useYoutubeUpload(flightId, {
@@ -414,6 +431,9 @@ export function FlightTelemetryInteractivePreview({
   const pipOffsetSeconds = calibrationOffsetSeconds;
   const hasYoutubeCarousel = youtubeMainUrls.length > 1;
   useEffect(() => {
+    setYoutubeExportJobId(readYoutubeExportJobId(flightId));
+  }, [flightId]);
+  useEffect(() => {
     if (
       youtubeExportJobId &&
       ['completed', 'failed', 'cancelled'].includes(
@@ -423,6 +443,7 @@ export function FlightTelemetryInteractivePreview({
       )
     ) {
       clearStoredYoutubeExportJobId(flightId, youtubeExportJobId);
+      setYoutubeExportJobId(null);
     }
   }, [
     flightId,
@@ -436,6 +457,31 @@ export function FlightTelemetryInteractivePreview({
       (index + youtubeMainUrls.length) % youtubeMainUrls.length
     );
     setCameraTime(0);
+  };
+  const handleStartYoutubeLayoutExport = async () => {
+    if (!youtubeUrl || !hasYoutubeReuseRights) return;
+    setYoutubeExportStartError(null);
+    try {
+      const job = await startYoutubeTelemetryExport.mutateAsync({
+        youtube_url: youtubeUrl,
+        offset_seconds: calibrationOffsetSeconds,
+      });
+      try {
+        window.sessionStorage.setItem(
+          youtubeExportJobStorageKey(flightId),
+          job.job_id
+        );
+      } catch {
+        // Keep tracking the job in memory when browser storage is unavailable.
+      }
+      setYoutubeExportJobId(job.job_id);
+      setIsYoutubeExportDialogOpen(false);
+      setHasYoutubeReuseRights(false);
+    } catch (error) {
+      setYoutubeExportStartError(
+        await getApiErrorMessage(error, t('flights.youtubeOverlayExportError'))
+      );
+    }
   };
   const youtubeExportStatusValue =
     youtubeExportStatus?.internal_status ?? youtubeExportStatus?.status;
@@ -796,6 +842,24 @@ export function FlightTelemetryInteractivePreview({
               </div>
             )}
             <div className="min-w-0 flex-1">
+              {youtubeUrl && (
+                <div className="mb-3 flex justify-end">
+                  <Button
+                    variant="outline"
+                    isDisabled={
+                      isYoutubeExportActive ||
+                      startYoutubeTelemetryExport.isPending
+                    }
+                    onPress={() => {
+                      setYoutubeExportStartError(null);
+                      setIsYoutubeExportDialogOpen(true);
+                    }}
+                  >
+                    <Upload className="h-4 w-4" aria-hidden="true" />
+                    {t('flights.youtubeOverlayExport')}
+                  </Button>
+                </div>
+              )}
               <FlightOverlayPlayer
                 key={youtubeUrl ?? mainCameraUrl ?? 'camera-only'}
                 mode="interactive"
@@ -862,6 +926,55 @@ export function FlightTelemetryInteractivePreview({
             <span>{t('flights.goproOverlayEnrichmentFailed')}</span>
           </div>
         )}
+        <Modal
+          isOpen={isYoutubeExportDialogOpen}
+          onClose={() => setIsYoutubeExportDialogOpen(false)}
+          title={t('flights.youtubeOverlayExportTitle')}
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              {t('flights.youtubeOverlayExportDescription')}
+            </p>
+            <label className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
+              <input
+                type="checkbox"
+                checked={hasYoutubeReuseRights}
+                onChange={(event) =>
+                  setHasYoutubeReuseRights(event.currentTarget.checked)
+                }
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+              />
+              <span>{t('flights.youtubeOverlayExportRights')}</span>
+            </label>
+            {youtubeExportStartError && (
+              <p
+                role="alert"
+                className="text-sm text-red-700 dark:text-red-300"
+              >
+                {youtubeExportStartError}
+              </p>
+            )}
+            <div className="flex justify-end">
+              <Button
+                isDisabled={
+                  !hasYoutubeReuseRights ||
+                  startYoutubeTelemetryExport.isPending
+                }
+                onPress={() => void handleStartYoutubeLayoutExport()}
+              >
+                {startYoutubeTelemetryExport.isPending ? (
+                  <LoaderCircle
+                    className="h-4 w-4 motion-safe:animate-spin"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <Upload className="h-4 w-4" aria-hidden="true" />
+                )}
+                {t('flights.youtubeOverlayExportStart')}
+              </Button>
+            </div>
+          </div>
+        </Modal>
         {showUnavailable && (
           <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
             <CircleAlert
