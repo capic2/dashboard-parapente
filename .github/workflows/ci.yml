@@ -125,8 +125,9 @@ jobs:
           trap 'echo "::endgroup::"' EXIT
           # Start Nx Cloud before the validation script's first Nx command.
           pnpm dlx nx-cloud start-ci-run \
-            --distribute-on="3 linux-medium-js" \
-            --stop-agents-after="build,lint,type-check,test"
+            --distribute-on="3 linux-medium-python" \
+            --stop-agents-after="build,lint,type-check,test" \
+            --with-env-vars="TESTING,BACKEND_DATABASE_URL,BACKEND_WEATHERAPI_KEY,BACKEND_METEOBLUE_API_KEY,BACKEND_JWT_SECRET,VITE_CESIUM_ION_TOKEN"
           bash .github/scripts/run-full-nx-validation.sh
         env:
           NX_NO_CLOUD: 'false'
