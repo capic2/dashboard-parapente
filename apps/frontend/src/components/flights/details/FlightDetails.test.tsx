@@ -1044,7 +1044,7 @@ describe('FlightDetails GoPro overlay action', () => {
     ).toHaveAttribute('aria-expanded', 'true');
   });
 
-  it('keeps the automatic alignment separate from the manual GPX offset', () => {
+  it('adjusts the manual offset for the linked YouTube calibration', () => {
     setYoutubeVideoRole('face');
     previewMock.current = {
       isPending: false,
@@ -1100,7 +1100,7 @@ describe('FlightDetails GoPro overlay action', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Adjust offset by 1 second' })
     );
-    expect(screen.getByText('9.0 s')).toBeInTheDocument();
+    expect(screen.getByText('1.0 s')).toBeInTheDocument();
   });
 
   it('restores the stored manual offset in the calibration workspace', () => {
@@ -1270,9 +1270,8 @@ describe('FlightDetails GoPro overlay action', () => {
     );
   });
 
-  it('seeks to the start and end preview segments from their buttons', () => {
+  it('shows the linked YouTube source in the calibration workspace', () => {
     setYoutubeVideoRole('face');
-    setSegmentedPreview();
 
     render(
       <FlightDetails
@@ -1283,21 +1282,14 @@ describe('FlightDetails GoPro overlay action', () => {
     );
 
     openTab('Media');
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: /Synchronization and overlay layer/u,
-      })
-    );
+    expandOverlayWorkspace();
 
-    const camera = screen.getByLabelText('GoPro video preview');
-    fireEvent.click(screen.getByRole('button', { name: 'End of flight' }));
-    expect(camera).toHaveProperty('currentTime', 180);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Start of flight' }));
-    expect(camera).toHaveProperty('currentTime', 0);
+    expect(
+      screen.getByLabelText('flights.goproOverlayCameraPreview')
+    ).toBeInTheDocument();
   });
 
-  it('requests a longer low-resolution preview from the duration slider', async () => {
+  it('does not show the low-resolution preview controls for a YouTube source', () => {
     setYoutubeVideoRole('face');
     previewMock.current = {
       isPending: false,
@@ -1346,24 +1338,11 @@ describe('FlightDetails GoPro overlay action', () => {
     );
     openTab('Media');
     expandOverlayWorkspace();
-    const durationSlider = screen.getByLabelText(
-      'flights.goproPreviewDuration'
-    );
-    expect(durationSlider).toHaveAttribute('max', '10');
-    fireEvent.change(durationSlider, {
-      target: { value: '8' },
-    });
-    fireEvent.click(
-      screen.getByRole('button', { name: 'flights.goproPreviewGenerate' })
-    );
-
-    await waitFor(() =>
-      expect(generatePreviewMock).toHaveBeenCalledWith({
-        durationSeconds: 480,
-        targetEndSeconds: 1200,
-      })
-    );
-  }, 10_000);
+    expect(
+      screen.queryByLabelText('flights.goproPreviewDuration')
+    ).not.toBeInTheDocument();
+    expect(generatePreviewMock).not.toHaveBeenCalled();
+  });
 
   it('requests the default start and end preview when no matching cache exists', async () => {
     setYoutubeVideoRole('face');
@@ -1418,7 +1397,7 @@ describe('FlightDetails GoPro overlay action', () => {
     );
   });
 
-  it('shows a notice while the low-resolution preview is generating', () => {
+  it('does not show the low-resolution preview notice for a YouTube source', () => {
     setYoutubeVideoRole('face');
     previewMock.current = {
       isPending: false,
@@ -1470,11 +1449,11 @@ describe('FlightDetails GoPro overlay action', () => {
     expandOverlayWorkspace();
 
     expect(
-      screen.getByText('flights.goproPreviewGeneratingNotice')
-    ).toBeInTheDocument();
+      screen.queryByText('flights.goproPreviewGeneratingNotice')
+    ).not.toBeInTheDocument();
   });
 
-  it('saves a manual alignment separately from automatic alignment', async () => {
+  it('saves the linked YouTube calibration offset at the selected video position', async () => {
     setYoutubeVideoRole('face');
     previewMock.current = {
       isPending: false,
@@ -1532,7 +1511,7 @@ describe('FlightDetails GoPro overlay action', () => {
 
     await waitFor(() =>
       expect(updateFlightMock).toHaveBeenCalledWith({
-        gopro_overlay_gpx_offset: -8,
+        gopro_overlay_gpx_offset: 0,
       })
     );
   });
