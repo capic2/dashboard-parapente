@@ -424,6 +424,22 @@ const expandOverlayWorkspace = () => {
   }
 };
 
+const setYoutubeVideoRole = (
+  role: 'face' | 'pano' | 'pilote',
+  url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+) => {
+  mockFlight.youtube_urls = [url];
+  youtubeAssociationsMock.current = [
+    {
+      url,
+      video_id: 'youtube-role-video',
+      can_delete_from_youtube: false,
+      exists_on_youtube: true,
+      title: `Test flight - ${role}`,
+    },
+  ];
+};
+
 const setSegmentedPreview = () => {
   previewMock.current = {
     isPending: false,
@@ -1028,7 +1044,8 @@ describe('FlightDetails GoPro overlay action', () => {
     ).toHaveAttribute('aria-expanded', 'true');
   });
 
-  it('keeps the automatic alignment separate from the manual GPX offset', () => {
+  it('adjusts the manual offset for the linked YouTube calibration', () => {
+    setYoutubeVideoRole('face');
     previewMock.current = {
       isPending: false,
       data: {
@@ -1083,10 +1100,11 @@ describe('FlightDetails GoPro overlay action', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Adjust offset by 1 second' })
     );
-    expect(screen.getByText('9.0 s')).toBeInTheDocument();
+    expect(screen.getByText('1.0 s')).toBeInTheDocument();
   });
 
   it('restores the stored manual offset in the calibration workspace', () => {
+    setYoutubeVideoRole('face');
     mockFlight.gopro_overlay_gpx_offset = -1.75;
     setSegmentedPreview();
 
@@ -1108,6 +1126,7 @@ describe('FlightDetails GoPro overlay action', () => {
   });
 
   it('allows a precise manual offset in the synchronization workspace', async () => {
+    setYoutubeVideoRole('face');
     setSegmentedPreview();
 
     render(
@@ -1144,7 +1163,7 @@ describe('FlightDetails GoPro overlay action', () => {
   it('shows calibration for a YouTube video without a pano file', () => {
     mockFlight.video_file_exists = false;
     mockFlight.video_file_path = null;
-    mockFlight.youtube_urls = ['https://www.youtube.com/watch?v=dQw4w9WgXcQ'];
+    setYoutubeVideoRole('face');
 
     render(
       <FlightDetails
@@ -1163,7 +1182,61 @@ describe('FlightDetails GoPro overlay action', () => {
     ).toBeInTheDocument();
   });
 
+  it.each(['face', 'pano', 'pilote'] as const)(
+    'shows synchronization for a YouTube %s video',
+    (role) => {
+      setYoutubeVideoRole(role);
+
+      render(
+        <FlightDetails
+          flight={mockFlight}
+          sites={sites}
+          onShowCreateSiteModal={() => undefined}
+        />
+      );
+
+      openTab('Media');
+
+      expect(
+        screen.getByRole('button', {
+          name: /Synchronization and overlay layer/u,
+        })
+      ).toBeInTheDocument();
+    }
+  );
+
+  it('hides synchronization when only local and unrelated YouTube videos exist', () => {
+    const url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+    mockFlight.youtube_urls = [url];
+    youtubeAssociationsMock.current = [
+      {
+        url,
+        video_id: 'youtube-video',
+        can_delete_from_youtube: false,
+        exists_on_youtube: true,
+        title: 'Test flight - vol',
+      },
+    ];
+
+    render(
+      <FlightDetails
+        flight={mockFlight}
+        sites={sites}
+        onShowCreateSiteModal={() => undefined}
+      />
+    );
+
+    openTab('Media');
+
+    expect(
+      screen.queryByRole('button', {
+        name: /Synchronization and overlay layer/u,
+      })
+    ).not.toBeInTheDocument();
+  });
+
   it('collapses the synchronization workspace after calibration is saved', async () => {
+    setYoutubeVideoRole('face');
     mockFlight.gopro_overlay_gpx_offset = null;
     const { rerender } = render(
       <FlightDetails
@@ -1197,8 +1270,8 @@ describe('FlightDetails GoPro overlay action', () => {
     );
   });
 
-  it('seeks to the start and end preview segments from their buttons', () => {
-    setSegmentedPreview();
+  it('shows calibration controls for a linked YouTube source', () => {
+    setYoutubeVideoRole('face');
 
     render(
       <FlightDetails
@@ -1209,21 +1282,15 @@ describe('FlightDetails GoPro overlay action', () => {
     );
 
     openTab('Media');
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: /Synchronization and overlay layer/u,
-      })
-    );
+    expandOverlayWorkspace();
 
-    const camera = screen.getByLabelText('GoPro video preview');
-    fireEvent.click(screen.getByRole('button', { name: 'End of flight' }));
-    expect(camera).toHaveProperty('currentTime', 180);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Start of flight' }));
-    expect(camera).toHaveProperty('currentTime', 0);
+    expect(
+      screen.getByRole('button', { name: 'Adjust offset by 1 second' })
+    ).toBeInTheDocument();
   });
 
-  it('requests a longer low-resolution preview from the duration slider', async () => {
+  it('does not show the low-resolution preview controls for a YouTube source', () => {
+    setYoutubeVideoRole('face');
     previewMock.current = {
       isPending: false,
       data: {
@@ -1271,26 +1338,14 @@ describe('FlightDetails GoPro overlay action', () => {
     );
     openTab('Media');
     expandOverlayWorkspace();
-    const durationSlider = screen.getByLabelText(
-      'flights.goproPreviewDuration'
-    );
-    expect(durationSlider).toHaveAttribute('max', '10');
-    fireEvent.change(durationSlider, {
-      target: { value: '8' },
-    });
-    fireEvent.click(
-      screen.getByRole('button', { name: 'flights.goproPreviewGenerate' })
-    );
-
-    await waitFor(() =>
-      expect(generatePreviewMock).toHaveBeenCalledWith({
-        durationSeconds: 480,
-        targetEndSeconds: 1200,
-      })
-    );
-  }, 10_000);
+    expect(
+      screen.queryByLabelText('flights.goproPreviewDuration')
+    ).not.toBeInTheDocument();
+    expect(generatePreviewMock).not.toHaveBeenCalled();
+  });
 
   it('requests the default start and end preview when no matching cache exists', async () => {
+    setYoutubeVideoRole('face');
     previewMock.current = {
       isPending: false,
       data: {
@@ -1342,7 +1397,8 @@ describe('FlightDetails GoPro overlay action', () => {
     );
   });
 
-  it('shows a notice while the low-resolution preview is generating', () => {
+  it('does not show the low-resolution preview notice for a YouTube source', () => {
+    setYoutubeVideoRole('face');
     previewMock.current = {
       isPending: false,
       data: {
@@ -1393,11 +1449,12 @@ describe('FlightDetails GoPro overlay action', () => {
     expandOverlayWorkspace();
 
     expect(
-      screen.getByText('flights.goproPreviewGeneratingNotice')
-    ).toBeInTheDocument();
+      screen.queryByText('flights.goproPreviewGeneratingNotice')
+    ).not.toBeInTheDocument();
   });
 
-  it('saves a manual alignment separately from automatic alignment', async () => {
+  it('saves the linked YouTube calibration offset at the selected video position', async () => {
+    setYoutubeVideoRole('face');
     previewMock.current = {
       isPending: false,
       data: {
@@ -1454,7 +1511,7 @@ describe('FlightDetails GoPro overlay action', () => {
 
     await waitFor(() =>
       expect(updateFlightMock).toHaveBeenCalledWith({
-        gopro_overlay_gpx_offset: -8,
+        gopro_overlay_gpx_offset: 0,
       })
     );
   });
