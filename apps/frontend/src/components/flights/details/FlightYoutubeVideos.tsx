@@ -1,4 +1,5 @@
 import { Button } from '@dashboard-parapente/design-system';
+import type { YoutubeVideoAssociation } from '@dashboard-parapente/shared-types';
 import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -6,6 +7,7 @@ import { getYoutubeEmbedUrl, getYoutubeVideoId } from '../../../lib/youtube';
 
 interface FlightYoutubeVideosProps {
   urls?: string[];
+  associations?: YoutubeVideoAssociation[];
   removingUrl?: string | null;
   onRemove?: (url: string) => void;
 }
@@ -14,6 +16,7 @@ const EMPTY_URLS: string[] = [];
 
 export function FlightYoutubeVideos({
   urls = EMPTY_URLS,
+  associations = [],
   removingUrl = null,
   onRemove,
 }: FlightYoutubeVideosProps) {
@@ -24,7 +27,10 @@ export function FlightYoutubeVideos({
   const videos = urls.flatMap((url) => {
     const embedUrl = getYoutubeEmbedUrl(url);
     const videoId = getYoutubeVideoId(url);
-    return embedUrl && videoId ? [{ embedUrl, videoId, url }] : [];
+    const title = associations
+      .find((association) => association.video_id === videoId)
+      ?.title?.trim();
+    return embedUrl && videoId ? [{ embedUrl, videoId, url, title }] : [];
   });
 
   if (videos.length === 0) return null;
@@ -41,16 +47,18 @@ export function FlightYoutubeVideos({
         {t('flights.mediaPublishedDescription')}
       </p>
       <div className="grid gap-4 2xl:grid-cols-2">
-        {videos.map(({ embedUrl, videoId, url }, index) => (
+        {videos.map(({ embedUrl, videoId, url, title }, index) => (
           <div
             key={embedUrl}
-            className="overflow-hidden rounded-lg bg-black shadow-sm"
+            className="min-w-0 overflow-hidden rounded-lg bg-gray-900 shadow-sm"
           >
             {activeVideoIds.has(videoId) ? (
               // oxlint-disable-next-line react/iframe-missing-sandbox -- The source is restricted to validated youtube-nocookie.com video IDs; YouTube playback does not work inside the restrictive sandbox.
               <iframe
                 src={embedUrl}
-                title={t('flights.youtubeVideoTitle', { count: index + 1 })}
+                title={
+                  title || t('flights.youtubeVideoTitle', { count: index + 1 })
+                }
                 className="aspect-video w-full"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; xr-spatial-tracking"
                 referrerPolicy="origin"
@@ -63,6 +71,7 @@ export function FlightYoutubeVideos({
                 aria-label={t('flights.playYoutubeVideo', {
                   count: index + 1,
                 })}
+                aria-describedby={`youtube-video-title-${videoId}`}
                 onClick={() =>
                   setActiveVideoIds((current) => new Set(current).add(videoId))
                 }
@@ -75,6 +84,12 @@ export function FlightYoutubeVideos({
                 />
               </button>
             )}
+            <h4
+              id={`youtube-video-title-${videoId}`}
+              className="px-3 pt-3 text-sm font-semibold break-words text-white"
+            >
+              {title || t('flights.youtubeVideoTitle', { count: index + 1 })}
+            </h4>
             <div className="flex items-center justify-between gap-2 bg-gray-900 px-3 py-2">
               <a
                 href={url}

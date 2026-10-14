@@ -995,6 +995,7 @@ export function FlightDetails({
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800 sm:p-5">
             <FlightYoutubeVideos
               urls={flight.youtube_urls}
+              associations={youtubeAssociations}
               removingUrl={
                 removeYoutubeAssociation.isPending
                   ? youtubeRemovalTarget?.url
