@@ -1270,7 +1270,7 @@ describe('FlightDetails GoPro overlay action', () => {
     );
   });
 
-  it('shows the linked YouTube source in the calibration workspace', () => {
+  it('shows calibration controls for a linked YouTube source', () => {
     setYoutubeVideoRole('face');
 
     render(
@@ -1285,7 +1285,7 @@ describe('FlightDetails GoPro overlay action', () => {
     expandOverlayWorkspace();
 
     expect(
-      screen.getByLabelText('flights.goproOverlayCameraPreview')
+      screen.getByRole('button', { name: 'Adjust offset by 1 second' })
     ).toBeInTheDocument();
   });
 
