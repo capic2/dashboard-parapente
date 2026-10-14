@@ -31,8 +31,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Reuse valid local Nx task results between runs. The Mergify queue
-      # validation explicitly skips this cache below.
+      # Keep local Nx task results available for CI runs that do not use Nx Cloud.
       - name: 💾 Setup NX Cache
         uses: actions/cache@v6
         with:
@@ -118,8 +117,13 @@ jobs:
         run: |
           echo "::group::Full Nx validation for Mergify queue"
           trap 'echo "::endgroup::"' EXIT
+          # Start Nx Cloud before the validation script's first Nx command.
+          pnpm dlx nx-cloud start-ci-run \
+            --distribute-on="3 linux-medium-js" \
+            --stop-agents-after="build,lint,type-check,test"
           bash .github/scripts/run-full-nx-validation.sh
         env:
+          NX_NO_CLOUD: 'false'
           TESTING: true
           BACKEND_DATABASE_URL: sqlite:///./test.db
           BACKEND_WEATHERAPI_KEY: test_key
