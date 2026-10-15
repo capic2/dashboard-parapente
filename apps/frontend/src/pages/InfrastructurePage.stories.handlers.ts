@@ -440,6 +440,7 @@ export const videoExportHandlers = [
       page_size: 25,
       total: 26,
       total_pages: 2,
+      temp_files_available: true,
     })
   ),
   http.get(

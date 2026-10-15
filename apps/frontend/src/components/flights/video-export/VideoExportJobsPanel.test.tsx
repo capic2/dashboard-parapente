@@ -19,6 +19,7 @@ const {
   refetch,
   jobs,
   typeCounts,
+  tempFilesAvailable,
 } = vi.hoisted(() => ({
   cancelJob: vi.fn(),
   cancelHighlightJob: vi.fn(),
@@ -31,6 +32,7 @@ const {
   toastSuccess: vi.fn(),
   refetch: vi.fn(),
   typeCounts: { all: 0 },
+  tempFilesAvailable: { value: false },
   jobs: [
     {
       job_id: 'job-active',
@@ -130,6 +132,7 @@ vi.mock('../../../hooks/flights/useVideoExportJobs', () => ({
       total: jobs.length,
       totalPages: 1,
       typeCounts,
+      tempFilesAvailable: tempFilesAvailable.value,
     },
     isLoading: false,
     isError: false,
@@ -231,6 +234,7 @@ describe('VideoExportJobsPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     typeCounts.all = 0;
+    tempFilesAvailable.value = false;
     jobs.splice(
       0,
       jobs.length,
@@ -591,6 +595,7 @@ describe('VideoExportJobsPanel', () => {
   });
 
   it('cleans temporary files after confirmation', async () => {
+    tempFilesAvailable.value = true;
     cleanupTempFiles.mockResolvedValue({
       files_deleted: 2,
       dirs_deleted: 1,
@@ -612,6 +617,14 @@ describe('VideoExportJobsPanel', () => {
     expect(toastSuccess).toHaveBeenCalledWith(
       '3 élément(s) temporaire(s) supprimé(s)'
     );
+  });
+
+  it('hides temporary-file cleanup when no files remain', () => {
+    render(<VideoExportJobsPanel />);
+
+    expect(
+      screen.queryByRole('button', { name: 'Nettoyer les temporaires' })
+    ).not.toBeInTheDocument();
   });
 
   it('shows an empty state when there are no jobs', () => {

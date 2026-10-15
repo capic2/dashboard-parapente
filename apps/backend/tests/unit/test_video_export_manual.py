@@ -2040,10 +2040,16 @@ def test_cleanup_video_export_temp_files_removes_youtube_cache_for_inactive_jobs
     active_cache.mkdir(parents=True)
     (failed_cache / "source.mp4").write_bytes(b"downloaded")
     (active_cache / "source.mp4").write_bytes(b"downloaded")
+    old_timestamp = time.time() - video_export_manual._YOUTUBE_RETRY_CACHE_RETENTION_SECONDS - 1
+    os.utime(failed_cache, (old_timestamp, old_timestamp))
 
     result = video_export_manual.cleanup_video_export_temp_files(
         [
-            {"job_id": failed_job_id, "internal_status": "failed"},
+            {
+                "job_id": failed_job_id,
+                "internal_status": "failed",
+                "mode": "youtube_overlay",
+            },
             {"job_id": active_job_id, "internal_status": "running"},
         ]
     )
@@ -2051,6 +2057,85 @@ def test_cleanup_video_export_temp_files_removes_youtube_cache_for_inactive_jobs
     assert str(failed_cache) in result["paths_deleted"]
     assert not failed_cache.exists()
     assert active_cache.exists()
+
+
+def test_cleanup_keeps_recent_failed_youtube_download_for_retry(tmp_path, monkeypatch):
+    temp_root = tmp_path / "configured-temp-images"
+    export_root = tmp_path / "configured-video-exports"
+    job_id = "4e58f4e1-1456-4421-a761-278d2eb86102"
+    youtube_cache = export_root / ".youtube-exports" / job_id
+    youtube_cache.mkdir(parents=True)
+    source_video = youtube_cache / "source.mp4"
+    source_video.write_bytes(b"downloaded")
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "_video_legacy_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "_video_export_dir", lambda: export_root)
+
+    result = video_export_manual.cleanup_video_export_temp_files(
+        [
+            {
+                "job_id": job_id,
+                "internal_status": "failed",
+                "mode": "youtube_overlay",
+            }
+        ]
+    )
+
+    assert str(youtube_cache) not in result["paths_deleted"]
+    assert youtube_cache.exists()
+
+
+def test_cleanup_button_status_detects_recent_youtube_cache_and_manual_cleanup_removes_it(
+    tmp_path, monkeypatch
+):
+    temp_root = tmp_path / "configured-temp-images"
+    export_root = tmp_path / "configured-video-exports"
+    job_id = "4e58f4e1-1456-4421-a761-278d2eb86102"
+    youtube_cache = export_root / ".youtube-exports" / job_id
+    youtube_cache.mkdir(parents=True)
+    source_video = youtube_cache / "source.mp4"
+    source_video.write_bytes(b"downloaded")
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "_video_legacy_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "_video_export_dir", lambda: export_root)
+
+    class NoActiveJobsQuery:
+        def query(self, *_args):
+            return self
+
+        def filter(self, *_args):
+            return self
+
+        def all(self):
+            return []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+    monkeypatch.setattr(video_export_manual, "SessionLocal", NoActiveJobsQuery)
+    exports = [
+        {
+            "job_id": job_id,
+            "internal_status": "failed",
+            "mode": "youtube_overlay",
+        }
+    ]
+
+    assert video_export_manual.has_video_export_temp_files(exports) is True
+    assert (
+        video_export_manual.has_video_export_temp_files(exports, include_retry_cache=False) is False
+    )
+    source_video.unlink()
+    assert video_export_manual.has_video_export_temp_files(exports) is False
+    source_video.write_bytes(b"downloaded")
+
+    result = video_export_manual.cleanup_video_export_temp_files(exports, include_retry_cache=True)
+
+    assert str(youtube_cache) in result["paths_deleted"]
+    assert not youtube_cache.exists()
 
 
 def test_cleanup_youtube_orphans_checks_persisted_active_jobs(tmp_path, monkeypatch):
