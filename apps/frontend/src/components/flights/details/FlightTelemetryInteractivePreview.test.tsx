@@ -644,13 +644,13 @@ describe('FlightTelemetryInteractivePreview', () => {
       status: 'processing',
       internal_status: 'running',
       progress: 5,
-      message: 'Génération de l’overlay synchronisé: 5%',
+      message: 'Assemblage de la vidéo avec l’overlay synchronisé: 5%',
       created_at: new Date(Date.now() - 120_000).toISOString(),
       started_at: new Date(Date.now() - 115_000).toISOString(),
       updated_at: new Date(Date.now() - 2_000).toISOString(),
       log_tail: [
         'Préparation de l’export YouTube',
-        'Génération de l’overlay synchronisé: 5%',
+        'Assemblage de la vidéo avec l’overlay synchronisé: 5%',
       ],
     };
     window.sessionStorage.setItem(
@@ -674,7 +674,9 @@ describe('FlightTelemetryInteractivePreview', () => {
       screen.getByText('flights.youtubeOverlayExportElapsed')
     ).toBeInTheDocument();
     expect(
-      screen.getAllByText(/Génération de l’overlay synchronisé: 5%/u).length
+      screen.getAllByText(
+        /Assemblage de la vidéo avec l’overlay synchronisé: 5%/u
+      ).length
     ).toBeGreaterThan(1);
     expect(
       screen.getByText('flights.youtubeOverlayExportShowLogs')
