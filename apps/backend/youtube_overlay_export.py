@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import shutil
 import subprocess
@@ -19,6 +21,18 @@ class YoutubeExportError(RuntimeError):
 
 
 _DOWNLOAD_PROGRESS_RE = re.compile(r"\[download\]\s+(?P<percent>\d+(?:\.\d+)?)%")
+_YOUTUBE_VIDEO_EXTENSIONS = {
+    ".avi",
+    ".flv",
+    ".m4v",
+    ".mkv",
+    ".mov",
+    ".mp4",
+    ".mpg",
+    ".mpeg",
+    ".ts",
+    ".webm",
+}
 ProgressCallback = Callable[[str, int | None], None]
 _OVERLAY_TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
 
@@ -87,6 +101,29 @@ def download_youtube(
     cookies: str | None = None,
 ) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
+    manifest_path = directory / ".youtube-download-complete.json"
+    url_digest = hashlib.sha256(url.encode("utf-8")).hexdigest()
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        cached_path = directory / str(manifest["filename"])
+        if (
+            manifest.get("url_sha256") == url_digest
+            and cached_path.parent == directory
+            and cached_path.suffix.lower() in _YOUTUBE_VIDEO_EXTENSIONS
+            and cached_path.is_file()
+            and not cached_path.is_symlink()
+            and cached_path.stat().st_size > 0
+        ):
+            progress(f"Vidéo YouTube téléchargée réutilisée: {cached_path.name}", 100)
+            return cached_path
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+
+    manifest_path.unlink(missing_ok=True)
+    for stale_path in directory.glob("source.*"):
+        if stale_path.suffix.lower() in _YOUTUBE_VIDEO_EXTENSIONS:
+            stale_path.unlink(missing_ok=True)
+
     temp_directory = directory / "temp"
     temp_directory.mkdir(parents=True, exist_ok=True)
     output = directory / "source.%(ext)s"
@@ -111,6 +148,7 @@ def download_youtube(
             return
         progress(f"yt-dlp: {line}", None)
 
+    files: list[Path] = []
     try:
         progress("Téléchargement YouTube démarré", 0)
         command = [
@@ -132,13 +170,21 @@ def download_youtube(
             command.extend(["--cookies", str(cookie_path)])
         command.append(url)
         _run(command, on_output=report_download_output)
+        files = sorted(
+            path
+            for path in directory.glob("source.*")
+            if path.is_file() and path.suffix.lower() in _YOUTUBE_VIDEO_EXTENSIONS
+        )
+        if not files:
+            raise YoutubeExportError("YouTube n’a fourni aucun fichier vidéo exploitable")
+        manifest_path.write_text(
+            json.dumps({"url_sha256": url_digest, "filename": files[0].name}),
+            encoding="utf-8",
+        )
     finally:
         if cookie_path is not None:
             cookie_path.unlink(missing_ok=True)
         shutil.rmtree(temp_directory, ignore_errors=True)
-    files = sorted(directory.glob("source.*"))
-    if not files:
-        raise YoutubeExportError("YouTube n’a fourni aucun fichier vidéo exploitable")
     progress(f"Téléchargement YouTube terminé: {files[0].name}", 100)
     return files[0]
 
@@ -254,35 +300,24 @@ def export_youtube_overlay(
     pip_url: str | None = None,
     pip_apply_offset: bool = True,
 ) -> None:
-    try:
-        if cookies:
-            source = download_youtube(url, work_dir, progress, cookies=cookies)
-        else:
-            source = download_youtube(url, work_dir, progress)
-        pip_source = None
-        if pip_url:
-            pip_directory = work_dir / "youtube-pip"
-            pip_source = (
-                download_youtube(pip_url, pip_directory, progress, cookies=cookies)
-                if cookies
-                else download_youtube(pip_url, pip_directory, progress)
-            )
-        rendered_video = render_saved_overlay(
-            overlay_job_id,
-            source,
-            offset_seconds=offset_seconds,
-            output_directory=work_dir,
-            progress=progress,
-            pip_video_path=pip_source,
-            pip_apply_offset=pip_apply_offset,
-        )
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(rendered_video, output_path)
-        if not output_path.is_file() or output_path.stat().st_size == 0:
-            raise YoutubeExportError("Le fichier MP4 final est vide")
-    except BaseException:
-        cleanup_work_dir(work_dir)
-        raise
+    source = download_youtube(url, work_dir, progress, cookies=cookies)
+    pip_source = None
+    if pip_url:
+        pip_directory = work_dir / "youtube-pip"
+        pip_source = download_youtube(pip_url, pip_directory, progress, cookies=cookies)
+    rendered_video = render_saved_overlay(
+        overlay_job_id,
+        source,
+        offset_seconds=offset_seconds,
+        output_directory=work_dir,
+        progress=progress,
+        pip_video_path=pip_source,
+        pip_apply_offset=pip_apply_offset,
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(rendered_video, output_path)
+    if not output_path.is_file() or output_path.stat().st_size == 0:
+        raise YoutubeExportError("Le fichier MP4 final est vide")
 
 
 def new_work_dir(job_id: str) -> Path:

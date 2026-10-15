@@ -89,6 +89,39 @@ def test_download_youtube_reports_download_percentage(tmp_path, monkeypatch):
     ]
 
 
+def test_download_youtube_reuses_only_completed_download_for_same_url(tmp_path, monkeypatch):
+    commands: list[list[str]] = []
+
+    def fake_run(command, *, cwd=None, on_output=None):
+        commands.append(command)
+        (tmp_path / "source.mp4").write_bytes(b"complete video")
+
+    monkeypatch.setattr(youtube_overlay_export, "_run", fake_run)
+    progress_events: list[tuple[str, int | None]] = []
+
+    def progress(message: str, percent: int | None) -> None:
+        progress_events.append((message, percent))
+
+    first = youtube_overlay_export.download_youtube(
+        "https://www.youtube.com/watch?v=test", tmp_path, progress
+    )
+    second = youtube_overlay_export.download_youtube(
+        "https://www.youtube.com/watch?v=test", tmp_path, progress
+    )
+
+    assert first == second == tmp_path / "source.mp4"
+    assert len(commands) == 1
+    assert progress_events[-1] == (
+        "Vidéo YouTube téléchargée réutilisée: source.mp4",
+        100,
+    )
+
+    youtube_overlay_export.download_youtube(
+        "https://www.youtube.com/watch?v=other", tmp_path, progress
+    )
+    assert len(commands) == 2
+
+
 def test_export_youtube_overlay_renders_saved_overlay_directly_onto_source(tmp_path, monkeypatch):
     source = tmp_path / "source.mp4"
     overlay = tmp_path / "rendered.mp4"
@@ -100,7 +133,7 @@ def test_export_youtube_overlay_renders_saved_overlay_directly_onto_source(tmp_p
     monkeypatch.setattr(
         youtube_overlay_export,
         "download_youtube",
-        lambda url, directory, progress: source,
+        lambda url, directory, progress, *, cookies=None: source,
     )
 
     def fake_render(
@@ -149,7 +182,7 @@ def test_export_youtube_overlay_renders_saved_overlay_directly_onto_source(tmp_p
     "failure_stage",
     ["download", "render", "cancel", "final_validation"],
 )
-def test_export_youtube_overlay_cleans_work_dir_after_failure(
+def test_export_youtube_overlay_keeps_work_dir_after_failure(
     failure_stage: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     work_dir = tmp_path / "work"
@@ -161,6 +194,8 @@ def test_export_youtube_overlay_cleans_work_dir_after_failure(
         url: str,
         directory: Path,
         progress: youtube_overlay_export.ProgressCallback,
+        *,
+        cookies: str | None = None,
     ) -> Path:
         directory.mkdir(parents=True, exist_ok=True)
         (directory / "download.part").write_bytes(b"temporary")
@@ -200,7 +235,7 @@ def test_export_youtube_overlay_cleans_work_dir_after_failure(
             progress=lambda message, percent: None,
         )
 
-    assert not work_dir.exists()
+    assert work_dir.exists()
 
 
 @pytest.mark.parametrize("gpx_mode", ["saved", "prepared_only"])

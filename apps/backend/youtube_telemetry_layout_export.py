@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 import math
-import shutil
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -181,89 +180,85 @@ def export_youtube_telemetry_layout(
     pip_exports: list[dict[str, object]] | None = None,
 ) -> None:
     """Download the source, capture the saved layout, then compose an MP4."""
-    try:
-        source = download_youtube(url, work_dir, progress, cookies=cookies)
-        for index, pip_export in enumerate(pip_exports or []):
-            pip_url = pip_export.get("youtube_url")
-            if not isinstance(pip_url, str):
-                raise YoutubeExportError("La source YouTube d’un PiP est invalide")
-            download_youtube(
-                pip_url,
-                work_dir / "youtube-pip" / f"pip-{index}",
-                lambda message, _percent, pip_index=index: progress(
-                    f"PiP {pip_index + 1}: {message}", None
-                ),
-                cookies=cookies,
-            )
-        if is_cancelled():
-            raise YoutubeExportError("Export annulé")
-        duration = _video_duration(source)
-        fps = 30
-        frames_directory = work_dir / "telemetry-layout-frames"
-        asyncio.run(
-            _capture_layout_frames(
-                frontend_url=frontend_url,
-                flight_id=_flight_id_for_job(job_id),
-                job_id=job_id,
-                job_token=job_token,
-                timeline_start_timestamp=timeline_start_timestamp,
-                offset_seconds=offset_seconds,
-                pip_exports=pip_exports or [],
-                fps=fps,
-                duration=duration,
-                frames_directory=frames_directory,
-                is_cancelled=is_cancelled,
-                progress=progress,
-            )
+    source = download_youtube(url, work_dir, progress, cookies=cookies)
+    for index, pip_export in enumerate(pip_exports or []):
+        pip_url = pip_export.get("youtube_url")
+        if not isinstance(pip_url, str):
+            raise YoutubeExportError("La source YouTube d’un PiP est invalide")
+        download_youtube(
+            pip_url,
+            work_dir / "youtube-pip" / f"pip-{index}",
+            lambda message, _percent, pip_index=index: progress(
+                f"PiP {pip_index + 1}: {message}", None
+            ),
+            cookies=cookies,
         )
-        if is_cancelled():
-            raise YoutubeExportError("Export annulé")
+    if is_cancelled():
+        raise YoutubeExportError("Export annulé")
+    duration = _video_duration(source)
+    fps = 30
+    frames_directory = work_dir / "telemetry-layout-frames"
+    asyncio.run(
+        _capture_layout_frames(
+            frontend_url=frontend_url,
+            flight_id=_flight_id_for_job(job_id),
+            job_id=job_id,
+            job_token=job_token,
+            timeline_start_timestamp=timeline_start_timestamp,
+            offset_seconds=offset_seconds,
+            pip_exports=pip_exports or [],
+            fps=fps,
+            duration=duration,
+            frames_directory=frames_directory,
+            is_cancelled=is_cancelled,
+            progress=progress,
+        )
+    )
+    if is_cancelled():
+        raise YoutubeExportError("Export annulé")
 
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        progress("Fusion du layout et de la vidéo YouTube", None)
-        _run(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(source),
-                "-f",
-                "concat",
-                "-safe",
-                "0",
-                "-i",
-                str(frames_directory / "frames.ffconcat"),
-                "-filter_complex",
-                "[1:v][0:v]scale2ref=w=main_w:h=main_h[overlay][base];"
-                "[base][overlay]overlay=0:0:eof_action=repeat:shortest=1[outv]",
-                "-map",
-                "[outv]",
-                "-map",
-                "0:a?",
-                "-c:v",
-                "libx264",
-                "-preset",
-                "fast",
-                "-crf",
-                "18",
-                "-pix_fmt",
-                "yuv420p",
-                "-c:a",
-                "aac",
-                "-b:a",
-                "192k",
-                "-shortest",
-                "-movflags",
-                "+faststart",
-                str(output_path),
-            ],
-            on_output=lambda line: progress(line, None),
-        )
-        if not output_path.is_file() or output_path.stat().st_size == 0:
-            raise YoutubeExportError("Le fichier MP4 final est vide")
-    except BaseException:
-        shutil.rmtree(work_dir, ignore_errors=True)
-        raise
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    progress("Fusion du layout et de la vidéo YouTube", None)
+    _run(
+        [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(source),
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            str(frames_directory / "frames.ffconcat"),
+            "-filter_complex",
+            "[1:v][0:v]scale2ref=w=main_w:h=main_h[overlay][base];"
+            "[base][overlay]overlay=0:0:eof_action=repeat:shortest=1[outv]",
+            "-map",
+            "[outv]",
+            "-map",
+            "0:a?",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "fast",
+            "-crf",
+            "18",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-shortest",
+            "-movflags",
+            "+faststart",
+            str(output_path),
+        ],
+        on_output=lambda line: progress(line, None),
+    )
+    if not output_path.is_file() or output_path.stat().st_size == 0:
+        raise YoutubeExportError("Le fichier MP4 final est vide")
 
 
 def _flight_id_for_job(job_id: str) -> str:
