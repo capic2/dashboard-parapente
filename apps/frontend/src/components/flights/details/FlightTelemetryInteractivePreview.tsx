@@ -147,13 +147,13 @@ function getYoutubeExportPhase(
   if (value.includes('overlay')) {
     return {
       key: 'flights.youtubeOverlayExportPhaseOverlay',
-      fallback: 'Génération de l’overlay synchronisé',
+      fallback: 'Assemblage de la vidéo avec l’overlay synchronisé',
     };
   }
   if (value.includes('layout') || value.includes('capture du layout')) {
     return {
       key: 'flights.youtubeOverlayExportPhaseOverlay',
-      fallback: 'Génération de l’overlay synchronisé',
+      fallback: 'Assemblage de la vidéo avec l’overlay synchronisé',
     };
   }
   if (value.includes('fusion') || value.includes('ffmpeg')) {
