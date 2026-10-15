@@ -938,7 +938,8 @@ def _export_youtube_overlay_job(job_id: str) -> None:
         _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
     finally:
         _log_job(job_id, "Nettoyage des fichiers temporaires YouTube")
-        cleanup_work_dir(work_dir)
+        if upload_started:
+            cleanup_work_dir(work_dir)
         if not upload_started:
             destination.unlink(missing_ok=True)
 
@@ -1052,7 +1053,8 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
             fail_youtube_overlay_upload(job.youtube_upload_job_id, str(exc))
         _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
     finally:
-        cleanup_work_dir(work_dir)
+        if upload_started:
+            cleanup_work_dir(work_dir)
         if not upload_started:
             destination.unlink(missing_ok=True)
         _clear_job_cancel_requested(job_id)
@@ -1173,7 +1175,14 @@ def _job_resume_info(job: VideoExportJob) -> dict[str, Any]:
     total_frames = job.total_frames or 0
     resume_from_frame = _first_missing_frame_index(frames_dir, total_frames)
     is_resumable_status = job.status in {_STATUS_CANCELLED, _STATUS_FAILED}
-    can_resume = is_resumable_status and bool(existing_indexes)
+    is_youtube_export = getattr(job, "mode", None) in {
+        "youtube_overlay",
+        "youtube_telemetry_layout",
+    }
+    can_resume = is_resumable_status and (
+        bool(existing_indexes)
+        or (is_youtube_export and bool(getattr(job, "youtube_upload_job_id", None)))
+    )
 
     return {
         "can_resume": can_resume,
@@ -1281,10 +1290,27 @@ def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, 
         for export in exports
         if export.get("job_id") and _is_export_active(export)
     }
+    represented_job_ids = {str(export["job_id"]) for export in exports if export.get("job_id")}
+    youtube_orphan_scan_allowed = True
+    try:
+        with SessionLocal() as db:
+            database_active_job_ids = {
+                str(job_id)
+                for (job_id,) in db.query(VideoExportJob.id)
+                .filter(VideoExportJob.status.in_(_ACTIVE_STATUSES | {"processing", "started"}))
+                .all()
+            }
+        active_job_ids.update(database_active_job_ids)
+    except SQLAlchemyError as exc:
+        logger.warning("Unable to inspect active exports before YouTube cache cleanup: %s", exc)
+        youtube_orphan_scan_allowed = False
+
     known_inactive_job_ids = {
         str(export["job_id"])
         for export in exports
-        if export.get("job_id") and not _is_export_active(export)
+        if export.get("job_id")
+        and str(export["job_id"]) not in active_job_ids
+        and not _is_export_active(export)
     }
 
     candidates: list[tuple[Path, Path]] = []
@@ -1293,6 +1319,7 @@ def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, 
         _video_legacy_temp_images_dir().resolve(strict=False),
     }
     export_root = _video_export_dir()
+    youtube_exports_root = export_root / ".youtube-exports"
 
     for export in exports:
         job_id = str(export.get("job_id") or "")
@@ -1300,6 +1327,7 @@ def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, 
             continue
         for temp_root in temp_roots:
             candidates.append((_job_temp_dir(temp_root, job_id), temp_root))
+        candidates.append((youtube_exports_root / job_id, youtube_exports_root))
         flight_id = export.get("flight_id")
         if isinstance(flight_id, str):
             try:
@@ -1332,6 +1360,16 @@ def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, 
                 child, _ORPHAN_TEMP_CLEANUP_GRACE_SECONDS
             ):
                 candidates.append((child, export_root))
+
+    if youtube_orphan_scan_allowed and youtube_exports_root.exists():
+        for child in youtube_exports_root.iterdir():
+            if (
+                _is_job_temp_dir_name(child.name)
+                and child.name not in active_job_ids
+                and child.name not in represented_job_ids
+                and _is_path_older_than(child, _ORPHAN_TEMP_CLEANUP_GRACE_SECONDS)
+            ):
+                candidates.append((child, youtube_exports_root))
 
     seen: set[str] = set()
     deleted_paths: list[str] = []
@@ -1372,6 +1410,10 @@ def cleanup_video_export_job_temp_files(job_id: str) -> dict[str, Any]:
     }
     candidates = [
         *[(_job_temp_dir(temp_root, job_id), temp_root) for temp_root in temp_roots],
+        (
+            _video_export_dir() / ".youtube-exports" / job_id,
+            _video_export_dir() / ".youtube-exports",
+        ),
         (_video_export_dir() / f"frames_{job_id}", _video_export_dir()),
         (Path("/tmp") / f"playwright-debug-{job_id}.png", Path("/tmp")),
         (Path("/tmp") / f"playwright-error-{job_id}.png", Path("/tmp")),
@@ -2869,32 +2911,80 @@ def resume_video_export(job_id: str, auth_token: str | None = None) -> bool:
     if _is_job_cancel_requested(job_id):
         _clear_job_cancel_requested(job_id)
 
+    youtube_export = job.mode in {"youtube_overlay", "youtube_telemetry_layout"}
     resume_info = _job_resume_info(job)
-    if not resume_info["can_resume"]:
+    if not youtube_export and not resume_info["can_resume"]:
         return False
 
-    with job_admission("video_export_resume"):
-        resumed_job = _update_job(
-            job_id,
-            status=_STATUS_QUEUED,
-            progress=_capture_progress_percent(
-                int(resume_info["frames_captured"]),
-                job.total_frames or int(resume_info["frames_captured"]),
-            ),
-            message=(
-                f"Resume enqueued from frame {resume_info['resume_from_frame']}"
-                if resume_info["resume_from_frame"] is not None
-                else "Resume enqueued"
-            ),
-            error=None,
-            video_path=None,
-            completed_at=None,
-            cancelled_at=None,
-            auth_token=_resolve_video_export_job_token(job_id, job.flight_id, auth_token),
-            allowed_current_statuses={_STATUS_CANCELLED, _STATUS_FAILED},
-            update_db=True,
+    if youtube_export:
+        if not job.youtube_upload_job_id:
+            return False
+
+    resume_message = (
+        "YouTube export retry enqueued"
+        if youtube_export
+        else (
+            f"Resume enqueued from frame {resume_info['resume_from_frame']}"
+            if resume_info["resume_from_frame"] is not None
+            else "Resume enqueued"
         )
+    )
+
+    with job_admission("video_export_resume"):
+        if youtube_export:
+            from youtube_upload import prepare_youtube_overlay_upload_retry
+
+            if not prepare_youtube_overlay_upload_retry(job.youtube_upload_job_id):
+                return False
+
+        def rollback_youtube_upload_if_export_is_terminal() -> None:
+            if not youtube_export:
+                return
+            try:
+                current_job = _get_job(job_id)
+            except Exception:
+                logger.exception(
+                    "Unable to inspect export %s after retry transition failure", job_id
+                )
+                return
+            if not current_job or current_job.status not in _TERMINAL_STATUSES:
+                return
+            from youtube_upload import fail_youtube_overlay_upload
+
+            try:
+                fail_youtube_overlay_upload(
+                    job.youtube_upload_job_id,
+                    "The YouTube export could not be queued for retry",
+                )
+            except Exception:
+                logger.exception("Unable to roll back YouTube upload retry for %s", job_id)
+
+        try:
+            resumed_job = _update_job(
+                job_id,
+                status=_STATUS_QUEUED,
+                progress=(
+                    0
+                    if youtube_export
+                    else _capture_progress_percent(
+                        int(resume_info["frames_captured"]),
+                        job.total_frames or int(resume_info["frames_captured"]),
+                    )
+                ),
+                message=resume_message,
+                error=None,
+                video_path=None,
+                completed_at=None,
+                cancelled_at=None,
+                auth_token=_resolve_video_export_job_token(job_id, job.flight_id, auth_token),
+                allowed_current_statuses={_STATUS_CANCELLED, _STATUS_FAILED},
+                update_db=True,
+            )
+        except Exception:
+            rollback_youtube_upload_if_export_is_terminal()
+            raise
         if not resumed_job:
+            rollback_youtube_upload_if_export_is_terminal()
             return False
         _set_job_update_db_flag(job_id, True)
         _set_job_runtime(

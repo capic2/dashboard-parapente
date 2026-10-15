@@ -1107,6 +1107,25 @@ def test_job_resume_info_requires_terminal_status_and_frames(tmp_path, monkeypat
     }
 
 
+def test_job_resume_info_allows_youtube_retry_without_frames(tmp_path, monkeypatch):
+    temp_root = tmp_path / "temp-images"
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "_video_legacy_temp_images_dir", lambda: temp_root)
+    job = VideoExportJob(
+        id="youtube-retry",
+        flight_id=None,
+        status="failed",
+        mode="youtube_overlay",
+        youtube_upload_job_id="upload-retry",
+    )
+
+    assert video_export_manual._job_resume_info(job) == {
+        "can_resume": True,
+        "frames_captured": 0,
+        "resume_from_frame": 0,
+    }
+
+
 def test_resume_video_export_requeues_cancelled_job_with_frames(test_db, tmp_path, monkeypatch):
     job_id = "job-resume"
     enqueued_job_ids: list[str] = []
@@ -1165,6 +1184,141 @@ def test_resume_video_export_requeues_cancelled_job_with_frames(test_db, tmp_pat
     assert job.video_path is None
     db_session.close()
     assert enqueued_job_ids == ["video-export-job-resume"]
+
+
+def test_resume_youtube_export_reuses_job_without_captured_frames(test_db, monkeypatch):
+    job_id = "job-youtube-export-resume"
+    upload_job_id = "youtube-upload-resume"
+    enqueued_job_ids: list[str] = []
+    prepared_uploads: list[str] = []
+    monkeypatch.setattr(video_export_manual, "SessionLocal", test_db)
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(
+        video_export_manual, "_is_rq_video_export_job_started", lambda _job_id: False
+    )
+
+    def prepare_upload_for_retry(retry_upload_job_id: str) -> bool:
+        with test_db() as db_session:
+            job = db_session.get(VideoExportJob, job_id)
+            assert job is not None
+            assert job.status == "failed"
+        prepared_uploads.append(retry_upload_job_id)
+        return True
+
+    monkeypatch.setattr(
+        "youtube_upload.prepare_youtube_overlay_upload_retry",
+        prepare_upload_for_retry,
+    )
+    monkeypatch.setattr(
+        video_export_manual,
+        "_enqueue_video_export_job_in_rq",
+        lambda queued_job_id: enqueued_job_ids.append(
+            video_export_manual._rq_job_id(queued_job_id)
+        ),
+    )
+
+    with test_db() as db_session:
+        db_session.add(
+            VideoExportJob(
+                id=job_id,
+                flight_id="flight-test-001",
+                status="failed",
+                mode="youtube_overlay",
+                quality="1080p",
+                fps=30,
+                speed=1,
+                progress=50,
+                total_frames=0,
+                message="render failed",
+                frontend_url="",
+                source_type="youtube",
+                youtube_url="https://www.youtube.com/watch?v=test",
+                youtube_upload_job_id=upload_job_id,
+                created_at=datetime.now(UTC).replace(tzinfo=None),
+                updated_at=datetime.now(UTC).replace(tzinfo=None),
+            )
+        )
+        db_session.commit()
+
+    assert video_export_manual.resume_video_export(job_id) is True
+
+    with test_db() as db_session:
+        job = db_session.get(VideoExportJob, job_id)
+        assert job is not None
+        assert job.status == "queued"
+        assert job.progress == 0
+    assert prepared_uploads == [upload_job_id]
+    assert enqueued_job_ids == ["video-export-job-youtube-export-resume"]
+
+
+def test_resume_youtube_export_reverts_upload_if_export_transition_fails(monkeypatch):
+    job = SimpleNamespace(
+        id="job-youtube-export-resume-race",
+        status="failed",
+        mode="youtube_overlay",
+        youtube_upload_job_id="youtube-upload-resume-race",
+        total_frames=0,
+        flight_id=None,
+    )
+    events: list[str] = []
+    jobs = iter([job, job])
+    monkeypatch.setattr(video_export_manual, "_get_job", lambda _job_id: next(jobs))
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(
+        video_export_manual, "_is_rq_video_export_job_started", lambda _job_id: False
+    )
+    monkeypatch.setattr(
+        video_export_manual,
+        "_update_job",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "youtube_upload.prepare_youtube_overlay_upload_retry",
+        lambda _upload_job_id: events.append("prepare") or True,
+    )
+    monkeypatch.setattr(
+        "youtube_upload.fail_youtube_overlay_upload",
+        lambda _upload_job_id, _error: events.append("rollback"),
+    )
+
+    assert video_export_manual.resume_video_export(job.id) is False
+    assert events == ["prepare", "rollback"]
+
+
+def test_resume_youtube_export_reverts_upload_if_export_transition_raises(monkeypatch):
+    job = SimpleNamespace(
+        id="job-youtube-export-resume-error",
+        status="failed",
+        mode="youtube_overlay",
+        youtube_upload_job_id="youtube-upload-resume-error",
+        total_frames=0,
+        flight_id=None,
+    )
+    events: list[str] = []
+    jobs = iter([job, job])
+    monkeypatch.setattr(video_export_manual, "_get_job", lambda _job_id: next(jobs))
+    monkeypatch.setattr(video_export_manual.config, "JOB_QUEUE_BACKEND", "rq")
+    monkeypatch.setattr(
+        video_export_manual, "_is_rq_video_export_job_started", lambda _job_id: False
+    )
+
+    def fail_transition(*_args, **_kwargs):
+        raise RuntimeError("database write failed")
+
+    monkeypatch.setattr(video_export_manual, "_update_job", fail_transition)
+    monkeypatch.setattr(
+        "youtube_upload.prepare_youtube_overlay_upload_retry",
+        lambda _upload_job_id: events.append("prepare") or True,
+    )
+    monkeypatch.setattr(
+        "youtube_upload.fail_youtube_overlay_upload",
+        lambda _upload_job_id, _error: events.append("rollback"),
+    )
+
+    with pytest.raises(RuntimeError, match="database write failed"):
+        video_export_manual.resume_video_export(job.id)
+
+    assert events == ["prepare", "rollback"]
 
 
 def test_stale_worker_update_does_not_overwrite_cancelled_job(test_db, monkeypatch):
@@ -1866,6 +2020,74 @@ def test_cleanup_video_export_temp_files_uses_configured_temp_dir(tmp_path, monk
     assert result["files_deleted"] == 1
     assert not inactive_temp_dir.exists()
     assert active_temp_dir.exists()
+
+
+def test_cleanup_video_export_temp_files_removes_youtube_cache_for_inactive_jobs(
+    tmp_path, monkeypatch
+):
+    temp_root = tmp_path / "configured-temp-images"
+    export_root = tmp_path / "configured-video-exports"
+    youtube_root = export_root / ".youtube-exports"
+    failed_job_id = "4e58f4e1-1456-4421-a761-278d2eb86102"
+    active_job_id = "6b04f899-c788-4f27-a8b6-d9bc7d842498"
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "_video_legacy_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "_video_export_dir", lambda: export_root)
+
+    failed_cache = youtube_root / failed_job_id
+    active_cache = youtube_root / active_job_id
+    failed_cache.mkdir(parents=True)
+    active_cache.mkdir(parents=True)
+    (failed_cache / "source.mp4").write_bytes(b"downloaded")
+    (active_cache / "source.mp4").write_bytes(b"downloaded")
+
+    result = video_export_manual.cleanup_video_export_temp_files(
+        [
+            {"job_id": failed_job_id, "internal_status": "failed"},
+            {"job_id": active_job_id, "internal_status": "running"},
+        ]
+    )
+
+    assert str(failed_cache) in result["paths_deleted"]
+    assert not failed_cache.exists()
+    assert active_cache.exists()
+
+
+def test_cleanup_youtube_orphans_checks_persisted_active_jobs(tmp_path, monkeypatch):
+    temp_root = tmp_path / "configured-temp-images"
+    export_root = tmp_path / "configured-video-exports"
+    active_job_id = "77819676-6fc3-4c6c-9baf-0845addb2855"
+    active_cache = export_root / ".youtube-exports" / active_job_id
+    active_cache.mkdir(parents=True)
+    (active_cache / "source.mp4").write_bytes(b"downloaded")
+    old_timestamp = time.time() - video_export_manual._ORPHAN_TEMP_CLEANUP_GRACE_SECONDS - 1
+    os.utime(active_cache, (old_timestamp, old_timestamp))
+    monkeypatch.setattr(video_export_manual, "_video_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "_video_legacy_temp_images_dir", lambda: temp_root)
+    monkeypatch.setattr(video_export_manual, "_video_export_dir", lambda: export_root)
+
+    class ActiveJobQuery:
+        def query(self, *_args):
+            return self
+
+        def filter(self, *_args):
+            return self
+
+        def all(self):
+            return [(active_job_id,)]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+    monkeypatch.setattr(video_export_manual, "SessionLocal", ActiveJobQuery)
+
+    result = video_export_manual.cleanup_video_export_temp_files([])
+
+    assert result["files_deleted"] == 0
+    assert active_cache.exists()
 
 
 def test_cleanup_video_export_temp_files_removes_configured_orphan_temp_dirs(tmp_path, monkeypatch):

@@ -284,6 +284,50 @@ def test_youtube_overlay_upload_job_waits_for_generated_source(
     assert enqueued == [upload_job_id]
 
 
+def test_failed_youtube_overlay_upload_can_return_to_preparing_for_export_retry(
+    db_session: Session, sample_flight: Flight, monkeypatch
+) -> None:
+    job = youtube_upload.create_youtube_overlay_upload_job(
+        db_session,
+        flight_id=sample_flight.id,
+        user_id=1,
+        title="Vol d’essai - overlay YouTube",
+        description="Description",
+        gopro_overlay_job_id="saved-overlay",
+    )
+    db_session.query(YoutubeUploadJob).filter_by(id=job.id).update(
+        {"status": "failed", "source_path": "/exports/previous.mp4", "error": "render failed"}
+    )
+    db_session.commit()
+    upload_job_id = job.id
+
+    def close_test_session(_self: object, *_args: object) -> bool:
+        db_session.expunge_all()
+        return False
+
+    monkeypatch.setattr(
+        youtube_upload,
+        "SessionLocal",
+        lambda: type(
+            "SessionContext",
+            (),
+            {
+                "__enter__": lambda self: db_session,
+                "__exit__": close_test_session,
+            },
+        )(),
+    )
+
+    assert youtube_upload.prepare_youtube_overlay_upload_retry(upload_job_id) is True
+
+    retried_job = db_session.get(YoutubeUploadJob, upload_job_id)
+    assert retried_job is not None
+    assert retried_job.status == "preparing"
+    assert retried_job.source_path is None
+    assert retried_job.error is None
+    assert retried_job.progress == 0
+
+
 def test_generated_youtube_overlay_cleanup_is_limited_to_export_storage(
     tmp_path: Path, monkeypatch
 ) -> None:
