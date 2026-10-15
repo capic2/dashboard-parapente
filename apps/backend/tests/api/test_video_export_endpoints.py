@@ -836,6 +836,7 @@ class TestVideoExportJobsEndpoint:
         with (
             patch("routes.list_exports_manual", return_value=manual_jobs),
             patch("routes.list_exports_stream", return_value=[]),
+            patch("routes.has_video_export_temp_files", return_value=True),
             patch(
                 "routes.list_gopro_overlay_jobs",
                 return_value=[
@@ -855,6 +856,7 @@ class TestVideoExportJobsEndpoint:
             response = client.get(f"{API_PREFIX}/video-export-jobs")
 
         assert response.status_code == 200
+        assert response.json()["temp_files_available"] is True
         jobs = response.json()["jobs"]
         assert jobs[0]["job_id"] == "job-overlay"
         assert jobs[0]["status"] == "running"
@@ -1155,7 +1157,7 @@ class TestVideoExportJobsEndpoint:
 
         assert response.status_code == 200
         assert response.json() == cleanup_payload
-        cleanup.assert_called_once_with(manual_jobs + stream_jobs)
+        cleanup.assert_called_once_with(manual_jobs + stream_jobs, include_retry_cache=True)
 
     def test_delete_video_export_job_row_removes_overlay_job(self, client: TestClient):
         delete_payload = {
