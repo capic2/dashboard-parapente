@@ -96,7 +96,7 @@ export interface FlightOverlayPip extends FlightTelemetryPipLayout {
   label: string;
 }
 
-function pipSyncOffsetSeconds(
+export function pipSyncOffsetSeconds(
   pip: FlightOverlayPip,
   mainVideoRole: TelemetryPipVideoRole,
   offsetSeconds: number

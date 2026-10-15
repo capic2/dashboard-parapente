@@ -993,7 +993,7 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
         _log_job(job_id, message)
         progress_percent = None
         if download_percent is not None:
-            if message.startswith("Capture du layout:"):
+            if message.startswith("Rendu de l’overlay:"):
                 progress_percent = 40 + round(download_percent * 45 / 100)
             elif message.startswith("yt-dlp:") or message.startswith("Téléchargement YouTube"):
                 progress_percent = 1 + round(download_percent * 39 / 100)
@@ -1022,6 +1022,7 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
             progress=progress,
             is_cancelled=lambda: _is_cancelled(job_id),
             cookies=download_cookies,
+            pip_exports=json.loads(job.pip_exports) if job.pip_exports else [],
         )
         if _is_cancelled(job_id):
             raise YoutubeExportError("Export annulé")
@@ -1973,6 +1974,7 @@ def _enqueue_video_export_job(
     youtube_url: str | None = None,
     pip_youtube_url: str | None = None,
     pip_apply_offset: bool = True,
+    pip_exports: list[dict[str, Any]] | None = None,
     overlay_job_id: str | None = None,
     overlay_offset_seconds: float | None = None,
     youtube_upload_job_id: str | None = None,
@@ -2009,6 +2011,7 @@ def _enqueue_video_export_job(
                 youtube_url=youtube_url,
                 pip_youtube_url=pip_youtube_url,
                 pip_apply_offset=pip_apply_offset,
+                pip_exports=json.dumps(pip_exports) if pip_exports else None,
                 overlay_job_id=overlay_job_id,
                 overlay_offset_seconds=overlay_offset_seconds,
                 youtube_upload_job_id=youtube_upload_job_id,
@@ -2091,6 +2094,7 @@ def start_youtube_telemetry_layout_export(
     flight_id: str,
     youtube_url: str,
     offset_seconds: float,
+    pip_exports: list[dict[str, Any]] | None = None,
     youtube_user_id: int,
     frontend_url: str,
     auth_token: str | None = None,
@@ -2123,6 +2127,7 @@ def start_youtube_telemetry_layout_export(
             auth_token=auth_token,
             source_type="youtube",
             youtube_url=youtube_url,
+            pip_exports=pip_exports,
             overlay_offset_seconds=offset_seconds,
             youtube_upload_job_id=upload_job.id,
         )

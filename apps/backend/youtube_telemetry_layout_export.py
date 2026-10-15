@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import math
 import shutil
 import subprocess
@@ -50,8 +51,9 @@ async def _capture_layout_frames(
     job_token: str | None,
     timeline_start_timestamp: float,
     offset_seconds: float,
+    pip_exports: list[dict[str, object]],
     fps: int,
-    frame_count: int,
+    duration: float,
     frames_directory: Path,
     is_cancelled: Callable[[], bool],
     progress: ProgressCallback,
@@ -67,6 +69,7 @@ async def _capture_layout_frames(
             "exportToken": job_token or "",
             "timelineStart": str(timeline_start_timestamp * 1000),
             "offset": str(offset_seconds),
+            "pipExports": json.dumps(pip_exports),
         }
     )
     url = f"{frontend_url.rstrip('/')}/export-viewer?{query}"
@@ -100,23 +103,64 @@ async def _capture_layout_frames(
                 raise YoutubeExportError(str(export_error))
             await page.add_style_tag(content="html,body,#root{background:transparent!important}")
 
+            sample_times = await page.evaluate(
+                "(duration) => window._getTelemetryExportTimes(duration)", duration
+            )
+            if not isinstance(sample_times, list) or not sample_times:
+                raise YoutubeExportError("Aucun instant de télémétrie ne peut être rendu")
+            normalized_times: list[float] = []
+            for sample_time in sample_times:
+                try:
+                    video_time = float(sample_time)
+                except (TypeError, ValueError) as exc:
+                    raise YoutubeExportError("Un instant de télémétrie est invalide") from exc
+                if not math.isfinite(video_time):
+                    raise YoutubeExportError("Un instant de télémétrie est invalide")
+                if 0 <= video_time <= duration:
+                    normalized_times.append(video_time)
+            if not normalized_times:
+                raise YoutubeExportError("Aucun instant de télémétrie ne peut être rendu")
+            sample_times = []
+            min_gap = 1 / fps
+            for video_time in sorted(set(normalized_times)):
+                if not sample_times or video_time - sample_times[-1] >= min_gap:
+                    sample_times.append(video_time)
+            if duration - sample_times[-1] >= min_gap:
+                sample_times.append(duration)
+
             frames_directory.mkdir(parents=True, exist_ok=True)
-            for frame_index in range(frame_count):
+            for frame_index, video_time in enumerate(sample_times):
                 if is_cancelled():
                     raise YoutubeExportError("Export annulé")
-                video_time = frame_index / fps
                 await page.evaluate("(time) => window._setTelemetryExportTime(time)", video_time)
                 await page.screenshot(
-                    path=str(frames_directory / f"frame{frame_index:05d}.png"),
+                    path=str(frames_directory / f"frame{frame_index:08d}.png"),
                     omit_background=True,
                     animations="disabled",
                 )
-                if frame_index % 120 == 0 or frame_index == frame_count - 1:
-                    percent = round((frame_index + 1) / max(frame_count, 1) * 100)
+                if frame_index % 30 == 0 or frame_index == len(sample_times) - 1:
+                    percent = round((frame_index + 1) / len(sample_times) * 100)
                     progress(
-                        f"Capture du layout: {frame_index + 1}/{frame_count} images",
+                        f"Rendu de l’overlay: {frame_index + 1}/{len(sample_times)} instants télémétriques",
                         percent,
                     )
+            manifest = frames_directory / "frames.ffconcat"
+            with manifest.open("w", encoding="utf-8") as concat_file:
+                concat_file.write("ffconcat version 1.0\n")
+                for frame_index, video_time in enumerate(sample_times):
+                    frame_path = frames_directory / f"frame{frame_index:08d}.png"
+                    next_time = (
+                        sample_times[frame_index + 1]
+                        if frame_index + 1 < len(sample_times)
+                        else duration
+                    )
+                    frame_duration = min(duration, next_time) - video_time
+                    if frame_duration <= 0:
+                        frame_duration = 1 / fps
+                    concat_file.write(f"file '{frame_path.as_posix()}'\n")
+                    concat_file.write(f"duration {frame_duration:.6f}\n")
+                last_path = frames_directory / f"frame{len(sample_times) - 1:08d}.png"
+                concat_file.write(f"file '{last_path.as_posix()}'\n")
         finally:
             await browser.close()
 
@@ -134,15 +178,27 @@ def export_youtube_telemetry_layout(
     progress: ProgressCallback,
     is_cancelled: Callable[[], bool],
     cookies: str | None = None,
+    pip_exports: list[dict[str, object]] | None = None,
 ) -> None:
     """Download the source, capture the saved layout, then compose an MP4."""
     try:
         source = download_youtube(url, work_dir, progress, cookies=cookies)
+        for index, pip_export in enumerate(pip_exports or []):
+            pip_url = pip_export.get("youtube_url")
+            if not isinstance(pip_url, str):
+                raise YoutubeExportError("La source YouTube d’un PiP est invalide")
+            download_youtube(
+                pip_url,
+                work_dir / "youtube-pip" / f"pip-{index}",
+                lambda message, _percent, pip_index=index: progress(
+                    f"PiP {pip_index + 1}: {message}", None
+                ),
+                cookies=cookies,
+            )
         if is_cancelled():
             raise YoutubeExportError("Export annulé")
         duration = _video_duration(source)
         fps = 30
-        frame_count = max(1, math.ceil(duration * fps))
         frames_directory = work_dir / "telemetry-layout-frames"
         asyncio.run(
             _capture_layout_frames(
@@ -152,8 +208,9 @@ def export_youtube_telemetry_layout(
                 job_token=job_token,
                 timeline_start_timestamp=timeline_start_timestamp,
                 offset_seconds=offset_seconds,
+                pip_exports=pip_exports or [],
                 fps=fps,
-                frame_count=frame_count,
+                duration=duration,
                 frames_directory=frames_directory,
                 is_cancelled=is_cancelled,
                 progress=progress,
@@ -170,13 +227,15 @@ def export_youtube_telemetry_layout(
                 "-y",
                 "-i",
                 str(source),
-                "-framerate",
-                str(fps),
+                "-f",
+                "concat",
+                "-safe",
+                "0",
                 "-i",
-                str(frames_directory / "frame%05d.png"),
+                str(frames_directory / "frames.ffconcat"),
                 "-filter_complex",
                 "[1:v][0:v]scale2ref=w=main_w:h=main_h[overlay][base];"
-                "[base][overlay]overlay=0:0:shortest=1[outv]",
+                "[base][overlay]overlay=0:0:eof_action=repeat:shortest=1[outv]",
                 "-map",
                 "[outv]",
                 "-map",
