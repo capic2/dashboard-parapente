@@ -846,6 +846,36 @@ def fail_youtube_overlay_upload(job_id: str, error: str) -> None:
         db.commit()
 
 
+def prepare_youtube_overlay_upload_retry(job_id: str) -> bool:
+    """Return a failed generated-video upload to its preparation state for export retry."""
+    with SessionLocal() as db:
+        updated = (
+            db.query(YoutubeUploadJob)
+            .filter(
+                YoutubeUploadJob.id == job_id,
+                YoutubeUploadJob.source_type == "youtube_overlay",
+                YoutubeUploadJob.status == "failed",
+            )
+            .update(
+                {
+                    "status": _PREPARING_STATUS,
+                    "source_path": None,
+                    "progress": 0,
+                    "error": None,
+                    "completed_at": None,
+                    "updated_at": datetime.now(UTC).replace(tzinfo=None),
+                }
+            )
+        )
+        db.commit()
+        if updated == 1:
+            return True
+        job = db.get(YoutubeUploadJob, job_id)
+        return bool(
+            job and job.source_type == "youtube_overlay" and job.status == _PREPARING_STATUS
+        )
+
+
 def _is_cancelled(job_id: str) -> bool:
     with SessionLocal() as db:
         job = db.get(YoutubeUploadJob, job_id)
