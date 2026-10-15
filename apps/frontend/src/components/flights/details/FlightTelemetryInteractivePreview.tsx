@@ -189,7 +189,6 @@ export function FlightTelemetryInteractivePreview({
   );
   const [isYoutubeExportDialogOpen, setIsYoutubeExportDialogOpen] =
     useState(false);
-  const [hasYoutubeReuseRights, setHasYoutubeReuseRights] = useState(false);
   const [youtubeExportStartError, setYoutubeExportStartError] = useState<
     string | null
   >(null);
@@ -459,7 +458,7 @@ export function FlightTelemetryInteractivePreview({
     setCameraTime(0);
   };
   const handleStartYoutubeLayoutExport = async () => {
-    if (!youtubeUrl || !hasYoutubeReuseRights) return;
+    if (!youtubeUrl) return;
     setYoutubeExportStartError(null);
     try {
       const job = await startYoutubeTelemetryExport.mutateAsync({
@@ -476,7 +475,6 @@ export function FlightTelemetryInteractivePreview({
       }
       setYoutubeExportJobId(job.job_id);
       setIsYoutubeExportDialogOpen(false);
-      setHasYoutubeReuseRights(false);
     } catch (error) {
       setYoutubeExportStartError(
         await getApiErrorMessage(error, t('flights.youtubeOverlayExportError'))
@@ -935,17 +933,6 @@ export function FlightTelemetryInteractivePreview({
             <p className="text-sm text-slate-600 dark:text-slate-300">
               {t('flights.youtubeOverlayExportDescription')}
             </p>
-            <label className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
-              <input
-                type="checkbox"
-                checked={hasYoutubeReuseRights}
-                onChange={(event) =>
-                  setHasYoutubeReuseRights(event.currentTarget.checked)
-                }
-                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
-              />
-              <span>{t('flights.youtubeOverlayExportRights')}</span>
-            </label>
             {youtubeExportStartError && (
               <p
                 role="alert"
@@ -956,10 +943,7 @@ export function FlightTelemetryInteractivePreview({
             )}
             <div className="flex justify-end">
               <Button
-                isDisabled={
-                  !hasYoutubeReuseRights ||
-                  startYoutubeTelemetryExport.isPending
-                }
+                isDisabled={startYoutubeTelemetryExport.isPending}
                 onPress={() => void handleStartYoutubeLayoutExport()}
               >
                 {startYoutubeTelemetryExport.isPending ? (

@@ -1222,7 +1222,6 @@
     "youtubeOverlayExport": "Publier sur YouTube avec overlay",
     "youtubeOverlayExportTitle": "Exporter la vidéo YouTube avec l’overlay",
     "youtubeOverlayExportDescription": "Les vidéos YouTube source et PiP configurées seront téléchargées, assemblées avec l’overlay alimenté par le GPX, puis publiées dans la playlist du vol. Les fichiers temporaires seront supprimés localement.",
-    "youtubeOverlayExportRights": "Je dispose des droits nécessaires pour télécharger et réutiliser cette vidéo.",
     "youtubeOverlayExportStart": "Lancer l’export",
     "youtubeOverlayExportError": "Impossible de lancer l’export YouTube.",
     "youtubeCookiesRequired": "YouTube a refusé le téléchargement de cette vidéo. Un cookie de session récent peut aider.",
