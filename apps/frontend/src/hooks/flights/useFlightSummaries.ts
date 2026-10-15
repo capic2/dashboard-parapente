@@ -95,11 +95,20 @@ export function mergeActiveMediaJobs(
         job.mode !== 'gopro_overlay' &&
         job.mode !== 'youtube' &&
         job.mode !== 'youtube_upload' &&
+        job.mode !== 'youtube_overlay' &&
+        job.mode !== 'youtube_telemetry_layout' &&
         job.mode !== 'highlight'
     );
     const highlightJob = flightJobs.find((job) => job.mode === 'highlight');
     const overlayJob = flightJobs.find((job) => job.mode === 'gopro_overlay');
-    const youtubeJob = flightJobs.find((job) => job.mode === 'youtube');
+    const youtubeOverlayExportJob = flightJobs.find(
+      (job) =>
+        job.mode === 'youtube_overlay' ||
+        job.mode === 'youtube_telemetry_layout'
+    );
+    const youtubeJob = flightJobs.find(
+      (job) => job.mode === 'youtube' || job.mode === 'youtube_upload'
+    );
     return {
       ...flight,
       ...(videoJob && {
@@ -111,6 +120,11 @@ export function mergeActiveMediaJobs(
         highlight_video_job_id: highlightJob.job_id,
         highlight_video_status: highlightJob.status,
         highlight_video_progress: highlightJob.progress ?? null,
+      }),
+      ...(youtubeOverlayExportJob && {
+        youtube_overlay_export_status: youtubeOverlayExportJob.status,
+        youtube_overlay_export_progress:
+          youtubeOverlayExportJob.progress ?? null,
       }),
       ...(overlayJob && {
         gopro_overlay_job_id: overlayJob.job_id,

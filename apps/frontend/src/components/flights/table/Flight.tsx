@@ -83,6 +83,12 @@ export function Flight({
     flight.youtube_upload_status === 'queued' ||
     flight.youtube_upload_status === 'uploading';
   const isYoutubeUploadFailed = flight.youtube_upload_status === 'failed';
+  const isYoutubeOverlayExportRunning = Boolean(
+    flight.youtube_overlay_export_status &&
+    VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(flight.youtube_overlay_export_status)
+  );
+  const isYoutubeOverlayExportFailed =
+    flight.youtube_overlay_export_status === 'failed';
   const hasPanoVideo = flight.has_pano_video;
   const hasOsv = flight.has_osv;
   const hasFaceVideo = flight.has_face_video === true;
@@ -132,6 +138,10 @@ export function Flight({
     t('flights.youtubeBadge'),
     isYoutubeUploadRunning ? flight.youtube_upload_progress : null
   );
+  const youtubeOverlayExportLabel = formatMediaProgressLabel(
+    t('flights.youtubeOverlayProcessingBadge'),
+    flight.youtube_overlay_export_progress
+  );
   const youtubeVideoCountLabel =
     flight.youtube_video_count > 1 ? ` x${flight.youtube_video_count}` : '';
   const youtubeVideoTypes = flight.youtube_video_types ?? [];
@@ -166,6 +176,8 @@ export function Flight({
     hasYoutubeVideo ||
     isYoutubeUploadRunning ||
     isYoutubeUploadFailed ||
+    isYoutubeOverlayExportRunning ||
+    isYoutubeOverlayExportFailed ||
     hasPanoVideo ||
     hasOsv ||
     hasFaceVideo ||
@@ -334,6 +346,16 @@ export function Flight({
               {isVideoExportFailed && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
                   {t('flights.videoErrorBadge')}
+                </span>
+              )}
+              {isYoutubeOverlayExportRunning && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
+                  {youtubeOverlayExportLabel}
+                </span>
+              )}
+              {isYoutubeOverlayExportFailed && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+                  {t('flights.youtubeOverlayErrorBadge')}
                 </span>
               )}
               {isHighlightVideoExportRunning && (
