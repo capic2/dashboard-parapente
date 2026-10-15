@@ -1291,8 +1291,12 @@ def _is_job_temp_dir_name(name: str) -> bool:
         return False
 
 
-def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, Any]:
-    """Delete non-active video export temporary files from configured storage."""
+def _video_export_temp_cleanup_candidates(
+    exports: list[dict[str, Any]],
+    *,
+    include_retry_cache: bool = False,
+) -> list[tuple[Path, Path]]:
+    """Return inactive export temporary paths eligible for cleanup."""
     active_job_ids = {
         str(export["job_id"])
         for export in exports
@@ -1336,10 +1340,15 @@ def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, 
         for temp_root in temp_roots:
             candidates.append((_job_temp_dir(temp_root, job_id), temp_root))
         youtube_cache_dir = youtube_exports_root / job_id
-        if export.get("mode") not in {
-            "youtube_overlay",
-            "youtube_telemetry_layout",
-        } or _is_path_older_than(youtube_cache_dir, _YOUTUBE_RETRY_CACHE_RETENTION_SECONDS):
+        if (
+            include_retry_cache
+            or export.get("mode")
+            not in {
+                "youtube_overlay",
+                "youtube_telemetry_layout",
+            }
+            or _is_path_older_than(youtube_cache_dir, _YOUTUBE_RETRY_CACHE_RETENTION_SECONDS)
+        ):
             candidates.append((youtube_cache_dir, youtube_exports_root))
         flight_id = export.get("flight_id")
         if isinstance(flight_id, str):
@@ -1384,6 +1393,33 @@ def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, 
             ):
                 candidates.append((child, youtube_exports_root))
 
+    return candidates
+
+
+def _path_contains_file(path: Path) -> bool:
+    try:
+        return path.is_file() or path.is_dir() and next(path.iterdir(), None) is not None
+    except OSError:
+        return False
+
+
+def has_video_export_temp_files(
+    exports: list[dict[str, Any]], *, include_retry_cache: bool = True
+) -> bool:
+    """Whether cleanup would find any files in eligible temporary paths."""
+    candidates = _video_export_temp_cleanup_candidates(
+        exports, include_retry_cache=include_retry_cache
+    )
+    return any(_path_contains_file(path) for path, _allowed_root in candidates)
+
+
+def cleanup_video_export_temp_files(
+    exports: list[dict[str, Any]], *, include_retry_cache: bool = False
+) -> dict[str, Any]:
+    """Delete non-active video export temporary files from configured storage."""
+    candidates = _video_export_temp_cleanup_candidates(
+        exports, include_retry_cache=include_retry_cache
+    )
     seen: set[str] = set()
     deleted_paths: list[str] = []
     errors: list[dict[str, str]] = []

@@ -1175,15 +1175,18 @@ export function VideoExportJobsPanel({
           </div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Button
-            onClick={handleCleanupTempFiles}
-            isDisabled={cleanupTempFiles.isPending}
-            className="cursor-pointer rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 disabled:cursor-not-allowed disabled:bg-amber-200 disabled:text-amber-900 dark:bg-amber-900/40 dark:text-amber-200 dark:hover:bg-amber-900/60 dark:disabled:bg-amber-900 dark:disabled:text-amber-100"
-          >
-            {cleanupTempFiles.isPending
-              ? t('videoJobs.cleaningTempFiles', 'Nettoyage...')
-              : t('videoJobs.cleanupTempFiles', 'Nettoyer les temporaires')}
-          </Button>
+          {jobsPage?.tempFilesAvailable && (
+            <Button
+              onClick={handleCleanupTempFiles}
+              isDisabled={cleanupTempFiles.isPending}
+              className="flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/60"
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+              {cleanupTempFiles.isPending
+                ? t('videoJobs.cleaningTempFiles', 'Nettoyage...')
+                : t('videoJobs.cleanupTempFiles', 'Nettoyer les temporaires')}
+            </Button>
+          )}
           <Button
             onClick={() => refetch()}
             className="cursor-pointer rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"

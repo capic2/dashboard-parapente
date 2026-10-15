@@ -34,4 +34,7 @@ Default.test('shows jobs from the mock data', async ({ canvasElement }) => {
   await expect(
     (await canvas.findAllByText('Chalais - thermique bleu')).length
   ).toBeGreaterThan(0);
+  await expect(
+    await canvas.findByRole('button', { name: 'Nettoyer les temporaires' })
+  ).toBeVisible();
 });

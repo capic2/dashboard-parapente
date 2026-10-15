@@ -231,6 +231,7 @@ from video_export_manual import cleanup_video_export_temp_files
 from video_export_manual import delete_video_export_job as delete_video_export_manual_job
 from video_export_manual import get_export_status as get_export_status_manual
 from video_export_manual import get_video_export_job_token
+from video_export_manual import has_video_export_temp_files
 from video_export_manual import list_exports as list_exports_manual
 from video_export_manual import (
     resolve_frontend_url,
@@ -891,6 +892,7 @@ class VideoExportJobsResponse(BaseModel):
     total_pages: int
     status_counts: dict[str, int] = Field(default_factory=dict)
     type_counts: dict[str, int] = Field(default_factory=dict)
+    temp_files_available: bool = False
 
 
 class SportstrackLiveSettingsUpdate(BaseModel):
@@ -906,9 +908,9 @@ def _get_video_export_jobs_payload(
     page: int | None = None,
     page_size: int | None = None,
 ) -> dict[str, Any]:
+    video_exports = list_exports_manual() + list_exports_stream()
     jobs = _build_video_export_jobs_payload(
-        list_exports_manual()
-        + list_exports_stream()
+        video_exports
         + [_gopro_overlay_export_job_payload(job) for job in list_gopro_overlay_jobs()]
         + [_highlight_export_job_payload(job) for job in db.query(HighlightVideoJob).all()]
         + [_youtube_upload_export_job_payload(job) for job in db.query(YoutubeUploadJob).all()],
@@ -969,6 +971,7 @@ def _get_video_export_jobs_payload(
         "jobs": jobs,
         "status_counts": status_counts,
         "type_counts": type_counts,
+        "temp_files_available": has_video_export_temp_files(video_exports),
     }
     if page is not None and page_size is not None:
         total = len(jobs)
@@ -7838,7 +7841,9 @@ async def stream_video_export_jobs(
 def delete_video_export_temp_files() -> VideoExportTempCleanupResponse:
     """Delete temporary files left by completed, failed, or cancelled video exports."""
     return VideoExportTempCleanupResponse.model_validate(
-        cleanup_video_export_temp_files(list_exports_manual() + list_exports_stream())
+        cleanup_video_export_temp_files(
+            list_exports_manual() + list_exports_stream(), include_retry_cache=True
+        )
     )
 
 
