@@ -1224,7 +1224,6 @@
     "youtubeOverlayExportDescription": "Les vidéos YouTube source et PiP configurées seront téléchargées, assemblées avec l’overlay alimenté par le GPX, puis publiées dans la playlist du vol. Les fichiers temporaires seront supprimés localement.",
     "youtubeOverlayExportStart": "Lancer l’export",
     "youtubeOverlayExportError": "Impossible de lancer l’export YouTube.",
-    "youtubeCookiesOptional": "Si YouTube bloque le téléchargement, importez ici un fichier cookies.txt récent.",
     "youtubeCookiesRequired": "YouTube a refusé le téléchargement de cette vidéo. Un cookie de session récent peut aider.",
     "youtubeCookiesInstructions": "Exportez un fichier cookies.txt depuis le navigateur connecté à YouTube, puis chargez-le ici. Seuls les cookies Google et YouTube seront conservés, chiffrés sur le serveur, et pourront être remplacés lorsqu’ils expirent.",
     "youtubeCookiesHelpLink": "Voir comment exporter les cookies",
