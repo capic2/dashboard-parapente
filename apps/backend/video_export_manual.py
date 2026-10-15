@@ -10,6 +10,7 @@ import asyncio
 import base64
 import json
 import logging
+import os
 import shutil
 import threading
 import uuid
@@ -132,6 +133,7 @@ _EXPORT_VIEWER_READY_TIMEOUT_SECONDS = 180
 _EXPORT_PAGE_EVALUATE_TIMEOUT_SECONDS = 120
 _FFMPEG_STALL_TIMEOUT_SECONDS = 10 * 60
 _ORPHAN_TEMP_CLEANUP_GRACE_SECONDS = 30
+_YOUTUBE_RETRY_CACHE_RETENTION_SECONDS = 24 * 60 * 60
 _EXPORT_FRAME_TERRAIN_TIMEOUT_SECONDS = 10.0
 _EXPORT_FRAME_TERRAIN_POLL_SECONDS = 0.1
 _EXPORT_FRAME_TERRAIN_EVALUATE_TIMEOUT_SECONDS = 2.0
@@ -940,6 +942,10 @@ def _export_youtube_overlay_job(job_id: str) -> None:
         _log_job(job_id, "Nettoyage des fichiers temporaires YouTube")
         if upload_started:
             cleanup_work_dir(work_dir)
+        elif work_dir.is_dir():
+            # Keep a completed source download available for retries, and start
+            # its retention window when this attempt ends.
+            os.utime(work_dir, None)
         if not upload_started:
             destination.unlink(missing_ok=True)
 
@@ -1055,6 +1061,8 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
     finally:
         if upload_started:
             cleanup_work_dir(work_dir)
+        elif work_dir.is_dir():
+            os.utime(work_dir, None)
         if not upload_started:
             destination.unlink(missing_ok=True)
         _clear_job_cancel_requested(job_id)
@@ -1327,7 +1335,12 @@ def cleanup_video_export_temp_files(exports: list[dict[str, Any]]) -> dict[str, 
             continue
         for temp_root in temp_roots:
             candidates.append((_job_temp_dir(temp_root, job_id), temp_root))
-        candidates.append((youtube_exports_root / job_id, youtube_exports_root))
+        youtube_cache_dir = youtube_exports_root / job_id
+        if export.get("mode") not in {
+            "youtube_overlay",
+            "youtube_telemetry_layout",
+        } or _is_path_older_than(youtube_cache_dir, _YOUTUBE_RETRY_CACHE_RETENTION_SECONDS):
+            candidates.append((youtube_cache_dir, youtube_exports_root))
         flight_id = export.get("flight_id")
         if isinstance(flight_id, str):
             try:
