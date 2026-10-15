@@ -5856,6 +5856,40 @@ def get_flight_telemetry_layout(
     )
 
 
+@public_router.get("/export-viewer/jobs/{job_id}/youtube-pip")
+def get_export_viewer_youtube_pip(job_id: str, request: Request, db: Session = Depends(get_db)):
+    """Serve the downloaded PiP video to its scoped headless export page."""
+    payload = _require_job_token(request, purpose="video_export", job_id=job_id)
+    flight_id = payload.get("flight_id")
+    if not isinstance(flight_id, str):
+        raise HTTPException(status_code=401, detail="Invalid job token")
+    export_job = db.get(VideoExportJob, job_id)
+    if export_job is None or export_job.flight_id != flight_id or not export_job.pip_exports:
+        raise HTTPException(status_code=404, detail="PiP video not found")
+    from youtube_overlay_export import new_work_dir
+
+    try:
+        pip_exports = json.loads(export_job.pip_exports)
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=404, detail="PiP video not found") from exc
+    slot_id = request.query_params.get("slot_id")
+    slot_index = next(
+        (
+            index
+            for index, pip_export in enumerate(pip_exports)
+            if isinstance(pip_export, dict) and pip_export.get("slot_id") == slot_id
+        ),
+        None,
+    )
+    if slot_index is None:
+        raise HTTPException(status_code=404, detail="PiP video not found")
+    pip_directory = new_work_dir(job_id) / "youtube-pip" / f"pip-{slot_index}"
+    candidates = [path for path in pip_directory.glob("source.*") if path.is_file()]
+    if not candidates:
+        raise HTTPException(status_code=404, detail="PiP video is not ready")
+    return FileResponse(path=candidates[0])
+
+
 @router.put("/flights/{flight_id}/telemetry-layout", response_model=TelemetryLayoutResponse)
 def update_flight_telemetry_layout(
     flight_id: str,
@@ -8406,6 +8440,21 @@ def create_youtube_telemetry_layout_export(
         raise HTTPException(
             status_code=400, detail="YouTube video is not associated with this flight"
         )
+    if any(
+        pip_export.youtube_url not in (flight.youtube_urls or [])
+        for pip_export in payload.pip_exports
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="PiP YouTube video is not associated with this flight",
+        )
+    if any(pip_export.youtube_url == payload.youtube_url for pip_export in payload.pip_exports):
+        raise HTTPException(
+            status_code=400, detail="PiP YouTube videos must differ from the main video"
+        )
+    pip_slot_ids = [pip_export.slot_id for pip_export in payload.pip_exports]
+    if len(pip_slot_ids) != len(set(pip_slot_ids)):
+        raise HTTPException(status_code=400, detail="PiP slot IDs must be unique")
     if not is_youtube_configured():
         raise HTTPException(status_code=503, detail="YouTube upload is not configured")
     if not is_youtube_connected(db, user.id):
@@ -8418,6 +8467,7 @@ def create_youtube_telemetry_layout_export(
             flight_id=flight_id,
             youtube_url=payload.youtube_url,
             offset_seconds=payload.offset_seconds,
+            pip_exports=[pip_export.model_dump() for pip_export in payload.pip_exports],
             youtube_user_id=user.id,
             frontend_url=resolve_frontend_url(config.FRONTEND_URL),
         )

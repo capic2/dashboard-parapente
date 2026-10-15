@@ -261,7 +261,16 @@ export function useStartYoutubeUpload(flightId: string) {
 export function useStartYoutubeTelemetryLayoutExport(flightId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { youtube_url: string; offset_seconds: number }) =>
+    mutationFn: (payload: {
+      youtube_url: string;
+      offset_seconds: number;
+      pip_exports: {
+        slot_id: string;
+        source: string;
+        youtube_url: string;
+        offset_seconds: number;
+      }[];
+    }) =>
       api
         .post(`flights/${flightId}/youtube-telemetry-layout-export`, {
           json: payload,

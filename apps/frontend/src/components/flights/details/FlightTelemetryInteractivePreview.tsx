@@ -28,7 +28,10 @@ import {
 } from '../../../lib/api';
 import { parseApiUtcDate } from '../../../lib/date';
 import { useAuthStore } from '../../../stores/authStore';
-import { FlightOverlayPlayer } from './FlightOverlayPlayer';
+import {
+  FlightOverlayPlayer,
+  pipSyncOffsetSeconds,
+} from './FlightOverlayPlayer';
 import { FlightTelemetryOverlay } from './FlightTelemetryOverlay';
 import {
   TELEMETRY_CANVAS_HEIGHT,
@@ -145,12 +148,6 @@ function getYoutubeExportPhase(
     };
   }
   if (value.includes('overlay')) {
-    return {
-      key: 'flights.youtubeOverlayExportPhaseOverlay',
-      fallback: 'Assemblage de la vidéo avec l’overlay synchronisé',
-    };
-  }
-  if (value.includes('layout') || value.includes('capture du layout')) {
     return {
       key: 'flights.youtubeOverlayExportPhaseOverlay',
       fallback: 'Assemblage de la vidéo avec l’overlay synchronisé',
@@ -461,9 +458,31 @@ export function FlightTelemetryInteractivePreview({
     if (!youtubeUrl) return;
     setYoutubeExportStartError(null);
     try {
+      const youtubePips = playablePips.filter(
+        (pip) =>
+          pip.youtubeUrl &&
+          pip.youtubeUrl !== youtubeUrl &&
+          pip.source?.startsWith('youtube:')
+      );
       const job = await startYoutubeTelemetryExport.mutateAsync({
         youtube_url: youtubeUrl,
         offset_seconds: calibrationOffsetSeconds,
+        pip_exports: youtubePips.flatMap((pip) =>
+          pip.youtubeUrl && pip.source
+            ? [
+                {
+                  slot_id: pip.id,
+                  source: pip.source,
+                  youtube_url: pip.youtubeUrl,
+                  offset_seconds: pipSyncOffsetSeconds(
+                    pip,
+                    mainVideoRole,
+                    calibrationOffsetSeconds
+                  ),
+                },
+              ]
+            : []
+        ),
       });
       try {
         window.sessionStorage.setItem(

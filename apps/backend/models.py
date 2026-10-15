@@ -438,6 +438,7 @@ class VideoExportJob(Base):
     youtube_url = Column(Text, nullable=True)
     pip_youtube_url = Column(Text, nullable=True)
     pip_apply_offset = Column(Boolean, nullable=False, default=True)
+    pip_exports = Column(Text, nullable=True)
     overlay_job_id = Column(String, nullable=True)
     overlay_offset_seconds = Column(Float, nullable=True)
     youtube_upload_job_id = Column(String, nullable=True)
