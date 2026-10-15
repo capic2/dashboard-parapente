@@ -236,7 +236,7 @@ def render_saved_overlay(
 
         current_progress = current_job.get("progress")
         progress(
-            f"Génération de l’overlay synchronisé: {current_progress or 0}%",
+            f"Assemblage de la vidéo avec l’overlay synchronisé: {current_progress or 0}%",
             None,
         )
         time.sleep(1)
