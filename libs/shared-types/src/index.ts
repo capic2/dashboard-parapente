@@ -280,6 +280,8 @@ export const FlightSummarySchema = z.object({
     .optional(),
   youtube_upload_status: z.string().nullable(),
   youtube_upload_progress: z.number().nullable(),
+  youtube_overlay_export_status: z.string().nullable().optional(),
+  youtube_overlay_export_progress: z.number().nullable().optional(),
   has_gopro_overlay: z.boolean(),
   has_pano_video: z.boolean(),
   has_osv: z.boolean().default(false),

@@ -1374,6 +1374,8 @@
     "youtubeHighlightFilter": "YouTube · Meilleurs moments",
     "videoProcessingBadge": "Vidéo: en cours",
     "videoErrorBadge": "Vidéo: erreur",
+    "youtubeOverlayProcessingBadge": "Overlay YouTube: en cours",
+    "youtubeOverlayErrorBadge": "Overlay YouTube: erreur",
     "goproOverlayBadge": "Overlay GoPro",
     "goproOverlayProcessingBadge": "Overlay GoPro: en cours",
     "goproOverlayQueuedBadge": "Overlay GoPro: en attente",
