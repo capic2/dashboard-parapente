@@ -429,24 +429,6 @@ export function FlightTelemetryInteractivePreview({
   useEffect(() => {
     setYoutubeExportJobId(readYoutubeExportJobId(flightId));
   }, [flightId]);
-  useEffect(() => {
-    if (
-      youtubeExportJobId &&
-      ['completed', 'failed', 'cancelled'].includes(
-        youtubeExportStatus?.internal_status ??
-          youtubeExportStatus?.status ??
-          ''
-      )
-    ) {
-      clearStoredYoutubeExportJobId(flightId, youtubeExportJobId);
-      setYoutubeExportJobId(null);
-    }
-  }, [
-    flightId,
-    youtubeExportJobId,
-    youtubeExportStatus?.internal_status,
-    youtubeExportStatus?.status,
-  ]);
   const selectYoutubeVideo = (index: number) => {
     if (youtubeMainUrls.length === 0) return;
     setSelectedYoutubeIndex(
@@ -577,15 +559,43 @@ export function FlightTelemetryInteractivePreview({
   } else if (youtubeExportStatusValue === 'completed') {
     youtubeExportProgressClass = 'bg-emerald-500';
   }
-  const youtubeDownloadNeedsCookies = [youtubeExportStatus?.error].some(
-    (error) => {
-      const normalizedError = error?.toLowerCase() ?? '';
-      return (
-        normalizedError.includes('sign in to confirm') ||
-        normalizedError.includes('http error 403: forbidden')
+  const isYoutubeCookieError = (errorText: string) => {
+    const normalizedError = errorText.toLowerCase();
+    return (
+      normalizedError.includes('sign in to confirm') ||
+      normalizedError.includes('cookie') ||
+      normalizedError.includes('http error 403: forbidden')
+    );
+  };
+  const youtubeDownloadNeedsCookies = youtubeExportStartError
+    ? isYoutubeCookieError(youtubeExportStartError)
+    : youtubeExportStatusValue === 'failed' &&
+      isYoutubeCookieError(
+        [
+          youtubeExportStatus?.error,
+          youtubeExportStatus?.message,
+          ...(youtubeExportStatus?.log_tail ?? []),
+        ]
+          .filter(Boolean)
+          .join('\n')
       );
+  useEffect(() => {
+    if (
+      youtubeExportJobId &&
+      ['completed', 'failed', 'cancelled'].includes(
+        youtubeExportStatusValue ?? ''
+      ) &&
+      !youtubeDownloadNeedsCookies
+    ) {
+      clearStoredYoutubeExportJobId(flightId, youtubeExportJobId);
+      setYoutubeExportJobId(null);
     }
-  );
+  }, [
+    flightId,
+    youtubeExportJobId,
+    youtubeExportStatusValue,
+    youtubeDownloadNeedsCookies,
+  ]);
   const handleYoutubeCookieFile = async (
     event: ChangeEvent<HTMLInputElement>
   ) => {
@@ -632,23 +642,31 @@ export function FlightTelemetryInteractivePreview({
         </span>
       </div>
       {validYoutubeUrls.length > 0 && (
-        <div className="border-t border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900 dark:bg-amber-950/20 sm:px-5">
-          <p className="text-sm font-semibold text-amber-950 dark:text-amber-100">
-            {youtubeDownloadNeedsCookies
-              ? t('flights.youtubeCookiesRequired')
-              : t('flights.youtubeCookiesOptional')}
-          </p>
-          <p className="mt-1 text-sm text-amber-900 dark:text-amber-200">
-            {t('flights.youtubeCookiesInstructions')}{' '}
-            <a
-              href="https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies"
-              target="_blank"
-              rel="noreferrer"
-              className="font-semibold underline underline-offset-2"
-            >
-              {t('flights.youtubeCookiesHelpLink')}
-            </a>
-          </p>
+        <div
+          className={
+            youtubeDownloadNeedsCookies
+              ? 'border-t border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900 dark:bg-amber-950/20 sm:px-5'
+              : 'border-t border-slate-200 p-4 dark:border-slate-700 sm:px-5'
+          }
+        >
+          {youtubeDownloadNeedsCookies && (
+            <>
+              <p className="text-sm font-semibold text-amber-950 dark:text-amber-100">
+                {t('flights.youtubeCookiesRequired')}
+              </p>
+              <p className="mt-1 text-sm text-amber-900 dark:text-amber-200">
+                {t('flights.youtubeCookiesInstructions')}{' '}
+                <a
+                  href="https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-semibold underline underline-offset-2"
+                >
+                  {t('flights.youtubeCookiesHelpLink')}
+                </a>
+              </p>
+            </>
+          )}
           <input
             ref={cookieFileInput}
             type="file"
