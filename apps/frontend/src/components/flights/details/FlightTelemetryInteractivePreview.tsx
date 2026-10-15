@@ -631,10 +631,12 @@ export function FlightTelemetryInteractivePreview({
           </Link>
         </span>
       </div>
-      {youtubeDownloadNeedsCookies && (
+      {validYoutubeUrls.length > 0 && (
         <div className="border-t border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900 dark:bg-amber-950/20 sm:px-5">
           <p className="text-sm font-semibold text-amber-950 dark:text-amber-100">
-            {t('flights.youtubeCookiesRequired')}
+            {youtubeDownloadNeedsCookies
+              ? t('flights.youtubeCookiesRequired')
+              : t('flights.youtubeCookiesOptional')}
           </p>
           <p className="mt-1 text-sm text-amber-900 dark:text-amber-200">
             {t('flights.youtubeCookiesInstructions')}{' '}
