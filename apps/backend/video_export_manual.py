@@ -624,7 +624,7 @@ def _mark_stale_jobs_as_queued():
             .update(
                 {
                     "status": _STATUS_QUEUED,
-                    "message": "Recovered from restart",
+                    "message": "Requeued after inactivity",
                     "updated_at": now,
                 },
                 synchronize_session=False,
