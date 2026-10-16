@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { useFlightTelemetry } from '../../../hooks/flights/useFlightTelemetry';
+import { useActiveFlightMediaJobs } from '../../../hooks/flights/useFlightSummaries';
 import { useTelemetryLayout } from '../../../hooks/flights/useTelemetryLayout';
 import {
   formatEta,
@@ -78,6 +79,16 @@ function readYoutubeExportJobId(flightId: string): string | null {
     return window.sessionStorage.getItem(youtubeExportJobStorageKey(flightId));
   } catch {
     return null;
+  }
+}
+
+function storeYoutubeExportJobId(flightId: string, jobId: string): void {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.sessionStorage.setItem(youtubeExportJobStorageKey(flightId), jobId);
+  } catch {
+    // Keep tracking the job in memory when browser storage is unavailable.
   }
 }
 
@@ -180,6 +191,7 @@ export function FlightTelemetryInteractivePreview({
   const overlayPreview = useGoproOverlayPreview(flightId, true);
   const telemetry = useFlightTelemetry(flightId, true);
   const layout = useTelemetryLayout(flightId);
+  const activeMediaJobs = useActiveFlightMediaJobs(true);
   const [cameraTime, setCameraTime] = useState(0);
   const [youtubeExportJobId, setYoutubeExportJobId] = useState(() =>
     readYoutubeExportJobId(flightId)
@@ -196,6 +208,7 @@ export function FlightTelemetryInteractivePreview({
   const youtubeOverlayUpload = useYoutubeUpload(flightId, {
     source_type: 'youtube_overlay',
   });
+  const clearedYoutubeExportJobIds = useRef(new Set<string>());
   const cookieFileInput = useRef<HTMLInputElement>(null);
   const [cookieUploadMessage, setCookieUploadMessage] = useState<string | null>(
     null
@@ -205,6 +218,41 @@ export function FlightTelemetryInteractivePreview({
   );
   const { status: youtubeExportStatus, error: youtubeExportStatusError } =
     useVideoExportStatus(youtubeExportJobId);
+  useEffect(() => {
+    const activeJobIds = new Set(
+      (activeMediaJobs.data ?? []).map((job) => job.job_id)
+    );
+    for (const jobId of clearedYoutubeExportJobIds.current) {
+      if (!activeJobIds.has(jobId)) {
+        clearedYoutubeExportJobIds.current.delete(jobId);
+      }
+    }
+    const activeYoutubeExports =
+      activeMediaJobs.data?.filter(
+        (job) =>
+          job.flight_id === flightId &&
+          job.mode === 'youtube_overlay' &&
+          job.status !== 'completed' &&
+          job.status !== 'failed' &&
+          job.status !== 'cancelled'
+      ) ?? [];
+    const trackedActiveYoutubeExport = activeYoutubeExports.find(
+      (job) => job.job_id === youtubeExportJobId
+    );
+    const activeYoutubeExport =
+      trackedActiveYoutubeExport ??
+      activeYoutubeExports.find(
+        (job) => !clearedYoutubeExportJobIds.current.has(job.job_id)
+      );
+    if (
+      !activeYoutubeExport ||
+      activeYoutubeExport.job_id === youtubeExportJobId
+    ) {
+      return;
+    }
+    storeYoutubeExportJobId(flightId, activeYoutubeExport.job_id);
+    setYoutubeExportJobId(activeYoutubeExport.job_id);
+  }, [activeMediaJobs.data, flightId, youtubeExportJobId]);
   const [youtubeExportNow, setYoutubeExportNow] = useState(() => Date.now());
   const validYoutubeUrls = youtubeUrls.filter((url) => getYoutubeVideoId(url));
   const configuredMainVideoSource =
@@ -587,6 +635,7 @@ export function FlightTelemetryInteractivePreview({
       ) &&
       !youtubeDownloadNeedsCookies
     ) {
+      clearedYoutubeExportJobIds.current.add(youtubeExportJobId);
       clearStoredYoutubeExportJobId(flightId, youtubeExportJobId);
       setYoutubeExportJobId(null);
     }
