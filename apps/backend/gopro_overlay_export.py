@@ -6,8 +6,8 @@ import logging
 import math
 import os
 import re
-import shlex
 import select
+import shlex
 import shutil
 import subprocess
 import sys
@@ -22,14 +22,14 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import UploadFile
+from sqlalchemy.exc import OperationalError
 
 import config
-from datetime_utils import to_api_utc
 from database import SessionLocal
+from datetime_utils import to_api_utc
 from deployment_drain import job_admission
 from flight_storage import flight_temporary_directory
 from models import Flight, GoproOverlayJob
-from sqlalchemy.exc import OperationalError
 from video_acceleration import (
     VideoAccelerator,
     ffmpeg_supports_cuda_overlay,
@@ -614,6 +614,7 @@ def _job_preparation_metadata(
     overlay_size: tuple[int, int] | None = None,
     video_start_override: datetime | None = None,
     pip_offset_seconds: float | None = None,
+    preserve_work_dir_on_failure: bool = False,
 ) -> dict[str, Any]:
     metadata = {
         "prepare_overlay_inputs": True,
@@ -623,6 +624,8 @@ def _job_preparation_metadata(
         "gpx_offset": gpx_offset,
         "overlay_only": overlay_only,
     }
+    if preserve_work_dir_on_failure:
+        metadata["preserve_work_dir_on_failure"] = True
     if overlay_size:
         metadata["overlay_size"] = list(overlay_size)
     if video_start_override is not None:
@@ -2464,6 +2467,7 @@ def _create_gopro_overlay_job_from_paths(
         overlay_size=overlay_size,
         video_start_override=video_start_override,
         pip_offset_seconds=pip_offset_seconds,
+        preserve_work_dir_on_failure=output_name.startswith("youtube-overlay-"),
     )
 
     now = _utc_now_dt()
@@ -3018,6 +3022,15 @@ def _can_delete_work_dir(work_dir: Path) -> bool:
 
 
 def _cleanup_gopro_overlay_temp_files(job: dict[str, Any]) -> None:
+    job_id = str(job.get("id") or job.get("job_id") or "")
+    if job_id and job.get("status") in {_STATUS_FAILED, _STATUS_CANCELLED}:
+        full_job = get_gopro_overlay_job(job_id, include_command=True)
+        metadata = full_job.get("command") if full_job else None
+        if isinstance(metadata, dict) and metadata.get("preserve_work_dir_on_failure"):
+            # The video export cleaner removes this nested directory after its
+            # 24-hour YouTube retry-cache window expires.
+            return
+
     temp_output_path = job.get("temp_output_path")
     if temp_output_path:
         _unlink_if_exists(Path(str(temp_output_path)))
@@ -3081,6 +3094,65 @@ def _enqueue_existing_gopro_overlay_job(job_id: str) -> None:
         _enqueue_gopro_overlay_job_in_rq(job_id)
     elif not config.TESTING:
         start_gopro_overlay_worker()
+
+
+def resume_failed_gopro_overlay_job(job_id: str) -> bool:
+    """Requeue a failed YouTube render while retaining its completed segments."""
+    try:
+        with SessionLocal() as db:
+            job = db.get(GoproOverlayJob, job_id)
+            if job is None or job.status not in {_STATUS_FAILED, _STATUS_CANCELLED}:
+                return False
+            try:
+                metadata = json.loads(job.command_json or "{}")
+            except (TypeError, ValueError):
+                metadata = {}
+            if not isinstance(metadata, dict) or not metadata.get("preserve_work_dir_on_failure"):
+                return False
+            original_pip_path = metadata.get("source_pip_path")
+            if job.pip_path and original_pip_path:
+                source_pip_path = Path(str(original_pip_path))
+                if not source_pip_path.is_file():
+                    return False
+                job.pip_path = str(source_pip_path)
+            job.status = _STATUS_QUEUED
+            job.progress = 0
+            job.message = "Overlay retry queued"
+            job.error = None
+            job.completed_at = None
+            job.cancelled_at = None
+            job.updated_at = _utc_now_dt()
+            db.commit()
+    except OperationalError as exc:
+        if "no such table: gopro_overlay_jobs" not in str(exc):
+            raise
+        with _LOCK:
+            job = _JOBS.get(job_id)
+            metadata = job.get("command") if job else None
+            if (
+                not job
+                or job.get("status") not in {_STATUS_FAILED, _STATUS_CANCELLED}
+                or not isinstance(metadata, dict)
+                or not metadata.get("preserve_work_dir_on_failure")
+            ):
+                return False
+            original_pip_path = metadata.get("source_pip_path")
+            if job.get("pip_path") and original_pip_path:
+                source_pip_path = Path(str(original_pip_path))
+                if not source_pip_path.is_file():
+                    return False
+                job["pip_path"] = str(source_pip_path)
+            job.update(
+                status=_STATUS_QUEUED,
+                progress=0,
+                message="Overlay retry queued",
+                error=None,
+                completed_at=None,
+                cancelled_at=None,
+            )
+
+    _enqueue_existing_gopro_overlay_job(job_id)
+    return True
 
 
 def _delete_rq_gopro_overlay_job(job_id: str) -> bool:
