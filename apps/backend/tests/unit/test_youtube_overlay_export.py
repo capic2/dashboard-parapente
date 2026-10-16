@@ -1,13 +1,16 @@
 """Tests for the YouTube source + telemetry overlay export helpers."""
 
+import json
 from datetime import datetime, timedelta, timezone
 from io import StringIO
 from pathlib import Path
 
-import gopro_overlay_export
 import pytest
 import yaml
+
+import gopro_overlay_export
 import youtube_overlay_export
+from models import GoproOverlayJob
 
 
 def test_new_work_dir_uses_flight_temp_storage(tmp_path, monkeypatch):
@@ -368,12 +371,14 @@ def test_render_saved_overlay_preserves_manual_timeline_and_pip(gpx_mode, tmp_pa
     )
 
     assert result == output
+    output_filename = create_args.pop("output_filename")
+    assert output_filename.startswith("youtube-overlay-saved-job-")
+    assert output_filename.endswith(".mp4")
     assert create_args == {
         "video_path": source,
         "gpx_path": merged_gpx,
         "pip_path": camera,
         "layout_id": "parapente-3840",
-        "output_filename": "youtube-overlay-saved-job.mp4",
         "output_resolution": "source",
         "output_dir": str(tmp_path / "work"),
         "gpx_offset": 0.0,
@@ -382,3 +387,275 @@ def test_render_saved_overlay_preserves_manual_timeline_and_pip(gpx_mode, tmp_pa
         "video_start_override": gpx_start,
         "pip_offset_seconds": 0.0,
     }
+
+
+def _checkpoint_render_inputs(tmp_path: Path) -> tuple[Path, Path, dict[str, object], str]:
+    source = tmp_path / "source.mp4"
+    camera = tmp_path / "camera.mp4"
+    gpx = tmp_path / "track.gpx"
+    source.write_bytes(b"youtube video")
+    camera.write_bytes(b"camera video")
+    gpx.write_text("<gpx></gpx>", encoding="utf-8")
+    saved_job: dict[str, object] = {
+        "job_id": "saved-overlay",
+        "video_path": str(camera),
+        "gpx_path": str(gpx),
+        "pip_path": None,
+        "layout_id": "parapente-1920",
+        "command": {},
+    }
+    render_key = youtube_overlay_export._youtube_overlay_render_key(
+        overlay_job_id="saved-overlay",
+        source_video_path=source,
+        gpx_path=gpx,
+        pip_video_path=None,
+        layout_id="parapente-1920",
+        offset_seconds=0.0,
+        pip_apply_offset=True,
+        timeline_start=None,
+    )
+    return source, gpx, saved_job, render_key
+
+
+def test_render_file_identity_ignores_missing_pip_path(tmp_path: Path) -> None:
+    assert youtube_overlay_export._render_file_identity(tmp_path / "missing-pip.mp4") is None
+
+
+def test_render_saved_overlay_reuses_valid_completed_checkpoint(tmp_path, monkeypatch):
+    source, _gpx, saved_job, render_key = _checkpoint_render_inputs(tmp_path)
+    output_directory = tmp_path / "work"
+    output_directory.mkdir()
+    output = output_directory / "completed.mp4"
+    output.write_bytes(b"rendered")
+    (output_directory / ".youtube-overlay-render.json").write_text(
+        '{"job_id":"completed-job","render_key":"' + render_key + '"}',
+        encoding="utf-8",
+    )
+
+    def fake_get(job_id, include_command=False):
+        if job_id == "saved-overlay":
+            return saved_job
+        return {"job_id": job_id, "status": "completed", "output_path": str(output)}
+
+    monkeypatch.setattr(gopro_overlay_export, "get_gopro_overlay_job", fake_get)
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "create_gopro_overlay_job_from_paths",
+        lambda **_kwargs: pytest.fail("completed render should be reused"),
+    )
+
+    result = youtube_overlay_export.render_saved_overlay(
+        "saved-overlay",
+        source,
+        offset_seconds=0,
+        output_directory=output_directory,
+        progress=lambda _message, _percent: None,
+    )
+
+    assert result == output
+
+
+@pytest.mark.parametrize("output_state", ["missing", "empty"])
+def test_render_saved_overlay_recreates_unusable_completed_output(
+    output_state: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source, _gpx, saved_job, render_key = _checkpoint_render_inputs(tmp_path)
+    output_directory = tmp_path / "work"
+    output_directory.mkdir()
+    old_output = output_directory / "old.mp4"
+    if output_state == "empty":
+        old_output.write_bytes(b"")
+    (output_directory / ".youtube-overlay-render.json").write_text(
+        '{"job_id":"old-job","render_key":"' + render_key + '"}',
+        encoding="utf-8",
+    )
+    create_calls: list[dict[str, object]] = []
+
+    def fake_get(job_id, include_command=False):
+        if job_id == "saved-overlay":
+            return saved_job
+        if job_id == "old-job":
+            return {"job_id": job_id, "status": "completed", "output_path": str(old_output)}
+        replacement_output = output_directory / str(create_calls[0]["output_filename"])
+        replacement_output.write_bytes(b"replacement render")
+        return {
+            "job_id": job_id,
+            "status": "completed",
+            "output_path": str(replacement_output),
+        }
+
+    def fake_create(**kwargs):
+        create_calls.append(kwargs)
+        return {"job_id": "replacement-job"}
+
+    monkeypatch.setattr(gopro_overlay_export, "get_gopro_overlay_job", fake_get)
+    monkeypatch.setattr(gopro_overlay_export, "create_gopro_overlay_job_from_paths", fake_create)
+    monkeypatch.setattr(youtube_overlay_export.time, "sleep", lambda _seconds: None)
+
+    result = youtube_overlay_export.render_saved_overlay(
+        "saved-overlay",
+        source,
+        offset_seconds=0,
+        output_directory=output_directory,
+        progress=lambda _message, _percent: None,
+    )
+
+    assert len(create_calls) == 1
+    assert result != old_output
+    assert result.read_bytes() == b"replacement render"
+
+
+def test_render_saved_overlay_resumes_failed_checkpoint(tmp_path, monkeypatch):
+    source, _gpx, saved_job, render_key = _checkpoint_render_inputs(tmp_path)
+    output_directory = tmp_path / "work"
+    output_directory.mkdir()
+    output = output_directory / "resumed.mp4"
+    (output_directory / ".youtube-overlay-render.json").write_text(
+        '{"job_id":"failed-job","render_key":"' + render_key + '"}',
+        encoding="utf-8",
+    )
+    statuses = iter(["failed", "queued", "completed"])
+    resumed_jobs: list[str] = []
+
+    def fake_get(job_id, include_command=False):
+        if job_id == "saved-overlay":
+            return saved_job
+        status = next(statuses)
+        if status == "completed":
+            output.write_bytes(b"resumed render")
+        return {"job_id": job_id, "status": status, "output_path": str(output)}
+
+    monkeypatch.setattr(gopro_overlay_export, "get_gopro_overlay_job", fake_get)
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "resume_failed_gopro_overlay_job",
+        lambda job_id: resumed_jobs.append(job_id) or True,
+    )
+    monkeypatch.setattr(youtube_overlay_export.time, "sleep", lambda _seconds: None)
+
+    result = youtube_overlay_export.render_saved_overlay(
+        "saved-overlay",
+        source,
+        offset_seconds=0,
+        output_directory=output_directory,
+        progress=lambda _message, _percent: None,
+    )
+
+    assert resumed_jobs == ["failed-job"]
+    assert result == output
+
+
+@pytest.mark.parametrize(
+    ("stale_status", "expected_cancelled"),
+    [("running", True), ("completed", False)],
+)
+def test_render_saved_overlay_replaces_checkpoint_when_render_settings_change(
+    stale_status: str,
+    expected_cancelled: bool,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, _gpx, saved_job, render_key = _checkpoint_render_inputs(tmp_path)
+    output_directory = tmp_path / "work"
+    output_directory.mkdir()
+    (output_directory / ".youtube-overlay-render.json").write_text(
+        '{"job_id":"stale-job","render_key":"' + render_key + '"}',
+        encoding="utf-8",
+    )
+    cancelled_jobs: list[str] = []
+    create_calls: list[dict[str, object]] = []
+    replacement_output = output_directory / "replacement.mp4"
+    stale_output = output_directory / f"youtube-overlay-saved-overlay-{render_key[:16]}.mp4"
+    stale_output.write_bytes(b"stale render")
+
+    def fake_get(job_id, include_command=False):
+        if job_id == "saved-overlay":
+            return saved_job
+        if job_id == "stale-job":
+            return {
+                "job_id": job_id,
+                "status": stale_status,
+                "output_path": str(stale_output),
+            }
+        replacement_output.write_bytes(b"new settings render")
+        return {
+            "job_id": job_id,
+            "status": "completed",
+            "output_path": str(replacement_output),
+        }
+
+    def fake_create(**kwargs):
+        create_calls.append(kwargs)
+        return {"job_id": "replacement-job"}
+
+    monkeypatch.setattr(gopro_overlay_export, "get_gopro_overlay_job", fake_get)
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "cancel_gopro_overlay_job",
+        lambda job_id: cancelled_jobs.append(job_id) or True,
+    )
+    monkeypatch.setattr(gopro_overlay_export, "create_gopro_overlay_job_from_paths", fake_create)
+
+    result = youtube_overlay_export.render_saved_overlay(
+        "saved-overlay",
+        source,
+        offset_seconds=3,
+        output_directory=output_directory,
+        progress=lambda _message, _percent: None,
+    )
+
+    assert cancelled_jobs == (["stale-job"] if expected_cancelled else [])
+    assert len(create_calls) == 1
+    assert create_calls[0]["output_filename"] != stale_output.name
+    assert stale_output.exists() is expected_cancelled
+    assert result == replacement_output
+
+
+def test_resume_failed_gopro_overlay_job_restores_original_pip_path(
+    db_session, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source_pip = tmp_path / "source-pip.mp4"
+    prepared_pip = tmp_path / "prepared-pip.mp4"
+    source_pip.write_bytes(b"source pip")
+    prepared_pip.write_bytes(b"prepared pip")
+    job = GoproOverlayJob(
+        id="failed-youtube-overlay-with-pip",
+        status="failed",
+        progress=100,
+        message="Overlay rendering failed",
+        error="ffmpeg failed",
+        video_path=str(tmp_path / "source.mp4"),
+        gpx_path=str(tmp_path / "track.gpx"),
+        pip_path=str(prepared_pip),
+        layout_id="parapente-1920",
+        layout_label="Parapente",
+        layout_path=str(tmp_path / "layout.xml"),
+        output_path=str(tmp_path / "output.mp4"),
+        temp_output_path=str(tmp_path / "output.tmp.mp4"),
+        output_filename="output.mp4",
+        command_json=json.dumps(
+            {
+                "preserve_work_dir_on_failure": True,
+                "source_pip_path": str(source_pip),
+                "resume": {"completed_segments": [0, 1]},
+            }
+        ),
+    )
+    db_session.add(job)
+    db_session.commit()
+    enqueued_jobs: list[str] = []
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "_enqueue_existing_gopro_overlay_job",
+        enqueued_jobs.append,
+    )
+
+    assert gopro_overlay_export.resume_failed_gopro_overlay_job(job.id) is True
+
+    db_session.expire_all()
+    resumed_job = db_session.get(GoproOverlayJob, job.id)
+    assert resumed_job is not None
+    assert resumed_job.status == "queued"
+    assert resumed_job.pip_path == str(source_pip)
+    assert json.loads(resumed_job.command_json or "{}")["resume"]["completed_segments"] == [0, 1]
+    assert enqueued_jobs == [job.id]
