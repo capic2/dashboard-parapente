@@ -138,6 +138,7 @@ def download_youtube(
             encoding="utf-8",
             prefix=".youtube-cookies-",
             suffix=".txt",
+            dir=directory,
             delete=False,
         ) as cookie_file:
             cookie_file.write(cookies)
@@ -323,12 +324,8 @@ def export_youtube_overlay(
         raise YoutubeExportError("Le fichier MP4 final est vide")
 
 
-def new_work_dir(job_id: str, flight_id: str | None = None) -> Path:
+def new_work_dir(job_id: str, flight_id: str) -> Path:
     """Return the YouTube export workspace below its owning flight's temp folder."""
-    if flight_id is None:
-        # Keep the legacy helper behavior for older callers; export workers
-        # always provide the flight ID so new downloads use per-flight storage.
-        return Path(config.VIDEO_EXPORT_DIR) / ".youtube-exports" / job_id
     with SessionLocal() as db:
         flight = db.get(Flight, flight_id)
         if flight is None:
@@ -336,8 +333,9 @@ def new_work_dir(job_id: str, flight_id: str | None = None) -> Path:
         return flight_temporary_directory(db, flight, "youtube-exports") / job_id
 
 
-def output_path(job_id: str) -> Path:
-    return Path(config.VIDEO_EXPORT_DIR) / f"youtube-overlay-{job_id}.mp4"
+def output_path(job_id: str, flight_id: str) -> Path:
+    """Return the generated upload video path inside its flight's temp workspace."""
+    return new_work_dir(job_id, flight_id) / f"youtube-overlay-{job_id}.mp4"
 
 
 def cleanup_work_dir(path: Path) -> None:

@@ -10,11 +10,40 @@ import yaml
 import youtube_overlay_export
 
 
-def test_new_work_dir_uses_shared_video_export_storage(tmp_path, monkeypatch):
-    monkeypatch.setattr(youtube_overlay_export.config, "VIDEO_EXPORT_DIR", str(tmp_path))
+def test_new_work_dir_uses_flight_temp_storage(tmp_path, monkeypatch):
+    flight = object()
 
-    assert youtube_overlay_export.new_work_dir("job-id") == (
-        tmp_path / ".youtube-exports" / "job-id"
+    class FakeSession:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def get(self, _model, flight_id):
+            assert flight_id == "flight-id"
+            return flight
+
+    monkeypatch.setattr(youtube_overlay_export, "SessionLocal", FakeSession)
+    monkeypatch.setattr(
+        youtube_overlay_export,
+        "flight_temporary_directory",
+        lambda _db, selected_flight, namespace: (
+            tmp_path / namespace if selected_flight is flight else None
+        ),
+    )
+
+    assert youtube_overlay_export.new_work_dir("job-id", "flight-id") == (
+        tmp_path / "youtube-exports" / "job-id"
+    )
+
+
+def test_output_path_uses_flight_work_dir(tmp_path, monkeypatch):
+    work_dir = tmp_path / "flight" / "temp" / "youtube-exports" / "job-id"
+    monkeypatch.setattr(youtube_overlay_export, "new_work_dir", lambda _job, _flight: work_dir)
+
+    assert youtube_overlay_export.output_path("job-id", "flight-id") == (
+        work_dir / "youtube-overlay-job-id.mp4"
     )
 
 
@@ -87,6 +116,28 @@ def test_download_youtube_reports_download_percentage(tmp_path, monkeypatch):
         ),
         ("Téléchargement YouTube terminé: source.mp4", 100),
     ]
+
+
+def test_download_youtube_stores_cookies_in_export_work_dir(tmp_path, monkeypatch):
+    cookie_paths: list[Path] = []
+
+    def fake_run(command, *, cwd=None, on_output=None):
+        cookie_path = Path(command[command.index("--cookies") + 1])
+        cookie_paths.append(cookie_path)
+        assert cookie_path.parent == tmp_path
+        assert cookie_path.read_text(encoding="utf-8") == "cookie data"
+        (tmp_path / "source.mp4").write_bytes(b"video")
+
+    monkeypatch.setattr(youtube_overlay_export, "_run", fake_run)
+    youtube_overlay_export.download_youtube(
+        "https://www.youtube.com/watch?v=test",
+        tmp_path,
+        lambda _message, _percent: None,
+        cookies="cookie data",
+    )
+
+    assert len(cookie_paths) == 1
+    assert not cookie_paths[0].exists()
 
 
 def test_download_youtube_reuses_only_completed_download_for_same_url(tmp_path, monkeypatch):
