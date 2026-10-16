@@ -5869,7 +5869,7 @@ def get_export_viewer_youtube_pip(job_id: str, request: Request, db: Session = D
     export_job = db.get(VideoExportJob, job_id)
     if export_job is None or export_job.flight_id != flight_id or not export_job.pip_exports:
         raise HTTPException(status_code=404, detail="PiP video not found")
-    from youtube_overlay_export import new_work_dir
+    from youtube_overlay_export import YoutubeExportError, new_work_dir
 
     try:
         pip_exports = json.loads(export_job.pip_exports)
@@ -5886,7 +5886,11 @@ def get_export_viewer_youtube_pip(job_id: str, request: Request, db: Session = D
     )
     if slot_index is None:
         raise HTTPException(status_code=404, detail="PiP video not found")
-    pip_directory = new_work_dir(job_id) / "youtube-pip" / f"pip-{slot_index}"
+    try:
+        work_dir = new_work_dir(job_id, flight_id)
+    except YoutubeExportError as exc:
+        raise HTTPException(status_code=404, detail="PiP video not found") from exc
+    pip_directory = work_dir / "youtube-pip" / f"pip-{slot_index}"
     candidates = [path for path in pip_directory.glob("source.*") if path.is_file()]
     if not candidates:
         raise HTTPException(status_code=404, detail="PiP video is not ready")

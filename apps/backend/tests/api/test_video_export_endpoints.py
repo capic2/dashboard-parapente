@@ -14,7 +14,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from auth import create_job_token
-from models import GoproOverlayJob, YoutubeUploadJob
+from models import GoproOverlayJob, VideoExportJob, YoutubeUploadJob
 from routes import (
     _get_video_export_jobs_payload,
     _video_export_can_cancel,
@@ -796,6 +796,48 @@ class TestExportStatusAndCancel:
         )
 
         assert response.status_code == 401
+
+    def test_export_viewer_youtube_pip_uses_flight_temporary_work_dir(
+        self, client: TestClient, db_session, sample_flight, tmp_path, monkeypatch
+    ):
+        job_id = "job-youtube-pip"
+        slot_id = "slot-youtube-pip"
+        db_session.add(
+            VideoExportJob(
+                id=job_id,
+                flight_id=sample_flight.id,
+                status="running",
+                mode="youtube_telemetry_layout",
+                pip_exports=json.dumps([{"slot_id": slot_id}]),
+            )
+        )
+        db_session.commit()
+
+        work_dir = tmp_path / "flight" / "temp" / "youtube-exports" / job_id
+        pip_video = work_dir / "youtube-pip" / "pip-0" / "source.mp4"
+        pip_video.parent.mkdir(parents=True)
+        pip_video.write_bytes(b"youtube-pip-video")
+        resolved_jobs: list[tuple[str, str]] = []
+
+        def resolve_work_dir(export_job_id: str, flight_id: str) -> Path:
+            resolved_jobs.append((export_job_id, flight_id))
+            return work_dir
+
+        monkeypatch.setattr("youtube_overlay_export.new_work_dir", resolve_work_dir)
+        token = create_job_token(
+            purpose="video_export",
+            job_id=job_id,
+            flight_id=sample_flight.id,
+        )
+
+        response = client.get(
+            f"{API_PREFIX}/export-viewer/jobs/{job_id}/youtube-pip",
+            params={"access_token": token, "slot_id": slot_id},
+        )
+
+        assert response.status_code == 200
+        assert response.content == b"youtube-pip-video"
+        assert resolved_jobs == [(job_id, sample_flight.id)]
 
 
 class TestVideoExportJobsEndpoint:
