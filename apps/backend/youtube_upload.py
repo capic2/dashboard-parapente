@@ -1089,10 +1089,6 @@ def _delete_generated_overlay_source(path: Path, *, cleanup_workspace: bool = Fa
     """Delete an upload file and optionally its completed export workspace."""
     resolved_path = path.resolve()
     resolved_export_dir = Path(config.VIDEO_EXPORT_DIR).resolve()
-    is_legacy_export = (
-        resolved_path.parent == resolved_export_dir
-        and path.name.startswith("youtube-overlay-")
-    )
     flight_temp_root = Path(config.PARAGLIDING_DATA_ROOT).resolve()
     resolved_parent = resolved_path.parent
     is_flight_temp_export = (
@@ -1103,13 +1099,16 @@ def _delete_generated_overlay_source(path: Path, *, cleanup_workspace: bool = Fa
         and resolved_parent.parent.name == "youtube-exports"
         and resolved_parent.parent.parent.name == "temp"
     )
+    is_legacy_export = (
+        resolved_path.is_relative_to(resolved_export_dir) and not is_flight_temp_export
+    )
     if not is_legacy_export and not is_flight_temp_export:
         logger.warning("Refusing to delete YouTube overlay source outside export storage: %s", path)
         return
     try:
         (resolved_path if is_flight_temp_export else path).unlink(missing_ok=True)
         if is_flight_temp_export and cleanup_workspace:
-            shutil.rmtree(resolved_parent, ignore_errors=True)
+            shutil.rmtree(resolved_parent)
         logger.info("Removed generated YouTube overlay source %s", path)
     except OSError:
         logger.warning("Unable to remove generated YouTube overlay source %s", path)
