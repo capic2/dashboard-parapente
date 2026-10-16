@@ -28,6 +28,8 @@ interface TelemetryExportPip {
   offset_seconds: number;
 }
 
+const TELEMETRY_EXPORT_PIP_SEEK_TIMEOUT_MS = 60_000;
+
 function getExportParams() {
   const params = new URLSearchParams(window.location.search);
   return {
@@ -136,7 +138,12 @@ export function TelemetryLayoutExport() {
               time - pip.offset_seconds
             )
           );
-          if (Math.abs(video.currentTime - targetTime) <= 0.025) return;
+          if (
+            Math.abs(video.currentTime - targetTime) <= 0.025 &&
+            !video.seeking
+          ) {
+            return;
+          }
           await new Promise<void>((resolve, reject) => {
             const cleanup = () => {
               window.clearTimeout(timeoutId);
@@ -155,8 +162,12 @@ export function TelemetryLayoutExport() {
             };
             const timeoutId = window.setTimeout(() => {
               cleanup();
-              reject(new Error('La synchronisation de la vidéo PiP a expiré'));
-            }, 10_000);
+              reject(
+                new Error(
+                  `La synchronisation du PiP ${pip.slot_id} à ${targetTime.toFixed(2)} s a expiré après ${TELEMETRY_EXPORT_PIP_SEEK_TIMEOUT_MS / 1_000} s`
+                )
+              );
+            }, TELEMETRY_EXPORT_PIP_SEEK_TIMEOUT_MS);
             video.addEventListener('seeked', onSeeked, { once: true });
             video.addEventListener('error', onError, { once: true });
             video.currentTime = targetTime;
