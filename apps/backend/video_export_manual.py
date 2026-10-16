@@ -34,7 +34,7 @@ from datetime_utils import to_api_utc
 from deployment_drain import DeploymentDrainActive, job_admission
 from auth import create_job_token, decode_job_token
 from database import SessionLocal
-from flight_storage import flight_temporary_directory, get_video_output_path
+from flight_storage import flight_directory, flight_temporary_directory, get_video_output_path
 from models import Flight, VideoExportJob
 from video_acceleration import (
     VideoAccelerator,
@@ -866,7 +866,7 @@ def _export_youtube_overlay_job(job_id: str) -> None:
         _update_job(job_id, status=_STATUS_FAILED, error="Paramètres d’export YouTube incomplets")
         return
 
-    work_dir = new_work_dir(job_id)
+    work_dir: Path | None = None
     destination = output_path(job_id)
     upload_started = False
 
@@ -885,6 +885,7 @@ def _export_youtube_overlay_job(job_id: str) -> None:
         )
 
     try:
+        work_dir = new_work_dir(job_id, job.flight_id)
         _log_job(job_id, "Préparation de l’export YouTube")
         _update_job(
             job_id, status=_STATUS_RUNNING, message="Préparation de l’export YouTube", progress=1
@@ -940,9 +941,9 @@ def _export_youtube_overlay_job(job_id: str) -> None:
         _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
     finally:
         _log_job(job_id, "Nettoyage des fichiers temporaires YouTube")
-        if upload_started:
+        if work_dir is not None and upload_started:
             cleanup_work_dir(work_dir)
-        elif work_dir.is_dir():
+        elif work_dir is not None and work_dir.is_dir():
             # Keep a completed source download available for retries, and start
             # its retention window when this attempt ends.
             os.utime(work_dir, None)
@@ -990,7 +991,7 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
         fail_youtube_overlay_upload(job.youtube_upload_job_id, error)
         return
 
-    work_dir = new_work_dir(job_id)
+    work_dir: Path | None = None
     destination = output_path(job_id)
     upload_started = False
 
@@ -1012,6 +1013,7 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
         )
 
     try:
+        work_dir = new_work_dir(job_id, job.flight_id)
         _log_job(job_id, "Préparation de l’export avec le layout de télémétrie")
         _update_job(
             job_id, status=_STATUS_RUNNING, message="Préparation de l’export YouTube", progress=1
@@ -1059,9 +1061,9 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
             fail_youtube_overlay_upload(job.youtube_upload_job_id, str(exc))
         _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
     finally:
-        if upload_started:
+        if work_dir is not None and upload_started:
             cleanup_work_dir(work_dir)
-        elif work_dir.is_dir():
+        elif work_dir is not None and work_dir.is_dir():
             os.utime(work_dir, None)
         if not upload_started:
             destination.unlink(missing_ok=True)
@@ -1117,6 +1119,13 @@ def _flight_job_temp_dir(db: Session, flight_id: str, job_id: str) -> Path | Non
     if not flight:
         return None
     return flight_temporary_directory(db, flight, "video-exports") / job_id
+
+
+def _flight_youtube_work_dir(db: Session, flight_id: str, job_id: str) -> Path | None:
+    flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    if not flight:
+        return None
+    return flight_directory(db, flight) / "temp" / "youtube-exports" / job_id
 
 
 def _job_temp_dir_for_export(job: VideoExportJob | str) -> Path:
@@ -1355,10 +1364,22 @@ def _video_export_temp_cleanup_candidates(
             try:
                 with SessionLocal() as db:
                     temp_dir = _flight_job_temp_dir(db, flight_id, job_id)
+                    youtube_work_dir = _flight_youtube_work_dir(db, flight_id, job_id)
             except SQLAlchemyError:
                 temp_dir = None
+                youtube_work_dir = None
             if temp_dir:
                 candidates.append((temp_dir, temp_dir.parent))
+            if youtube_work_dir and (
+                include_retry_cache
+                or export.get("mode")
+                not in {
+                    "youtube_overlay",
+                    "youtube_telemetry_layout",
+                }
+                or _is_path_older_than(youtube_work_dir, _YOUTUBE_RETRY_CACHE_RETENTION_SECONDS)
+            ):
+                candidates.append((youtube_work_dir, youtube_work_dir.parent))
         candidates.append((export_root / f"frames_{job_id}", export_root))
         candidates.append((Path("/tmp") / f"playwright-debug-{job_id}.png", Path("/tmp")))
         candidates.append((Path("/tmp") / f"playwright-error-{job_id}.png", Path("/tmp")))
@@ -1476,10 +1497,14 @@ def cleanup_video_export_job_temp_files(job_id: str) -> dict[str, Any]:
         try:
             with SessionLocal() as db:
                 temp_dir = _flight_job_temp_dir(db, job.flight_id, job_id)
+                youtube_work_dir = _flight_youtube_work_dir(db, job.flight_id, job_id)
         except SQLAlchemyError:
             temp_dir = None
+            youtube_work_dir = None
         if temp_dir:
             candidates.append((temp_dir, temp_dir.parent))
+        if youtube_work_dir:
+            candidates.append((youtube_work_dir, youtube_work_dir.parent))
 
     deleted_paths: list[str] = []
     errors: list[dict[str, str]] = []
