@@ -853,7 +853,6 @@ def _export_youtube_overlay_job(job_id: str) -> None:
     """Download a selected YouTube source and compose the existing alpha layer."""
     from youtube_overlay_export import (
         YoutubeExportError,
-        cleanup_work_dir,
         export_youtube_overlay,
         new_work_dir,
         output_path,
@@ -867,7 +866,7 @@ def _export_youtube_overlay_job(job_id: str) -> None:
         return
 
     work_dir: Path | None = None
-    destination = output_path(job_id)
+    destination: Path | None = None
     upload_started = False
 
     def progress(message: str, download_percent: int | None = None) -> None:
@@ -886,6 +885,7 @@ def _export_youtube_overlay_job(job_id: str) -> None:
 
     try:
         work_dir = new_work_dir(job_id, job.flight_id)
+        destination = output_path(job_id, job.flight_id)
         _log_job(job_id, "Préparation de l’export YouTube")
         _update_job(
             job_id, status=_STATUS_RUNNING, message="Préparation de l’export YouTube", progress=1
@@ -906,6 +906,8 @@ def _export_youtube_overlay_job(job_id: str) -> None:
             raise YoutubeExportError("Export annulé")
         if not job.youtube_upload_job_id:
             raise YoutubeExportError("Job d’upload YouTube introuvable")
+        if destination is None:
+            raise YoutubeExportError("Chemin du fichier YouTube introuvable")
         from youtube_upload import enqueue_youtube_overlay_upload
 
         enqueue_youtube_overlay_upload(job.youtube_upload_job_id, destination)
@@ -941,13 +943,11 @@ def _export_youtube_overlay_job(job_id: str) -> None:
         _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
     finally:
         _log_job(job_id, "Nettoyage des fichiers temporaires YouTube")
-        if work_dir is not None and upload_started:
-            cleanup_work_dir(work_dir)
-        elif work_dir is not None and work_dir.is_dir():
-            # Keep a completed source download available for retries, and start
-            # its retention window when this attempt ends.
+        if work_dir is not None and work_dir.is_dir():
+            # Keep retry data and the upload source available, and start their
+            # retention window when this attempt ends.
             os.utime(work_dir, None)
-        if not upload_started:
+        if not upload_started and destination is not None:
             destination.unlink(missing_ok=True)
 
 
@@ -964,7 +964,6 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
     from gopro_overlay_export import first_gpx_timestamp
     from youtube_overlay_export import (
         YoutubeExportError,
-        cleanup_work_dir,
         new_work_dir,
         output_path,
     )
@@ -992,7 +991,7 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
         return
 
     work_dir: Path | None = None
-    destination = output_path(job_id)
+    destination: Path | None = None
     upload_started = False
 
     def progress(message: str, download_percent: int | None = None) -> None:
@@ -1014,6 +1013,7 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
 
     try:
         work_dir = new_work_dir(job_id, job.flight_id)
+        destination = output_path(job_id, job.flight_id)
         _log_job(job_id, "Préparation de l’export avec le layout de télémétrie")
         _update_job(
             job_id, status=_STATUS_RUNNING, message="Préparation de l’export YouTube", progress=1
@@ -1035,6 +1035,8 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
         )
         if _is_cancelled(job_id):
             raise YoutubeExportError("Export annulé")
+        if destination is None:
+            raise YoutubeExportError("Chemin du fichier YouTube introuvable")
         enqueue_youtube_overlay_upload(job.youtube_upload_job_id, destination)
         upload_started = True
         _log_job(job_id, "Vidéo composée et upload YouTube lancé")
@@ -1061,11 +1063,9 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
             fail_youtube_overlay_upload(job.youtube_upload_job_id, str(exc))
         _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
     finally:
-        if work_dir is not None and upload_started:
-            cleanup_work_dir(work_dir)
-        elif work_dir is not None and work_dir.is_dir():
+        if work_dir is not None and work_dir.is_dir():
             os.utime(work_dir, None)
-        if not upload_started:
+        if not upload_started and destination is not None:
             destination.unlink(missing_ok=True)
         _clear_job_cancel_requested(job_id)
 

@@ -954,10 +954,12 @@ def test_thread_worker_dispatches_youtube_overlay_jobs(test_db, monkeypatch):
     assert dispatched_job_ids == ["job-process-youtube-overlay"]
 
 
-def test_youtube_overlay_worker_cleans_temp_files_after_success(tmp_path, monkeypatch):
+def test_youtube_overlay_worker_keeps_upload_source_in_flight_temp_until_upload_finishes(
+    tmp_path, monkeypatch
+):
     job_id = "job-youtube-overlay-cleanup"
     work_dir = tmp_path / "temp" / job_id
-    output = tmp_path / "exports" / f"youtube-overlay-{job_id}.mp4"
+    output = work_dir / f"youtube-overlay-{job_id}.mp4"
     job = SimpleNamespace(
         flight_id="flight-youtube-overlay-cleanup",
         youtube_url="https://www.youtube.com/watch?v=test",
@@ -978,12 +980,12 @@ def test_youtube_overlay_worker_cleans_temp_files_after_success(tmp_path, monkey
     monkeypatch.setattr(
         youtube_overlay_export, "new_work_dir", lambda _job_id, _flight_id: work_dir
     )
-    monkeypatch.setattr(youtube_overlay_export, "output_path", lambda _: output)
+    monkeypatch.setattr(youtube_overlay_export, "output_path", lambda _job, _flight: output)
 
     def fake_export_youtube_overlay(**kwargs):
-        kwargs["work_dir"].mkdir(parents=True)
+        kwargs["work_dir"].mkdir(parents=True, exist_ok=True)
         (kwargs["work_dir"] / "temporary-source.mp4").write_bytes(b"temporary")
-        kwargs["output_path"].parent.mkdir(parents=True)
+        kwargs["output_path"].parent.mkdir(parents=True, exist_ok=True)
         kwargs["output_path"].write_bytes(b"final")
 
     monkeypatch.setattr(
@@ -1003,7 +1005,7 @@ def test_youtube_overlay_worker_cleans_temp_files_after_success(tmp_path, monkey
     video_export_manual._export_youtube_overlay_job(job_id)
 
     assert uploaded == [("upload-job", output)]
-    assert not work_dir.exists()
+    assert work_dir.exists()
     assert output.read_bytes() == b"final"
 
 

@@ -6,6 +6,7 @@ import base64
 import hashlib
 import logging
 import re
+import shutil
 import threading
 import time
 import uuid
@@ -1081,18 +1082,33 @@ def _finish_upload(job_id: str, video_id: str) -> None:
         logger.exception("Unable to add YouTube video %s to its flight playlist", video_id)
         _log_job(job_id, f"Playlist organization failed: {_safe_log_error(exc)}")
     if generated_overlay_path is not None:
-        _delete_generated_overlay_source(generated_overlay_path)
+        _delete_generated_overlay_source(generated_overlay_path, cleanup_workspace=True)
 
 
-def _delete_generated_overlay_source(path: Path) -> None:
-    """Delete only generated YouTube-overlay files after upload and playlisting."""
-    try:
-        path.resolve().relative_to(Path(config.VIDEO_EXPORT_DIR).resolve())
-    except ValueError:
+def _delete_generated_overlay_source(path: Path, *, cleanup_workspace: bool = False) -> None:
+    """Delete an upload file and optionally its completed export workspace."""
+    resolved_path = path.resolve()
+    resolved_export_dir = Path(config.VIDEO_EXPORT_DIR).resolve()
+    flight_temp_root = Path(config.PARAGLIDING_DATA_ROOT).resolve()
+    resolved_parent = resolved_path.parent
+    is_flight_temp_export = (
+        not path.is_symlink()
+        and resolved_path.is_relative_to(flight_temp_root)
+        and resolved_path.name.startswith("youtube-overlay-")
+        and resolved_parent.name == resolved_path.stem.removeprefix("youtube-overlay-")
+        and resolved_parent.parent.name == "youtube-exports"
+        and resolved_parent.parent.parent.name == "temp"
+    )
+    is_legacy_export = (
+        resolved_path.is_relative_to(resolved_export_dir) and not is_flight_temp_export
+    )
+    if not is_legacy_export and not is_flight_temp_export:
         logger.warning("Refusing to delete YouTube overlay source outside export storage: %s", path)
         return
     try:
-        path.unlink(missing_ok=True)
+        (resolved_path if is_flight_temp_export else path).unlink(missing_ok=True)
+        if is_flight_temp_export and cleanup_workspace:
+            shutil.rmtree(resolved_parent)
         logger.info("Removed generated YouTube overlay source %s", path)
     except OSError:
         logger.warning("Unable to remove generated YouTube overlay source %s", path)
@@ -1491,6 +1507,7 @@ def process_youtube_upload(job_id: str) -> None:
             except OSError:
                 logger.warning("Unable to remove prepared panorama for YouTube upload %s", job_id)
         generated_overlay_path: Path | None = None
+        cleanup_generated_workspace = False
         with SessionLocal() as db:
             job = db.get(YoutubeUploadJob, job_id)
             if (
@@ -1500,8 +1517,12 @@ def process_youtube_upload(job_id: str) -> None:
                 and job.status in {"completed", "failed", "cancelled"}
             ):
                 generated_overlay_path = Path(job.source_path)
+                cleanup_generated_workspace = job.status == "completed"
         if generated_overlay_path is not None:
-            _delete_generated_overlay_source(generated_overlay_path)
+            _delete_generated_overlay_source(
+                generated_overlay_path,
+                cleanup_workspace=cleanup_generated_workspace,
+            )
         with _SUBMITTED_LOCK:
             _SUBMITTED.discard(job_id)
 
