@@ -55,7 +55,10 @@ export const flightSummariesQueryOptions = (search: FlightsSearch) =>
     refetchOnWindowFocus: 'always',
   });
 
-export const activeFlightMediaJobsQueryOptions = (pollWhenIdle = false) =>
+export const activeFlightMediaJobsQueryOptions = (
+  pollWhenIdle = false,
+  pollIntervalMs = 10000
+) =>
   queryOptions({
     queryKey: ['video-export-jobs', 'active'],
     queryFn: async () => {
@@ -70,7 +73,7 @@ export const activeFlightMediaJobsQueryOptions = (pollWhenIdle = false) =>
       pollWhenIdle ||
       query.state.data === undefined ||
       query.state.data.length > 0
-        ? 10000
+        ? pollIntervalMs
         : false,
   });
 
@@ -160,6 +163,11 @@ export function useFlightSummaries(search: FlightsSearch) {
   return useInfiniteQuery(flightSummariesQueryOptions(search));
 }
 
-export function useActiveFlightMediaJobs(pollWhenIdle = false) {
-  return useQuery(activeFlightMediaJobsQueryOptions(pollWhenIdle));
+export function useActiveFlightMediaJobs(
+  pollWhenIdle = false,
+  pollIntervalMs = 10000
+) {
+  return useQuery(
+    activeFlightMediaJobsQueryOptions(pollWhenIdle, pollIntervalMs)
+  );
 }

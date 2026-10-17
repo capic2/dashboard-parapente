@@ -61,6 +61,13 @@ describe('flight summary queries', () => {
     expect(interval({ state: { data: undefined } } as never)).toBe(10000);
     expect(interval({ state: { data: [] } } as never)).toBe(false);
     expect(interval({ state: { data: [{}] } } as never)).toBe(10000);
+    const detailInterval = activeFlightMediaJobsQueryOptions(
+      true,
+      2000
+    ).refetchInterval;
+    expect(detailInterval).toBeTypeOf('function');
+    if (typeof detailInterval !== 'function') return;
+    expect(detailInterval({ state: { data: [] } } as never)).toBe(2000);
   });
 
   it('serializes the backend query contract', () => {
