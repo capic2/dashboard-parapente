@@ -92,7 +92,7 @@ export function Flight({
     flight.youtube_overlay_export_status === 'failed';
   const hasPanoVideo = flight.has_pano_video;
   const hasOsv = flight.has_osv;
-  const hasGpxEnrichmentMismatch = flight.has_gpx_enrichment_mismatch;
+  const hasGpxEnrichmentMismatch = flight.has_gpx_enrichment_mismatch === true;
   const hasFaceVideo = flight.has_face_video === true;
   const hasPiloteVideo = flight.has_pilote_video === true;
   const shouldShowGpxUnsyncedBadge =
