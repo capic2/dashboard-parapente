@@ -242,10 +242,21 @@ export function FlightTelemetryInteractivePreview({
     setYoutubeExportJobId(activeYoutubeExportJobId);
   }, [activeYoutubeExportJobIds, flightId, youtubeExportJobId]);
   const [youtubeExportNow, setYoutubeExportNow] = useState(() => Date.now());
+  const publishedOverlayUrl = youtubeOverlayUpload.data?.youtube_url;
   const validYoutubeUrls = youtubeUrls.filter((url) => getYoutubeVideoId(url));
+  const validYoutubeMainUrls = youtubeAssociations.isSuccess
+    ? validYoutubeUrls.filter((url) => {
+        if (url === publishedOverlayUrl) return false;
+        const title = youtubeAssociations.data.find(
+          (association) => association.url === url
+        )?.title;
+        return !/(?:^|[\s:–—-])(?:télémétrie|telemetry)(?:\s+(?:overlay|video))?\s*$/iu.test(
+          title ?? ''
+        );
+      })
+    : [];
   const configuredMainVideoSource =
     layout.data?.layout.mainVideoSource ?? 'auto';
-  const publishedOverlayUrl = youtubeOverlayUpload.data?.youtube_url;
   const isYoutubeOverlayPublished = Boolean(
     youtubeOverlayUpload.data?.status === 'completed' &&
     publishedOverlayUrl &&
@@ -276,7 +287,7 @@ export function FlightTelemetryInteractivePreview({
     telemetry.isSuccess &&
     layout.isSuccess &&
     (overlayPreview.isSuccess ||
-      validYoutubeUrls.length > 0 ||
+      validYoutubeMainUrls.length > 0 ||
       isSelectedLocalMainAvailable) &&
     !isEnrichmentPending &&
     Boolean(telemetry.data?.points.length);
@@ -323,7 +334,7 @@ export function FlightTelemetryInteractivePreview({
     role
       ? (youtubeAssociations.data ?? []).find(
           (association) =>
-            validYoutubeUrls.includes(association.url) &&
+            validYoutubeMainUrls.includes(association.url) &&
             getYoutubeVideoRoleFromTitle(association.title) === role
         )?.url
       : undefined;
@@ -391,7 +402,7 @@ export function FlightTelemetryInteractivePreview({
   const assignedYoutubePipUrls = new Set(
     playerPips.flatMap((pip) => (pip.youtubeUrl ? [pip.youtubeUrl] : []))
   );
-  const unassignedYoutubeUrls = validYoutubeUrls.filter(
+  const unassignedYoutubeUrls = validYoutubeMainUrls.filter(
     (url) => !assignedYoutubePipUrls.has(url)
   );
   const mainYoutubeRole = mainVideoSource.startsWith('youtube:')
@@ -404,7 +415,7 @@ export function FlightTelemetryInteractivePreview({
   if (mainVideoSource === 'auto') {
     youtubeMainUrls = unassignedYoutubeUrls.length
       ? unassignedYoutubeUrls
-      : validYoutubeUrls;
+      : validYoutubeMainUrls;
   } else if (mainYoutubeRole && explicitMainYoutubeUrl) {
     youtubeMainUrls = [explicitMainYoutubeUrl];
   } else {
@@ -656,14 +667,6 @@ export function FlightTelemetryInteractivePreview({
       input.value = '';
     }
   };
-  if (
-    layout.isSuccess &&
-    layout.data.layout.mainVideoSource === 'auto' &&
-    validYoutubeUrls.length > 0
-  ) {
-    return null;
-  }
-
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
       <div className="flex items-start gap-3 p-4 sm:p-5">
