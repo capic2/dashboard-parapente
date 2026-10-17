@@ -626,6 +626,55 @@ def test_summaries_require_completed_generations_and_existing_files(
     assert summaries["media-incomplete"]["has_osv"] is False
 
 
+def test_summaries_flag_gpx_path_that_does_not_point_to_enriched_track(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("flight_summaries.config.PARAGLIDING_DATA_ROOT", str(tmp_path))
+    source_gpx_path = tmp_path / "source.gpx"
+    source_gpx_path.write_text("source GPX", encoding="utf-8")
+    flights: list[Flight] = []
+    for sequence, (flight_id, departure_hour, current_path, create_enriched_gpx) in enumerate(
+        (
+            ("mismatch", 10, source_gpx_path, False),
+            ("enriched", 11, "merged-gopro-overlay.gpx", True),
+            ("missing-path", 12, None, False),
+            ("missing-enriched", 13, "merged-gopro-overlay.gpx", False),
+        ),
+        start=1,
+    ):
+        flight_directory = tmp_path / "20260102" / f"{sequence:02d}"
+        flight_directory.mkdir(parents=True)
+        (flight_directory / "telemetry.osv").write_bytes(b"osv")
+        if isinstance(current_path, str):
+            current_path = flight_directory / current_path
+            if create_enriched_gpx:
+                current_path.write_text("enriched GPX", encoding="utf-8")
+        flights.append(
+            Flight(
+                id=flight_id,
+                title=flight_id,
+                flight_date=date(2026, 1, 2),
+                departure_time=datetime(2026, 1, 2, departure_hour),
+                gpx_file_path=str(current_path) if current_path else None,
+                gpx_source_file_path=str(source_gpx_path),
+            )
+        )
+    db_session.add_all(flights)
+    db_session.commit()
+
+    response = client.get(API_URL)
+    summaries = {item["id"]: item for item in response.json()["flights"]}
+
+    assert response.status_code == 200
+    assert summaries["mismatch"]["has_gpx_enrichment_mismatch"] is True
+    assert summaries["enriched"]["has_gpx_enrichment_mismatch"] is False
+    assert summaries["missing-path"]["has_gpx_enrichment_mismatch"] is True
+    assert summaries["missing-enriched"]["has_gpx_enrichment_mismatch"] is True
+
+
 def test_summaries_put_nulls_last_and_keyset_ties_by_id(client, db_session, arguel_site):
     db_session.add_all(
         [
