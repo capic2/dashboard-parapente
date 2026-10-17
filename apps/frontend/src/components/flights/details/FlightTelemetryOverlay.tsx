@@ -6,6 +6,7 @@ import {
 } from '../../../hooks/flights/useFlightTelemetry';
 import {
   DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
+  getTelemetryLayoutGroupBounds,
   TELEMETRY_CANVAS_HEIGHT,
   TELEMETRY_CANVAS_WIDTH,
   type TelemetryLayout,
@@ -92,6 +93,39 @@ export function FlightTelemetryOverlay({
         backgroundPosition: backgroundImage ? 'center' : undefined,
       }}
     >
+      {Array.from(
+        new Set(
+          layout
+            .map((slot) => slot.groupId)
+            .filter((id): id is string => Boolean(id))
+        )
+      ).map((groupId) => {
+        const group = layout.find((slot) => slot.groupId === groupId);
+        const bounds = getTelemetryLayoutGroupBounds(layout, groupId);
+        if (!group?.groupBackgroundColor || !bounds) return null;
+        const opacity = Math.max(
+          0,
+          Math.min(1, group.groupBackgroundOpacity ?? 0.25)
+        );
+        return (
+          <div
+            key={`group-background-${groupId}`}
+            aria-hidden="true"
+            className="pointer-events-none absolute rounded-xl"
+            style={{
+              left: `${(bounds.x / TELEMETRY_CANVAS_WIDTH) * 100}%`,
+              top: `${(bounds.y / TELEMETRY_CANVAS_HEIGHT) * 100}%`,
+              width: `${(bounds.width / TELEMETRY_CANVAS_WIDTH) * 100}%`,
+              height: `${(bounds.height / TELEMETRY_CANVAS_HEIGHT) * 100}%`,
+              backgroundColor: `${group.groupBackgroundColor}${Math.round(
+                opacity * 255
+              )
+                .toString(16)
+                .padStart(2, '0')}`,
+            }}
+          />
+        );
+      })}
       {layout
         .filter((slot) => slot.visible)
         .map((slot) => {
