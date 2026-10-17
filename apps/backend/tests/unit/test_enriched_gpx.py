@@ -59,3 +59,66 @@ def test_enriched_gpx_serializes_concurrent_rebuilds(tmp_path: Path) -> None:
 
     assert results == [tmp_path / "merged-gopro-overlay.gpx"] * 2
     assert merger.call_count == 1
+
+
+def test_enriched_gpx_retries_if_staged_file_disappears_during_validation(
+    tmp_path: Path,
+) -> None:
+    gpx_path = tmp_path / "track.gpx"
+    osv_path = tmp_path / "camera.osv"
+    gpx_path.write_text(_VALID_GPX, encoding="utf-8")
+    osv_path.write_text("osv", encoding="utf-8")
+
+    merge_attempts = 0
+
+    def merge(_osv_paths: list[Path], _gpx_path: Path, output_dir: Path, **_kwargs: object) -> Path:
+        nonlocal merge_attempts
+        merge_attempts += 1
+        output_path = output_dir / "merged-gopro-overlay.gpx"
+        output_path.write_text(_VALID_GPX, encoding="utf-8")
+        return output_path
+
+    def staged_file_is_usable(path: Path) -> bool:
+        if merge_attempts == 1:
+            path.unlink()
+            return False
+        return True
+
+    with (
+        patch("gopro_overlay_export._merge_osv_files_with_gpx", side_effect=merge) as merger,
+        patch(
+            "gopro_overlay_export._has_usable_gpx_timestamps",
+            side_effect=staged_file_is_usable,
+        ),
+    ):
+        enriched_path = ensure_enriched_gpx([osv_path], gpx_path, tmp_path)
+
+    assert enriched_path == tmp_path / "merged-gopro-overlay.gpx"
+    assert enriched_path.read_text(encoding="utf-8") == _VALID_GPX
+    assert merger.call_count == 2
+
+
+def test_enriched_gpx_retries_if_merge_helper_creates_no_output(tmp_path: Path) -> None:
+    gpx_path = tmp_path / "track.gpx"
+    osv_path = tmp_path / "camera.osv"
+    script_dir = tmp_path / "scripts"
+    script_dir.mkdir()
+    gpx_path.write_text(_VALID_GPX, encoding="utf-8")
+    osv_path.write_text("osv", encoding="utf-8")
+    (script_dir / "osv_merge.py").write_text(
+        "from pathlib import Path\n"
+        "import sys\n"
+        "output = Path(sys.argv[-1])\n"
+        "marker = output.parent.parent / '.merge-attempt'\n"
+        "if marker.exists():\n"
+        f"    output.write_text({_VALID_GPX!r}, encoding='utf-8')\n"
+        "else:\n"
+        "    marker.touch()\n",
+        encoding="utf-8",
+    )
+
+    with patch("gopro_overlay_export.config.GOPRO_OVERLAY_ROOT", str(script_dir)):
+        enriched_path = ensure_enriched_gpx([osv_path], gpx_path, tmp_path)
+
+    assert enriched_path == tmp_path / "merged-gopro-overlay.gpx"
+    assert enriched_path.read_text(encoding="utf-8") == _VALID_GPX
