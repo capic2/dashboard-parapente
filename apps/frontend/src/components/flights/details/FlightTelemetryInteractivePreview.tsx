@@ -656,6 +656,14 @@ export function FlightTelemetryInteractivePreview({
       input.value = '';
     }
   };
+  if (
+    layout.isSuccess &&
+    layout.data.layout.mainVideoSource === 'auto' &&
+    validYoutubeUrls.length > 0
+  ) {
+    return null;
+  }
+
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
       <div className="flex items-start gap-3 p-4 sm:p-5">
