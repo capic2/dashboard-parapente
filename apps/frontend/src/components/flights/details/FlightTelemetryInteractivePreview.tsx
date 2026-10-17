@@ -817,10 +817,15 @@ export function FlightTelemetryInteractivePreview({
               <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
                 {t(
                   'flights.youtubeOverlayExportFrames',
-                  '{{captured}} / {{total}} images traitées',
+                  '{{captured}} / {{total}} images · {{remaining}} restantes',
                   {
                     captured: youtubeExportStatus.frames_captured,
                     total: youtubeExportStatus.total_frames,
+                    remaining: Math.max(
+                      0,
+                      youtubeExportStatus.total_frames -
+                        youtubeExportStatus.frames_captured
+                    ),
                   }
                 )}
               </p>

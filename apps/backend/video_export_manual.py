@@ -358,6 +358,13 @@ def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
         "cancelled_at": _to_iso(job.cancelled_at),
         "log_tail": _job_log_tail(job.id),
         **resume_info,
+        "eta_seconds": job.eta_seconds,
+        "frames_captured": (
+            job.frames_processed
+            if job.frames_processed is not None
+            else resume_info["frames_captured"]
+        ),
+        "fps_actual": job.fps_actual,
     }
 
     with _JOB_RUNTIME_LOCK:
@@ -959,6 +966,34 @@ def _export_youtube_telemetry_layout_job(job_id: str) -> None:
         _clear_job_auth_token(job_id)
 
 
+def _set_youtube_composition_progress(
+    job_id: str,
+    frames_processed: int,
+    total_frames: int,
+    eta_seconds: int | None,
+    completion: float,
+    encoding_fps: float | None,
+) -> None:
+    _set_job_runtime(
+        job_id,
+        phase=_STATUS_ENCODING,
+        eta_seconds=eta_seconds,
+        frames_captured=frames_processed,
+        total_frames=total_frames,
+        fps_actual=encoding_fps,
+    )
+    _update_job(
+        job_id,
+        status=_STATUS_RUNNING,
+        progress=min(99, 85 + round(completion * 14)),
+        message=f"Fusion de la vidéo: {frames_processed}/{total_frames} images",
+        eta_seconds=eta_seconds,
+        frames_processed=frames_processed,
+        total_frames=total_frames,
+        fps_actual=encoding_fps,
+    )
+
+
 def _run_youtube_telemetry_layout_job(job_id: str) -> None:
     """Run the render while the public wrapper guarantees token cleanup."""
     from gopro_overlay_export import first_gpx_timestamp
@@ -1011,12 +1046,35 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
             **({"progress": progress_percent} if progress_percent is not None else {}),
         )
 
+    def composition_progress(
+        frames_processed: int,
+        total_frames: int,
+        eta_seconds: int | None,
+        completion: float,
+        encoding_fps: float | None,
+    ) -> None:
+        _set_youtube_composition_progress(
+            job_id,
+            frames_processed,
+            total_frames,
+            eta_seconds,
+            completion,
+            encoding_fps,
+        )
+
     try:
         work_dir = new_work_dir(job_id, job.flight_id)
         destination = output_path(job_id, job.flight_id)
         _log_job(job_id, "Préparation de l’export avec le layout de télémétrie")
         _update_job(
-            job_id, status=_STATUS_RUNNING, message="Préparation de l’export YouTube", progress=1
+            job_id,
+            status=_STATUS_RUNNING,
+            message="Préparation de l’export YouTube",
+            progress=1,
+            eta_seconds=None,
+            frames_processed=None,
+            total_frames=None,
+            fps_actual=None,
         )
         download_cookies = download_cookies_for_upload_job(job.youtube_upload_job_id)
         export_youtube_telemetry_layout(
@@ -1029,6 +1087,7 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
             job_token=get_video_export_job_token(job_id),
             work_dir=work_dir,
             progress=progress,
+            composition_progress=composition_progress,
             is_cancelled=lambda: _is_cancelled(job_id),
             cookies=download_cookies,
             pip_exports=json.loads(job.pip_exports) if job.pip_exports else [],

@@ -1244,7 +1244,7 @@
     "youtubeOverlayExportLastActivity": "Activité",
     "youtubeOverlayExportEta": "Estimation",
     "youtubeOverlayExportEtaUnknown": "Non disponible",
-    "youtubeOverlayExportFrames": "{{captured}} / {{total}} images traitées",
+    "youtubeOverlayExportFrames": "{{captured}} / {{total}} images · {{remaining}} restantes",
     "youtubeOverlayExportLatestEvent": "Dernier événement",
     "youtubeOverlayExportShowLogs": "Voir les derniers événements",
     "youtubeOverlayExportStalled": "Aucune mise à jour depuis {{minutes}} min. Le traitement est peut-être bloqué.",
