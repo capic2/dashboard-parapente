@@ -294,6 +294,10 @@ vi.mock('@tanstack/react-query', () => ({
   useMutation: () => ({ isPending: false, mutateAsync: vi.fn() }),
 }));
 
+vi.mock('../../../hooks/flights/useFlightSummaries', () => ({
+  useActiveFlightMediaJobs: () => ({ data: [] }),
+}));
+
 vi.mock('../../../hooks/flights/useFlights', () => ({
   useUpdateFlight: () => ({ mutateAsync: updateFlightMock }),
   useUploadGPXToFlight: () => ({ isPending: false, mutate: vi.fn() }),
