@@ -1,5 +1,6 @@
 """Tests for the YouTube source + telemetry overlay export helpers."""
 
+import hashlib
 import json
 from datetime import datetime, timedelta, timezone
 from io import StringIO
@@ -174,6 +175,150 @@ def test_download_youtube_reuses_only_completed_download_for_same_url(tmp_path, 
         "https://www.youtube.com/watch?v=other", tmp_path, progress
     )
     assert len(commands) == 2
+
+
+def test_download_youtube_reuses_completed_download_from_previous_export(tmp_path, monkeypatch):
+    url = "https://www.youtube.com/watch?v=test"
+    previous_export = tmp_path / "4e58f4e1-1456-4421-a761-278d2eb86102"
+    previous_export.mkdir()
+    source = previous_export / "source.mp4"
+    source.write_bytes(b"complete video")
+    (previous_export / ".youtube-download-complete.json").write_text(
+        json.dumps(
+            {
+                "cache_version": 2,
+                "url_sha256": hashlib.sha256(url.encode("utf-8")).hexdigest(),
+                "cookies_sha256": None,
+                "filename": source.name,
+            }
+        ),
+        encoding="utf-8",
+    )
+    current_export = tmp_path / "6b04f899-c788-4f27-a8b6-d9bc7d842498"
+    commands: list[list[str]] = []
+
+    def fake_run(command, *, cwd=None, on_output=None):
+        commands.append(command)
+
+    monkeypatch.setattr(youtube_overlay_export, "_run", fake_run)
+    events: list[tuple[str, int | None]] = []
+
+    reused_source = youtube_overlay_export.download_youtube(
+        url, current_export, lambda message, percent: events.append((message, percent))
+    )
+
+    assert reused_source == current_export / "source.mp4"
+    assert reused_source.read_bytes() == b"complete video"
+    assert not commands
+    assert events == [("Vidéo YouTube téléchargée réutilisée: source.mp4", 100)]
+
+
+def test_download_youtube_does_not_reuse_download_with_different_cookies(tmp_path, monkeypatch):
+    url = "https://www.youtube.com/watch?v=members-only"
+    previous_export = tmp_path / "4e58f4e1-1456-4421-a761-278d2eb86102"
+    previous_export.mkdir()
+    previous_source = previous_export / "source.mp4"
+    previous_source.write_bytes(b"video downloaded with another account")
+    (previous_export / ".youtube-download-complete.json").write_text(
+        json.dumps(
+            {
+                "cache_version": 2,
+                "url_sha256": hashlib.sha256(url.encode("utf-8")).hexdigest(),
+                "cookies_sha256": hashlib.sha256(b"previous account cookies").hexdigest(),
+                "filename": previous_source.name,
+            }
+        ),
+        encoding="utf-8",
+    )
+    current_export = tmp_path / "6b04f899-c788-4f27-a8b6-d9bc7d842498"
+    commands: list[list[str]] = []
+
+    def fake_run(command, *, cwd=None, on_output=None):
+        commands.append(command)
+        (current_export / "source.mp4").write_bytes(b"fresh video")
+
+    monkeypatch.setattr(youtube_overlay_export, "_run", fake_run)
+    result = youtube_overlay_export.download_youtube(
+        url,
+        current_export,
+        lambda _message, _percent: None,
+        cookies="current account cookies",
+    )
+
+    assert len(commands) == 1
+    assert result.read_bytes() == b"fresh video"
+
+
+def test_download_youtube_reuses_nested_pip_download_from_previous_export(tmp_path, monkeypatch):
+    url = "https://www.youtube.com/watch?v=pip"
+    previous_export = tmp_path / "4e58f4e1-1456-4421-a761-278d2eb86102"
+    previous_pip_cache = previous_export / "youtube-pip" / "pip-0"
+    previous_pip_cache.mkdir(parents=True)
+    source = previous_pip_cache / "source.mp4"
+    source.write_bytes(b"complete pip video")
+    (previous_pip_cache / ".youtube-download-complete.json").write_text(
+        json.dumps(
+            {
+                "cache_version": 2,
+                "url_sha256": hashlib.sha256(url.encode("utf-8")).hexdigest(),
+                "cookies_sha256": None,
+                "filename": source.name,
+            }
+        ),
+        encoding="utf-8",
+    )
+    current_pip_cache = tmp_path / "6b04f899-c788-4f27-a8b6-d9bc7d842498" / "youtube-pip" / "pip-0"
+    commands: list[list[str]] = []
+
+    def fake_run(command, *, cwd=None, on_output=None):
+        commands.append(command)
+
+    monkeypatch.setattr(youtube_overlay_export, "_run", fake_run)
+    reused_source = youtube_overlay_export.download_youtube(
+        url, current_pip_cache, lambda _message, _percent: None
+    )
+
+    assert reused_source == current_pip_cache / "source.mp4"
+    assert reused_source.read_bytes() == b"complete pip video"
+    assert not commands
+
+
+def test_download_youtube_replaces_source_symlink_when_reusing_sibling_cache(tmp_path, monkeypatch):
+    url = "https://www.youtube.com/watch?v=test"
+    previous_export = tmp_path / "4e58f4e1-1456-4421-a761-278d2eb86102"
+    previous_export.mkdir()
+    source = previous_export / "source.mp4"
+    source.write_bytes(b"complete video")
+    (previous_export / ".youtube-download-complete.json").write_text(
+        json.dumps(
+            {
+                "cache_version": 2,
+                "url_sha256": hashlib.sha256(url.encode("utf-8")).hexdigest(),
+                "cookies_sha256": None,
+                "filename": source.name,
+            }
+        ),
+        encoding="utf-8",
+    )
+    current_export = tmp_path / "6b04f899-c788-4f27-a8b6-d9bc7d842498"
+    current_export.mkdir()
+    outside_file = tmp_path / "outside.mp4"
+    outside_file.write_bytes(b"must not be overwritten")
+    (current_export / "source.mp4").symlink_to(outside_file)
+    commands: list[list[str]] = []
+
+    def fake_run(command, *, cwd=None, on_output=None):
+        commands.append(command)
+
+    monkeypatch.setattr(youtube_overlay_export, "_run", fake_run)
+    reused_source = youtube_overlay_export.download_youtube(
+        url, current_export, lambda _message, _percent: None
+    )
+
+    assert reused_source.read_bytes() == b"complete video"
+    assert not reused_source.is_symlink()
+    assert outside_file.read_bytes() == b"must not be overwritten"
+    assert not commands
 
 
 def test_export_youtube_overlay_renders_saved_overlay_directly_onto_source(tmp_path, monkeypatch):
