@@ -148,6 +148,7 @@ def h264_encode_args(
     include_audio: bool,
     pixel_format: str = "yuv420p",
     audio_codec: str = "copy",
+    cpu_threads: int | None = None,
 ) -> list[str]:
     if accelerator == "nvidia":
         args = [
@@ -177,5 +178,7 @@ def h264_encode_args(
             "-pix_fmt",
             pixel_format,
         ]
+        if cpu_threads is not None:
+            args.extend(["-threads", str(cpu_threads)])
     audio_args = ["-c:a", audio_codec] if include_audio else ["-an"]
     return [*args, *audio_args]
