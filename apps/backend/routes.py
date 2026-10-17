@@ -5548,7 +5548,12 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/flights/{flight_id}")
-async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session = Depends(get_db)):
+async def update_flight(
+    flight_id: str,
+    flight_data: FlightUpdate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     """
     Update flight details
 
@@ -5610,6 +5615,19 @@ async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session =
         db.commit()
         db.refresh(flight)
         logger.info(f" Updated flight {flight_id}: {list(update_data.keys())}")
+
+        if (
+            "gopro_overlay_gpx_offset" in update_data
+            and flight.gopro_overlay_gpx_offset is not None
+        ):
+            try:
+                _schedule_enriched_gpx_for_saved_offset(db, flight, background_tasks)
+            except Exception:
+                logger.warning(
+                    "Unable to schedule enriched GPX for flight %s",
+                    flight_id,
+                    exc_info=True,
+                )
 
         # Return in the format expected by frontend (ApiResponseSchema)
         response_flight = FlightSchema.model_validate(flight).model_dump(mode="json")
@@ -8166,8 +8184,8 @@ def _prepare_enriched_gpx_in_background(
     gpx_path: Path,
     input_dir: Path,
     *,
-    video_duration: float,
-    first_gpx_at: float | None,
+    video_duration: float | None = None,
+    first_gpx_at: float | None = None,
 ) -> None:
     try:
         ensure_enriched_gpx(
@@ -8187,6 +8205,46 @@ def _prepare_enriched_gpx_in_background(
         except OSError:
             logger.warning("Unable to persist enriched GPX error marker in %s", input_dir)
         logger.warning("Unable to prepare enriched GPX in background: %s", exc)
+
+
+def _schedule_enriched_gpx_for_saved_offset(
+    db: Session,
+    flight: Flight,
+    background_tasks: BackgroundTasks,
+) -> None:
+    """Prepare the durable GPX/OSV merge after a user saves a sync offset.
+
+    YouTube calibration can save an offset without a local GoPro camera file.
+    The merge uses absolute GPX/OSV timestamps, so the camera is not required.
+    """
+    if flight.gopro_overlay_gpx_offset is None or not flight.gpx_file_path:
+        return
+
+    try:
+        input_dir = _gopro_overlay_flight_directory(db, flight, create=False)
+        gpx_path = _resolve_flight_file_path(flight.gpx_file_path)
+        if gpx_path is None or not gpx_path.is_file():
+            return
+
+        osv_paths = _matching_files_by_mtime(input_dir, "*.osv")
+        if not osv_paths:
+            return
+
+        _clear_enriched_gpx_error(input_dir)
+        background_tasks.add_task(
+            _prepare_enriched_gpx_in_background,
+            osv_paths,
+            gpx_path,
+            input_dir,
+            video_duration=None,
+            first_gpx_at=None,
+        )
+    except (HTTPException, OSError, ValueError) as exc:
+        logger.warning(
+            "Unable to schedule enriched GPX for flight %s after offset update: %s",
+            flight.id,
+            exc,
+        )
 
 
 def _enriched_gpx_error_path(input_dir: Path) -> Path:
