@@ -1,11 +1,17 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { GoproOverlaySyncPreview } from './GoproOverlaySyncPreview';
 
 const hooks = vi.hoisted(() => ({
   preview: null as GoproOverlayPreview | null,
+  invalidateQueries: vi.fn(),
 }));
+
+beforeEach(() => {
+  hooks.preview = null;
+  hooks.invalidateQueries.mockClear();
+});
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -19,7 +25,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('@tanstack/react-query', () => ({
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useQueryClient: () => ({ invalidateQueries: hooks.invalidateQueries }),
 }));
 
 vi.mock('../../../hooks/gopro/useGoproOverlay', () => ({
@@ -102,14 +108,24 @@ describe('GoproOverlaySyncPreview calibration mapping', () => {
       },
     } as GoproOverlayPreview;
 
-    const { container } = render(
+    const preview = (flightId: string) => (
       <GoproOverlaySyncPreview
-        flightId="flight-1"
+        flightId={flightId}
         offset="10.4"
         onOffsetChange={vi.fn()}
         onOffsetSave={vi.fn().mockResolvedValue(undefined)}
       />
     );
+    const { container, rerender } = render(preview('flight-1'));
+
+    expect(hooks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['flights'],
+    });
+    hooks.invalidateQueries.mockClear();
+    rerender(preview('flight-2'));
+    expect(hooks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['flights'],
+    });
 
     const camera = screen.getByLabelText(
       'flights.goproOverlayCameraPreview'

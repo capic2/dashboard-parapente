@@ -434,26 +434,53 @@ def ensure_enriched_gpx(
                 if metadata == signature and _has_usable_gpx_timestamps(merged_gpx_path):
                     return merged_gpx_path
 
-            staging_dir = input_dir / f".merged-gopro-overlay-{uuid.uuid4().hex}"
-            staging_dir.mkdir()
-            try:
-                staged_gpx_path = _merge_osv_files_with_gpx(
-                    osv_paths,
-                    gpx_path,
-                    staging_dir,
-                    gpx_offset=0.0,
-                    video_duration=video_duration,
-                    first_gpx_at=first_gpx_at,
-                )
-                if not _has_usable_gpx_timestamps(staged_gpx_path):
-                    logger.warning(
-                        "OSV merge produced an unusable GPX; falling back to source GPX %s",
-                        gpx_path,
-                    )
-                    return gpx_path
-                staged_gpx_path.replace(merged_gpx_path)
-            finally:
-                shutil.rmtree(staging_dir, ignore_errors=True)
+            for attempt in range(2):
+                staging_dir = input_dir / f".merged-gopro-overlay-{uuid.uuid4().hex}"
+                staging_dir.mkdir()
+                try:
+                    try:
+                        staged_gpx_path = _merge_osv_files_with_gpx(
+                            osv_paths,
+                            gpx_path,
+                            staging_dir,
+                            gpx_offset=0.0,
+                            video_duration=video_duration,
+                            first_gpx_at=first_gpx_at,
+                        )
+                    except ValueError as exc:
+                        if str(exc) != "OSV merge did not create a GPX file" or attempt == 1:
+                            raise
+                        logger.warning("OSV merge created no staged GPX; retrying merge")
+                        continue
+                    has_usable_timestamps = _has_usable_gpx_timestamps(staged_gpx_path)
+                    if not staged_gpx_path.is_file():
+                        if attempt == 1:
+                            raise FileNotFoundError(
+                                f"Staged enriched GPX disappeared during validation: "
+                                f"{staged_gpx_path}"
+                            )
+                        logger.warning(
+                            "Staged enriched GPX disappeared during validation; retrying merge"
+                        )
+                        continue
+                    if not has_usable_timestamps:
+                        logger.warning(
+                            "OSV merge produced an unusable GPX; falling back to source GPX %s",
+                            gpx_path,
+                        )
+                        return gpx_path
+                    try:
+                        staged_gpx_path.replace(merged_gpx_path)
+                    except FileNotFoundError:
+                        if attempt == 1:
+                            raise
+                        logger.warning(
+                            "Staged enriched GPX disappeared before publication; retrying merge"
+                        )
+                        continue
+                finally:
+                    shutil.rmtree(staging_dir, ignore_errors=True)
+                break
 
             temporary_metadata_path = input_dir / f".{metadata_path.name}.{uuid.uuid4().hex}.tmp"
             temporary_metadata_path.write_text(
