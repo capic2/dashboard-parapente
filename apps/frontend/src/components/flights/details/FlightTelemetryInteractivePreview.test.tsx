@@ -687,4 +687,31 @@ describe('FlightTelemetryInteractivePreview', () => {
     ).toBeInTheDocument();
     window.sessionStorage.removeItem('youtube-overlay-export-job:flight-1');
   });
+
+  it('disables another export while a shared job is downloading', async () => {
+    hooks.exportStatus = {
+      status: 'processing',
+      internal_status: 'downloading',
+      progress: 18,
+    };
+    window.sessionStorage.setItem(
+      'youtube-overlay-export-job:flight-1',
+      'local-export-job'
+    );
+
+    render(
+      <FlightTelemetryInteractivePreview
+        flightId="flight-1"
+        youtubeUrls={['https://www.youtube.com/watch?v=dQw4w9WgXcQ']}
+        activeYoutubeExportJobIds={['shared-export-job']}
+      />
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'flights.youtubeOverlayExport' })
+      ).toBeDisabled()
+    );
+    window.sessionStorage.removeItem('youtube-overlay-export-job:flight-1');
+  });
 });
