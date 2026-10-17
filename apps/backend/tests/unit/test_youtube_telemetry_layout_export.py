@@ -28,6 +28,47 @@ def _raw_pip_layout(**overrides: object) -> dict[str, object]:
     }
 
 
+def test_parse_ffmpeg_stats_extracts_frame_rate_time_and_speed() -> None:
+    stats = telemetry_layout_export._parse_ffmpeg_stats(
+        "frame= 824 fps=5.1 q=26.0 size=102656KiB time=00:00:13.70 "
+        "bitrate=61383.8kbits/s speed=0.0847x"
+    )
+
+    assert stats == (824, 5.1, 13.7, 0.0847)
+
+
+def test_report_composition_output_skips_lines_without_ffmpeg_stats() -> None:
+    progress_events: list[tuple[str, int | None]] = []
+    composition_events: list[tuple[int, int, int | None, float, float | None]] = []
+
+    telemetry_layout_export._report_composition_output(
+        "Fusion du layout et de la vidéo YouTube",
+        progress=lambda message, percent: progress_events.append((message, percent)),
+        composition_progress=lambda *metrics: composition_events.append(metrics),
+        total_frames=1000,
+        duration=20,
+    )
+
+    assert progress_events == [("Fusion du layout et de la vidéo YouTube", None)]
+    assert composition_events == []
+
+
+def test_report_composition_output_omits_eta_when_ffmpeg_speed_is_zero() -> None:
+    progress_events: list[tuple[str, int | None]] = []
+    composition_events: list[tuple[int, int, int | None, float, float | None]] = []
+
+    telemetry_layout_export._report_composition_output(
+        "frame= 824 fps=5.1 q=26.0 time=00:00:13.70 speed=0.0x",
+        progress=lambda message, percent: progress_events.append((message, percent)),
+        composition_progress=lambda *metrics: composition_events.append(metrics),
+        total_frames=1000,
+        duration=20,
+    )
+
+    assert len(progress_events) == 1
+    assert composition_events == [(824, 1000, None, 0.824, 5.1)]
+
+
 @pytest.mark.parametrize(
     ("raw_layouts", "pip_exports"),
     [

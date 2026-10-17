@@ -22,6 +22,121 @@ import video_export_manual
 import youtube_overlay_export
 
 
+def test_youtube_composition_progress_updates_runtime_and_job_status(monkeypatch):
+    runtime_updates: list[tuple[str, dict[str, Any]]] = []
+    job_updates: list[tuple[str, dict[str, Any]]] = []
+    monkeypatch.setattr(
+        video_export_manual,
+        "_set_job_runtime",
+        lambda job_id, **values: runtime_updates.append((job_id, values)),
+    )
+    monkeypatch.setattr(
+        video_export_manual,
+        "_update_job",
+        lambda job_id, **values: job_updates.append((job_id, values)),
+    )
+
+    video_export_manual._set_youtube_composition_progress(
+        "youtube-job",
+        frames_processed=824,
+        total_frames=1000,
+        eta_seconds=74,
+        completion=0.824,
+        encoding_fps=5.1,
+    )
+
+    assert runtime_updates == [
+        (
+            "youtube-job",
+            {
+                "phase": video_export_manual._STATUS_ENCODING,
+                "eta_seconds": 74,
+                "frames_captured": 824,
+                "total_frames": 1000,
+                "fps_actual": 5.1,
+            },
+        )
+    ]
+    assert job_updates == [
+        (
+            "youtube-job",
+            {
+                "status": video_export_manual._STATUS_RUNNING,
+                "progress": 97,
+                "message": "Fusion de la vidéo: 824/1000 images",
+                "eta_seconds": 74,
+                "frames_processed": 824,
+                "total_frames": 1000,
+                "fps_actual": 5.1,
+            },
+        )
+    ]
+
+
+def test_youtube_composition_progress_throttles_and_publishes_final_update(monkeypatch):
+    current_time = 10.0
+    updates: list[tuple[int, int, int | None, float, float | None]] = []
+    monkeypatch.setattr(video_export_manual.time, "monotonic", lambda: current_time)
+    monkeypatch.setattr(
+        video_export_manual,
+        "_set_youtube_composition_progress",
+        lambda _job_id, *values: updates.append(values),
+    )
+    publish = video_export_manual._make_youtube_composition_progress_callback("youtube-job")
+
+    publish(1, 100, 20, 0.01, 5.0)
+    current_time = 10.5
+    publish(20, 100, 16, 0.20, 5.0)
+    current_time = 11.1
+    publish(30, 100, 14, 0.30, 5.0)
+    current_time = 11.2
+    publish(100, 100, 0, 1.0, 5.0)
+
+    assert [update[0] for update in updates] == [1, 30, 100]
+
+
+def test_video_export_snapshot_exposes_persisted_composition_metrics(monkeypatch):
+    job = SimpleNamespace(
+        id="youtube-job",
+        flight_id="flight-1",
+        status=video_export_manual._STATUS_RUNNING,
+        progress=97,
+        message="Fusion de la vidéo: 824/1000 images",
+        started_at=None,
+        completed_at=None,
+        video_path=None,
+        error=None,
+        total_frames=1000,
+        fps=30,
+        quality="1080p",
+        speed=1,
+        mode="youtube_telemetry_layout",
+        source_type="youtube",
+        youtube_url="https://youtube.com/watch?v=example",
+        overlay_job_id=None,
+        render_method=None,
+        created_at=None,
+        updated_at=None,
+        cancelled_at=None,
+        eta_seconds=74,
+        frames_processed=824,
+        fps_actual=5.1,
+    )
+    monkeypatch.setattr(
+        video_export_manual,
+        "_job_resume_info",
+        lambda _job: {"frames_captured": 0, "resume_from_frame": None, "can_resume": False},
+    )
+    monkeypatch.setattr(video_export_manual, "_job_log_tail", lambda _job_id: [])
+
+    snapshot = video_export_manual._snapshot_from_job(job)
+
+    assert snapshot["eta_seconds"] == 74
+    assert snapshot["frames_captured"] == 824
+    assert snapshot["total_frames"] == 1000
+    assert snapshot["fps_actual"] == 5.1
+
+
 def test_video_export_log_survives_temp_cleanup_until_job_deletion(tmp_path, monkeypatch):
     export_root = tmp_path / "exports"
     temp_root = tmp_path / "temp"
