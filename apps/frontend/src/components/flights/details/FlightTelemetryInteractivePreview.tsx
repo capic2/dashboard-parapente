@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import { useGoproOverlayPreview } from '../../../hooks/gopro/useGoproOverlay';
 import { useFlightTelemetry } from '../../../hooks/flights/useFlightTelemetry';
-import { useActiveFlightMediaJobs } from '../../../hooks/flights/useFlightSummaries';
 import { useTelemetryLayout } from '../../../hooks/flights/useTelemetryLayout';
 import {
   formatEta,
@@ -53,6 +52,7 @@ import {
 
 interface FlightTelemetryInteractivePreviewProps {
   flightId: string;
+  activeYoutubeExportJobIds?: string[];
   hasFlightVideo?: boolean;
   hasFaceVideo?: boolean;
   hasPiloteVideo?: boolean;
@@ -66,6 +66,7 @@ interface FlightTelemetryInteractivePreviewProps {
 
 const EMPTY_YOUTUBE_URLS: string[] = [];
 const EMPTY_VIDEO_MARKERS: FlightVideoMarker[] = [];
+const EMPTY_YOUTUBE_EXPORT_JOB_IDS: string[] = [];
 const YOUTUBE_EXPORT_STALL_THRESHOLD_MS = 5 * 60 * 1000;
 
 function youtubeExportJobStorageKey(flightId: string): string {
@@ -178,6 +179,7 @@ function getYoutubeExportPhase(
 
 export function FlightTelemetryInteractivePreview({
   flightId,
+  activeYoutubeExportJobIds = EMPTY_YOUTUBE_EXPORT_JOB_IDS,
   hasFlightVideo = true,
   hasFaceVideo = false,
   hasPiloteVideo = false,
@@ -191,7 +193,6 @@ export function FlightTelemetryInteractivePreview({
   const overlayPreview = useGoproOverlayPreview(flightId, true);
   const telemetry = useFlightTelemetry(flightId, true);
   const layout = useTelemetryLayout(flightId);
-  const activeMediaJobs = useActiveFlightMediaJobs(true);
   const [cameraTime, setCameraTime] = useState(0);
   const [youtubeExportJobId, setYoutubeExportJobId] = useState(() =>
     readYoutubeExportJobId(flightId)
@@ -219,40 +220,27 @@ export function FlightTelemetryInteractivePreview({
   const { status: youtubeExportStatus, error: youtubeExportStatusError } =
     useVideoExportStatus(youtubeExportJobId);
   useEffect(() => {
-    const activeJobIds = new Set(
-      (activeMediaJobs.data ?? []).map((job) => job.job_id)
-    );
+    const activeJobIds = new Set(activeYoutubeExportJobIds);
     for (const jobId of clearedYoutubeExportJobIds.current) {
       if (!activeJobIds.has(jobId)) {
         clearedYoutubeExportJobIds.current.delete(jobId);
       }
     }
-    const activeYoutubeExports =
-      activeMediaJobs.data?.filter(
-        (job) =>
-          job.flight_id === flightId &&
-          job.mode === 'youtube_overlay' &&
-          job.status !== 'completed' &&
-          job.status !== 'failed' &&
-          job.status !== 'cancelled'
-      ) ?? [];
-    const trackedActiveYoutubeExport = activeYoutubeExports.find(
-      (job) => job.job_id === youtubeExportJobId
-    );
-    const activeYoutubeExport =
-      trackedActiveYoutubeExport ??
-      activeYoutubeExports.find(
-        (job) => !clearedYoutubeExportJobIds.current.has(job.job_id)
-      );
+    const activeYoutubeExportJobId =
+      (youtubeExportJobId && activeJobIds.has(youtubeExportJobId)
+        ? youtubeExportJobId
+        : activeYoutubeExportJobIds.find(
+            (jobId) => !clearedYoutubeExportJobIds.current.has(jobId)
+          )) ?? null;
     if (
-      !activeYoutubeExport ||
-      activeYoutubeExport.job_id === youtubeExportJobId
+      !activeYoutubeExportJobId ||
+      activeYoutubeExportJobId === youtubeExportJobId
     ) {
       return;
     }
-    storeYoutubeExportJobId(flightId, activeYoutubeExport.job_id);
-    setYoutubeExportJobId(activeYoutubeExport.job_id);
-  }, [activeMediaJobs.data, flightId, youtubeExportJobId]);
+    storeYoutubeExportJobId(flightId, activeYoutubeExportJobId);
+    setYoutubeExportJobId(activeYoutubeExportJobId);
+  }, [activeYoutubeExportJobIds, flightId, youtubeExportJobId]);
   const [youtubeExportNow, setYoutubeExportNow] = useState(() => Date.now());
   const validYoutubeUrls = youtubeUrls.filter((url) => getYoutubeVideoId(url));
   const configuredMainVideoSource =

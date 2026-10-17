@@ -19,6 +19,7 @@ import {
   useUploadGPXToFlight,
 } from '../../../hooks/flights/useFlights';
 import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
+import { useActiveFlightMediaJobs } from '../../../hooks/flights/useFlightSummaries';
 import {
   useRemoveYoutubeVideoAssociation,
   useYoutubeSourcePublicationStatus,
@@ -87,6 +88,22 @@ export function FlightDetails({
   mobileMode = false,
   onCloseMobile,
 }: FlightDetailsProps) {
+  const activeMediaJobs = useActiveFlightMediaJobs(true);
+  const activeYoutubeExportJobIds = useMemo(
+    () =>
+      activeMediaJobs.data
+        ?.filter(
+          (job) =>
+            job.flight_id === flight.id &&
+            (job.mode === 'youtube_overlay' ||
+              job.mode === 'youtube_telemetry_layout') &&
+            job.status !== 'completed' &&
+            job.status !== 'failed' &&
+            job.status !== 'cancelled'
+        )
+        .map((job) => job.job_id) ?? [],
+    [activeMediaJobs.data, flight.id]
+  );
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -870,6 +887,7 @@ export function FlightDetails({
         {hasGpx && hasYoutubeSyncVideo && (
           <FlightTelemetryInteractivePreview
             flightId={flight.id}
+            activeYoutubeExportJobIds={activeYoutubeExportJobIds}
             hasFlightVideo={hasVideo}
             hasFaceVideo={hasFaceVideo}
             hasPiloteVideo={hasPiloteVideo}
