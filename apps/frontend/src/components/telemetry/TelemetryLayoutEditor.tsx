@@ -312,30 +312,29 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     0,
     Math.min(1, selectedGroupStyle?.groupBackgroundOpacity ?? 0.25)
   );
-  const groups = Array.from(
-    new Map(
-      layout.flatMap((item) => [
-        ...(item.groupId
-          ? [
-              [
-                item.groupId,
-                item.groupName ?? item.groupId,
-                item.parentGroupId,
-              ] as const,
-            ]
-          : []),
-        ...(item.parentGroupId
-          ? [
-              [
-                item.parentGroupId,
-                item.parentGroupName ?? item.parentGroupId,
-                undefined,
-              ] as const,
-            ]
-          : []),
-      ])
-    ).values()
-  ).sort((left, right) => Number(Boolean(left[2])) - Number(Boolean(right[2])));
+  const groupMap = new Map<
+    string,
+    readonly [string, string, string | undefined]
+  >();
+  for (const item of layout) {
+    if (item.groupId) {
+      groupMap.set(item.groupId, [
+        item.groupId,
+        item.groupName ?? item.groupId,
+        item.parentGroupId,
+      ]);
+    }
+    if (item.parentGroupId) {
+      groupMap.set(item.parentGroupId, [
+        item.parentGroupId,
+        item.parentGroupName ?? item.parentGroupId,
+        undefined,
+      ]);
+    }
+  }
+  const groups = Array.from(groupMap.values()).sort(
+    (left, right) => Number(Boolean(left[2])) - Number(Boolean(right[2]))
+  );
   const groupItems = useCallback(
     (groupId: string) =>
       layout.filter(
