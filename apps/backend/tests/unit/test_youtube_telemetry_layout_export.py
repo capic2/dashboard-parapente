@@ -152,10 +152,12 @@ def test_build_ffmpeg_composition_scales_and_formats_pip_offset(
     ("offset_seconds", "trim_start", "start_pad"),
     [(2.5, "0.000000", "2.500000"), (-1.5, "1.500000", "0.000000")],
 )
+@pytest.mark.parametrize("accelerator", ["cpu", "nvidia"])
 def test_export_composes_smooth_pip_at_source_resolution(
     offset_seconds: float,
     trim_start: str,
     start_pad: str,
+    accelerator: str,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -188,6 +190,9 @@ def test_export_composes_smooth_pip_at_source_resolution(
     monkeypatch.setattr(telemetry_layout_export, "_capture_layout_frames", fake_capture)
     monkeypatch.setattr(telemetry_layout_export, "_flight_id_for_job", lambda _job_id: "flight")
     monkeypatch.setattr(telemetry_layout_export, "_run", fake_run)
+    monkeypatch.setattr(
+        telemetry_layout_export, "select_video_accelerator", lambda _preference: accelerator
+    )
 
     output = tmp_path / "output.mp4"
     telemetry_layout_export.export_youtube_telemetry_layout(
@@ -210,4 +215,12 @@ def test_export_composes_smooth_pip_at_source_resolution(
     assert "scale=w=960:h=540:force_original_aspect_ratio=increase" in filter_graph
     assert "overlay=x=1920:y=1080:eof_action=repeat:shortest=0" in filter_graph
     assert "[basepip0][overlay]overlay=0:0:eof_action=repeat:shortest=1[outv]" in filter_graph
+    command = commands[0]
+    assert command[command.index("-filter_complex_threads") + 1] == "4"
+    if accelerator == "nvidia":
+        assert command[command.index("-c:v") + 1] == "h264_nvenc"
+        assert "-threads" not in command
+    else:
+        assert command[command.index("-c:v") + 1] == "libx264"
+        assert command[command.index("-threads") + 1] == "4"
     assert output.read_bytes() == b"rendered"
