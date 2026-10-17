@@ -19,6 +19,99 @@ LAYOUT_CANVAS_WIDTH = 1920
 LAYOUT_CANVAS_HEIGHT = 1080
 
 
+def _normalize_pip_layouts(
+    raw_layouts: object, pip_exports: list[dict[str, object]]
+) -> list[dict[str, float | str]]:
+    if not isinstance(raw_layouts, list) or len(raw_layouts) != len(pip_exports):
+        raise YoutubeExportError("La disposition des PiP est indisponible")
+
+    pip_layouts: list[dict[str, float | str]] = []
+    for raw_layout, pip_export in zip(raw_layouts, pip_exports, strict=True):
+        if not isinstance(raw_layout, dict):
+            raise YoutubeExportError("La disposition d’un PiP est invalide")
+        slot_id = raw_layout.get("slot_id")
+        expected_slot_id = pip_export.get("slot_id")
+        if not isinstance(slot_id, str) or slot_id != expected_slot_id:
+            raise YoutubeExportError("La disposition d’un PiP est invalide")
+
+        normalized_layout: dict[str, float | str] = {"slot_id": slot_id}
+        for key in ("x", "y", "width", "height"):
+            try:
+                value = float(raw_layout[key])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise YoutubeExportError("La disposition d’un PiP est invalide") from exc
+            if not math.isfinite(value):
+                raise YoutubeExportError("La disposition d’un PiP est invalide")
+            normalized_layout[key] = value
+        try:
+            offset_seconds = float(pip_export["offset_seconds"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise YoutubeExportError("L’offset d’un PiP est invalide") from exc
+        if not math.isfinite(offset_seconds):
+            raise YoutubeExportError("L’offset d’un PiP est invalide")
+        normalized_layout["offset_seconds"] = offset_seconds
+        if normalized_layout["width"] <= 0 or normalized_layout["height"] <= 0:
+            raise YoutubeExportError("La taille d’un PiP est invalide")
+        pip_layouts.append(normalized_layout)
+    return pip_layouts
+
+
+def _build_ffmpeg_composition(
+    *,
+    source: Path,
+    frames_manifest: Path,
+    pip_video_paths: list[Path],
+    pip_layouts: list[dict[str, float | str]],
+    pip_durations: list[float],
+    video_width: int,
+    video_height: int,
+    fps: int,
+) -> tuple[list[str], str]:
+    ffmpeg_inputs = [
+        "-i",
+        str(source),
+        "-f",
+        "concat",
+        "-safe",
+        "0",
+        "-i",
+        str(frames_manifest),
+    ]
+    filter_graph = ["[1:v][0:v]scale2ref=w=main_w:h=main_h[overlay][base]"]
+    current_base = "base"
+    for index, (pip_video_path, pip_layout, pip_duration) in enumerate(
+        zip(pip_video_paths, pip_layouts, pip_durations, strict=True)
+    ):
+        input_index = index + 2
+        ffmpeg_inputs.extend(["-i", str(pip_video_path)])
+        width = max(
+            2, round(float(pip_layout["width"]) * video_width / LAYOUT_CANVAS_WIDTH / 2) * 2
+        )
+        height = max(
+            2, round(float(pip_layout["height"]) * video_height / LAYOUT_CANVAS_HEIGHT / 2) * 2
+        )
+        x = round(float(pip_layout["x"]) * video_width / LAYOUT_CANVAS_WIDTH)
+        y = round(float(pip_layout["y"]) * video_height / LAYOUT_CANVAS_HEIGHT)
+        offset = float(pip_layout["offset_seconds"])
+        trim_start = min(max(0.0, -offset), max(0.0, pip_duration - 1 / fps))
+        start_pad = max(0.0, offset)
+        pip_label = f"pip{index}"
+        composed_base = f"basepip{index}"
+        filter_graph.append(
+            f"[{input_index}:v]trim=start={trim_start:.6f},setpts=PTS-STARTPTS,"
+            f"tpad=start_mode=clone:start_duration={start_pad:.6f},"
+            f"scale=w={width}:h={height}:force_original_aspect_ratio=increase,"
+            f"crop=w={width}:h={height},setsar=1[{pip_label}]"
+        )
+        filter_graph.append(
+            f"[{current_base}][{pip_label}]overlay=x={x}:y={y}:"
+            f"eof_action=repeat:shortest=0[{composed_base}]"
+        )
+        current_base = composed_base
+    filter_graph.append(f"[{current_base}][overlay]overlay=0:0:eof_action=repeat:shortest=1[outv]")
+    return ffmpeg_inputs, ";".join(filter_graph)
+
+
 def _video_duration(path: Path) -> float:
     try:
         result = subprocess.run(
@@ -100,7 +193,7 @@ async def _capture_layout_frames(
     frames_directory: Path,
     is_cancelled: Callable[[], bool],
     progress: ProgressCallback,
-) -> None:
+) -> list[dict[str, float | str]]:
     from playwright.async_api import TimeoutError as PlaywrightTimeoutError
     from playwright.async_api import async_playwright
 
@@ -170,6 +263,9 @@ async def _capture_layout_frames(
                     normalized_times.append(video_time)
             if not normalized_times:
                 raise YoutubeExportError("Aucun instant de télémétrie ne peut être rendu")
+
+            raw_pip_layouts = await page.evaluate("window._getTelemetryExportPips()")
+            pip_layouts = _normalize_pip_layouts(raw_pip_layouts, pip_exports)
             sample_times = []
             min_gap = 1 / fps
             for video_time in sorted(set(normalized_times)):
@@ -211,6 +307,7 @@ async def _capture_layout_frames(
                     concat_file.write(f"duration {frame_duration:.6f}\n")
                 last_path = frames_directory / f"frame{len(sample_times) - 1:08d}.png"
                 concat_file.write(f"file '{last_path.as_posix()}'\n")
+            return pip_layouts
         finally:
             await browser.close()
 
@@ -232,17 +329,20 @@ def export_youtube_telemetry_layout(
 ) -> None:
     """Download the source, capture the saved layout, then compose an MP4."""
     source = download_youtube(url, work_dir, progress, cookies=cookies)
+    pip_video_paths: list[Path] = []
     for index, pip_export in enumerate(pip_exports or []):
         pip_url = pip_export.get("youtube_url")
         if not isinstance(pip_url, str):
             raise YoutubeExportError("La source YouTube d’un PiP est invalide")
-        download_youtube(
-            pip_url,
-            work_dir / "youtube-pip" / f"pip-{index}",
-            lambda message, _percent, pip_index=index: progress(
-                f"PiP {pip_index + 1}: {message}", None
-            ),
-            cookies=cookies,
+        pip_video_paths.append(
+            download_youtube(
+                pip_url,
+                work_dir / "youtube-pip" / f"pip-{index}",
+                lambda message, _percent, pip_index=index: progress(
+                    f"PiP {pip_index + 1}: {message}", None
+                ),
+                cookies=cookies,
+            )
         )
     if is_cancelled():
         raise YoutubeExportError("Export annulé")
@@ -250,7 +350,7 @@ def export_youtube_telemetry_layout(
     video_width, video_height = _video_resolution(source)
     fps = 30
     frames_directory = work_dir / "telemetry-layout-frames"
-    asyncio.run(
+    pip_layouts = asyncio.run(
         _capture_layout_frames(
             frontend_url=frontend_url,
             flight_id=_flight_id_for_job(job_id),
@@ -273,21 +373,24 @@ def export_youtube_telemetry_layout(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     progress("Fusion du layout et de la vidéo YouTube", None)
+    pip_durations = [_video_duration(path) for path in pip_video_paths]
+    ffmpeg_inputs, filter_graph = _build_ffmpeg_composition(
+        source=source,
+        frames_manifest=frames_directory / "frames.ffconcat",
+        pip_video_paths=pip_video_paths,
+        pip_layouts=pip_layouts,
+        pip_durations=pip_durations,
+        video_width=video_width,
+        video_height=video_height,
+        fps=fps,
+    )
     _run(
         [
             "ffmpeg",
             "-y",
-            "-i",
-            str(source),
-            "-f",
-            "concat",
-            "-safe",
-            "0",
-            "-i",
-            str(frames_directory / "frames.ffconcat"),
+            *ffmpeg_inputs,
             "-filter_complex",
-            "[1:v][0:v]scale2ref=w=main_w:h=main_h[overlay][base];"
-            "[base][overlay]overlay=0:0:eof_action=repeat:shortest=1[outv]",
+            filter_graph,
             "-map",
             "[outv]",
             "-map",
