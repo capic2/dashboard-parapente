@@ -1,17 +1,18 @@
 import {
   createLazyFileRoute,
   Outlet,
-  useMatch,
+  useLocation,
 } from '@tanstack/react-router';
 import FlightHistory from '../pages/FlightHistory';
 
 function FlightRoute() {
-  const telemetryLayoutMatch = useMatch({
-    from: '/flights/$flightId/telemetry-layout',
-    shouldThrow: false,
-  });
+  const { flightId } = Route.useParams();
+  const pathname = useLocation({ select: (location) => location.pathname });
+  const isTelemetryLayoutRoute =
+    pathname.replace(/\/+$/, '').toLowerCase() ===
+    `/flights/${encodeURIComponent(flightId)}/telemetry-layout`.toLowerCase();
 
-  return telemetryLayoutMatch ? <Outlet /> : <FlightHistory />;
+  return isTelemetryLayoutRoute ? <Outlet /> : <FlightHistory />;
 }
 
 export const Route = createLazyFileRoute('/flights/$flightId')({
