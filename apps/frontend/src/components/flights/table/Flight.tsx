@@ -5,6 +5,7 @@ import {
   Camera,
   Clock3,
   ExternalLink,
+  FileWarning,
   FileText,
   MapPin,
   Mountain,
@@ -91,6 +92,7 @@ export function Flight({
     flight.youtube_overlay_export_status === 'failed';
   const hasPanoVideo = flight.has_pano_video;
   const hasOsv = flight.has_osv;
+  const hasGpxEnrichmentMismatch = flight.has_gpx_enrichment_mismatch;
   const hasFaceVideo = flight.has_face_video === true;
   const hasPiloteVideo = flight.has_pilote_video === true;
   const shouldShowGpxUnsyncedBadge =
@@ -180,6 +182,7 @@ export function Flight({
     isYoutubeOverlayExportFailed ||
     hasPanoVideo ||
     hasOsv ||
+    hasGpxEnrichmentMismatch ||
     hasFaceVideo ||
     hasPiloteVideo ||
     hasHighlightVideo ||
@@ -289,6 +292,12 @@ export function Flight({
                 <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200">
                   <Video className="h-3 w-3" aria-hidden="true" />
                   {t('flights.osvSourcesBadge')}
+                </span>
+              )}
+              {hasGpxEnrichmentMismatch && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                  <FileWarning className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.gpxEnrichmentMismatchBadge')}
                 </span>
               )}
               {hasFaceVideo && (
