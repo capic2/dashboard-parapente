@@ -891,6 +891,7 @@ class FlightSummary(BaseModel):
     has_gopro_overlay: bool
     has_pano_video: bool
     has_osv: bool = False
+    has_gpx_enrichment_mismatch: bool = False
     has_face_video: bool = False
     has_pilote_video: bool = False
     has_highlight_video: bool
