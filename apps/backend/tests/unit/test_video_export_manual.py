@@ -73,6 +73,28 @@ def test_youtube_composition_progress_updates_runtime_and_job_status(monkeypatch
     ]
 
 
+def test_youtube_composition_progress_throttles_and_publishes_final_update(monkeypatch):
+    current_time = 10.0
+    updates: list[tuple[int, int, int | None, float, float | None]] = []
+    monkeypatch.setattr(video_export_manual.time, "monotonic", lambda: current_time)
+    monkeypatch.setattr(
+        video_export_manual,
+        "_set_youtube_composition_progress",
+        lambda _job_id, *values: updates.append(values),
+    )
+    publish = video_export_manual._make_youtube_composition_progress_callback("youtube-job")
+
+    publish(1, 100, 20, 0.01, 5.0)
+    current_time = 10.5
+    publish(20, 100, 16, 0.20, 5.0)
+    current_time = 11.1
+    publish(30, 100, 14, 0.30, 5.0)
+    current_time = 11.2
+    publish(100, 100, 0, 1.0, 5.0)
+
+    assert [update[0] for update in updates] == [1, 30, 100]
+
+
 def test_video_export_snapshot_exposes_persisted_composition_metrics(monkeypatch):
     job = SimpleNamespace(
         id="youtube-job",

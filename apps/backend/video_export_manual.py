@@ -17,7 +17,7 @@ import uuid
 import traceback
 import time
 from collections import deque
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -994,6 +994,38 @@ def _set_youtube_composition_progress(
     )
 
 
+def _make_youtube_composition_progress_callback(
+    job_id: str,
+) -> Callable[[int, int, int | None, float, float | None], None]:
+    """Throttle persisted FFmpeg progress updates while always publishing completion."""
+    last_published_at: float | None = None
+
+    def publish(
+        frames_processed: int,
+        total_frames: int,
+        eta_seconds: int | None,
+        completion: float,
+        encoding_fps: float | None,
+    ) -> None:
+        nonlocal last_published_at
+        now = time.monotonic()
+        is_complete = completion >= 1.0 or frames_processed >= total_frames
+        if last_published_at is not None and now - last_published_at < 1.0 and not is_complete:
+            return
+
+        _set_youtube_composition_progress(
+            job_id,
+            frames_processed,
+            total_frames,
+            eta_seconds,
+            completion,
+            encoding_fps,
+        )
+        last_published_at = now
+
+    return publish
+
+
 def _run_youtube_telemetry_layout_job(job_id: str) -> None:
     """Run the render while the public wrapper guarantees token cleanup."""
     from gopro_overlay_export import first_gpx_timestamp
@@ -1046,21 +1078,7 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
             **({"progress": progress_percent} if progress_percent is not None else {}),
         )
 
-    def composition_progress(
-        frames_processed: int,
-        total_frames: int,
-        eta_seconds: int | None,
-        completion: float,
-        encoding_fps: float | None,
-    ) -> None:
-        _set_youtube_composition_progress(
-            job_id,
-            frames_processed,
-            total_frames,
-            eta_seconds,
-            completion,
-            encoding_fps,
-        )
+    composition_progress = _make_youtube_composition_progress_callback(job_id)
 
     try:
         work_dir = new_work_dir(job_id, job.flight_id)
