@@ -9,7 +9,7 @@ import math
 import statistics
 import time
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -143,15 +143,15 @@ def instrument_source_call(source_name: str, db_session):
             if success:
                 source.success_count += 1
                 source.total_response_time_ms += response_time_ms
-                source.last_success_at = datetime.utcnow()
+                source.last_success_at = datetime.now(UTC).replace(tzinfo=None)
             else:
                 source.error_count += 1
-                source.last_error_at = datetime.utcnow()
+                source.last_error_at = datetime.now(UTC).replace(tzinfo=None)
                 source.last_error_message = (
                     error_message[:500] if error_message else None
                 )  # Limit length
 
-            source.updated_at = datetime.utcnow()
+            source.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
             try:
                 db_session.commit()
@@ -304,15 +304,15 @@ async def fetch_from_enabled_sources(
             if source:
                 if result.get("success") and not result.get("is_stale"):
                     source.success_count += 1
-                    source.last_success_at = datetime.utcnow()
+                    source.last_success_at = datetime.now(UTC).replace(tzinfo=None)
                 else:
                     source.error_count += 1
-                    source.last_error_at = datetime.utcnow()
+                    source.last_error_at = datetime.now(UTC).replace(tzinfo=None)
                     source.last_error_message = str(
                         result.get("freshness_error") or result.get("error") or "Unknown error"
                     )[:500]
 
-                source.updated_at = datetime.utcnow()
+                source.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
         try:
             db.commit()

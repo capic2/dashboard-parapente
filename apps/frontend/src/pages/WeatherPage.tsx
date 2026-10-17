@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { RefreshCw } from 'lucide-react';
+import { ChevronRight, RefreshCw } from 'lucide-react';
 import CurrentConditions from '../components/weather/CurrentConditions';
 import Forecast7Day from '../components/weather/Forecast7Day';
 import HourlyForecast from '../components/weather/HourlyForecast';
@@ -84,6 +84,31 @@ const formatLocalDate = (date: Date) => {
 
 const getLocalDayStart = (date: Date) =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const getDistanceKm = (
+  from: { latitude: number; longitude: number },
+  to: { latitude: number; longitude: number }
+): number | null => {
+  if (
+    !Number.isFinite(from.latitude) ||
+    !Number.isFinite(from.longitude) ||
+    !Number.isFinite(to.latitude) ||
+    !Number.isFinite(to.longitude)
+  ) {
+    return null;
+  }
+
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  const latitudeDifference = radians(to.latitude - from.latitude);
+  const longitudeDifference = radians(to.longitude - from.longitude);
+  const haversine =
+    Math.sin(latitudeDifference / 2) ** 2 +
+    Math.cos(radians(from.latitude)) *
+      Math.cos(radians(to.latitude)) *
+      Math.sin(longitudeDifference / 2) ** 2;
+
+  return 6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+};
 
 const getForecastDaySearch = (dayIndex: number) => {
   if (dayIndex <= 0) return undefined;
@@ -237,13 +262,19 @@ export default function WeatherPage() {
   const routeSelectionTab: WeatherSelectionTab = selectedSearchTarget
     ? 'search'
     : 'favorites';
-  const [selectionTab, setSelectionTab] =
-    useState<WeatherSelectionTab>(routeSelectionTab);
+  const [selectionTabState, setSelectionTabState] = useState({
+    routeSelectionTab,
+    selectionTab: routeSelectionTab,
+  });
+  const selectionTab =
+    selectionTabState.routeSelectionTab === routeSelectionTab
+      ? selectionTabState.selectionTab
+      : routeSelectionTab;
+  const setSelectionTab = (nextTab: WeatherSelectionTab) => {
+    setSelectionTabState({ routeSelectionTab, selectionTab: nextTab });
+  };
   const [isForceRefreshing, setIsForceRefreshing] = useState(false);
   const [forceRefreshError, setForceRefreshError] = useState(false);
-  useEffect(() => {
-    setSelectionTab(routeSelectionTab);
-  }, [routeSelectionTab]);
   const favoriteSites = useMemo(() => {
     if (favoriteSiteIds.length === 0) return sites;
 
@@ -251,11 +282,25 @@ export default function WeatherPage() {
     const matchedFavorites = sites.filter((site) => favoriteSet.has(site.id));
     return matchedFavorites.length > 0 ? matchedFavorites : sites;
   }, [favoriteSiteIds, sites]);
+  const nearbyFavoriteSites = useMemo(() => {
+    const location = currentLocation.location;
+    if (!location) return favoriteSites;
+
+    return [...favoriteSites].sort((first, second) => {
+      const firstDistance = getDistanceKm(location, first);
+      const secondDistance = getDistanceKm(location, second);
+
+      if (firstDistance === null) return secondDistance === null ? 0 : 1;
+      if (secondDistance === null) return -1;
+      return firstDistance - secondDistance;
+    });
+  }, [currentLocation.location, favoriteSites]);
   const routeSiteExists = sites.some((site) => site.id === routeSiteId);
   const selectedSiteId =
     (routeSiteExists ? routeSiteId : undefined) ??
-    favoriteSites[0]?.id ??
-    sites[0]?.id ??
+    (currentLocation.isLoading
+      ? undefined
+      : (nearbyFavoriteSites[0]?.id ?? sites[0]?.id)) ??
     '';
   const { data: dailySummary } = useDailySummary(
     !selectedSearchTarget && selectedSiteId ? selectedSiteId : undefined
@@ -270,14 +315,14 @@ export default function WeatherPage() {
     selectedDayIndex,
     nearbyLocation,
     radiusKm,
-    !currentLocation.isLoading
+    !currentLocation.isLoading && Boolean(nearbyLocation)
   );
   const { data: hourlyBestSpots } = useHourlyBestSpotsAPI(
     selectedDayIndex,
     24,
     nearbyLocation,
     radiusKm,
-    !currentLocation.isLoading
+    !currentLocation.isLoading && Boolean(nearbyLocation)
   );
   const selectedSite = sites.find((site) => site.id === selectedSiteId);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -502,7 +547,7 @@ export default function WeatherPage() {
       selectedDayLabel={selectedDayLabel}
       selectionTab={selectionTab}
       allSites={sites}
-      sites={favoriteSites}
+      sites={nearbyFavoriteSites}
       selectedSearchTarget={selectedSearchTarget}
       selectedSiteId={selectedSiteId}
       selectedDayIndex={selectedDayIndex}
@@ -522,6 +567,10 @@ export default function WeatherPage() {
       selectedDayIndex={selectedDayIndex}
       radiusKm={radiusKm}
       onRadiusChange={setRadiusKm}
+      locationUnavailable={
+        !currentLocation.isLoading && !currentLocation.location
+      }
+      onRetryLocation={currentLocation.requestLocation}
     />
   );
 
@@ -535,7 +584,7 @@ export default function WeatherPage() {
     ) : undefined;
 
   const mobileEmptyPanel =
-    !selectedSearchTarget && !selectedSiteId ? (
+    !currentLocation.isLoading && !selectedSearchTarget && !selectedSiteId ? (
       <WeatherEmptyState />
     ) : undefined;
 
@@ -634,9 +683,7 @@ export default function WeatherPage() {
         activeWeatherName={activeWeatherName}
         selectedDayLabel={selectedDayLabel}
         sourceLabel={sourceLabel}
-        selectedSiteId={selectedSiteId}
         isSearchMode={Boolean(selectedSearchTarget)}
-        isAuthenticated={isAuthenticated}
         stickySelectionBar={stickySelectionBar}
         forecastPanel={forecastDaySelector}
         bestSpotSuggestion={bestSpotSuggestion}
@@ -661,11 +708,9 @@ export default function WeatherPage() {
       <div className="min-w-0 space-y-4">
         {forceRefreshControl}
 
-        {forecastDaySelector}
-
-        {bestSpotSuggestion}
-
-        {!selectedSearchTarget && !selectedSiteId && <WeatherEmptyState />}
+        {!currentLocation.isLoading &&
+          !selectedSearchTarget &&
+          !selectedSiteId && <WeatherEmptyState />}
 
         {selectedSearchTarget && (
           <WeatherSearchResultPanel
@@ -713,24 +758,44 @@ export default function WeatherPage() {
           />
         )}
 
+        {forecastDaySelector}
+
         {!selectedSearchTarget && selectedSiteId && (
           <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:[&>*]:min-w-0 lg:[&>*]:flex-1">
             <WeatherLiveWindPanel
               latitude={selectedSite?.latitude}
               longitude={selectedSite?.longitude}
             />
-
-            {/* Landing Sites Weather */}
-            <WeatherMultiLanding
-              spotId={selectedSiteId}
-              dayIndex={selectedDayIndex}
-            />
           </div>
         )}
 
-        {/* Emagram Analysis (authenticated only) */}
-        {isAuthenticated && !selectedSearchTarget && selectedSiteId && (
-          <EmagramWidget siteId={selectedSiteId} dayIndex={selectedDayIndex} />
+        {!selectedSearchTarget && selectedSiteId && (
+          <details className="group rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-bold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-white">
+              <span>
+                <span className="block">{t('weather.page.advancedTitle')}</span>
+                <span className="mt-0.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                  {t('weather.page.advancedSummary')}
+                </span>
+              </span>
+              <ChevronRight
+                aria-hidden="true"
+                className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-90"
+              />
+            </summary>
+            <div className="space-y-4 border-t border-slate-200 p-3 dark:border-slate-700">
+              <WeatherMultiLanding
+                spotId={selectedSiteId}
+                dayIndex={selectedDayIndex}
+              />
+              {isAuthenticated && (
+                <EmagramWidget
+                  siteId={selectedSiteId}
+                  dayIndex={selectedDayIndex}
+                />
+              )}
+            </div>
+          </details>
         )}
 
         {/* Hourly Forecast */}
@@ -755,6 +820,24 @@ export default function WeatherPage() {
             thermalCeilingByHour={thermalCeilingByHour}
           />
         )}
+
+        <details className="group rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-bold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-white">
+            <span>
+              <span className="block">{t('weather.page.otherSitesTitle')}</span>
+              <span className="mt-0.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                {t('weather.page.otherSitesSummary')}
+              </span>
+            </span>
+            <ChevronRight
+              aria-hidden="true"
+              className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-90"
+            />
+          </summary>
+          <div className="border-t border-slate-200 p-3 dark:border-slate-700">
+            {bestSpotSuggestion}
+          </div>
+        </details>
       </div>
     </div>
   );

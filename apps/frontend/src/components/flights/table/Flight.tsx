@@ -4,6 +4,7 @@ import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-t
 import {
   Camera,
   Clock3,
+  ExternalLink,
   FileText,
   MapPin,
   Mountain,
@@ -22,17 +23,19 @@ import {
   useAppSettingsStore,
 } from '../../../stores/appSettingsStore';
 import { isGoproOverlayInProgress } from '../../../lib/flightMediaState';
+import { getFlightGpxProvider } from '../../../lib/flightGpxProvider';
 
 interface FlightProps {
   flight: FlightSummary;
   isActive: boolean;
   isSelected: boolean;
   selectionMode: boolean;
+  isListOption?: boolean;
   onSelectFlight: (flight: FlightSummary) => void;
   onDeleteFlight: (flight: FlightSummary) => void;
 }
 
-function formatFlightDate(date: string, language: string) {
+export function formatFlightDate(date: string, language: string) {
   const [year, month, day] = date.split('-');
   const localDate = new Date(Number(year), Number(month) - 1, Number(day));
 
@@ -56,6 +59,7 @@ export function Flight({
   isActive,
   isSelected,
   selectionMode,
+  isListOption = true,
   onSelectFlight,
   onDeleteFlight,
 }: FlightProps) {
@@ -63,14 +67,38 @@ export function Flight({
   const units = useAppSettingsStore((state) => state.settings.units);
   const isHighlighted = isActive || isSelected;
   const hasGpx = flight.has_gpx;
+  const gpxProvider = getFlightGpxProvider(flight);
+  const isGpxUnsynced = flight.gopro_overlay_gpx_offset == null;
+  const gpxProviderBadgeKeys: Record<string, string> = {
+    intervals_icu: 'flights.gpxIcuBadge',
+    strava: 'flights.gpxStravaBadge',
+    external: 'flights.gpxZeppBadge',
+    zepp: 'flights.gpxZeppBadge',
+  };
+  const gpxProviderBadgeKey = gpxProviderBadgeKeys[gpxProvider ?? ''];
   const hasVideo = flight.has_video;
   const hasCamera = flight.has_camera;
   const hasYoutubeVideo = flight.has_youtube_video;
   const isYoutubeUploadRunning =
     flight.youtube_upload_status === 'queued' ||
     flight.youtube_upload_status === 'uploading';
+  const isYoutubeUploadFailed = flight.youtube_upload_status === 'failed';
+  const isYoutubeOverlayExportRunning = Boolean(
+    flight.youtube_overlay_export_status &&
+    VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(flight.youtube_overlay_export_status)
+  );
+  const isYoutubeOverlayExportFailed =
+    flight.youtube_overlay_export_status === 'failed';
   const hasPanoVideo = flight.has_pano_video;
+  const hasOsv = flight.has_osv;
+  const hasFaceVideo = flight.has_face_video === true;
+  const hasPiloteVideo = flight.has_pilote_video === true;
+  const shouldShowGpxUnsyncedBadge =
+    hasGpx && isGpxUnsynced && (hasFaceVideo || hasPiloteVideo);
   const hasHighlightVideo = flight.has_highlight_video;
+  const hasSportstrackliveTrack =
+    flight.sportstracklive_status === 'uploaded' &&
+    flight.sportstracklive_track_id != null;
   const hasPersistedGoproOverlay = flight.has_gopro_overlay;
   const isGoproOverlayRunning = isGoproOverlayInProgress(
     flight.gopro_overlay_status
@@ -110,8 +138,23 @@ export function Flight({
     t('flights.youtubeBadge'),
     isYoutubeUploadRunning ? flight.youtube_upload_progress : null
   );
+  const youtubeOverlayExportLabel = formatMediaProgressLabel(
+    t('flights.youtubeOverlayProcessingBadge'),
+    flight.youtube_overlay_export_progress
+  );
   const youtubeVideoCountLabel =
     flight.youtube_video_count > 1 ? ` x${flight.youtube_video_count}` : '';
+  const youtubeVideoTypes = flight.youtube_video_types ?? [];
+  const youtubeTypeLabels: Record<string, string> = {
+    gopro_overlay: 'flights.goproOverlayBadge',
+    youtube_overlay: 'flights.goproOverlayBadge',
+    camera: 'flights.cameraBadge',
+    video: 'flights.videoBadge',
+    pano: 'flights.panoBadge',
+    face: 'flights.faceBadge',
+    pilote: 'flights.piloteBadge',
+    highlight: 'flights.highlightVideoBadge',
+  };
   const selectFlight = () => {
     if (!selectionMode) {
       onSelectFlight(flight);
@@ -132,8 +175,15 @@ export function Flight({
     hasCamera ||
     hasYoutubeVideo ||
     isYoutubeUploadRunning ||
+    isYoutubeUploadFailed ||
+    isYoutubeOverlayExportRunning ||
+    isYoutubeOverlayExportFailed ||
     hasPanoVideo ||
+    hasOsv ||
+    hasFaceVideo ||
+    hasPiloteVideo ||
     hasHighlightVideo ||
+    hasSportstrackliveTrack ||
     isVideoExportRunning ||
     isVideoExportFailed ||
     isHighlightVideoExportRunning ||
@@ -153,8 +203,8 @@ export function Flight({
   return (
     <Card
       // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
-      role="option"
-      aria-selected={isHighlighted}
+      role={isListOption ? 'option' : 'button'}
+      aria-selected={isListOption ? isHighlighted : undefined}
       tabIndex={0}
       data-testid={`flight-row-${flight.id}`}
       selected={isHighlighted}
@@ -197,12 +247,24 @@ export function Flight({
           <h3 className={`truncate text-sm font-semibold ${titleColor}`}>
             {flight.title || t('flights.untitledFlight')}
           </h3>
-          {!selectionMode && hasMediaStatus && (
+          {hasMediaStatus && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {hasGpx && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
                   <FileText className="h-3 w-3" aria-hidden="true" />
-                  {t('flights.gpxBadge')}
+                  {t(gpxProviderBadgeKey ?? 'flights.gpxBadge')}
+                </span>
+              )}
+              {shouldShowGpxUnsyncedBadge && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                  <Clock3 className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.gpxNoSyncBadge')}
+                </span>
+              )}
+              {hasSportstrackliveTrack && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-800 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200">
+                  <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.sportstrackliveBadge')}
                 </span>
               )}
               {hasVideo && (
@@ -223,6 +285,24 @@ export function Flight({
                   {t('flights.panoBadge')}
                 </span>
               )}
+              {hasOsv && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200">
+                  <Video className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.osvSourcesBadge')}
+                </span>
+              )}
+              {hasFaceVideo && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
+                  <Video className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.faceBadge')}
+                </span>
+              )}
+              {hasPiloteVideo && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
+                  <Video className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.piloteBadge')}
+                </span>
+              )}
               {hasCompletedGoproOverlay && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200">
                   <Wand2 className="h-3 w-3" aria-hidden="true" />
@@ -235,14 +315,27 @@ export function Flight({
                   {t('flights.highlightVideoBadge')}
                 </span>
               )}
-              {(hasYoutubeVideo || isYoutubeUploadRunning) && (
+              {youtubeVideoTypes.map((sourceType, index) => (
                 <span
-                  aria-live={isYoutubeUploadRunning ? 'polite' : undefined}
+                  key={`${sourceType}-${index}`}
                   className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
                 >
                   <Play className="h-3 w-3" aria-hidden="true" />
-                  {youtubeLabel}
-                  {youtubeVideoCountLabel}
+                  {t(youtubeTypeLabels[sourceType] ?? 'flights.youtubeBadge')}
+                </span>
+              ))}
+              {((hasYoutubeVideo && youtubeVideoTypes.length === 0) ||
+                isYoutubeUploadRunning ||
+                isYoutubeUploadFailed) && (
+                <span
+                  aria-live={isYoutubeUploadRunning ? 'polite' : undefined}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${isYoutubeUploadFailed ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100' : 'border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200'}`}
+                >
+                  <Play className="h-3 w-3" aria-hidden="true" />
+                  {isYoutubeUploadFailed
+                    ? t('flights.temporarySourceFailed')
+                    : youtubeLabel}
+                  {youtubeVideoTypes.length === 0 ? youtubeVideoCountLabel : ''}
                 </span>
               )}
               {isVideoExportRunning && (
@@ -253,6 +346,16 @@ export function Flight({
               {isVideoExportFailed && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
                   {t('flights.videoErrorBadge')}
+                </span>
+              )}
+              {isYoutubeOverlayExportRunning && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
+                  {youtubeOverlayExportLabel}
+                </span>
+              )}
+              {isYoutubeOverlayExportFailed && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+                  {t('flights.youtubeOverlayErrorBadge')}
                 </span>
               )}
               {isHighlightVideoExportRunning && (

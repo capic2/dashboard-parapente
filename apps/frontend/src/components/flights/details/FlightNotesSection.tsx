@@ -29,6 +29,7 @@ export function FlightNotesSection({
     <div>
       <div className="mb-2 flex items-center justify-between gap-2">
         <label
+          id="flight-notes-label"
           htmlFor="flight-notes"
           className="block text-sm font-semibold text-gray-700 dark:text-gray-300"
         >
@@ -46,7 +47,11 @@ export function FlightNotesSection({
       </div>
       {editingNotes ? (
         <div className="space-y-2">
-          <TextField value={notesText} onChange={onNotesTextChange}>
+          <TextField
+            aria-labelledby="flight-notes-label"
+            value={notesText}
+            onChange={onNotesTextChange}
+          >
             <TextArea
               id="flight-notes"
               placeholder={t('flights.notesPlaceholder')}

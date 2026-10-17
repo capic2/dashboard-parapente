@@ -85,10 +85,10 @@ const mockEmagramLatest = {
       ],
       par_source: {
         'meteo-parapente': [
-          "Courbe observee: température et point de rosée proches en basses couches | Comment la reconnaitre: les deux courbes se rapprochent sous 1700 m | Interpretation: humidité suffisante pour matérialiser la convection | Consequence parapente: déclenchement possible mais plafond modéré.",
+          'Courbe observee: température et point de rosée proches en basses couches | Comment la reconnaitre: les deux courbes se rapprochent sous 1700 m | Interpretation: humidité suffisante pour matérialiser la convection | Consequence parapente: déclenchement possible mais plafond modéré.',
         ],
         meteociel: [
-          "Courbe observee: vent qui forcit au-dessus de 2000 m | Comment la reconnaitre: barbules plus longues sur la colonne de vent | Interpretation: cisaillement et dérive en altitude | Consequence parapente: rester prudent en transition et près du relief.",
+          'Courbe observee: vent qui forcit au-dessus de 2000 m | Comment la reconnaitre: barbules plus longues sur la colonne de vent | Interpretation: cisaillement et dérive en altitude | Consequence parapente: rester prudent en transition et près du relief.',
         ],
       },
     },
@@ -131,10 +131,10 @@ const mockEmagramHours = {
 };
 
 const PLACEHOLDER_PNG = new Uint8Array([
-  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1,
-  0, 0, 0, 1, 8, 2, 0, 0, 0, 144, 119, 83, 222, 0, 0, 0, 12, 73, 68,
-  65, 84, 8, 215, 99, 104, 104, 248, 15, 0, 1, 1, 0, 5, 24, 217, 38, 57,
-  0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0,
+  0, 0, 1, 8, 2, 0, 0, 0, 144, 119, 83, 222, 0, 0, 0, 12, 73, 68, 65, 84, 8,
+  215, 99, 104, 104, 248, 15, 0, 1, 1, 0, 5, 24, 217, 38, 57, 0, 0, 0, 0, 73,
+  69, 78, 68, 174, 66, 96, 130,
 ]);
 
 const screenshotHandler = http.get(
@@ -158,14 +158,16 @@ const defaultHandlers = [
 
 export const Default = meta.story({
   name: 'Default',
-  parameters: { msw: { handlers: defaultHandlers } },
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
+  },
 });
 
 export const NoData = meta.story({
   name: 'No Data',
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('/api/spots/:id', () => HttpResponse.json(mockSite)),
         http.get('/api/emagram/hours', () =>
           HttpResponse.json({
@@ -179,16 +181,16 @@ export const NoData = meta.story({
         http.post('/api/emagram/trigger', () =>
           HttpResponse.json({ success: true })
         ),
-      ],
-    },
+      ]
+    );
   },
 });
 
 export const Loading = meta.story({
   name: 'Loading',
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('/api/spots/:id', () => HttpResponse.json(mockSite)),
         http.get('/api/emagram/hours', async () => {
           await new Promise(() => {});
@@ -199,7 +201,7 @@ export const Loading = meta.story({
         http.get('/api/emagram/history', async () => {
           await new Promise(() => {});
         }),
-      ],
-    },
+      ]
+    );
   },
 });

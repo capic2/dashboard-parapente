@@ -1,7 +1,8 @@
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from unittest.mock import Mock
 from urllib.parse import parse_qs, urlparse
 
 import config
@@ -13,9 +14,96 @@ from fastapi.testclient import TestClient
 from models import Flight, GoproOverlayJob, YoutubeCredential, YoutubeUploadJob
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from youtube_upload import decode_oauth_state, encrypt_secret
+from youtube_upload import (
+    decode_oauth_state,
+    encrypt_secret,
+    playlist_title_for_flight,
+    prepare_flight_playlist,
+)
 
 API_PREFIX = "/api"
+
+
+def test_playlist_title_uses_daily_sequence_and_date(db_session: Session) -> None:
+    first = Flight(id="flight-a", name="Annecy", flight_date=date(2026, 9, 24))
+    second = Flight(id="flight-b", name="Annecy", flight_date=date(2026, 9, 24))
+    db_session.add_all([first, second])
+    db_session.flush()
+
+    assert playlist_title_for_flight(db_session, first) == "Parapente - Vol 1 du 24/09/2026"
+    assert playlist_title_for_flight(db_session, second) == "Parapente - Vol 2 du 24/09/2026"
+
+
+@pytest.mark.parametrize(
+    ("created", "expected_created"),
+    [(True, True), (False, False)],
+)
+def test_prepare_flight_playlist_returns_playlist_link_and_creation_state(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch, created: bool, expected_created: bool
+) -> None:
+    flight = Flight(id="playlist-flight", flight_date=date(2026, 9, 24))
+    db_session.add(flight)
+    db_session.flush()
+    find_or_create = Mock(return_value=("playlist-id", created))
+    monkeypatch.setattr(youtube_upload, "_find_or_create_playlist", find_or_create)
+
+    result = prepare_flight_playlist(db_session, flight=flight, user_id=1)
+
+    assert result == {
+        "title": "Parapente - Vol 1 du 24/09/2026",
+        "url": "https://www.youtube.com/playlist?list=playlist-id",
+        "created": expected_created,
+    }
+    find_or_create.assert_called_once_with(user_id=1, title=result["title"])
+
+
+def test_prepare_youtube_playlist_endpoint_returns_playlist_details(
+    client: TestClient,
+    db_session: Session,
+    sample_flight: Flight,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_session.add(
+        YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
+    )
+    db_session.commit()
+    monkeypatch.setattr(
+        youtube_upload,
+        "_find_or_create_playlist",
+        Mock(return_value=("playlist-id", True)),
+    )
+
+    response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/youtube-playlist/prepare")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "title": "Parapente - Vol 1 du 15/03/2026",
+        "url": "https://www.youtube.com/playlist?list=playlist-id",
+        "created": True,
+    }
+
+
+def test_prepare_youtube_playlist_endpoint_requires_connection(
+    client: TestClient, sample_flight: Flight
+) -> None:
+    response = client.post(f"{API_PREFIX}/flights/{sample_flight.id}/youtube-playlist/prepare")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Connect YouTube before preparing a playlist"
+
+
+def test_prepare_youtube_playlist_endpoint_returns_not_found_for_missing_flight(
+    client: TestClient, db_session: Session
+) -> None:
+    db_session.add(
+        YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
+    )
+    db_session.commit()
+
+    response = client.post(f"{API_PREFIX}/flights/missing/youtube-playlist/prepare")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Flight not found"
 
 
 def _configure_youtube(monkeypatch) -> None:
@@ -46,10 +134,61 @@ def test_existing_youtube_video_ids_returns_only_remote_matches(monkeypatch) -> 
 
     assert result == {"dQw4w9WgXcQ"}
     assert requests[0]["params"] == {
-        "part": "id",
+        "part": "id,snippet",
         "id": "9bZkp7q19f0,dQw4w9WgXcQ",
     }
     assert requests[0]["headers"] == {"Authorization": "Bearer token-1"}
+
+
+def test_youtube_video_metadata_includes_the_remote_video_title(monkeypatch) -> None:
+    monkeypatch.setattr(youtube_upload, "_access_token", lambda _user_id: "token")
+
+    def get_videos(url: str, **kwargs: Any) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "items": [
+                    {
+                        "id": "dQw4w9WgXcQ",
+                        "snippet": {"title": "Vol du 02/10/2026 - face"},
+                    }
+                ]
+            },
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr(youtube_upload.httpx, "get", get_videos)
+
+    assert youtube_upload.youtube_video_metadata({1: {"dQw4w9WgXcQ", "9bZkp7q19f0"}}) == {
+        "dQw4w9WgXcQ": {
+            "exists": True,
+            "title": "Vol du 02/10/2026 - face",
+        },
+        "9bZkp7q19f0": {"exists": False, "title": None},
+    }
+
+
+def test_youtube_video_metadata_ignores_invalid_snippets_and_continues_batch(monkeypatch) -> None:
+    monkeypatch.setattr(youtube_upload, "_access_token", lambda _user_id: "token")
+
+    def get_videos(url: str, **kwargs: Any) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "items": [
+                    {"id": "dQw4w9WgXcQ", "snippet": None},
+                    {"id": "9bZkp7q19f0", "snippet": {"title": "Vol du 02/10/2026 - pilote"}},
+                ]
+            },
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr(youtube_upload.httpx, "get", get_videos)
+
+    assert youtube_upload.youtube_video_metadata({1: {"dQw4w9WgXcQ", "9bZkp7q19f0"}}) == {
+        "dQw4w9WgXcQ": {"exists": True, "title": None},
+        "9bZkp7q19f0": {"exists": True, "title": "Vol du 02/10/2026 - pilote"},
+    }
 
 
 def test_existing_youtube_video_ids_tolerates_token_refresh_failure(monkeypatch) -> None:
@@ -98,6 +237,115 @@ def _create_completed_overlay(
     return overlay
 
 
+def test_youtube_overlay_upload_job_waits_for_generated_source(
+    db_session: Session, sample_flight: Flight, tmp_path: Path, monkeypatch
+) -> None:
+    generated_video = tmp_path / "youtube-overlay.mp4"
+    generated_video.write_bytes(b"video")
+    job = youtube_upload.create_youtube_overlay_upload_job(
+        db_session,
+        flight_id=sample_flight.id,
+        user_id=1,
+        title="Vol d’essai - overlay YouTube",
+        description="Description",
+        gopro_overlay_job_id="saved-overlay",
+    )
+
+    assert job.source_type == "youtube_overlay"
+    assert job.source_path is None
+    assert job.status == "preparing"
+
+    enqueued: list[str] = []
+    monkeypatch.setattr(youtube_upload, "enqueue_youtube_upload", enqueued.append)
+
+    def close_test_session(_self: object, *_args: object) -> bool:
+        db_session.expunge_all()
+        return False
+
+    monkeypatch.setattr(
+        youtube_upload,
+        "SessionLocal",
+        lambda: type(
+            "SessionContext",
+            (),
+            {
+                "__enter__": lambda self: db_session,
+                "__exit__": close_test_session,
+            },
+        )(),
+    )
+    upload_job_id = job.id
+    youtube_upload.enqueue_youtube_overlay_upload(job.id, generated_video)
+
+    queued_job = db_session.get(YoutubeUploadJob, upload_job_id)
+    assert queued_job is not None
+    assert queued_job.source_path == str(generated_video)
+    assert queued_job.status == "queued"
+    assert enqueued == [upload_job_id]
+
+
+def test_failed_youtube_overlay_upload_can_return_to_preparing_for_export_retry(
+    db_session: Session, sample_flight: Flight, monkeypatch
+) -> None:
+    job = youtube_upload.create_youtube_overlay_upload_job(
+        db_session,
+        flight_id=sample_flight.id,
+        user_id=1,
+        title="Vol d’essai - overlay YouTube",
+        description="Description",
+        gopro_overlay_job_id="saved-overlay",
+    )
+    db_session.query(YoutubeUploadJob).filter_by(id=job.id).update(
+        {"status": "failed", "source_path": "/exports/previous.mp4", "error": "render failed"}
+    )
+    db_session.commit()
+    upload_job_id = job.id
+
+    def close_test_session(_self: object, *_args: object) -> bool:
+        db_session.expunge_all()
+        return False
+
+    monkeypatch.setattr(
+        youtube_upload,
+        "SessionLocal",
+        lambda: type(
+            "SessionContext",
+            (),
+            {
+                "__enter__": lambda self: db_session,
+                "__exit__": close_test_session,
+            },
+        )(),
+    )
+
+    assert youtube_upload.prepare_youtube_overlay_upload_retry(upload_job_id) is True
+
+    retried_job = db_session.get(YoutubeUploadJob, upload_job_id)
+    assert retried_job is not None
+    assert retried_job.status == "preparing"
+    assert retried_job.source_path is None
+    assert retried_job.error is None
+    assert retried_job.progress == 0
+
+
+def test_generated_youtube_overlay_cleanup_is_limited_to_export_storage(
+    tmp_path: Path, monkeypatch
+) -> None:
+    export_root = tmp_path / "exports"
+    export_root.mkdir()
+    generated = export_root / "youtube-overlay.mp4"
+    generated.write_bytes(b"video")
+    outside = tmp_path / "flight-source.mp4"
+    outside.write_bytes(b"source")
+    monkeypatch.setattr(config, "VIDEO_EXPORT_DIR", str(export_root))
+
+    youtube_upload._delete_generated_overlay_source(generated)
+    youtube_upload._delete_generated_overlay_source(outside)
+
+    assert not generated.exists()
+    assert outside.exists()
+
+
 def test_youtube_status_reports_configuration_and_connection(client, db_session, monkeypatch):
     _configure_youtube(monkeypatch)
 
@@ -132,6 +380,70 @@ def test_youtube_status_requires_reauthorization_for_legacy_upload_scope(
 
     assert response.status_code == 200
     assert response.json() == {"configured": True, "connected": False}
+
+
+def test_upload_youtube_download_cookies_stores_filtered_encrypted_cookies(
+    client: TestClient, db_session: Session
+) -> None:
+    credential = YoutubeCredential(
+        user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token")
+    )
+    db_session.add(credential)
+    db_session.commit()
+    cookies = (
+        "# Netscape HTTP Cookie File\n"
+        ".youtube.com\tTRUE\t/\tTRUE\t0\tSID\tyoutube-session\n"
+        ".google.com\tTRUE\t/\tTRUE\t0\tSAPISID\tgoogle-session\n"
+        ".example.com\tTRUE\t/\tTRUE\t0\tOTHER\tunrelated-cookie\n"
+    )
+
+    response = client.put(
+        f"{API_PREFIX}/youtube/download-cookies",
+        files={"file": ("cookies.txt", cookies, "text/plain")},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"configured": True}
+    db_session.refresh(credential)
+    assert credential.download_cookies_encrypted != cookies
+    assert youtube_upload.decrypt_secret(credential.download_cookies_encrypted) == (
+        "# Netscape HTTP Cookie File\n"
+        ".youtube.com\tTRUE\t/\tTRUE\t0\tSID\tyoutube-session\n"
+        ".google.com\tTRUE\t/\tTRUE\t0\tSAPISID\tgoogle-session\n"
+    )
+
+
+def test_upload_youtube_download_cookies_rejects_invalid_file(
+    client: TestClient, db_session: Session
+) -> None:
+    db_session.add(
+        YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
+    )
+    db_session.commit()
+
+    response = client.put(
+        f"{API_PREFIX}/youtube/download-cookies",
+        files={"file": ("cookies.txt", "not a Netscape cookie file", "text/plain")},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Choose a cookies.txt file in Netscape format"
+
+
+def test_upload_youtube_download_cookies_rejects_disconnected_user(client: TestClient) -> None:
+    response = client.put(
+        f"{API_PREFIX}/youtube/download-cookies",
+        files={
+            "file": (
+                "cookies.txt",
+                "# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tTRUE\t0\tSID\tvalue\n",
+                "text/plain",
+            )
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Connect YouTube before uploading cookies"
 
 
 def test_youtube_auth_url_contains_signed_current_user_state(client, monkeypatch):
@@ -281,6 +593,68 @@ def test_start_youtube_upload_rejects_missing_panorama(
     assert response.json()["detail"] == "Panorama video is not available"
 
 
+@pytest.mark.parametrize("source_type", ["face", "pilote"])
+def test_start_youtube_upload_accepts_face_and_pilote_sources(
+    source_type: str,
+    client: TestClient,
+    db_session: Session,
+    sample_flight: Flight,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _configure_youtube(monkeypatch)
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    video_path = (
+        tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01" / f"{source_type}.mp4"
+    )
+    video_path.parent.mkdir(parents=True)
+    video_path.write_bytes(source_type.encode())
+    db_session.add(
+        YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
+    )
+    db_session.commit()
+    enqueued: list[str] = []
+    monkeypatch.setattr("routes.enqueue_youtube_upload", enqueued.append)
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload",
+        json={"source_type": source_type, "title": f"Vol - {source_type}"},
+    )
+
+    assert response.status_code == 202
+    payload = response.json()
+    assert payload["source_type"] == source_type
+    job = db_session.get(YoutubeUploadJob, payload["job_id"])
+    assert job is not None
+    assert job.source_type == source_type
+    assert enqueued == [job.id]
+
+
+@pytest.mark.parametrize("source_type", ["face", "pilote"])
+def test_start_youtube_upload_rejects_missing_face_and_pilote_sources(
+    source_type: str,
+    client: TestClient,
+    db_session: Session,
+    sample_flight: Flight,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _configure_youtube(monkeypatch)
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    db_session.add(
+        YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
+    )
+    db_session.commit()
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload",
+        json={"source_type": source_type, "title": source_type},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == f"{source_type.title()} video is not available"
+
+
 def test_get_youtube_upload_includes_recent_job_logs(
     client, db_session, sample_flight, tmp_path, monkeypatch
 ):
@@ -360,6 +734,66 @@ def test_worker_resolves_panorama_from_the_flight_directory(
     assert youtube_upload._source_video_path(db_session, job) == pano_path
 
 
+def test_worker_resolves_prefixed_panorama_filename(
+    db_session: Session,
+    sample_flight: Flight,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    pano_path = (
+        tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01" / "20261001_1_pano.mp4"
+    )
+    pano_path.parent.mkdir(parents=True)
+    pano_path.write_bytes(b"panorama")
+    job = YoutubeUploadJob(
+        id="youtube-prefixed-pano-source",
+        flight_id=sample_flight.id,
+        user_id=1,
+        source_type="pano",
+        status="queued",
+        progress=0,
+        title="Panorama",
+        description="",
+        privacy_status="private",
+    )
+    db_session.add(job)
+    db_session.commit()
+
+    assert youtube_upload._source_video_path(db_session, job) == pano_path
+
+
+@pytest.mark.parametrize("source_type", ["face", "pilote"])
+def test_worker_resolves_face_and_pilote_from_the_flight_directory(
+    source_type: str,
+    db_session: Session,
+    sample_flight: Flight,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    pano_path = tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01" / "pano.mp4"
+    pano_path.parent.mkdir(parents=True)
+    pano_path.write_bytes(b"panorama")
+    video_path = pano_path.with_name(f"{source_type}.mp4")
+    video_path.write_bytes(source_type.encode())
+    job = YoutubeUploadJob(
+        id=f"youtube-{source_type}-source",
+        flight_id=sample_flight.id,
+        user_id=1,
+        source_type=source_type,
+        status="queued",
+        progress=0,
+        title=source_type.title(),
+        description="",
+        privacy_status="private",
+    )
+    db_session.add(job)
+    db_session.commit()
+
+    assert youtube_upload._source_video_path(db_session, job) == video_path
+
+
 def test_worker_injects_spherical_metadata_for_panorama_uploads(tmp_path, monkeypatch) -> None:
     source_path = tmp_path / "pano.mp4"
     source_path.write_bytes(b"flat panorama")
@@ -387,7 +821,11 @@ def test_worker_injects_spherical_metadata_for_panorama_uploads(tmp_path, monkey
     monkeypatch.setattr(
         youtube_upload.metadata_utils,
         "parse_metadata",
-        lambda _path, _console: parsed_metadata,
+        lambda path, _console: (
+            youtube_upload.metadata_utils.ParsedMetadata()
+            if Path(path) == source_path
+            else parsed_metadata
+        ),
     )
 
     upload_path = youtube_upload._prepare_upload_video(
@@ -407,6 +845,45 @@ def test_worker_injects_spherical_metadata_for_panorama_uploads(tmp_path, monkey
     assert progress_updates == [1, 10]
     assert any("Preparing panorama for YouTube" in message for message in log_messages)
     assert any("Panorama preparation complete" in message for message in log_messages)
+
+
+def test_worker_reuses_panorama_with_spherical_metadata(tmp_path, monkeypatch) -> None:
+    source_path = tmp_path / "pano.mp4"
+    source_path.write_bytes(b"spherical panorama")
+    monkeypatch.setattr(config, "VIDEO_EXPORT_DIR", str(tmp_path / "exports"))
+    progress_updates: list[int] = []
+    log_messages: list[str] = []
+    parsed_metadata = youtube_upload.metadata_utils.ParsedMetadata()
+    parsed_metadata.video["Track 0"] = {
+        "Spherical": "true",
+        "ProjectionType": "equirectangular",
+    }
+    inject_metadata = Mock()
+    monkeypatch.setattr(youtube_upload.metadata_utils, "inject_metadata", inject_metadata)
+    monkeypatch.setattr(
+        youtube_upload.metadata_utils,
+        "parse_metadata",
+        lambda _path, _console: parsed_metadata,
+    )
+    monkeypatch.setattr(
+        youtube_upload,
+        "_log_job",
+        lambda _job_id, message: log_messages.append(message),
+    )
+
+    upload_path = youtube_upload._prepare_upload_video(
+        "youtube-pano-ready",
+        "pano",
+        source_path,
+        progress_callback=lambda progress: progress_updates.append(progress),
+    )
+
+    assert upload_path == source_path
+    assert upload_path.read_bytes() == b"spherical panorama"
+    assert not youtube_upload._panorama_upload_path("youtube-pano-ready").exists()
+    inject_metadata.assert_not_called()
+    assert progress_updates == [youtube_upload._PANORAMA_PREPARATION_PROGRESS_MAX]
+    assert any("already has verified 360° metadata" in message for message in log_messages)
 
 
 def test_worker_rejects_unverified_spherical_metadata(tmp_path, monkeypatch) -> None:
@@ -597,6 +1074,7 @@ def test_database_rejects_two_active_uploads_for_the_same_flight(db_session, sam
         id="youtube-job-1",
         flight_id=sample_flight.id,
         user_id=1,
+        active_source_key="gopro_overlay:test-source",
         status="queued",
         progress=0,
         title="Premier envoi",
@@ -607,6 +1085,7 @@ def test_database_rejects_two_active_uploads_for_the_same_flight(db_session, sam
         id="youtube-job-2",
         flight_id=sample_flight.id,
         user_id=1,
+        active_source_key="gopro_overlay:test-source",
         status="uploading",
         progress=1,
         title="Deuxième envoi",
@@ -753,14 +1232,29 @@ def test_youtube_video_metadata_marks_only_current_users_completed_upload_as_del
         )
     )
     db_session.commit()
+
+    metadata_queries: list[dict[int, set[str]]] = []
+
+    def youtube_metadata(video_ids_by_user: dict[int, set[str]]) -> dict[str, dict[str, Any]]:
+        metadata_queries.append(
+            {owner_id: set(video_ids) for owner_id, video_ids in video_ids_by_user.items()}
+        )
+        return {
+            "dQw4w9WgXcQ": {
+                "exists": True,
+                "title": "Vol du 02/10/2026 - face",
+            }
+        }
+
     monkeypatch.setattr(
         youtube_upload,
-        "youtube_video_availability",
-        lambda _video_ids_by_user: {"dQw4w9WgXcQ": True},
+        "youtube_video_metadata",
+        youtube_metadata,
     )
 
     response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/youtube-videos")
 
+    assert metadata_queries == [{1: {"dQw4w9WgXcQ"}}]
     assert response.status_code == 200
     assert response.json() == [
         {
@@ -768,18 +1262,21 @@ def test_youtube_video_metadata_marks_only_current_users_completed_upload_as_del
             "video_id": "dQw4w9WgXcQ",
             "can_delete_from_youtube": True,
             "exists_on_youtube": True,
+            "title": "Vol du 02/10/2026 - face",
         },
         {
             "url": "https://www.youtube.com/watch?v=abcdefghijk",
             "video_id": "abcdefghijk",
             "can_delete_from_youtube": False,
             "exists_on_youtube": None,
+            "title": None,
         },
         {
             "url": "https://www.youtube.com/watch?v=Zyxwvutsr_1",
             "video_id": "Zyxwvutsr_1",
             "can_delete_from_youtube": False,
             "exists_on_youtube": None,
+            "title": None,
         },
     ]
 
@@ -801,6 +1298,7 @@ def test_youtube_video_metadata_disables_remote_deletion_when_disconnected(
             "video_id": "dQw4w9WgXcQ",
             "can_delete_from_youtube": False,
             "exists_on_youtube": None,
+            "title": "Uploaded video",
         }
     ]
 
@@ -823,8 +1321,8 @@ def test_youtube_video_metadata_reports_a_video_deleted_directly_from_youtube(
     db_session.commit()
     monkeypatch.setattr(
         youtube_upload,
-        "youtube_video_availability",
-        lambda _video_ids_by_user: {"dQw4w9WgXcQ": False},
+        "youtube_video_metadata",
+        lambda _video_ids_by_user: {"dQw4w9WgXcQ": {"exists": False, "title": None}},
     )
 
     response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/youtube-videos")
@@ -836,6 +1334,7 @@ def test_youtube_video_metadata_reports_a_video_deleted_directly_from_youtube(
             "video_id": "dQw4w9WgXcQ",
             "can_delete_from_youtube": True,
             "exists_on_youtube": False,
+            "title": "Uploaded video",
         }
     ]
 

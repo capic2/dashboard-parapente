@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useCurrentTime } from '../../hooks/useCurrentTime';
 import { getStaleTime } from '../../lib/cacheConfig';
 import { parseApiLocalDate } from '../../lib/date';
 import {
@@ -27,10 +28,11 @@ export default function Forecast7Day({
   onSelectDay,
 }: Forecast7DayProps) {
   const { t, i18n } = useTranslation();
+  const currentTime = useCurrentTime();
 
   const formatDate = (dateStr: string): string => {
     const date = parseApiLocalDate(dateStr);
-    const today = new Date();
+    const today = new Date(currentTime);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 

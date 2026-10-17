@@ -7,6 +7,9 @@ import App from './App';
 import './App.css';
 import { initTheme } from './stores/themeStore';
 import { appTitle } from './lib/appEnvironment';
+import { registerPreloadErrorRecovery } from './lib/preloadErrorRecovery';
+
+registerPreloadErrorRecovery();
 
 document.title = appTitle;
 
@@ -20,7 +23,7 @@ async function enableMocking() {
     // `worker.start()` retourne une Promise qui se résout
     // une fois que le Service Worker est prêt à intercepter les requêtes
     return worker.start({
-      onUnhandledRequest: 'bypass', // Ignore les requêtes non mockées
+      onUnhandledFrame: 'bypass', // Ignore les requêtes non mockées
     });
   }
 }

@@ -5,6 +5,7 @@ import { fn } from 'storybook/test';
 
 const mockFlight: FlightSummary = {
   id: 'flight-1',
+  tags: [],
   flight_date: '2024-03-15',
   site_name: 'Puy de Dome',
   site_id: 'site-1',
@@ -25,6 +26,7 @@ const mockFlight: FlightSummary = {
   youtube_upload_progress: null,
   has_gopro_overlay: true,
   has_pano_video: false,
+  has_osv: false,
   has_highlight_video: false,
   video_export_job_id: null,
   video_export_status: null,
@@ -143,6 +145,7 @@ export const WithYoutubeVideo = meta.story({
           has_video: false,
           has_youtube_video: true,
           youtube_video_count: 2,
+          youtube_video_types: ['face', 'pano'],
           has_gopro_overlay: false,
         }}
         isActive={false}

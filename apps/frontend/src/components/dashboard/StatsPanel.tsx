@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import {
   CalendarDays,
+  ChevronDown,
   Clock3,
   Compass,
   MapPin,
@@ -64,50 +65,66 @@ export default function StatsPanel() {
     isRefetching,
   } = useFlightStats();
 
+  let summaryStatus = t('dashboard.flightStatsSummary');
+  if (isLoading) summaryStatus = t('common.loading');
+  else if (error || !stats) summaryStatus = t('common.dataUnavailable');
+  const summary = (
+    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-1 py-2 text-slate-800 outline-none marker:hidden focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-slate-100 [&::-webkit-details-marker]:hidden">
+      <span className="flex items-center gap-2 font-bold">
+        <Waves
+          className="h-4 w-4 text-sky-600 dark:text-sky-400"
+          aria-hidden="true"
+        />
+        {t('stats.title')}
+      </span>
+      <span className="flex items-center gap-2 text-right text-xs font-medium text-slate-500 dark:text-slate-400">
+        {summaryStatus}
+        <ChevronDown
+          className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180"
+          aria-hidden="true"
+        />
+      </span>
+    </summary>
+  );
+
   if (isLoading) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-md shadow-slate-200/60 dark:border-slate-700 dark:bg-slate-900/90 dark:shadow-black/20">
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
-          <Waves
-            className="h-4 w-4 text-sky-600 dark:text-sky-400"
-            aria-hidden="true"
-          />
-          {t('stats.title')}
-        </h2>
-        <div className="py-5 text-center text-sm text-slate-500 dark:text-slate-400">
+      <details className="group rounded-2xl border border-slate-200 bg-white/90 p-4 dark:border-slate-700 dark:bg-slate-900/90">
+        {summary}
+        <output
+          className="border-t border-slate-100 pt-3 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400"
+          aria-live="polite"
+        >
           {t('common.loading')}
-        </div>
-      </div>
+        </output>
+      </details>
     );
   }
 
   if (error || !stats) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-md shadow-slate-200/60 dark:border-slate-700 dark:bg-slate-900/90 dark:shadow-black/20">
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
-          <Waves
-            className="h-4 w-4 text-sky-600 dark:text-sky-400"
-            aria-hidden="true"
-          />
-          {t('stats.title')}
-        </h2>
-        <div className="py-5 text-center text-red-500 dark:text-red-400 text-sm">
-          {t('common.dataUnavailable')}
+      <details
+        open
+        className="group rounded-2xl border border-slate-200 bg-white/90 p-4 dark:border-slate-700 dark:bg-slate-900/90"
+      >
+        {summary}
+        <div className="border-t border-slate-100 pt-3 text-center text-sm text-red-500 dark:border-slate-700 dark:text-red-400">
+          <p className="mb-3">{t('common.dataUnavailable')}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={() => void refetch()}
+            isDisabled={isRefetching}
+            className="mx-auto"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`}
+              aria-hidden="true"
+            />
+            {t('common.refresh')}
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onPress={() => void refetch()}
-          isDisabled={isRefetching}
-          className="mx-auto"
-        >
-          <RefreshCw
-            className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`}
-            aria-hidden="true"
-          />
-          {t('common.refresh')}
-        </Button>
-      </div>
+      </details>
     );
   }
 
@@ -187,20 +204,15 @@ export default function StatsPanel() {
   ];
 
   return (
-    <div className="flex flex-1 flex-col rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-md shadow-slate-200/60 dark:border-slate-700 dark:bg-slate-900/90 dark:shadow-black/20">
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
-        <Waves
-          className="h-4 w-4 text-sky-600 dark:text-sky-400"
-          aria-hidden="true"
-        />
-        {t('stats.title')}
-      </h2>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 flex-1">
-        {cards.map((card) => (
-          <StatCard key={card.label} {...card} />
-        ))}
+    <details className="group rounded-2xl border border-slate-200 bg-white/90 p-4 dark:border-slate-700 dark:bg-slate-900/90">
+      {summary}
+      <div className="border-t border-slate-100 pt-3 dark:border-slate-700">
+        <div className="grid flex-1 grid-cols-1 gap-2.5 md:grid-cols-2 md:gap-3 lg:grid-cols-4">
+          {cards.map((card) => (
+            <StatCard key={card.label} {...card} />
+          ))}
+        </div>
       </div>
-    </div>
+    </details>
   );
 }

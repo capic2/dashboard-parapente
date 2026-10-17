@@ -36,6 +36,10 @@ This file defines global rules for the entire monorepo.
 - Do not use destructive commands (`reset --hard`, `checkout --`, etc.).
 - Keep commits small and explicit.
 - Use Conventional Commits when a commit is requested.
+- Before every push or pull request, fetch the current `origin/main`, verify the
+  branch is based on that ref, and check for conflicts with `git merge-tree` or
+  an equivalent read-only comparison. Confirm that the final diff contains the
+  intended changes and that no expected commit was dropped before pushing.
 
 ## Security
 

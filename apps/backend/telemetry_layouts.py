@@ -108,6 +108,12 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
                 raise ValueError("Telemetry text must contain 1 to 500 characters")
         if widget.tag == "pip" and widget.attrib.get("action") not in VALID_PIP_ACTIONS:
             raise ValueError("Telemetry PiP action is invalid")
+        if widget.tag == "pip" and widget.attrib.get("apply-offset") not in {
+            None,
+            "true",
+            "false",
+        }:
+            raise ValueError("Telemetry PiP offset setting is invalid")
         element_name = widget.attrib.get("label")
         if element_name is not None and not 1 <= len(element_name) <= 100:
             raise ValueError("Telemetry element names must contain 1 to 100 characters")

@@ -14,7 +14,7 @@ if (options.help) {
 
 const output = options.output
   ? resolve(options.output)
-  : resolve('/tmp/opencode/storybook-visual-preview/storybook.png');
+  : resolve('/tmp/codex/storybook-visual-preview/storybook.png');
 
 const width = parsePositiveInt(options.width, 1440, 'width');
 const height = parsePositiveInt(options.height, 1000, 'height');

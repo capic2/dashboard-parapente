@@ -14,13 +14,14 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from auth import create_job_token
-from models import YoutubeUploadJob
+from models import GoproOverlayJob, VideoExportJob, YoutubeUploadJob
 from routes import (
     _get_video_export_jobs_payload,
     _video_export_can_cancel,
     _video_export_can_delete,
     serialize_sse_event,
 )
+from youtube_upload import YoutubeUploadAlreadyActiveError
 
 
 class TestHighlightExportLifecycleRules:
@@ -84,15 +85,32 @@ class TestHighlightExportLifecycleRules:
             }
         )
 
-    def test_youtube_upload_never_exposes_highlight_lifecycle_actions(self):
-        job = {
-            "mode": "youtube_upload",
-            "job_id": "youtube-1",
-            "flight_id": "flight-1",
-            "status": "running",
-        }
-        assert not _video_export_can_cancel(job)
-        assert not _video_export_can_delete(job)
+    def test_active_youtube_uploads_can_be_cancelled_but_not_deleted(self):
+        for status in ("preparing", "queued", "uploading"):
+            job = {
+                "mode": "youtube_upload",
+                "job_id": "youtube-1",
+                "flight_id": "flight-1",
+                "status": status,
+            }
+            assert _video_export_can_cancel(job)
+            assert not _video_export_can_delete(job)
+
+        assert not _video_export_can_cancel(
+            {
+                "mode": "youtube_upload",
+                "job_id": "youtube-1",
+                "flight_id": "flight-1",
+                "status": "completed",
+            }
+        )
+        assert not _video_export_can_cancel(
+            {
+                "mode": "youtube_upload",
+                "job_id": "youtube-1",
+                "status": "uploading",
+            }
+        )
 
 
 API_PREFIX = "/api"
@@ -100,6 +118,214 @@ API_PREFIX = "/api"
 
 class TestVideoExportStartEndpoint:
     """Tests for POST /flights/{flight_id}/export-video"""
+
+    def test_youtube_overlay_export_requires_youtube_url(self, client):
+        response = client.post(
+            f"{API_PREFIX}/flights/unknown/youtube-overlay-export",
+            json={},
+            headers={"Authorization": "Bearer test-token"},
+        )
+        assert response.status_code == 422
+
+    def test_youtube_overlay_export_rejects_unknown_flight(self, client):
+        response = client.post(
+            f"{API_PREFIX}/flights/unknown/youtube-overlay-export",
+            json={
+                "youtube_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            },
+            headers={"Authorization": "Bearer test-token"},
+        )
+        assert response.status_code == 404
+
+    def test_youtube_overlay_export_rejects_unassociated_video(self, client, sample_flight):
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/youtube-overlay-export",
+            json={
+                "youtube_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            },
+            headers={"Authorization": "Bearer test-token"},
+        )
+        assert response.status_code == 400
+
+    def test_youtube_overlay_export_rejects_unconfigured_youtube(
+        self, client, db_session, sample_flight, monkeypatch
+    ):
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        sample_flight.youtube_urls = [youtube_url]
+        db_session.commit()
+        monkeypatch.setattr("routes.is_youtube_configured", lambda: False)
+
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/youtube-overlay-export",
+            json={"youtube_url": youtube_url},
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 503
+
+    def test_youtube_overlay_export_rejects_disconnected_youtube(
+        self, client, db_session, sample_flight, monkeypatch
+    ):
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        sample_flight.youtube_urls = [youtube_url]
+        db_session.commit()
+        monkeypatch.setattr("routes.is_youtube_configured", lambda: True)
+        monkeypatch.setattr("routes.is_youtube_connected", lambda db, user_id: False)
+
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/youtube-overlay-export",
+            json={"youtube_url": youtube_url},
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 409
+
+    def test_youtube_overlay_export_rejects_active_youtube_upload(
+        self, client, db_session, sample_flight, monkeypatch
+    ):
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        sample_flight.youtube_urls = [youtube_url]
+        db_session.add(
+            YoutubeUploadJob(
+                id="active-youtube-overlay-upload",
+                flight_id=sample_flight.id,
+                user_id=1,
+                source_type="youtube_overlay",
+                status="preparing",
+                progress=0,
+                title="Overlay en préparation",
+                description="",
+                privacy_status="unlisted",
+            )
+        )
+        db_session.commit()
+        monkeypatch.setattr("routes.is_youtube_configured", lambda: True)
+        monkeypatch.setattr("routes.is_youtube_connected", lambda db, user_id: True)
+
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/youtube-overlay-export",
+            json={"youtube_url": youtube_url},
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 409
+
+    def test_youtube_overlay_export_accepts_saved_legacy_overlay(
+        self, client, db_session, sample_flight, monkeypatch
+    ):
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        sample_flight.youtube_urls = [youtube_url]
+        sample_flight.gopro_overlay_gpx_offset = 12.5
+        db_session.add(
+            GoproOverlayJob(
+                id="saved-legacy-overlay",
+                flight_id=sample_flight.id,
+                status="completed",
+                video_path="/data/source.mp4",
+                gpx_path="/data/flight.gpx",
+                layout_id="default",
+                layout_label="Default",
+                layout_path="/data/layout.json",
+                output_path="/data/render.mp4",
+                temp_output_path="/data/render.mp4.tmp",
+                output_filename="render.mp4",
+                command_json=json.dumps({"overlay_only": False}),
+            )
+        )
+        db_session.commit()
+        monkeypatch.setattr("routes.is_youtube_configured", lambda: True)
+        monkeypatch.setattr("routes.is_youtube_connected", lambda db, user_id: True)
+
+        with patch(
+            "routes.start_youtube_overlay_export", return_value="youtube-export-1"
+        ) as mock_start:
+            response = client.post(
+                f"{API_PREFIX}/flights/{sample_flight.id}/youtube-overlay-export",
+                json={"youtube_url": youtube_url},
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        assert response.status_code == 202
+        assert response.json()["job_id"] == "youtube-export-1"
+        assert response.json()["status"] == "queued"
+        assert response.json()["operation_id"]
+        assert mock_start.call_args.kwargs["overlay_job_id"] == "saved-legacy-overlay"
+        assert mock_start.call_args.kwargs["overlay_offset_seconds"] == 12.5
+
+    def test_youtube_telemetry_layout_export_rejects_active_upload(
+        self, client, db_session, sample_flight, monkeypatch
+    ):
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        sample_flight.youtube_urls = [youtube_url]
+        db_session.add(
+            YoutubeUploadJob(
+                id="active-layout-upload",
+                flight_id=sample_flight.id,
+                user_id=1,
+                source_type="youtube_overlay",
+                status="preparing",
+                progress=0,
+                title="Layout en préparation",
+                description="",
+                privacy_status="unlisted",
+            )
+        )
+        db_session.commit()
+        monkeypatch.setattr("routes.is_youtube_configured", lambda: True)
+        monkeypatch.setattr("routes.is_youtube_connected", lambda db, user_id: True)
+
+        response = client.post(
+            f"{API_PREFIX}/flights/{sample_flight.id}/youtube-telemetry-layout-export",
+            json={"youtube_url": youtube_url, "offset_seconds": 3.5},
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 409
+
+    def test_youtube_telemetry_layout_export_starts_successfully(
+        self, client, db_session, sample_flight, monkeypatch
+    ):
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        sample_flight.youtube_urls = [youtube_url]
+        db_session.commit()
+        monkeypatch.setattr("routes.is_youtube_configured", lambda: True)
+        monkeypatch.setattr("routes.is_youtube_connected", lambda db, user_id: True)
+
+        with patch(
+            "routes.start_youtube_telemetry_layout_export", return_value="layout-export-1"
+        ) as mock_start:
+            response = client.post(
+                f"{API_PREFIX}/flights/{sample_flight.id}/youtube-telemetry-layout-export",
+                json={"youtube_url": youtube_url, "offset_seconds": 3.5},
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        assert response.status_code == 202
+        assert response.json()["job_id"] == "layout-export-1"
+        assert response.json()["status"] == "queued"
+        assert response.json()["operation_id"]
+        assert mock_start.call_args.kwargs["offset_seconds"] == 3.5
+
+    def test_youtube_telemetry_layout_export_maps_concurrent_duplicate_to_conflict(
+        self, client, db_session, sample_flight, monkeypatch
+    ):
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        sample_flight.youtube_urls = [youtube_url]
+        db_session.commit()
+        monkeypatch.setattr("routes.is_youtube_configured", lambda: True)
+        monkeypatch.setattr("routes.is_youtube_connected", lambda db, user_id: True)
+
+        with patch(
+            "routes.start_youtube_telemetry_layout_export",
+            side_effect=YoutubeUploadAlreadyActiveError("already active"),
+        ):
+            response = client.post(
+                f"{API_PREFIX}/flights/{sample_flight.id}/youtube-telemetry-layout-export",
+                json={"youtube_url": youtube_url, "offset_seconds": 3.5},
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        assert response.status_code == 409
 
     def test_start_video_export_prefers_manual_when_available(
         self, client: TestClient, sample_flight
@@ -571,6 +797,48 @@ class TestExportStatusAndCancel:
 
         assert response.status_code == 401
 
+    def test_export_viewer_youtube_pip_uses_flight_temporary_work_dir(
+        self, client: TestClient, db_session, sample_flight, tmp_path, monkeypatch
+    ):
+        job_id = "job-youtube-pip"
+        slot_id = "slot-youtube-pip"
+        db_session.add(
+            VideoExportJob(
+                id=job_id,
+                flight_id=sample_flight.id,
+                status="running",
+                mode="youtube_telemetry_layout",
+                pip_exports=json.dumps([{"slot_id": slot_id}]),
+            )
+        )
+        db_session.commit()
+
+        work_dir = tmp_path / "flight" / "temp" / "youtube-exports" / job_id
+        pip_video = work_dir / "youtube-pip" / "pip-0" / "source.mp4"
+        pip_video.parent.mkdir(parents=True)
+        pip_video.write_bytes(b"youtube-pip-video")
+        resolved_jobs: list[tuple[str, str]] = []
+
+        def resolve_work_dir(export_job_id: str, flight_id: str) -> Path:
+            resolved_jobs.append((export_job_id, flight_id))
+            return work_dir
+
+        monkeypatch.setattr("youtube_overlay_export.new_work_dir", resolve_work_dir)
+        token = create_job_token(
+            purpose="video_export",
+            job_id=job_id,
+            flight_id=sample_flight.id,
+        )
+
+        response = client.get(
+            f"{API_PREFIX}/export-viewer/jobs/{job_id}/youtube-pip",
+            params={"access_token": token, "slot_id": slot_id},
+        )
+
+        assert response.status_code == 200
+        assert response.content == b"youtube-pip-video"
+        assert resolved_jobs == [(job_id, sample_flight.id)]
+
 
 class TestVideoExportJobsEndpoint:
     """Tests for GET /video-export-jobs."""
@@ -610,6 +878,7 @@ class TestVideoExportJobsEndpoint:
         with (
             patch("routes.list_exports_manual", return_value=manual_jobs),
             patch("routes.list_exports_stream", return_value=[]),
+            patch("routes.has_video_export_temp_files", return_value=True),
             patch(
                 "routes.list_gopro_overlay_jobs",
                 return_value=[
@@ -629,6 +898,7 @@ class TestVideoExportJobsEndpoint:
             response = client.get(f"{API_PREFIX}/video-export-jobs")
 
         assert response.status_code == 200
+        assert response.json()["temp_files_available"] is True
         jobs = response.json()["jobs"]
         assert jobs[0]["job_id"] == "job-overlay"
         assert jobs[0]["status"] == "running"
@@ -831,7 +1101,7 @@ class TestVideoExportJobsEndpoint:
         assert jobs[0]["flight_id"] == sample_flight.id
         assert jobs[0]["status"] == "uploading"
         assert jobs[0]["progress"] == 42
-        assert jobs[0]["mode"] == "youtube"
+        assert jobs[0]["mode"] == "youtube_upload"
         assert jobs[0]["can_cancel"] is True
 
     def test_export_status_passthrough_keeps_render_method(self, client: TestClient):
@@ -929,7 +1199,7 @@ class TestVideoExportJobsEndpoint:
 
         assert response.status_code == 200
         assert response.json() == cleanup_payload
-        cleanup.assert_called_once_with(manual_jobs + stream_jobs)
+        cleanup.assert_called_once_with(manual_jobs + stream_jobs, include_retry_cache=True)
 
     def test_delete_video_export_job_row_removes_overlay_job(self, client: TestClient):
         delete_payload = {

@@ -12,6 +12,9 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 process.env.NODE_ENV = 'test';
 
 export default defineConfig({
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
+  },
   plugins: [react(), tailwindcss()],
   test: {
     globals: true,
@@ -32,14 +35,11 @@ export default defineConfig({
       {
         test: {
           name: 'unit',
+          sequence: { groupOrder: 0 },
           environment: 'happy-dom',
           setupFiles: ['./src/test/setup.ts'],
           include: ['src/**/*.{test,spec}.{ts,tsx}'],
-          exclude: [
-            'node_modules',
-            'dist',
-            '.storybook',
-          ],
+          exclude: ['node_modules', 'dist', '.storybook'],
           env: {
             VITE_API_URL: 'http://localhost:8001',
             VITE_ENABLE_MSW: 'false',
@@ -48,15 +48,15 @@ export default defineConfig({
       },
       {
         plugins: [
-          react(),
-          tailwindcss(),
           storybookTest({
             configDir: path.join(dirname, '.storybook'),
           }),
         ],
         test: {
           name: 'storybook',
+          sequence: { groupOrder: 1 },
           globals: true,
+          maxWorkers: 2,
           browser: {
             enabled: true,
             headless: true,

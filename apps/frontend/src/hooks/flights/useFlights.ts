@@ -160,7 +160,6 @@ export const useUpdateFlight = (
       // Validate API response with Zod
       const validation = ApiResponseSchema(FlightSchema).safeParse(data);
       if (!validation.success) {
-        console.error('❌ Update flight validation failed:', validation.error);
         throw new Error(
           `Invalid flight update response: ${validation.error.message}`
         );
@@ -212,21 +211,10 @@ export function useCreateFlight() {
   });
 }
 
-const IntervalsSyncResponseSchema = z.object({
-  success: z.boolean(),
-  imported: z.number().int().nonnegative(),
-  updated: z.number().int().nonnegative(),
-  skipped: z.number().int().nonnegative(),
-  failed: z.number().int().nonnegative(),
-  flights: z.array(
-    z.object({
-      id: z.string(),
-      external_provider: z.string(),
-      external_activity_id: z.string(),
-      name: z.string(),
-      date: z.string(),
-    })
-  ),
+const BackgroundOperationStartSchema = z.object({
+  operation_id: z.string(),
+  status: z.enum(['queued', 'running']),
+  detail_url: z.string(),
 });
 
 const IntervalsActivitySchema = z.object({
@@ -243,11 +231,11 @@ const IntervalsPreviewResponseSchema = z.object({
   activity_types: z.array(z.string()),
 });
 
-export type IntervalsSyncResponse = z.infer<typeof IntervalsSyncResponseSchema>;
+export type IntervalsSyncResponse = z.infer<
+  typeof BackgroundOperationStartSchema
+>;
 
 export function useIntervalsSyncMutation() {
-  const queryClient = useQueryClient();
-
   return useMutation<
     IntervalsSyncResponse,
     Error,
@@ -279,21 +267,13 @@ export function useIntervalsSyncMutation() {
         throw error;
       }
 
-      const validation = IntervalsSyncResponseSchema.safeParse(data);
+      const validation = BackgroundOperationStartSchema.safeParse(data);
       if (!validation.success) {
         // oxlint-disable-next-line no-console
         console.error('Invalid Intervals.icu sync response', validation.error);
         throw new Error(i18n.t('intervals.invalidResponse'));
       }
-      if (!validation.data.success) {
-        throw new Error(i18n.t('intervals.syncError'));
-      }
       return validation.data;
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['flights'] });
-      void queryClient.invalidateQueries({ queryKey: ['flights', 'stats'] });
-      void queryClient.invalidateQueries({ queryKey: ['flights', 'records'] });
     },
   });
 }

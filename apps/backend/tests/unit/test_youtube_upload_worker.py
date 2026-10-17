@@ -52,6 +52,77 @@ def test_upload_jobs_are_enqueued_on_dedicated_queue(monkeypatch) -> None:
     )
 
 
+def test_failed_overlay_upload_cleanup_preserves_flight_workspace_for_retry(
+    tmp_path, monkeypatch
+) -> None:
+    flight_root = tmp_path / "paragliding"
+    export_root = tmp_path / "legacy-exports"
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(flight_root))
+    monkeypatch.setattr(config, "VIDEO_EXPORT_DIR", str(export_root))
+    job_id = "overlay-job"
+    work_dir = flight_root / "20261016" / "01" / "temp" / "youtube-exports" / job_id
+    source_path = work_dir / f"youtube-overlay-{job_id}.mp4"
+    source_path.parent.mkdir(parents=True)
+    source_path.write_bytes(b"generated video")
+    cached_source = work_dir / "source.mp4"
+    cached_source.write_bytes(b"cached source")
+
+    youtube_upload._delete_generated_overlay_source(source_path)
+
+    assert work_dir.is_dir()
+    assert not source_path.exists()
+    assert cached_source.read_bytes() == b"cached source"
+
+
+def test_completed_overlay_upload_cleanup_removes_flight_temp_workspace(
+    tmp_path, monkeypatch
+) -> None:
+    flight_root = tmp_path / "paragliding"
+    export_root = tmp_path / "legacy-exports"
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(flight_root))
+    monkeypatch.setattr(config, "VIDEO_EXPORT_DIR", str(export_root))
+    job_id = "overlay-job"
+    work_dir = flight_root / "20261016" / "01" / "temp" / "youtube-exports" / job_id
+    source_path = work_dir / f"youtube-overlay-{job_id}.mp4"
+    source_path.parent.mkdir(parents=True)
+    source_path.write_bytes(b"generated video")
+
+    youtube_upload._delete_generated_overlay_source(source_path, cleanup_workspace=True)
+
+    assert not work_dir.exists()
+
+
+def test_generated_overlay_cleanup_rejects_parent_symlink_outside_flight_root(
+    tmp_path, monkeypatch
+) -> None:
+    flight_root = tmp_path / "paragliding"
+    export_root = tmp_path / "legacy-exports"
+    outside_temp = tmp_path / "outside" / "temp"
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(flight_root))
+    monkeypatch.setattr(config, "VIDEO_EXPORT_DIR", str(export_root))
+    job_id = "overlay-job"
+    outside_work_dir = outside_temp / "youtube-exports" / job_id
+    source_path = (
+        flight_root
+        / "20261016"
+        / "01"
+        / "temp"
+        / "youtube-exports"
+        / job_id
+        / f"youtube-overlay-{job_id}.mp4"
+    )
+    outside_work_dir.mkdir(parents=True)
+    outside_source_path = outside_work_dir / source_path.name
+    outside_source_path.write_bytes(b"generated video")
+    (flight_root / "20261016" / "01").mkdir(parents=True)
+    (flight_root / "20261016" / "01" / "temp").symlink_to(outside_temp)
+
+    youtube_upload._delete_generated_overlay_source(source_path, cleanup_workspace=True)
+
+    assert outside_source_path.read_bytes() == b"generated video"
+    assert outside_work_dir.is_dir()
+
+
 def test_legacy_shared_queue_job_is_removed_before_requeue(monkeypatch) -> None:
     legacy_job = Mock(origin="video-test-queue")
     queue = Mock()
@@ -68,6 +139,28 @@ def test_legacy_shared_queue_job_is_removed_before_requeue(monkeypatch) -> None:
         "youtube-upload-upload-job",
         queue_name="video-test-queue",
     )
+
+
+def test_source_video_path_refresh_finds_regular_file(tmp_path: Path) -> None:
+    video_path = tmp_path / "pano.mp4"
+    video_path.write_bytes(b"video")
+
+    assert youtube_upload._refresh_source_video_path(video_path) == video_path
+
+
+def test_source_video_path_refresh_returns_none_when_file_is_missing(
+    tmp_path: Path,
+) -> None:
+    assert youtube_upload._refresh_source_video_path(tmp_path / "missing.mp4") is None
+
+
+def test_source_video_path_refresh_ignores_symlink(tmp_path: Path) -> None:
+    target_path = tmp_path / "target.mp4"
+    target_path.write_bytes(b"video")
+    video_path = tmp_path / "pano.mp4"
+    video_path.symlink_to(target_path)
+
+    assert youtube_upload._refresh_source_video_path(video_path) is None
 
 
 def test_worker_recovers_uploads_and_listens_only_to_dedicated_queue(

@@ -19,10 +19,11 @@ permissions:
 jobs:
   main:
     name: main
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
     env:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      NX_NO_CLOUD: true
 
     steps:
       - name: 📥 Checkout
@@ -30,13 +31,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      # NX Local Cache: fallback when NX Cloud credits are exhausted
-      # This cache is also used for Renovate PRs to conserve NX Cloud credits
-      # Cache strategy:
-      #   - Primary: OS + pnpm-lock hash + git SHA (exact match)
-      #   - Fallback 1: OS + pnpm-lock hash (recent builds with same deps)
-      #   - Fallback 2: OS only (any recent build)
-      - name: 💾 Setup NX Cache (local fallback)
+      # Keep local Nx task results available for CI runs that do not use Nx Cloud.
+      - name: 💾 Setup NX Cache
         uses: actions/cache@v6
         with:
           path: .nx/cache
@@ -46,20 +42,21 @@ jobs:
             nx-${{ runner.os }}-
 
       - name: 📦 Setup pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: 🔧 Setup Node.js
-        uses: actions/setup-node@v7
+        uses: pnpm/setup@v3
         with:
-          node-version: '24'
-          cache: 'pnpm'
+          runtime: node@24
+          cache: true
+          cache-dependency-path: pnpm-lock.yaml
+          install: false
 
       - name: 🐍 Setup Python
         uses: actions/setup-python@v7
         with:
-          python-version: "3.14"
-          cache: "pip"
-          cache-dependency-path: apps/backend/requirements.txt
+          python-version: '3.15'
+          cache: 'pip'
+          cache-dependency-path: |
+            apps/backend/requirements.txt
+            apps/backend/constraints.txt
 
       - name: 📦 Install dependencies
         run: pnpm install --frozen-lockfile
@@ -67,7 +64,7 @@ jobs:
       - name: 📦 Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          cd apps/backend && pip install -r requirements.txt
+          cd apps/backend && pip install -c constraints.txt -r requirements.txt
 
       - name: 💾 Cache Playwright browsers
         id: playwright-cache-main
@@ -88,108 +85,140 @@ jobs:
       - name: 🔍 Check unused code (knip)
         run: pnpm knip
 
-      - name: 🔍 Derive SHAs for Nx affected
+      - name: 🔍 Derive SHAs for affected projects
+        if: github.event_name != 'pull_request' || !startsWith(github.event.pull_request.title, 'merge queue:')
         uses: nrwl/nx-set-shas@v5
         with:
           main-branch-name: 'main'
 
-      # NX Cloud strategy:
-      # - Default: NX Cloud ENABLED
-      # - If 'skip-nx-cloud' label present: use local cache only
-      # - If credits exhausted at runtime: auto-add label + auto-retry with local cache
-      # - Renovate PRs always have 'skip-nx-cloud' (configured in renovate.json)
-      - name: 🎛️ Configure NX Cloud execution
+      - name: 🔎 Check for application changes
+        id: application-changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          IS_MERGE_QUEUE: ${{ github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'merge queue:') }}
         run: |
-          if [[ "${{ github.event_name }}" == "push" ]]; then
-            echo "IS_AUTOMERGE=false" >> $GITHUB_ENV
-            echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
-            echo "Push to main: using local cache"
-          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name' 2>/dev/null || echo "")
-            if echo "$LABELS" | grep -qx "automerge"; then
-              echo "IS_AUTOMERGE=true" >> $GITHUB_ENV
-              echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
-              echo "Automerge: NX Cloud disabled for a full uncached validation"
-            elif echo "$LABELS" | grep -qx "skip-nx-cloud"; then
-              echo "IS_AUTOMERGE=false" >> $GITHUB_ENV
-              echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
-              echo "NX Cloud DISABLED (skip-nx-cloud label)"
-            else
-              echo "IS_AUTOMERGE=false" >> $GITHUB_ENV
-              echo "NX_NO_CLOUD=false" >> $GITHUB_ENV
-              echo "NX Cloud ENABLED"
-            fi
-          else
-            echo "IS_AUTOMERGE=false" >> $GITHUB_ENV
-            echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
+          if [[ "$GITHUB_EVENT_NAME" != "pull_request" ]]; then
+            echo "application_changes=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
-        env:
-          GH_TOKEN: ${{ github.token }}
 
-      - name: 🔨 Verify production frontend build
-        run: pnpm exec nx build frontend --configuration=production
+          if [[ "$IS_MERGE_QUEUE" == "true" ]]; then
+            echo "application_changes=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed_files=$(git diff --name-only "${BASE_SHA}...HEAD")
+          if [[ -z "$changed_files" ]]; then
+            echo "Could not determine changed files; keeping validation enabled."
+            echo "application_changes=true" >> "$GITHUB_OUTPUT"
+          elif grep -qvE '^(\.mergify\.yml|\.github/workflows/ci\.yml)$' <<< "$changed_files"; then
+            echo "application_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Only Mergify and CI workflow configuration changed; skipping Nx application validation."
+            echo "application_changes=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 🔨 Run full validation for Mergify queue
+        if: github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'merge queue:') && steps.application-changes.outputs.application_changes == 'true'
+        run: |
+          echo "::group::Full Nx validation for Mergify queue"
+          trap 'echo "::endgroup::"' EXIT
+          # Start Nx Cloud before the validation script's first Nx command.
+          pnpm dlx nx-cloud start-ci-run \
+            --distribute-on="3 linux-medium-python" \
+            --stop-agents-after="build,lint,type-check,test" \
+            --with-env-vars="TESTING,BACKEND_DATABASE_URL,BACKEND_WEATHERAPI_KEY,BACKEND_METEOBLUE_API_KEY,BACKEND_JWT_SECRET,VITE_CESIUM_ION_TOKEN"
+          bash .github/scripts/run-full-nx-validation.sh
         env:
-          NX_NO_CLOUD: true
+          NX_NO_CLOUD: 'false'
+          TESTING: true
+          BACKEND_DATABASE_URL: sqlite:///./test.db
+          BACKEND_WEATHERAPI_KEY: test_key
+          BACKEND_METEOBLUE_API_KEY: test_key
+          BACKEND_JWT_SECRET: ci-test-secret-not-for-production
           VITE_CESIUM_ION_TOKEN: ${{ secrets.VITE_CESIUM_ION_TOKEN }}
 
-      - name: 🔨 Run affected (build, lint, type-check, test)
-        id: nx_tasks
+      - name: 🔎 Resolve affected projects
+        id: affected-projects
+        if: (github.event_name != 'pull_request' || !startsWith(github.event.pull_request.title, 'merge queue:')) && steps.application-changes.outputs.application_changes == 'true'
         run: |
-          run_nx() {
-            local output
-            output=$(pnpm exec "$@" 2>&1) || {
-              echo "$output"
-              if echo "$output" | grep -qE "(Workspace is unable to be authorized|exceeding the FREE plan|Workspace is disabled)"; then
-                echo "NX_CLOUD_EXHAUSTED=true" >> $GITHUB_ENV
-                return 1
-              fi
-              return 1
-            }
-            echo "$output"
-          }
-
-          if [[ "$IS_AUTOMERGE" == "true" ]]; then
-            run_nx nx run-many -t build,lint,type-check,test --all --parallel=5 --exclude=e2e --skip-nx-cache
-          else
-            run_nx nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e
+          affected_projects=$(pnpm exec nx show projects --affected --json)
+          affected_count=0
+          if [[ -n "$affected_projects" ]]; then
+            affected_count=$(node -e 'console.log(JSON.parse(process.argv[1]).length)' "$affected_projects")
           fi
-        continue-on-error: true
+          echo "count=$affected_count" >> "$GITHUB_OUTPUT"
+          if [[ "$affected_count" == "0" ]]; then
+            echo "Nx found no affected projects; skipping application validation."
+          fi
+
+      - name: 🚀 Start Nx Cloud agents for pull request validation
+        if: github.event_name == 'pull_request' && !startsWith(github.event.pull_request.title, 'merge queue:') && steps.application-changes.outputs.application_changes == 'true' && steps.affected-projects.outputs.count != '0' && !contains(github.event.pull_request.labels.*.name, 'skip-nx-cloud')
+        run: |
+          pnpm dlx nx-cloud start-ci-run \
+            --distribute-on="3 linux-medium-python" \
+            --stop-agents-after="build,lint,type-check,test" \
+            --with-env-vars="TESTING,BACKEND_DATABASE_URL,BACKEND_WEATHERAPI_KEY,BACKEND_METEOBLUE_API_KEY,BACKEND_JWT_SECRET,VITE_CESIUM_ION_TOKEN"
+          echo "NX_NO_CLOUD=false" >> "$GITHUB_ENV"
         env:
-          NODE_OPTIONS: --preserve-symlinks
+          NX_NO_CLOUD: 'false'
           TESTING: true
           BACKEND_DATABASE_URL: sqlite:///./test.db
           BACKEND_WEATHERAPI_KEY: test_key
           BACKEND_METEOBLUE_API_KEY: test_key
           BACKEND_JWT_SECRET: ci-test-secret-not-for-production
+          VITE_CESIUM_ION_TOKEN: ${{ secrets.VITE_CESIUM_ION_TOKEN }}
 
-      - name: 💡 Handle NX Cloud credits exhaustion
-        if: steps.nx_tasks.outcome == 'failure' && env.NX_CLOUD_EXHAUSTED == 'true'
-        run: |
-          echo "NX Cloud credits exhausted - retrying with local cache"
-          echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
-
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels \
-              -f "labels[]=nx-cloud-no-credit" -f "labels[]=skip-nx-cloud" || true
-          fi
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      - name: 🔄 Retry with local cache
-        if: steps.nx_tasks.outcome == 'failure' && env.NX_CLOUD_EXHAUSTED == 'true'
+      - name: 🔨 Run affected validation for pull requests and pushes
+        if: (github.event_name != 'pull_request' || !startsWith(github.event.pull_request.title, 'merge queue:')) && steps.application-changes.outputs.application_changes == 'true' && steps.affected-projects.outputs.count != '0'
         run: pnpm exec nx affected -t build,lint,type-check,test --parallel=5 --exclude=e2e
         env:
-          NODE_OPTIONS: --preserve-symlinks
-          NX_NO_CLOUD: true
           TESTING: true
           BACKEND_DATABASE_URL: sqlite:///./test.db
           BACKEND_WEATHERAPI_KEY: test_key
           BACKEND_METEOBLUE_API_KEY: test_key
           BACKEND_JWT_SECRET: ci-test-secret-not-for-production
+          VITE_CESIUM_ION_TOKEN: ${{ secrets.VITE_CESIUM_ION_TOKEN }}
 
-      - name: ❌ Fail if non-NX-Cloud error
-        if: steps.nx_tasks.outcome == 'failure' && env.NX_CLOUD_EXHAUSTED != 'true'
-        run: exit 1
+      - name: 📋 Summarize backend test results
+        if: always() && hashFiles('coverage/apps/backend/junit.xml') != ''
+        run: |
+          python - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          report = ET.parse("coverage/apps/backend/junit.xml")
+          test_cases = report.findall(".//testcase")
+          failures = [
+              case
+              for case in test_cases
+              if case.find("failure") is not None or case.find("error") is not None
+          ]
+          skipped = sum(case.find("skipped") is not None for case in test_cases)
+          passed = len(test_cases) - len(failures) - skipped
+
+          lines = [
+              "## Backend test results",
+              "",
+              "| Passed | Failed | Skipped | Total |",
+              "| ---: | ---: | ---: | ---: |",
+              f"| {passed} | {len(failures)} | {skipped} | {len(test_cases)} |",
+          ]
+
+          if failures:
+              lines.extend(["", "### Failed tests", ""])
+              for case in failures:
+                  name = f"{case.get('classname', '')}::{case.get('name', 'unknown')}"
+                  detail = case.find("failure")
+                  if detail is None:
+                      detail = case.find("error")
+                  message = (detail.get("message") or "").strip() if detail is not None else ""
+                  lines.append(f"- `{name}`" + (f": {message}" if message else ""))
+
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
+              summary.write("\n".join(lines) + "\n")
+          PY
 
       - name: 📊 Upload frontend coverage
         if: always() && env.CODECOV_TOKEN != ''
@@ -211,7 +240,7 @@ jobs:
 
   e2e:
     name: E2E Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     if: github.event_name == 'pull_request'
     env:
@@ -232,20 +261,21 @@ jobs:
             nx-${{ runner.os }}-
 
       - name: 📦 Setup pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: 🔧 Setup Node.js
-        uses: actions/setup-node@v7
+        uses: pnpm/setup@v3
         with:
-          node-version: '24'
-          cache: 'pnpm'
+          runtime: node@24
+          cache: true
+          cache-dependency-path: pnpm-lock.yaml
+          install: false
 
       - name: 🐍 Setup Python
         uses: actions/setup-python@v7
         with:
-          python-version: "3.14"
-          cache: "pip"
-          cache-dependency-path: apps/backend/requirements.txt
+          python-version: '3.15'
+          cache: 'pip'
+          cache-dependency-path: |
+            apps/backend/requirements.txt
+            apps/backend/constraints.txt
 
       - name: 📦 Install dependencies
         run: pnpm install --frozen-lockfile
@@ -253,7 +283,7 @@ jobs:
       - name: 📦 Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          cd apps/backend && pip install -r requirements.txt
+          cd apps/backend && pip install -c constraints.txt -r requirements.txt
 
       - name: 💾 Cache Playwright browsers
         id: playwright-cache-e2e

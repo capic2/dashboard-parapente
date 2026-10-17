@@ -62,6 +62,23 @@ describe('flightViewerTelemetry', () => {
     expect(label).toBe('3313.6 ft\n37.3 mph');
   });
 
+  it('uses the speed recorded in the GPX for the cursor label', () => {
+    const coordinates = [
+      { lat: 0, lon: 0, elevation: 1000, timestamp: 0 },
+      {
+        lat: 0,
+        lon: 0.008993216059,
+        elevation: 1010,
+        timestamp: 60000,
+        speed_kmh: 18.5,
+      },
+    ];
+
+    expect(
+      computeCursorTelemetryLabel(1, coordinates, 0, DEFAULT_VIEWER_UNITS)
+    ).toBe('1010 m\n18.5 km/h');
+  });
+
   it('updates label values when scrubbing index changes', () => {
     const coordinates = [
       { lat: 0, lon: 0, elevation: 900, timestamp: 0 },

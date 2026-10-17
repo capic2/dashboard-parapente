@@ -40,3 +40,4 @@ def test_migration_adds_pilot_context_fields_idempotently() -> None:
     ).fetchone()
     assert site == ("{}",)
     assert flight == ("[]", None, None)
+    connection.close()

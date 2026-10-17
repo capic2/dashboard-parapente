@@ -27,7 +27,8 @@ export type GoproOverlayPreview = {
     end_time: string;
     duration_seconds: number;
     coordinates: GeoPoint[];
-    enrichment_status?: 'missing' | 'pending' | 'ready';
+    enrichment_status?: 'missing' | 'pending' | 'ready' | 'failed';
+    enrichment_error?: string | null;
   };
   alignment: {
     automatic_offset_seconds: number;
@@ -62,15 +63,6 @@ export function useFlightOverlayLayer(flightId: string) {
   });
 }
 
-export function useGenerateFlightOverlayLayer(flightId: string) {
-  return useMutation({
-    mutationFn: () =>
-      api
-        .post(`flights/${flightId}/overlay-layer`, { timeout: false })
-        .json<GoproOverlayJob>(),
-  });
-}
-
 export function goproPreviewRefetchInterval(
   status?: GoproOverlayPreview['video']['preview_status']
 ) {
@@ -87,6 +79,7 @@ export function useGoproOverlayPreview(flightId: string, enabled: boolean) {
         .get(`flights/${flightId}/gopro-overlay/preview`)
         .json<GoproOverlayPreview>(),
     enabled,
+    refetchOnWindowFocus: false,
     refetchInterval: (query) => {
       const data = query.state.data;
       if (data?.gpx?.enrichment_status === 'pending') return 2000;
@@ -124,22 +117,14 @@ export function useGenerateGoproMerge(flightId: string) {
         .post(`flights/${flightId}/gopro-overlay/merge`)
         .json<{ status: 'missing' | 'pending' | 'ready' }>(),
     onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: ['flights', flightId, 'gopro-overlay-preview'],
-      }),
-  });
-}
-
-export function useCreateFlightGoproOverlayJob(flightId: string) {
-  return useMutation({
-    mutationFn: async (formData: FormData) => {
-      return await api
-        .post(`flights/${flightId}/gopro-overlay`, {
-          body: formData,
-          timeout: false,
-        })
-        .json<GoproOverlayJob>();
-    },
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ['flights', flightId, 'gopro-overlay-preview'],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['flights', flightId, 'telemetry'],
+        }),
+      ]),
   });
 }
 

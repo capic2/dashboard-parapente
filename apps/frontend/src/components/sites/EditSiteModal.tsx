@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,12 +19,18 @@ import type {
   CreateSiteData,
 } from '@dashboard-parapente/shared-types';
 import { Modal } from '@dashboard-parapente/design-system';
+import { getApiErrorMessage } from '../../lib/api';
 import LandingAssociationsManager from './LandingAssociationsManager';
 import {
   useLocationSearch,
   useNearbyFlightOptions,
 } from '../../hooks/weather/useCityWeather';
 import { useSites } from '../../hooks/sites/useSites';
+import {
+  useSuggestSitePracticalInfo,
+  type SitePracticalInfoKey,
+  type SitePracticalInfoSuggestions,
+} from '../../hooks/sites/useSiteMutations';
 
 type SiteFormData = Required<SiteUpdate>;
 type SiteUsageType = 'takeoff' | 'landing' | 'both';
@@ -141,6 +148,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
 
   const [originalData, setOriginalData] = useState<SiteFormData | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saveError, setSaveError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -150,6 +158,17 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
   const [limit, setLimit] = useState(5);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
   const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
+  const [suggestionSources, setSuggestionSources] = useState<
+    { title: string; url: string }[]
+  >([]);
+  const [suggestionDraft, setSuggestionDraft] =
+    useState<SitePracticalInfoSuggestions | null>(null);
+  const [suggestionSiteIdentity, setSuggestionSiteIdentity] = useState<
+    string | null
+  >(null);
+  const [suggestionStatus, setSuggestionStatus] = useState('');
+  const [suggestionError, setSuggestionError] = useState('');
+  const practicalInfoSuggestion = useSuggestSitePracticalInfo();
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setDebouncedQuery(query), 300);
@@ -247,6 +266,12 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
       setSelectedSpotId(null);
     }
     setErrors({});
+    setSaveError('');
+    setSuggestionSources([]);
+    setSuggestionDraft(null);
+    setSuggestionSiteIdentity(null);
+    setSuggestionStatus('');
+    setSuggestionError('');
   }, [site, isOpen]);
 
   useEffect(() => {
@@ -298,6 +323,67 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
     return { latitude: lat, longitude: lon, elevation_m: elev };
   };
 
+  const latitudeForSuggestions = Number(latitudeRaw);
+  const longitudeForSuggestions = Number(longitudeRaw);
+  const suggestionRequestIdentity = JSON.stringify({
+    name: formData.name.trim(),
+    latitude: latitudeRaw,
+    longitude: longitudeRaw,
+    region: formData.region.trim(),
+    country: formData.country,
+    usage_type: formData.usage_type,
+  });
+  const latestSuggestionRequestIdentity = useRef(suggestionRequestIdentity);
+  latestSuggestionRequestIdentity.current = suggestionRequestIdentity;
+  const canSuggestPracticalInfo =
+    formData.name.trim().length >= 2 &&
+    latitudeRaw.trim() !== '' &&
+    longitudeRaw.trim() !== '' &&
+    Number.isFinite(latitudeForSuggestions) &&
+    latitudeForSuggestions >= -90 &&
+    latitudeForSuggestions <= 90 &&
+    Number.isFinite(longitudeForSuggestions) &&
+    longitudeForSuggestions >= -180 &&
+    longitudeForSuggestions <= 180;
+
+  const hasCurrentSiteSuggestions =
+    suggestionSiteIdentity === suggestionRequestIdentity;
+
+  const handleSuggestPracticalInfo = async () => {
+    const requestIdentity = suggestionRequestIdentity;
+    setSuggestionError('');
+    setSuggestionStatus('');
+    setSuggestionSources([]);
+    setSuggestionDraft(null);
+    setSuggestionSiteIdentity(null);
+
+    try {
+      const result = await practicalInfoSuggestion.mutateAsync({
+        name: formData.name.trim(),
+        latitude: latitudeForSuggestions,
+        longitude: longitudeForSuggestions,
+        ...(formData.region.trim() && { region: formData.region.trim() }),
+        ...(formData.country && { country: formData.country }),
+        usage_type: formData.usage_type,
+      });
+      if (latestSuggestionRequestIdentity.current !== requestIdentity) return;
+      setSuggestionSiteIdentity(requestIdentity);
+      setSuggestionSources(result.sources);
+      setSuggestionDraft(result);
+      setSuggestionStatus(
+        Object.values(result.suggestions).some((value) => value.trim())
+          ? t('editSite.suggestionsReady')
+          : t('editSite.noSuggestions')
+      );
+    } catch (error) {
+      if (latestSuggestionRequestIdentity.current !== requestIdentity) return;
+      setSuggestionSiteIdentity(requestIdentity);
+      setSuggestionError(
+        await getApiErrorMessage(error, t('editSite.suggestionsError'))
+      );
+    }
+  };
+
   const validate = () => {
     const newErrors: Record<string, string> = {};
     const lat = parseFloat(latitudeRaw) || 0;
@@ -321,6 +407,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaveError('');
 
     const parsed = parseNumericFields();
 
@@ -360,8 +447,8 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         });
       }
       onClose();
-    } catch {
-      alert(t('editSite.saveError'));
+    } catch (error) {
+      setSaveError(await getApiErrorMessage(error, t('editSite.saveError')));
     } finally {
       setIsSaving(false);
     }
@@ -695,37 +782,166 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           </div>
         </div>
 
-        <fieldset className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/50">
-          <legend className="px-1 text-sm font-semibold text-slate-900 dark:text-white">
-            Informations pratiques privées
-          </legend>
-          <p className="text-xs text-slate-600 dark:text-slate-300">
-            Ces informations sont personnelles et ne sont jamais affichées comme
-            des données communautaires.
-          </p>
-          {[
-            ['access', 'Accès / parking'],
-            ['rules', 'Consignes locales'],
-            ['webcam', 'Webcam ou lien utile'],
-            ['contact', 'Contact club'],
-            ['hazards', 'Risques ou pièges connus'],
-          ].map(([key, label]) => (
-            <TextField
-              key={key}
-              value={formData.practical_info[key] ?? ''}
-              onChange={(value: string) =>
-                setFormData({
-                  ...formData,
-                  practical_info: { ...formData.practical_info, [key]: value },
-                })
-              }
-              className="flex flex-col gap-1"
-            >
-              <Label className={labelClass}>{label}</Label>
-              <Input className={inputClass} />
-            </TextField>
-          ))}
-        </fieldset>
+        <details className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/50">
+          <summary className="cursor-pointer font-semibold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-white">
+            {t('editSite.privatePracticalInfo')} ({t('editSite.optional')})
+          </summary>
+          <fieldset className="mt-3 space-y-3">
+            <legend className="sr-only">
+              {t('editSite.privatePracticalInfo')}
+            </legend>
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              {t('editSite.privatePracticalInfoHelp')}
+            </p>
+            <div className="space-y-2">
+              <Button
+                type="button"
+                onPress={handleSuggestPracticalInfo}
+                isDisabled={
+                  !canSuggestPracticalInfo ||
+                  isSaving ||
+                  practicalInfoSuggestion.isPending
+                }
+                className="inline-flex items-center gap-2 rounded bg-sky-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+              >
+                {practicalInfoSuggestion.isPending ? (
+                  <Loader2
+                    className="h-4 w-4 animate-spin"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <MapPin className="h-4 w-4" aria-hidden="true" />
+                )}
+                {practicalInfoSuggestion.isPending
+                  ? t('editSite.searchingSuggestions')
+                  : t('editSite.suggestPracticalInfo')}
+              </Button>
+              {!canSuggestPracticalInfo && (
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {t('editSite.suggestionsNeedCoordinates')}
+                </p>
+              )}
+              {hasCurrentSiteSuggestions && suggestionStatus && (
+                <p
+                  className="text-xs text-emerald-700 dark:text-emerald-300"
+                  aria-live="polite"
+                >
+                  {suggestionStatus}
+                </p>
+              )}
+              {hasCurrentSiteSuggestions && suggestionError && (
+                <p
+                  className="text-xs text-red-700 dark:text-red-300"
+                  role="alert"
+                >
+                  {suggestionError}
+                </p>
+              )}
+              {hasCurrentSiteSuggestions && suggestionSources.length > 0 && (
+                <div className="text-xs text-slate-600 dark:text-slate-300">
+                  <p className="font-medium">
+                    {t('editSite.suggestionSources')}
+                  </p>
+                  <ul className="mt-1 list-inside list-disc space-y-1">
+                    {suggestionSources.map((source) => (
+                      <li key={source.url}>
+                        <a
+                          href={source.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline decoration-slate-400 underline-offset-2 hover:text-sky-600 dark:hover:text-sky-300"
+                        >
+                          {source.title}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {hasCurrentSiteSuggestions &&
+                suggestionDraft?.grounded_result && (
+                  <div className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                    <p className="text-xs font-medium text-slate-700 dark:text-slate-200">
+                      {t(
+                        suggestionDraft.grounded_result_is_verified
+                          ? 'editSite.groundedSearchResult'
+                          : 'editSite.unverifiedSearchResult'
+                      )}
+                    </p>
+                    {!suggestionDraft.grounded_result_is_verified && (
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        {t('editSite.unverifiedSearchResultHelp')}
+                      </p>
+                    )}
+                    <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words text-xs text-slate-600 dark:text-slate-300">
+                      {suggestionDraft.grounded_result}
+                    </pre>
+                    {suggestionDraft.search_suggestions_html && (
+                      <div
+                        aria-label={t('editSite.searchSuggestionsTitle')}
+                        className="overflow-x-auto rounded border border-slate-200 dark:border-slate-700"
+                        dangerouslySetInnerHTML={{
+                          __html: suggestionDraft.search_suggestions_html,
+                        }}
+                      />
+                    )}
+                  </div>
+                )}
+            </div>
+            {[
+              ['access', t('editSite.accessParking')],
+              ['rules', t('editSite.localRules')],
+              ['webcam', t('editSite.webcamLink')],
+              ['contact', t('editSite.clubContact')],
+              ['hazards', t('editSite.knownHazards')],
+            ].map(([key, label]) => (
+              <TextField
+                key={key}
+                value={formData.practical_info[key] ?? ''}
+                onChange={(value: string) =>
+                  setFormData({
+                    ...formData,
+                    practical_info: {
+                      ...formData.practical_info,
+                      [key]: value,
+                    },
+                  })
+                }
+                className="flex flex-col gap-1"
+              >
+                <Label className={labelClass}>{label}</Label>
+                <Input className={inputClass} />
+                {hasCurrentSiteSuggestions &&
+                  suggestionDraft?.suggestions[
+                    key as SitePracticalInfoKey
+                  ]?.trim() &&
+                  !formData.practical_info[key]?.trim() && (
+                    <Button
+                      type="button"
+                      onPress={() => {
+                        const infoKey = key as SitePracticalInfoKey;
+                        const suggestedValue =
+                          suggestionDraft.suggestions[infoKey];
+                        setFormData((current) => ({
+                          ...current,
+                          practical_info: {
+                            ...current.practical_info,
+                            ...(current.practical_info[infoKey]?.trim()
+                              ? {}
+                              : { [infoKey]: suggestedValue }),
+                          },
+                        }));
+                        setSuggestionStatus(t('editSite.suggestionAdded'));
+                      }}
+                      className="mt-1 self-start rounded px-2 py-1 text-xs font-medium text-sky-700 underline underline-offset-2 hover:text-sky-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600 dark:text-sky-300 dark:hover:text-sky-100 cursor-pointer"
+                    >
+                      {t('editSite.addSuggestion')}
+                    </Button>
+                  )}
+              </TextField>
+            ))}
+          </fieldset>
+        </details>
 
         {/* GPS Coordinates */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -815,125 +1031,128 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
             className={inputClass}
           >
             <option value="">{t('editSite.undefined')}</option>
-            <option value="N">Nord (N)</option>
-            <option value="NE">Nord-Est (NE)</option>
-            <option value="E">Est (E)</option>
-            <option value="SE">Sud-Est (SE)</option>
-            <option value="S">Sud (S)</option>
-            <option value="SW">Sud-Ouest (SW)</option>
-            <option value="W">Ouest (W)</option>
-            <option value="NW">Nord-Ouest (NW)</option>
+            <option value="N">{t('editSite.north')} (N)</option>
+            <option value="NE">{t('editSite.northEast')} (NE)</option>
+            <option value="E">{t('editSite.east')} (E)</option>
+            <option value="SE">{t('editSite.southEast')} (SE)</option>
+            <option value="S">{t('editSite.south')} (S)</option>
+            <option value="SW">{t('editSite.southWest')} (SW)</option>
+            <option value="W">{t('editSite.west')} (W)</option>
+            <option value="NW">{t('editSite.northWest')} (NW)</option>
           </select>
         </div>
 
         {/* Camera Settings */}
-        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-700">
-          <h4 className="text-sm font-semibold mb-3 dark:text-gray-200">
+        <details className="rounded border border-blue-200 bg-blue-50 p-3 dark:border-blue-700 dark:bg-blue-900/20">
+          <summary className="cursor-pointer text-sm font-semibold text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-gray-200">
             <Camera
               className="mr-1.5 inline h-4 w-4 align-[-2px]"
               aria-hidden="true"
             />
-            {t('editSite.camera3D')}
-          </h4>
+            {t('editSite.camera3D')} ({t('editSite.optional')})
+          </summary>
 
-          <div className="mb-3">
-            <label className="block text-sm mb-1">
-              {t('editSite.angle')}: {formData.camera_angle}°
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="360"
-              step="5"
-              value={formData.camera_angle ?? 180}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  camera_angle: parseInt(e.target.value, 10),
-                })
-              }
-              className="w-full"
-            />
-            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-              <span>0° (N)</span>
-              <span>90° (E)</span>
-              <span>180° (S)</span>
-              <span>270° (W)</span>
+          <div className="mt-3">
+            <div className="mb-3">
+              <label className="block text-sm mb-1">
+                {t('editSite.angle')}: {formData.camera_angle}°
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="360"
+                step="5"
+                value={formData.camera_angle ?? 180}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    camera_angle: parseInt(e.target.value, 10),
+                  })
+                }
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <span>0° (N)</span>
+                <span>90° (E)</span>
+                <span>180° (S)</span>
+                <span>270° (W)</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm mb-1">
+                {t('editSite.distance')}: {formData.camera_distance}m
+              </label>
+              <input
+                type="range"
+                min="100"
+                max="2000"
+                step="50"
+                value={formData.camera_distance ?? 500}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    camera_distance: parseInt(e.target.value, 10),
+                  })
+                }
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <span>100m</span>
+                <span>2000m</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm mb-1">
+                {t('editSite.closeZoom')}: {formData.camera_close_zoom_percent}%
+              </label>
+              <input
+                type="range"
+                min="30"
+                max="100"
+                step="5"
+                value={formData.camera_close_zoom_percent ?? 75}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    camera_close_zoom_percent: parseInt(e.target.value, 10),
+                  })
+                }
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <span>30%</span>
+                <span>100%</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm mb-1">
+                {t('editSite.transition')}: {formData.camera_transition_percent}
+                %
+              </label>
+              <input
+                type="range"
+                min="1"
+                max="40"
+                step="1"
+                value={formData.camera_transition_percent ?? 12}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    camera_transition_percent: parseInt(e.target.value, 10),
+                  })
+                }
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <span>1%</span>
+                <span>40%</span>
+              </div>
             </div>
           </div>
-
-          <div>
-            <label className="block text-sm mb-1">
-              {t('editSite.distance')}: {formData.camera_distance}m
-            </label>
-            <input
-              type="range"
-              min="100"
-              max="2000"
-              step="50"
-              value={formData.camera_distance ?? 500}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  camera_distance: parseInt(e.target.value, 10),
-                })
-              }
-              className="w-full"
-            />
-            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-              <span>100m</span>
-              <span>2000m</span>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm mb-1">
-              {t('editSite.closeZoom')}: {formData.camera_close_zoom_percent}%
-            </label>
-            <input
-              type="range"
-              min="30"
-              max="100"
-              step="5"
-              value={formData.camera_close_zoom_percent ?? 75}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  camera_close_zoom_percent: parseInt(e.target.value, 10),
-                })
-              }
-              className="w-full"
-            />
-            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-              <span>30%</span>
-              <span>100%</span>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm mb-1">
-              {t('editSite.transition')}: {formData.camera_transition_percent}%
-            </label>
-            <input
-              type="range"
-              min="1"
-              max="40"
-              step="1"
-              value={formData.camera_transition_percent ?? 12}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  camera_transition_percent: parseInt(e.target.value, 10),
-                })
-              }
-              className="w-full"
-            />
-            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-              <span>1%</span>
-              <span>40%</span>
-            </div>
-          </div>
-        </div>
+        </details>
 
         {/* Description */}
         <div>
@@ -959,6 +1178,17 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           )}
 
         {/* Actions */}
+        {saveError && (
+          <div
+            className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200"
+            role="alert"
+            aria-live="assertive"
+            aria-atomic="true"
+          >
+            <p>{saveError}</p>
+            <p className="mt-1">{t('editSite.saveRecovery')}</p>
+          </div>
+        )}
         <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
           <Button
             type="button"
@@ -971,7 +1201,11 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           <Button
             type="submit"
             className="inline-flex flex-1 items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 cursor-pointer transition-colors"
-            isDisabled={isSaving || Boolean(duplicateSite)}
+            isDisabled={
+              isSaving ||
+              practicalInfoSuggestion.isPending ||
+              Boolean(duplicateSite)
+            }
           >
             {isSaving ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />

@@ -21,7 +21,7 @@ export const Default = meta.story({
   render: () => (
     <div className="w-[min(36rem,calc(100vw-2rem))]">
       <Tabs defaultSelectedKey="weather">
-        <TabList className="grid-cols-3">
+        <TabList aria-label="Settings sections" className="grid-cols-3">
           <Tab id="general">General</Tab>
           <Tab id="weather">Weather</Tab>
           <Tab id="data">Data</Tab>
@@ -55,7 +55,10 @@ export const Responsive = meta.story({
   render: () => (
     <div className="w-[min(24rem,calc(100vw-2rem))]">
       <Tabs defaultSelectedKey="sites">
-        <TabList className="grid-cols-2 sm:flex">
+        <TabList
+          aria-label="Responsive settings sections"
+          className="grid-cols-2 sm:flex"
+        >
           <Tab id="general">General</Tab>
           <Tab id="sites">Favorite sites</Tab>
           <Tab id="weather">Weather sources</Tab>

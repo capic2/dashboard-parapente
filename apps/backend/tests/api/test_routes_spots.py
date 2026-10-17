@@ -5,7 +5,9 @@ Tests HTTP endpoints in routes.py related to paragliding spots.
 Coverage: GET, POST, PATCH, DELETE for spots/sites.
 """
 
-from models import Site
+from unittest.mock import patch
+
+from models import BackgroundOperation, Site
 
 # API prefix for all routes
 API_PREFIX = "/api"
@@ -383,10 +385,16 @@ class TestSpotsSyncEndpoint:
     """Tests for POST /spots/sync"""
 
     def test_sync_spots_from_source(self, client, db_session):
-        """POST /spots/sync synchronizes spots from external source"""
-        response = client.post(f"{API_PREFIX}/spots/sync")
-        # Should sync or require auth or fail
-        assert response.status_code in [200, 401, 403, 500, 503]
+        """POST /spots/sync queues work and records its result."""
+        stats = {"total": 1, "added": 1, "updated": 0}
+        with patch("spots.sync_to_database", return_value=stats) as sync:
+            response = client.post(f"{API_PREFIX}/spots/sync?force=true")
+
+        assert response.status_code == 202
+        operation = db_session.get(BackgroundOperation, response.json()["operation_id"])
+        assert operation is not None
+        assert operation.status == "completed"
+        sync.assert_called_once()
 
 
 class TestSpotsStatusEndpoint:

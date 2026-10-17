@@ -36,7 +36,7 @@ RUN --mount=type=secret,id=VITE_CESIUM_ION_TOKEN,env=VITE_CESIUM_ION_TOKEN,requi
 # ============================================
 # Stage 2: Backend Python avec Playwright
 # ============================================
-FROM python:3.14-slim
+FROM python:3.15-slim AS backend-base
 
 WORKDIR /app
 
@@ -69,6 +69,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libva-drm2 \
     libva2 \
     libgtk-3-0 \
+    libavif16 \
+    libfreetype6 \
+    libjpeg62-turbo \
+    liblcms2-2 \
+    libopenjp2-7 \
+    libraqm0 \
+    libtiff6 \
+    libwebp7 \
+    libwebpdemux2 \
+    libwebpmux3 \
+    libxcb1 \
+    zlib1g \
     libnspr4 \
     libnss3 \
     libwayland-client0 \
@@ -99,6 +111,25 @@ COPY apps/backend/requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r requirements.txt
 
+# Compile pinned overlay dependencies when wheels are unavailable for Python 3.15.
+# Keep compilers and development headers out of the final runtime image.
+FROM backend-base AS gopro-overlay-builder
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libc6-dev \
+    pkg-config \
+    libavif-dev \
+    libfreetype6-dev \
+    libjpeg62-turbo-dev \
+    liblcms2-dev \
+    libopenjp2-7-dev \
+    libraqm-dev \
+    libtiff-dev \
+    libwebp-dev \
+    libxcb1-dev \
+    zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Installer GoPro Dashboard Overlay dans un venv créé dans l'image.
 COPY --from=gopro-overlay-src / /app/gopro-overlay
 # Prevent floating-point frame timestamps from repeatedly restarting the PIP decoder.
@@ -109,6 +140,13 @@ RUN rm -rf /app/gopro-overlay/venv && \
     python -m venv /app/gopro-overlay/venv && \
     /app/gopro-overlay/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel && \
     /app/gopro-overlay/venv/bin/pip install --no-cache-dir -e /app/gopro-overlay
+
+# The editable install and its venv retain the same path in the runtime image.
+FROM backend-base AS backend
+COPY --from=gopro-overlay-builder /app/gopro-overlay /app/gopro-overlay
+RUN /app/gopro-overlay/venv/bin/pip check && \
+    /app/gopro-overlay/venv/bin/python -c 'from PIL import ImageFont; ImageFont.load_default(size=16)' && \
+    /app/gopro-overlay/venv/bin/python /app/gopro-overlay/bin/gopro-dashboard.py --help > /dev/null
 
 # Installer Chromium pour Playwright
 RUN playwright install chromium
@@ -132,6 +170,8 @@ RUN chmod +x entrypoint.sh database_backup.sh
 # layers to preserve their BuildKit cache.
 ARG BACKEND_DEPLOY_VERSION
 ENV BACKEND_DEPLOY_VERSION=${BACKEND_DEPLOY_VERSION}
+ARG BACKEND_RELEASE_NOTES_URL
+ENV BACKEND_RELEASE_NOTES_URL=${BACKEND_RELEASE_NOTES_URL}
 
 # Exposer port
 EXPOSE 8001

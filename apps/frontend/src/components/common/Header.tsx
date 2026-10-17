@@ -5,6 +5,7 @@ import {
   Button as AriaButton,
   Dialog,
   DialogTrigger,
+  Heading,
   Menu,
   MenuItem,
   MenuTrigger,
@@ -12,12 +13,12 @@ import {
   ModalOverlay,
   Popover,
 } from 'react-aria-components';
-import { Bell, MonitorCog, Moon, Sun } from 'lucide-react';
+import { MonitorCog, Moon, Sun } from 'lucide-react';
 import { Button } from '@dashboard-parapente/design-system';
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore, type ThemePreference } from '../../stores/themeStore';
-import { requestJobNotificationPermission } from '../../hooks/useJobNotifications';
 import { appTitle } from '../../lib/appEnvironment';
+import { OperationCenter } from './OperationCenter';
 
 const linkClass =
   'px-3.5 py-2 rounded-md text-gray-600 dark:text-gray-300 text-sm transition-all hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-sky-600 [&.active]:bg-sky-600 [&.active]:text-white';
@@ -68,7 +69,12 @@ export default function Header() {
           <Link to="/sites" className={linkClassName} onClick={onNavigate}>
             {t('header.sites')}
           </Link>
-          <Link to="/settings" className={linkClassName} onClick={onNavigate}>
+          <Link
+            to="/settings"
+            search={{ tab: undefined }}
+            className={linkClassName}
+            onClick={onNavigate}
+          >
             {t('header.settings')}
           </Link>
           <Link to="/infrastructure" className={linkClass} onClick={onNavigate}>
@@ -97,10 +103,6 @@ export default function Header() {
     setThemePreference(next);
   }
 
-  async function enableJobNotifications() {
-    await requestJobNotificationPermission();
-  }
-
   const ActiveThemeIcon = themeIcons[themePreference];
   const themeTooltip = `${t('settings.languageTheme.theme')} : ${t(
     `settings.languageTheme.${themePreference}`
@@ -115,20 +117,7 @@ export default function Header() {
       {/* Desktop navigation */}
       <nav className="hidden sm:flex gap-2 flex-wrap items-center">
         {navLinks(linkClass)}
-        {isAuthenticated &&
-          typeof window !== 'undefined' &&
-          'Notification' in window && (
-            <AriaButton
-              onPress={enableJobNotifications}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100 text-sm font-medium transition-all hover:bg-gray-300 dark:hover:bg-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
-              aria-label={t(
-                'header.enableNotifications',
-                'Activer les notifications de jobs'
-              )}
-            >
-              <Bell className="h-4 w-4" aria-hidden="true" />
-            </AriaButton>
-          )}
+        {isAuthenticated && <OperationCenter />}
         <MenuTrigger>
           <AriaButton
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100 text-sm font-medium transition-all hover:bg-gray-300 dark:hover:bg-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
@@ -252,9 +241,12 @@ export default function Header() {
                 {({ close }: { close: () => void }) => (
                   <>
                     <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-                      <span className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+                      <Heading
+                        slot="title"
+                        className="text-lg font-semibold text-gray-800 dark:text-gray-100"
+                      >
                         {t('header.menu', 'Menu')}
-                      </span>
+                      </Heading>
                       <AriaButton
                         onPress={close}
                         aria-label={t('header.closeMenu', 'Fermer le menu')}
@@ -277,25 +269,11 @@ export default function Header() {
                     </div>
                     <nav className="flex-1 overflow-y-auto p-3 flex flex-col gap-1">
                       {navLinks(drawerLinkClass, close)}
-                      {isAuthenticated &&
-                        typeof window !== 'undefined' &&
-                        'Notification' in window && (
-                          <AriaButton
-                            onPress={() => {
-                              void enableJobNotifications();
-                              close();
-                            }}
-                            className={drawerLinkClass}
-                          >
-                            <span className="flex items-center gap-2">
-                              <Bell className="h-5 w-5" aria-hidden="true" />
-                              {t(
-                                'header.enableNotifications',
-                                'Activer les notifications de jobs'
-                              )}
-                            </span>
-                          </AriaButton>
-                        )}
+                      {isAuthenticated && (
+                        <div className="px-1 py-2">
+                          <OperationCenter />
+                        </div>
+                      )}
                     </nav>
                     <div className="p-4 border-t border-gray-200 dark:border-gray-700">
                       {isAuthenticated ? (

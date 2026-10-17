@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PointerEvent } from 'react';
+import type { CSSProperties, PointerEvent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@dashboard-parapente/design-system';
 import {
@@ -60,11 +60,15 @@ import {
   serializeTelemetryLayoutXml,
   alignTelemetryLayoutItems,
   getTelemetryLayoutGroupBounds,
+  DEFAULT_TELEMETRY_PIP_VIDEO_SOURCE,
+  TELEMETRY_PIP_VIDEO_SOURCES,
   TELEMETRY_CANVAS_HEIGHT,
   TELEMETRY_CANVAS_WIDTH,
   type FlightTelemetryIconLayout,
   type FlightTelemetryLayoutItem,
   type FlightTelemetryPipLayout,
+  type TelemetryPipVideoSource,
+  type TelemetryMainVideoSource,
   type FlightTelemetryTextLayout,
   type TelemetryAlignmentDirection,
   type TelemetryWidgetVariant,
@@ -91,6 +95,23 @@ const MIN_ITEM_HEIGHT = 24;
 
 function displayWidgetName(name: string) {
   return name.replace(/_/gu, ' ');
+}
+
+function getHierarchyLabel(item: FlightTelemetryLayoutItem): string {
+  let label: string;
+  if (item.name) label = item.name;
+  else if (item.type === 'widget') label = item.metric;
+  else if (item.type === 'icon') label = item.icon;
+  else if (item.type === 'text') label = item.content;
+  else label = 'PiP vidéo';
+  return displayWidgetName(label);
+}
+
+function getHierarchySymbol(item: FlightTelemetryLayoutItem): string {
+  if (item.type === 'widget') return '◈';
+  if (item.type === 'icon') return '◆';
+  if (item.type === 'text') return 'T';
+  return '▣';
 }
 
 function clamp(value: number, minimum: number, maximum: number) {
@@ -170,6 +191,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const layoutHistory = useRef<FlightTelemetryLayoutItem[][]>([]);
   const [canUndo, setCanUndo] = useState(false);
   const [backgroundImage, setBackgroundImage] = useState<string>();
+  const [mainVideoSource, setMainVideoSource] =
+    useState<TelemetryMainVideoSource>('auto');
   const [localTelemetry, setLocalTelemetry] = useState<FlightTelemetryData>();
   const [gpxFileName, setGpxFileName] = useState<string>();
   const [gpxError, setGpxError] = useState(false);
@@ -224,11 +247,9 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     setSelectedIds((current) => {
       const validIds = new Set(previous.map((item) => item.id));
       const retained = current.filter((id) => validIds.has(id));
-      return retained.length
-        ? retained
-        : previous[0]?.id
-          ? [previous[0].id]
-          : [];
+      if (retained.length) return retained;
+      if (previous[0]?.id) return [previous[0].id];
+      return [];
     });
   }, []);
 
@@ -237,6 +258,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       layoutHistory.current = [];
       setCanUndo(false);
       setLayoutState(layoutQuery.data.layout);
+      setMainVideoSource(layoutQuery.data.layout.mainVideoSource ?? 'auto');
       setSelectedIds(
         layoutQuery.data.layout[0]?.id ? [layoutQuery.data.layout[0].id] : []
       );
@@ -348,6 +370,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       setCanUndo(false);
       setLayoutState(importedLayout);
       setBackgroundImage(importedLayout.backgroundImage);
+      setMainVideoSource(importedLayout.mainVideoSource ?? 'auto');
       setSelectedIds(importedLayout[0]?.id ? [importedLayout[0].id] : []);
       setSaveError(undefined);
       toast.success(t('telemetryLayout.importSuccess'));
@@ -375,15 +398,13 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       (item) => item.type === 'text' && item.content.trim().length === 0
     );
     const xmlLength = serializeTelemetryLayoutXml(layout).length;
-    const validationMessage = invalidName
-      ? t('telemetryLayout.nameTooLong')
-      : invalidGroupName
-        ? t('telemetryLayout.groupNameTooLong')
-        : emptyText
-          ? t('telemetryLayout.textRequired')
-          : xmlLength > MAX_LAYOUT_XML_LENGTH
-            ? t('telemetryLayout.layoutTooLarge')
-            : undefined;
+    let validationMessage: string | undefined;
+    if (invalidName) validationMessage = t('telemetryLayout.nameTooLong');
+    else if (invalidGroupName)
+      validationMessage = t('telemetryLayout.groupNameTooLong');
+    else if (emptyText) validationMessage = t('telemetryLayout.textRequired');
+    else if (xmlLength > MAX_LAYOUT_XML_LENGTH)
+      validationMessage = t('telemetryLayout.layoutTooLarge');
 
     if (validationMessage) {
       setSaveError(validationMessage);
@@ -393,7 +414,11 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
 
     try {
       setSaveError(undefined);
-      await saveLayout.mutateAsync({ layout, backgroundImage });
+      await saveLayout.mutateAsync({
+        layout,
+        backgroundImage,
+        mainVideoSource,
+      });
       setBackgroundImage(backgroundImage);
       toast.success(t('telemetryLayout.saveSuccess'));
     } catch (error) {
@@ -406,17 +431,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     }
   };
 
-  const hierarchyLabel = (item: FlightTelemetryLayoutItem) =>
-    displayWidgetName(
-      item.name ??
-        (item.type === 'widget'
-          ? item.metric
-          : item.type === 'icon'
-            ? item.icon
-            : item.type === 'text'
-              ? item.content
-              : 'PiP vidéo')
-    );
+  const hierarchyLabel = getHierarchyLabel;
 
   const selectFromHierarchy = (ids: string[], additive: boolean) => {
     setSelectedIds((current) => {
@@ -537,6 +552,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       type: 'pip',
       name: 'PiP vidéo',
       action: 'switch_video',
+      source: DEFAULT_TELEMETRY_PIP_VIDEO_SOURCE,
+      applyOffset: true,
       x: 38.4,
       y: 842.4,
       width: 345.6,
@@ -634,11 +651,18 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       );
       return;
     }
-    const groupItems = isWholeGroupSelected(item)
-      ? layout.filter((candidate) => candidate.groupId === item.groupId)
-      : selectedIds.includes(item.id)
-        ? layout.filter((candidate) => selectedIds.includes(candidate.id))
-        : [item];
+    let groupItems: FlightTelemetryLayoutItem[];
+    if (isWholeGroupSelected(item)) {
+      groupItems = layout.filter(
+        (candidate) => candidate.groupId === item.groupId
+      );
+    } else if (selectedIds.includes(item.id)) {
+      groupItems = layout.filter((candidate) =>
+        selectedIds.includes(candidate.id)
+      );
+    } else {
+      groupItems = [item];
+    }
     const movingItems = mode === 'resize' ? [item] : groupItems;
     setSnapGuides({});
     setSelectedIds(movingItems.map((candidate) => candidate.id));
@@ -893,7 +917,6 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
             movement[1] * multiplier
           );
         }
-        return;
       }
     };
     const editor = editorRef.current;
@@ -948,7 +971,12 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     };
     xmlDocument.backgroundImage = backgroundImage;
     const blob = new Blob(
-      [serializeTelemetryLayoutXml(xmlDocument, { backgroundImage })],
+      [
+        serializeTelemetryLayoutXml(xmlDocument, {
+          backgroundImage,
+          mainVideoSource,
+        }),
+      ],
       { type: 'application/xml' }
     );
     const url = URL.createObjectURL(blob);
@@ -1292,6 +1320,29 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           {saveError}
         </p>
       )}
+      <label className="flex max-w-md flex-col gap-1 text-sm">
+        <span className="font-medium text-slate-700 dark:text-slate-200">
+          {t('telemetryLayout.mainVideoSource')}
+        </span>
+        <select
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+          value={mainVideoSource}
+          onChange={(event) =>
+            setMainVideoSource(event.target.value as TelemetryMainVideoSource)
+          }
+        >
+          <option value="auto">{t('telemetryLayout.mainVideoAuto')}</option>
+          {TELEMETRY_PIP_VIDEO_SOURCES.map((source) => {
+            const [sourceType, role] = source.split(':');
+            const translationKey = `${sourceType}${role[0].toUpperCase()}${role.slice(1)}`;
+            return (
+              <option key={source} value={source}>
+                {t(`telemetryLayout.${translationKey}`)}
+              </option>
+            );
+          })}
+        </select>
+      </label>
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
         <div className="min-w-0 rounded-2xl border border-slate-700 bg-slate-950 p-3 shadow-xl">
           <div className="max-w-full overflow-auto">
@@ -1375,6 +1426,91 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                           item.metric
                         ) ?? ['', '']);
                   const isSelected = selectedIds.includes(item.id);
+                  let textAlign: CSSProperties['textAlign'];
+                  if (item.type === 'widget')
+                    textAlign = item.valueAlign ?? 'left';
+                  else if (item.type === 'text')
+                    textAlign = item.textAlign ?? 'left';
+
+                  let backgroundClass = 'bg-transparent';
+                  if (item.transparent === false)
+                    backgroundClass = 'bg-slate-950/85';
+                  const visibilityClass = item.visible ? '' : 'opacity-35';
+                  let borderClass = 'border-transparent';
+                  if (isSelected)
+                    borderClass = 'border-sky-400 ring-2 ring-sky-400/40';
+                  else if (item.border === true)
+                    borderClass = 'border-white/20';
+
+                  let itemPreview: ReactNode;
+                  if (isPip) {
+                    itemPreview = (
+                      <>
+                        <PictureInPicture2 className="mx-auto h-1/2 w-1/2" />
+                        <span className="mt-1 block truncate text-center text-[10px] font-semibold text-slate-300">
+                          {item.name ?? t('telemetryLayout.pip')}
+                        </span>
+                      </>
+                    );
+                  } else if (isText) {
+                    itemPreview = (
+                      <span
+                        className="block truncate font-semibold"
+                        style={{ fontSize: '1em' }}
+                      >
+                        {item.content}
+                      </span>
+                    );
+                  } else if (isIcon) {
+                    itemPreview = (
+                      <>
+                        <TelemetryLayoutIcon
+                          name={item.icon}
+                          className="mx-auto h-1/2 w-1/2"
+                        />
+                        <span className="mt-1 block truncate text-center text-[10px] font-semibold text-slate-300">
+                          {item.name ?? item.icon}
+                        </span>
+                      </>
+                    );
+                  } else if (item.variant && item.variant !== 'value') {
+                    itemPreview = (
+                      <TelemetrySpeedometer
+                        metric={item.metric}
+                        value={value}
+                        unit={unit}
+                        showUnit={item.showUnit !== false}
+                        variant={item.variant}
+                      />
+                    );
+                  } else {
+                    itemPreview = (
+                      <>
+                        {item.showLabel !== false && (
+                          <span
+                            className="block font-semibold uppercase tracking-wide text-slate-300"
+                            style={{ fontSize: '0.35em' }}
+                          >
+                            {displayWidgetName(item.name ?? item.metric)}
+                          </span>
+                        )}
+                        <span
+                          className="mt-1 block truncate font-mono font-bold"
+                          style={{ fontSize: '1em' }}
+                        >
+                          {formatTelemetryValue(value, '')}
+                          {item.showUnit !== false && (
+                            <span
+                              className="ml-1 font-normal text-slate-300"
+                              style={{ fontSize: '0.45em' }}
+                            >
+                              {unit}
+                            </span>
+                          )}
+                        </span>
+                      </>
+                    );
+                  }
                   return (
                     <button
                       type="button"
@@ -1403,79 +1539,17 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                           return;
                         setSelectedIds([item.id]);
                       }}
-                      className={`absolute flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border px-3 py-2 text-left text-white shadow-lg ${item.transparent === false ? 'bg-slate-950/85' : 'bg-transparent'} ${item.visible ? '' : 'opacity-35'} ${isSelected ? 'border-sky-400 ring-2 ring-sky-400/40' : item.border === true ? 'border-white/20' : 'border-transparent'}`}
+                      className={`absolute flex min-h-0 min-w-0 touch-none flex-col overflow-hidden rounded-lg border px-3 py-2 text-left text-white shadow-lg ${backgroundClass} ${visibilityClass} ${borderClass}`}
                       style={{
                         left: `${item.x}px`,
                         top: `${item.y}px`,
                         width: `${item.width}px`,
                         height: `${item.height}px`,
                         fontSize: `${item.fontSize ?? 32}px`,
-                        textAlign:
-                          item.type === 'widget'
-                            ? (item.valueAlign ?? 'left')
-                            : item.type === 'text'
-                              ? (item.textAlign ?? 'left')
-                              : undefined,
+                        textAlign,
                       }}
                     >
-                      {isPip ? (
-                        <>
-                          <PictureInPicture2 className="mx-auto h-1/2 w-1/2" />
-                          <span className="mt-1 block truncate text-center text-[10px] font-semibold text-slate-300">
-                            {item.name ?? t('telemetryLayout.pip')}
-                          </span>
-                        </>
-                      ) : isText ? (
-                        <span
-                          className="block truncate font-semibold"
-                          style={{ fontSize: '1em' }}
-                        >
-                          {item.content}
-                        </span>
-                      ) : isIcon ? (
-                        <>
-                          <TelemetryLayoutIcon
-                            name={item.icon}
-                            className="mx-auto h-1/2 w-1/2"
-                          />
-                          <span className="mt-1 block truncate text-center text-[10px] font-semibold text-slate-300">
-                            {item.name ?? item.icon}
-                          </span>
-                        </>
-                      ) : item.variant && item.variant !== 'value' ? (
-                        <TelemetrySpeedometer
-                          metric={item.metric}
-                          value={value}
-                          unit={unit}
-                          showUnit={item.showUnit !== false}
-                          variant={item.variant}
-                        />
-                      ) : (
-                        <>
-                          {item.showLabel !== false && (
-                            <span
-                              className="block font-semibold uppercase tracking-wide text-slate-300"
-                              style={{ fontSize: '0.35em' }}
-                            >
-                              {displayWidgetName(item.name ?? item.metric)}
-                            </span>
-                          )}
-                          <span
-                            className="mt-1 block truncate font-mono font-bold"
-                            style={{ fontSize: '1em' }}
-                          >
-                            {formatTelemetryValue(value, '')}
-                            {item.showUnit !== false && (
-                              <span
-                                className="ml-1 font-normal text-slate-300"
-                                style={{ fontSize: '0.45em' }}
-                              >
-                                {unit}
-                              </span>
-                            )}
-                          </span>
-                        </>
-                      )}
+                      {itemPreview}
                       {isSelected && (
                         <span
                           className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-se-resize rounded-sm border border-white bg-sky-400"
@@ -1518,13 +1592,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   }
                 >
                   <span className="mr-2 text-slate-400">
-                    {item.type === 'widget'
-                      ? '◈'
-                      : item.type === 'icon'
-                        ? '◆'
-                        : item.type === 'text'
-                          ? 'T'
-                          : '▣'}
+                    {getHierarchySymbol(item)}
                   </span>
                   <span className="truncate">{hierarchyLabel(item)}</span>
                 </button>
@@ -1664,7 +1732,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
               </TooltipTrigger>
             ))}
           </div>
-          {selectedGroupId ? (
+          {selectedGroupId && (
             <div className="space-y-4">
               <div className="rounded-lg bg-violet-100 p-3 text-sm dark:bg-violet-950/40">
                 <div className="font-semibold text-violet-900 dark:text-violet-100">
@@ -1697,7 +1765,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                 {t('telemetryLayout.groupSelectionHint')}
               </p>
             </div>
-          ) : selected ? (
+          )}
+          {!selectedGroupId && selected && (
             <div className="space-y-4">
               <div className="rounded-lg bg-slate-100 p-3 text-sm font-medium dark:bg-slate-900">
                 <div className="flex items-center justify-between gap-2">
@@ -1758,7 +1827,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       />
                     </label>
                   )}
-                  {selected.type === 'icon' ? (
+                  {selected.type === 'icon' && (
                     <label className="block text-sm">
                       <span className="mb-1 block text-slate-600 dark:text-slate-300">
                         {t('telemetryLayout.icon')}
@@ -1791,7 +1860,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                         ))}
                       </select>
                     </label>
-                  ) : selected.type === 'text' ? (
+                  )}
+                  {selected.type === 'text' && (
                     <label className="block text-sm">
                       <span className="mb-1 block text-slate-600 dark:text-slate-300">
                         {t('telemetryLayout.text')}
@@ -1808,26 +1878,71 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                         }
                       />
                     </label>
-                  ) : selected.type === 'pip' ? (
-                    <label className="block text-sm">
-                      <span className="mb-1 block text-slate-600 dark:text-slate-300">
-                        {t('telemetryLayout.pipAction')}
-                      </span>
-                      <select
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                        value={selected.action}
-                        onChange={(event) =>
-                          updateItem(selected.id, {
-                            action: event.target.value as 'switch_video',
-                          })
-                        }
-                      >
-                        <option value="switch_video">
-                          {t('telemetryLayout.actionSwitchVideo')}
-                        </option>
-                      </select>
-                    </label>
-                  ) : (
+                  )}
+                  {selected.type === 'pip' && (
+                    <div className="space-y-3">
+                      <label className="block text-sm">
+                        <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                          {t('telemetryLayout.videoSource')}
+                        </span>
+                        <select
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                          value={
+                            selected.source ??
+                            DEFAULT_TELEMETRY_PIP_VIDEO_SOURCE
+                          }
+                          onChange={(event) =>
+                            updateItem(selected.id, {
+                              source: event.target
+                                .value as TelemetryPipVideoSource,
+                            })
+                          }
+                        >
+                          {TELEMETRY_PIP_VIDEO_SOURCES.map((source) => {
+                            const [sourceType, role] = source.split(':');
+                            const translationKey = `${sourceType}${role[0].toUpperCase()}${role.slice(1)}`;
+                            return (
+                              <option key={source} value={source}>
+                                {t(`telemetryLayout.${translationKey}`)}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </label>
+                      <label className="block text-sm">
+                        <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                          {t('telemetryLayout.pipAction')}
+                        </span>
+                        <select
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                          value={selected.action}
+                          onChange={(event) =>
+                            updateItem(selected.id, {
+                              action: event.target.value as 'switch_video',
+                            })
+                          }
+                        >
+                          <option value="switch_video">
+                            {t('telemetryLayout.actionSwitchVideo')}
+                          </option>
+                        </select>
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                        <input
+                          type="checkbox"
+                          checked={selected.applyOffset !== false}
+                          onChange={(event) =>
+                            updateItem(selected.id, {
+                              applyOffset: event.target.checked,
+                            })
+                          }
+                          className="cursor-pointer rounded border-slate-300 text-sky-600 focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-600"
+                        />
+                        {t('telemetryLayout.pipApplyOffset')}
+                      </label>
+                    </div>
+                  )}
+                  {selected.type === 'widget' && (
                     <label className="block text-sm">
                       <span className="mb-1 block text-slate-600 dark:text-slate-300">
                         {t('telemetryLayout.metric')}
@@ -2189,7 +2304,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                 </div>
               </details>
             </div>
-          ) : (
+          )}
+          {!selectedGroupId && !selected && (
             <p className="text-sm text-slate-500">
               {t('telemetryLayout.selectWidget')}
             </p>

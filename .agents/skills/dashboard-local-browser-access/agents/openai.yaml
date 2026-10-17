@@ -1,0 +1,3 @@
+interface:
+  display_name: "Dashboard Local Browser Access"
+  short_description: "Open the dashboard frontend and sign in"

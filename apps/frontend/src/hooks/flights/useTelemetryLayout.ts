@@ -6,6 +6,7 @@ import {
   serializeTelemetryLayoutXml,
   type TelemetryLayout,
   type FlightTelemetryLayoutItem,
+  type TelemetryMainVideoSource,
 } from '../../components/flights/details/flightTelemetryLayout';
 
 export interface TelemetryLayoutResponse {
@@ -20,6 +21,7 @@ export interface TelemetryLayoutResponse {
 export interface TelemetryLayoutDocument {
   layout: readonly FlightTelemetryLayoutItem[];
   backgroundImage?: string;
+  mainVideoSource?: TelemetryMainVideoSource;
 }
 
 export function telemetryLayoutQueryKey(flightId?: string) {
@@ -37,6 +39,7 @@ export function useTelemetryLayout(flightId?: string) {
             : 'telemetry-layouts/default'
         )
         .json<TelemetryLayoutResponse>(),
+    refetchOnWindowFocus: false,
     select: (response) => ({
       ...response,
       layout: parseTelemetryLayoutXml(response.xml_content),
@@ -58,6 +61,7 @@ export function useSaveTelemetryLayout(flightId?: string) {
             json: {
               xml_content: serializeTelemetryLayoutXml(layout, {
                 backgroundImage: document.backgroundImage,
+                mainVideoSource: document.mainVideoSource,
               }),
             },
           }
@@ -86,5 +90,7 @@ export function useResetTelemetryLayout(flightId: string) {
 }
 
 export function defaultTelemetryLayout() {
-  return DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget) => ({ ...widget }));
+  return DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget) =>
+    Object.assign({}, widget)
+  );
 }

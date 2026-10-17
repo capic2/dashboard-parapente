@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-04T06:53:02.000Z",
+  "title": "Design System: Dashboard Parapente",
+  "extensions": {
+    "colorMeta": {
+      "altitude-blue": {
+        "role": "primary",
+        "displayName": "Bleu d’altitude",
+        "tonalRamp": ["#082f49", "#0c4a6e", "#075985", "#0369a1", "#0284c7", "#0ea5e9", "#7dd3fc", "#f0f9ff"]
+      },
+      "altitude-blue-hover": {
+        "role": "primary",
+        "displayName": "Bleu d’altitude — interaction",
+        "tonalRamp": ["#082f49", "#0c4a6e", "#075985", "#0369a1", "#0284c7", "#0ea5e9", "#7dd3fc", "#f0f9ff"]
+      },
+      "terrain-slate": {
+        "role": "neutral",
+        "displayName": "Ardoise de terrain",
+        "tonalRamp": ["#020617", "#0f172a", "#334155", "#475569", "#64748b", "#94a3b8", "#cbd5e1", "#f1f5f9"]
+      },
+      "cloud-gray": {
+        "role": "neutral",
+        "displayName": "Cloud gray",
+        "tonalRamp": ["#030712", "#111827", "#374151", "#4b5563", "#6b7280", "#9ca3af", "#d1d5db", "#f9fafb"]
+      },
+      "paper-white": {
+        "role": "neutral",
+        "displayName": "Paper white",
+        "tonalRamp": ["#111827", "#1f2937", "#374151", "#4b5563", "#6b7280", "#9ca3af", "#e5e7eb", "#ffffff"]
+      },
+      "horizon-line": {
+        "role": "neutral",
+        "displayName": "Horizon line",
+        "tonalRamp": ["#111827", "#1f2937", "#374151", "#4b5563", "#6b7280", "#9ca3af", "#d1d5db", "#e5e7eb"]
+      },
+      "flight-green": {
+        "role": "tertiary",
+        "displayName": "Flight green",
+        "tonalRamp": ["#052e16", "#14532d", "#166534", "#15803d", "#16a34a", "#22c55e", "#86efac", "#f0fdf4"]
+      },
+      "caution-orange": {
+        "role": "tertiary",
+        "displayName": "Caution orange",
+        "tonalRamp": ["#431407", "#7c2d12", "#9a3412", "#c2410c", "#ea580c", "#f97316", "#fdba74", "#fff7ed"]
+      },
+      "danger-red": {
+        "role": "tertiary",
+        "displayName": "Danger red",
+        "tonalRamp": ["#450a0a", "#7f1d1d", "#991b1b", "#b91c1c", "#dc2626", "#ef4444", "#fca5a5", "#fef2f2"]
+      }
+    },
+    "shadows": [
+      { "name": "resting-card", "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)", "purpose": "Subtle separation for routine cards." },
+      { "name": "raised-panel", "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)", "purpose": "Selected cards and higher-priority panels." },
+      { "name": "floating-layer", "value": "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)", "purpose": "Dialogs and prominent weather panels." }
+    ],
+    "motion": [
+      { "name": "state-transition", "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Button, navigation, and surface color feedback." },
+      { "name": "theme-change-pop", "value": "220ms ease-out", "purpose": "Small acknowledgment when the theme changes." },
+      { "name": "mobile-drawer", "value": "200ms ease-out", "purpose": "Slide-in navigation drawer." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary action with sky-blue emphasis and clear interaction states.",
+      "html": "<button class=\"ds-btn-primary\">Voir les conditions</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.75rem; padding: .625rem 1rem; border: 0; border-radius: .5rem; background: #0284c7; color: #fff; box-shadow: 0 1px 2px 0 rgb(0 0 0 / .05); font: 500 .875rem/1.25 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; white-space: nowrap; cursor: pointer; transition: background-color 150ms cubic-bezier(.4,0,.2,1); } .ds-btn-primary:hover { background: #0369a1; } .ds-btn-primary:active, .ds-btn-primary[data-pressed] { background: #075985; } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #0ea5e9; } .ds-btn-primary:disabled { opacity: .5; cursor: not-allowed; } @media (min-width: 640px) { .ds-btn-primary { min-height: 0; padding-top: .5rem; padding-bottom: .5rem; } } .dark .ds-btn-primary:focus-visible { box-shadow: 0 0 0 2px #111827, 0 0 0 4px #0ea5e9; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Neutral action for supporting or repeatable controls.",
+      "html": "<button class=\"ds-btn-secondary\">Choisir un site</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.75rem; padding: .625rem 1rem; border: 0; border-radius: .5rem; background: #f3f4f6; color: #374151; font: 500 .875rem/1.25 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; cursor: pointer; transition: background-color 150ms cubic-bezier(.4,0,.2,1), color 150ms cubic-bezier(.4,0,.2,1); } .ds-btn-secondary:hover { background: #e5e7eb; } .ds-btn-secondary:focus-visible { outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #0ea5e9; } .ds-btn-secondary:disabled { opacity: .5; cursor: not-allowed; } .dark .ds-btn-secondary { background: #374151; color: #e5e7eb; } .dark .ds-btn-secondary:hover { background: #4b5563; } @media (min-width: 640px) { .ds-btn-secondary { min-height: 0; padding-top: .5rem; padding-bottom: .5rem; } } .dark .ds-btn-secondary:focus-visible { box-shadow: 0 0 0 2px #111827, 0 0 0 4px #0ea5e9; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Quiet bordered action for secondary choices.",
+      "html": "<button class=\"ds-btn-outline\">Annuler</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.75rem; padding: .625rem 1rem; border: 1px solid #d1d5db; border-radius: .5rem; background: #fff; color: #374151; font: 500 .875rem/1.25 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; cursor: pointer; transition: background-color 150ms cubic-bezier(.4,0,.2,1); } .ds-btn-outline:hover { background: #f9fafb; } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #0ea5e9; } .ds-btn-outline:disabled { opacity: .5; cursor: not-allowed; } .dark .ds-btn-outline { border-color: #4b5563; background: #1f2937; color: #e5e7eb; } .dark .ds-btn-outline:hover { background: #374151; } @media (min-width: 640px) { .ds-btn-outline { min-height: 0; padding-top: .5rem; padding-bottom: .5rem; } } .dark .ds-btn-outline:focus-visible { box-shadow: 0 0 0 2px #111827, 0 0 0 4px #0ea5e9; }"
+    },
+    {
+      "name": "Neutral Card",
+      "kind": "card",
+      "refersTo": "card-neutral",
+      "description": "Routine information container with a fine border and quiet elevation.",
+      "html": "<article class=\"ds-card\"><strong>Mont Poupet Nord</strong><p>Vent · 12 km/h</p></article>",
+      "css": ".ds-card { position: relative; overflow: hidden; padding: 1rem; border: 1px solid #e5e7eb; border-radius: .5rem; background: #fff; color: #111827; box-shadow: 0 1px 2px 0 rgb(0 0 0 / .05); font: 400 .875rem/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; transition: all 200ms; } .ds-card strong { font-size: 1rem; font-weight: 600; } .ds-card p { margin: .25rem 0 0; color: #4b5563; } .dark .ds-card { border-color: #374151; background: #1f2937; color: #f9fafb; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input-default",
+      "description": "Full-width field with a visible blue focus treatment.",
+      "html": "<label class=\"ds-field\"><span>Rechercher un site</span><input class=\"ds-input\" type=\"search\" placeholder=\"Nom du site\"></label>",
+      "css": ".ds-field { display: grid; gap: .25rem; color: #374151; font: 500 .875rem/1.25 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-input { width: 100%; padding: .5rem .75rem; border: 1px solid #d1d5db; border-radius: .5rem; background: #fff; color: #111827; font: 400 1rem/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-input::placeholder { color: #6b7280; } .ds-input:focus-visible { outline: 2px solid #0ea5e9; outline-offset: 1px; border-color: transparent; } .ds-input:disabled { background: #f3f4f6; color: #6b7280; cursor: not-allowed; }"
+    },
+    {
+      "name": "Active Navigation",
+      "kind": "nav",
+      "description": "Compact desktop navigation with an unmistakable active destination.",
+      "html": "<nav class=\"ds-nav\"><a href=\"#\">Dashboard</a><a class=\"ds-nav-active\" href=\"#\" aria-current=\"page\">Météo</a><a href=\"#\">Vols</a></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; gap: .5rem; font: 500 .875rem/1.25 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-nav a { padding: .5rem .875rem; border-radius: .375rem; color: #4b5563; text-decoration: none; transition: background-color 150ms cubic-bezier(.4,0,.2,1), color 150ms cubic-bezier(.4,0,.2,1); } .ds-nav a:hover { background: #f3f4f6; color: #0284c7; } .ds-nav a:focus-visible { outline: 2px solid #0ea5e9; outline-offset: 2px; } .ds-nav .ds-nav-active { background: #0284c7; color: #fff; } .ds-nav .ds-nav-active:hover { background: #0369a1; color: #fff; }",
+      "refersTo": "navigation-active"
+    },
+    {
+      "name": "Weather Hero",
+      "kind": "custom",
+      "description": "High-contrast location and forecast anchor for the weather workspace.",
+      "html": "<section class=\"ds-weather-hero\"><span class=\"ds-weather-badge\">MÉTÉO DU SITE</span><h2>Mont Poupet Nord</h2><p>Conditions et prévisions pour préparer votre vol.</p><div class=\"ds-weather-meta\"><span><small>JOUR</small><strong>Aujourd’hui</strong></span><span><small>SOURCE</small><strong>Prévisions locales</strong></span></div></section>",
+      "css": ".ds-weather-hero { overflow: hidden; padding: 1.5rem; border: 1px solid rgb(226 232 240); border-radius: 1.5rem; background: linear-gradient(135deg, #0369a1 0%, #1d4ed8 52%, #020617 100%); color: #fff; box-shadow: 0 20px 25px -5px rgb(2 132 199 / .2), 0 8px 10px -6px rgb(2 132 199 / .2); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-weather-badge { display: inline-block; padding: .25rem .75rem; border: 1px solid rgb(255 255 255 / .2); border-radius: 9999px; background: rgb(255 255 255 / .1); color: #e0f2fe; font-size: .75rem; font-weight: 700; letter-spacing: .18em; } .ds-weather-hero h2 { margin: .75rem 0 0; font-size: 1.875rem; line-height: 1.2; font-weight: 800; } .ds-weather-hero p { margin: .5rem 0 1rem; color: #e0f2fe; font-size: .9375rem; line-height: 1.5; } .ds-weather-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; } .ds-weather-meta span { display: grid; gap: .25rem; padding: .5rem .75rem; border: 1px solid rgb(255 255 255 / .15); border-radius: 1rem; background: rgb(255 255 255 / .1); } .ds-weather-meta small { color: #e0f2fe; font-size: .75rem; font-weight: 600; } .ds-weather-meta strong { font-size: .875rem; font-weight: 600; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Le cockpit météo du pilote",
+    "overview": "The interface is a practical, technical cockpit for preparing and reviewing flights. Its visual language keeps changing weather and flight data easy to scan: a clear sky-blue accent marks active choices and primary actions, while restrained slate and gray surfaces keep dense information legible. The same system supports both light and dark themes.\n\nThe character is clear, practical, and technical, with a welcoming touch. Cards and controls use familiar shapes and direct state feedback; the interface favors useful hierarchy over decorative treatment.",
+    "keyCharacteristics": [
+      "Sky blue identifies primary actions, active navigation, and weather emphasis.",
+      "Neutral surfaces and slate text organize information in both themes.",
+      "Compact cards support comparison; stronger depth is reserved for prominent panels and overlays."
+    ],
+    "rules": [
+      { "name": "The Status-Has-Meaning Rule", "body": "Green, orange, and red communicate outcome or caution. Do not use them as interchangeable decoration.", "section": "colors" },
+      { "name": "The Shared-Family Rule", "body": "Keep the interface in its existing system sans-serif family; use size and weight to create hierarchy.", "section": "typography" },
+      { "name": "The Readable-Workspace Rule", "body": "Keep related weather readings together and preserve the responsive collapse of comparison grids instead of shrinking data labels to fit.", "section": "layout" },
+      { "name": "The Selective-Depth Rule", "body": "Reserve stronger shadows for priority panels and floating layers; keep routine cards quiet.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use the altitude blue for the primary action, active route, selected state, and visible keyboard focus.",
+      "Do keep text and data contrast strong in both light and dark themes.",
+      "Do give interactive controls clear hover, focus, pressed, and disabled states.",
+      "Do use semantic status colors consistently and pair color with text or an icon.",
+      "Do preserve responsive layouts and mobile touch targets."
+    ],
+    "donts": [
+      "Don't introduce a second display typeface or a competing brand accent without an explicit visual-system decision.",
+      "Don't give routine cards the same shadow weight as a dialog or feature hero.",
+      "Don't use status colors as decoration or rely on color alone to communicate a state.",
+      "Don't remove dark-theme treatments when extending shared components."
+    ]
+  }
+}

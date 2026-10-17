@@ -53,10 +53,15 @@ export const flightQueryOptions = (
     },
     enabled: !!flightId,
     staleTime: getStaleTime(1000 * 10), // 10 seconds - refresh frequently to check media status
+    // Returning to the flight media tab must not refresh the flight object
+    // while an embedded YouTube player is active.
+    refetchOnWindowFocus: false,
     refetchInterval: (query) => {
       const data = query.state.data as Flight | undefined;
       return isExportInProgress(data?.video_export_status) ||
-        isGoproOverlayInProgress(data?.gopro_overlay_status)
+        isGoproOverlayInProgress(data?.gopro_overlay_status) ||
+        data?.sportstracklive_status === 'queued' ||
+        data?.sportstracklive_status === 'uploading'
         ? 10000
         : false;
     },

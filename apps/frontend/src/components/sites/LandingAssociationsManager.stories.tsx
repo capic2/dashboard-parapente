@@ -31,8 +31,6 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-
-
 // Mock data
 const mockAssociations = [
   {
@@ -173,8 +171,8 @@ export const WithAssociations = meta.story({
   args: {
     takeoffSiteId: 'site-arguel',
   },
-  parameters: {
-    msw: { handlers: defaultHandlers },
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
   },
 });
 
@@ -182,9 +180,9 @@ WithAssociations.test(
   'displays existing landing associations',
   async ({ canvas }) => {
     await canvas.findByText("Plaine d'Arguel");
-    await expect(canvas.getByText(/1\.34 km/)).toBeInTheDocument();
+    await expect(canvas.getByText(/1\.34 km/u)).toBeInTheDocument();
     await expect(canvas.getByText('Terrain de secours')).toBeInTheDocument();
-    await expect(canvas.getByText(/2\.1 km/)).toBeInTheDocument();
+    await expect(canvas.getByText(/2\.1 km/u)).toBeInTheDocument();
   }
 );
 
@@ -194,9 +192,9 @@ export const Empty = meta.story({
   args: {
     takeoffSiteId: 'site-arguel',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/sites/:siteId/landings', () => {
           return HttpResponse.json([]);
         }),
@@ -204,8 +202,8 @@ export const Empty = meta.story({
           return HttpResponse.json(mockSites);
         }),
         ...defaultHandlers.slice(2),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -222,9 +220,9 @@ export const AddingAssociation = meta.story({
   args: {
     takeoffSiteId: 'site-arguel',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/sites/:siteId/landings', () => {
           return HttpResponse.json([]);
         }),
@@ -232,8 +230,8 @@ export const AddingAssociation = meta.story({
           return HttpResponse.json(mockSites);
         }),
         ...defaultHandlers.slice(2),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -248,7 +246,9 @@ AddingAssociation.test(
       await canvas.findByText('Choisir un site...')
     ).toBeInTheDocument();
     await expect(
-      canvas.getByPlaceholderText('Notes (optionnel)')
+      canvas.getByPlaceholderText(
+        /Commentaire \(localité ajoutée automatiquement\)/u
+      )
     ).toBeInTheDocument();
     await expect(canvas.getByText('Ajouter')).toBeInTheDocument();
     await expect(canvas.getByText('Annuler')).toBeInTheDocument();
@@ -261,14 +261,14 @@ export const WithNotes = meta.story({
   args: {
     takeoffSiteId: 'site-arguel',
   },
-  parameters: {
-    msw: { handlers: defaultHandlers },
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
   },
 });
 
 WithNotes.test('displays notes for associations', async ({ canvas }) => {
-  await canvas.findByText(/grand champ/);
-  await expect(canvas.getByText(/vent fort du nord/)).toBeInTheDocument();
+  await canvas.findByText(/grand champ/u);
+  await expect(canvas.getByText(/vent fort du nord/u)).toBeInTheDocument();
 });
 
 // Story: Loading state
@@ -277,16 +277,16 @@ export const Loading = meta.story({
   args: {
     takeoffSiteId: 'site-arguel',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/sites/:siteId/landings', async () => {
           await new Promise(() => {}); // Never resolves
         }),
         http.get('*/api/spots', () => {
           return HttpResponse.json(mockSites);
         }),
-      ],
-    },
+      ]
+    );
   },
 });

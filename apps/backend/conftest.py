@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import tempfile
 
+from anyio.from_thread import start_blocking_portal
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -34,7 +35,7 @@ from sqlalchemy.orm import sessionmaker
 # This ensures all tables are registered with SQLAlchemy Base.metadata
 # before Base.metadata.create_all() is called in the test_db fixture
 from auth import get_current_user
-from database import Base, get_db
+from database import Base, SessionLocal as SharedSessionLocal, engine as database_engine, get_db
 from deployment_drain import deployment_drain
 from main import app
 from models import (
@@ -71,10 +72,14 @@ def test_db():
     # Connect to temp DB
     engine = create_engine(f"sqlite:///{db_path}")
     Base.metadata.create_all(bind=engine)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    # Background tasks and service modules use the shared SessionLocal factory
+    # directly instead of FastAPI's get_db dependency. Point that factory at the
+    # same isolated database for the duration of each test.
+    SharedSessionLocal.configure(bind=engine)
+    TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
     def override_get_db():
-        db = SessionLocal()
+        db = TestSessionLocal()
         try:
             yield db
         finally:
@@ -82,10 +87,11 @@ def test_db():
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = _override_get_current_user
-    yield SessionLocal
+    yield TestSessionLocal
 
     # Cleanup
     app.dependency_overrides.clear()
+    SharedSessionLocal.configure(bind=database_engine)
     engine.dispose()
 
     # Remove temp file
@@ -98,7 +104,15 @@ def test_db():
 @pytest.fixture(scope="function")
 def client(test_db):
     """FastAPI TestClient with test database (authenticated)"""
-    return TestClient(app)
+    from cache import close_redis
+
+    with start_blocking_portal() as portal:
+        test_client = TestClient(app)
+        test_client.portal = portal
+        yield test_client
+        portal.call(close_redis)
+        test_client.portal = None
+        test_client.close()
 
 
 @pytest.fixture(scope="function")

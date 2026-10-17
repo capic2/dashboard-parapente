@@ -4,6 +4,10 @@ import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore } from '../../stores/themeStore';
 import Header from './Header';
 
+vi.mock('./OperationCenter', () => ({
+  OperationCenter: () => null,
+}));
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, fallback?: string) => {
@@ -57,12 +61,14 @@ vi.mock('react-aria-components', async () => {
   const MockButton = ({
     children,
     onPress,
+    isDisabled,
     ...props
   }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
     onPress?: () => void;
+    isDisabled?: boolean;
   }) => {
     return (
-      <button type="button" onClick={onPress} {...props}>
+      <button type="button" disabled={isDisabled} onClick={onPress} {...props}>
         {children}
       </button>
     );
@@ -116,6 +122,9 @@ vi.mock('react-aria-components', async () => {
     ),
     ModalOverlay: ({ children }: { children: React.ReactNode }) => (
       <div>{children}</div>
+    ),
+    Heading: ({ children }: { children: React.ReactNode }) => (
+      <h2>{children}</h2>
     ),
     Popover: ({ children }: { children: React.ReactNode }) => (
       <div>{children}</div>

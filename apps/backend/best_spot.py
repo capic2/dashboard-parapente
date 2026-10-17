@@ -43,6 +43,11 @@ def _filter_sites_by_location(
     ]
 
 
+def _filter_sites_for_best_spot(sites: list[Site]) -> list[Site]:
+    """Keep launch sites and sites usable for both launch and landing."""
+    return [site for site in sites if site.usage_type != "landing"]
+
+
 def _get_current_forecast_hour() -> int:
     return datetime.now(FORECAST_TIME_ZONE).hour
 
@@ -243,7 +248,9 @@ async def calculate_best_spot_from_cache(
 
     try:
         # Get all sites
-        sites = _filter_sites_by_location(db.query(Site).all(), latitude, longitude, radius_km)
+        sites = _filter_sites_for_best_spot(
+            _filter_sites_by_location(db.query(Site).all(), latitude, longitude, radius_km)
+        )
 
         if not sites:
             logger.warning("No sites found in database")
@@ -522,6 +529,11 @@ async def calculate_best_spot_from_db(db: Session, day_index: int = 0) -> dict[s
             .filter(WeatherForecast.forecast_date == forecast_date)
             .all()
         )
+        sites_with_forecasts = [
+            (site, forecast)
+            for site, forecast in sites_with_forecasts
+            if site.usage_type != "landing"
+        ]
 
         if not sites_with_forecasts:
             logger.warning(f"No forecast data found for {forecast_date}")
@@ -622,7 +634,9 @@ async def calculate_hourly_best_spots_from_cache(
     logger.info(f"Calculating hourly best spots from cached weather data for day {day_index}...")
 
     try:
-        sites = _filter_sites_by_location(db.query(Site).all(), latitude, longitude, radius_km)
+        sites = _filter_sites_for_best_spot(
+            _filter_sites_by_location(db.query(Site).all(), latitude, longitude, radius_km)
+        )
         if not sites:
             logger.warning("No sites found in database")
             return None

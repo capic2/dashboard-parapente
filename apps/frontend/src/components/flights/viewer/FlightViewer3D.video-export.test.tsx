@@ -218,6 +218,7 @@ vi.mock('@dashboard-parapente/design-system', () => ({
 }));
 
 vi.mock('react-aria-components', () => ({
+  Heading: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
   Disclosure: ({
     children,
   }: {
@@ -403,9 +404,9 @@ describe('FlightViewer3D video export mode', () => {
     window._setExportFrame?.(1, 3);
     window._setExportFrame?.(2, 3);
 
-    expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(1, 250);
+    expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(1, 200);
     expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(2, 500);
-    expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(3, 250);
+    expect(viewer.camera.moveBackward).toHaveBeenNthCalledWith(3, 200);
   });
 
   it('passes GPX longitude, latitude and rendered elevation to Cesium', async () => {

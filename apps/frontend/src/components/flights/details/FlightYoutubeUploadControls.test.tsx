@@ -8,26 +8,32 @@ import { FlightYoutubeUploadControls } from './FlightYoutubeUploadControls';
 
 const {
   cancelUpload,
+  preparePlaylist,
   startUpload,
   toastError,
   toastSuccess,
   useCancelYoutubeUpload,
+  usePrepareYoutubePlaylist,
   useStartYoutubeUpload,
   useYoutubeAuthorizationUrl,
   useYoutubeStatus,
   useYoutubeUpload,
   useYoutubeVideoAssociations,
+  useYoutubeSourcePublicationStatus,
 } = vi.hoisted(() => ({
   cancelUpload: vi.fn(),
+  preparePlaylist: vi.fn(),
   startUpload: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
   useCancelYoutubeUpload: vi.fn(),
+  usePrepareYoutubePlaylist: vi.fn(),
   useStartYoutubeUpload: vi.fn(),
   useYoutubeAuthorizationUrl: vi.fn(),
   useYoutubeStatus: vi.fn(),
   useYoutubeUpload: vi.fn(),
   useYoutubeVideoAssociations: vi.fn(),
+  useYoutubeSourcePublicationStatus: vi.fn(),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -39,6 +45,7 @@ vi.mock('react-i18next', () => ({
           "Arrêter l'envoi en cours vers YouTube",
         'flights.youtubeUploadCancelled': "L'envoi vers YouTube a été arrêté.",
         'flights.youtubeUpload': 'Publier sur YouTube',
+        'flights.youtubeUploadRetry': 'Réessayer',
         'flights.youtubeUploadConfirm': "Lancer l'envoi",
         'flights.youtubeUploadPublished': 'Déjà publiée',
       };
@@ -54,11 +61,13 @@ vi.mock('../../../hooks/useToast', () => ({
 
 vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
   useCancelYoutubeUpload,
+  usePrepareYoutubePlaylist,
   useStartYoutubeUpload,
   useYoutubeAuthorizationUrl,
   useYoutubeStatus,
   useYoutubeUpload,
   useYoutubeVideoAssociations,
+  useYoutubeSourcePublicationStatus,
   youtubeVideoAssociationsQueryKey: (flightId: string) => [
     'youtube-video-associations',
     flightId,
@@ -69,6 +78,11 @@ describe('FlightYoutubeUploadControls', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     cancelUpload.mockResolvedValue({ status: 'cancelled' });
+    preparePlaylist.mockResolvedValue({
+      title: 'Parapente - Vol 1 du 19/08/2026',
+      url: 'https://www.youtube.com/playlist?list=playlist-id',
+      created: true,
+    });
     startUpload.mockResolvedValue({ status: 'queued' });
     useYoutubeStatus.mockReturnValue({
       data: { configured: true, connected: true },
@@ -76,6 +90,7 @@ describe('FlightYoutubeUploadControls', () => {
     });
     useYoutubeUpload.mockReturnValue({
       data: {
+        job_id: 'youtube-job-1',
         status: 'uploading',
         progress: 42,
         gopro_overlay_job_id: 'overlay-1080p',
@@ -83,12 +98,32 @@ describe('FlightYoutubeUploadControls', () => {
       isLoading: false,
     });
     useYoutubeVideoAssociations.mockReturnValue({ data: [] });
+    useYoutubeSourcePublicationStatus.mockImplementation(
+      (flightId: string, source: unknown, youtubeUrls: string[]) => {
+        const upload = useYoutubeUpload(flightId, source);
+        const youtubeUrl = upload.data?.youtube_url;
+        const isPublished = Boolean(
+          upload.data?.status === 'completed' &&
+          youtubeUrl &&
+          youtubeUrls.includes(youtubeUrl) &&
+          useYoutubeVideoAssociations(flightId).data?.find(
+            (association: { url: string; exists_on_youtube?: boolean }) =>
+              association.url === youtubeUrl
+          )?.exists_on_youtube === true
+        );
+        return { upload, isPublished };
+      }
+    );
     useStartYoutubeUpload.mockReturnValue({
       mutateAsync: startUpload,
       isPending: false,
     });
     useCancelYoutubeUpload.mockReturnValue({
       mutateAsync: cancelUpload,
+      isPending: false,
+    });
+    usePrepareYoutubePlaylist.mockReturnValue({
+      mutateAsync: preparePlaylist,
       isPending: false,
     });
     useYoutubeAuthorizationUrl.mockReturnValue({
@@ -162,14 +197,42 @@ describe('FlightYoutubeUploadControls', () => {
       expect(startUpload).toHaveBeenCalledWith({
         source_type: 'gopro_overlay',
         gopro_overlay_job_id: 'overlay-4k',
-        title: 'Vol test',
+        title: 'Vol test - vol',
         description: '',
         privacy_status: 'unlisted',
       })
     );
   });
 
-  it('starts an upload from the panorama video', async () => {
+  it('offers an immediate retry after an upload failure', () => {
+    useYoutubeUpload.mockReturnValue({
+      data: { status: 'failed', error: 'YouTube quota exceeded' },
+      isLoading: false,
+    });
+    const queryClient = new QueryClient();
+    const flight = {
+      id: 'flight-1',
+      flight_date: '2026-08-19',
+      name: 'Vol test',
+    } as Flight;
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FlightYoutubeUploadControls
+          flight={flight}
+          source={{ source_type: 'face' }}
+        />
+      </QueryClientProvider>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
+
+    expect(
+      screen.getByRole('dialog', { name: 'flights.youtubeUploadDialogTitle' })
+    ).toBeInTheDocument();
+  });
+
+  it('starts an upload from the panorama video with the pano role', async () => {
     useYoutubeUpload.mockReturnValue({ data: null, isLoading: false });
     const queryClient = new QueryClient();
     const flight = {
@@ -194,12 +257,77 @@ describe('FlightYoutubeUploadControls', () => {
     await waitFor(() =>
       expect(startUpload).toHaveBeenCalledWith({
         source_type: 'pano',
-        title: 'Vol test pano',
+        title: 'Vol test - pano',
         description: '',
         privacy_status: 'unlisted',
       })
     );
   });
+
+  it('names a camera upload with the face role', async () => {
+    useYoutubeUpload.mockReturnValue({ data: null, isLoading: false });
+    const queryClient = new QueryClient();
+    const flight = {
+      id: 'flight-1',
+      flight_date: '2026-08-19',
+      name: 'Vol test',
+    } as Flight;
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FlightYoutubeUploadControls
+          flight={flight}
+          source={{ source_type: 'camera' }}
+        />
+      </QueryClientProvider>
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Publier sur YouTube' })
+    );
+    fireEvent.click(screen.getByRole('button', { name: "Lancer l'envoi" }));
+
+    await waitFor(() =>
+      expect(startUpload).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Vol test - face' })
+      )
+    );
+  });
+
+  it.each([
+    ['pano', 'pano'],
+    ['face', 'face'],
+    ['pilote', 'pilote'],
+  ] as const)(
+    'names a %s upload with the %s role',
+    async (sourceType, role) => {
+      useYoutubeUpload.mockReturnValue({ data: null, isLoading: false });
+      const queryClient = new QueryClient();
+      const flight = {
+        id: 'flight-1',
+        flight_date: '2026-08-19',
+        name: 'Vol test',
+      } as Flight;
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <FlightYoutubeUploadControls
+            flight={flight}
+            source={{ source_type: sourceType }}
+          />
+        </QueryClientProvider>
+      );
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Publier sur YouTube' })
+      );
+      fireEvent.click(screen.getByRole('button', { name: "Lancer l'envoi" }));
+
+      await waitFor(() =>
+        expect(startUpload).toHaveBeenCalledWith(
+          expect.objectContaining({ title: `Vol test - ${role}` })
+        )
+      );
+    }
+  );
 
   it('limits the default title to the YouTube maximum length', async () => {
     useYoutubeUpload.mockReturnValue({ data: null, isLoading: false });
@@ -228,7 +356,7 @@ describe('FlightYoutubeUploadControls', () => {
 
     await waitFor(() =>
       expect(startUpload).toHaveBeenCalledWith(
-        expect.objectContaining({ title: 'x'.repeat(100) })
+        expect.objectContaining({ title: `${'x'.repeat(94)} - vol` })
       )
     );
   });
@@ -316,6 +444,37 @@ describe('FlightYoutubeUploadControls', () => {
     ).toBeInTheDocument();
   });
 
+  it('allows reupload when the old association is no longer available', () => {
+    useYoutubeUpload.mockReturnValue({
+      data: {
+        status: 'completed',
+        youtube_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      },
+      isLoading: false,
+    });
+    useYoutubeVideoAssociations.mockReturnValue({ data: [] });
+    const queryClient = new QueryClient();
+    const flight = {
+      id: 'flight-1',
+      flight_date: '2026-08-19',
+      name: 'Vol test',
+      youtube_urls: ['https://www.youtube.com/watch?v=dQw4w9WgXcQ'],
+    } as Flight;
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FlightYoutubeUploadControls
+          flight={flight}
+          source={{ source_type: 'pano' }}
+        />
+      </QueryClientProvider>
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Publier sur YouTube' })
+    ).toBeEnabled();
+  });
+
   it('refreshes YouTube associations when an upload completes', async () => {
     let status = 'uploading';
     useYoutubeUpload.mockImplementation(
@@ -355,6 +514,54 @@ describe('FlightYoutubeUploadControls', () => {
       expect(invalidateQueries).toHaveBeenCalledWith({
         queryKey: ['youtube-video-associations', flight.id],
       })
+    );
+  });
+
+  it('prepares a playlist and displays the manual upload details', async () => {
+    useYoutubeUpload.mockReturnValue({ data: null, isLoading: false });
+    const flight = {
+      id: 'flight-1',
+      flight_date: '2026-08-19',
+      name: 'Vol test',
+    } as Flight;
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <FlightYoutubeUploadControls
+          flight={flight}
+          source={{ source_type: 'pano' }}
+        />
+      </QueryClientProvider>
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Publier sur YouTube' })
+    );
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'flights.youtubeUploadTitleLabel' }),
+      { target: { value: '' } }
+    );
+    expect(
+      screen.getByRole('button', { name: 'flights.youtubeManualPrepare' })
+    ).toBeEnabled();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'flights.youtubeManualPrepare' })
+    );
+
+    expect(preparePlaylist).toHaveBeenCalledOnce();
+    expect(
+      await screen.findByRole('link', {
+        name: 'Parapente - Vol 1 du 19/08/2026',
+      })
+    ).toHaveAttribute(
+      'href',
+      'https://www.youtube.com/playlist?list=playlist-id'
+    );
+    expect(
+      screen.getByRole('link', { name: 'flights.youtubeManualOpenUpload' })
+    ).toHaveAttribute('href', 'https://www.youtube.com/upload');
+    expect(toastSuccess).toHaveBeenCalledWith(
+      'flights.youtubeManualPreparationReady'
     );
   });
 });

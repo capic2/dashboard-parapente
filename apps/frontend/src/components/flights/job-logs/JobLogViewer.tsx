@@ -108,7 +108,7 @@ export function JobLogViewer({
     <div className="space-y-2">
       <div
         ref={scrollContainerRef}
-        className="max-h-72 overflow-y-auto rounded-lg border border-slate-200 bg-slate-100/70 p-2 dark:border-slate-700 dark:bg-slate-950/50"
+        className="max-h-[32rem] overflow-y-auto rounded-lg border border-slate-200 bg-slate-100/70 p-2 dark:border-slate-700 dark:bg-slate-950/50"
         aria-label={t('flights.generationLogs.activity', 'Activity log')}
         aria-live={isLive ? 'polite' : 'off'}
       >
@@ -155,7 +155,7 @@ export function JobLogViewer({
             })}
           </span>
         </summary>
-        <pre className="max-h-64 overflow-auto whitespace-pre-wrap border-t border-slate-800 p-3 font-mono text-xs leading-relaxed text-slate-100">
+        <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap border-t border-slate-800 p-3 font-mono text-xs leading-relaxed text-slate-100">
           {lines.join('\n')}
         </pre>
       </details>

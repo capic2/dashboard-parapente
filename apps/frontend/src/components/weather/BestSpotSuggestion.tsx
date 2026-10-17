@@ -7,6 +7,7 @@
  * Updated to support displaying the date for different days
  */
 
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format, addDays } from 'date-fns';
 import type { Locale } from 'date-fns';
@@ -48,6 +49,8 @@ interface BestSpotSuggestionProps {
   selectedDayIndex?: number;
   radiusKm?: number;
   onRadiusChange?: (radiusKm: number) => void;
+  locationUnavailable?: boolean;
+  onRetryLocation?: () => void;
   className?: string;
 }
 
@@ -202,14 +205,18 @@ export const BestSpotSuggestion = ({
   selectedDayIndex = 0,
   radiusKm,
   onRadiusChange,
+  locationUnavailable = false,
+  onRetryLocation,
   className = '',
 }: BestSpotSuggestionProps) => {
   const { t, i18n } = useTranslation();
   const resolvedHourlyBestSpots = hourlyBestSpots ?? EMPTY_HOURLY_BEST_SPOTS;
   const resolvedRadiusKm = radiusKm ?? DEFAULT_BEST_SPOT_RADIUS_KM;
+  const [showAllHourlyBestSpots, setShowAllHourlyBestSpots] = useState(false);
 
   // Calculate the date label based on selectedDayIndex
-  const selectedDate = addDays(new Date(), selectedDayIndex);
+  const [today] = useState(() => new Date());
+  const selectedDate = addDays(today, selectedDayIndex);
   const dateFnsLocale = i18n.language.startsWith('en') ? enUS : fr;
   const dateLabel = getDateLabel(
     selectedDayIndex,
@@ -230,9 +237,26 @@ export const BestSpotSuggestion = ({
             <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-300">
               {t('weather.bestSpotFor', { date: dateLabel })}
             </h3>
-            <div className="mt-1 text-lg font-bold text-slate-500 dark:text-slate-400">
-              {t('weather.calculating')}
-            </div>
+            {locationUnavailable ? (
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  {t('weather.locationUnavailableForBestSpot')}
+                </p>
+                {onRetryLocation && (
+                  <button
+                    type="button"
+                    onClick={onRetryLocation}
+                    className="cursor-pointer rounded-lg border border-sky-300 px-3 py-1.5 text-sm font-semibold text-sky-700 transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-950/60"
+                  >
+                    {t('common.retry')}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="mt-1 text-lg font-bold text-slate-500 dark:text-slate-400">
+                {t('weather.calculating')}
+              </div>
+            )}
           </div>
         </div>
         {onRadiusChange && (
@@ -292,6 +316,11 @@ export const BestSpotSuggestion = ({
       orientationLabel: hourlySpot.site?.orientation ?? '—',
     };
   });
+  const displayedHourlyRows = showAllHourlyBestSpots
+    ? hourlyRows
+    : [...hourlyRows]
+        .sort((left, right) => right.score - left.score)
+        .slice(0, 3);
 
   return (
     <div
@@ -369,6 +398,10 @@ export const BestSpotSuggestion = ({
             </div>
           )}
         </div>
+
+        <p className="mb-4 rounded-lg border-l-4 border-amber-500 bg-amber-50 px-3 py-2.5 text-sm font-medium leading-relaxed text-amber-950 dark:bg-amber-950/40 dark:text-amber-100">
+          {t('weather.bestSpotDisclaimer')}
+        </p>
 
         {/* Metrics grid */}
         <div className="grid grid-cols-2 gap-3 mb-4">
@@ -453,17 +486,27 @@ export const BestSpotSuggestion = ({
         </p>
 
         {resolvedHourlyBestSpots.length > 0 && (
-          <div className="@container/best-spot-timeline mb-4 min-w-0 border-t border-slate-100 pt-3 dark:border-slate-700">
+          <div
+            id="best-spot-hourly-options"
+            className="@container/best-spot-timeline mb-4 min-w-0 border-t border-slate-100 pt-3 dark:border-slate-700"
+          >
             <div className="flex items-center justify-between gap-2 mb-2">
               <span className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 {t('weather.bestSpotTimeline')}
               </span>
               <span className="text-xs font-medium text-slate-400 dark:text-slate-500">
-                {t('weather.byHour')}
+                {showAllHourlyBestSpots
+                  ? t('weather.showingAllHourlySlots', {
+                      count: hourlyRows.length,
+                    })
+                  : t('weather.showingTopHourlySlots', {
+                      count: Math.min(3, hourlyRows.length),
+                      total: hourlyRows.length,
+                    })}
               </span>
             </div>
             <div className="flex max-w-full min-w-0 gap-2 overflow-x-auto overscroll-x-contain pb-1 @min-[760px]/best-spot-timeline:hidden">
-              {hourlyRows.map((row) => {
+              {displayedHourlyRows.map((row) => {
                 const rowSite = row.spot.site;
                 const content = (
                   <>
@@ -523,7 +566,6 @@ export const BestSpotSuggestion = ({
                     type="button"
                     key={row.key}
                     onClick={() => onSelectSite(rowSite.id)}
-                    aria-label={rowSite.name}
                     className="min-w-[216px] cursor-pointer flex-col items-stretch justify-start gap-0 whitespace-normal rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-left shadow-sm transition-colors hover:border-sky-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:bg-slate-950/60 dark:hover:border-sky-800 dark:hover:bg-slate-950"
                   >
                     {content}
@@ -557,7 +599,7 @@ export const BestSpotSuggestion = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {hourlyRows.map((row) => {
+                  {displayedHourlyRows.map((row) => {
                     const rowSite = row.spot.site;
 
                     return (
@@ -574,7 +616,15 @@ export const BestSpotSuggestion = ({
                             <button
                               type="button"
                               onClick={() => onSelectSite(rowSite.id)}
-                              aria-label={rowSite.name}
+                              aria-label={t(
+                                'weather.hourlySpotAccessibleLabel',
+                                {
+                                  site: rowSite.name,
+                                  hour: row.hourLabel,
+                                  score: row.score,
+                                  verdict: row.verdict.label,
+                                }
+                              )}
                               className="min-h-0 max-w-full cursor-pointer justify-start whitespace-normal break-normal rounded-none bg-transparent px-0 py-0 text-left font-bold leading-tight text-slate-950 shadow-none transition-colors hover:bg-transparent hover:text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-white dark:hover:bg-transparent dark:hover:text-sky-300 [&[data-pressed]]:bg-transparent"
                             >
                               {rowSite.name}
@@ -620,6 +670,20 @@ export const BestSpotSuggestion = ({
                 </tbody>
               </table>
             </div>
+            {hourlyRows.length > 3 && (
+              <button
+                type="button"
+                aria-expanded={showAllHourlyBestSpots}
+                onClick={() => setShowAllHourlyBestSpots((showAll) => !showAll)}
+                className="mt-3 min-h-11 rounded-lg px-3 text-sm font-semibold text-sky-700 underline underline-offset-4 hover:text-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-sky-300 dark:hover:text-sky-200"
+              >
+                {showAllHourlyBestSpots
+                  ? t('weather.showFewerHourlySlots')
+                  : t('weather.showAllHourlySlots', {
+                      count: hourlyRows.length,
+                    })}
+              </button>
+            )}
           </div>
         )}
 

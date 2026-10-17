@@ -1,0 +1,1 @@
+ALTER TABLE flights ADD COLUMN video_markers TEXT NOT NULL DEFAULT '[]';

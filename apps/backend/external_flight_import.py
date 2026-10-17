@@ -60,12 +60,20 @@ def _local_departure(value: datetime) -> datetime:
 
 def _update_existing_flight(flight: Flight, activity: ExternalActivity) -> bool:
     name = format_automatic_flight_name(flight.flight_date, flight.departure_time)
+    gpx_provider = flight.gpx_provider
+    if gpx_provider is None and flight.gpx_file_path:
+        if Path(flight.gpx_file_path).name.startswith("intervals_"):
+            gpx_provider = activity.source.casefold()
     changed = (
-        flight.name != name or flight.title != name or flight.external_url != activity.external_url
+        flight.name != name
+        or flight.title != name
+        or flight.external_url != activity.external_url
+        or flight.gpx_provider != gpx_provider
     )
     flight.name = name
     flight.title = name
     flight.external_url = activity.external_url
+    flight.gpx_provider = gpx_provider
     return changed
 
 
@@ -183,6 +191,8 @@ async def import_external_activities(
                 else:
                     legacy = _find_legacy_flight(db, activity, points, stats)
                     if legacy:
+                        if legacy.gpx_provider is None:
+                            legacy.gpx_provider = legacy.external_provider
                         legacy.external_provider = provider_name
                         legacy.external_activity_id = activity.id
                         legacy.external_url = activity.external_url
@@ -198,6 +208,7 @@ async def import_external_activities(
                         flight.external_provider = provider_name
                         flight.external_activity_id = activity.id
                         flight.external_url = activity.external_url
+                        flight.gpx_provider = activity.source.casefold()
                         flight.name = flight_name
                         flight.title = flight_name
                         flight.flight_date = departure.date()

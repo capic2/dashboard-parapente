@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   YoutubeVideoAssociationsSchema,
@@ -10,13 +11,33 @@ export interface YoutubeConnectionStatus {
   connected: boolean;
 }
 
+export interface YoutubePlaylistPreparation {
+  title: string;
+  url: string;
+  created: boolean;
+}
+
 export interface YoutubeUploadJob {
   job_id: string;
   flight_id: string;
-  source_type: 'gopro_overlay' | 'pano' | 'highlight';
+  source_type:
+    | 'gopro_overlay'
+    | 'camera'
+    | 'video'
+    | 'pano'
+    | 'face'
+    | 'pilote'
+    | 'highlight'
+    | 'youtube_overlay';
   gopro_overlay_job_id?: string | null;
   highlight_video_job_id?: string | null;
-  status: 'queued' | 'uploading' | 'completed' | 'failed' | 'cancelled';
+  status:
+    | 'preparing'
+    | 'queued'
+    | 'uploading'
+    | 'completed'
+    | 'failed'
+    | 'cancelled';
   progress: number;
   youtube_url?: string | null;
   error?: string | null;
@@ -26,8 +47,19 @@ export interface YoutubeUploadJob {
 
 export type YoutubeUploadSource =
   | { source_type: 'gopro_overlay'; gopro_overlay_job_id: string }
+  | { source_type: 'camera' }
+  | { source_type: 'video' }
   | { source_type: 'pano' }
+  | { source_type: 'face' }
+  | { source_type: 'pilote' }
   | { source_type: 'highlight'; highlight_video_job_id: string };
+
+type YoutubeUploadSourceFilter =
+  | YoutubeUploadSource
+  | { source_type: 'youtube_overlay' };
+
+export type TemporaryFlightMediaSource = 'camera' | 'pano' | 'face' | 'pilote';
+type DeletableFlightMediaSource = 'video' | TemporaryFlightMediaSource;
 
 type YoutubeUploadInput = YoutubeUploadSource & {
   title: string;
@@ -35,15 +67,24 @@ type YoutubeUploadInput = YoutubeUploadSource & {
   privacy_status: 'private' | 'unlisted' | 'public';
 };
 
-const sourceFromInput = (input: YoutubeUploadInput): YoutubeUploadSource => {
-  if (input.source_type === 'pano') {
-    return { source_type: 'pano' };
+export const sourceFromInput = (
+  input: YoutubeUploadInput
+): YoutubeUploadSource => {
+  if (
+    input.source_type === 'pano' ||
+    input.source_type === 'face' ||
+    input.source_type === 'pilote'
+  ) {
+    return { source_type: input.source_type };
   }
   if (input.source_type === 'highlight') {
     return {
       source_type: 'highlight',
       highlight_video_job_id: input.highlight_video_job_id,
     };
+  }
+  if (input.source_type === 'camera' || input.source_type === 'video') {
+    return { source_type: input.source_type };
   }
   return {
     source_type: 'gopro_overlay',
@@ -59,16 +100,38 @@ export function useYoutubeStatus() {
   });
 }
 
+export function usePrepareYoutubePlaylist(flightId: string) {
+  return useMutation({
+    mutationFn: () =>
+      api
+        .post(`flights/${flightId}/youtube-playlist/prepare`)
+        .json<YoutubePlaylistPreparation>(),
+  });
+}
+
+export function useUploadYoutubeDownloadCookies() {
+  return useMutation({
+    mutationFn: (file: File) => {
+      const body = new FormData();
+      body.append('file', file);
+      return api
+        .put('youtube/download-cookies', { body })
+        .json<{ configured: boolean }>();
+    },
+  });
+}
+
 const youtubeUploadQueryKey = (
   flightId: string,
-  source?: YoutubeUploadSource
+  source?: YoutubeUploadSourceFilter
 ) => ['youtube-upload', flightId, source ?? 'latest'];
 
 export function useYoutubeUpload(
   flightId: string,
-  source?: YoutubeUploadSource
+  source?: YoutubeUploadSourceFilter
 ) {
-  return useQuery({
+  const queryClient = useQueryClient();
+  const query = useQuery({
     queryKey: youtubeUploadQueryKey(flightId, source),
     queryFn: () =>
       api
@@ -78,11 +141,25 @@ export function useYoutubeUpload(
         .json<YoutubeUploadJob | null>(),
     refetchInterval: (query) => {
       const job = query.state.data;
-      return job?.status === 'queued' || job?.status === 'uploading'
+      return job?.status === 'preparing' ||
+        job?.status === 'queued' ||
+        job?.status === 'uploading'
         ? 3_000
         : false;
     },
   });
+
+  useEffect(() => {
+    if (query.data?.status !== 'completed') return;
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['flights'] }),
+      queryClient.invalidateQueries({
+        queryKey: youtubeVideoAssociationsQueryKey(flightId),
+      }),
+    ]);
+  }, [flightId, query.data?.status, queryClient]);
+
+  return query;
 }
 
 export const youtubeVideoAssociationsQueryKey = (flightId: string) => [
@@ -97,6 +174,36 @@ export function useYoutubeVideoAssociations(flightId: string) {
       const data = await api.get(`flights/${flightId}/youtube-videos`).json();
       return YoutubeVideoAssociationsSchema.parse(data);
     },
+  });
+}
+
+export function useYoutubeSourcePublicationStatus(
+  flightId: string,
+  source: YoutubeUploadSource,
+  youtubeUrls: string[]
+) {
+  const upload = useYoutubeUpload(flightId, source);
+  const associations = useYoutubeVideoAssociations(flightId);
+  const isPublished = Boolean(
+    upload.data?.status === 'completed' &&
+    upload.data.youtube_url &&
+    youtubeUrls.includes(upload.data.youtube_url) &&
+    associations.data?.find(
+      (association) => association.url === upload.data?.youtube_url
+    )?.exists_on_youtube === true
+  );
+
+  return { upload, isPublished };
+}
+
+export function useDeleteFlightTemporaryMedia(flightId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (sourceType: DeletableFlightMediaSource) => {
+      await api.delete(`flights/${flightId}/temporary-media/${sourceType}`);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['flights'] }),
   });
 }
 
@@ -151,15 +258,43 @@ export function useStartYoutubeUpload(flightId: string) {
   });
 }
 
+export function useStartYoutubeTelemetryLayoutExport(flightId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: {
+      youtube_url: string;
+      offset_seconds: number;
+      pip_exports: {
+        slot_id: string;
+        source: string;
+        youtube_url: string;
+        offset_seconds: number;
+      }[];
+    }) =>
+      api
+        .post(`flights/${flightId}/youtube-telemetry-layout-export`, {
+          json: payload,
+        })
+        .json<{ job_id: string; operation_id: string; status: string }>(),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['youtube-upload', flightId],
+      });
+    },
+  });
+}
+
 export function useCancelYoutubeUpload(flightId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (targetFlightId?: string) =>
+    mutationFn: (target: { targetFlightId?: string; jobId: string }) =>
       api
-        .delete(`flights/${targetFlightId ?? flightId}/youtube-upload`)
+        .delete(`flights/${target.targetFlightId ?? flightId}/youtube-upload`, {
+          searchParams: { job_id: target.jobId },
+        })
         .json<YoutubeUploadJob>(),
-    onSuccess: (job, targetFlightId) => {
-      const resolvedFlightId = targetFlightId ?? flightId;
+    onSuccess: (job, target) => {
+      const resolvedFlightId = target.targetFlightId ?? flightId;
       queryClient.setQueryData(youtubeUploadQueryKey(resolvedFlightId), job);
       void queryClient.invalidateQueries({
         queryKey: ['video-export-jobs'],

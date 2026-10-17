@@ -2,14 +2,24 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach, beforeAll, afterAll, vi } from 'vitest';
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
 import { server } from '../../mocks/server';
 import { overrideApi } from '../lib/api';
 
+// Use i18next's key-returning mode so tests stay independent of translations.
+// This initializes react-i18next and avoids its missing-instance warning.
+await i18n.use(initReactI18next).init({
+  lng: 'cimode',
+  fallbackLng: 'cimode',
+  resources: {},
+});
+
 // Disable API logs in tests
-overrideApi({ logs: false });
+overrideApi({});
 
 // Setup MSW
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
 afterEach(() => {
   server.resetHandlers();
   cleanup();

@@ -6,8 +6,8 @@ import logging
 import math
 import os
 import re
-import shlex
 import select
+import shlex
 import shutil
 import subprocess
 import sys
@@ -22,14 +22,14 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import UploadFile
+from sqlalchemy.exc import OperationalError
 
 import config
-from datetime_utils import to_api_utc
 from database import SessionLocal
+from datetime_utils import to_api_utc
 from deployment_drain import job_admission
 from flight_storage import flight_temporary_directory
 from models import Flight, GoproOverlayJob
-from sqlalchemy.exc import OperationalError
 from video_acceleration import (
     VideoAccelerator,
     ffmpeg_supports_cuda_overlay,
@@ -150,6 +150,8 @@ _WORKER_THREAD: threading.Thread | None = None
 _WORKER_STOP = threading.Event()
 _WORKER_LOCK = threading.Lock()
 _JOB_HEARTBEAT_INTERVAL_SECONDS = 30.0
+_PROCESS_OUTPUT_READ_SIZE = 64 * 1024
+_PROCESS_CANCEL_CHECK_INTERVAL_SECONDS = 1.0
 
 
 def _utc_now() -> str:
@@ -610,6 +612,9 @@ def _job_preparation_metadata(
     gpx_offset: float = 0.0,
     overlay_only: bool = False,
     overlay_size: tuple[int, int] | None = None,
+    video_start_override: datetime | None = None,
+    pip_offset_seconds: float | None = None,
+    preserve_work_dir_on_failure: bool = False,
 ) -> dict[str, Any]:
     metadata = {
         "prepare_overlay_inputs": True,
@@ -619,8 +624,14 @@ def _job_preparation_metadata(
         "gpx_offset": gpx_offset,
         "overlay_only": overlay_only,
     }
+    if preserve_work_dir_on_failure:
+        metadata["preserve_work_dir_on_failure"] = True
     if overlay_size:
         metadata["overlay_size"] = list(overlay_size)
+    if video_start_override is not None:
+        metadata["video_start_override"] = video_start_override.isoformat()
+    if pip_offset_seconds is not None:
+        metadata["pip_offset_seconds"] = pip_offset_seconds
     return metadata
 
 
@@ -921,15 +932,18 @@ def _read_process_updates_from_process(
     if not stream:
         return
 
-    current = ""
+    current: list[str] = []
     last_heartbeat = time.monotonic()
+    last_cancel_check = last_heartbeat - _PROCESS_CANCEL_CHECK_INTERVAL_SECONDS
     while True:
         if process.poll() is None:
-            if _is_job_cancelled(job_id):
-                process.terminate()
-                return
-
             now = time.monotonic()
+            if now - last_cancel_check >= _PROCESS_CANCEL_CHECK_INTERVAL_SECONDS:
+                if _is_job_cancelled(job_id):
+                    process.terminate()
+                    return
+                last_cancel_check = now
+
             if now - last_heartbeat >= _JOB_HEARTBEAT_INTERVAL_SECONDS:
                 _update_job(job_id)
                 last_heartbeat = now
@@ -938,20 +952,25 @@ def _read_process_updates_from_process(
             if not ready:
                 continue
 
-        char = stream.read(1)
-        if not char:
+        read_chunk = getattr(stream, "read1", stream.read)
+        chunk = read_chunk(_PROCESS_OUTPUT_READ_SIZE)
+        if not chunk:
             if process.poll() is None:
+                time.sleep(_PROCESS_CANCEL_CHECK_INTERVAL_SECONDS)
                 continue
             break
-        if char in {"\n", "\r"}:
-            if current.strip():
-                yield current.strip()
-            current = ""
-            continue
-        current += char
+        for char in chunk:
+            if char in {"\n", "\r"}:
+                line = "".join(current).strip()
+                if line:
+                    yield line
+                current.clear()
+            else:
+                current.append(char)
 
-    if current.strip():
-        yield current.strip()
+    line = "".join(current).strip()
+    if line:
+        yield line
 
 
 def _background_process_command(command: list[str]) -> list[str]:
@@ -1714,6 +1733,11 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         source_gpx_path = gpx_path
         pip_path = Path(str(job["pip_path"])) if job.get("pip_path") else None
         command_metadata = dict(metadata)
+        if pip_path is not None:
+            # Keep the original input path separately from the prepared PIP,
+            # which lives in this job's temporary work directory and is
+            # removed after the overlay render completes.
+            command_metadata["source_pip_path"] = str(pip_path)
         render_gpx_path = gpx_path
 
         if metadata.get("pin_inputs"):
@@ -1729,7 +1753,12 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
         gpx_offset = _gpx_offset_from_command_metadata(command_metadata)
         embedded_video_start = probe_video_start_time(video_path)
         gpx_start = first_gpx_timestamp(render_gpx_path)
-        alignment_video_start = resolve_gopro_video_start_time(video_path, gpx_start)
+        video_start_override = _parse_utc_datetime(metadata.get("video_start_override"))
+        alignment_video_start = (
+            video_start_override
+            if video_start_override is not None
+            else resolve_gopro_video_start_time(video_path, gpx_start)
+        )
         aligned_video_start = align_video_start_time_to_gpx(alignment_video_start, gpx_start)
         automatic_offset = (
             (gpx_start - aligned_video_start).total_seconds()
@@ -1785,6 +1814,15 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
 
         if pip_path:
             _update_job(job_id, progress=15, message="Preparing PIP video")
+            has_pip_offset = command_metadata.get("pip_offset_seconds") is not None
+            pip_offset = (
+                float(command_metadata["pip_offset_seconds"]) if has_pip_offset else gpx_offset
+            )
+            pip_timeline_start = (
+                aligned_video_start if has_pip_offset else first_gpx_timestamp(render_gpx_path)
+            )
+            if has_pip_offset and pip_timeline_start is None:
+                pip_timeline_start = first_gpx_timestamp(source_gpx_path)
             pip_path = _prepare_pip_video_for_overlay(
                 job_id,
                 video_path,
@@ -1792,8 +1830,8 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
                 pip_path,
                 work_dir,
                 log_path=log_path,
-                timeline_start=first_gpx_timestamp(render_gpx_path),
-                gpx_offset=gpx_offset,
+                timeline_start=pip_timeline_start,
+                gpx_offset=pip_offset,
             )
         else:
             _append_job_log(log_path, "No PIP video configured")
@@ -2344,6 +2382,8 @@ def create_gopro_overlay_job_from_paths(
     flight_id: str | None = None,
     overlay_only: bool = False,
     overlay_size: tuple[int, int] | None = None,
+    video_start_override: datetime | None = None,
+    pip_offset_seconds: float | None = None,
 ) -> dict[str, Any]:
     _validate_file_extension(video_path, _VIDEO_EXTENSIONS)
     _validate_file_extension(gpx_path, _GPX_EXTENSIONS)
@@ -2370,6 +2410,8 @@ def create_gopro_overlay_job_from_paths(
                 flight_id=flight_id,
                 overlay_only=overlay_only,
                 overlay_size=overlay_size,
+                video_start_override=video_start_override,
+                pip_offset_seconds=pip_offset_seconds,
             )
     except Exception:
         shutil.rmtree(work_dir, ignore_errors=True)
@@ -2391,6 +2433,8 @@ def _create_gopro_overlay_job_from_paths(
     flight_id: str | None = None,
     overlay_only: bool = False,
     overlay_size: tuple[int, int] | None = None,
+    video_start_override: datetime | None = None,
+    pip_offset_seconds: float | None = None,
 ) -> dict[str, Any]:
     if output_resolution not in _OUTPUT_RESOLUTIONS:
         raise ValueError("Unknown output resolution")
@@ -2421,6 +2465,9 @@ def _create_gopro_overlay_job_from_paths(
         gpx_offset=gpx_offset,
         overlay_only=overlay_only,
         overlay_size=overlay_size,
+        video_start_override=video_start_override,
+        pip_offset_seconds=pip_offset_seconds,
+        preserve_work_dir_on_failure=output_name.startswith("youtube-overlay-"),
     )
 
     now = _utc_now_dt()
@@ -2975,6 +3022,15 @@ def _can_delete_work_dir(work_dir: Path) -> bool:
 
 
 def _cleanup_gopro_overlay_temp_files(job: dict[str, Any]) -> None:
+    job_id = str(job.get("id") or job.get("job_id") or "")
+    if job_id and job.get("status") in {_STATUS_FAILED, _STATUS_CANCELLED}:
+        full_job = get_gopro_overlay_job(job_id, include_command=True)
+        metadata = full_job.get("command") if full_job else None
+        if isinstance(metadata, dict) and metadata.get("preserve_work_dir_on_failure"):
+            # The video export cleaner removes this nested directory after its
+            # 24-hour YouTube retry-cache window expires.
+            return
+
     temp_output_path = job.get("temp_output_path")
     if temp_output_path:
         _unlink_if_exists(Path(str(temp_output_path)))
@@ -3038,6 +3094,65 @@ def _enqueue_existing_gopro_overlay_job(job_id: str) -> None:
         _enqueue_gopro_overlay_job_in_rq(job_id)
     elif not config.TESTING:
         start_gopro_overlay_worker()
+
+
+def resume_failed_gopro_overlay_job(job_id: str) -> bool:
+    """Requeue a failed YouTube render while retaining its completed segments."""
+    try:
+        with SessionLocal() as db:
+            job = db.get(GoproOverlayJob, job_id)
+            if job is None or job.status not in {_STATUS_FAILED, _STATUS_CANCELLED}:
+                return False
+            try:
+                metadata = json.loads(job.command_json or "{}")
+            except (TypeError, ValueError):
+                metadata = {}
+            if not isinstance(metadata, dict) or not metadata.get("preserve_work_dir_on_failure"):
+                return False
+            original_pip_path = metadata.get("source_pip_path")
+            if job.pip_path and original_pip_path:
+                source_pip_path = Path(str(original_pip_path))
+                if not source_pip_path.is_file():
+                    return False
+                job.pip_path = str(source_pip_path)
+            job.status = _STATUS_QUEUED
+            job.progress = 0
+            job.message = "Overlay retry queued"
+            job.error = None
+            job.completed_at = None
+            job.cancelled_at = None
+            job.updated_at = _utc_now_dt()
+            db.commit()
+    except OperationalError as exc:
+        if "no such table: gopro_overlay_jobs" not in str(exc):
+            raise
+        with _LOCK:
+            job = _JOBS.get(job_id)
+            metadata = job.get("command") if job else None
+            if (
+                not job
+                or job.get("status") not in {_STATUS_FAILED, _STATUS_CANCELLED}
+                or not isinstance(metadata, dict)
+                or not metadata.get("preserve_work_dir_on_failure")
+            ):
+                return False
+            original_pip_path = metadata.get("source_pip_path")
+            if job.get("pip_path") and original_pip_path:
+                source_pip_path = Path(str(original_pip_path))
+                if not source_pip_path.is_file():
+                    return False
+                job["pip_path"] = str(source_pip_path)
+            job.update(
+                status=_STATUS_QUEUED,
+                progress=0,
+                message="Overlay retry queued",
+                error=None,
+                completed_at=None,
+                cancelled_at=None,
+            )
+
+    _enqueue_existing_gopro_overlay_job(job_id)
+    return True
 
 
 def _delete_rq_gopro_overlay_job(job_id: str) -> bool:

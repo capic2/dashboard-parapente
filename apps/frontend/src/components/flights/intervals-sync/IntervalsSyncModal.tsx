@@ -76,13 +76,9 @@ export function IntervalsSyncModal({
         activity_ids: selectedActivityIds,
       },
       {
-        onSuccess: (result) => {
-          toast.success(
-            t('intervals.importToast', {
-              imported: result.imported,
-              updated: result.updated,
-              skipped: result.skipped,
-            })
+        onSuccess: () => {
+          toast.info(
+            t('intervals.importStarted', 'La synchronisation a été lancée')
           );
           onSyncComplete();
           void previewQuery.refetch();
@@ -296,18 +292,14 @@ export function IntervalsSyncModal({
           <output className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-700 dark:bg-green-900/20">
             <p className="mb-2 flex items-center gap-2 font-semibold text-green-800 dark:text-green-200">
               <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-              {t('intervals.syncComplete')}
+              {t('intervals.importStarted', 'La synchronisation a été lancée')}
             </p>
-            <ul className="space-y-1 text-sm text-green-700 dark:text-green-300">
-              <li>{t('intervals.imported', { count: data.imported })}</li>
-              <li>{t('intervals.updated', { count: data.updated })}</li>
-              <li>{t('intervals.skipped', { count: data.skipped })}</li>
-              {data.failed > 0 && (
-                <li className="text-orange-700 dark:text-orange-400">
-                  {t('intervals.failures', { count: data.failed })}
-                </li>
+            <p className="text-sm text-green-700 dark:text-green-300">
+              {t(
+                'intervals.importProgressHint',
+                'Suivez les étapes depuis le centre des traitements.'
               )}
-            </ul>
+            </p>
           </output>
         )}
 

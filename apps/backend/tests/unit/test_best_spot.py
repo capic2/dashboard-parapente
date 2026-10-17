@@ -25,6 +25,7 @@ import pytest
 
 from best_spot import (
     _filter_sites_by_location,
+    _filter_sites_for_best_spot,
     FORECAST_TIME_ZONE,
     _get_current_forecast_hour,
     calculate_angle_difference,
@@ -63,6 +64,15 @@ def test_filter_sites_by_location_without_position_keeps_all_sites(arguel_site, 
         arguel_site,
         chalais_site,
     ]
+
+
+def test_filter_sites_for_best_spot_excludes_landings_and_keeps_takeoffs():
+    """Best spot recommendations only include launch-capable sites."""
+    takeoff = Site(id="takeoff", name="Déco", usage_type="takeoff")
+    both = Site(id="both", name="Déco et atterro", usage_type="both")
+    landing = Site(id="landing", name="Atterro", usage_type="landing")
+
+    assert _filter_sites_for_best_spot([takeoff, both, landing]) == [takeoff, both]
 
 
 def test_parse_wind_direction_valid():

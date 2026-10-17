@@ -8,9 +8,7 @@ type WeatherPageMobileProps = {
   activeWeatherName?: string;
   selectedDayLabel: string;
   sourceLabel: string;
-  selectedSiteId?: string;
   isSearchMode: boolean;
-  isAuthenticated: boolean;
   stickySelectionBar: ReactNode;
   bestSpotSuggestion: ReactNode;
   forceRefreshControl?: ReactNode;
@@ -67,9 +65,7 @@ export default function WeatherPageMobileLayout({
   activeWeatherName,
   selectedDayLabel,
   sourceLabel,
-  selectedSiteId,
   isSearchMode,
-  isAuthenticated,
   stickySelectionBar,
   bestSpotSuggestion,
   forceRefreshControl,
@@ -89,7 +85,6 @@ export default function WeatherPageMobileLayout({
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-3 pb-24 sm:max-w-lg lg:max-w-xl">
       {stickySelectionBar}
-      {forecastPanel}
 
       <WeatherPageHero
         activeWeatherName={activeWeatherName}
@@ -101,13 +96,12 @@ export default function WeatherPageMobileLayout({
 
       {forceRefreshControl}
 
-      {bestSpotSuggestion}
-
       {emptyPanel}
       {decisionPanel}
-      {airspacePanel}
       {currentConditions}
       {searchResultPanel}
+      {airspacePanel}
+      {forecastPanel}
       <ExpandableSection
         title={t('weather.liveWindTitle')}
         summary={t('weather.mobile.liveWindSummary')}
@@ -130,36 +124,12 @@ export default function WeatherPageMobileLayout({
           {emagramPanel}
         </div>
       </ExpandableSection>
-
-      <section className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-300">
-        <p className="font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-          {t('weather.mobile.state')}
-        </p>
-        <dl className="mt-2 grid grid-cols-2 gap-2">
-          <div>
-            <dt className="font-semibold">{t('weather.mobile.mode')}</dt>
-            <dd>
-              {isSearchMode
-                ? t('weather.source.search')
-                : t('weather.source.favoriteSiteShort')}
-            </dd>
-          </div>
-          <div>
-            <dt className="font-semibold">{t('weather.mobile.emagram')}</dt>
-            <dd>
-              {isAuthenticated
-                ? t('weather.mobile.available')
-                : t('weather.mobile.hidden')}
-            </dd>
-          </div>
-          <div className="col-span-2">
-            <dt className="font-semibold">
-              {t('weather.mobile.activeWeather')}
-            </dt>
-            <dd>{activeWeatherName ?? selectedSiteId ?? t('common.none')}</dd>
-          </div>
-        </dl>
-      </section>
+      <ExpandableSection
+        title={t('weather.page.otherSitesTitle')}
+        summary={t('weather.page.otherSitesSummary')}
+      >
+        {bestSpotSuggestion}
+      </ExpandableSection>
     </div>
   );
 }

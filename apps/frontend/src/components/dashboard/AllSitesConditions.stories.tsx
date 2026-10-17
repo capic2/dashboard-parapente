@@ -135,11 +135,12 @@ export const SingleSite = meta.story({
 export const ErrorState = meta.story({
   name: 'Error',
   args: {
-    entries: threeEntries.map((e) => ({
-      ...e,
-      weather: undefined,
-      isLoading: false,
-      isError: true,
-    })),
+    entries: threeEntries.map((e) =>
+      Object.assign({}, e, {
+        weather: undefined,
+        isLoading: false,
+        isError: true,
+      })
+    ),
   },
 });

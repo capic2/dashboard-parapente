@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 export interface CurrentLocation {
   latitude: number;
@@ -8,14 +8,18 @@ export interface CurrentLocation {
 interface CurrentLocationState {
   location: CurrentLocation | null;
   isLoading: boolean;
+  requestLocation: () => void;
 }
 
 export function useCurrentLocation(): CurrentLocationState {
   const [location, setLocation] = useState<CurrentLocation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (!navigator.geolocation) {
+  const requestLocation = useCallback(() => {
+    setLocation(null);
+    setIsLoading(true);
+
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
       setIsLoading(false);
       return;
     }
@@ -30,12 +34,16 @@ export function useCurrentLocation(): CurrentLocationState {
       },
       () => setIsLoading(false),
       {
-        enableHighAccuracy: false,
-        maximumAge: 15 * 60 * 1000,
-        timeout: 5000,
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 10000,
       }
     );
   }, []);
 
-  return { location, isLoading };
+  useEffect(() => {
+    requestLocation();
+  }, [requestLocation]);
+
+  return { location, isLoading, requestLocation };
 }

@@ -12,7 +12,7 @@ fi
 is_forbidden_deploy_path() {
   path="$1"
   case "$path" in
-    .codenomad|.codenomad/*|*/.codenomad|*/.codenomad/*|.agents|.agents/*|*/.agents|*/.agents/*|.opencode|.opencode/*|*/.opencode|*/.opencode/*)
+    .codenomad|.codenomad/*|*/.codenomad|*/.codenomad/*|.agents|.agents/*|*/.agents|*/.agents/*)
       return 0
       ;;
   esac
@@ -57,7 +57,7 @@ resolve_from_portainer_volume() {
 }
 
 configure_compose_cmd() {
-  compose_files="-f docker-compose.yml"
+  compose_files="-f docker-compose.yml -f docker-compose.production.yml"
   if [ "$NVIDIA_GPU_ENABLED" = "true" ] && [ -f docker-compose.gpu.yml ]; then
     compose_files="$compose_files -f docker-compose.gpu.yml"
     echo "Using GPU compose override"
@@ -84,7 +84,6 @@ print_backend_diagnostics() {
     parapente-backend \
     parapente-backend-worker \
     parapente-highlight-video-worker \
-    parapente-youtube-upload-worker \
     parapente-gopro-overlay-worker \
     parapente-gopro-preview-worker \
     parapente-redis; do
@@ -96,12 +95,22 @@ print_backend_diagnostics() {
     docker inspect \
       --format 'status={{.State.Status}} exit_code={{.State.ExitCode}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
       "$container_name" || true
+    if [ "$container_name" = "parapente-redis" ]; then
+      docker inspect \
+        --format '{{range .State.Health.Log}}{{printf "%s exit=%d output=%s\n" .Start .ExitCode .Output}}{{end}}' \
+        "$container_name" || true
+    fi
   done
 
   echo "Recent backend logs"
   docker logs --tail 200 parapente-backend 2>&1 || true
   echo "Recent YouTube upload worker logs"
-  docker logs --tail 200 parapente-youtube-upload-worker 2>&1 || true
+  for container_name in $(docker ps -a \
+    --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" \
+    --filter "label=com.docker.compose.service=youtube-upload-worker" \
+    --format '{{.Names}}'); do
+    docker logs --tail 200 "$container_name" 2>&1 || true
+  done
   echo "Recent GoPro overlay worker logs"
   docker logs --tail 200 parapente-gopro-overlay-worker 2>&1 || true
   echo "Recent GoPro preview worker logs"
@@ -118,38 +127,106 @@ verify_gpu_prerequisites() {
   if ! docker info --format '{{json .Runtimes}}' | grep -q '"nvidia"'; then
     echo "NVIDIA runtime is not registered in Docker; falling back to CPU deployment"
     export NVIDIA_GPU_ENABLED=false BACKEND_VIDEO_ACCELERATOR=cpu
-    compose_files="-f docker-compose.yml"
+    compose_files="-f docker-compose.yml -f docker-compose.production.yml"
     return 0
   fi
   if ! docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi -L; then
     echo "NVIDIA GPU preflight failed; falling back to CPU deployment"
     export NVIDIA_GPU_ENABLED=false BACKEND_VIDEO_ACCELERATOR=cpu
-    compose_files="-f docker-compose.yml"
+    compose_files="-f docker-compose.yml -f docker-compose.production.yml"
     return 0
   fi
+}
+
+ensure_redis_healthy() {
+  redis_container_id=$(compose_cmd ps --all --quiet redis | sed -n '1p')
+  if [ -z "$redis_container_id" ]; then
+    echo "Redis container is missing; starting Redis before replacing backend services"
+    compose_cmd up -d redis || return 1
+    redis_container_id=$(compose_cmd ps --all --quiet redis | sed -n '1p')
+  fi
+
+  if [ -z "$redis_container_id" ]; then
+    echo "Redis container was not created by docker compose"
+    return 1
+  fi
+
+  redis_state=$(docker inspect --format '{{.State.Status}}' "$redis_container_id" 2>/dev/null || true)
+  redis_health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$redis_container_id" 2>/dev/null || true)
+  if [ "$redis_state" != "running" ]; then
+    echo "Redis is not running (state=${redis_state:-unknown}); starting the existing container before replacing backend services"
+    docker start "$redis_container_id" >/dev/null || return 1
+  elif [ "$redis_health" = "unhealthy" ]; then
+    echo "Redis is unhealthy; restarting only Redis before replacing backend services"
+    docker restart "$redis_container_id" >/dev/null || return 1
+  fi
+
+  attempt=1
+  max_attempts=18
+  while [ "$attempt" -le "$max_attempts" ]; do
+    redis_state=$(docker inspect --format '{{.State.Status}}' "$redis_container_id" 2>/dev/null || true)
+    redis_health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$redis_container_id" 2>/dev/null || true)
+    if [ "$redis_state" = "running" ] && [ "$redis_health" = "healthy" ]; then
+      echo "Redis is healthy; continuing production deployment"
+      return 0
+    fi
+
+    echo "Waiting for Redis readiness: attempt $attempt/$max_attempts state=${redis_state:-unknown} health=${redis_health:-unknown}"
+    [ "$attempt" -lt "$max_attempts" ] && sleep 5
+    attempt=$((attempt + 1))
+  done
+
+  echo "Redis did not become healthy; backend services were not replaced"
+  print_backend_diagnostics
+  return 1
 }
 
 verify_workers_started() {
   attempts=1
   while [ "$attempts" -le "$LOCAL_VERIFY_MAX_ATTEMPTS" ]; do
     failed=0
-    for container_name in parapente-backend parapente-backend-worker parapente-highlight-video-worker parapente-youtube-upload-worker parapente-gopro-overlay-worker parapente-gopro-preview-worker parapente-redis; do
+    for container_name in parapente-backend parapente-backend-worker parapente-highlight-video-worker parapente-gopro-overlay-worker parapente-gopro-preview-worker parapente-redis; do
       state=$(docker inspect --format '{{.State.Status}}' "$container_name" 2>/dev/null || true)
       health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_name" 2>/dev/null || true)
       if [ "$state" != "running" ] || [ "$health" != "healthy" ]; then
+        echo "Readiness check failed for $container_name: state=${state:-missing} health=${health:-missing}"
         failed=1
       fi
     done
-    for worker_log in parapente-backend-worker parapente-highlight-video-worker parapente-gopro-overlay-worker parapente-gopro-preview-worker parapente-youtube-upload-worker; do
+    youtube_worker_ids=$(compose_cmd ps --all --quiet youtube-upload-worker)
+    if [ -n "$youtube_worker_ids" ]; then
+      youtube_worker_count=$(printf "%s\n" "$youtube_worker_ids" | wc -l)
+    else
+      youtube_worker_count=0
+    fi
+    if [ "$youtube_worker_count" -ne 3 ]; then
+      echo "Readiness check found $youtube_worker_count YouTube upload workers; expected 3"
+      failed=1
+    fi
+    for worker_id in $youtube_worker_ids; do
+      worker_name=$(docker inspect --format "{{.Name}}" "$worker_id" 2>/dev/null | sed "s#^/##" || true)
+      state=$(docker inspect --format '{{.State.Status}}' "$worker_id" 2>/dev/null || true)
+      health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$worker_id" 2>/dev/null || true)
+      if [ "$state" != "running" ] || [ "$health" != "healthy" ]; then
+        echo "Readiness check failed for ${worker_name:-YouTube worker}: state=${state:-missing} health=${health:-missing}"
+        failed=1
+      fi
+      if ! docker logs "$worker_id" 2>&1 | grep -q "Starting YouTube upload RQ worker"; then
+        echo "Readiness check found no YouTube worker startup marker in ${worker_name:-YouTube worker} logs"
+        failed=1
+      fi
+    done
+    for worker_log in parapente-backend-worker parapente-highlight-video-worker parapente-gopro-overlay-worker parapente-gopro-preview-worker; do
       if ! docker logs "$worker_log" 2>&1 | grep -q "Listening on"; then
+        echo "Readiness check found no RQ listening marker in $worker_log logs"
         failed=1
       fi
     done
     if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
-      gpu_devices=$(docker inspect --format '{{json .HostConfig.DeviceRequests}}' parapente-gopro-overlay-worker 2>/dev/null || true)
+      gpu_driver=$(docker inspect --format '{{range .HostConfig.DeviceRequests}}{{.Driver}}{{end}}' parapente-gopro-overlay-worker 2>/dev/null || true)
       gpu_accelerator=$(docker inspect --format "{{range .Config.Env}}{{println .}}{{end}}" parapente-gopro-overlay-worker 2>/dev/null | grep "^BACKEND_VIDEO_ACCELERATOR=" || true)
-      if ! echo "$gpu_devices" | grep -q "\"Driver\":\"nvidia\"" || [ "$gpu_accelerator" != "BACKEND_VIDEO_ACCELERATOR=nvidia" ]; then
-        echo "GoPro worker was started without the requested NVIDIA device"
+      if [ "$gpu_driver" != "nvidia" ] || [ "$gpu_accelerator" != "BACKEND_VIDEO_ACCELERATOR=nvidia" ]; then
+        echo "GoPro worker GPU readiness failed: driver=${gpu_driver:-missing} accelerator_configured=$([ "$gpu_accelerator" = "BACKEND_VIDEO_ACCELERATOR=nvidia" ] && echo yes || echo no)"
         failed=1
       fi
     fi
@@ -292,6 +369,29 @@ download_gpu_compose_override() {
   esac
 }
 
+download_production_compose_override() {
+  production_url="https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.production.yml"
+  if ! production_status=$(curl --silent --show-error --location \
+    --output docker-compose.production.yml.tmp \
+    --write-out '%{http_code}' \
+    "$production_url"); then
+    rm -f docker-compose.production.yml.tmp
+    echo "Failed to download production compose override"
+    return 1
+  fi
+
+  case "$production_status" in
+    200)
+      mv docker-compose.production.yml.tmp docker-compose.production.yml
+      ;;
+    *)
+      rm -f docker-compose.production.yml.tmp
+      echo "Production compose override download returned HTTP $production_status"
+      return 1
+      ;;
+  esac
+}
+
 deploy_from_compose_path() {
   path="$1"
 
@@ -310,6 +410,7 @@ deploy_from_compose_path() {
   echo "Updating production compose file from $REPO_SLUG@$TARGET_SHA"
   curl -fsSL "https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.yml" -o docker-compose.yml.tmp
   mv docker-compose.yml.tmp docker-compose.yml
+  download_production_compose_override
   download_gpu_compose_override
 
   configure_compose_cmd
@@ -321,9 +422,10 @@ deploy_from_compose_path() {
   export CI_BACKEND_IMAGE="$BACKEND_IMAGE"
 
   # Redis is not part of the backend image update. Keep it running
-  # so deployments do not pull and recreate the stateful service.
+  # so deployments do not pull or recreate the stateful service.
+  ensure_redis_healthy || return 1
   if ! compose_cmd pull backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker gopro-preview-worker database-backup ||
-    ! compose_cmd up -d --remove-orphans backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker gopro-preview-worker database-backup redis; then
+    ! compose_cmd up -d --no-deps --remove-orphans --scale youtube-upload-worker=3 backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker gopro-preview-worker database-backup; then
     print_backend_diagnostics
     return 1
   fi
@@ -364,6 +466,24 @@ deploy_from_portainer_volume() {
       curl -fsSL "https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.yml" -o docker-compose.yml.tmp
       mv docker-compose.yml.tmp docker-compose.yml
 
+      production_url="https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.production.yml"
+      if ! production_status=$(curl --silent --show-error --location \
+        --output docker-compose.production.yml.tmp \
+        --write-out "%{http_code}" \
+        "$production_url"); then
+        rm -f docker-compose.production.yml.tmp
+        echo "Failed to download production compose override"
+        exit 1
+      fi
+      case "$production_status" in
+        200) mv docker-compose.production.yml.tmp docker-compose.production.yml ;;
+        *)
+          rm -f docker-compose.production.yml.tmp
+          echo "Production compose override download returned HTTP $production_status"
+          exit 1
+          ;;
+      esac
+
       if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
         gpu_url="https://raw.githubusercontent.com/$REPO_SLUG/$TARGET_SHA/docker-compose.gpu.yml"
         if ! gpu_status=$(curl --silent --show-error --location \
@@ -392,7 +512,7 @@ deploy_from_portainer_volume() {
         echo "NVIDIA GPU deployment disabled; using CPU compose"
       fi
 
-      compose_files="-f docker-compose.yml"
+      compose_files="-f docker-compose.yml -f docker-compose.production.yml"
       if [ "$NVIDIA_GPU_ENABLED" = "true" ] && [ -f docker-compose.gpu.yml ]; then
         compose_files="$compose_files -f docker-compose.gpu.yml"
       fi
@@ -410,40 +530,104 @@ deploy_from_portainer_volume() {
         if ! docker info --format "{{json .Runtimes}}" | grep -q "\"nvidia\""; then
           echo "NVIDIA runtime is not registered in Docker; falling back to CPU deployment"
           export NVIDIA_GPU_ENABLED=false BACKEND_VIDEO_ACCELERATOR=cpu
-          compose_files="-f docker-compose.yml"
+          compose_files="-f docker-compose.yml -f docker-compose.production.yml"
         fi
         if [ "$NVIDIA_GPU_ENABLED" = "true" ] && ! docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi -L; then
           echo "NVIDIA GPU preflight failed; falling back to CPU deployment"
           export NVIDIA_GPU_ENABLED=false BACKEND_VIDEO_ACCELERATOR=cpu
-          compose_files="-f docker-compose.yml"
+          compose_files="-f docker-compose.yml -f docker-compose.production.yml"
         fi
       fi
 
       printf "%s" "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
       # Redis is not part of the backend image update. Keep it running
-      # so deployments do not pull and recreate the stateful service.
+      # so deployments do not pull or recreate the stateful service.
+      redis_container_id=$(compose_cmd ps --all --quiet redis | sed -n "1p")
+      if [ -z "$redis_container_id" ]; then
+        echo "Redis container is missing; starting Redis before replacing backend services"
+        compose_cmd up -d redis || exit 1
+        redis_container_id=$(compose_cmd ps --all --quiet redis | sed -n "1p")
+      fi
+      if [ -z "$redis_container_id" ]; then
+        echo "Redis container was not created by docker compose"
+        exit 1
+      fi
+      redis_state=$(docker inspect --format "{{.State.Status}}" "$redis_container_id" 2>/dev/null || true)
+      redis_health=$(docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" "$redis_container_id" 2>/dev/null || true)
+      if [ "$redis_state" != "running" ]; then
+        echo "Redis is not running (state=${redis_state:-unknown}); starting the existing container before replacing backend services"
+        docker start "$redis_container_id" >/dev/null || exit 1
+      elif [ "$redis_health" = "unhealthy" ]; then
+        echo "Redis is unhealthy; restarting only Redis before replacing backend services"
+        docker restart "$redis_container_id" >/dev/null || exit 1
+      fi
+      readiness_attempt=1
+      redis_ready=0
+      while [ "$readiness_attempt" -le 18 ]; do
+        redis_state=$(docker inspect --format "{{.State.Status}}" "$redis_container_id" 2>/dev/null || true)
+        redis_health=$(docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" "$redis_container_id" 2>/dev/null || true)
+        if [ "$redis_state" = "running" ] && [ "$redis_health" = "healthy" ]; then
+          redis_ready=1
+          break
+        fi
+        echo "Waiting for Redis readiness: attempt $readiness_attempt/18 state=${redis_state:-unknown} health=${redis_health:-unknown}"
+        [ "$readiness_attempt" -lt 18 ] && sleep 5
+        readiness_attempt=$((readiness_attempt + 1))
+      done
+      if [ "$redis_ready" -ne 1 ]; then
+        echo "Redis did not become healthy; backend services were not replaced"
+        exit 1
+      fi
+      echo "Redis is healthy; continuing production deployment"
       compose_cmd pull backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker gopro-preview-worker database-backup
-      compose_cmd up -d --remove-orphans backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker gopro-preview-worker database-backup redis
+      compose_cmd up -d --no-deps --remove-orphans --scale youtube-upload-worker=3 backend backend-worker highlight-video-worker youtube-upload-worker gopro-overlay-worker gopro-preview-worker database-backup
       readiness_attempt=1
       readiness_ok=0
       while [ "$readiness_attempt" -le "$LOCAL_VERIFY_MAX_ATTEMPTS" ]; do
         readiness_failed=0
-        for container_name in parapente-backend parapente-backend-worker parapente-highlight-video-worker parapente-youtube-upload-worker parapente-gopro-overlay-worker parapente-gopro-preview-worker parapente-redis; do
+        for container_name in parapente-backend parapente-backend-worker parapente-highlight-video-worker parapente-gopro-overlay-worker parapente-gopro-preview-worker parapente-redis; do
           state=$(docker inspect --format "{{.State.Status}}" "$container_name" 2>/dev/null || true)
           health=$(docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" "$container_name" 2>/dev/null || true)
           if [ "$state" != "running" ] || [ "$health" != "healthy" ]; then
+            echo "Readiness check failed for $container_name: state=${state:-missing} health=${health:-missing}"
             readiness_failed=1
           fi
         done
-        for worker_log in parapente-backend-worker parapente-highlight-video-worker parapente-gopro-overlay-worker parapente-gopro-preview-worker parapente-youtube-upload-worker; do
+        youtube_worker_ids=$(compose_cmd ps --all --quiet youtube-upload-worker)
+        if [ -n "$youtube_worker_ids" ]; then
+          youtube_worker_count=$(printf "%s\n" "$youtube_worker_ids" | wc -l)
+        else
+          youtube_worker_count=0
+        fi
+        if [ "$youtube_worker_count" -ne 3 ]; then
+          echo "Readiness check found $youtube_worker_count YouTube upload workers; expected 3"
+          readiness_failed=1
+        fi
+        for worker_id in $youtube_worker_ids; do
+          worker_name=$(docker inspect --format "{{.Name}}" "$worker_id" 2>/dev/null | sed "s#^/##" || true)
+          state=$(docker inspect --format "{{.State.Status}}" "$worker_id" 2>/dev/null || true)
+          health=$(docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" "$worker_id" 2>/dev/null || true)
+          if [ "$state" != "running" ] || [ "$health" != "healthy" ]; then
+            echo "Readiness check failed for ${worker_name:-YouTube worker}: state=${state:-missing} health=${health:-missing}"
+            readiness_failed=1
+          fi
+          if ! docker logs "$worker_id" 2>&1 | grep -q "Starting YouTube upload RQ worker"; then
+            echo "Readiness check found no YouTube worker startup marker in ${worker_name:-YouTube worker} logs"
+            readiness_failed=1
+          fi
+        done
+        for worker_log in parapente-backend-worker parapente-highlight-video-worker parapente-gopro-overlay-worker parapente-gopro-preview-worker; do
           if ! docker logs "$worker_log" 2>&1 | grep -q "Listening on"; then
+            echo "Readiness check found no RQ listening marker in $worker_log logs"
             readiness_failed=1
           fi
         done
         if [ "$NVIDIA_GPU_ENABLED" = "true" ]; then
-          gpu_devices=$(docker inspect --format "{{json .HostConfig.DeviceRequests}}" parapente-gopro-overlay-worker 2>/dev/null || true)
-          if ! echo "$gpu_devices" | grep -q "\"Driver\":\"nvidia\""; then
+          gpu_driver=$(docker inspect --format "{{range .HostConfig.DeviceRequests}}{{.Driver}}{{end}}" parapente-gopro-overlay-worker 2>/dev/null || true)
+          gpu_accelerator=$(docker inspect --format "{{range .Config.Env}}{{println .}}{{end}}" parapente-gopro-overlay-worker 2>/dev/null | grep "^BACKEND_VIDEO_ACCELERATOR=" || true)
+          if [ "$gpu_driver" != "nvidia" ] || [ "$gpu_accelerator" != "BACKEND_VIDEO_ACCELERATOR=nvidia" ]; then
+            echo "GoPro worker GPU readiness failed: driver=${gpu_driver:-missing} accelerator_configured=$([ "$gpu_accelerator" = "BACKEND_VIDEO_ACCELERATOR=nvidia" ] && echo yes || echo no)"
             readiness_failed=1
           fi
         fi

@@ -11,10 +11,18 @@ Use this skill whenever the user asks to inspect the production Portainer deploy
 
 - Synchronize Bitwarden before searching: `mcp__bitwarden__sync`.
 - Use the exact Bitwarden item named `portainer`. Do not substitute `portainer2`, `.env pour portainer`, or an IP-address item.
+- Bitwarden search/list responses may include complete Notes values and other secrets. Never print, quote, log, or otherwise expose raw search/list/get responses. If a search is needed to disambiguate the exact item, extract and display only item names and IDs; retrieve the exact item by ID afterward.
 - The item URI is `https://portainer.capic.ignorelist.com`.
-- Read the API token from the item's login password (`mcp__bitwarden__get` with `object: "item"`). Never print, quote, log, or save the token in files.
+- Read the API token from the exact item's **Notes** field (Bitwarden's additional information), using `mcp__bitwarden__get` with `object: "item"`. Do not use the login password field. Keep the token in memory or an environment variable only; never print, quote, log, or save it in files.
 - Authenticate Portainer API calls with `X-API-Key: <token>`.
 - The Portainer local Docker endpoint is endpoint ID `2`; verify this with `GET /api/endpoints` before using it.
+- If Portainer returns `401`, sync Bitwarden again and verify that the token came from Notes on the exact `portainer` item. Retry once; if it still fails, stop and report the authentication blocker without trying another item or credential.
+- Use the complete Notes value as the API token when Notes contains the raw token. Do not extract a prefix-matching substring, apply a character allowlist, or truncate at punctuation: valid token characters may occur after the `ptr_` prefix. If Notes contains labels or other text, do not guess which substring is the token; ask for the exact item Notes to be updated with the raw token alone, then sync and retrieve it again.
+- Authenticate Portainer API calls with `X-API-Key: <token>`.
+- The Portainer local Docker endpoint is endpoint ID `2`; verify this with `GET /api/endpoints` before using it.
+- If Portainer returns `401`, sync Bitwarden again and verify that the token came from Notes on the exact `portainer` item. Retry once; if it still fails, stop and report the authentication blocker without trying another item or credential.
+
+When reporting API failures, print only the HTTP status or a generic error category. Do not print response bodies, since they may contain sensitive deployment data.
 
 Example read-only API shape (the token stays in the environment and TLS verification remains enabled):
 

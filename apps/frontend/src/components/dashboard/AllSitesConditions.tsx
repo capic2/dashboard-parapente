@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
 import { Cloud, RefreshCw, Thermometer, Wind } from 'lucide-react';
@@ -61,9 +62,9 @@ function SiteConditionCard({
     >
       {/* Site name + orientation */}
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-black text-slate-950 dark:text-white truncate">
+        <span className="text-sm font-black text-slate-950 dark:text-white truncate">
           {getSiteDisplayName(site)}
-        </h3>
+        </span>
         {site.orientation && (
           <span className="ml-2 shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
             {site.orientation}
@@ -106,20 +107,20 @@ function SiteConditionCard({
 
           {/* Metrics */}
           <div className="space-y-1.5 text-sm">
-            <div className="flex justify-between">
-              <Thermometer
-                className="h-4 w-4 text-slate-500 dark:text-slate-400"
-                aria-hidden="true"
-              />
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                <Thermometer className="h-4 w-4" aria-hidden="true" />
+                {t('common.temperature')}
+              </span>
               <span className="font-bold text-slate-950 dark:text-white">
                 {weather.temperature}°C
               </span>
             </div>
-            <div className="flex justify-between items-center">
-              <Wind
-                className="h-4 w-4 text-slate-500 dark:text-slate-400"
-                aria-hidden="true"
-              />
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                <Wind className="h-4 w-4" aria-hidden="true" />
+                {t('common.wind')}
+              </span>
               <div className="flex items-center gap-2">
                 <span className="font-bold text-slate-950 dark:text-white">
                   {weather.wind_speed.toFixed(1)} km/h
@@ -143,12 +144,12 @@ function SiteConditionCard({
               </div>
             </div>
             {weather.conditions && (
-              <div className="flex justify-between">
-                <Cloud
-                  className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400"
-                  aria-hidden="true"
-                />
-                <span className="ml-2 truncate font-bold text-slate-950 dark:text-white">
+              <div className="flex items-center justify-between gap-3">
+                <span className="flex shrink-0 items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                  <Cloud className="h-4 w-4" aria-hidden="true" />
+                  {t('common.conditions')}
+                </span>
+                <span className="truncate text-right font-bold text-slate-950 dark:text-white">
                   {weather.conditions}
                 </span>
               </div>
@@ -170,9 +171,19 @@ export default function AllSitesConditions({
   onRefresh,
 }: AllSitesConditionsProps) {
   const { t } = useTranslation();
+  const [showAllSites, setShowAllSites] = useState(false);
   const hasError = entries.some((entry) => entry.isError);
 
   if (entries.length === 0) return null;
+
+  const rankedEntries = [...entries].sort((left, right) => {
+    const leftScore = left.weather?.score ?? left.weather?.para_index ?? -1;
+    const rightScore = right.weather?.score ?? right.weather?.para_index ?? -1;
+    return rightScore - leftScore;
+  });
+  const visibleEntries = showAllSites
+    ? rankedEntries
+    : rankedEntries.slice(0, 4);
 
   return (
     <div>
@@ -199,11 +210,39 @@ export default function AllSitesConditions({
           </Button>
         )}
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {entries.map((entry) => (
+      {entries.length > 4 && (
+        <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+          {showAllSites
+            ? t('dashboard.showingAllSites', { count: entries.length })
+            : t('dashboard.showingTopSites', {
+                count: visibleEntries.length,
+                total: entries.length,
+              })}
+        </p>
+      )}
+      <div
+        id="all-sites-conditions-list"
+        className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${
+          visibleEntries.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2'
+        } lg:grid-cols-3 xl:grid-cols-4`}
+      >
+        {visibleEntries.map((entry) => (
           <SiteConditionCard key={entry.site.id} {...entry} />
         ))}
       </div>
+      {entries.length > 4 && (
+        <button
+          type="button"
+          aria-expanded={showAllSites}
+          aria-controls="all-sites-conditions-list"
+          onClick={() => setShowAllSites((showAll) => !showAll)}
+          className="mt-3 min-h-11 rounded-lg px-3 text-sm font-semibold text-sky-700 underline underline-offset-4 hover:text-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-sky-300 dark:hover:text-sky-200"
+        >
+          {showAllSites
+            ? t('dashboard.showFewerSites')
+            : t('dashboard.showAllSites', { count: entries.length })}
+        </button>
+      )}
     </div>
   );
 }

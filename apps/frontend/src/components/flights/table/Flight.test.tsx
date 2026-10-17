@@ -15,9 +15,20 @@ vi.mock('@dashboard-parapente/design-system', () => ({
   Card: ({
     children,
     selected,
+    interactive,
+    borderWidth,
     ...props
-  }: React.HTMLAttributes<HTMLDivElement> & { selected?: boolean }) => (
-    <div data-selected={selected ? 'true' : 'false'} {...props}>
+  }: React.HTMLAttributes<HTMLDivElement> & {
+    selected?: boolean;
+    interactive?: boolean;
+    borderWidth?: string;
+  }) => (
+    <div
+      data-selected={selected ? 'true' : 'false'}
+      data-interactive={interactive ? 'true' : 'false'}
+      data-border-width={borderWidth}
+      {...props}
+    >
       {children}
     </div>
   ),
@@ -42,6 +53,7 @@ import { Flight } from './Flight';
 
 const flight = {
   id: 'flight-1',
+  tags: [],
   flight_date: '2024-03-15',
   title: 'Vol thermique',
   name: 'Vol thermique',
@@ -62,6 +74,7 @@ const flight = {
   youtube_upload_progress: null,
   has_gopro_overlay: false,
   has_pano_video: false,
+  has_osv: false,
   has_highlight_video: false,
   video_export_job_id: null,
   video_export_status: null,
@@ -95,10 +108,10 @@ test('does not render the selected flight badge', () => {
   expect(screen.getByText('Besançon - Puy de Dôme')).toBeInTheDocument();
 });
 
-test('renders media as a passive status in the flight list', () => {
+test('renders media and OSV sources as passive statuses in the flight list', () => {
   render(
     <Flight
-      flight={{ ...flight, has_gpx: true }}
+      flight={{ ...flight, has_gpx: true, has_osv: true }}
       isActive={false}
       isSelected={false}
       selectionMode={false}
@@ -108,6 +121,7 @@ test('renders media as a passive status in the flight list', () => {
   );
 
   expect(screen.getByText('flights.gpxBadge')).toBeInTheDocument();
+  expect(screen.getByText('flights.osvSourcesBadge')).toBeInTheDocument();
   expect(
     screen.queryByRole('button', { name: 'flights.downloadGpx' })
   ).not.toBeInTheDocument();
@@ -270,4 +284,32 @@ test('shows the number of available YouTube videos when there are several', () =
   );
 
   expect(screen.getByText('flights.youtubeBadge x2')).toBeInTheDocument();
+});
+
+test('renders a YouTube badge for each available video in source order', () => {
+  render(
+    <Flight
+      flight={{
+        ...flight,
+        has_youtube_video: true,
+        youtube_video_count: 2,
+        youtube_video_types: ['face', 'pano'],
+      }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  const badges = [
+    screen.getByText('flights.faceBadge'),
+    screen.getByText('flights.panoBadge'),
+  ];
+
+  expect(badges[0].compareDocumentPosition(badges[1])).toBe(
+    Node.DOCUMENT_POSITION_FOLLOWING
+  );
+  expect(screen.queryByText('flights.youtubeBadge x2')).not.toBeInTheDocument();
 });

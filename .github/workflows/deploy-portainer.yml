@@ -130,12 +130,19 @@ jobs:
                 : parsedDeployTags
                     .filter((tag) => tag.sha !== currentSha)
                     .at(-1);
+            const previousSuccessfulTag = parsedSuccessTags
+              .filter((tag) => tag.sha !== currentSha)
+              .at(-1);
 
             core.setOutput('version', version);
             core.setOutput('tag_name', `deploy/${version}`);
             core.setOutput('success_tag_name', `deploy-success/${version}`);
             core.setOutput('label_name', `version:${version}`);
             core.setOutput('previous_deploy_sha', latestSuccessfulTag ? latestSuccessfulTag.sha : '');
+            core.setOutput(
+              'previous_success_tag_name',
+              previousSuccessfulTag ? previousSuccessfulTag.ref.replace('refs/tags/', '') : ''
+            );
 
             if (latestSuccessfulTag) {
               core.info(`Previous successful deployment tag: ${latestSuccessfulTag.ref} (${latestSuccessfulTag.sha})`);
@@ -223,6 +230,7 @@ jobs:
           push: true
           build-args: |
             BACKEND_DEPLOY_VERSION=${{ steps.version.outputs.version }}
+            BACKEND_RELEASE_NOTES_URL=https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag_name }}
           secrets: |
             VITE_CESIUM_ION_TOKEN=${{ secrets.VITE_CESIUM_ION_TOKEN }}
           build-contexts: |
@@ -441,17 +449,33 @@ jobs:
             exit 1
           fi
 
-          response=$(curl --show-error --silent --fail-with-body \
-            --connect-timeout 5 --max-time 20 \
-            --request POST \
-            --header "Authorization: Bearer $DRAIN_API_TOKEN" \
-            "$DRAIN_BASE_URL/$DEPLOYMENT_ID/deploying")
+          max_attempts=6
+          attempt=1
+          while [ "$attempt" -le "$max_attempts" ]; do
+            if response=$(curl --show-error --silent --fail-with-body \
+              --connect-timeout 5 --max-time 20 \
+              --request POST \
+              --header "Authorization: Bearer $DRAIN_API_TOKEN" \
+              "$DRAIN_BASE_URL/$DEPLOYMENT_ID/deploying"); then
+              if phase=$(python -c 'import json, sys; data=json.load(sys.stdin); phase=data["phase"]; ready=data["ready_for_deployment"]; active=data["active_jobs"]; admissions=data["admissions_in_progress"]; assert phase == "deploying" and type(ready) is bool and type(active) is int and active >= 0 and type(admissions) is int and admissions >= 0; print(phase)' <<< "$response" 2>/dev/null); then
+                echo "Deployment drain phase: $phase"
+                exit 0
+              fi
+              echo "Mark-deploying attempt $attempt/$max_attempts returned malformed JSON"
+            else
+              curl_status=$?
+              echo "Mark-deploying attempt $attempt/$max_attempts failed (curl exit $curl_status); retrying when attempts remain"
+            fi
 
-          if ! phase=$(python -c 'import json, sys; data=json.load(sys.stdin); phase=data["phase"]; ready=data["ready_for_deployment"]; active=data["active_jobs"]; admissions=data["admissions_in_progress"]; assert phase == "deploying" and type(ready) is bool and type(active) is int and active >= 0 and type(admissions) is int and admissions >= 0; print(phase)' <<< "$response" 2>/dev/null); then
-            echo "Mark-deploying response returned malformed JSON"
-            exit 1
-          fi
-          echo "Deployment drain phase: $phase"
+            if [ "$attempt" -lt "$max_attempts" ]; then
+              sleep_seconds=$((attempt * 5))
+              sleep "$sleep_seconds"
+            fi
+            attempt=$((attempt + 1))
+          done
+
+          echo "Failed to mark production deployment drain as deploying after $max_attempts attempts"
+          exit 1
 
       - name: Deploy on production server
         id: trigger_deploy
@@ -828,6 +852,7 @@ jobs:
             );
 
       - name: Mark deployment as successful
+        id: mark_deployment_successful
         if: steps.trigger_deploy.outcome == 'success' && steps.verify_deploy.outcome == 'success' && steps.label_deployed_prs.outcome == 'success' && (vars.DEPLOY_DRAIN_ENABLED != 'true' || ((steps.begin_drain.outputs.drain_bootstrap == 'true') && (steps.begin_drain.outputs.drain_cleanup_required != 'true' || steps.release_drain.outcome == 'success')) || (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success'))
         uses: actions/github-script@v9
         env:
@@ -870,6 +895,80 @@ jobs:
                 throw error;
               }
             }
+
+      - name: Publish automatic release summary
+        id: publish_release_summary
+        if: steps.mark_deployment_successful.outcome == 'success'
+        continue-on-error: true
+        uses: actions/github-script@v9
+        env:
+          TAG_NAME: ${{ steps.version.outputs.tag_name }}
+          PREVIOUS_TAG_NAME: ${{ steps.version.outputs.previous_success_tag_name }}
+          DEPLOYMENT_VERSION: ${{ steps.version.outputs.version }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const tagName = process.env.TAG_NAME;
+            const version = process.env.DEPLOYMENT_VERSION;
+            const previousTagName = process.env.PREVIOUS_TAG_NAME;
+
+            const generatedNotes = await github.request(
+              'POST /repos/{owner}/{repo}/releases/generate-notes',
+              {
+                owner,
+                repo,
+                tag_name: tagName,
+                target_commitish: context.sha,
+                ...(previousTagName ? { previous_tag_name: previousTagName } : {}),
+              }
+            );
+            const body = generatedNotes.data.body || 'No user-facing changes in this deployment.';
+            const release = {
+              owner,
+              repo,
+              tag_name: tagName,
+              target_commitish: context.sha,
+              name: `Version ${version}`,
+              body,
+              draft: false,
+              prerelease: false,
+            };
+
+            try {
+              const existing = await github.request(
+                'GET /repos/{owner}/{repo}/releases/tags/{tag}',
+                { owner, repo, tag: tagName }
+              );
+              await github.request('PATCH /repos/{owner}/{repo}/releases/{release_id}', {
+                ...release,
+                release_id: existing.data.id,
+              });
+              core.info(`Updated release summary for ${tagName}`);
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              const created = await github.request('POST /repos/{owner}/{repo}/releases', release);
+              core.info(`Published release summary: ${created.data.html_url}`);
+            }
+
+      - name: Clean old deployment version labels
+        if: steps.mark_deployment_successful.outcome == 'success'
+        id: cleanup_deployment_version_labels
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_LABELS_TO_KEEP: '500'
+        run: bash .github/scripts/cleanup-deployment-version-labels.sh
+
+      - name: Report deployment label cleanup warning
+        if: steps.mark_deployment_successful.outcome == 'success' && steps.cleanup_deployment_version_labels.outcome == 'failure'
+        run: |
+          echo "::warning::Production deployment succeeded, but old deployment version labels could not be cleaned."
+          {
+            echo "### Deployment label cleanup needs attention"
+            echo
+            echo "The production deployment succeeded, but pruning old version labels failed. Run the **Clean old deployment version labels** workflow to retry."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Label merged PRs as non deployed when deployment fails
         if: >-
@@ -1012,6 +1111,7 @@ jobs:
             echo "| Image build | ${{ steps.build_image.outcome }} |"
             echo "| SSH deployment | ${{ steps.trigger_deploy.outcome }} |"
             echo "| Version verification | ${{ steps.verify_deploy.outcome }} |"
+            echo "| Release summary | ${{ steps.publish_release_summary.outcome }} |"
             echo "| Deployment labels | ${{ steps.label_deployed_prs.outcome }} |"
             echo "| Target version | ${{ steps.version.outputs.version }} |"
             echo "| Run | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |"

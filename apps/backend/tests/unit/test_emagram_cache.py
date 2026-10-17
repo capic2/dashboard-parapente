@@ -24,11 +24,11 @@ async def test_emagram_cache_reads_written_value_from_shared_backend_client(monk
         calls.append(("get", key))
         return store.get(key)
 
-    async def fake_setex(key, ttl, value):
-        calls.append(("setex", key, ttl))
+    async def fake_set(key, value, *, ex):
+        calls.append(("set", key, ex))
         store[key] = value
 
-    fake_client = SimpleNamespace(get=fake_get, setex=fake_setex)
+    fake_client = SimpleNamespace(get=fake_get, set=fake_set)
 
     async def fake_get_redis():
         return fake_client
@@ -56,7 +56,7 @@ async def test_emagram_cache_reads_written_value_from_shared_backend_client(monk
     assert payload is not None
     assert payload["success"] is True
     assert payload["cached_at"]
-    assert ("setex", "emagram:sounding:07145:12:2026-01-15", 86400) in calls
+    assert ("set", "emagram:sounding:07145:12:2026-01-15", 86400) in calls
     assert ("get", "emagram:sounding:07145:12:2026-01-15") in calls
 
 
@@ -64,11 +64,11 @@ async def test_emagram_cache_reads_written_value_from_shared_backend_client(monk
 async def test_emagram_cache_skips_failed_payloads(monkeypatch):
     called = False
 
-    async def fake_setex(*args, **kwargs):
+    async def fake_set(*args, **kwargs):
         nonlocal called
         called = True
 
-    fake_client = SimpleNamespace(setex=fake_setex)
+    fake_client = SimpleNamespace(set=fake_set)
 
     async def fake_get_redis():
         return fake_client

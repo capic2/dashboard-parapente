@@ -8,7 +8,7 @@ import json
 import logging
 import time
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from datetime import time as dt_time
 from typing import Any
 
@@ -545,6 +545,7 @@ def _normalize_llm_analysis(
         "force_thermique_indices": raw_analysis.get("force_thermique_indices", []),
         "heures_volables": raw_analysis.get("heures_volables"),
         "score_volabilite": raw_analysis.get("score_volabilite"),
+        "sources_agreement": raw_analysis.get("sources_agreement"),
         "conseils_vol": raw_analysis.get("conseils_vol"),
         "alertes_securite": raw_analysis.get("alertes_securite", []),
         "details_analyse": raw_analysis.get("details_analyse"),
@@ -632,7 +633,7 @@ async def generate_multi_source_emagram_for_spot(
         logger.info(f"🎯 Starting multi-source emagram analysis for {site.name}")
 
         # Compute forecast target date
-        forecast_date = (datetime.utcnow() + timedelta(days=day_index)).date()
+        forecast_date = (datetime.now(UTC).replace(tzinfo=None) + timedelta(days=day_index)).date()
 
         # Step 2: Check for recent analysis (unless force_refresh)
         if not force_refresh:
@@ -661,7 +662,7 @@ async def generate_multi_source_emagram_for_spot(
                 )
                 return emagram_analysis_to_dict(existing, db=db)
 
-            failure_cutoff = datetime.utcnow() - timedelta(
+            failure_cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(
                 minutes=config.EMAGRAM_FAILURE_RETRY_MINUTES
             )
             failed_filters = [
@@ -877,7 +878,7 @@ def save_emagram_analysis(
     Save emagram analysis to database
     """
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     analysis_id = str(uuid.uuid4())
 
     # Build external URLs, screenshot paths, and source errors JSON
@@ -973,7 +974,7 @@ def save_failed_analysis(
     """
     Save failed analysis attempt for debugging
     """
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
 
     # Collect per-source errors
     sources_errors = {}

@@ -39,7 +39,7 @@
       "outputs": ["{workspaceRoot}/coverage/apps/backend"],
       "options": {
         "commands": [
-          "command -v ../../.venv/bin/pytest >/dev/null 2>&1 && PYTEST=../../.venv/bin/pytest || PYTEST=pytest; $PYTEST tests/ -m 'not integration and not slow' -q --tb=short --no-header --cov=. --cov-config=.coveragerc --cov-report=term-missing --cov-report=xml:../../coverage/apps/backend/coverage.xml"
+          "bash ../../.github/scripts/run-backend-tests.sh tests/ -m 'not integration and not slow' -q -o console_output_style=classic --tb=short --no-header --junitxml=../../coverage/apps/backend/junit.xml --cov=. --cov-config=.coveragerc --cov-report=term-missing --cov-report=xml:../../coverage/apps/backend/coverage.xml"
         ],
         "cwd": "apps/backend",
         "env": {

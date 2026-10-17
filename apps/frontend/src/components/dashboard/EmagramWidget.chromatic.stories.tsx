@@ -25,8 +25,12 @@ const meta = preview.meta({
     chromatic: {
       disableSnapshot: false,
     },
-    msw: {
-      handlers: [
+  },
+  tags: ['!autodocs'],
+
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/emagram/hours', () =>
           HttpResponse.json({
             site_id: 'site-arguel',
@@ -80,10 +84,9 @@ const meta = preview.meta({
               headers: { 'Content-Type': 'image/png' },
             })
         ),
-      ],
-    },
+      ]
+    );
   },
-  tags: ['!autodocs'],
 });
 
 export const EmagramWidgetChromatic = meta.story({

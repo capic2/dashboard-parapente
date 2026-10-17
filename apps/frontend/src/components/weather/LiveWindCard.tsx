@@ -83,9 +83,9 @@ const StationRow = ({
         )}
       </div>
       <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-        {station.age_minutes !== null
-          ? t('weather.liveWindAgeMinutes', { count: station.age_minutes })
-          : t('weather.liveWindNoRecent')}
+        {station.age_minutes === null
+          ? t('weather.liveWindNoRecent')
+          : t('weather.liveWindAgeMinutes', { count: station.age_minutes })}
         {station.temperature_c !== null && (
           <span className="inline-flex items-center gap-1">
             <Thermometer
@@ -172,11 +172,7 @@ export default function LiveWindCard({ siteId }: LiveWindCardProps) {
         </div>
       </div>
 
-      {!primaryStation ? (
-        <div className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-          {t('weather.liveWindEmpty')}
-        </div>
-      ) : (
+      {primaryStation ? (
         <>
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
@@ -198,6 +194,10 @@ export default function LiveWindCard({ siteId }: LiveWindCardProps) {
             </div>
           )}
         </>
+      ) : (
+        <div className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+          {t('weather.liveWindEmpty')}
+        </div>
       )}
     </div>
   );

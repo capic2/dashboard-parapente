@@ -55,7 +55,7 @@ export const flightSummariesQueryOptions = (search: FlightsSearch) =>
     refetchOnWindowFocus: 'always',
   });
 
-export const activeFlightMediaJobsQueryOptions = () =>
+export const activeFlightMediaJobsQueryOptions = (pollWhenIdle = false) =>
   queryOptions({
     queryKey: ['video-export-jobs', 'active'],
     queryFn: async () => {
@@ -67,7 +67,9 @@ export const activeFlightMediaJobsQueryOptions = () =>
       return ActiveFlightMediaJobsResponseSchema.parse(data).jobs;
     },
     refetchInterval: (query) =>
-      query.state.data === undefined || query.state.data.length > 0
+      pollWhenIdle ||
+      query.state.data === undefined ||
+      query.state.data.length > 0
         ? 10000
         : false,
   });
@@ -95,11 +97,20 @@ export function mergeActiveMediaJobs(
         job.mode !== 'gopro_overlay' &&
         job.mode !== 'youtube' &&
         job.mode !== 'youtube_upload' &&
+        job.mode !== 'youtube_overlay' &&
+        job.mode !== 'youtube_telemetry_layout' &&
         job.mode !== 'highlight'
     );
     const highlightJob = flightJobs.find((job) => job.mode === 'highlight');
     const overlayJob = flightJobs.find((job) => job.mode === 'gopro_overlay');
-    const youtubeJob = flightJobs.find((job) => job.mode === 'youtube');
+    const youtubeOverlayExportJob = flightJobs.find(
+      (job) =>
+        job.mode === 'youtube_overlay' ||
+        job.mode === 'youtube_telemetry_layout'
+    );
+    const youtubeJob = flightJobs.find(
+      (job) => job.mode === 'youtube' || job.mode === 'youtube_upload'
+    );
     return {
       ...flight,
       ...(videoJob && {
@@ -111,6 +122,11 @@ export function mergeActiveMediaJobs(
         highlight_video_job_id: highlightJob.job_id,
         highlight_video_status: highlightJob.status,
         highlight_video_progress: highlightJob.progress ?? null,
+      }),
+      ...(youtubeOverlayExportJob && {
+        youtube_overlay_export_status: youtubeOverlayExportJob.status,
+        youtube_overlay_export_progress:
+          youtubeOverlayExportJob.progress ?? null,
       }),
       ...(overlayJob && {
         gopro_overlay_job_id: overlayJob.job_id,
@@ -144,6 +160,6 @@ export function useFlightSummaries(search: FlightsSearch) {
   return useInfiniteQuery(flightSummariesQueryOptions(search));
 }
 
-export function useActiveFlightMediaJobs() {
-  return useQuery(activeFlightMediaJobsQueryOptions());
+export function useActiveFlightMediaJobs(pollWhenIdle = false) {
+  return useQuery(activeFlightMediaJobsQueryOptions(pollWhenIdle));
 }

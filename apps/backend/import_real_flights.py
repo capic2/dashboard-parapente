@@ -4,7 +4,7 @@
 import math
 import sqlite3
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 # GPX namespace
@@ -176,8 +176,8 @@ def main():
                     metrics["duration_minutes"],
                     metrics["distance_km"],
                     metrics["elevation_gain_m"],
-                    datetime.utcnow().isoformat(),
-                    datetime.utcnow().isoformat(),
+                    datetime.now(UTC).replace(tzinfo=None).isoformat(),
+                    datetime.now(UTC).replace(tzinfo=None).isoformat(),
                 ),
             )
 

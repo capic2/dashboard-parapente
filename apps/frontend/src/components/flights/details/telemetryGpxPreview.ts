@@ -42,15 +42,18 @@ function headingDegrees(
 
 function numericExtensionValue(
   trackPoint: Element,
-  localNames: readonly string[]
+  localNames: readonly string[],
+  isValid: (value: number) => boolean = Number.isFinite
 ) {
   for (const localName of localNames) {
     const element = Array.from(trackPoint.getElementsByTagName('*')).find(
       (candidate) =>
         candidate.localName === localName || candidate.tagName === localName
     );
-    const value = Number(element?.textContent);
-    if (Number.isFinite(value)) return value;
+    const text = element?.textContent?.trim();
+    if (!text) continue;
+    const value = Number(text);
+    if (Number.isFinite(value) && isValid(value)) return value;
   }
   return undefined;
 }
@@ -79,10 +82,11 @@ export async function parseTelemetryGpxFile(
     lastTimestamp = timestamp;
     const heartRate = numericExtensionValue(trackPoint, ['hr', 'heartRate']);
     const power = numericExtensionValue(trackPoint, ['power', 'watts']);
-    const speedMps = numericExtensionValue(trackPoint, [
-      'speed',
-      'enhancedSpeed',
-    ]);
+    const speedMps = numericExtensionValue(
+      trackPoint,
+      ['speed', 'enhancedSpeed'],
+      (value) => value >= 0 && value * 3.6 < 150
+    );
     const recordedVario = numericExtensionValue(trackPoint, [
       'vario',
       'vertical_speed',
@@ -94,23 +98,22 @@ export async function parseTelemetryGpxFile(
       'course',
       'track',
     ]);
-    return {
+    const point: FlightTelemetryPoint = {
       timestamp,
       lat: Number(trackPoint.getAttribute('lat') ?? 0),
       lon: Number(trackPoint.getAttribute('lon') ?? 0),
       elevation: Number(trackPoint.querySelector('ele')?.textContent ?? 0),
       segment: 0,
       distance_km: 0,
-      ...(heartRate !== undefined ? { heart_rate: heartRate } : {}),
-      ...(power !== undefined ? { power } : {}),
-      ...(speedMps !== undefined && speedMps >= 0
-        ? { speed_kmh: speedMps * 3.6 }
-        : {}),
-      ...(recordedVario !== undefined ? { vario_ms: recordedVario } : {}),
-      ...(recordedHeading !== undefined
-        ? { heading_deg: recordedHeading }
-        : {}),
     };
+    if (heartRate !== undefined) point.heart_rate = heartRate;
+    if (power !== undefined) point.power = power;
+    if (speedMps !== undefined && speedMps >= 0) {
+      point.speed_kmh = speedMps * 3.6;
+    }
+    if (recordedVario !== undefined) point.vario_ms = recordedVario;
+    if (recordedHeading !== undefined) point.heading_deg = recordedHeading;
+    return point;
   });
 
   for (let index = 1; index < points.length; index += 1) {

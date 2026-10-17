@@ -6,6 +6,11 @@ const FlightViewer3D = lazy(() =>
     default: m.FlightViewer3D,
   }))
 );
+const TelemetryLayoutExport = lazy(() =>
+  import('../components/flights/details/TelemetryLayoutExport').then((m) => ({
+    default: m.TelemetryLayoutExport,
+  }))
+);
 
 export const Route = createLazyFileRoute('/export-viewer')({
   component: ExportViewer,
@@ -16,6 +21,19 @@ function ExportViewer() {
   const flightId = search.get('flightId') || '';
   const exportJobId = search.get('jobId') || null;
   const exportToken = search.get('exportToken') || null;
+  const mode = search.get('mode');
+
+  if (mode === 'telemetry-layout') {
+    return (
+      <div className="fixed inset-0 overflow-hidden bg-transparent">
+        <Suspense
+          fallback={<div className="h-screen w-screen bg-transparent" />}
+        >
+          <TelemetryLayoutExport />
+        </Suspense>
+      </div>
+    );
+  }
 
   if (!flightId) {
     return (

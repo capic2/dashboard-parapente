@@ -90,23 +90,22 @@ export const getFlightCameraShot = ({
   );
   const closeDistanceMultiplier = safeCloseZoomPercent / 100;
   const transitionProgress = safeTransitionPercent / 100;
-  const keyframes = CAMERA_KEYFRAMES.map((keyframe) => ({
-    ...keyframe,
-    progress:
-      keyframe.progress === 0.15
-        ? transitionProgress
-        : keyframe.progress === 0.25
-          ? transitionProgress * 2
-          : keyframe.progress === 0.75
-            ? 1 - transitionProgress * 2
-            : keyframe.progress === 0.85
-              ? 1 - transitionProgress
-              : keyframe.progress,
-    distanceMultiplier:
-      keyframe.distanceMultiplier === 0.65
-        ? closeDistanceMultiplier
-        : keyframe.distanceMultiplier,
-  }));
+  const getTransitionProgress = (progress: number) => {
+    if (progress === 0.15) return transitionProgress;
+    if (progress === 0.25) return transitionProgress * 2;
+    if (progress === 0.75) return 1 - transitionProgress * 2;
+    if (progress === 0.85) return 1 - transitionProgress;
+    return progress;
+  };
+  const keyframes = CAMERA_KEYFRAMES.map((keyframe) =>
+    Object.assign({}, keyframe, {
+      progress: getTransitionProgress(keyframe.progress),
+      distanceMultiplier:
+        keyframe.distanceMultiplier === 0.65
+          ? closeDistanceMultiplier
+          : keyframe.distanceMultiplier,
+    })
+  );
   const nextKeyframeIndex = keyframes.findIndex(
     (keyframe) => keyframe.progress >= safeProgress
   );
