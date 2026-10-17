@@ -388,6 +388,8 @@ def export_youtube_telemetry_layout(
         [
             "ffmpeg",
             "-y",
+            "-filter_complex_threads",
+            "2",
             *ffmpeg_inputs,
             "-filter_complex",
             filter_graph,
@@ -395,6 +397,8 @@ def export_youtube_telemetry_layout(
             "[outv]",
             "-map",
             "0:a?",
+            "-threads",
+            "2",
             "-c:v",
             "libx264",
             "-preset",
