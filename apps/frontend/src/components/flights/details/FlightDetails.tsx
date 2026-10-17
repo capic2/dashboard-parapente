@@ -88,7 +88,7 @@ export function FlightDetails({
   mobileMode = false,
   onCloseMobile,
 }: FlightDetailsProps) {
-  const activeMediaJobs = useActiveFlightMediaJobs(true);
+  const activeMediaJobs = useActiveFlightMediaJobs(true, 2000);
   const activeYoutubeExportJobIds = useMemo(
     () =>
       activeMediaJobs.data
