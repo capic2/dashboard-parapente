@@ -66,11 +66,7 @@ def _video_resolution(path: Path) -> tuple[int, int]:
         )
         metadata = json.loads(result.stdout)
         streams = metadata.get("streams")
-        if (
-            not isinstance(streams, list)
-            or not streams
-            or not isinstance(streams[0], dict)
-        ):
+        if not isinstance(streams, list) or not streams or not isinstance(streams[0], dict):
             raise ValueError("La résolution de la vidéo source est absente")
         width = int(streams[0]["width"])
         height = int(streams[0]["height"])
@@ -82,9 +78,7 @@ def _video_resolution(path: Path) -> tuple[int, int]:
         TypeError,
         subprocess.SubprocessError,
     ) as exc:
-        raise YoutubeExportError(
-            "La résolution de la vidéo source est indisponible"
-        ) from exc
+        raise YoutubeExportError("La résolution de la vidéo source est indisponible") from exc
     if width <= 0 or height <= 0:
         raise YoutubeExportError("La résolution de la vidéo source est invalide")
     return width, height
