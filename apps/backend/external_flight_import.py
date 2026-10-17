@@ -234,6 +234,7 @@ async def import_external_activities(
                         temporary_path.write_bytes(gpx)
                         temporary_path.replace(written_path)
                         flight.gpx_file_path = str(written_path)
+                        flight.gpx_source_file_path = str(written_path)
                         db.flush()
                         outcome = "imported"
                         pending_summary = _flight_summary(flight)

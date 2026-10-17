@@ -1783,6 +1783,7 @@ class TestFlightGPXEndpoints:
         assert sample_flight.max_climb_rate_ms == expected["max_climb_rate_ms"]
         assert sample_flight.max_sink_rate_ms == expected["max_sink_rate_ms"]
         assert sample_flight.departure_time == expected["departure_time"].replace(tzinfo=None)
+        assert sample_flight.gpx_source_file_path == sample_flight.gpx_file_path
 
     def test_upload_gpx_succeeds_when_stat_calculation_fails(
         self, client, db_session, sample_flight, sample_gpx

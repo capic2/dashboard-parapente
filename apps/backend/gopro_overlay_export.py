@@ -1,6 +1,7 @@
 import asyncio
 import fcntl
 import fnmatch
+import hashlib
 import json
 import logging
 import math
@@ -405,15 +406,19 @@ def ensure_enriched_gpx(
     input_dir.mkdir(parents=True, exist_ok=True)
     merged_gpx_path = input_dir / _ENRICHED_GPX_FILENAME
     metadata_path = input_dir / _ENRICHED_GPX_METADATA_FILENAME
+    source_signatures = []
+    for index, path in enumerate([gpx_path, *osv_paths]):
+        stat = path.stat()
+        source_signature = {
+            "path": str(path.resolve()),
+            "size": stat.st_size,
+            "mtime_ns": stat.st_mtime_ns,
+        }
+        if index == 0:
+            source_signature["sha256"] = _file_sha256(path)
+        source_signatures.append(source_signature)
     signature = {
-        "sources": [
-            {
-                "path": str(path.resolve()),
-                "size": path.stat().st_size,
-                "mtime_ns": path.stat().st_mtime_ns,
-            }
-            for path in [gpx_path, *osv_paths]
-        ],
+        "sources": source_signatures,
         "video_duration": video_duration,
         "first_gpx_at": first_gpx_at,
     }
@@ -468,6 +473,31 @@ def _has_usable_gpx_timestamps(gpx_path: Path) -> bool:
 def enriched_gpx_path(input_dir: Path) -> Path:
     """Return the stable location used for the persisted enriched GPX."""
     return input_dir / _ENRICHED_GPX_FILENAME
+
+
+def enriched_gpx_matches_source(enriched_path: Path, source_path: Path) -> bool:
+    """Return whether the cache metadata describes the current source GPX."""
+    metadata_path = enriched_path.with_suffix(".json")
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        cached_source = metadata["sources"][0]
+        stat = source_path.stat()
+        return (
+            cached_source["path"] == str(source_path.resolve())
+            and cached_source["size"] == stat.st_size
+            and cached_source["mtime_ns"] == stat.st_mtime_ns
+            and cached_source["sha256"] == _file_sha256(source_path)
+        )
+    except (OSError, KeyError, IndexError, TypeError, json.JSONDecodeError):
+        return False
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source_file:
+        for chunk in iter(lambda: source_file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _output_path_for_video(video_path: Path, output_name: str) -> Path:

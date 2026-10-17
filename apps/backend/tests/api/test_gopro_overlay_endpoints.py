@@ -35,6 +35,25 @@ from models import VideoExportJob
 API_PREFIX = "/api"
 
 
+def _write_enriched_gpx_metadata(enriched_path: Path, source_path: Path) -> None:
+    stat = source_path.stat()
+    enriched_path.with_suffix(".json").write_text(
+        json.dumps(
+            {
+                "sources": [
+                    {
+                        "path": str(source_path.resolve()),
+                        "size": stat.st_size,
+                        "mtime_ns": stat.st_mtime_ns,
+                        "sha256": gopro_overlay_export._file_sha256(source_path),
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def _successful_osv_merge_process(command, *, output: str = ""):
     Path(command[-1]).write_text("<gpx>merged</gpx>")
     process = Mock()
@@ -371,6 +390,261 @@ def test_gopro_overlay_preview_prefers_flight_gpx_over_zepp_folder_file(
 
     assert response.status_code == 200
     assert response.json()["gpx"]["start_time"] == "2026-03-15T10:00:10Z"
+
+
+def test_gopro_overlay_preview_keeps_source_gpx_timeline_after_enrichment(
+    client: TestClient, db_session, sample_flight, tmp_path, monkeypatch
+) -> None:
+    input_dir = tmp_path / sample_flight.flight_date.strftime("%Y%m%d") / "01"
+    input_dir.mkdir(parents=True)
+    (input_dir / "camera.mp4").write_bytes(b"video")
+    (input_dir / "camera.osv").write_bytes(b"osv")
+    source_gpx_path = tmp_path / "flight-source.gpx"
+    source_gpx_path.write_text(
+        "<gpx><trk><trkseg>"
+        '<trkpt lat="45" lon="5"><time>2026-03-15T10:00:10Z</time></trkpt>'
+        '<trkpt lat="45.1" lon="5.1"><time>2026-03-15T10:01:10Z</time></trkpt>'
+        "</trkseg></trk></gpx>"
+    )
+    enriched_path = input_dir / "merged-gopro-overlay.gpx"
+    enriched_path.write_text(
+        "<gpx><trk><trkseg>"
+        '<trkpt lat="44.9" lon="4.9"><time>2026-03-15T10:00:00Z</time></trkpt>'
+        '<trkpt lat="45" lon="5"><time>2026-03-15T10:00:10Z</time></trkpt>'
+        '<trkpt lat="45.1" lon="5.1"><time>2026-03-15T10:01:10Z</time></trkpt>'
+        "</trkseg></trk></gpx>"
+    )
+    _write_enriched_gpx_metadata(enriched_path, source_gpx_path)
+    sample_flight.gpx_source_file_path = str(source_gpx_path)
+    sample_flight.gpx_file_path = str(enriched_path)
+    sample_flight.gopro_overlay_gpx_offset = 5.0
+    db_session.commit()
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+
+    with (
+        patch("routes.probe_video_duration", return_value=120.0),
+        patch(
+            "gopro_overlay_export.probe_video_start_time",
+            return_value=datetime.fromisoformat("2026-03-15T10:00:00+00:00"),
+        ),
+    ):
+        response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/gopro-overlay/preview")
+
+    assert response.status_code == 200
+    assert response.json()["alignment"] == {
+        "automatic_offset_seconds": 10.0,
+        "manual_offset_seconds": 5.0,
+        "effective_offset_seconds": 15.0,
+    }
+    assert response.json()["gpx"]["start_time"] == "2026-03-15T10:00:10Z"
+    db_session.refresh(sample_flight)
+    assert sample_flight.gpx_file_path == str(enriched_path)
+
+
+def test_enrichment_persists_canonical_gpx_without_changing_source_or_offset(
+    db_session, sample_flight, test_db, tmp_path, monkeypatch
+) -> None:
+    source_gpx_path = tmp_path / "flight-source.gpx"
+    source_gpx_path.write_text("<gpx />")
+    enriched_path = tmp_path / "merged-gopro-overlay.gpx"
+    enriched_path.write_text("<gpx />")
+    osv_path = tmp_path / "camera.osv"
+    osv_path.write_bytes(b"osv")
+    sample_flight.gpx_file_path = str(source_gpx_path)
+    sample_flight.gpx_source_file_path = str(source_gpx_path)
+    sample_flight.gopro_overlay_gpx_offset = -7.25
+    db_session.commit()
+    monkeypatch.setattr(routes, "SessionLocal", test_db)
+
+    def create_enriched_cache(*_args, **_kwargs):
+        _write_enriched_gpx_metadata(enriched_path, source_gpx_path)
+        return enriched_path
+
+    monkeypatch.setattr(routes, "ensure_enriched_gpx", create_enriched_cache)
+
+    routes._prepare_enriched_gpx_in_background(
+        sample_flight.id,
+        [osv_path],
+        source_gpx_path,
+        tmp_path,
+        video_duration=120.0,
+        first_gpx_at=10.0,
+    )
+
+    db_session.refresh(sample_flight)
+    assert sample_flight.gpx_file_path == str(enriched_path)
+    assert sample_flight.gpx_source_file_path == str(source_gpx_path)
+    assert sample_flight.gopro_overlay_gpx_offset == -7.25
+    persisted_updated_at = sample_flight.updated_at
+    routes._persist_enriched_gpx_for_flight(sample_flight.id, source_gpx_path, enriched_path)
+    db_session.refresh(sample_flight)
+    assert sample_flight.updated_at == persisted_updated_at
+
+    replacement_gpx_path = tmp_path / "replacement.gpx"
+    replacement_gpx_path.write_text("<gpx />")
+    sample_flight.gpx_file_path = str(replacement_gpx_path)
+    sample_flight.gpx_source_file_path = str(replacement_gpx_path)
+    db_session.commit()
+    routes._prepare_enriched_gpx_in_background(
+        sample_flight.id,
+        [osv_path],
+        source_gpx_path,
+        tmp_path,
+        video_duration=120.0,
+        first_gpx_at=10.0,
+    )
+
+    db_session.refresh(sample_flight)
+    assert sample_flight.gpx_file_path == str(replacement_gpx_path)
+    assert sample_flight.gpx_source_file_path == str(replacement_gpx_path)
+
+
+def test_enrichment_persist_resolves_relative_source_paths(
+    db_session, sample_flight, test_db, tmp_path, monkeypatch
+) -> None:
+    source_path = tmp_path / "legacy-source.gpx"
+    source_path.write_text("<gpx />")
+    enriched_path = tmp_path / "merged-gopro-overlay.gpx"
+    enriched_path.write_text("<gpx />")
+    _write_enriched_gpx_metadata(enriched_path, source_path)
+    relative_source_path = "legacy/flight.gpx"
+    sample_flight.gpx_file_path = relative_source_path
+    sample_flight.gpx_source_file_path = relative_source_path
+    db_session.commit()
+
+    def resolve_path(path: str | None) -> Path | None:
+        if path == relative_source_path:
+            return source_path
+        return Path(path) if path else None
+
+    monkeypatch.setattr(routes, "_resolve_flight_file_path", resolve_path)
+    monkeypatch.setattr(routes, "SessionLocal", test_db)
+
+    routes._persist_enriched_gpx_for_flight(
+        sample_flight.id,
+        source_path,
+        enriched_path,
+    )
+
+    db_session.refresh(sample_flight)
+    assert sample_flight.gpx_file_path == str(enriched_path)
+    assert sample_flight.gpx_source_file_path == relative_source_path
+
+
+def test_in_place_source_replacement_invalidates_enriched_cache_and_persistence(
+    db_session, sample_flight, test_db, tmp_path, monkeypatch
+) -> None:
+    source_path = tmp_path / "flight-source.gpx"
+    source_path.write_text("<gpx />")
+    enriched_path = tmp_path / "merged-gopro-overlay.gpx"
+    enriched_path.write_text("<gpx />")
+    _write_enriched_gpx_metadata(enriched_path, source_path)
+    original_stat = source_path.stat()
+    sample_flight.gpx_file_path = str(source_path)
+    sample_flight.gpx_source_file_path = str(source_path)
+    db_session.commit()
+    monkeypatch.setattr(routes, "SessionLocal", test_db)
+
+    source_path.write_text("<gpx/> ")
+    os.utime(source_path, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
+
+    assert source_path.stat().st_size == original_stat.st_size
+    assert source_path.stat().st_mtime_ns == original_stat.st_mtime_ns
+    assert routes._enriched_gpx_status(tmp_path, source_path) == "missing"
+    routes._persist_enriched_gpx_for_flight(sample_flight.id, source_path, enriched_path)
+
+    db_session.refresh(sample_flight)
+    assert sample_flight.gpx_file_path == str(source_path)
+
+
+def test_enrichment_persist_does_not_overwrite_source_replaced_after_read(
+    db_session, sample_flight, test_db, tmp_path, monkeypatch
+) -> None:
+    source_gpx_path = tmp_path / "flight-source.gpx"
+    source_gpx_path.write_text("<gpx />")
+    replacement_gpx_path = tmp_path / "replacement.gpx"
+    replacement_gpx_path.write_text("<gpx />")
+    enriched_path = tmp_path / "merged-gopro-overlay.gpx"
+    enriched_path.write_text("<gpx />")
+    _write_enriched_gpx_metadata(enriched_path, source_gpx_path)
+    sample_flight.gpx_file_path = str(source_gpx_path)
+    sample_flight.gpx_source_file_path = str(source_gpx_path)
+    db_session.commit()
+
+    class RacingSession:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def query(self, *args, **kwargs):
+            return db_session.query(*args, **kwargs)
+
+        def execute(self, statement):
+            sample_flight.gpx_file_path = str(replacement_gpx_path)
+            sample_flight.gpx_source_file_path = str(replacement_gpx_path)
+            db_session.commit()
+            return db_session.execute(statement)
+
+        def commit(self):
+            return db_session.commit()
+
+    monkeypatch.setattr(routes, "SessionLocal", lambda: RacingSession())
+
+    routes._persist_enriched_gpx_for_flight(
+        sample_flight.id,
+        source_gpx_path,
+        enriched_path,
+    )
+
+    db_session.refresh(sample_flight)
+    assert sample_flight.gpx_file_path == str(replacement_gpx_path)
+    assert sample_flight.gpx_source_file_path == str(replacement_gpx_path)
+
+
+def test_enrichment_persist_handles_database_error_without_raising(
+    db_session, sample_flight, tmp_path, monkeypatch
+) -> None:
+    source_gpx_path = tmp_path / "flight-source.gpx"
+    source_gpx_path.write_text("<gpx />")
+    enriched_path = tmp_path / "merged-gopro-overlay.gpx"
+    enriched_path.write_text("<gpx />")
+    _write_enriched_gpx_metadata(enriched_path, source_gpx_path)
+    sample_flight.gpx_file_path = str(source_gpx_path)
+    sample_flight.gpx_source_file_path = str(source_gpx_path)
+    db_session.commit()
+    commit_calls = []
+
+    class FailingSession:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def query(self, *args, **kwargs):
+            return db_session.query(*args, **kwargs)
+
+        def execute(self, statement):
+            return db_session.execute(statement)
+
+        def commit(self):
+            commit_calls.append(1)
+            raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(routes, "SessionLocal", lambda: FailingSession())
+
+    routes._persist_enriched_gpx_for_flight(
+        sample_flight.id,
+        source_gpx_path,
+        enriched_path,
+    )
+
+    assert commit_calls == [1]
+    db_session.rollback()
+    db_session.refresh(sample_flight)
+    assert sample_flight.gpx_file_path == str(source_gpx_path)
 
 
 def test_gopro_camera_endpoint_serves_the_flight_camera(

@@ -1,3 +1,4 @@
+import fcntl
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -6,6 +7,7 @@ from types import SimpleNamespace
 from fastapi import HTTPException, Response
 import pytest
 
+import gopro_overlay_export
 import routes
 from routes import (
     _flight_overlay_layer_job,
@@ -191,7 +193,7 @@ def test_gopro_preview_starts_missing_enriched_gpx_generation(
     assert response.gpx.coordinates == []
     assert len(background_tasks.calls) == 1
     assert background_tasks.calls[0][0] is routes._prepare_enriched_gpx_in_background
-    assert background_tasks.calls[0][1][:3] == ([osv_path], gpx_path, tmp_path)
+    assert background_tasks.calls[0][1][:4] == ("flight-1", [osv_path], gpx_path, tmp_path)
 
 
 def test_enriched_gpx_failure_marker_is_terminal_until_retry(tmp_path: Path) -> None:
@@ -201,6 +203,25 @@ def test_enriched_gpx_failure_marker_is_terminal_until_retry(tmp_path: Path) -> 
 
     routes._clear_enriched_gpx_error(tmp_path)
     assert routes._enriched_gpx_status(tmp_path) == "missing"
+
+
+def test_stale_enriched_gpx_cache_respects_lock_and_error_marker(tmp_path: Path) -> None:
+    cached_path = routes.enriched_gpx_path(tmp_path)
+    cached_path.write_text("<gpx />", encoding="utf-8")
+    cached_path.with_suffix(".json").write_text(
+        json.dumps({"sources": [{"path": str((tmp_path / "old-source.gpx").resolve())}]}),
+        encoding="utf-8",
+    )
+    routes._enriched_gpx_error_path(tmp_path).touch()
+    source_path = tmp_path / "new-source.gpx"
+    lock_path = tmp_path / "merged-gopro-overlay.lock"
+
+    with lock_path.open("a+") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        assert routes._enriched_gpx_status(tmp_path, source_path) == "pending"
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+    assert routes._enriched_gpx_status(tmp_path, source_path) == "failed"
 
 
 def test_flight_telemetry_keeps_enriched_gpx_on_absolute_timeline(
@@ -223,6 +244,22 @@ def test_flight_telemetry_keeps_enriched_gpx_on_absolute_timeline(
         "</trkseg></trk></gpx>",
         encoding="utf-8",
     )
+    stat = gpx_path.stat()
+    cached_path.with_suffix(".json").write_text(
+        json.dumps(
+            {
+                "sources": [
+                    {
+                        "path": str(gpx_path.resolve()),
+                        "size": stat.st_size,
+                        "mtime_ns": stat.st_mtime_ns,
+                        "sha256": gopro_overlay_export._file_sha256(gpx_path),
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
     camera_path = tmp_path / "camera.mp4"
     camera_path.touch()
     (tmp_path / "telemetry.OSV").touch()
@@ -235,6 +272,43 @@ def test_flight_telemetry_keeps_enriched_gpx_on_absolute_timeline(
     assert response.source == "gpx+osv"
     assert len(response.points) == 1
     assert response.points[0].heart_rate == 140
+    assert response.points[0].timestamp == int(
+        datetime(2026, 7, 1, 10, 0, 25, tzinfo=timezone.utc).timestamp() * 1000
+    )
+
+
+def test_flight_telemetry_uses_source_when_camera_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source_path = tmp_path / "source.gpx"
+    source_path.write_text(
+        '<gpx><trk><trkseg><trkpt lat="47.2" lon="6.0">'
+        "<time>2026-07-01T10:00:25Z</time></trkpt></trkseg></trk></gpx>",
+        encoding="utf-8",
+    )
+    enriched_path = tmp_path / "merged-gopro-overlay.gpx"
+    enriched_path.write_text(
+        '<gpx><trk><trkseg><trkpt lat="47.1" lon="5.9">'
+        "<time>2026-07-01T10:00:00Z</time></trkpt>"
+        '<trkpt lat="47.2" lon="6.0"><time>2026-07-01T10:00:25Z</time>'
+        "</trkpt></trkseg></trk></gpx>",
+        encoding="utf-8",
+    )
+    flight = SimpleNamespace(
+        id="flight-1",
+        gpx_file_path=str(enriched_path),
+        gpx_source_file_path=str(source_path),
+    )
+
+    def camera_missing(*_args: object) -> Path:
+        raise HTTPException(status_code=404, detail="camera missing")
+
+    monkeypatch.setattr(routes, "_flight_gopro_camera_path", camera_missing)
+
+    response = routes.get_flight_telemetry("flight-1", _FakeDb(flight))
+
+    assert len(response.points) == 1
+    assert response.points[0].lat == 47.2
     assert response.points[0].timestamp == int(
         datetime(2026, 7, 1, 10, 0, 25, tzinfo=timezone.utc).timestamp() * 1000
     )
