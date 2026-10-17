@@ -6,9 +6,7 @@ import pytest
 import database_migrations
 
 MIGRATION = (
-    Path(__file__).parents[2]
-    / "sql_migrations"
-    / "046_add_video_export_progress_metrics.sql"
+    Path(__file__).parents[2] / "sql_migrations" / "046_add_video_export_progress_metrics.sql"
 )
 
 

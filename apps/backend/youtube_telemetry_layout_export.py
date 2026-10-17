@@ -16,9 +16,7 @@ from video_acceleration import chromium_launch_args, select_video_accelerator
 from youtube_overlay_export import YoutubeExportError, _run, download_youtube
 
 ProgressCallback = Callable[[str, int | None], None]
-CompositionProgressCallback = Callable[
-    [int, int, int | None, float, float | None], None
-]
+CompositionProgressCallback = Callable[[int, int, int | None, float, float | None], None]
 LAYOUT_CANVAS_WIDTH = 1920
 LAYOUT_CANVAS_HEIGHT = 1080
 _FFMPEG_STATS_RE = re.compile(
@@ -99,9 +97,7 @@ def _report_composition_output(
     frame, encoding_fps, encoded_seconds, speed = stats
     completion = min(max(frame / max(total_frames, 1), 0.0), 1.0)
     remaining_seconds = max(duration - encoded_seconds, 0.0)
-    eta_seconds = (
-        max(0, round(remaining_seconds / speed)) if speed > 0 else None
-    )
+    eta_seconds = max(0, round(remaining_seconds / speed)) if speed > 0 else None
     composition_progress(frame, total_frames, eta_seconds, completion, encoding_fps)
 
 
