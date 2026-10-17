@@ -28,6 +28,9 @@ This file defines global rules for the entire monorepo.
   fetch `origin/main` and create or update a clean worktree from the freshly
   fetched ref, unless the user explicitly asks to inspect local uncommitted
   changes or a specific branch/worktree.
+- For every new worktree, run `./scripts/bootstrap-local.sh` before Nx or
+  backend checks. Each worktree must have its own initialized
+  `.venv`; do not rely on an environment from another checkout.
 - If GitHub cannot be reached, state clearly that the analysis uses a local ref
   that may be stale.
 
