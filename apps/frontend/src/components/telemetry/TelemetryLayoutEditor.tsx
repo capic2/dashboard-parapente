@@ -267,37 +267,88 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
 
   const selected = layout.find((item) => item.id === selectedIds[0]) ?? null;
   const selectedGroupId = (() => {
-    const groupIds = new Set(
-      layout
-        .filter((item) => selectedIds.includes(item.id) && item.groupId)
-        .map((item) => item.groupId)
+    const candidateIds = Array.from(
+      new Set(
+        layout
+          .filter((item) => selectedIds.includes(item.id))
+          .flatMap((item) => [item.groupId, item.parentGroupId])
+          .filter((id): id is string => Boolean(id))
+      )
     );
-    if (groupIds.size !== 1) return undefined;
-    const groupId = [...groupIds][0];
-    const children = layout.filter((item) => item.groupId === groupId);
-    return children.length === selectedIds.length &&
-      children.every((item) => selectedIds.includes(item.id))
-      ? groupId
-      : undefined;
+    return candidateIds.find((groupId) => {
+      const children = layout.filter(
+        (item) => item.groupId === groupId || item.parentGroupId === groupId
+      );
+      return (
+        children.length === selectedIds.length &&
+        children.every((item) => selectedIds.includes(item.id))
+      );
+    });
   })();
   const selectedGroupName = selectedGroupId
     ? (layout.find((item) => item.groupId === selectedGroupId)?.groupName ??
+      layout.find((item) => item.parentGroupId === selectedGroupId)
+        ?.parentGroupName ??
       selectedGroupId)
     : undefined;
-  const selectedGroupStyle = selectedGroupId
+  const selectedGroupItem = selectedGroupId
     ? layout.find((item) => item.groupId === selectedGroupId)
     : undefined;
+  const selectedParentGroupItem = selectedGroupId
+    ? layout.find((item) => item.parentGroupId === selectedGroupId)
+    : undefined;
+  const selectedGroupStyle = selectedGroupItem
+    ? selectedGroupItem
+    : selectedParentGroupItem
+      ? {
+          groupBackgroundColor:
+            selectedParentGroupItem.parentGroupBackgroundColor,
+          groupBackgroundOpacity:
+            selectedParentGroupItem.parentGroupBackgroundOpacity,
+          groupBorderRadius: selectedParentGroupItem.parentGroupBorderRadius,
+        }
+      : undefined;
   const selectedGroupOpacity = Math.max(
     0,
     Math.min(1, selectedGroupStyle?.groupBackgroundOpacity ?? 0.25)
   );
   const groups = Array.from(
     new Map(
-      layout
-        .filter((item) => item.groupId)
-        .map((item) => [item.groupId as string, item.groupName ?? item.groupId])
-    )
+      layout.flatMap((item) => [
+        ...(item.groupId
+          ? [
+              [
+                item.groupId,
+                item.groupName ?? item.groupId,
+                item.parentGroupId,
+              ] as const,
+            ]
+          : []),
+        ...(item.parentGroupId
+          ? [
+              [
+                item.parentGroupId,
+                item.parentGroupName ?? item.parentGroupId,
+                undefined,
+              ] as const,
+            ]
+          : []),
+      ])
+    ).values()
+  ).sort((left, right) => Number(Boolean(left[2])) - Number(Boolean(right[2])));
+  const groupItems = useCallback(
+    (groupId: string) =>
+      layout.filter(
+        (item) => item.groupId === groupId || item.parentGroupId === groupId
+      ),
+    [layout]
   );
+  const directGroupItems = (groupId: string) =>
+    layout.filter(
+      (item) =>
+        item.groupId === groupId ||
+        (item.parentGroupId === groupId && !item.groupId)
+    );
   const ungroupedItems = layout.filter((item) => !item.groupId);
   const previewTelemetry = localTelemetry ?? telemetryQuery.data;
   const previewPoint =
@@ -399,7 +450,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       (item) => item.name !== undefined && item.name.length > 100
     );
     const invalidGroupName = layout.find(
-      (item) => item.groupName !== undefined && item.groupName.length > 100
+      (item) =>
+        (item.groupName !== undefined && item.groupName.length > 100) ||
+        (item.parentGroupName !== undefined &&
+          item.parentGroupName.length > 100)
     );
     const emptyText = layout.find(
       (item) => item.type === 'text' && item.content.trim().length === 0
@@ -598,22 +652,79 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
         .filter((item) => selectedIds.includes(item.id) && item.groupId)
         .map((item) => item.groupId)
     );
+    const selectedGroupItems = layout.filter((item) =>
+      selectedIds.includes(item.id)
+    );
+    const hasSameParentGroup =
+      new Set(selectedGroupItems.map((item) => item.parentGroupId)).size === 1;
+    const canNestGroups =
+      existingGroupIds.size >= 2 &&
+      selectedGroupItems.every((item) => item.groupId) &&
+      [...existingGroupIds].every((groupId) =>
+        layout
+          .filter((item) => item.groupId === groupId)
+          .every((item) => selectedIds.includes(item.id))
+      ) &&
+      hasSameParentGroup &&
+      selectedGroupItems.every((item) => !item.parentGroupId);
     const existingGroupId =
-      existingGroupIds.size === 1 ? [...existingGroupIds][0] : undefined;
+      existingGroupIds.size === 1 && !canNestGroups
+        ? [...existingGroupIds][0]
+        : undefined;
     const existingGroupName = existingGroupId
       ? layout.find((item) => item.groupId === existingGroupId)?.groupName
       : undefined;
-    const groupId =
-      existingGroupId ?? `group-${Date.now()}-${widgetIdCounter.current++}`;
-    const groupName = existingGroupName ?? `Group ${widgetIdCounter.current}`;
+    const groupId = `group-${Date.now()}-${widgetIdCounter.current++}`;
+    const groupName = `Group ${widgetIdCounter.current}`;
     setLayout((current) =>
-      current.map((item) =>
-        selectedIds.includes(item.id) ? { ...item, groupId, groupName } : item
-      )
+      current.map((item) => {
+        if (!selectedIds.includes(item.id)) return item;
+        if (canNestGroups) {
+          return {
+            ...item,
+            parentGroupId: groupId,
+            parentGroupName: groupName,
+          };
+        }
+        return {
+          ...item,
+          groupId: existingGroupId ?? groupId,
+          groupName: existingGroupName ?? groupName,
+          ...(hasSameParentGroup
+            ? {}
+            : {
+                parentGroupId: undefined,
+                parentGroupName: undefined,
+                parentGroupBackgroundColor: undefined,
+                parentGroupBackgroundOpacity: undefined,
+                parentGroupBorderRadius: undefined,
+              }),
+        };
+      })
     );
   };
 
   const ungroupSelected = () => {
+    if (
+      selectedGroupId &&
+      layout.some((item) => item.parentGroupId === selectedGroupId)
+    ) {
+      setLayout((current) =>
+        current.map((item) =>
+          item.parentGroupId === selectedGroupId
+            ? {
+                ...item,
+                parentGroupId: undefined,
+                parentGroupName: undefined,
+                parentGroupBackgroundColor: undefined,
+                parentGroupBackgroundOpacity: undefined,
+                parentGroupBorderRadius: undefined,
+              }
+            : item
+        )
+      );
+      return;
+    }
     const groupIds = new Set(
       layout
         .filter((item) => selectedIds.includes(item.id) && item.groupId)
@@ -623,7 +734,16 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     setLayout((current) =>
       current.map((item) =>
         item.groupId && groupIds.has(item.groupId)
-          ? { ...item, groupId: undefined, groupName: undefined }
+          ? {
+              ...item,
+              groupId: undefined,
+              groupName: undefined,
+              parentGroupId: undefined,
+              parentGroupName: undefined,
+              parentGroupBackgroundColor: undefined,
+              parentGroupBackgroundOpacity: undefined,
+              parentGroupBorderRadius: undefined,
+            }
           : item
       )
     );
@@ -831,7 +951,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
 
   const copySelected = useCallback(() => {
     const items = selectedGroupId
-      ? layout.filter((item) => item.groupId === selectedGroupId)
+      ? groupItems(selectedGroupId)
       : layout.filter((item) => selectedIds.includes(item.id));
     if (!items.length) {
       toast.error(t('telemetryLayout.nothingToCopy'));
@@ -839,7 +959,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     }
     setCopiedItems(items);
     toast.success(t('telemetryLayout.copySuccess'));
-  }, [layout, selectedGroupId, selectedIds, t, toast]);
+  }, [groupItems, layout, selectedGroupId, selectedIds, t, toast]);
 
   const pasteCopied = useCallback(() => {
     if (!copiedItems.length) {
@@ -859,6 +979,22 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
         })
     );
     const groupIdMap = new Map<string, string>();
+    const copiedParentGroupIds = new Set(
+      copiedItems
+        .map((item) => item.parentGroupId)
+        .filter((id): id is string => Boolean(id))
+        .filter((id) =>
+          layout
+            .filter((item) => item.parentGroupId === id)
+            .every((item) => copiedIds.has(item.id))
+        )
+    );
+    const parentGroupIdMap = new Map(
+      [...copiedParentGroupIds].map((id) => [
+        id,
+        `group-${Date.now()}-${widgetIdCounter.current++}`,
+      ])
+    );
     const pastedItems = copiedItems.map((item) => {
       const id = `${item.type}-${Date.now()}-${widgetIdCounter.current++}`;
       const groupId =
@@ -877,6 +1013,18 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
         ...(groupId
           ? { groupId, groupName: item.groupName }
           : { groupId: undefined, groupName: undefined }),
+        ...(item.parentGroupId && parentGroupIdMap.has(item.parentGroupId)
+          ? {
+              parentGroupId: parentGroupIdMap.get(item.parentGroupId),
+              parentGroupName: item.parentGroupName,
+            }
+          : {
+              parentGroupId: undefined,
+              parentGroupName: undefined,
+              parentGroupBackgroundColor: undefined,
+              parentGroupBackgroundOpacity: undefined,
+              parentGroupBorderRadius: undefined,
+            }),
       };
     });
     setLayout((current) => [...current, ...pastedItems]);
@@ -1406,12 +1554,24 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   const groupStyle = layout.find(
                     (item) => item.groupId === groupId
                   );
-                  const groupColor = groupStyle?.groupBackgroundColor;
+                  const parentStyle = layout.find(
+                    (item) => item.parentGroupId === groupId
+                  );
+                  const groupColor =
+                    groupStyle?.groupBackgroundColor ??
+                    parentStyle?.parentGroupBackgroundColor;
                   const groupOpacity =
-                    groupStyle?.groupBackgroundOpacity ?? 0.25;
+                    groupStyle?.groupBackgroundOpacity ??
+                    parentStyle?.parentGroupBackgroundOpacity ??
+                    0.25;
                   const groupBorderRadius = Math.max(
                     0,
-                    Math.min(120, groupStyle?.groupBorderRadius ?? 12)
+                    Math.min(
+                      120,
+                      groupStyle?.groupBorderRadius ??
+                        parentStyle?.parentGroupBorderRadius ??
+                        12
+                    )
                   );
                   const groupBackground = groupColor
                     ? `${groupColor}${Math.round(groupOpacity * 255)
@@ -1637,78 +1797,161 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   <span className="truncate">{hierarchyLabel(item)}</span>
                 </button>
               ))}
-              {groups.map(([groupId, groupName]) => {
-                const children = layout.filter(
-                  (item) => item.groupId === groupId
-                );
-                const isGroupSelected = children.every((item) =>
-                  selectedIds.includes(item.id)
-                );
-                const isCollapsed = collapsedGroupIds.has(groupId);
-                return (
-                  <div key={groupId}>
-                    <div className="flex items-center">
-                      <button
-                        type="button"
-                        className={`flex min-w-0 flex-1 items-center truncate rounded-md px-2 py-1.5 text-left text-xs font-semibold transition ${isGroupSelected ? 'bg-violet-100 text-violet-800 dark:bg-violet-950/50 dark:text-violet-200' : 'text-slate-800 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-700'}`}
-                        aria-pressed={isGroupSelected}
-                        onClick={(event) =>
-                          selectFromHierarchy(
-                            children.map((item) => item.id),
-                            event.ctrlKey || event.metaKey
-                          )
-                        }
-                      >
-                        <span className="truncate">{groupName}</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded p-1 text-violet-500 hover:bg-slate-100 dark:hover:bg-slate-700"
-                        aria-label={t(
-                          isCollapsed
-                            ? 'telemetryLayout.expandGroup'
-                            : 'telemetryLayout.collapseGroup'
-                        )}
-                        onClick={() =>
-                          setCollapsedGroupIds((current) => {
-                            const next = new Set(current);
-                            if (next.has(groupId)) next.delete(groupId);
-                            else next.add(groupId);
-                            return next;
-                          })
-                        }
-                      >
-                        <ChevronDown
-                          className={`h-3.5 w-3.5 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
-                        />
-                      </button>
-                    </div>
-                    {!isCollapsed && (
-                      <div className="ml-4 border-l border-slate-200 pl-2 dark:border-slate-700">
-                        {children.map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            className={`flex w-full items-center truncate rounded-md px-2 py-1.5 text-left text-xs transition ${selectedIds.includes(item.id) ? 'bg-sky-100 font-semibold text-sky-800 dark:bg-sky-950/50 dark:text-sky-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700'}`}
-                            aria-pressed={selectedIds.includes(item.id)}
-                            onClick={(event) =>
-                              selectFromHierarchy(
-                                [item.id],
-                                event.ctrlKey || event.metaKey
-                              )
-                            }
-                          >
-                            <span className="mr-2 text-slate-400">└</span>
-                            <span className="truncate">
-                              {hierarchyLabel(item)}
-                            </span>
-                          </button>
-                        ))}
+              {groups
+                .filter(([, , parentGroupId]) => !parentGroupId)
+                .map(([groupId, groupName]) => {
+                  const children = groupItems(groupId);
+                  const isGroupSelected =
+                    children.length > 0 &&
+                    children.every((item) => selectedIds.includes(item.id));
+                  const nestedGroups = groups.filter(
+                    ([, , parentGroupId]) => parentGroupId === groupId
+                  );
+                  const isCollapsed = collapsedGroupIds.has(groupId);
+                  return (
+                    <div key={groupId}>
+                      <div className="flex items-center">
+                        <button
+                          type="button"
+                          className={`flex min-w-0 flex-1 items-center truncate rounded-md px-2 py-1.5 text-left text-xs font-semibold transition ${isGroupSelected ? 'bg-violet-100 text-violet-800 dark:bg-violet-950/50 dark:text-violet-200' : 'text-slate-800 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-700'}`}
+                          aria-pressed={isGroupSelected}
+                          onClick={(event) =>
+                            selectFromHierarchy(
+                              children.map((item) => item.id),
+                              event.ctrlKey || event.metaKey
+                            )
+                          }
+                        >
+                          <span className="truncate">{groupName}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded p-1 text-violet-500 hover:bg-slate-100 dark:hover:bg-slate-700"
+                          aria-label={t(
+                            isCollapsed
+                              ? 'telemetryLayout.expandGroup'
+                              : 'telemetryLayout.collapseGroup'
+                          )}
+                          onClick={() =>
+                            setCollapsedGroupIds((current) => {
+                              const next = new Set(current);
+                              if (next.has(groupId)) next.delete(groupId);
+                              else next.add(groupId);
+                              return next;
+                            })
+                          }
+                        >
+                          <ChevronDown
+                            className={`h-3.5 w-3.5 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                          />
+                        </button>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                      {!isCollapsed && (
+                        <div className="ml-4 border-l border-slate-200 pl-2 dark:border-slate-700">
+                          {directGroupItems(groupId).map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              className={`flex w-full items-center truncate rounded-md px-2 py-1.5 text-left text-xs transition ${selectedIds.includes(item.id) ? 'bg-sky-100 font-semibold text-sky-800 dark:bg-sky-950/50 dark:text-sky-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700'}`}
+                              aria-pressed={selectedIds.includes(item.id)}
+                              onClick={(event) =>
+                                selectFromHierarchy(
+                                  [item.id],
+                                  event.ctrlKey || event.metaKey
+                                )
+                              }
+                            >
+                              <span className="mr-2 text-slate-400">└</span>
+                              <span className="truncate">
+                                {hierarchyLabel(item)}
+                              </span>
+                            </button>
+                          ))}
+                          {nestedGroups.map(([nestedId, nestedName]) => {
+                            const nestedItems = layout.filter(
+                              (item) => item.groupId === nestedId
+                            );
+                            const nestedCollapsed =
+                              collapsedGroupIds.has(nestedId);
+                            return (
+                              <div
+                                key={nestedId}
+                                className="ml-2 border-l border-violet-300 pl-2 dark:border-violet-800"
+                              >
+                                <div className="flex items-center">
+                                  <button
+                                    type="button"
+                                    className={`min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-left text-xs font-semibold transition ${nestedItems.length > 0 && nestedItems.every((item) => selectedIds.includes(item.id)) ? 'bg-violet-100 text-violet-800 dark:bg-violet-950/50 dark:text-violet-200' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700'}`}
+                                    aria-pressed={
+                                      nestedItems.length > 0 &&
+                                      nestedItems.every((item) =>
+                                        selectedIds.includes(item.id)
+                                      )
+                                    }
+                                    onClick={(event) =>
+                                      selectFromHierarchy(
+                                        nestedItems.map((item) => item.id),
+                                        event.ctrlKey || event.metaKey
+                                      )
+                                    }
+                                  >
+                                    {nestedName}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="rounded p-1 text-violet-500 hover:bg-slate-100 dark:hover:bg-slate-700"
+                                    aria-label={t(
+                                      nestedCollapsed
+                                        ? 'telemetryLayout.expandGroup'
+                                        : 'telemetryLayout.collapseGroup'
+                                    )}
+                                    onClick={() =>
+                                      setCollapsedGroupIds((current) => {
+                                        const next = new Set(current);
+                                        if (next.has(nestedId))
+                                          next.delete(nestedId);
+                                        else next.add(nestedId);
+                                        return next;
+                                      })
+                                    }
+                                  >
+                                    <ChevronDown
+                                      className={`h-3.5 w-3.5 transition-transform ${nestedCollapsed ? '-rotate-90' : ''}`}
+                                    />
+                                  </button>
+                                </div>
+                                {!nestedCollapsed &&
+                                  nestedItems.map((item) => (
+                                    <button
+                                      key={item.id}
+                                      type="button"
+                                      className={`flex w-full items-center truncate rounded-md px-2 py-1.5 text-left text-xs transition ${selectedIds.includes(item.id) ? 'bg-sky-100 font-semibold text-sky-800 dark:bg-sky-950/50 dark:text-sky-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700'}`}
+                                      aria-pressed={selectedIds.includes(
+                                        item.id
+                                      )}
+                                      onClick={(event) =>
+                                        selectFromHierarchy(
+                                          [item.id],
+                                          event.ctrlKey || event.metaKey
+                                        )
+                                      }
+                                    >
+                                      <span className="mr-2 text-slate-400">
+                                        └
+                                      </span>
+                                      <span className="truncate">
+                                        {hierarchyLabel(item)}
+                                      </span>
+                                    </button>
+                                  ))}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
             </div>
           </details>
           <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
@@ -1795,7 +2038,9 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       current.map((item) =>
                         item.groupId === selectedGroupId
                           ? { ...item, groupName: event.target.value }
-                          : item
+                          : item.parentGroupId === selectedGroupId
+                            ? { ...item, parentGroupName: event.target.value }
+                            : item
                       )
                     )
                   }
@@ -1818,7 +2063,12 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                               ...item,
                               groupBackgroundColor: event.target.value,
                             }
-                          : item
+                          : item.parentGroupId === selectedGroupId
+                            ? {
+                                ...item,
+                                parentGroupBackgroundColor: event.target.value,
+                              }
+                            : item
                       )
                     )
                   }
@@ -1846,7 +2096,14 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                               ...item,
                               groupBorderRadius: Number(event.target.value),
                             }
-                          : item
+                          : item.parentGroupId === selectedGroupId
+                            ? {
+                                ...item,
+                                parentGroupBorderRadius: Number(
+                                  event.target.value
+                                ),
+                              }
+                            : item
                       )
                     )
                   }
@@ -1875,7 +2132,15 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                               groupBackgroundOpacity:
                                 Number(event.target.value) / 100,
                             }
-                          : item
+                          : item.parentGroupId === selectedGroupId
+                            ? {
+                                ...item,
+                                parentGroupBackgroundColor:
+                                  item.parentGroupBackgroundColor ?? '#38bdf8',
+                                parentGroupBackgroundOpacity:
+                                  Number(event.target.value) / 100,
+                              }
+                            : item
                       )
                     )
                   }
