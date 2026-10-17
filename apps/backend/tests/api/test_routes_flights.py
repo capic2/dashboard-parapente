@@ -1466,6 +1466,61 @@ class TestUpdateFlightEndpoint:
         db_session.refresh(sample_flight)
         assert sample_flight.notes == "Great thermal conditions!"
 
+    def test_saving_gopro_offset_schedules_gpx_merge_without_camera_video(
+        self,
+        client: TestClient,
+        db_session: Session,
+        sample_flight: Flight,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        gpx_path = tmp_path / "flight.gpx"
+        gpx_path.write_text("<gpx />", encoding="utf-8")
+        input_dir = tmp_path / "20260315" / "01"
+        input_dir.mkdir(parents=True)
+        osv_path = input_dir / "camera.OSV"
+        osv_path.write_text("telemetry", encoding="utf-8")
+        monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+        sample_flight.gpx_file_path = str(gpx_path)
+        db_session.commit()
+
+        with patch("routes._prepare_enriched_gpx_in_background") as prepare:
+            response = client.patch(
+                f"{API_PREFIX}/flights/{sample_flight.id}",
+                json={"gopro_overlay_gpx_offset": 2.5},
+            )
+
+        assert response.status_code == 200
+        prepare.assert_called_once_with(
+            [osv_path],
+            gpx_path,
+            input_dir,
+            video_duration=None,
+            first_gpx_at=None,
+        )
+        assert not (input_dir / "camera.mp4").exists()
+
+    def test_gpx_merge_scheduling_failure_does_not_fail_saved_offset(
+        self,
+        client: TestClient,
+        db_session: Session,
+        sample_flight: Flight,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        def fail_scheduling(*_args: object) -> None:
+            raise RuntimeError("merge scheduling failed")
+
+        monkeypatch.setattr("routes._schedule_enriched_gpx_for_saved_offset", fail_scheduling)
+
+        response = client.patch(
+            f"{API_PREFIX}/flights/{sample_flight.id}",
+            json={"gopro_overlay_gpx_offset": 0.0},
+        )
+
+        assert response.status_code == 200
+        db_session.refresh(sample_flight)
+        assert sample_flight.gopro_overlay_gpx_offset == 0.0
+
     def test_takeoff_and_landing_markers_set_effective_flight_duration(
         self, client, db_session, sample_flight
     ):
