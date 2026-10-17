@@ -1,5 +1,6 @@
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
+import os
 from time import sleep
 from unittest.mock import patch
 
@@ -27,8 +28,12 @@ def test_enriched_gpx_is_cached_until_a_source_changes(tmp_path: Path) -> None:
         assert ensure_enriched_gpx([osv_path], gpx_path, tmp_path) == merged_path
         osv_path.write_text("updated osv", encoding="utf-8")
         assert ensure_enriched_gpx([osv_path], gpx_path, tmp_path) == merged_path
+        source_stat = gpx_path.stat()
+        gpx_path.write_text(_VALID_GPX.replace("46.0", "47.0"), encoding="utf-8")
+        os.utime(gpx_path, ns=(source_stat.st_atime_ns, source_stat.st_mtime_ns))
+        assert ensure_enriched_gpx([osv_path], gpx_path, tmp_path) == merged_path
 
-    assert merger.call_count == 2
+    assert merger.call_count == 3
 
 
 def test_enriched_gpx_serializes_concurrent_rebuilds(tmp_path: Path) -> None:

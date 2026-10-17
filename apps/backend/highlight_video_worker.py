@@ -1415,7 +1415,7 @@ def process_highlight_video_job(job_id: str) -> None:
         if flight is None:
             raise ValueError(f"Flight not found for highlight job: {job.flight_id}")
         source_path = Path(job.source_video_path)
-        gpx_file_path = flight.gpx_file_path
+        gpx_file_path = flight.gpx_source_file_path or flight.gpx_file_path
         output_dir = flight_temporary_directory(db, flight, "highlights") / job.id
         output_path = output_dir / "highlights-original-format.mp4"
         offset = float(job.overlay_offset_seconds or 0.0)

@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 import config
 import pytest
+import routes
 from fastapi.testclient import TestClient
 from flight_tracks import calculate_track_stats, normalize_track
 from models import Flight, GoproOverlayJob, HighlightVideoJob, Site, YoutubeUploadJob
@@ -1497,8 +1498,41 @@ class TestUpdateFlightEndpoint:
             input_dir,
             video_duration=None,
             first_gpx_at=None,
+            flight_id=sample_flight.id,
         )
         assert not (input_dir / "camera.mp4").exists()
+
+    @pytest.mark.parametrize("cache_status", ["ready", "pending"])
+    def test_saving_gopro_offset_does_not_queue_duplicate_gpx_merge(
+        self,
+        client: TestClient,
+        db_session: Session,
+        sample_flight: Flight,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        cache_status: str,
+    ) -> None:
+        gpx_path = tmp_path / "flight.gpx"
+        gpx_path.write_text("<gpx />", encoding="utf-8")
+        input_dir = tmp_path / "20260315" / "01"
+        input_dir.mkdir(parents=True)
+        (input_dir / "camera.OSV").write_text("telemetry", encoding="utf-8")
+        monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+        monkeypatch.setattr(routes, "_enriched_gpx_status", lambda *_args: cache_status)
+        sample_flight.gpx_file_path = str(gpx_path)
+        sample_flight.gpx_source_file_path = str(gpx_path)
+        db_session.commit()
+
+        with patch("routes._prepare_enriched_gpx_in_background") as prepare:
+            response = client.patch(
+                f"{API_PREFIX}/flights/{sample_flight.id}",
+                json={"gopro_overlay_gpx_offset": 3.5},
+            )
+
+        assert response.status_code == 200
+        prepare.assert_not_called()
+        db_session.refresh(sample_flight)
+        assert sample_flight.gopro_overlay_gpx_offset == 3.5
 
     def test_gpx_merge_scheduling_failure_does_not_fail_saved_offset(
         self,
@@ -1618,15 +1652,19 @@ class TestUpdateFlightEndpoint:
         assert sample_flight.distance_km == 20.5
 
     def test_update_gpx_metrics_exclusion_recalculates_vertical_rates(
-        self, client, db_session, sample_flight
+        self, client, db_session, sample_flight, tmp_path, monkeypatch
     ):
-        sample_flight.gpx_file_path = "private/track.gpx"
+        source_path = tmp_path / "recorded-track.gpx"
+        source_path.write_text("<gpx />", encoding="utf-8")
+        sample_flight.gpx_source_file_path = str(source_path)
+        sample_flight.gpx_file_path = str(tmp_path / "merged-gopro-overlay.gpx")
         sample_flight.max_climb_rate_ms = 1.0
         sample_flight.max_sink_rate_ms = 0.5
         db_session.commit()
+        monkeypatch.setattr(routes, "_resolve_flight_file_path", lambda _path: source_path)
 
         with (
-            patch("routes.parse_gpx_file", return_value=[{"timestamp": 1}]),
+            patch("routes.parse_gpx_file", return_value=[{"timestamp": 1}]) as parse_gpx,
             patch(
                 "routes.calculate_track_stats",
                 return_value={"max_climb_rate_ms": 4.2, "max_sink_rate_ms": 3.4},
@@ -1649,6 +1687,7 @@ class TestUpdateFlightEndpoint:
         assert sample_flight.gpx_metrics_excluded is False
         assert sample_flight.max_climb_rate_ms == 4.2
         assert sample_flight.max_sink_rate_ms == 3.4
+        assert all(call.args[0] == source_path for call in parse_gpx.call_args_list)
 
 
 class TestDeleteFlightEndpoint:
@@ -1801,6 +1840,36 @@ class TestFlightGPXEndpoints:
         ]
         assert response.json()["data"]["max_speed_kmh"] == 43.2
 
+    def test_gpx_data_and_download_use_the_recorded_track_after_enrichment(
+        self, client, db_session, sample_flight, tmp_path
+    ):
+        source_path = tmp_path / "source.gpx"
+        source_path.write_text(
+            '<gpx><trk><trkseg><trkpt lat="47.2" lon="6.0"><ele>100</ele>'
+            "<time>2026-07-01T10:00:10Z</time></trkpt></trkseg></trk></gpx>",
+            encoding="utf-8",
+        )
+        enriched_path = tmp_path / "merged-gopro-overlay.gpx"
+        enriched_path.write_text(
+            '<gpx><trk><trkseg><trkpt lat="47.1" lon="5.9"><ele>50</ele>'
+            "<time>2026-07-01T10:00:00Z</time></trkpt>"
+            '<trkpt lat="47.2" lon="6.0"><ele>100</ele>'
+            "<time>2026-07-01T10:00:10Z</time></trkpt></trkseg></trk></gpx>",
+            encoding="utf-8",
+        )
+        sample_flight.gpx_source_file_path = str(source_path)
+        sample_flight.gpx_file_path = str(enriched_path)
+        db_session.commit()
+
+        data_response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/gpx-data")
+        download_response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/gpx")
+
+        assert data_response.status_code == 200
+        assert len(data_response.json()["data"]["coordinates"]) == 1
+        assert data_response.json()["data"]["takeoff_altitude_m"] == 100
+        assert download_response.status_code == 200
+        assert download_response.content == source_path.read_bytes()
+
     def test_max_speed_uses_geometry_only_for_intervals_without_recorded_speed(self):
         coordinates = [
             {"lat": 47.2, "lon": 6.0, "timestamp": 1_000, "speed_kmh": 0},
@@ -1838,6 +1907,7 @@ class TestFlightGPXEndpoints:
         assert sample_flight.max_climb_rate_ms == expected["max_climb_rate_ms"]
         assert sample_flight.max_sink_rate_ms == expected["max_sink_rate_ms"]
         assert sample_flight.departure_time == expected["departure_time"].replace(tzinfo=None)
+        assert sample_flight.gpx_source_file_path == sample_flight.gpx_file_path
 
     def test_upload_gpx_succeeds_when_stat_calculation_fails(
         self, client, db_session, sample_flight, sample_gpx
