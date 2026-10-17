@@ -252,6 +252,66 @@ describe('FlightTelemetryInteractivePreview', () => {
     hooks.youtubeAssociations = [];
   });
 
+  it('hides the interactive overlay when auto selects a YouTube main video', () => {
+    const youtubeUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+    hooks.youtubeAssociations = [
+      { url: youtubeUrl, title: 'Vol du 02/10/2026 - face' },
+    ];
+    hooks.overlayPreview.data = {
+      video: { preview_segments: [] },
+      alignment: { automatic_offset_seconds: 0, manual_offset_seconds: 0 },
+      gpx: { coordinates: [] },
+    } as unknown as GoproOverlayPreview;
+    hooks.overlayPreview.isPending = false;
+    hooks.overlayPreview.isSuccess = true;
+    hooks.telemetry.data = {
+      points: [
+        {
+          timestamp: 0,
+          lat: 0,
+          lon: 0,
+          elevation: 0,
+          segment: 0,
+        },
+      ],
+      source: 'gpx',
+      has_osv: false,
+      enrichment_status: 'ready',
+      start_time: null,
+      end_time: null,
+      duration_seconds: 0,
+    } as FlightTelemetryData;
+    hooks.telemetry.isPending = false;
+    hooks.telemetry.isSuccess = true;
+    hooks.layout.data = {
+      layout: Object.assign([], { mainVideoSource: 'auto' }),
+    };
+    hooks.layout.isPending = false;
+    hooks.layout.isSuccess = true;
+
+    render(
+      <FlightTelemetryInteractivePreview
+        flightId="flight-1"
+        youtubeUrls={[youtubeUrl]}
+      />
+    );
+
+    expect(
+      screen.queryByText('flights.overlayInteractivePreview')
+    ).not.toBeInTheDocument();
+
+    hooks.overlayPreview.data = undefined;
+    hooks.overlayPreview.isPending = true;
+    hooks.overlayPreview.isSuccess = false;
+    hooks.telemetry.data = undefined;
+    hooks.telemetry.isPending = true;
+    hooks.telemetry.isSuccess = false;
+    hooks.layout.data = undefined;
+    hooks.layout.isPending = true;
+    hooks.layout.isSuccess = false;
+    hooks.youtubeAssociations = [];
+  });
+
   it('shows unavailable only after a request has failed', () => {
     hooks.overlayPreview.isPending = false;
     hooks.overlayPreview.isError = true;
