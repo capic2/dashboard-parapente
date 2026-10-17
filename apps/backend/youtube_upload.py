@@ -1071,6 +1071,8 @@ def _finish_upload(job_id: str, video_id: str) -> None:
         playlist_title = playlist_title_for_flight(db, flight)
         db.commit()
         user_id = job.user_id
+    if generated_overlay_path is not None:
+        _delete_generated_overlay_source(generated_overlay_path, cleanup_workspace=True)
     _log_job(job_id, f"YouTube upload completed: {youtube_url}")
     try:
         add_video_to_flight_playlist(
@@ -1081,8 +1083,6 @@ def _finish_upload(job_id: str, video_id: str) -> None:
         # The upload remains successful; playlist organization can be retried later.
         logger.exception("Unable to add YouTube video %s to its flight playlist", video_id)
         _log_job(job_id, f"Playlist organization failed: {_safe_log_error(exc)}")
-    if generated_overlay_path is not None:
-        _delete_generated_overlay_source(generated_overlay_path, cleanup_workspace=True)
 
 
 def _delete_generated_overlay_source(path: Path, *, cleanup_workspace: bool = False) -> None:
