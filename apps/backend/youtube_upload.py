@@ -34,6 +34,7 @@ from models import (
     HighlightVideoJob,
     VideoExportJob,
     YoutubeCredential,
+    YoutubeFlightPlaylist,
     YoutubeUploadJob,
 )
 from schemas import youtube_video_id_from_url
@@ -383,35 +384,87 @@ def _youtube_api_error(response: httpx.Response) -> RuntimeError:
     return RuntimeError(f"YouTube API request failed ({response.status_code})")
 
 
-def _find_or_create_playlist(*, user_id: int, title: str) -> tuple[str, bool]:
-    access_token = _access_token(user_id)
+def _youtube_playlist_api_error(response: httpx.Response, *, action: str) -> RuntimeError:
+    if response.status_code == 401:
+        return YoutubeOAuthError("Reconnect YouTube and try removing the video again")
+
+    reasons: set[str] = set()
+    try:
+        error = response.json().get("error", {})
+        reasons = {
+            item.get("reason")
+            for item in error.get("errors", [])
+            if isinstance(item.get("reason"), str)
+        }
+    except (AttributeError, TypeError, ValueError):
+        pass
+    if reasons & {
+        "accountClosed",
+        "accountSuspended",
+        "authError",
+        "forbidden",
+        "insufficientPermissions",
+        "invalidCredentials",
+        "youtubeSignupRequired",
+    }:
+        return YoutubeOAuthError("Reconnect YouTube and try removing the video again")
+
+    return YoutubeRemoteDeletionError(f"YouTube could not {action} ({response.status_code})")
+
+
+def _find_playlist_id(*, access_token: str, title: str, for_removal: bool = False) -> str | None:
     headers = {"Authorization": f"Bearer {access_token}"}
     page_token: str | None = None
     while True:
-        response = httpx.get(
-            _PLAYLISTS_URL,
-            params={
-                "part": "snippet",
-                "mine": "true",
-                "maxResults": 50,
-                **({"pageToken": page_token} if page_token else {}),
-            },
-            headers=headers,
-            timeout=30,
-        )
+        try:
+            response = httpx.get(
+                _PLAYLISTS_URL,
+                params={
+                    "part": "snippet",
+                    "mine": "true",
+                    "maxResults": 50,
+                    **({"pageToken": page_token} if page_token else {}),
+                },
+                headers=headers,
+                timeout=30,
+            )
+        except httpx.RequestError as exc:
+            if not for_removal:
+                raise
+            raise YoutubeRemoteDeletionError(
+                "YouTube could not be reached; retry removing the video later"
+            ) from exc
         if response.is_error:
-            raise _youtube_api_error(response)
+            if not for_removal:
+                raise _youtube_api_error(response)
+            raise _youtube_playlist_api_error(response, action="find the flight playlist")
         payload = response.json()
         for item in payload.get("items", []):
             if item.get("snippet", {}).get("title") == title:
-                return item["id"], False
+                playlist_id = item.get("id")
+                return playlist_id if isinstance(playlist_id, str) else None
         page_token = payload.get("nextPageToken")
         if not page_token:
             break
+    return None
+
+
+def _find_or_create_playlist(*, user_id: int, title: str) -> tuple[str, bool]:
+    access_token = _access_token(user_id)
+    playlist_id = _find_playlist_id(access_token=access_token, title=title)
+    if playlist_id:
+        return playlist_id, False
+    return _create_playlist(access_token=access_token, title=title), True
+
+
+def _create_playlist(*, access_token: str, title: str) -> str:
     response = httpx.post(
         _PLAYLISTS_URL,
         params={"part": "snippet,status"},
-        headers={**headers, "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        },
         json={"snippet": {"title": title}, "status": {"privacyStatus": "private"}},
         timeout=30,
     )
@@ -420,7 +473,63 @@ def _find_or_create_playlist(*, user_id: int, title: str) -> tuple[str, bool]:
     playlist_id = response.json().get("id")
     if not isinstance(playlist_id, str) or not playlist_id:
         raise RuntimeError("YouTube did not return a playlist identifier")
-    return playlist_id, True
+    return playlist_id
+
+
+def _save_flight_playlist(
+    db: Session, *, flight: Flight, user_id: int, playlist_id: str
+) -> YoutubeFlightPlaylist:
+    mapping = YoutubeFlightPlaylist(
+        user_id=user_id,
+        flight_id=flight.id,
+        playlist_id=playlist_id,
+    )
+    db.add(mapping)
+    try:
+        db.commit()
+        return mapping
+    except IntegrityError:
+        db.rollback()
+        existing = db.get(YoutubeFlightPlaylist, (user_id, flight.id))
+        if existing is None:
+            raise
+        return existing
+
+
+def _delete_flight_playlist_mapping(
+    db: Session,
+    *,
+    flight: Flight,
+    user_id: int,
+    expected_playlist_id: str | None = None,
+) -> None:
+    mapping = db.get(YoutubeFlightPlaylist, (user_id, flight.id))
+    if mapping is None or (
+        expected_playlist_id is not None and mapping.playlist_id != expected_playlist_id
+    ):
+        return
+    db.delete(mapping)
+    db.commit()
+
+
+def _get_or_create_flight_playlist(
+    db: Session, *, flight: Flight, user_id: int
+) -> tuple[str, bool]:
+    mapping = db.get(YoutubeFlightPlaylist, (user_id, flight.id))
+    if mapping is not None:
+        return mapping.playlist_id, False
+
+    playlist_id, created = _find_or_create_playlist(
+        user_id=user_id,
+        title=playlist_title_for_flight(db, flight),
+    )
+    mapping = _save_flight_playlist(
+        db,
+        flight=flight,
+        user_id=user_id,
+        playlist_id=playlist_id,
+    )
+    return mapping.playlist_id, created and mapping.playlist_id == playlist_id
 
 
 def prepare_flight_playlist(
@@ -428,7 +537,7 @@ def prepare_flight_playlist(
 ) -> YoutubePlaylistPreparationPayload:
     """Create or find the flight playlist before a manual YouTube upload."""
     title = playlist_title_for_flight(db, flight)
-    playlist_id, created = _find_or_create_playlist(user_id=user_id, title=title)
+    playlist_id, created = _get_or_create_flight_playlist(db, flight=flight, user_id=user_id)
     return {
         "title": title,
         "url": f"https://www.youtube.com/playlist?list={playlist_id}",
@@ -436,35 +545,50 @@ def prepare_flight_playlist(
     }
 
 
-def add_video_to_flight_playlist(*, user_id: int, playlist_title: str, video_id: str) -> bool:
+def add_video_to_flight_playlist(
+    db: Session, *, flight: Flight, user_id: int, video_id: str
+) -> bool:
     """Create/reuse the flight playlist and add the video once."""
-    playlist_id, playlist_created = _find_or_create_playlist(user_id=user_id, title=playlist_title)
+    playlist_id, playlist_created = _get_or_create_flight_playlist(
+        db, flight=flight, user_id=user_id
+    )
     access_token = _access_token(user_id)
     if not playlist_created:
-        page_token: str | None = None
-        while True:
-            response = httpx.get(
-                _PLAYLIST_ITEMS_URL,
-                params={
-                    "part": "snippet",
-                    "playlistId": playlist_id,
-                    "maxResults": 50,
-                    **({"pageToken": page_token} if page_token else {}),
-                },
-                headers={"Authorization": f"Bearer {access_token}"},
-                timeout=30,
+        # A concurrent upload may have recovered the same stale mapping first.
+        # Always check the ID returned by the database before adding the video.
+        for _ in range(2):
+            contains_video = _playlist_contains_video(
+                access_token=access_token,
+                playlist_id=playlist_id,
+                video_id=video_id,
             )
-            if response.is_error:
-                raise _youtube_api_error(response)
-            payload = response.json()
-            if any(
-                item.get("snippet", {}).get("resourceId", {}).get("videoId") == video_id
-                for item in payload.get("items", [])
-            ):
+            if contains_video is True:
                 return False
-            page_token = payload.get("nextPageToken")
-            if not page_token:
+            if contains_video is False:
                 break
+
+            _delete_flight_playlist_mapping(
+                db,
+                flight=flight,
+                user_id=user_id,
+                expected_playlist_id=playlist_id,
+            )
+            created_playlist_id = _create_playlist(
+                access_token=access_token,
+                title=playlist_title_for_flight(db, flight),
+            )
+            mapping = _save_flight_playlist(
+                db,
+                flight=flight,
+                user_id=user_id,
+                playlist_id=created_playlist_id,
+            )
+            playlist_id = mapping.playlist_id
+            playlist_created = playlist_id == created_playlist_id
+            if playlist_created:
+                break
+        else:
+            raise RuntimeError("YouTube flight playlist is unavailable")
     response = httpx.post(
         _PLAYLIST_ITEMS_URL,
         params={"part": "snippet"},
@@ -484,6 +608,122 @@ def add_video_to_flight_playlist(*, user_id: int, playlist_title: str, video_id:
     return True
 
 
+def _playlist_contains_video(*, access_token: str, playlist_id: str, video_id: str) -> bool | None:
+    """Return whether a video exists, or None when the playlist no longer exists."""
+    page_token: str | None = None
+    while True:
+        response = httpx.get(
+            _PLAYLIST_ITEMS_URL,
+            params={
+                "part": "snippet",
+                "playlistId": playlist_id,
+                "maxResults": 50,
+                **({"pageToken": page_token} if page_token else {}),
+            },
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=30,
+        )
+        if response.status_code == 404:
+            return None
+        if response.is_error:
+            raise _youtube_api_error(response)
+        payload = response.json()
+        if any(
+            item.get("snippet", {}).get("resourceId", {}).get("videoId") == video_id
+            for item in payload.get("items", [])
+        ):
+            return True
+        page_token = payload.get("nextPageToken")
+        if not page_token:
+            return False
+
+
+def _remove_video_from_flight_playlist(
+    db: Session, *, flight: Flight, user_id: int, video_id: str
+) -> None:
+    """Remove the video from the flight playlist when YouTube is connected."""
+    if not is_connected(db, user_id):
+        raise YoutubeOAuthError(
+            "Connect YouTube before removing the video from its flight playlist"
+        )
+
+    mapping = db.get(YoutubeFlightPlaylist, (user_id, flight.id))
+    try:
+        access_token = _access_token(user_id)
+    except httpx.RequestError as exc:
+        raise YoutubeRemoteDeletionError(
+            "YouTube could not be reached; retry removing the video later"
+        ) from exc
+    if mapping is None:
+        playlist_id = _find_playlist_id(
+            access_token=access_token,
+            title=playlist_title_for_flight(db, flight),
+            for_removal=True,
+        )
+        if playlist_id is None:
+            return
+        mapping = _save_flight_playlist(
+            db,
+            flight=flight,
+            user_id=user_id,
+            playlist_id=playlist_id,
+        )
+    playlist_id = mapping.playlist_id
+
+    headers = {"Authorization": f"Bearer {access_token}"}
+    page_token: str | None = None
+    playlist_item_ids: list[str] = []
+    while True:
+        try:
+            response = httpx.get(
+                _PLAYLIST_ITEMS_URL,
+                params={
+                    "part": "id,snippet",
+                    "playlistId": playlist_id,
+                    "maxResults": 50,
+                    **({"pageToken": page_token} if page_token else {}),
+                },
+                headers=headers,
+                timeout=30,
+            )
+        except httpx.RequestError as exc:
+            raise YoutubeRemoteDeletionError(
+                "YouTube could not be reached; retry removing the video later"
+            ) from exc
+        if response.status_code == 404:
+            _delete_flight_playlist_mapping(db, flight=flight, user_id=user_id)
+            return
+        if response.is_error:
+            raise _youtube_playlist_api_error(response, action="list the flight playlist")
+        payload = response.json()
+        for item in payload.get("items", []):
+            item_id = item.get("id")
+            item_video_id = item.get("snippet", {}).get("resourceId", {}).get("videoId")
+            if isinstance(item_id, str) and item_video_id == video_id:
+                playlist_item_ids.append(item_id)
+        page_token = payload.get("nextPageToken")
+        if not page_token:
+            break
+
+    for playlist_item_id in playlist_item_ids:
+        try:
+            response = httpx.delete(
+                _PLAYLIST_ITEMS_URL,
+                params={"id": playlist_item_id},
+                headers=headers,
+                timeout=30,
+            )
+        except httpx.RequestError as exc:
+            raise YoutubeRemoteDeletionError(
+                "YouTube could not be reached; retry removing the video later"
+            ) from exc
+        if response.status_code in {200, 204, 404}:
+            continue
+        raise _youtube_playlist_api_error(
+            response, action="remove the video from its flight playlist"
+        )
+
+
 def migrate_flight_playlists(*, user_id: int) -> dict[str, int]:
     """Organize all locally associated historical videos for a YouTube account."""
     added = skipped = failed = 0
@@ -494,8 +734,9 @@ def migrate_flight_playlists(*, user_id: int) -> dict[str, int]:
                 for url in flight.youtube_urls:
                     video_id = youtube_video_id_from_url(url)
                     if not add_video_to_flight_playlist(
+                        db,
+                        flight=flight,
                         user_id=user_id,
-                        playlist_title=playlist_title_for_flight(db, flight),
                         video_id=video_id,
                     ):
                         skipped += 1
@@ -712,6 +953,13 @@ def remove_youtube_video(
                 "Only the user who uploaded this video can delete it from YouTube"
             )
         _delete_remote_video(video_id=video_id, user_id=user_id)
+
+    _remove_video_from_flight_playlist(
+        db,
+        flight=flight,
+        user_id=user_id,
+        video_id=video_id,
+    )
 
     associated_url_set = set(associated_urls)
     flight.youtube_urls = [url for url in flight.youtube_urls if url not in associated_url_set]
@@ -1068,14 +1316,21 @@ def _finish_upload(job_id: str, video_id: str) -> None:
         urls = flight.youtube_urls
         if youtube_url not in urls:
             flight.youtube_urls = [*urls, youtube_url]
-        playlist_title = playlist_title_for_flight(db, flight)
+        flight_id = flight.id
         db.commit()
         user_id = job.user_id
     _log_job(job_id, f"YouTube upload completed: {youtube_url}")
     try:
-        add_video_to_flight_playlist(
-            user_id=user_id, playlist_title=playlist_title, video_id=video_id
-        )
+        with SessionLocal() as playlist_db:
+            playlist_flight = playlist_db.get(Flight, flight_id)
+            if playlist_flight is None:
+                raise RuntimeError("Flight was deleted before its YouTube playlist update")
+            add_video_to_flight_playlist(
+                playlist_db,
+                flight=playlist_flight,
+                user_id=user_id,
+                video_id=video_id,
+            )
         _log_job(job_id, "Video added to the flight playlist")
     except Exception as exc:
         # The upload remains successful; playlist organization can be retried later.
