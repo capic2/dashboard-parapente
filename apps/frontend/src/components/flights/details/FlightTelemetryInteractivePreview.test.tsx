@@ -70,6 +70,10 @@ vi.mock('../../../hooks/flights/useTelemetryLayout', () => ({
   useTelemetryLayout: () => hooks.layout,
 }));
 
+vi.mock('../../../hooks/flights/useFlightSummaries', () => ({
+  useActiveFlightMediaJobs: () => ({ data: [] }),
+}));
+
 vi.mock('../../../hooks/flights/useVideoExportStatus', () => ({
   useVideoExportStatus: () => ({ status: hooks.exportStatus }),
   formatEta: () => null,
