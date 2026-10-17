@@ -387,6 +387,21 @@ class Flight(Base):
         self.tags_json = json.dumps(value or [])
 
 
+class YoutubeFlightPlaylist(Base):
+    """YouTube playlist ID assigned to one flight for one application user."""
+
+    __tablename__ = "youtube_flight_playlists"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    flight_id = Column(String, ForeignKey("flights.id", ondelete="CASCADE"), primary_key=True)
+    playlist_id = Column(String, nullable=False, index=True)
+    created_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        nullable=False,
+    )
+
+
 Index(
     "idx_flights_summary_default",
     Flight.flight_date.desc(),
