@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { FlightTelemetryData } from '../../../hooks/flights/useFlightTelemetry';
 import {
@@ -6,7 +6,7 @@ import {
   type FlightTelemetryLayoutItem,
 } from './flightTelemetryLayout';
 import { FlightTelemetryOverlay } from './FlightTelemetryOverlay';
-import { api, getApiUrlWithSearchParams } from '../../../lib/api';
+import { api } from '../../../lib/api';
 
 declare global {
   interface Window {
@@ -14,6 +14,13 @@ declare global {
     _telemetryExportError?: string;
     _setTelemetryExportTime?: (time: number) => Promise<void>;
     _getTelemetryExportTimes?: (duration: number) => number[];
+    _getTelemetryExportPips?: () => {
+      slot_id: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    }[];
   }
 }
 
@@ -27,8 +34,6 @@ interface TelemetryExportPip {
   youtube_url: string;
   offset_seconds: number;
 }
-
-const TELEMETRY_EXPORT_PIP_SEEK_TIMEOUT_MS = 60_000;
 
 function getExportParams() {
   const params = new URLSearchParams(window.location.search);
@@ -63,11 +68,6 @@ export function TelemetryLayoutExport() {
     [rawPipExports]
   );
   const [videoTimeSeconds, setVideoTimeSeconds] = useState(0);
-  const [loadedPipSlots, setLoadedPipSlots] = useState<Set<string>>(
-    () => new Set()
-  );
-  const [pipLoadError, setPipLoadError] = useState<string | null>(null);
-  const pipVideoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
   const telemetry = useQuery({
     queryKey: ['telemetry-export', jobId],
     queryFn: () =>
@@ -121,59 +121,25 @@ export function TelemetryLayoutExport() {
         (first, second) => first - second
       );
     };
+    window._getTelemetryExportPips = () =>
+      pipExports.flatMap((pip) => {
+        const slot = layout.data?.find(
+          (item) => item.type === 'pip' && item.id === pip.slot_id
+        );
+        return slot
+          ? [
+              {
+                slot_id: pip.slot_id,
+                x: slot.x,
+                y: slot.y,
+                width: slot.width,
+                height: slot.height,
+              },
+            ]
+          : [];
+      });
     window._setTelemetryExportTime = async (time: number) => {
       setVideoTimeSeconds(time);
-      await Promise.all(
-        pipExports.map(async (pip) => {
-          const video = pipVideoRefs.current[pip.slot_id];
-          if (!video || video.readyState < HTMLMediaElement.HAVE_METADATA) {
-            throw new Error(
-              'La vidéo PiP n’est pas prête pour la synchronisation'
-            );
-          }
-          const targetTime = Math.max(
-            0,
-            Math.min(
-              video.duration || Number.MAX_SAFE_INTEGER,
-              time - pip.offset_seconds
-            )
-          );
-          if (
-            Math.abs(video.currentTime - targetTime) <= 0.025 &&
-            !video.seeking
-          ) {
-            return;
-          }
-          await new Promise<void>((resolve, reject) => {
-            const cleanup = () => {
-              window.clearTimeout(timeoutId);
-              video.removeEventListener('seeked', onSeeked);
-              video.removeEventListener('error', onError);
-            };
-            const onSeeked = () => {
-              cleanup();
-              resolve();
-            };
-            const onError = () => {
-              cleanup();
-              reject(
-                new Error('La vidéo PiP n’a pas pu atteindre le temps demandé')
-              );
-            };
-            const timeoutId = window.setTimeout(() => {
-              cleanup();
-              reject(
-                new Error(
-                  `La synchronisation du PiP ${pip.slot_id} à ${targetTime.toFixed(2)} s a expiré après ${TELEMETRY_EXPORT_PIP_SEEK_TIMEOUT_MS / 1_000} s`
-                )
-              );
-            }, TELEMETRY_EXPORT_PIP_SEEK_TIMEOUT_MS);
-            video.addEventListener('seeked', onSeeked, { once: true });
-            video.addEventListener('error', onError, { once: true });
-            video.currentTime = targetTime;
-          });
-        })
-      );
       await new Promise<void>((resolve) => {
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
       });
@@ -186,10 +152,6 @@ export function TelemetryLayoutExport() {
     if (telemetry.data?.enrichment_status === 'failed') {
       window._telemetryExportError =
         'La télémétrie enrichie du vol est indisponible';
-      return;
-    }
-    if (pipLoadError) {
-      window._telemetryExportError = pipLoadError;
       return;
     }
     if (
@@ -210,21 +172,18 @@ export function TelemetryLayoutExport() {
         window._telemetryExportError = `Le layout ne contient pas le PiP sélectionné (${missingPipSlotId})`;
         return;
       }
-      if (pipExports.every((pip) => loadedPipSlots.has(pip.slot_id))) {
-        window._telemetryExportReady = true;
-      }
+      window._telemetryExportReady = true;
     }
     return () => {
       window._telemetryExportReady = false;
       delete window._setTelemetryExportTime;
       delete window._getTelemetryExportTimes;
+      delete window._getTelemetryExportPips;
     };
   }, [
     layout.data,
     layout.isError,
-    loadedPipSlots,
     offset,
-    pipLoadError,
     pipExports,
     missingPipSlotId,
     telemetry.data,
@@ -255,29 +214,10 @@ export function TelemetryLayoutExport() {
           (slot) => slot.type === 'pip' && slot.id === pip.slot_id
         );
         if (!pipSlot) return null;
-        const pipVideoUrl = getApiUrlWithSearchParams(
-          `export-viewer/jobs/${jobId}/youtube-pip`,
-          { access_token: token, slot_id: pip.slot_id }
-        );
         return (
-          <video
+          <div
             key={pip.slot_id}
-            ref={(video) => {
-              pipVideoRefs.current[pip.slot_id] = video;
-            }}
-            className="pointer-events-none absolute z-10 rounded-lg border-2 border-white/80 bg-black object-cover shadow-lg"
-            src={pipVideoUrl}
-            muted
-            playsInline
-            preload="auto"
-            onLoadedData={() =>
-              setLoadedPipSlots((current) => new Set(current).add(pip.slot_id))
-            }
-            onError={() => {
-              setPipLoadError(
-                `La vidéo PiP YouTube est indisponible (${pip.slot_id})`
-              );
-            }}
+            className="pointer-events-none absolute z-10 rounded-lg border-2 border-white/80 shadow-lg"
             style={{
               left: `${(pipSlot.x / 1920) * 100}%`,
               top: `${(pipSlot.y / 1080) * 100}%`,
