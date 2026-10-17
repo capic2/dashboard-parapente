@@ -95,21 +95,38 @@ export function FlightTelemetryOverlay({
     >
       {Array.from(
         new Set(
-          layout
-            .map((slot) => slot.groupId)
-            .filter((id): id is string => Boolean(id))
+          [
+            ...layout.map((slot) => slot.parentGroupId),
+            ...layout.map((slot) => slot.groupId),
+          ].filter((id): id is string => Boolean(id))
         )
       ).map((groupId) => {
         const group = layout.find((slot) => slot.groupId === groupId);
+        const parentGroup = layout.find(
+          (slot) => slot.parentGroupId === groupId
+        );
         const bounds = getTelemetryLayoutGroupBounds(layout, groupId);
-        if (!group?.groupBackgroundColor || !bounds) return null;
+        const backgroundColor =
+          group?.groupBackgroundColor ??
+          parentGroup?.parentGroupBackgroundColor;
+        if (!backgroundColor || !bounds) return null;
         const opacity = Math.max(
           0,
-          Math.min(1, group.groupBackgroundOpacity ?? 0.25)
+          Math.min(
+            1,
+            group?.groupBackgroundOpacity ??
+              parentGroup?.parentGroupBackgroundOpacity ??
+              0.25
+          )
         );
         const borderRadius = Math.max(
           0,
-          Math.min(120, group.groupBorderRadius ?? 12)
+          Math.min(
+            120,
+            group?.groupBorderRadius ??
+              parentGroup?.parentGroupBorderRadius ??
+              12
+          )
         );
         return (
           <div
@@ -122,9 +139,7 @@ export function FlightTelemetryOverlay({
               width: `${(bounds.width / TELEMETRY_CANVAS_WIDTH) * 100}%`,
               height: `${(bounds.height / TELEMETRY_CANVAS_HEIGHT) * 100}%`,
               borderRadius: `${(borderRadius / TELEMETRY_CANVAS_WIDTH) * 100}cqw`,
-              backgroundColor: `${group.groupBackgroundColor}${Math.round(
-                opacity * 255
-              )
+              backgroundColor: `${backgroundColor}${Math.round(opacity * 255)
                 .toString(16)
                 .padStart(2, '0')}`,
             }}
