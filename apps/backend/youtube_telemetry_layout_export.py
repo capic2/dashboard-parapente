@@ -12,13 +12,14 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 import config
-from video_acceleration import chromium_launch_args, select_video_accelerator
+from video_acceleration import chromium_launch_args, h264_encode_args, select_video_accelerator
 from youtube_overlay_export import YoutubeExportError, _run, download_youtube
 
 ProgressCallback = Callable[[str, int | None], None]
 CompositionProgressCallback = Callable[[int, int, int | None, float, float | None], None]
 LAYOUT_CANVAS_WIDTH = 1920
 LAYOUT_CANVAS_HEIGHT = 1080
+COMPOSITION_THREADS = 4
 _FFMPEG_STATS_RE = re.compile(
     r"frame=\s*(?P<frame>\d+).*?fps=\s*(?P<fps>[\d.]+).*?"
     r"time=(?P<time>\d{2}:\d{2}:\d{2}(?:\.\d+)?).*?"
@@ -473,7 +474,7 @@ def export_youtube_telemetry_layout(
             "ffmpeg",
             "-y",
             "-filter_complex_threads",
-            "2",
+            str(COMPOSITION_THREADS),
             *ffmpeg_inputs,
             "-filter_complex",
             filter_graph,
@@ -481,18 +482,14 @@ def export_youtube_telemetry_layout(
             "[outv]",
             "-map",
             "0:a?",
-            "-threads",
-            "2",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "fast",
-            "-crf",
-            "18",
-            "-pix_fmt",
-            "yuv420p",
-            "-c:a",
-            "aac",
+            *h264_encode_args(
+                select_video_accelerator(config.VIDEO_ACCELERATOR),
+                quality="18",
+                cpu_preset="fast",
+                include_audio=True,
+                audio_codec="aac",
+                cpu_threads=COMPOSITION_THREADS,
+            ),
             "-b:a",
             "192k",
             "-shortest",
