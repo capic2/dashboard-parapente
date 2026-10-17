@@ -551,13 +551,16 @@ export function FlightTelemetryInteractivePreview({
   const exportLastActivitySeconds = exportUpdatedAt
     ? Math.max(0, (youtubeExportNow - exportUpdatedAt) / 1000)
     : null;
-  const isYoutubeExportActive =
+  const isYoutubeExportActive = Boolean(
+    (youtubeExportJobId &&
+      activeYoutubeExportJobIds.includes(youtubeExportJobId)) ||
     youtubeExportStatusValue === 'queued' ||
     youtubeExportStatusValue === 'running' ||
     youtubeExportStatusValue === 'processing' ||
     youtubeExportStatusValue === 'initializing' ||
     youtubeExportStatusValue === 'capturing' ||
-    youtubeExportStatusValue === 'encoding';
+    youtubeExportStatusValue === 'encoding'
+  );
   const shouldShowYoutubeExportProgress = Boolean(
     youtubeExportJobId &&
     (!isYoutubeOverlayPublished ||
