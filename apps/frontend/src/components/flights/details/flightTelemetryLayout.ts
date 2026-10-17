@@ -81,6 +81,11 @@ interface FlightTelemetryLayoutItemBase {
   fontSize?: number;
   groupId?: string;
   groupName?: string;
+  parentGroupId?: string;
+  parentGroupName?: string;
+  parentGroupBackgroundColor?: string;
+  parentGroupBackgroundOpacity?: number;
+  parentGroupBorderRadius?: number;
   groupBackgroundColor?: string;
   groupBackgroundOpacity?: number;
   groupBorderRadius?: number;
@@ -203,7 +208,9 @@ export function getTelemetryLayoutGroupBounds(
   layout: readonly FlightTelemetryLayoutItem[],
   groupId: string
 ): TelemetryLayoutGroupBounds | null {
-  const items = layout.filter((item) => item.groupId === groupId);
+  const items = layout.filter(
+    (item) => item.groupId === groupId || item.parentGroupId === groupId
+  );
   if (!items.length) return null;
   const left = Math.min(...items.map((item) => item.x));
   const top = Math.min(...items.map((item) => item.y));
@@ -343,6 +350,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
     string,
     {
       name?: string;
+      parentId?: string;
       backgroundColor?: string;
       backgroundOpacity?: number;
       borderRadius?: number;
@@ -356,6 +364,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
     const rawBackgroundColor = group.getAttribute('background-color');
     groupNames.set(id, {
       name: group.getAttribute('name') ?? undefined,
+      parentId: group.getAttribute('parent') ?? undefined,
       backgroundColor:
         rawBackgroundColor && /^#[\da-f]{6}$/iu.test(rawBackgroundColor)
           ? rawBackgroundColor
@@ -425,6 +434,17 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
         grouping.groupBackgroundOpacity = group.backgroundOpacity;
       if (group?.borderRadius !== undefined)
         grouping.groupBorderRadius = group.borderRadius;
+      if (group?.parentId) {
+        grouping.parentGroupId = group.parentId;
+        const parent = groupNames.get(group.parentId);
+        if (parent?.name) grouping.parentGroupName = parent.name;
+        if (parent?.backgroundColor)
+          grouping.parentGroupBackgroundColor = parent.backgroundColor;
+        if (parent?.backgroundOpacity !== undefined)
+          grouping.parentGroupBackgroundOpacity = parent.backgroundOpacity;
+        if (parent?.borderRadius !== undefined)
+          grouping.parentGroupBorderRadius = parent.borderRadius;
+      }
     }
     const name = element.getAttribute('label');
     const naming = name ? { name } : {};
@@ -606,26 +626,42 @@ export function serializeTelemetryLayoutXml(
     mainVideoSource?: TelemetryMainVideoSource;
   }
 ) {
-  const groups = Array.from(
+  const groupIds = Array.from(
     new Set(
       layout
-        .map((item) => item.groupId)
+        .flatMap((item) => [item.groupId, item.parentGroupId])
         .filter((groupId): groupId is string => Boolean(groupId))
     )
-  )
+  );
+  const groups = groupIds
     .map((groupId) => {
       const groupItems = layout.filter((item) => item.groupId === groupId);
-      const groupName = groupItems.find((item) => item.groupName)?.groupName;
-      const color = groupItems.find(
-        (item) => item.groupBackgroundColor
-      )?.groupBackgroundColor;
-      const opacity = groupItems.find(
-        (item) => item.groupBackgroundOpacity !== undefined
-      )?.groupBackgroundOpacity;
-      const borderRadius = groupItems.find(
-        (item) => item.groupBorderRadius !== undefined
-      )?.groupBorderRadius;
-      return `<group id="${escapeXml(groupId)}"${groupName ? ` name="${escapeXml(groupName)}"` : ''}${color ? ` background-color="${escapeXml(color)}"` : ''}${opacity !== undefined ? ` background-opacity="${opacity}"` : ''}${borderRadius !== undefined ? ` border-radius="${borderRadius}"` : ''} />`;
+      const nestedItems = layout.filter(
+        (item) => item.parentGroupId === groupId
+      );
+      const groupName =
+        groupItems.find((item) => item.groupName)?.groupName ??
+        nestedItems.find((item) => item.parentGroupName)?.parentGroupName;
+      const color =
+        groupItems.find((item) => item.groupBackgroundColor)
+          ?.groupBackgroundColor ??
+        nestedItems.find((item) => item.parentGroupBackgroundColor)
+          ?.parentGroupBackgroundColor;
+      const opacity =
+        groupItems.find((item) => item.groupBackgroundOpacity !== undefined)
+          ?.groupBackgroundOpacity ??
+        nestedItems.find(
+          (item) => item.parentGroupBackgroundOpacity !== undefined
+        )?.parentGroupBackgroundOpacity;
+      const borderRadius =
+        groupItems.find((item) => item.groupBorderRadius !== undefined)
+          ?.groupBorderRadius ??
+        nestedItems.find((item) => item.parentGroupBorderRadius !== undefined)
+          ?.parentGroupBorderRadius;
+      const actualParent = groupItems.length
+        ? groupItems[0].parentGroupId
+        : undefined;
+      return `<group id="${escapeXml(groupId)}"${actualParent ? ` parent="${escapeXml(actualParent)}"` : ''}${groupName ? ` name="${escapeXml(groupName)}"` : ''}${color ? ` background-color="${escapeXml(color)}"` : ''}${opacity !== undefined ? ` background-opacity="${opacity}"` : ''}${borderRadius !== undefined ? ` border-radius="${borderRadius}"` : ''} />`;
     })
     .join('');
   const backgroundImage = options

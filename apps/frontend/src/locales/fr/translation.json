@@ -2098,7 +2098,7 @@
     "pasteSuccess": "Élément(s) collé(s).",
     "pasteLimit": "Trop d’éléments pour les coller dans ce layout.",
     "selectedGroup": "Groupe sélectionné",
-    "groupSelectionHint": "Sélectionnez un élément du groupe pour modifier ses propriétés.",
+    "groupSelectionHint": "Sélectionnez un groupe dans la hiérarchie pour modifier ses propriétés.",
     "collapseGroup": "Replier le groupe",
     "expandGroup": "Déplier le groupe",
     "content": "Contenu",
