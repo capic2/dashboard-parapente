@@ -2093,7 +2093,7 @@
     "pasteSuccess": "Element(s) pasted.",
     "pasteLimit": "Too many elements to paste into this layout.",
     "selectedGroup": "Selected group",
-    "groupSelectionHint": "Select an item in the group to edit its properties.",
+    "groupSelectionHint": "Select a group in the hierarchy to edit its properties.",
     "collapseGroup": "Collapse group",
     "expandGroup": "Expand group",
     "content": "Content",
