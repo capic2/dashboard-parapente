@@ -474,6 +474,16 @@ def ensure_enriched_gpx(
                             "retrying merge"
                         )
                         continue
+                    if not staged_gpx_path.is_file():
+                        if attempt == 1:
+                            raise FileNotFoundError(
+                                f"Staged enriched GPX disappeared during validation: "
+                                f"{staged_gpx_path}"
+                            )
+                        logger.warning(
+                            "Staged enriched GPX disappeared during validation; retrying merge"
+                        )
+                        continue
                     if not has_usable_timestamps:
                         logger.warning(
                             "OSV merge produced an unusable GPX; falling back to source GPX %s",
