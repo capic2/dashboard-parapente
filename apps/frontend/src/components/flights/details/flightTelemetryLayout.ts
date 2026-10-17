@@ -73,6 +73,8 @@ interface FlightTelemetryLayoutItemBase {
   height: number;
   visible: boolean;
   transparent?: boolean;
+  backgroundColor?: string;
+  backgroundOpacity?: number;
   border?: boolean;
   showLabel?: boolean;
   showUnit?: boolean;
@@ -81,6 +83,7 @@ interface FlightTelemetryLayoutItemBase {
   groupName?: string;
   groupBackgroundColor?: string;
   groupBackgroundOpacity?: number;
+  groupBorderRadius?: number;
 }
 
 export interface FlightTelemetryWidgetLayout extends FlightTelemetryLayoutItemBase {
@@ -338,7 +341,12 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
   );
   const groupNames = new Map<
     string,
-    { name?: string; backgroundColor?: string; backgroundOpacity?: number }
+    {
+      name?: string;
+      backgroundColor?: string;
+      backgroundOpacity?: number;
+      borderRadius?: number;
+    }
   >();
   for (const group of document.documentElement.querySelectorAll(
     ':scope > group'
@@ -356,6 +364,12 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
         ? Math.max(
             0,
             Math.min(1, numberAttribute(group, 'background-opacity', 1))
+          )
+        : undefined,
+      borderRadius: group.hasAttribute('border-radius')
+        ? Math.max(
+            0,
+            Math.min(120, numberAttribute(group, 'border-radius', 12))
           )
         : undefined,
     });
@@ -409,6 +423,8 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
         grouping.groupBackgroundColor = group.backgroundColor;
       if (group?.backgroundOpacity !== undefined)
         grouping.groupBackgroundOpacity = group.backgroundOpacity;
+      if (group?.borderRadius !== undefined)
+        grouping.groupBorderRadius = group.borderRadius;
     }
     const name = element.getAttribute('label');
     const naming = name ? { name } : {};
@@ -419,6 +435,19 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
       styling.transparent = true;
     } else if (backgroundAttribute === 'solid') {
       styling.transparent = false;
+    }
+    const rawItemBackgroundColor = element.getAttribute('background-color');
+    if (
+      rawItemBackgroundColor &&
+      /^#[\da-f]{6}$/iu.test(rawItemBackgroundColor)
+    ) {
+      styling.backgroundColor = rawItemBackgroundColor;
+    }
+    if (element.hasAttribute('background-opacity')) {
+      styling.backgroundOpacity = Math.max(
+        0,
+        Math.min(1, numberAttribute(element, 'background-opacity', 0.85))
+      );
     }
     if (borderAttribute === 'true') {
       styling.border = true;
@@ -578,17 +607,25 @@ export function serializeTelemetryLayoutXml(
   }
 ) {
   const groups = Array.from(
-    new Map(
+    new Set(
       layout
-        .filter((item) => item.groupId)
-        .map((item) => [item.groupId as string, item] as const)
+        .map((item) => item.groupId)
+        .filter((groupId): groupId is string => Boolean(groupId))
     )
   )
-    .map(([groupId, item]) => {
-      const groupName = item.groupName;
-      const color = item.groupBackgroundColor;
-      const opacity = item.groupBackgroundOpacity;
-      return `<group id="${escapeXml(groupId)}"${groupName ? ` name="${escapeXml(groupName)}"` : ''}${color ? ` background-color="${escapeXml(color)}"` : ''}${opacity !== undefined ? ` background-opacity="${opacity}"` : ''} />`;
+    .map((groupId) => {
+      const groupItems = layout.filter((item) => item.groupId === groupId);
+      const groupName = groupItems.find((item) => item.groupName)?.groupName;
+      const color = groupItems.find(
+        (item) => item.groupBackgroundColor
+      )?.groupBackgroundColor;
+      const opacity = groupItems.find(
+        (item) => item.groupBackgroundOpacity !== undefined
+      )?.groupBackgroundOpacity;
+      const borderRadius = groupItems.find(
+        (item) => item.groupBorderRadius !== undefined
+      )?.groupBorderRadius;
+      return `<group id="${escapeXml(groupId)}"${groupName ? ` name="${escapeXml(groupName)}"` : ''}${color ? ` background-color="${escapeXml(color)}"` : ''}${opacity !== undefined ? ` background-opacity="${opacity}"` : ''}${borderRadius !== undefined ? ` border-radius="${borderRadius}"` : ''} />`;
     })
     .join('');
   const backgroundImage = options
@@ -614,6 +651,13 @@ export function serializeTelemetryLayoutXml(
       } else if (item.transparent === false) {
         background = ' background="solid"';
       }
+      const backgroundColor = item.backgroundColor
+        ? ` background-color="${escapeXml(item.backgroundColor)}"`
+        : '';
+      const backgroundOpacity =
+        item.backgroundOpacity !== undefined
+          ? ` background-opacity="${item.backgroundOpacity}"`
+          : '';
       let border = '';
       if (item.border === true) {
         border = ' border="true"';
@@ -656,7 +700,7 @@ export function serializeTelemetryLayoutXml(
           : '';
       const pipSource =
         item.type === 'pip' && item.source ? ` source="${item.source}"` : '';
-      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility}${unitVisibility}${fontSize}${clickAction}${longPressAction}${variant}${valueAlign}${textAlign} x="${(item.x / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" y="${(item.y / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" width="${(item.width / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" height="${(item.height / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" visible="${item.visible ? 'true' : 'false'}"`;
+      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${backgroundColor}${backgroundOpacity}${border}${labelVisibility}${unitVisibility}${fontSize}${clickAction}${longPressAction}${variant}${valueAlign}${textAlign} x="${(item.x / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" y="${(item.y / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" width="${(item.width / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" height="${(item.height / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" visible="${item.visible ? 'true' : 'false'}"`;
       if (item.type === 'icon') return `<icon ${common} name="${item.icon}" />`;
       if (item.type === 'text') {
         return `<text ${common} content="${escapeXml(item.content)}" />`;

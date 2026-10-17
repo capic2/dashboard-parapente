@@ -1409,6 +1409,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   const groupColor = groupStyle?.groupBackgroundColor;
                   const groupOpacity =
                     groupStyle?.groupBackgroundOpacity ?? 0.25;
+                  const groupBorderRadius = Math.max(
+                    0,
+                    Math.min(120, groupStyle?.groupBorderRadius ?? 12)
+                  );
                   const groupBackground = groupColor
                     ? `${groupColor}${Math.round(groupOpacity * 255)
                         .toString(16)
@@ -1423,6 +1427,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                         top: `${bounds.y}px`,
                         width: `${bounds.width}px`,
                         height: `${bounds.height}px`,
+                        borderRadius: `${groupBorderRadius}px`,
                         backgroundColor:
                           groupBackground ?? 'rgb(56 189 248 / 5%)',
                       }}
@@ -1453,8 +1458,22 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                     textAlign = item.textAlign ?? 'left';
 
                   let backgroundClass = 'bg-transparent';
-                  if (item.transparent === false)
-                    backgroundClass = 'bg-slate-950/85';
+                  if (item.transparent === false) {
+                    backgroundClass = item.backgroundColor
+                      ? 'bg-transparent'
+                      : 'bg-slate-950/85';
+                  }
+                  const itemBackgroundColor =
+                    item.transparent === false && item.backgroundColor
+                      ? `${item.backgroundColor}${Math.round(
+                          Math.max(
+                            0,
+                            Math.min(1, item.backgroundOpacity ?? 0.85)
+                          ) * 255
+                        )
+                          .toString(16)
+                          .padStart(2, '0')}`
+                      : undefined;
                   const visibilityClass = item.visible ? '' : 'opacity-35';
                   let borderClass = 'border-transparent';
                   if (isSelected)
@@ -1567,6 +1586,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                         height: `${item.height}px`,
                         fontSize: `${item.fontSize ?? 32}px`,
                         textAlign,
+                        backgroundColor: itemBackgroundColor,
                       }}
                     >
                       {itemPreview}
@@ -1797,6 +1817,34 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                           ? {
                               ...item,
                               groupBackgroundColor: event.target.value,
+                            }
+                          : item
+                      )
+                    )
+                  }
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 flex justify-between text-slate-600 dark:text-slate-300">
+                  <span>{t('telemetryLayout.groupBorderRadius')}</span>
+                  <span>
+                    {Math.round(selectedGroupStyle?.groupBorderRadius ?? 12)} px
+                  </span>
+                </span>
+                <input
+                  aria-label={t('telemetryLayout.groupBorderRadius')}
+                  className="w-full accent-sky-600"
+                  type="range"
+                  min="0"
+                  max="120"
+                  value={selectedGroupStyle?.groupBorderRadius ?? 12}
+                  onChange={(event) =>
+                    setLayout((current) =>
+                      current.map((item) =>
+                        item.groupId === selectedGroupId
+                          ? {
+                              ...item,
+                              groupBorderRadius: Number(event.target.value),
                             }
                           : item
                       )
@@ -2283,6 +2331,51 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       }
                     />
                     {t('telemetryLayout.transparentBackground')}
+                  </label>
+                  <label className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-slate-600 dark:text-slate-300">
+                      {t('telemetryLayout.fieldBackgroundColor')}
+                    </span>
+                    <input
+                      aria-label={t('telemetryLayout.fieldBackgroundColor')}
+                      className="h-9 w-14 cursor-pointer rounded border border-slate-300 bg-white p-1 dark:border-slate-600 dark:bg-slate-900"
+                      type="color"
+                      value={selected.backgroundColor ?? '#020617'}
+                      onChange={(event) =>
+                        updateItem(selected.id, {
+                          transparent: false,
+                          backgroundColor: event.target.value,
+                          backgroundOpacity: selected.backgroundOpacity ?? 0.85,
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="mb-1 flex justify-between text-slate-600 dark:text-slate-300">
+                      <span>{t('telemetryLayout.fieldBackgroundOpacity')}</span>
+                      <span>
+                        {Math.round((selected.backgroundOpacity ?? 0.85) * 100)}
+                        %
+                      </span>
+                    </span>
+                    <input
+                      aria-label={t('telemetryLayout.fieldBackgroundOpacity')}
+                      className="w-full accent-sky-600"
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={Math.round(
+                        (selected.backgroundOpacity ?? 0.85) * 100
+                      )}
+                      onChange={(event) =>
+                        updateItem(selected.id, {
+                          transparent: false,
+                          backgroundColor:
+                            selected.backgroundColor ?? '#020617',
+                          backgroundOpacity: Number(event.target.value) / 100,
+                        })
+                      }
+                    />
                   </label>
                   <label className="flex items-center gap-2 text-sm">
                     <input
