@@ -11,7 +11,7 @@ uvicorn[standard]==0.54.0
 # ============================================
 # Database ORM
 # ============================================
-sqlalchemy==2.1.4
+sqlalchemy==2.1.5
 
 # ============================================
 # Data Validation & Settings
@@ -89,7 +89,7 @@ spatialmedia @ https://github.com/google/spatial-media/archive/2308497c39bb604a7
 metpy==1.7.1
 matplotlib==3.11.2
 numpy==2.5.4
-pillow==12.3.0
+pillow==13.0.0
 
 # ============================================
 # Authentication (JWT + Password Hashing)
