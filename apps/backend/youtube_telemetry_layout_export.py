@@ -15,6 +15,8 @@ from video_acceleration import chromium_launch_args, select_video_accelerator
 from youtube_overlay_export import YoutubeExportError, _run, download_youtube
 
 ProgressCallback = Callable[[str, int | None], None]
+LAYOUT_CANVAS_WIDTH = 1920
+LAYOUT_CANVAS_HEIGHT = 1080
 
 
 def _video_duration(path: Path) -> float:
@@ -42,6 +44,46 @@ def _video_duration(path: Path) -> float:
     return duration
 
 
+def _video_resolution(path: Path) -> tuple[int, int]:
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=width,height",
+                "-of",
+                "json",
+                str(path),
+            ],
+            capture_output=True,
+            check=True,
+            text=True,
+            timeout=20,
+        )
+        metadata = json.loads(result.stdout)
+        streams = metadata.get("streams")
+        if not isinstance(streams, list) or not streams or not isinstance(streams[0], dict):
+            raise ValueError("La résolution de la vidéo source est absente")
+        width = int(streams[0]["width"])
+        height = int(streams[0]["height"])
+    except (
+        OSError,
+        ValueError,
+        KeyError,
+        IndexError,
+        TypeError,
+        subprocess.SubprocessError,
+    ) as exc:
+        raise YoutubeExportError("La résolution de la vidéo source est indisponible") from exc
+    if width <= 0 or height <= 0:
+        raise YoutubeExportError("La résolution de la vidéo source est invalide")
+    return width, height
+
+
 async def _capture_layout_frames(
     *,
     frontend_url: str,
@@ -53,6 +95,8 @@ async def _capture_layout_frames(
     pip_exports: list[dict[str, object]],
     fps: int,
     duration: float,
+    video_width: int,
+    video_height: int,
     frames_directory: Path,
     is_cancelled: Callable[[], bool],
     progress: ProgressCallback,
@@ -80,8 +124,15 @@ async def _capture_layout_frames(
         )
         try:
             context = await browser.new_context(
-                viewport={"width": 1920, "height": 1080},
-                device_scale_factor=1,
+                viewport={
+                    "width": LAYOUT_CANVAS_WIDTH,
+                    "height": LAYOUT_CANVAS_HEIGHT,
+                },
+                device_scale_factor=max(
+                    1.0,
+                    video_width / LAYOUT_CANVAS_WIDTH,
+                    video_height / LAYOUT_CANVAS_HEIGHT,
+                ),
                 java_script_enabled=True,
                 color_scheme="dark",
             )
@@ -196,6 +247,7 @@ def export_youtube_telemetry_layout(
     if is_cancelled():
         raise YoutubeExportError("Export annulé")
     duration = _video_duration(source)
+    video_width, video_height = _video_resolution(source)
     fps = 30
     frames_directory = work_dir / "telemetry-layout-frames"
     asyncio.run(
@@ -209,6 +261,8 @@ def export_youtube_telemetry_layout(
             pip_exports=pip_exports or [],
             fps=fps,
             duration=duration,
+            video_width=video_width,
+            video_height=video_height,
             frames_directory=frames_directory,
             is_cancelled=is_cancelled,
             progress=progress,
