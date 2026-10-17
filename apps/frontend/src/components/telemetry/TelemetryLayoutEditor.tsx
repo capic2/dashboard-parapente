@@ -284,6 +284,13 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     ? (layout.find((item) => item.groupId === selectedGroupId)?.groupName ??
       selectedGroupId)
     : undefined;
+  const selectedGroupStyle = selectedGroupId
+    ? layout.find((item) => item.groupId === selectedGroupId)
+    : undefined;
+  const selectedGroupOpacity = Math.max(
+    0,
+    Math.min(1, selectedGroupStyle?.groupBackgroundOpacity ?? 0.25)
+  );
   const groups = Array.from(
     new Map(
       layout
@@ -1396,15 +1403,28 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                 {groups.map(([groupId, groupName]) => {
                   const bounds = getTelemetryLayoutGroupBounds(layout, groupId);
                   if (!bounds) return null;
+                  const groupStyle = layout.find(
+                    (item) => item.groupId === groupId
+                  );
+                  const groupColor = groupStyle?.groupBackgroundColor;
+                  const groupOpacity =
+                    groupStyle?.groupBackgroundOpacity ?? 0.25;
+                  const groupBackground = groupColor
+                    ? `${groupColor}${Math.round(groupOpacity * 255)
+                        .toString(16)
+                        .padStart(2, '0')}`
+                    : undefined;
                   return (
                     <div
                       key={groupId}
-                      className="pointer-events-none absolute rounded-xl border border-dashed border-sky-400/70 bg-sky-400/5"
+                      className="pointer-events-none absolute rounded-xl border border-dashed border-sky-400/70"
                       style={{
                         left: `${bounds.x}px`,
                         top: `${bounds.y}px`,
                         width: `${bounds.width}px`,
                         height: `${bounds.height}px`,
+                        backgroundColor:
+                          groupBackground ?? 'rgb(56 189 248 / 5%)',
                       }}
                     >
                       <span className="absolute -top-5 left-2 rounded-t bg-sky-500/80 px-2 py-0.5 text-[10px] font-semibold text-white">
@@ -1755,6 +1775,58 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       current.map((item) =>
                         item.groupId === selectedGroupId
                           ? { ...item, groupName: event.target.value }
+                          : item
+                      )
+                    )
+                  }
+                />
+              </label>
+              <label className="flex items-center justify-between gap-3 text-sm">
+                <span className="text-slate-600 dark:text-slate-300">
+                  {t('telemetryLayout.groupBackgroundColor')}
+                </span>
+                <input
+                  aria-label={t('telemetryLayout.groupBackgroundColor')}
+                  className="h-9 w-14 cursor-pointer rounded border border-slate-300 bg-white p-1 dark:border-slate-600 dark:bg-slate-900"
+                  type="color"
+                  value={selectedGroupStyle?.groupBackgroundColor ?? '#38bdf8'}
+                  onChange={(event) =>
+                    setLayout((current) =>
+                      current.map((item) =>
+                        item.groupId === selectedGroupId
+                          ? {
+                              ...item,
+                              groupBackgroundColor: event.target.value,
+                            }
+                          : item
+                      )
+                    )
+                  }
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 flex justify-between text-slate-600 dark:text-slate-300">
+                  <span>{t('telemetryLayout.groupBackgroundOpacity')}</span>
+                  <span>{Math.round(selectedGroupOpacity * 100)}%</span>
+                </span>
+                <input
+                  aria-label={t('telemetryLayout.groupBackgroundOpacity')}
+                  className="w-full accent-sky-600"
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round(selectedGroupOpacity * 100)}
+                  onChange={(event) =>
+                    setLayout((current) =>
+                      current.map((item) =>
+                        item.groupId === selectedGroupId
+                          ? {
+                              ...item,
+                              groupBackgroundColor:
+                                item.groupBackgroundColor ?? '#38bdf8',
+                              groupBackgroundOpacity:
+                                Number(event.target.value) / 100,
+                            }
                           : item
                       )
                     )

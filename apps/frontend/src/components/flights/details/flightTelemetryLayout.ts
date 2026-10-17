@@ -79,6 +79,8 @@ interface FlightTelemetryLayoutItemBase {
   fontSize?: number;
   groupId?: string;
   groupName?: string;
+  groupBackgroundColor?: string;
+  groupBackgroundOpacity?: number;
 }
 
 export interface FlightTelemetryWidgetLayout extends FlightTelemetryLayoutItemBase {
@@ -334,13 +336,30 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
       ':scope > widget, :scope > icon, :scope > text, :scope > pip'
     )
   );
-  const groupNames = new Map(
-    Array.from(document.documentElement.querySelectorAll(':scope > group'))
-      .map((group) => [group.getAttribute('id'), group.getAttribute('name')])
-      .filter((entry): entry is [string, string] =>
-        Boolean(entry[0] && entry[1])
-      )
-  );
+  const groupNames = new Map<
+    string,
+    { name?: string; backgroundColor?: string; backgroundOpacity?: number }
+  >();
+  for (const group of document.documentElement.querySelectorAll(
+    ':scope > group'
+  )) {
+    const id = group.getAttribute('id');
+    if (!id) continue;
+    const rawBackgroundColor = group.getAttribute('background-color');
+    groupNames.set(id, {
+      name: group.getAttribute('name') ?? undefined,
+      backgroundColor:
+        rawBackgroundColor && /^#[\da-f]{6}$/iu.test(rawBackgroundColor)
+          ? rawBackgroundColor
+          : undefined,
+      backgroundOpacity: group.hasAttribute('background-opacity')
+        ? Math.max(
+            0,
+            Math.min(1, numberAttribute(group, 'background-opacity', 1))
+          )
+        : undefined,
+    });
+  }
   if (items.length < 1)
     return withLayoutMetadata(
       DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget) => ({ ...widget }))
@@ -384,8 +403,12 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
     const grouping: Record<string, unknown> = {};
     if (groupId) {
       grouping.groupId = groupId;
-      const groupName = groupNames.get(groupId);
-      if (groupName) grouping.groupName = groupName;
+      const group = groupNames.get(groupId);
+      if (group?.name) grouping.groupName = group.name;
+      if (group?.backgroundColor)
+        grouping.groupBackgroundColor = group.backgroundColor;
+      if (group?.backgroundOpacity !== undefined)
+        grouping.groupBackgroundOpacity = group.backgroundOpacity;
     }
     const name = element.getAttribute('label');
     const naming = name ? { name } : {};
@@ -558,13 +581,15 @@ export function serializeTelemetryLayoutXml(
     new Map(
       layout
         .filter((item) => item.groupId)
-        .map((item) => [item.groupId as string, item.groupName] as const)
+        .map((item) => [item.groupId as string, item] as const)
     )
   )
-    .map(
-      ([groupId, groupName]) =>
-        `<group id="${escapeXml(groupId)}"${groupName ? ` name="${escapeXml(groupName)}"` : ''} />`
-    )
+    .map(([groupId, item]) => {
+      const groupName = item.groupName;
+      const color = item.groupBackgroundColor;
+      const opacity = item.groupBackgroundOpacity;
+      return `<group id="${escapeXml(groupId)}"${groupName ? ` name="${escapeXml(groupName)}"` : ''}${color ? ` background-color="${escapeXml(color)}"` : ''}${opacity !== undefined ? ` background-opacity="${opacity}"` : ''} />`;
+    })
     .join('');
   const backgroundImage = options
     ? options.backgroundImage

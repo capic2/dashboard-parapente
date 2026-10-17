@@ -2107,6 +2107,8 @@
     "exitFullscreen": "Quitter le plein écran",
     "name": "Nom",
     "groupName": "Nom du groupe",
+    "groupBackgroundColor": "Couleur du fond",
+    "groupBackgroundOpacity": "Opacité du fond",
     "addField": "Ajouter un champ",
     "addElement": "Ajouter un élément",
     "telemetryElements": "Télémétrie",
