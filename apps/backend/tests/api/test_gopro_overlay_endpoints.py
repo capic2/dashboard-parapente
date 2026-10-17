@@ -463,12 +463,12 @@ def test_enrichment_persists_canonical_gpx_without_changing_source_or_offset(
     monkeypatch.setattr(routes, "ensure_enriched_gpx", create_enriched_cache)
 
     routes._prepare_enriched_gpx_in_background(
-        sample_flight.id,
         [osv_path],
         source_gpx_path,
         tmp_path,
         video_duration=120.0,
         first_gpx_at=10.0,
+        flight_id=sample_flight.id,
     )
 
     db_session.refresh(sample_flight)
@@ -486,12 +486,12 @@ def test_enrichment_persists_canonical_gpx_without_changing_source_or_offset(
     sample_flight.gpx_source_file_path = str(replacement_gpx_path)
     db_session.commit()
     routes._prepare_enriched_gpx_in_background(
-        sample_flight.id,
         [osv_path],
         source_gpx_path,
         tmp_path,
         video_duration=120.0,
         first_gpx_at=10.0,
+        flight_id=sample_flight.id,
     )
 
     db_session.refresh(sample_flight)

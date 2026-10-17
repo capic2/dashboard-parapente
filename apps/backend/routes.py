@@ -449,13 +449,18 @@ def _flight_gopro_camera_path(db: Session, flight: Flight) -> Path:
 def _flight_gopro_preview_inputs(db: Session, flight: Flight) -> tuple[Path, Path]:
     camera_path = _flight_gopro_camera_path(db, flight)
     input_dir = camera_path.parent
-    source_gpx_path = getattr(flight, "gpx_source_file_path", None) or flight.gpx_file_path
-    gpx_path = _resolve_flight_file_path(source_gpx_path)
+    gpx_path = _flight_source_gpx_path(flight)
     if not gpx_path or not gpx_path.is_file():
         gpx_path = first_matching_file(input_dir, "Zepp*.gpx")
     if not gpx_path or not gpx_path.is_file():
         raise HTTPException(status_code=404, detail="Flight GPX file not found")
     return camera_path, gpx_path
+
+
+def _flight_source_gpx_path(flight: Flight) -> Path | None:
+    """Resolve the original recorded track after gpx_file_path is enriched."""
+    source_file_path = getattr(flight, "gpx_source_file_path", None) or flight.gpx_file_path
+    return _resolve_flight_file_path(source_file_path)
 
 
 _GOPRO_OVERLAY_IN_PROGRESS_STATUSES = {"queued", "preparing", "running"}
@@ -5550,7 +5555,12 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/flights/{flight_id}")
-async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session = Depends(get_db)):
+async def update_flight(
+    flight_id: str,
+    flight_data: FlightUpdate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     """
     Update flight details
 
@@ -5586,10 +5596,10 @@ async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session =
     if (
         gpx_metrics_excluded is not None
         and gpx_metrics_excluded != flight.gpx_metrics_excluded
-        and flight.gpx_file_path
+        and _flight_source_gpx_path(flight)
     ):
         try:
-            coordinates = parse_gpx_file(Path(flight.gpx_file_path))
+            coordinates = parse_gpx_file(_flight_source_gpx_path(flight))
             stats = calculate_track_stats(coordinates)
             flight.max_climb_rate_ms = stats["max_climb_rate_ms"]
             flight.max_sink_rate_ms = stats["max_sink_rate_ms"]
@@ -5612,6 +5622,19 @@ async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session =
         db.commit()
         db.refresh(flight)
         logger.info(f" Updated flight {flight_id}: {list(update_data.keys())}")
+
+        if (
+            "gopro_overlay_gpx_offset" in update_data
+            and flight.gopro_overlay_gpx_offset is not None
+        ):
+            try:
+                _schedule_enriched_gpx_for_saved_offset(db, flight, background_tasks)
+            except Exception:
+                logger.warning(
+                    "Unable to schedule enriched GPX for flight %s",
+                    flight_id,
+                    exc_info=True,
+                )
 
         # Return in the format expected by frontend (ApiResponseSchema)
         response_flight = FlightSchema.model_validate(flight).model_dump(mode="json")
@@ -5641,10 +5664,10 @@ def get_flight_gpx_data(flight_id: str, db: Session = Depends(get_db)):
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
 
-    if not flight.gpx_file_path:
+    gpx_path = _flight_source_gpx_path(flight)
+    if gpx_path is None:
         raise HTTPException(status_code=404, detail="No GPX file available for this flight")
 
-    gpx_path = Path(flight.gpx_file_path)
     if not gpx_path.exists():
         raise HTTPException(status_code=404, detail="GPX file not found on disk")
 
@@ -5692,8 +5715,7 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
     if not flight.gpx_file_path:
         raise HTTPException(status_code=404, detail="No GPX file available for this flight")
 
-    source_file_path = getattr(flight, "gpx_source_file_path", None) or flight.gpx_file_path
-    source_path = _resolve_flight_file_path(source_file_path)
+    source_path = _flight_source_gpx_path(flight)
     if source_path is None or not source_path.is_file():
         raise HTTPException(status_code=404, detail="GPX file not found on disk")
 
@@ -5959,10 +5981,10 @@ def get_flight_gpx_data_debug(flight_id: str, db: Session = Depends(get_db)):
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
 
-    if not flight.gpx_file_path:
+    gpx_path = _flight_source_gpx_path(flight)
+    if gpx_path is None:
         raise HTTPException(status_code=404, detail="No GPX file available for this flight")
 
-    gpx_path = Path(flight.gpx_file_path)
     if not gpx_path.exists():
         raise HTTPException(status_code=404, detail="GPX file not found on disk")
 
@@ -5987,10 +6009,10 @@ def download_flight_gpx(flight_id: str, db: Session = Depends(get_db)):
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
 
-    if not flight.gpx_file_path:
+    gpx_path = _flight_source_gpx_path(flight)
+    if gpx_path is None:
         raise HTTPException(status_code=404, detail="No GPX file available for this flight")
 
-    gpx_path = Path(flight.gpx_file_path)
     if not gpx_path.exists():
         raise HTTPException(status_code=404, detail="GPX file not found on disk")
 
@@ -8178,13 +8200,13 @@ def get_gopro_overlay_dependencies() -> GoproOverlayDependencies:
 
 
 def _prepare_enriched_gpx_in_background(
-    flight_id: str,
     osv_paths: list[Path],
     gpx_path: Path,
     input_dir: Path,
     *,
-    video_duration: float,
-    first_gpx_at: float | None,
+    video_duration: float | None = None,
+    first_gpx_at: float | None = None,
+    flight_id: str | None = None,
 ) -> None:
     try:
         enriched_path = ensure_enriched_gpx(
@@ -8194,7 +8216,8 @@ def _prepare_enriched_gpx_in_background(
             video_duration=video_duration,
             first_gpx_at=first_gpx_at,
         )
-        _persist_enriched_gpx_for_flight(flight_id, gpx_path, enriched_path)
+        if flight_id is not None:
+            _persist_enriched_gpx_for_flight(flight_id, gpx_path, enriched_path)
         try:
             _enriched_gpx_error_path(input_dir).unlink(missing_ok=True)
         except OSError:
@@ -8258,6 +8281,51 @@ def _persist_enriched_gpx_for_flight(
             db.commit()
     except Exception:
         logger.exception("Unable to persist enriched GPX path for flight %s", flight_id)
+
+
+def _schedule_enriched_gpx_for_saved_offset(
+    db: Session,
+    flight: Flight,
+    background_tasks: BackgroundTasks,
+) -> None:
+    """Prepare the durable GPX/OSV merge after a user saves a sync offset.
+
+    YouTube calibration can save an offset without a local GoPro camera file.
+    The merge uses absolute GPX/OSV timestamps, so the camera is not required.
+    """
+    source_file_path = flight.gpx_source_file_path or flight.gpx_file_path
+    if flight.gopro_overlay_gpx_offset is None or not source_file_path:
+        return
+
+    try:
+        input_dir = _gopro_overlay_flight_directory(db, flight, create=False)
+        gpx_path = _resolve_flight_file_path(source_file_path)
+        if gpx_path is None or not gpx_path.is_file():
+            return
+
+        osv_paths = _matching_files_by_mtime(input_dir, "*.osv")
+        if not osv_paths:
+            return
+
+        if _enriched_gpx_status(input_dir, gpx_path) in {"ready", "pending"}:
+            return
+
+        _clear_enriched_gpx_error(input_dir)
+        background_tasks.add_task(
+            _prepare_enriched_gpx_in_background,
+            osv_paths,
+            gpx_path,
+            input_dir,
+            video_duration=None,
+            first_gpx_at=None,
+            flight_id=flight.id,
+        )
+    except (HTTPException, OSError, ValueError) as exc:
+        logger.warning(
+            "Unable to schedule enriched GPX for flight %s after offset update: %s",
+            flight.id,
+            exc,
+        )
 
 
 def _enriched_gpx_error_path(input_dir: Path) -> Path:
@@ -8691,12 +8759,12 @@ def start_flight_gopro_overlay_merge(
 
     background_tasks.add_task(
         _prepare_enriched_gpx_in_background,
-        flight_id,
         osv_paths,
         gpx_path,
         camera_path.parent,
         video_duration=video_duration,
         first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
+        flight_id=flight_id,
     )
     return GoproOverlayEnrichmentResponse(status="pending")
 
@@ -8750,12 +8818,12 @@ def get_flight_gopro_overlay_preview(
         _clear_enriched_gpx_error(camera_path.parent)
         background_tasks.add_task(
             _prepare_enriched_gpx_in_background,
-            flight_id,
             osv_paths,
             gpx_path,
             camera_path.parent,
             video_duration=video_duration,
             first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
+            flight_id=flight_id,
         )
         enrichment_status = "pending"
     if enrichment_status == "ready" and osv_paths:
@@ -9005,9 +9073,7 @@ async def create_flight_gopro_overlay_job(
         )
         if not resolved_video_path and auto_video_path.exists():
             resolved_video_path = auto_video_path
-        fallback_gpx_path = (
-            resolved_gpx_path or auto_gpx_path or _resolve_flight_file_path(flight.gpx_file_path)
-        )
+        fallback_gpx_path = resolved_gpx_path or auto_gpx_path or _flight_source_gpx_path(flight)
         fallback_pip_path = resolved_pip_path or auto_pip_path or generated_video_path
         gpx_file_for_job = gpx_file
         pin_overlay_inputs = bool(auto_osv_paths)

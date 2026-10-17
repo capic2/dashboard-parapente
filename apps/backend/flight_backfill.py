@@ -22,7 +22,9 @@ def calculate_and_persist_missing_max_speed(
     if flight.max_speed_kmh is not None or not flight.gpx_file_path:
         return False
 
-    gpx_path = base_dir / flight.gpx_file_path
+    gpx_path = Path(flight.gpx_source_file_path or flight.gpx_file_path)
+    if not gpx_path.is_absolute():
+        gpx_path = base_dir / gpx_path
     if not gpx_path.exists():
         logger.debug(
             "Skipping max speed backfill for flight %s: GPX not found at %s",

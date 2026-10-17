@@ -5,6 +5,8 @@ Run once to fix existing flights that have max_speed_kmh = 0
 
 from pathlib import Path
 
+from sqlalchemy import func
+
 from database import SessionLocal
 from models import Flight
 from routes import calculate_max_speed, parse_gpx_file
@@ -18,7 +20,10 @@ def fix_max_speed():
         # Get all flights with GPX files but max_speed = 0
         flights = (
             db.query(Flight)
-            .filter(Flight.gpx_file_path.isnot(None), Flight.max_speed_kmh == 0.0)
+            .filter(
+                func.coalesce(Flight.gpx_source_file_path, Flight.gpx_file_path).isnot(None),
+                Flight.max_speed_kmh == 0.0,
+            )
             .all()
         )
 
@@ -29,7 +34,7 @@ def fix_max_speed():
 
         for flight in flights:
             try:
-                gpx_path = Path(flight.gpx_file_path)
+                gpx_path = Path(flight.gpx_source_file_path or flight.gpx_file_path)
 
                 if not gpx_path.exists():
                     print(f"⚠️  GPX file not found: {flight.gpx_file_path}")

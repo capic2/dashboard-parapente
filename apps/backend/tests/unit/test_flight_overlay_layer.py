@@ -193,7 +193,8 @@ def test_gopro_preview_starts_missing_enriched_gpx_generation(
     assert response.gpx.coordinates == []
     assert len(background_tasks.calls) == 1
     assert background_tasks.calls[0][0] is routes._prepare_enriched_gpx_in_background
-    assert background_tasks.calls[0][1][:4] == ("flight-1", [osv_path], gpx_path, tmp_path)
+    assert background_tasks.calls[0][1] == ([osv_path], gpx_path, tmp_path)
+    assert background_tasks.calls[0][2]["flight_id"] == "flight-1"
 
 
 def test_enriched_gpx_failure_marker_is_terminal_until_retry(tmp_path: Path) -> None:
