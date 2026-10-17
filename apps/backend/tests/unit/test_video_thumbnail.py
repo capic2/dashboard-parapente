@@ -22,6 +22,7 @@ def test_get_video_thumbnail_generates_and_reuses_cache(tmp_path: Path) -> None:
 
     assert first == second
     assert first.read_bytes() == b"jpeg"
+    assert first.parent == tmp_path / "thumbnails"
     run.assert_called_once()
 
 
@@ -35,6 +36,19 @@ def test_get_video_thumbnail_invalidates_cache_when_source_changes(tmp_path: Pat
         get_video_thumbnail(video_path)
 
     assert run.call_count == 2
+
+
+def test_get_video_thumbnail_for_temporary_video_is_stored_outside_temp(
+    tmp_path: Path,
+) -> None:
+    video_path = tmp_path / "temp" / "overlay" / "flight.mp4"
+    video_path.parent.mkdir(parents=True)
+    video_path.write_bytes(b"video")
+
+    with patch("video_thumbnail.subprocess.run", side_effect=_successful_ffmpeg):
+        thumbnail_path = get_video_thumbnail(video_path)
+
+    assert thumbnail_path.parent == tmp_path / "thumbnails" / "temp" / "overlay"
 
 
 def test_get_video_thumbnail_retries_without_seek(tmp_path: Path) -> None:
