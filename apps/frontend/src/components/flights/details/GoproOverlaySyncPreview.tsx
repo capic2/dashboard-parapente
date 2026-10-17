@@ -323,6 +323,17 @@ export function GoproOverlaySyncPreview({
     Math.floor((preview.data?.video.preview_max_duration_seconds ?? 900) / 60)
   );
   const isGenerating = preview.data?.video.preview_status === 'generating';
+  const enrichmentStatus = preview.data?.gpx?.enrichment_status;
+
+  useEffect(() => {
+    if (enrichmentStatus === 'ready') {
+      // The enrichment finishes after the offset PATCH response. Refresh the
+      // flight after the preview confirms it is ready so clients receive the
+      // newly persisted canonical GPX path.
+      void queryClient.invalidateQueries({ queryKey: ['flights'] });
+    }
+  }, [enrichmentStatus, flightId, queryClient]);
+
   const isMergeMissing = preview.data?.gpx?.enrichment_status === 'missing';
   const isEnrichmentFailed =
     flightTelemetry.data?.enrichment_status === 'failed' ||
@@ -594,7 +605,7 @@ export function GoproOverlaySyncPreview({
             <span>{formatSeconds(sourceVideoTime)}</span>
           </div>
           {previewSegments.length > 1 && (
-            <div className="grid grid-cols-2 border-t border-gray-800 text-center text-xs font-medium text-gray-400">
+            <div className="grid grid-cols-2 border-t border-gray-800 text-center text-xs font-medium text-gray-300">
               <button
                 type="button"
                 onClick={() => seekToPreviewBoundary(0)}
