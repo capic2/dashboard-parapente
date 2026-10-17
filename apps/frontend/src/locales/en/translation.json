@@ -1354,6 +1354,7 @@
     "cameraBadge": "Camera",
     "panoBadge": "Pano",
     "osvSourcesBadge": "OSV video sources",
+    "gpxEnrichmentMismatchBadge": "GPX not enriched",
     "faceBadge": "Face",
     "piloteBadge": "Pilot",
     "highlightVideoBadge": "Best moments",

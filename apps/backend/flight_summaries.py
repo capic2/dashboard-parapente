@@ -12,6 +12,7 @@ from sqlalchemy.orm import Query, Session, aliased
 from sqlalchemy.sql.elements import ColumnElement
 
 from flight_storage import flight_storage_root, resolve_temporary_video_path
+from gopro_overlay_export import enriched_gpx_path
 import config
 from models import Flight, GoproOverlayJob, HighlightVideoJob, Site, YoutubeUploadJob
 from schemas import FlightSummariesResponse, FlightSummary, youtube_video_id_from_url
@@ -482,6 +483,7 @@ def list_flight_summaries(
         Flight.gpx_provider,
         Flight.gopro_overlay_gpx_offset,
         Flight.gpx_file_path,
+        Flight.gpx_source_file_path,
         Flight.sportstracklive_status,
         Flight.sportstracklive_track_id,
         Flight.video_export_job_id,
@@ -542,7 +544,9 @@ def list_flight_summaries(
     face_flags: dict[str, bool] = {}
     pilote_flags: dict[str, bool] = {}
     osv_flags: dict[str, bool] = {}
+    gpx_enrichment_mismatch_flags: dict[str, bool] = {}
     for row in rows:
+        flight_directory = _flight_directory(row.flight_date, row.flight_sequence)
         path = (
             Path(row.pano_video_file_path)
             if row.pano_video_file_path
@@ -554,8 +558,18 @@ def list_flight_summaries(
         pano_flags[row.id] = _directory_file_exists(resolve_temporary_video_path(path, "pano"))
         face_flags[row.id] = _directory_file_exists(resolve_temporary_video_path(path, "face"))
         pilote_flags[row.id] = _directory_file_exists(resolve_temporary_video_path(path, "pilote"))
-        osv_flags[row.id] = _directory_has_osv_files(
-            _flight_directory(row.flight_date, row.flight_sequence)
+        osv_flags[row.id] = _directory_has_osv_files(flight_directory)
+        source_gpx_path = _resolve_file_path(row.gpx_source_file_path or row.gpx_file_path)
+        current_gpx_path = _resolve_file_path(row.gpx_file_path)
+        gpx_enrichment_mismatch_flags[row.id] = bool(
+            source_gpx_path
+            and source_gpx_path.is_file()
+            and osv_flags[row.id]
+            and (
+                current_gpx_path is None
+                or not current_gpx_path.is_file()
+                or current_gpx_path.resolve() != enriched_gpx_path(flight_directory).resolve()
+            )
         )
         if pano_flags[row.id] and not row.pano_video_file_path:
             detected_pano_paths.append({"id": row.id, "pano_video_file_path": str(path.resolve())})
@@ -614,6 +628,7 @@ def list_flight_summaries(
             ),
             has_pano_video=pano_flags[row.id],
             has_osv=osv_flags[row.id],
+            has_gpx_enrichment_mismatch=gpx_enrichment_mismatch_flags[row.id],
             has_face_video=face_flags[row.id],
             has_pilote_video=pilote_flags[row.id],
             has_highlight_video=bool(_file_exists(row.completed_highlight_path)),
