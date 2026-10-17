@@ -90,10 +90,11 @@ def _credential_for_upload(db: Session, user_id: int) -> tuple[str, str]:
 def upload_flight(
     db: Session, flight: Flight, user_id: int, *, already_claimed: bool = False
 ) -> dict[str, Any]:
-    if not flight.gpx_file_path:
+    source_file_path = flight.gpx_source_file_path or flight.gpx_file_path
+    if not source_file_path:
         raise HTTPException(status_code=400, detail="Ce vol n'a pas de fichier GPX à envoyer.")
 
-    gpx_path = resolve_flight_file_path(flight.gpx_file_path)
+    gpx_path = resolve_flight_file_path(source_file_path)
     if not gpx_path or not gpx_path.is_file():
         raise HTTPException(status_code=404, detail="Le fichier GPX de ce vol est introuvable.")
 

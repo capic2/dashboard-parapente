@@ -171,7 +171,8 @@ def test_sportstracklive_unexpected_upload_error_allows_retry(
 def test_sportstracklive_upload_resolves_relative_gpx_from_backend_directory(
     db_session, sample_flight, tmp_path, monkeypatch
 ):
-    sample_flight.gpx_file_path = "tests/fixtures/sample_arguel.gpx"
+    sample_flight.gpx_file_path = str(tmp_path / "merged-gopro-overlay.gpx")
+    sample_flight.gpx_source_file_path = "tests/fixtures/sample_arguel.gpx"
     db_session.add(
         SportstrackLiveCredential(
             user_id=1,

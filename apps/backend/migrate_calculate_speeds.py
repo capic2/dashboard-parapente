@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import SessionLocal
@@ -45,8 +46,8 @@ def backfill_missing_max_speeds(
     with session_factory() as db:
         while True:
             query = db.query(Flight).filter(
-                Flight.gpx_file_path.isnot(None),
-                Flight.gpx_file_path != "",
+                func.coalesce(Flight.gpx_source_file_path, Flight.gpx_file_path).isnot(None),
+                func.coalesce(Flight.gpx_source_file_path, Flight.gpx_file_path) != "",
             )
             if last_id is not None:
                 query = query.filter(Flight.id > last_id)
@@ -59,7 +60,9 @@ def backfill_missing_max_speeds(
                 report.scanned += 1
                 last_id = flight.id
                 try:
-                    path = _track_path(flight.gpx_file_path, base_dir)
+                    path = _track_path(
+                        flight.gpx_source_file_path or flight.gpx_file_path, base_dir
+                    )
                     content = path.read_bytes()
                     file_type = "gpx.gz" if path.name.lower().endswith(".gpx.gz") else path.suffix
                     _, points = normalize_track(content, file_type)

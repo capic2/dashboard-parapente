@@ -34,6 +34,7 @@ from datetime_utils import to_api_utc
 from deployment_drain import DeploymentDrainActive, job_admission
 from auth import create_job_token, decode_job_token
 from database import SessionLocal
+from flight_file_paths import resolve_flight_file_path
 from flight_storage import flight_directory, flight_temporary_directory, get_video_output_path
 from models import Flight, VideoExportJob
 from video_acceleration import (
@@ -1049,7 +1050,8 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
 
     with SessionLocal() as db:
         flight = db.get(Flight, job.flight_id)
-        gpx_path = Path(flight.gpx_file_path) if flight and flight.gpx_file_path else None
+        source_file_path = flight.gpx_source_file_path or flight.gpx_file_path if flight else None
+        gpx_path = resolve_flight_file_path(source_file_path)
     timeline_start = first_gpx_timestamp(gpx_path) if gpx_path and gpx_path.is_file() else None
     if timeline_start is None:
         error = "L’origine temporelle du GPX est introuvable"
