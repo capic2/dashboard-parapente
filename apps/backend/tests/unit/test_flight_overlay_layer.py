@@ -184,9 +184,14 @@ def test_gopro_preview_starts_missing_enriched_gpx_generation(
             error=None,
         ),
     )
+    monkeypatch.setattr(routes, "_create_gpx_enrichment_operation", lambda *_args: "operation-1")
 
     response = routes.get_flight_gopro_overlay_preview(
-        "flight-1", Response(), background_tasks, _FakeDb(flight)
+        "flight-1",
+        Response(),
+        background_tasks,
+        _FakeDb(flight),
+        user=SimpleNamespace(id=1),
     )
 
     assert response.gpx.enrichment_status == "pending"
@@ -195,6 +200,7 @@ def test_gopro_preview_starts_missing_enriched_gpx_generation(
     assert background_tasks.calls[0][0] is routes._prepare_enriched_gpx_in_background
     assert background_tasks.calls[0][1] == ([osv_path], gpx_path, tmp_path)
     assert background_tasks.calls[0][2]["flight_id"] == "flight-1"
+    assert background_tasks.calls[0][2]["operation_id"] == "operation-1"
 
 
 def test_enriched_gpx_failure_marker_is_terminal_until_retry(tmp_path: Path) -> None:

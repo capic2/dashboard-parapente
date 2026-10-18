@@ -5559,8 +5559,8 @@ async def update_flight(
     flight_id: str,
     flight_data: FlightUpdate,
     background_tasks: BackgroundTasks,
-    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     """
     Update flight details
@@ -8825,8 +8825,8 @@ async def create_flight_overlay_layer(
 def start_flight_gopro_overlay_merge(
     flight_id: str,
     background_tasks: BackgroundTasks,
-    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ) -> GoproOverlayEnrichmentResponse:
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
     if not flight:
@@ -8883,8 +8883,8 @@ def get_flight_gopro_overlay_preview(
     flight_id: str,
     response: Response,
     background_tasks: BackgroundTasks,
-    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ) -> GoproOverlayPreview:
     response.headers["Cache-Control"] = "no-store"
 
