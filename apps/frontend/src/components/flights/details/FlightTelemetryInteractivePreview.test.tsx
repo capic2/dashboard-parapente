@@ -80,7 +80,10 @@ vi.mock('../../../hooks/flights/useVideoExportStatus', () => ({
 }));
 
 vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
-  useYoutubeVideoAssociations: () => ({ data: hooks.youtubeAssociations }),
+  useYoutubeVideoAssociations: () => ({
+    data: hooks.youtubeAssociations,
+    isSuccess: true,
+  }),
   useUploadYoutubeDownloadCookies: () => ({ mutateAsync: vi.fn() }),
   useYoutubeUpload: () => ({ data: null }),
   useStartYoutubeTelemetryLayoutExport: () => ({
@@ -252,10 +255,15 @@ describe('FlightTelemetryInteractivePreview', () => {
     hooks.youtubeAssociations = [];
   });
 
-  it('hides the interactive overlay when auto selects a YouTube main video', () => {
+  it('keeps the dynamic overlay and skips the YouTube telemetry export in auto mode', () => {
     const youtubeUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+    const youtubeTelemetryUrl = 'https://www.youtube.com/watch?v=AbCdEfGh123';
     hooks.youtubeAssociations = [
-      { url: youtubeUrl, title: 'Vol du 02/10/2026 - face' },
+      { url: youtubeUrl, title: 'Vol du 02/10/2026 - vol' },
+      {
+        url: youtubeTelemetryUrl,
+        title: 'Vol du 02/10/2026 - télémétrie',
+      },
     ];
     hooks.overlayPreview.data = {
       video: { preview_segments: [] },
@@ -292,13 +300,18 @@ describe('FlightTelemetryInteractivePreview', () => {
     render(
       <FlightTelemetryInteractivePreview
         flightId="flight-1"
-        youtubeUrls={[youtubeUrl]}
+        youtubeUrls={[youtubeUrl, youtubeTelemetryUrl]}
       />
     );
 
     expect(
-      screen.queryByText('flights.overlayInteractivePreview')
-    ).not.toBeInTheDocument();
+      screen.getByText('flights.overlayInteractivePreview')
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('player-youtube-main')).toHaveAttribute(
+      'data-url',
+      youtubeUrl
+    );
+    expect(screen.getByTestId('telemetry-overlay')).toBeInTheDocument();
 
     hooks.overlayPreview.data = undefined;
     hooks.overlayPreview.isPending = true;
