@@ -1369,6 +1369,14 @@ def _delete_generated_overlay_source(path: Path, *, cleanup_workspace: bool = Fa
         logger.warning("Unable to remove generated YouTube overlay source %s", path)
 
 
+def _cleanup_generated_overlay_after_upload(path: Path, status: str) -> None:
+    """Keep a failed overlay export available so the upload can be retried."""
+    if status == "failed":
+        return
+    if status in {"completed", "cancelled"}:
+        _delete_generated_overlay_source(path, cleanup_workspace=status == "completed")
+
+
 def _refresh_source_video_path(path: Path) -> Path | None:
     """Recheck a source through its parent directory to refresh stale NFS dentries."""
     try:
@@ -1762,7 +1770,7 @@ def process_youtube_upload(job_id: str) -> None:
             except OSError:
                 logger.warning("Unable to remove prepared panorama for YouTube upload %s", job_id)
         generated_overlay_path: Path | None = None
-        cleanup_generated_workspace = False
+        generated_overlay_status: str | None = None
         with SessionLocal() as db:
             job = db.get(YoutubeUploadJob, job_id)
             if (
@@ -1772,11 +1780,10 @@ def process_youtube_upload(job_id: str) -> None:
                 and job.status in {"completed", "failed", "cancelled"}
             ):
                 generated_overlay_path = Path(job.source_path)
-                cleanup_generated_workspace = job.status == "completed"
-        if generated_overlay_path is not None:
-            _delete_generated_overlay_source(
-                generated_overlay_path,
-                cleanup_workspace=cleanup_generated_workspace,
+                generated_overlay_status = job.status
+        if generated_overlay_path is not None and generated_overlay_status is not None:
+            _cleanup_generated_overlay_after_upload(
+                generated_overlay_path, generated_overlay_status
             )
         with _SUBMITTED_LOCK:
             _SUBMITTED.discard(job_id)
