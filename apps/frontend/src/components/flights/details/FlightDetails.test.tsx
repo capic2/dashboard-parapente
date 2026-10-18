@@ -1273,7 +1273,7 @@ describe('FlightDetails GoPro overlay action', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('collapses the synchronization workspace after calibration is saved', async () => {
+  it('keeps the synchronization workspace open after calibration is saved', async () => {
     setYoutubeVideoRole('face');
     mockFlight.gopro_overlay_gpx_offset = null;
     const { rerender } = render(
@@ -1304,7 +1304,7 @@ describe('FlightDetails GoPro overlay action', () => {
         screen.getByRole('button', {
           name: /Synchronization and overlay layer/u,
         })
-      ).toHaveAttribute('aria-expanded', 'false')
+      ).toHaveAttribute('aria-expanded', 'true')
     );
   });
 
