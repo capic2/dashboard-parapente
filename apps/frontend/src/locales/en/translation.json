@@ -2201,6 +2201,7 @@
     "deleteError": "Unable to delete the treatment",
     "genericError": "The treatment failed",
     "videoExport": "Video export",
+    "gpxEnrichment": "GPX enrichment",
     "goproOverlay": "GoPro overlay generation",
     "highlightVideo": "Highlight video generation",
     "youtubeUpload": "YouTube upload",
@@ -2217,6 +2218,7 @@
     },
     "steps": {
       "prepare": "Preparation",
+      "enrich_gpx": "GPX/OSV merge",
       "render": "Generation",
       "finalize": "Finalization",
       "select": "Scene selection",

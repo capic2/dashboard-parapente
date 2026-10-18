@@ -2206,6 +2206,7 @@
     "deleteError": "Impossible de supprimer le traitement",
     "genericError": "Le traitement a échoué",
     "videoExport": "Export vidéo",
+    "gpxEnrichment": "Enrichissement du GPX",
     "goproOverlay": "Génération de l’overlay GoPro",
     "highlightVideo": "Génération des meilleurs moments",
     "youtubeUpload": "Upload YouTube",
@@ -2222,6 +2223,7 @@
     },
     "steps": {
       "prepare": "Préparation",
+      "enrich_gpx": "Fusion GPX/OSV",
       "render": "Génération",
       "finalize": "Finalisation",
       "select": "Sélection des scènes",

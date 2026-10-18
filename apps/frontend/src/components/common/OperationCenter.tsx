@@ -169,6 +169,15 @@ export function OperationCenter() {
                     operation.operation_type
                   );
                   const progress = operationProgress(operation);
+                  const operationDetail =
+                    (operation.status === 'failed' && operation.error_detail) ||
+                    operation.current_step_detail ||
+                    (operation.current_step_key
+                      ? t(
+                          `operations.steps.${operation.current_step_key}`,
+                          operation.current_step_key
+                        )
+                      : null);
                   const isCancelling =
                     cancel.isPending &&
                     cancel.variables === operation.operation_id;
@@ -199,16 +208,11 @@ export function OperationCenter() {
                           </span>
                         </div>
                         <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
-                          {operation.current_step_detail ||
-                            (operation.current_step_key
-                              ? t(
-                                  `operations.steps.${operation.current_step_key}`,
-                                  operation.current_step_key
-                                )
-                              : t(
-                                  `operations.status.${operation.status}`,
-                                  operation.status
-                                ))}
+                          {t(
+                            `operations.status.${operation.status}`,
+                            operation.status
+                          )}
+                          {operationDetail && ` · ${operationDetail}`}
                         </p>
                         <div className="mt-2">
                           <OperationProgressBar progress={progress} />

@@ -5560,6 +5560,7 @@ async def update_flight(
     flight_data: FlightUpdate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     """
     Update flight details
@@ -5628,7 +5629,7 @@ async def update_flight(
             and flight.gopro_overlay_gpx_offset is not None
         ):
             try:
-                _schedule_enriched_gpx_for_saved_offset(db, flight, background_tasks)
+                _schedule_enriched_gpx_for_saved_offset(db, flight, background_tasks, user.id)
             except Exception:
                 logger.warning(
                     "Unable to schedule enriched GPX for flight %s",
@@ -8212,8 +8213,10 @@ def _prepare_enriched_gpx_in_background(
     video_duration: float | None = None,
     first_gpx_at: float | None = None,
     flight_id: str | None = None,
+    operation_id: str | None = None,
 ) -> None:
     _write_enriched_gpx_progress(input_dir, None)
+    _update_gpx_enrichment_operation(operation_id, status="running", progress=0)
     try:
         enriched_path = ensure_enriched_gpx(
             osv_paths,
@@ -8221,7 +8224,10 @@ def _prepare_enriched_gpx_in_background(
             input_dir,
             video_duration=video_duration,
             first_gpx_at=first_gpx_at,
-            progress_callback=lambda progress: _write_enriched_gpx_progress(input_dir, progress),
+            progress_callback=lambda progress: (
+                _write_enriched_gpx_progress(input_dir, progress),
+                _update_gpx_enrichment_operation(operation_id, status="running", progress=progress),
+            ),
         )
         if flight_id is not None:
             _persist_enriched_gpx_for_flight(flight_id, gpx_path, enriched_path)
@@ -8230,13 +8236,60 @@ def _prepare_enriched_gpx_in_background(
         except OSError:
             logger.warning("Unable to clear enriched GPX error marker in %s", input_dir)
         _remove_enriched_gpx_progress(input_dir)
+        _update_gpx_enrichment_operation(operation_id, status="completed", progress=100)
     except Exception as exc:
         try:
             _enriched_gpx_error_path(input_dir).touch()
         except OSError:
             logger.warning("Unable to persist enriched GPX error marker in %s", input_dir)
         _remove_enriched_gpx_progress(input_dir)
+        _update_gpx_enrichment_operation(operation_id, status="failed", error=str(exc))
         logger.warning("Unable to prepare enriched GPX in background: %s", exc)
+
+
+def _create_gpx_enrichment_operation(db: Session, user_id: int, flight_id: str) -> str:
+    operation = OperationReporter.create(
+        db,
+        user_id=user_id,
+        operation_type="gpx_enrichment",
+        title_key="operations.gpxEnrichment",
+        steps=["enrich_gpx"],
+        source_kind="gpx_enrichment",
+        source_id=f"{flight_id}:{uuid.uuid4().hex}",
+    ).operation
+    return operation.id
+
+
+def _update_gpx_enrichment_operation(
+    operation_id: str | None,
+    *,
+    status: Literal["running", "completed", "failed"],
+    progress: int | None = None,
+    error: str | None = None,
+) -> None:
+    if operation_id is None:
+        return
+    try:
+        with SessionLocal() as db:
+            operation = (
+                db.query(BackgroundOperationModel)
+                .filter(BackgroundOperationModel.id == operation_id)
+                .first()
+            )
+            if operation is None or operation.status in {"cancelled", "failed", "completed"}:
+                return
+            reporter = OperationReporter(db, operation)
+            if status == "running":
+                if operation.status == "queued":
+                    reporter.start_step("enrich_gpx")
+                reporter.update_step("enrich_gpx", progress)
+            elif status == "completed":
+                reporter.complete_step("enrich_gpx")
+                reporter.complete()
+            else:
+                reporter.fail(error or "Échec de la fusion GPX/OSV")
+    except Exception:
+        logger.exception("Unable to update GPX enrichment operation %s", operation_id)
 
 
 def _enriched_gpx_progress_path(input_dir: Path) -> Path:
@@ -8334,6 +8387,7 @@ def _schedule_enriched_gpx_for_saved_offset(
     db: Session,
     flight: Flight,
     background_tasks: BackgroundTasks,
+    user_id: int,
 ) -> None:
     """Prepare the durable GPX/OSV merge after a user saves a sync offset.
 
@@ -8358,6 +8412,7 @@ def _schedule_enriched_gpx_for_saved_offset(
             return
 
         _clear_enriched_gpx_error(input_dir)
+        operation_id = _create_gpx_enrichment_operation(db, user_id, flight.id)
         background_tasks.add_task(
             _prepare_enriched_gpx_in_background,
             osv_paths,
@@ -8366,6 +8421,7 @@ def _schedule_enriched_gpx_for_saved_offset(
             video_duration=None,
             first_gpx_at=None,
             flight_id=flight.id,
+            operation_id=operation_id,
         )
     except (HTTPException, OSError, ValueError) as exc:
         logger.warning(
@@ -8770,6 +8826,7 @@ def start_flight_gopro_overlay_merge(
     flight_id: str,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ) -> GoproOverlayEnrichmentResponse:
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
     if not flight:
@@ -8804,6 +8861,7 @@ def start_flight_gopro_overlay_merge(
     if aligned_video_start is None:
         raise HTTPException(status_code=422, detail="Unable to align camera video and GPX")
 
+    operation_id = _create_gpx_enrichment_operation(db, user.id, flight.id)
     background_tasks.add_task(
         _prepare_enriched_gpx_in_background,
         osv_paths,
@@ -8812,6 +8870,7 @@ def start_flight_gopro_overlay_merge(
         video_duration=video_duration,
         first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
         flight_id=flight_id,
+        operation_id=operation_id,
     )
     return GoproOverlayEnrichmentResponse(status="pending")
 
@@ -8825,6 +8884,7 @@ def get_flight_gopro_overlay_preview(
     response: Response,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ) -> GoproOverlayPreview:
     response.headers["Cache-Control"] = "no-store"
 
@@ -8863,6 +8923,7 @@ def get_flight_gopro_overlay_preview(
         # trigger the old manual merge action, so make the durable enriched
         # GPX generation self-starting when the cache is absent.
         _clear_enriched_gpx_error(camera_path.parent)
+        operation_id = _create_gpx_enrichment_operation(db, user.id, flight.id)
         background_tasks.add_task(
             _prepare_enriched_gpx_in_background,
             osv_paths,
@@ -8871,6 +8932,7 @@ def get_flight_gopro_overlay_preview(
             video_duration=video_duration,
             first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
             flight_id=flight_id,
+            operation_id=operation_id,
         )
         enrichment_status = "pending"
     if enrichment_status == "ready" and osv_paths:
