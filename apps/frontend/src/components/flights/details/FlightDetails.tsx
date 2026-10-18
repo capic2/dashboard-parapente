@@ -134,6 +134,7 @@ export function FlightDetails({
   const [isOverlayWorkspaceExpanded, setIsOverlayWorkspaceExpanded] = useState(
     !hasSavedOverlaySynchronization
   );
+  const overlayWorkspaceFlightIdRef = useRef(flight.id);
   const [videoMarkersDraft, setVideoMarkersDraft] = useState(
     flight.video_markers ?? []
   );
@@ -704,8 +705,10 @@ export function FlightDetails({
     />
   );
   useEffect(() => {
+    if (overlayWorkspaceFlightIdRef.current === flight.id) return;
+    overlayWorkspaceFlightIdRef.current = flight.id;
     setIsOverlayWorkspaceExpanded(!hasSavedOverlaySynchronization);
-  }, [hasSavedOverlaySynchronization]);
+  }, [flight.id, hasSavedOverlaySynchronization]);
   useEffect(() => {
     const previous = lastPersistedVideoMarkersRef.current;
     const flightChanged = previous.flightId !== flight.id;
