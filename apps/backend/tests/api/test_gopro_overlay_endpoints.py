@@ -499,6 +499,45 @@ def test_enrichment_persists_canonical_gpx_without_changing_source_or_offset(
     assert sample_flight.gpx_source_file_path == str(replacement_gpx_path)
 
 
+def test_enriched_gpx_progress_reports_pending_ready_and_invalid_markers(tmp_path) -> None:
+    routes._write_enriched_gpx_progress(tmp_path, 37)
+
+    assert routes._read_enriched_gpx_progress(tmp_path, "pending") == 37
+    assert routes._read_enriched_gpx_progress(tmp_path, "ready") == 100
+    assert routes._read_enriched_gpx_progress(tmp_path, "failed") is None
+
+    progress_path = routes._enriched_gpx_progress_path(tmp_path)
+    progress_path.write_text("not json", encoding="utf-8")
+    assert routes._read_enriched_gpx_progress(tmp_path, "pending") is None
+
+    progress_path.unlink()
+    assert routes._read_enriched_gpx_progress(tmp_path, "pending") is None
+
+
+@pytest.mark.parametrize("should_fail", [False, True])
+def test_enrichment_progress_marker_is_removed_after_background_completion(
+    tmp_path,
+    monkeypatch,
+    should_fail,
+) -> None:
+    def prepare_enriched_gpx(*_args, progress_callback, **_kwargs):
+        progress_callback(64)
+        if should_fail:
+            raise RuntimeError("merge failed")
+        return tmp_path / "merged-gopro-overlay.gpx"
+
+    monkeypatch.setattr(routes, "ensure_enriched_gpx", prepare_enriched_gpx)
+
+    routes._prepare_enriched_gpx_in_background(
+        [tmp_path / "camera.osv"],
+        tmp_path / "source.gpx",
+        tmp_path,
+    )
+
+    assert not routes._enriched_gpx_progress_path(tmp_path).exists()
+    assert routes._enriched_gpx_error_path(tmp_path).exists() is should_fail
+
+
 def test_enrichment_persist_resolves_relative_source_paths(
     db_session, sample_flight, test_db, tmp_path, monkeypatch
 ) -> None:
@@ -1636,6 +1675,7 @@ def test_worker_merge_osv_files_with_gpx_streams_progress(
             self.returncode = -9
 
     updates = []
+    merge_progress = []
     with (
         patch("gopro_overlay_export.subprocess.Popen", side_effect=FakeProcess) as popen,
         patch("gopro_overlay_export.select.select", return_value=([True], [], [])),
@@ -1650,10 +1690,12 @@ def test_worker_merge_osv_files_with_gpx_streams_progress(
             source_gpx,
             input_dir,
             job_id="job-progress",
+            progress_callback=merge_progress.append,
         )
 
     assert result == merged_gpx_path
     assert popen.call_args.args[0][2] == "--progress"
+    assert merge_progress == [20, 80]
     assert [update["progress"] for update in updates] == [11, 14, 15]
     assert updates[-1]["message"] == "OSV telemetry merged"
 
@@ -3983,11 +4025,50 @@ def test_worker_preparation_merges_osv_files_before_rendering(
     assert prepared is not None
     assert merge_osv.call_args.args[0] == [first_osv, second_osv]
     assert merge_osv.call_args.args[1] == gpx_path
-    assert merge_osv.call_args.args[2].parent == video_path.parent
+    assert merge_osv.call_args.args[2].parent == video_path.parent / "temp" / "gpx-enrichment"
     assert merge_osv.call_args.args[2].name.startswith(".merged-gopro-overlay-")
     assert prepared["command"]["render_gpx_path"] == str(
         gopro_overlay_export.enriched_gpx_path(video_path.parent)
     )
+
+
+def test_worker_preparation_migrates_matching_legacy_enriched_gpx_metadata(tmp_path) -> None:
+    input_dir = tmp_path / "flight"
+    input_dir.mkdir()
+    gpx_path = _write_usable_gpx(input_dir / "source.gpx")
+    osv_path = input_dir / "camera.osv"
+    osv_path.write_bytes(b"osv")
+    enriched_path = _write_usable_gpx(input_dir / "merged-gopro-overlay.gpx")
+    source_signatures = []
+    for index, source_path in enumerate([gpx_path, osv_path]):
+        stat = source_path.stat()
+        source_signature = {
+            "path": str(source_path.resolve()),
+            "size": stat.st_size,
+            "mtime_ns": stat.st_mtime_ns,
+        }
+        if index == 0:
+            source_signature["sha256"] = gopro_overlay_export._file_sha256(source_path)
+        source_signatures.append(source_signature)
+    legacy_metadata_path = enriched_path.with_suffix(".json")
+    legacy_metadata_path.write_text(
+        json.dumps(
+            {
+                "sources": source_signatures,
+                "video_duration": None,
+                "first_gpx_at": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with patch("gopro_overlay_export._merge_osv_files_with_gpx") as merge_osv:
+        result = gopro_overlay_export.ensure_enriched_gpx([osv_path], gpx_path, input_dir)
+
+    assert result == enriched_path
+    assert (input_dir / "temp" / "merged-gopro-overlay.json").is_file()
+    assert not legacy_metadata_path.exists()
+    merge_osv.assert_not_called()
 
 
 def test_worker_preparation_uses_exact_video_size_for_non_standard_source(
