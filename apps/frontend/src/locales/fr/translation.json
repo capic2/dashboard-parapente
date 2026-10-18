@@ -1453,6 +1453,7 @@
     "goproOverlayGpxOffsetHint": "Une valeur positive retarde le GPX ; une valeur négative l'avance.",
     "goproOverlayPreviewLoading": "Chargement de la prévisualisation synchronisée…",
     "goproOverlayEnrichmentPending": "Le serveur génère le GPX enrichi en arrière-plan. Cette fenêtre se mettra à jour automatiquement.",
+    "goproOverlayEnrichmentProgressLabel": "Progression de la génération du GPX enrichi",
     "goproOverlayEnrichmentFailed": "La génération du GPX enrichi a échoué.",
     "goproOverlayEnrichmentRetry": "Relancer la génération",
     "goproOverlayPreviewError": "La prévisualisation n’est pas disponible. Vérifiez les horodatages de la vidéo et du GPX.",
