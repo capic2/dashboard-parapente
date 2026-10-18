@@ -30,7 +30,13 @@ export function FlightYoutubeVideos({
     const title = associations
       .find((association) => association.video_id === videoId)
       ?.title?.trim();
-    return embedUrl && videoId ? [{ embedUrl, videoId, url, title }] : [];
+    const isTelemetryVideo =
+      /(?:^|[\s:–—-])(?:télémétrie|telemetry)(?:\s+(?:overlay|video))?\s*$/iu.test(
+        title ?? ''
+      );
+    return embedUrl && videoId
+      ? [{ embedUrl, videoId, url, title, isTelemetryVideo }]
+      : [];
   });
 
   if (videos.length === 0) return null;
@@ -47,75 +53,90 @@ export function FlightYoutubeVideos({
         {t('flights.mediaPublishedDescription')}
       </p>
       <div className="grid gap-4 2xl:grid-cols-2">
-        {videos.map(({ embedUrl, videoId, url, title }, index) => (
-          <div
-            key={embedUrl}
-            className="min-w-0 overflow-hidden rounded-lg bg-gray-900 shadow-sm"
-          >
-            {activeVideoIds.has(videoId) ? (
-              // oxlint-disable-next-line react/iframe-missing-sandbox -- The source is restricted to validated youtube-nocookie.com video IDs; YouTube playback does not work inside the restrictive sandbox.
-              <iframe
-                src={embedUrl}
-                title={
-                  title || t('flights.youtubeVideoTitle', { count: index + 1 })
-                }
-                className="aspect-video w-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; xr-spatial-tracking"
-                referrerPolicy="origin"
-                allowFullScreen
-              />
-            ) : (
-              <button
-                type="button"
-                className="group relative flex aspect-video w-full cursor-pointer items-center justify-center overflow-hidden bg-black text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-400"
-                aria-label={t('flights.playYoutubeVideo', {
-                  count: index + 1,
-                })}
-                aria-describedby={`youtube-video-title-${videoId}`}
-                onClick={() =>
-                  setActiveVideoIds((current) => new Set(current).add(videoId))
-                }
-              >
-                <img
-                  src={`https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`}
-                  alt=""
-                  className="absolute inset-0 h-full w-full object-cover transition-opacity group-hover:opacity-80"
-                  loading="lazy"
-                />
-              </button>
-            )}
-            <h4
-              id={`youtube-video-title-${videoId}`}
-              className="px-3 pt-3 text-sm font-semibold break-words text-white"
+        {videos.map(
+          ({ embedUrl, videoId, url, title, isTelemetryVideo }, index) => (
+            <div
+              key={embedUrl}
+              className="min-w-0 overflow-hidden rounded-lg bg-gray-900 shadow-sm"
             >
-              {title || t('flights.youtubeVideoTitle', { count: index + 1 })}
-            </h4>
-            <div className="flex items-center justify-between gap-2 bg-gray-900 px-3 py-2">
-              <a
-                href={url}
-                target="_blank"
-                rel="noreferrer"
-                className="min-w-0 flex-1 cursor-pointer truncate py-1 text-sm text-gray-200 underline-offset-2 transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              >
-                {t('flights.openOnYoutube')}
-              </a>
-              {onRemove && (
-                <Button
-                  variant="ghost"
-                  className="min-h-9 shrink-0 rounded-lg px-2 py-1 text-sm text-red-300 hover:text-red-200"
-                  aria-label={t('flights.removeYoutubeAssociation')}
-                  isDisabled={removingUrl !== null}
-                  onPress={() => onRemove(url)}
+              {activeVideoIds.has(videoId) ? (
+                // oxlint-disable-next-line react/iframe-missing-sandbox -- The source is restricted to validated youtube-nocookie.com video IDs; YouTube playback does not work inside the restrictive sandbox.
+                <iframe
+                  src={embedUrl}
+                  title={
+                    title ||
+                    t('flights.youtubeVideoTitle', { count: index + 1 })
+                  }
+                  className="aspect-video w-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; xr-spatial-tracking"
+                  referrerPolicy="origin"
+                  allowFullScreen
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="group relative flex aspect-video w-full cursor-pointer items-center justify-center overflow-hidden bg-black text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-400"
+                  aria-label={t('flights.playYoutubeVideo', {
+                    count: index + 1,
+                  })}
+                  aria-describedby={`youtube-video-title-${videoId}`}
+                  onClick={() =>
+                    setActiveVideoIds((current) =>
+                      new Set(current).add(videoId)
+                    )
+                  }
                 >
-                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                  {removingUrl === url
-                    ? t('flights.youtubeAssociationRemoving')
-                    : t('flights.removeYoutubeAssociation')}
-                </Button>
+                  <img
+                    src={`https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover transition-opacity group-hover:opacity-80"
+                    loading="lazy"
+                  />
+                </button>
               )}
+              <h4
+                id={`youtube-video-title-${videoId}`}
+                className="px-3 pt-3 text-sm font-semibold break-words text-white"
+              >
+                {title || t('flights.youtubeVideoTitle', { count: index + 1 })}
+              </h4>
+              <div className="flex items-center justify-between gap-2 bg-gray-900 px-3 py-2">
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="min-w-0 flex-1 cursor-pointer truncate py-1 text-sm text-gray-200 underline-offset-2 transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                >
+                  {t('flights.openOnYoutube')}
+                </a>
+                {isTelemetryVideo && (
+                  <a
+                    href={`https://studio.youtube.com/video/${videoId}/edit`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 cursor-pointer py-1 text-sm text-gray-200 underline-offset-2 transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  >
+                    {t('flights.openYoutubeStudio')}
+                  </a>
+                )}
+                {onRemove && (
+                  <Button
+                    variant="ghost"
+                    className="min-h-9 shrink-0 rounded-lg px-2 py-1 text-sm text-red-300 hover:text-red-200"
+                    aria-label={t('flights.removeYoutubeAssociation')}
+                    isDisabled={removingUrl !== null}
+                    onPress={() => onRemove(url)}
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    {removingUrl === url
+                      ? t('flights.youtubeAssociationRemoving')
+                      : t('flights.removeYoutubeAssociation')}
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        )}
       </div>
     </section>
   );
