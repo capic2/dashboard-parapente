@@ -25,6 +25,7 @@ export interface FlightTelemetryData {
   source: 'gpx' | 'gpx+osv';
   has_osv: boolean;
   enrichment_status: 'missing' | 'ready' | 'pending' | 'failed';
+  enrichment_progress?: number | null;
   enrichment_error?: string | null;
   start_time: string | null;
   end_time: string | null;

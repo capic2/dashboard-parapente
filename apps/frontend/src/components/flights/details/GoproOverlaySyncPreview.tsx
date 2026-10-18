@@ -324,6 +324,10 @@ export function GoproOverlaySyncPreview({
   );
   const isGenerating = preview.data?.video.preview_status === 'generating';
   const enrichmentStatus = preview.data?.gpx?.enrichment_status;
+  const enrichmentProgress =
+    preview.data?.gpx?.enrichment_progress ??
+    flightTelemetry.data?.enrichment_progress ??
+    null;
 
   useEffect(() => {
     if (enrichmentStatus === 'ready') {
@@ -529,8 +533,29 @@ export function GoproOverlaySyncPreview({
       (preview.isPending || preview.data?.gpx?.enrichment_status === 'pending'))
   ) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-        {t('flights.goproOverlayEnrichmentPending')}
+      <div
+        className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+        aria-live="polite"
+      >
+        <p className="text-center">
+          {t('flights.goproOverlayEnrichmentPending')}
+        </p>
+        <div className="mt-4 flex items-center gap-3">
+          <progress
+            aria-label={t('flights.goproOverlayEnrichmentProgressLabel')}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={enrichmentProgress ?? undefined}
+            value={enrichmentProgress ?? undefined}
+            max={100}
+            className="h-2 min-w-0 flex-1 accent-blue-600 dark:accent-blue-400"
+          />
+          {enrichmentProgress != null && (
+            <span className="min-w-10 text-right text-xs font-semibold tabular-nums text-blue-800 dark:text-blue-200">
+              {enrichmentProgress}%
+            </span>
+          )}
+        </div>
       </div>
     );
   }
@@ -605,12 +630,12 @@ export function GoproOverlaySyncPreview({
             <span>{formatSeconds(sourceVideoTime)}</span>
           </div>
           {previewSegments.length > 1 && (
-            <div className="grid grid-cols-2 border-t border-gray-800 text-center text-xs font-medium text-gray-300">
+            <div className="grid grid-cols-2 border-t border-gray-800 text-center text-xs font-medium text-white">
               <button
                 type="button"
                 onClick={() => seekToPreviewBoundary(0)}
                 aria-pressed={videoTime <= 0.05}
-                className={`cursor-pointer px-3 py-2 transition-colors hover:bg-gray-900 hover:text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 ${videoTime <= 0.05 ? 'bg-sky-950 text-sky-200' : ''}`}
+                className={`cursor-pointer px-3 py-2 transition-colors hover:bg-gray-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 ${videoTime <= 0.05 ? 'bg-sky-950 text-sky-200' : ''}`}
               >
                 {t('flights.goproPreviewStart')}
               </button>
@@ -622,7 +647,7 @@ export function GoproOverlaySyncPreview({
                   videoTime >= endPreviewStartTime - 0.05
                 }
                 disabled={previewEndTime <= 0}
-                className={`cursor-pointer border-l border-gray-800 px-3 py-2 transition-colors hover:bg-gray-900 hover:text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 ${endPreviewStartTime > 0 && videoTime >= endPreviewStartTime - 0.05 ? 'bg-sky-950 text-sky-200' : ''}`}
+                className={`cursor-pointer border-l border-gray-800 px-3 py-2 transition-colors hover:bg-gray-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 ${endPreviewStartTime > 0 && videoTime >= endPreviewStartTime - 0.05 ? 'bg-sky-950 text-sky-200' : ''}`}
               >
                 {t('flights.goproPreviewEnd')}
               </button>

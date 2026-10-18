@@ -28,6 +28,7 @@ export type GoproOverlayPreview = {
     duration_seconds: number;
     coordinates: GeoPoint[];
     enrichment_status?: 'missing' | 'pending' | 'ready' | 'failed';
+    enrichment_progress?: number | null;
     enrichment_error?: string | null;
   };
   alignment: {
