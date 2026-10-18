@@ -1492,14 +1492,18 @@ class TestUpdateFlightEndpoint:
             )
 
         assert response.status_code == 200
-        prepare.assert_called_once_with(
-            [osv_path],
-            gpx_path,
-            input_dir,
-            video_duration=None,
-            first_gpx_at=None,
-            flight_id=sample_flight.id,
-        )
+        prepare.assert_called_once()
+        operation = db_session.query(routes.BackgroundOperationModel).one()
+        assert prepare.call_args.args == ([osv_path], gpx_path, input_dir)
+        assert prepare.call_args.kwargs == {
+            "video_duration": None,
+            "first_gpx_at": None,
+            "flight_id": sample_flight.id,
+            "operation_id": operation.id,
+        }
+        assert operation.operation_type == "gpx_enrichment"
+        assert operation.title_key == "operations.gpxEnrichment"
+        assert operation.status == "queued"
         assert not (input_dir / "camera.mp4").exists()
 
     @pytest.mark.parametrize("cache_status", ["ready", "pending"])
