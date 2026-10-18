@@ -52,9 +52,7 @@ def test_upload_jobs_are_enqueued_on_dedicated_queue(monkeypatch) -> None:
     )
 
 
-def test_failed_overlay_upload_cleanup_preserves_flight_workspace_for_retry(
-    tmp_path, monkeypatch
-) -> None:
+def test_failed_overlay_upload_preserves_generated_video_for_retry(tmp_path, monkeypatch) -> None:
     flight_root = tmp_path / "paragliding"
     export_root = tmp_path / "legacy-exports"
     monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(flight_root))
@@ -67,10 +65,10 @@ def test_failed_overlay_upload_cleanup_preserves_flight_workspace_for_retry(
     cached_source = work_dir / "source.mp4"
     cached_source.write_bytes(b"cached source")
 
-    youtube_upload._delete_generated_overlay_source(source_path)
+    youtube_upload._cleanup_generated_overlay_after_upload(source_path, "failed")
 
     assert work_dir.is_dir()
-    assert not source_path.exists()
+    assert source_path.read_bytes() == b"generated video"
     assert cached_source.read_bytes() == b"cached source"
 
 
@@ -87,9 +85,28 @@ def test_completed_overlay_upload_cleanup_removes_flight_temp_workspace(
     source_path.parent.mkdir(parents=True)
     source_path.write_bytes(b"generated video")
 
-    youtube_upload._delete_generated_overlay_source(source_path, cleanup_workspace=True)
+    youtube_upload._cleanup_generated_overlay_after_upload(source_path, "completed")
 
     assert not work_dir.exists()
+
+
+def test_cancelled_overlay_upload_removes_generated_video_but_keeps_workspace(
+    tmp_path, monkeypatch
+) -> None:
+    flight_root = tmp_path / "paragliding"
+    export_root = tmp_path / "legacy-exports"
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(flight_root))
+    monkeypatch.setattr(config, "VIDEO_EXPORT_DIR", str(export_root))
+    job_id = "overlay-job"
+    work_dir = flight_root / "20261016" / "01" / "temp" / "youtube-exports" / job_id
+    source_path = work_dir / f"youtube-overlay-{job_id}.mp4"
+    source_path.parent.mkdir(parents=True)
+    source_path.write_bytes(b"generated video")
+
+    youtube_upload._cleanup_generated_overlay_after_upload(source_path, "cancelled")
+
+    assert work_dir.is_dir()
+    assert not source_path.exists()
 
 
 def test_generated_overlay_cleanup_rejects_parent_symlink_outside_flight_root(
