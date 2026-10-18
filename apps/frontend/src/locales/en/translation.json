@@ -1286,6 +1286,7 @@
     "youtubeVideoTitle": "Flight YouTube video {{count}}",
     "playYoutubeVideo": "Play flight YouTube video {{count}}",
     "openOnYoutube": "Open on YouTube",
+    "openYoutubeStudio": "Edit in Studio",
     "youtubeConnect": "Connect YouTube",
     "youtubeConnectionError": "Unable to start the YouTube connection",
     "youtubeUpload": "Publish to YouTube",
