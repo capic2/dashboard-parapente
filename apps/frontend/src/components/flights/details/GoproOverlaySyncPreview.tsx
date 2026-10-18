@@ -504,7 +504,7 @@ export function GoproOverlaySyncPreview({
       (flightTelemetry.data?.has_osv === true &&
         (flightTelemetry.data.enrichment_status === 'missing' ||
           flightTelemetry.data.enrichment_status === 'pending')) ||
-      preview.data?.gpx.enrichment_status === 'pending');
+      preview.data?.gpx?.enrichment_status === 'pending');
   if (isEnrichmentFailed) {
     return (
       <div

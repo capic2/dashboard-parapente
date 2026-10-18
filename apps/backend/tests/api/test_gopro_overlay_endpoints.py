@@ -29,7 +29,7 @@ from gopro_overlay_export import cancel_gopro_overlay_job
 from gopro_overlay_export import create_gopro_overlay_job
 from gopro_overlay_export import create_gopro_overlay_job_from_paths
 from gopro_overlay_export import delete_gopro_overlay_job
-from models import Flight, GoproOverlayJob
+from models import BackgroundOperation, Flight, GoproOverlayJob
 from models import VideoExportJob
 
 API_PREFIX = "/api"
@@ -516,10 +516,17 @@ def test_enriched_gpx_progress_reports_pending_ready_and_invalid_markers(tmp_pat
 
 @pytest.mark.parametrize("should_fail", [False, True])
 def test_enrichment_progress_marker_is_removed_after_background_completion(
+    db_session,
+    test_db,
     tmp_path,
     monkeypatch,
     should_fail,
 ) -> None:
+    monkeypatch.setattr(routes, "SessionLocal", test_db)
+    operation_id = routes._create_gpx_enrichment_operation(
+        db_session, user_id=1, flight_id="flight-test"
+    )
+
     def prepare_enriched_gpx(*_args, progress_callback, **_kwargs):
         progress_callback(64)
         if should_fail:
@@ -532,10 +539,18 @@ def test_enrichment_progress_marker_is_removed_after_background_completion(
         [tmp_path / "camera.osv"],
         tmp_path / "source.gpx",
         tmp_path,
+        operation_id=operation_id,
     )
 
     assert not routes._enriched_gpx_progress_path(tmp_path).exists()
     assert routes._enriched_gpx_error_path(tmp_path).exists() is should_fail
+    operation = db_session.query(BackgroundOperation).filter_by(id=operation_id).one()
+    assert operation.status == ("failed" if should_fail else "completed")
+    if should_fail:
+        assert operation.current_step_progress == 64
+    else:
+        assert operation.progress == 100
+    assert operation.error_detail == ("merge failed" if should_fail else None)
 
 
 def test_enrichment_persist_resolves_relative_source_paths(
