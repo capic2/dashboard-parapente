@@ -237,6 +237,7 @@ def _merge_osv_files_with_gpx(
     video_duration: float | None = None,
     first_gpx_at: float | None = None,
     job_id: str | None = None,
+    progress_callback: Callable[[int], None] | None = None,
 ) -> Path:
     if not osv_paths:
         return gpx_path
@@ -337,6 +338,11 @@ def _merge_osv_files_with_gpx(
                 progress_match = _OSV_PROGRESS_RE.fullmatch(line)
                 if progress_match:
                     merge_progress = max(0, min(100, int(progress_match.group("percent"))))
+                    if progress_callback is not None:
+                        try:
+                            progress_callback(merge_progress)
+                        except Exception:
+                            logger.warning("Unable to report enriched GPX progress", exc_info=True)
                     if job_id:
                         _update_job(
                             job_id,
@@ -393,6 +399,7 @@ def ensure_enriched_gpx(
     *,
     video_duration: float | None = None,
     first_gpx_at: float | None = None,
+    progress_callback: Callable[[int], None] | None = None,
 ) -> Path:
     """Return a cached GPX containing the GPX track enriched with OSV data.
 
@@ -405,7 +412,9 @@ def ensure_enriched_gpx(
 
     input_dir.mkdir(parents=True, exist_ok=True)
     merged_gpx_path = input_dir / _ENRICHED_GPX_FILENAME
-    metadata_path = input_dir / _ENRICHED_GPX_METADATA_FILENAME
+    metadata_path = input_dir / "temp" / _ENRICHED_GPX_METADATA_FILENAME
+    legacy_metadata_path = input_dir / _ENRICHED_GPX_METADATA_FILENAME
+    staging_root = input_dir / "temp" / "gpx-enrichment"
     source_signatures = []
     for index, path in enumerate([gpx_path, *osv_paths]):
         stat = path.stat()
@@ -426,6 +435,17 @@ def ensure_enriched_gpx(
     with lock_path.open("a+") as lock_file:
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
         try:
+            if not metadata_path.is_file() and legacy_metadata_path.is_file():
+                try:
+                    legacy_metadata = json.loads(legacy_metadata_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    legacy_metadata = None
+                if legacy_metadata == signature:
+                    metadata_path.parent.mkdir(parents=True, exist_ok=True)
+                    legacy_metadata_path.replace(metadata_path)
+                else:
+                    legacy_metadata_path.unlink(missing_ok=True)
+
             if merged_gpx_path.is_file() and metadata_path.is_file():
                 try:
                     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
@@ -434,8 +454,9 @@ def ensure_enriched_gpx(
                 if metadata == signature and _has_usable_gpx_timestamps(merged_gpx_path):
                     return merged_gpx_path
 
+            staging_root.mkdir(parents=True, exist_ok=True)
             for attempt in range(2):
-                staging_dir = input_dir / f".merged-gopro-overlay-{uuid.uuid4().hex}"
+                staging_dir = staging_root / f".merged-gopro-overlay-{uuid.uuid4().hex}"
                 staging_dir.mkdir()
                 try:
                     try:
@@ -446,6 +467,7 @@ def ensure_enriched_gpx(
                             gpx_offset=0.0,
                             video_duration=video_duration,
                             first_gpx_at=first_gpx_at,
+                            progress_callback=progress_callback,
                         )
                     except ValueError as exc:
                         if str(exc) != "OSV merge did not create a GPX file" or attempt == 1:
@@ -503,7 +525,9 @@ def ensure_enriched_gpx(
                     shutil.rmtree(staging_dir, ignore_errors=True)
                 break
 
-            temporary_metadata_path = input_dir / f".{metadata_path.name}.{uuid.uuid4().hex}.tmp"
+            temporary_metadata_path = metadata_path.parent / (
+                f".{metadata_path.name}.{uuid.uuid4().hex}.tmp"
+            )
             temporary_metadata_path.write_text(
                 json.dumps(signature, separators=(",", ":")),
                 encoding="utf-8",
@@ -525,7 +549,9 @@ def enriched_gpx_path(input_dir: Path) -> Path:
 
 def enriched_gpx_matches_source(enriched_path: Path, source_path: Path) -> bool:
     """Return whether the cache metadata describes the current source GPX."""
-    metadata_path = enriched_path.with_suffix(".json")
+    metadata_path = enriched_path.parent / "temp" / _ENRICHED_GPX_METADATA_FILENAME
+    if not metadata_path.is_file():
+        metadata_path = enriched_path.with_suffix(".json")
     try:
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
         cached_source = metadata["sources"][0]

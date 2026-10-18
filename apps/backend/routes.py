@@ -5741,6 +5741,10 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
     except (OSError, ValueError) as exc:
         logger.warning("Unable to enrich telemetry for %s: %s", flight_id, exc)
 
+    enrichment_progress = (
+        _read_enriched_gpx_progress(camera_path.parent, enrichment_status) if osv_paths else None
+    )
+
     # The remaining work is file parsing only. Do not keep the request's DB
     # connection checked out while reading the GPX/OSV cache.
     db.close()
@@ -5789,6 +5793,7 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
         source="gpx+osv" if osv_paths else "gpx",
         has_osv=bool(osv_paths),
         enrichment_status=enrichment_status,
+        enrichment_progress=enrichment_progress,
         enrichment_error=(
             "Unable to generate enriched GPX" if enrichment_status == "failed" else None
         ),
@@ -8208,6 +8213,7 @@ def _prepare_enriched_gpx_in_background(
     first_gpx_at: float | None = None,
     flight_id: str | None = None,
 ) -> None:
+    _write_enriched_gpx_progress(input_dir, None)
     try:
         enriched_path = ensure_enriched_gpx(
             osv_paths,
@@ -8215,6 +8221,7 @@ def _prepare_enriched_gpx_in_background(
             input_dir,
             video_duration=video_duration,
             first_gpx_at=first_gpx_at,
+            progress_callback=lambda progress: _write_enriched_gpx_progress(input_dir, progress),
         )
         if flight_id is not None:
             _persist_enriched_gpx_for_flight(flight_id, gpx_path, enriched_path)
@@ -8222,12 +8229,52 @@ def _prepare_enriched_gpx_in_background(
             _enriched_gpx_error_path(input_dir).unlink(missing_ok=True)
         except OSError:
             logger.warning("Unable to clear enriched GPX error marker in %s", input_dir)
+        _remove_enriched_gpx_progress(input_dir)
     except Exception as exc:
         try:
             _enriched_gpx_error_path(input_dir).touch()
         except OSError:
             logger.warning("Unable to persist enriched GPX error marker in %s", input_dir)
+        _remove_enriched_gpx_progress(input_dir)
         logger.warning("Unable to prepare enriched GPX in background: %s", exc)
+
+
+def _enriched_gpx_progress_path(input_dir: Path) -> Path:
+    return input_dir / "temp" / "gpx-enrichment" / "progress.json"
+
+
+def _write_enriched_gpx_progress(input_dir: Path, progress: int | None) -> None:
+    path = _enriched_gpx_progress_path(input_dir)
+    temporary_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path.write_text(json.dumps({"progress": progress}), encoding="utf-8")
+        temporary_path.replace(path)
+    except OSError:
+        logger.warning("Unable to persist enriched GPX progress in %s", input_dir)
+        temporary_path.unlink(missing_ok=True)
+
+
+def _remove_enriched_gpx_progress(input_dir: Path) -> None:
+    try:
+        _enriched_gpx_progress_path(input_dir).unlink(missing_ok=True)
+    except OSError:
+        logger.warning("Unable to clear enriched GPX progress in %s", input_dir)
+
+
+def _read_enriched_gpx_progress(input_dir: Path, status: str) -> int | None:
+    if status == "ready":
+        return 100
+    if status != "pending":
+        return None
+    try:
+        payload = json.loads(_enriched_gpx_progress_path(input_dir).read_text(encoding="utf-8"))
+        progress = payload.get("progress")
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return None
+    if not isinstance(progress, int) or isinstance(progress, bool):
+        return None
+    return max(0, min(100, progress))
 
 
 def _persist_enriched_gpx_for_flight(
@@ -8890,6 +8937,11 @@ def get_flight_gopro_overlay_preview(
             "duration_seconds": gpx_duration,
             "coordinates": coordinates,
             "enrichment_status": enrichment_status,
+            "enrichment_progress": (
+                _read_enriched_gpx_progress(camera_path.parent, enrichment_status)
+                if osv_paths
+                else None
+            ),
             "enrichment_error": (
                 "Unable to generate enriched GPX" if enrichment_status == "failed" else None
             ),

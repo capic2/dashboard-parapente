@@ -188,6 +188,7 @@ class FlightTelemetryResponse(BaseModel):
     source: Literal["gpx", "gpx+osv"]
     has_osv: bool
     enrichment_status: Literal["missing", "pending", "ready", "failed"]
+    enrichment_progress: int | None = None
     enrichment_error: str | None = None
     start_time: datetime | None = None
     end_time: datetime | None = None
@@ -217,6 +218,7 @@ class GoproOverlayPreviewGpx(BaseModel):
     duration_seconds: float
     coordinates: list[GoproOverlayPreviewCoordinate]
     enrichment_status: Literal["missing", "pending", "ready", "failed"]
+    enrichment_progress: int | None = None
     enrichment_error: str | None = None
 
 

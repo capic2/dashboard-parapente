@@ -274,6 +274,10 @@ export function FlightTelemetryInteractivePreview({
   const isEnrichmentFailed =
     telemetry.data?.enrichment_status === 'failed' ||
     overlayPreview.data?.gpx?.enrichment_status === 'failed';
+  const enrichmentProgress =
+    telemetry.data?.enrichment_progress ??
+    overlayPreview.data?.gpx?.enrichment_progress ??
+    null;
   const isLoading =
     telemetry.isPending ||
     overlayPreview.isPending ||
@@ -897,9 +901,29 @@ export function FlightTelemetryInteractivePreview({
           >
             {t('flights.overlayInteractivePreviewLoading')}
             {isEnrichmentPending && (
-              <span className="mt-1 block">
-                {t('flights.goproOverlayEnrichmentPending')}
-              </span>
+              <div className="mt-2">
+                <span className="block">
+                  {t('flights.goproOverlayEnrichmentPending')}
+                </span>
+                <div className="mt-2 flex items-center gap-3">
+                  <progress
+                    aria-label={t(
+                      'flights.goproOverlayEnrichmentProgressLabel'
+                    )}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={enrichmentProgress ?? undefined}
+                    value={enrichmentProgress ?? undefined}
+                    max={100}
+                    className="h-2 min-w-0 flex-1 accent-blue-600 dark:accent-blue-400"
+                  />
+                  {enrichmentProgress != null && (
+                    <span className="min-w-10 text-right text-xs font-semibold tabular-nums text-blue-800 dark:text-blue-200">
+                      {enrichmentProgress}%
+                    </span>
+                  )}
+                </div>
+              </div>
             )}
           </output>
         )}
