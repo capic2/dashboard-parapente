@@ -71,7 +71,15 @@ function operationElapsed(operation: BackgroundOperation, now: number) {
     return null;
   }
 
-  const startedAt = Date.parse(operation.started_at ?? '');
+  const startedAtValue = operation.started_at?.trim();
+  if (!startedAtValue) return null;
+
+  // Backend datetimes are UTC even when the database/API serialization omits
+  // the timezone suffix. Date.parse would otherwise treat them as local time.
+  const hasTimezone = /(?:z|[+-]\d{2}:?\d{2})$/i.test(startedAtValue);
+  const startedAt = Date.parse(
+    hasTimezone ? startedAtValue : `${startedAtValue}Z`
+  );
   if (!Number.isFinite(startedAt)) return null;
 
   return Math.floor(Math.max(0, now - startedAt) / 60_000);
