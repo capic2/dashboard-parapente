@@ -75,6 +75,12 @@ export function useOperationCompletionNotifications() {
           queryKey: ['flights', 'records'],
         });
       }
+      if (
+        operation.status === 'completed' &&
+        operation.operation_type === 'gpx_enrichment'
+      ) {
+        void queryClient.invalidateQueries({ queryKey: ['flights'] });
+      }
       sendSystemNotification(title, body);
     }
     previousStatuses.current = nextStatuses;
