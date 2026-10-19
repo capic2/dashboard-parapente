@@ -10,6 +10,7 @@ def _operation(
     *,
     operation_id: str,
     user_id: int = 1,
+    operation_type: str = "test_operation",
     status: str = "running",
     source_kind: str | None = None,
     source_id: str | None = None,
@@ -20,7 +21,7 @@ def _operation(
     return BackgroundOperation(
         id=operation_id,
         user_id=user_id,
-        operation_type="test_operation",
+        operation_type=operation_type,
         title_key="operations.test",
         status=status,
         progress=0,
@@ -93,6 +94,29 @@ def test_cancel_rejects_terminal_operation(client, db_session):
     response = client.post("/api/operations/completed-operation/cancel")
 
     assert response.status_code == 409
+
+
+def test_legacy_gpx_enrichment_operation_can_be_cancelled(client, db_session):
+    operation = _operation(
+        operation_id="legacy-gpx-enrichment",
+        operation_type="gpx_enrichment",
+        source_kind="gpx_enrichment",
+        source_id="flight-1:job-1",
+    )
+    db_session.add(operation)
+    db_session.commit()
+
+    listed_operation = next(
+        item
+        for item in client.get("/api/operations").json()
+        if item["operation_id"] == operation.id
+    )
+    assert listed_operation["can_cancel"] is True
+
+    response = client.post(f"/api/operations/{operation.id}/cancel")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "cancelled"
 
 
 def test_retry_rejects_operation_without_source(client, db_session):

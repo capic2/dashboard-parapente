@@ -8,6 +8,7 @@ import logging
 import math
 import os
 import subprocess
+import time
 import uuid
 import xml.etree.ElementTree as ET
 from dataclasses import asdict
@@ -36,7 +37,7 @@ from fastapi import (
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel, Field
 
@@ -88,6 +89,7 @@ from flight_tracks import (
     normalize_track,
 )
 from gopro_overlay_export import (
+    EnrichedGpxCancelled,
     align_video_start_time_to_gpx,
     cancel_gopro_overlay_job,
     check_gopro_overlay_dependencies,
@@ -274,6 +276,7 @@ from operations import (
     ACTIVE_STATUSES as OPERATION_ACTIVE_STATUSES,
     OperationReporter,
     get_user_operation,
+    operation_can_cancel,
     operation_payload,
     purge_expired_operations,
     sync_operation_from_snapshot,
@@ -1356,7 +1359,7 @@ def cancel_background_operation(
     operation = get_user_operation(db, operation_id, user.id)
     if operation is None:
         raise HTTPException(status_code=404, detail="Operation not found")
-    if operation.status not in OPERATION_ACTIVE_STATUSES or not operation.can_cancel:
+    if operation.status not in OPERATION_ACTIVE_STATUSES or not operation_can_cancel(operation):
         raise HTTPException(status_code=409, detail="Operation cannot be cancelled")
     _cancel_operation_source(db, operation)
     reporter = OperationReporter(db, operation)
@@ -8215,19 +8218,32 @@ def _prepare_enriched_gpx_in_background(
     flight_id: str | None = None,
     operation_id: str | None = None,
 ) -> None:
-    class EnrichmentCancelled(Exception):
-        pass
+    last_cancellation_check_error = 0.0
 
-    def report_progress(progress: int) -> None:
-        if operation_id is not None:
+    def cancellation_requested() -> bool:
+        nonlocal last_cancellation_check_error
+        if operation_id is None:
+            return False
+        try:
             with SessionLocal() as db:
                 operation = (
                     db.query(BackgroundOperationModel)
                     .filter(BackgroundOperationModel.id == operation_id)
                     .first()
                 )
-                if operation is None or operation.status == "cancelled":
-                    raise EnrichmentCancelled
+                return operation is None or operation.status == "cancelled"
+        except SQLAlchemyError:
+            now = time.monotonic()
+            if now - last_cancellation_check_error >= 30:
+                logger.warning(
+                    "Unable to check cancellation for GPX enrichment %s",
+                    operation_id,
+                    exc_info=True,
+                )
+                last_cancellation_check_error = now
+            return False
+
+    def report_progress(progress: int) -> None:
         _write_enriched_gpx_progress(input_dir, progress)
         _update_gpx_enrichment_operation(
             operation_id,
@@ -8245,16 +8261,10 @@ def _prepare_enriched_gpx_in_background(
             video_duration=video_duration,
             first_gpx_at=first_gpx_at,
             progress_callback=report_progress,
+            cancellation_check=cancellation_requested,
         )
-        if operation_id is not None:
-            with SessionLocal() as db:
-                operation = (
-                    db.query(BackgroundOperationModel)
-                    .filter(BackgroundOperationModel.id == operation_id)
-                    .first()
-                )
-                if operation is None or operation.status == "cancelled":
-                    raise EnrichmentCancelled
+        if cancellation_requested():
+            raise EnrichedGpxCancelled
         if flight_id is not None:
             _persist_enriched_gpx_for_flight(flight_id, gpx_path, enriched_path)
         try:
@@ -8263,7 +8273,7 @@ def _prepare_enriched_gpx_in_background(
             logger.warning("Unable to clear enriched GPX error marker in %s", input_dir)
         _remove_enriched_gpx_progress(input_dir)
         _update_gpx_enrichment_operation(operation_id, status="completed", progress=100)
-    except EnrichmentCancelled:
+    except EnrichedGpxCancelled:
         _remove_enriched_gpx_progress(input_dir)
     except Exception as exc:
         try:
