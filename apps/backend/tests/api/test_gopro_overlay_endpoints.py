@@ -553,6 +553,44 @@ def test_enrichment_progress_marker_is_removed_after_background_completion(
     assert operation.error_detail == ("merge failed" if should_fail else None)
 
 
+def test_enrichment_does_not_persist_result_if_cancelled_after_merge(
+    db_session,
+    test_db,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(routes, "SessionLocal", test_db)
+    operation_id = routes._create_gpx_enrichment_operation(
+        db_session, user_id=1, flight_id="flight-test"
+    )
+
+    def cancel_after_merge(*_args, **_kwargs):
+        with test_db() as db:
+            operation = db.query(BackgroundOperation).filter_by(id=operation_id).one()
+            operation.status = "cancelled"
+            db.commit()
+        return tmp_path / "merged-gopro-overlay.gpx"
+
+    persist = Mock()
+    monkeypatch.setattr(routes, "ensure_enriched_gpx", cancel_after_merge)
+    monkeypatch.setattr(routes, "_persist_enriched_gpx_for_flight", persist)
+
+    routes._prepare_enriched_gpx_in_background(
+        [tmp_path / "camera.osv"],
+        tmp_path / "source.gpx",
+        tmp_path,
+        flight_id="flight-test",
+        operation_id=operation_id,
+    )
+
+    db_session.expire_all()
+    operation = db_session.query(BackgroundOperation).filter_by(id=operation_id).one()
+    assert operation.status == "cancelled"
+    assert not routes._enriched_gpx_progress_path(tmp_path).exists()
+    assert not routes._enriched_gpx_error_path(tmp_path).exists()
+    persist.assert_not_called()
+
+
 def test_enrichment_persist_resolves_relative_source_paths(
     db_session, sample_flight, test_db, tmp_path, monkeypatch
 ) -> None:
