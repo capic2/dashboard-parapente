@@ -2193,6 +2193,11 @@
     "openCenter": "Open treatments",
     "enableNotifications": "Enable notifications",
     "timeline": "Treatment progress",
+    "progressUnavailable": "In progress",
+    "elapsed": {
+      "lessThanMinute": "Running for less than a minute",
+      "minutes": "Running for {{count}} min"
+    },
     "cancel": "Cancel",
     "cancelSuccess": "Treatment stopped",
     "cancelError": "Unable to stop the treatment",
