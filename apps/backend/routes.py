@@ -6699,7 +6699,15 @@ async def upload_gpx_to_flight(
             flight.gpx_elevation_gain_m = stats["elevation_gain_m"]
             flight.max_climb_rate_ms = stats["max_climb_rate_ms"]
             flight.max_sink_rate_ms = stats["max_sink_rate_ms"]
-            flight.departure_time = stats["departure_time"]
+            departure_time = stats["departure_time"]
+            if departure_time is not None:
+                if departure_time.tzinfo is None:
+                    departure_time = departure_time.replace(tzinfo=UTC)
+                flight.departure_time = departure_time.astimezone(ZoneInfo("Europe/Paris")).replace(
+                    tzinfo=None
+                )
+            else:
+                flight.departure_time = None
         except Exception as exc:
             logger.warning(
                 "Could not calculate GPX stats for uploaded track on %s: %s", flight_id, exc
