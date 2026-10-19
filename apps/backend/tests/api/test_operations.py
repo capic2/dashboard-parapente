@@ -1,9 +1,19 @@
 """API and adapter tests for user-visible background operations."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 import routes
-from models import BackgroundOperation
+from models import (
+    BackgroundOperation,
+    Flight,
+    GoproOverlayJob,
+    HighlightVideoJob,
+    YoutubeUploadJob,
+)
 
 
 def _operation(
@@ -180,3 +190,96 @@ def test_cancel_dispatches_to_underlying_video_export(monkeypatch, db_session):
     routes._cancel_operation_source(db_session, operation)
 
     assert calls == ["manual", "stream"]
+
+
+def test_operation_payloads_include_flight_ids_for_flight_jobs(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    flight = Flight(
+        id="flight-linked-to-treatments",
+        title="Linked flight",
+        flight_date=date(2026, 10, 19),
+    )
+    db_session.add(flight)
+    db_session.add_all(
+        [
+            GoproOverlayJob(
+                id="gopro-job-1",
+                flight_id=flight.id,
+                status="running",
+                video_path="camera.mp4",
+                gpx_path="flight.gpx",
+                layout_id="layout",
+                layout_label="Layout",
+                layout_path="layout.xml",
+                output_path="overlay.mp4",
+                temp_output_path="overlay.tmp.mp4",
+                output_filename="overlay.mp4",
+            ),
+            HighlightVideoJob(
+                id="highlight-operation-job",
+                flight_id=flight.id,
+                status="running",
+                source_video_path="pano.mp4",
+                output_format="original",
+            ),
+            YoutubeUploadJob(
+                id="youtube-operation-job",
+                flight_id=flight.id,
+                user_id=1,
+                status="running",
+                title="Flight upload",
+                description="",
+            ),
+            _operation(
+                operation_id="gpx-flight-operation",
+                source_kind="gpx_enrichment",
+                source_id=f"{flight.id}:job-1",
+            ),
+            _operation(
+                operation_id="video-flight-operation",
+                source_kind="video_export",
+                source_id="video-job-1",
+            ),
+            _operation(
+                operation_id="gopro-flight-operation",
+                source_kind="gopro_overlay",
+                source_id="gopro-job-1",
+            ),
+            _operation(
+                operation_id="highlight-flight-operation",
+                source_kind="highlight_video",
+                source_id="highlight-operation-job",
+            ),
+            _operation(
+                operation_id="youtube-flight-operation",
+                source_kind="youtube_upload",
+                source_id="youtube-operation-job",
+            ),
+            _operation(
+                operation_id="missing-flight-operation",
+                source_kind="highlight_video",
+                source_id="missing-highlight-job",
+            ),
+        ]
+    )
+    db_session.commit()
+    monkeypatch.setattr(routes, "_resolve_export_status", lambda _job_id: {"flight_id": flight.id})
+
+    listed_operations = {
+        item["operation_id"]: item for item in client.get("/api/operations").json()
+    }
+    stream_operations = {
+        item["operation_id"]: item for item in routes._read_operations_payload(user_id=1)
+    }
+    expected_ids = {
+        "gpx-flight-operation",
+        "video-flight-operation",
+        "gopro-flight-operation",
+        "highlight-flight-operation",
+        "youtube-flight-operation",
+    }
+
+    for payload in (listed_operations, stream_operations):
+        assert all(payload[operation_id]["flight_id"] == flight.id for operation_id in expected_ids)
+        assert payload["missing-flight-operation"]["flight_id"] is None

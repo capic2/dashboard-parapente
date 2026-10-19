@@ -2205,6 +2205,7 @@
     "deleteSuccess": "Traitement supprimé",
     "deleteError": "Impossible de supprimer le traitement",
     "genericError": "Le traitement a échoué",
+    "openFlight": "Ouvrir le vol",
     "videoExport": "Export vidéo",
     "gpxEnrichment": "Enrichissement du GPX",
     "goproOverlay": "Génération de l’overlay GoPro",
