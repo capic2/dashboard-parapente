@@ -5,11 +5,12 @@ Tests HTTP endpoints in routes.py related to flight management.
 Coverage: GET, POST, PATCH, DELETE for flights.
 """
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 import json
 from pathlib import Path
 import re
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 import config
 import pytest
@@ -1910,8 +1911,40 @@ class TestFlightGPXEndpoints:
         assert sample_flight.gpx_elevation_gain_m == expected["elevation_gain_m"]
         assert sample_flight.max_climb_rate_ms == expected["max_climb_rate_ms"]
         assert sample_flight.max_sink_rate_ms == expected["max_sink_rate_ms"]
-        assert sample_flight.departure_time == expected["departure_time"].replace(tzinfo=None)
+        expected_departure = expected["departure_time"]
+        if expected_departure.tzinfo is None:
+            expected_departure = expected_departure.replace(tzinfo=ZoneInfo("UTC"))
+        expected_departure = expected_departure.astimezone(ZoneInfo("Europe/Paris"))
+        assert sample_flight.departure_time == expected_departure.replace(tzinfo=None)
         assert sample_flight.gpx_source_file_path == sample_flight.gpx_file_path
+
+    @pytest.mark.parametrize("departure_time_mode", ["naive", "missing"])
+    def test_upload_gpx_normalizes_naive_or_missing_departure_time(
+        self, client, db_session, sample_flight, sample_gpx, departure_time_mode
+    ):
+        _, points = normalize_track(sample_gpx.encode(), "gpx")
+        stats = calculate_track_stats(points)
+        departure_time = stats["departure_time"]
+        assert departure_time.tzinfo == timezone.utc
+
+        if departure_time_mode == "naive":
+            stats["departure_time"] = datetime(2026, 3, 15, 14, 0)
+            expected_departure = datetime(2026, 3, 15, 15, 0)
+        else:
+            stats["departure_time"] = None
+            expected_departure = None
+
+        files = {"gpx_file": ("test.gpx", sample_gpx.encode(), "application/gpx+xml")}
+        with (
+            patch("routes.write_flight_text_file", return_value=Path("private/track.gpx")),
+            patch("routes.calculate_track_stats", return_value=stats),
+            patch("video_export_manual.trigger_auto_export"),
+        ):
+            response = client.post(f"{API_PREFIX}/flights/flight-test-001/upload-gpx", files=files)
+
+        assert response.status_code == 200
+        db_session.refresh(sample_flight)
+        assert sample_flight.departure_time == expected_departure
 
     def test_upload_gpx_succeeds_when_stat_calculation_fails(
         self, client, db_session, sample_flight, sample_gpx
