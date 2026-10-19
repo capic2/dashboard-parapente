@@ -2,9 +2,12 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import os
 from time import sleep
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
-from gopro_overlay_export import ensure_enriched_gpx
+import pytest
+
+import gopro_overlay_export
+from gopro_overlay_export import EnrichedGpxCancelled, ensure_enriched_gpx
 
 _VALID_GPX = """<?xml version="1.0"?><gpx xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>
 <trkpt lat="46.0" lon="6.0"><ele>1000</ele><time>2026-01-01T12:00:00Z</time></trkpt>
@@ -122,3 +125,38 @@ def test_enriched_gpx_retries_if_merge_helper_creates_no_output(tmp_path: Path) 
 
     assert enriched_path == tmp_path / "merged-gopro-overlay.gpx"
     assert enriched_path.read_text(encoding="utf-8") == _VALID_GPX
+
+
+def test_osv_merge_terminates_when_enrichment_is_cancelled(tmp_path: Path) -> None:
+    script_dir = tmp_path / "scripts"
+    script_dir.mkdir()
+    (script_dir / "osv_merge.py").touch()
+    gpx_path = tmp_path / "track.gpx"
+    osv_path = tmp_path / "camera.osv"
+    gpx_path.write_text(_VALID_GPX, encoding="utf-8")
+    osv_path.write_text("osv", encoding="utf-8")
+
+    process = Mock()
+    process.stdout = object()
+    process.poll.return_value = None
+    process.wait.return_value = -15
+
+    def wait_for_cancellation(*_args):
+        sleep(1.01)
+        return [], [], []
+
+    with (
+        patch("gopro_overlay_export.subprocess.Popen", return_value=process),
+        patch("gopro_overlay_export.select.select", side_effect=wait_for_cancellation),
+        patch("gopro_overlay_export.config.GOPRO_OVERLAY_ROOT", str(script_dir)),
+    ):
+        with pytest.raises(EnrichedGpxCancelled):
+            gopro_overlay_export._merge_osv_files_with_gpx(
+                [osv_path],
+                gpx_path,
+                tmp_path / "output",
+                cancellation_check=lambda: True,
+            )
+
+    process.terminate.assert_called_once()
+    process.kill.assert_called_once()

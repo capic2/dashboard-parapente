@@ -40,6 +40,11 @@ from video_acceleration import (
 
 logger = logging.getLogger(__name__)
 
+
+class EnrichedGpxCancelled(Exception):
+    """Raised when a background GPX enrichment is cancelled by its owner."""
+
+
 _STATUS_QUEUED = "queued"
 _STATUS_PREPARING = "preparing"
 _STATUS_RUNNING = "running"
@@ -238,6 +243,7 @@ def _merge_osv_files_with_gpx(
     first_gpx_at: float | None = None,
     job_id: str | None = None,
     progress_callback: Callable[[int], None] | None = None,
+    cancellation_check: Callable[[], bool] | None = None,
 ) -> Path:
     if not osv_paths:
         return gpx_path
@@ -298,12 +304,18 @@ def _merge_osv_files_with_gpx(
     deadline = time.monotonic() + config.GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS
     last_heartbeat = time.monotonic()
     last_cancellation_check = last_heartbeat
+    last_operation_cancellation_check = last_heartbeat
     try:
         while True:
             now = time.monotonic()
             if now >= deadline:
                 process.terminate()
                 raise ValueError("OSV merge timed out")
+            if cancellation_check is not None and now - last_operation_cancellation_check >= 1:
+                if cancellation_check():
+                    process.terminate()
+                    raise EnrichedGpxCancelled
+                last_operation_cancellation_check = now
 
             stream = process.stdout
             if stream is None:
@@ -400,6 +412,7 @@ def ensure_enriched_gpx(
     video_duration: float | None = None,
     first_gpx_at: float | None = None,
     progress_callback: Callable[[int], None] | None = None,
+    cancellation_check: Callable[[], bool] | None = None,
 ) -> Path:
     """Return a cached GPX containing the GPX track enriched with OSV data.
 
@@ -468,6 +481,7 @@ def ensure_enriched_gpx(
                             video_duration=video_duration,
                             first_gpx_at=first_gpx_at,
                             progress_callback=progress_callback,
+                            cancellation_check=cancellation_check,
                         )
                     except ValueError as exc:
                         if str(exc) != "OSV merge did not create a GPX file" or attempt == 1:
