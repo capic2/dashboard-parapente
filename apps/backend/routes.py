@@ -8215,6 +8215,26 @@ def _prepare_enriched_gpx_in_background(
     flight_id: str | None = None,
     operation_id: str | None = None,
 ) -> None:
+    class EnrichmentCancelled(Exception):
+        pass
+
+    def report_progress(progress: int) -> None:
+        if operation_id is not None:
+            with SessionLocal() as db:
+                operation = (
+                    db.query(BackgroundOperationModel)
+                    .filter(BackgroundOperationModel.id == operation_id)
+                    .first()
+                )
+                if operation is None or operation.status == "cancelled":
+                    raise EnrichmentCancelled
+        _write_enriched_gpx_progress(input_dir, progress)
+        _update_gpx_enrichment_operation(
+            operation_id,
+            status="running",
+            progress=progress,
+        )
+
     _write_enriched_gpx_progress(input_dir, None)
     _update_gpx_enrichment_operation(operation_id, status="running", progress=0)
     try:
@@ -8224,11 +8244,17 @@ def _prepare_enriched_gpx_in_background(
             input_dir,
             video_duration=video_duration,
             first_gpx_at=first_gpx_at,
-            progress_callback=lambda progress: (
-                _write_enriched_gpx_progress(input_dir, progress),
-                _update_gpx_enrichment_operation(operation_id, status="running", progress=progress),
-            ),
+            progress_callback=report_progress,
         )
+        if operation_id is not None:
+            with SessionLocal() as db:
+                operation = (
+                    db.query(BackgroundOperationModel)
+                    .filter(BackgroundOperationModel.id == operation_id)
+                    .first()
+                )
+                if operation is None or operation.status == "cancelled":
+                    raise EnrichmentCancelled
         if flight_id is not None:
             _persist_enriched_gpx_for_flight(flight_id, gpx_path, enriched_path)
         try:
@@ -8237,6 +8263,8 @@ def _prepare_enriched_gpx_in_background(
             logger.warning("Unable to clear enriched GPX error marker in %s", input_dir)
         _remove_enriched_gpx_progress(input_dir)
         _update_gpx_enrichment_operation(operation_id, status="completed", progress=100)
+    except EnrichmentCancelled:
+        _remove_enriched_gpx_progress(input_dir)
     except Exception as exc:
         try:
             _enriched_gpx_error_path(input_dir).touch()
@@ -8256,6 +8284,7 @@ def _create_gpx_enrichment_operation(db: Session, user_id: int, flight_id: str) 
         steps=["enrich_gpx"],
         source_kind="gpx_enrichment",
         source_id=f"{flight_id}:{uuid.uuid4().hex}",
+        can_cancel=True,
     ).operation
     return operation.id
 
