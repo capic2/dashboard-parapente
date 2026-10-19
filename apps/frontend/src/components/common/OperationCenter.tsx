@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Bell, CheckCircle2, Square, Trash2, XCircle } from 'lucide-react';
 import {
@@ -39,6 +39,16 @@ function resultSummary(result: BackgroundOperation['result']) {
 
 function operationProgress(operation: BackgroundOperation) {
   if (
+    operation.status === 'running' &&
+    operation.operation_type === 'gpx_enrichment' &&
+    operation.progress === 0
+  ) {
+    // GPX enrichment can spend a while preparing inputs before the merger
+    // emits its first measured progress update.
+    return null;
+  }
+
+  if (
     operation.source_kind === 'video_export' &&
     typeof operation.current_step_progress === 'number' &&
     Number.isFinite(operation.current_step_progress)
@@ -52,8 +62,23 @@ function operationProgress(operation: BackgroundOperation) {
   return operation.progress;
 }
 
+function operationElapsed(operation: BackgroundOperation, now: number) {
+  if (
+    operation.status !== 'running' ||
+    operation.operation_type !== 'gpx_enrichment'
+  ) {
+    return null;
+  }
+
+  const startedAt = Date.parse(operation.started_at ?? '');
+  if (!Number.isFinite(startedAt)) return null;
+
+  return Math.floor(Math.max(0, now - startedAt) / 60_000);
+}
+
 export function OperationCenter() {
   const { t } = useTranslation();
+  const [now, setNow] = useState(0);
   const [notificationPermission, setNotificationPermission] =
     useState<NotificationPermission | null>(() =>
       typeof window !== 'undefined' && 'Notification' in window
@@ -68,6 +93,12 @@ export function OperationCenter() {
   const toast = useToast();
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [selected, setSelected] = useState<BackgroundOperation | null>(null);
+
+  useEffect(() => {
+    setNow(Date.now());
+    const interval = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
   const displayableOperations = useMemo(
     () => operations.filter((operation) => operation.status !== 'cancelled'),
     [operations]
@@ -169,6 +200,17 @@ export function OperationCenter() {
                     operation.operation_type
                   );
                   const progress = operationProgress(operation);
+                  const elapsed =
+                    now > 0 ? operationElapsed(operation, now) : null;
+                  let progressLabel = '—';
+                  if (progress != null) {
+                    progressLabel = `${progress}%`;
+                  } else if (operation.status === 'running') {
+                    progressLabel = t(
+                      'operations.progressUnavailable',
+                      'En cours'
+                    );
+                  }
                   const operationDetail =
                     (operation.status === 'failed' && operation.error_detail) ||
                     operation.current_step_detail ||
@@ -204,7 +246,7 @@ export function OperationCenter() {
                             {title}
                           </span>
                           <span className="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400">
-                            {progress == null ? '—' : `${progress}%`}
+                            {progressLabel}
                           </span>
                         </div>
                         <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
@@ -212,6 +254,18 @@ export function OperationCenter() {
                             `operations.status.${operation.status}`,
                             operation.status
                           )}
+                          {elapsed !== null &&
+                            ` · ${
+                              elapsed === 0
+                                ? t(
+                                    'operations.elapsed.lessThanMinute',
+                                    'Depuis moins d’une minute'
+                                  )
+                                : t('operations.elapsed.minutes', {
+                                    count: elapsed,
+                                    defaultValue: `Depuis ${elapsed} min`,
+                                  })
+                            }`}
                           {operationDetail && ` · ${operationDetail}`}
                         </p>
                         <div className="mt-2">

@@ -2198,6 +2198,11 @@
     "openCenter": "Ouvrir les traitements",
     "enableNotifications": "Activer les notifications",
     "timeline": "Progression du traitement",
+    "progressUnavailable": "En cours",
+    "elapsed": {
+      "lessThanMinute": "Depuis moins d’une minute",
+      "minutes": "Depuis {{count}} min"
+    },
     "cancel": "Annuler",
     "cancelSuccess": "Traitement stoppé",
     "cancelError": "Impossible de stopper le traitement",
