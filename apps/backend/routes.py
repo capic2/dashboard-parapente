@@ -1157,16 +1157,21 @@ def _ensure_job_operation(
     ).operation
 
 
-def _refresh_operation_from_source(db: Session, operation: BackgroundOperationModel) -> None:
+def _refresh_operation_from_source(db: Session, operation: BackgroundOperationModel) -> str | None:
     if not operation.source_kind or not operation.source_id:
-        return
+        return None
+    if operation.source_kind == "gpx_enrichment":
+        return operation.source_id.split(":", 1)[0] or None
+
     status: str | None = None
     progress: int | float | None = None
     detail: str | None = None
     error: str | None = None
+    flight_id: str | None = None
     if operation.source_kind == "video_export":
         snapshot = _resolve_export_status(operation.source_id)
         if snapshot:
+            flight_id = snapshot.get("flight_id")
             status = snapshot.get("internal_status") or snapshot.get("status")
             progress = snapshot.get("progress")
             detail = snapshot.get("message")
@@ -1174,6 +1179,7 @@ def _refresh_operation_from_source(db: Session, operation: BackgroundOperationMo
     elif operation.source_kind == "gopro_overlay":
         snapshot = get_gopro_overlay_job(operation.source_id)
         if snapshot:
+            flight_id = snapshot.get("flight_id")
             status = snapshot.get("status")
             progress = snapshot.get("progress")
             detail = snapshot.get("message")
@@ -1183,6 +1189,7 @@ def _refresh_operation_from_source(db: Session, operation: BackgroundOperationMo
             db.query(HighlightVideoJob).filter(HighlightVideoJob.id == operation.source_id).first()
         )
         if job:
+            flight_id = job.flight_id
             status = job.status
             progress = job.progress
             detail = job.message
@@ -1190,6 +1197,7 @@ def _refresh_operation_from_source(db: Session, operation: BackgroundOperationMo
     elif operation.source_kind == "youtube_upload":
         job = db.query(YoutubeUploadJob).filter(YoutubeUploadJob.id == operation.source_id).first()
         if job:
+            flight_id = job.flight_id
             status = job.status
             progress = job.progress
             detail = job.title
@@ -1203,11 +1211,25 @@ def _refresh_operation_from_source(db: Session, operation: BackgroundOperationMo
             detail=detail,
             error=error,
         )
+    return str(flight_id) if flight_id else None
 
 
-def _refresh_operations(db: Session, operations: list[BackgroundOperationModel]) -> None:
+def _refresh_operations(db: Session, operations: list[BackgroundOperationModel]) -> dict[str, str]:
+    flight_ids: dict[str, str] = {}
     for operation in operations:
-        _refresh_operation_from_source(db, operation)
+        flight_id = _refresh_operation_from_source(db, operation)
+        if flight_id:
+            flight_ids[operation.id] = flight_id
+    return flight_ids
+
+
+def _background_operation_payload(
+    operation: BackgroundOperationModel, flight_id: str | None
+) -> dict[str, Any]:
+    return {
+        **operation_payload(operation),
+        "flight_id": flight_id,
+    }
 
 
 def _spots_data_is_recent(last_sync_value: Any, *, now: datetime | None = None) -> bool:
@@ -1256,9 +1278,11 @@ def _read_operations_payload(user_id: int) -> list[dict[str, Any]]:
             .limit(100)
             .all()
         )
-        _refresh_operations(db, operations)
+        flight_ids = _refresh_operations(db, operations)
         return [
-            BackgroundOperation.model_validate(operation_payload(item)).model_dump(mode="json")
+            BackgroundOperation.model_validate(
+                _background_operation_payload(item, flight_ids.get(item.id))
+            ).model_dump(mode="json")
             for item in operations
         ]
 
@@ -1275,8 +1299,13 @@ def list_background_operations(
     if not include_completed:
         query = query.filter(BackgroundOperationModel.status.in_(OPERATION_ACTIVE_STATUSES))
     operations = query.order_by(BackgroundOperationModel.updated_at.desc()).limit(limit).all()
-    _refresh_operations(db, operations)
-    return [BackgroundOperation.model_validate(operation_payload(item)) for item in operations]
+    flight_ids = _refresh_operations(db, operations)
+    return [
+        BackgroundOperation.model_validate(
+            _background_operation_payload(item, flight_ids.get(item.id))
+        )
+        for item in operations
+    ]
 
 
 @router.get("/operations/stream")
