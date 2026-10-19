@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from '@tanstack/react-router';
 import { Bell, CheckCircle2, Square, Trash2, XCircle } from 'lucide-react';
 import {
   Button as AriaButton,
@@ -305,6 +306,16 @@ export function OperationCenter() {
                       ))}
                     </dl>
                   </div>
+                )}
+                {selected.flight_id && (
+                  <Link
+                    to="/flights/$flightId"
+                    params={{ flightId: selected.flight_id }}
+                    onClick={() => setSelected(null)}
+                    className="mt-5 inline-flex min-h-10 cursor-pointer items-center rounded-md border border-sky-200 px-3 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-sky-900 dark:text-sky-300 dark:hover:bg-sky-950/30"
+                  >
+                    {t('operations.openFlight', 'Ouvrir le vol')}
+                  </Link>
                 )}
                 {selected.can_cancel && (
                   <button

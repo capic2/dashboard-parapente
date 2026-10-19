@@ -2200,6 +2200,7 @@
     "deleteSuccess": "Treatment deleted",
     "deleteError": "Unable to delete the treatment",
     "genericError": "The treatment failed",
+    "openFlight": "Open flight",
     "videoExport": "Video export",
     "gpxEnrichment": "GPX enrichment",
     "goproOverlay": "GoPro overlay generation",

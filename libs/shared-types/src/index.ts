@@ -349,6 +349,7 @@ export const BackgroundOperationSchema = z.object({
   error_detail: z.string().nullable().optional(),
   source_kind: z.string().nullable().optional(),
   source_id: z.string().nullable().optional(),
+  flight_id: z.string().nullable().optional(),
   can_cancel: z.boolean(),
   can_retry: z.boolean(),
   unread: z.boolean(),
