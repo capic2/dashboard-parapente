@@ -235,6 +235,9 @@ export function groupTelemetryLayoutSelection(
     });
   }
 
+  if (existingGroupIds.size > 1 && [...existingGroupIds].some(isParentGroup))
+    return layout;
+
   const existingGroupId =
     existingGroupIds.size === 1 ? [...existingGroupIds][0] : undefined;
   const existingGroupName = existingGroupId

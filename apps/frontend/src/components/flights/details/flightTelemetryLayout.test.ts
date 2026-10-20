@@ -358,6 +358,49 @@ describe('flight telemetry layout XML', () => {
     expect(wholeGroupNesting).toBe(layout);
   });
 
+  it('keeps a parent group when regrouping a loose item with part of its nested group', () => {
+    const layout = [
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[0],
+        id: 'target-one',
+        groupId: 'target',
+        groupName: 'Target',
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[1],
+        id: 'target-two',
+        groupId: 'target',
+        groupName: 'Target',
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[2],
+        id: 'source-one',
+        groupId: 'source',
+        groupName: 'Source',
+        parentGroupId: 'target',
+        parentGroupName: 'Target',
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[3],
+        id: 'source-two',
+        groupId: 'source',
+        groupName: 'Source',
+        parentGroupId: 'target',
+        parentGroupName: 'Target',
+      },
+      { ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[4], id: 'loose' },
+    ];
+
+    expect(
+      groupTelemetryLayoutSelection(
+        layout,
+        ['target-one', 'target-two', 'source-one', 'loose'],
+        'new-parent',
+        'New parent'
+      )
+    ).toBe(layout);
+  });
+
   it('preserves the existing parent when an ungrouped item joins part of a nested group', () => {
     const layout = [
       { ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[2], id: 'loose' },
