@@ -4,7 +4,7 @@ import asyncio
 import os
 import time
 from collections import deque
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -15,11 +15,54 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from auth import create_access_token, create_job_token, decode_job_token
 from deployment_drain import DeploymentDrainActive, deployment_drain
-from models import Flight, VideoExportJob
+from models import Flight, VideoExportJob, YoutubeUploadJob
 
 import video_export
 import video_export_manual
 import youtube_overlay_export
+
+
+def test_persist_youtube_telemetry_video_replaces_flight_media(tmp_path, monkeypatch, db_session):
+    monkeypatch.setattr(video_export_manual.config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    flight = Flight(id="telemetry-persist-flight", flight_date=date(2026, 10, 20))
+    db_session.add(flight)
+    db_session.commit()
+
+    first_export = tmp_path / "first-render.mp4"
+    first_export.write_bytes(b"first export")
+    first_path = video_export_manual.persist_youtube_telemetry_video(
+        db_session, flight, first_export, "first-export"
+    )
+
+    assert flight.youtube_telemetry_video_file_path == str(first_path)
+    assert first_path.read_bytes() == b"first export"
+    assert not first_export.exists()
+
+    db_session.add(
+        YoutubeUploadJob(
+            id="telemetry-upload-in-progress",
+            flight_id=flight.id,
+            user_id=1,
+            source_type="youtube_telemetry",
+            source_path=str(first_path),
+            status="uploading",
+            progress=40,
+            title="Telemetry",
+            description="",
+            privacy_status="unlisted",
+        )
+    )
+    db_session.commit()
+    second_export = tmp_path / "second-render.mp4"
+    second_export.write_bytes(b"replacement export")
+
+    second_path = video_export_manual.persist_youtube_telemetry_video(
+        db_session, flight, second_export, "second-export"
+    )
+
+    assert flight.youtube_telemetry_video_file_path == str(second_path)
+    assert second_path.read_bytes() == b"replacement export"
+    assert first_path.read_bytes() == b"first export"
 
 
 def test_youtube_composition_progress_updates_runtime_and_job_status(monkeypatch):

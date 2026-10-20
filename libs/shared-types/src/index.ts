@@ -199,6 +199,8 @@ export const FlightSchema = z
     video_export_progress: z.number().nullish(),
     video_file_path: z.string().nullish(),
     video_file_exists: z.boolean().nullish(),
+    youtube_telemetry_video_file_path: z.string().nullish(),
+    youtube_telemetry_video_file_exists: z.boolean().nullish(),
     pano_video_file_exists: z.boolean().nullish(),
     pano_video_filename: z.string().nullish(),
     face_video_file_exists: z.boolean().nullish(),

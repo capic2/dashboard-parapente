@@ -35,7 +35,11 @@ from deployment_drain import DeploymentDrainActive, job_admission
 from auth import create_job_token, decode_job_token
 from database import SessionLocal
 from flight_file_paths import resolve_flight_file_path
-from flight_storage import flight_directory, flight_temporary_directory, get_video_output_path
+from flight_storage import (
+    flight_directory,
+    flight_temporary_directory,
+    get_video_output_path,
+)
 from models import Flight, VideoExportJob
 from video_acceleration import (
     VideoAccelerator,
@@ -1027,6 +1031,28 @@ def _make_youtube_composition_progress_callback(
     return publish
 
 
+def persist_youtube_telemetry_video(
+    db: Session, flight: Flight, generated_path: Path, export_id: str
+) -> Path:
+    """Move an export into flight media and replace the flight's current telemetry video."""
+    from youtube_upload import cleanup_stale_telemetry_video
+
+    previous_path = flight.youtube_telemetry_video_file_path
+    persisted_path = flight_directory(db, flight) / f"youtube-telemetry-{export_id}.mp4"
+    persisted_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(generated_path), str(persisted_path))
+    flight.youtube_telemetry_video_file_path = str(persisted_path)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        persisted_path.unlink(missing_ok=True)
+        raise
+    if previous_path:
+        cleanup_stale_telemetry_video(db, flight, Path(previous_path))
+    return persisted_path
+
+
 def _run_youtube_telemetry_layout_job(job_id: str) -> None:
     """Run the render while the public wrapper guarantees token cleanup."""
     from gopro_overlay_export import first_gpx_timestamp
@@ -1037,8 +1063,8 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
     )
     from youtube_telemetry_layout_export import export_youtube_telemetry_layout
     from youtube_upload import (
+        discard_youtube_overlay_upload_preparation,
         download_cookies_for_upload_job,
-        enqueue_youtube_overlay_upload,
         fail_youtube_overlay_upload,
     )
 
@@ -1061,7 +1087,8 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
 
     work_dir: Path | None = None
     destination: Path | None = None
-    upload_started = False
+    persisted_path: Path | None = None
+    video_persisted = False
 
     def progress(message: str, download_percent: int | None = None) -> None:
         if _is_cancelled(job_id):
@@ -1116,35 +1143,45 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
             raise YoutubeExportError("Export annulé")
         if destination is None:
             raise YoutubeExportError("Chemin du fichier YouTube introuvable")
-        enqueue_youtube_overlay_upload(job.youtube_upload_job_id, destination)
-        upload_started = True
-        _log_job(job_id, "Vidéo composée et upload YouTube lancé")
+        with SessionLocal() as db:
+            flight = db.get(Flight, job.flight_id)
+            if flight is None:
+                raise YoutubeExportError("Le vol associé à l’export est introuvable")
+            persisted_path = persist_youtube_telemetry_video(db, flight, destination, job_id)
+        video_persisted = True
+        try:
+            discard_youtube_overlay_upload_preparation(job.youtube_upload_job_id)
+        except Exception:
+            logger.exception("Unable to clean up export upload preparation %s", job_id)
+        _log_job(job_id, "Vidéo télémétrique enregistrée dans les médias du vol")
         try:
             _update_job(
                 job_id,
                 status=_STATUS_COMPLETED,
                 progress=100,
-                message="Vidéo composée, envoi YouTube en cours",
-                video_path=str(destination),
+                message="Vidéo télémétrique prête dans les médias du vol",
+                video_path=str(persisted_path),
             )
         except Exception as exc:
             logger.exception("Unable to finalize telemetry-layout export %s", job_id)
-            _log_job(job_id, f"Upload YouTube lancé, statut d’export non mis à jour: {exc}")
+            _log_job(job_id, f"Vidéo enregistrée, statut d’export non mis à jour: {exc}")
     except YoutubeExportError as exc:
         _log_job(job_id, f"Export YouTube échoué: {exc}")
-        if not upload_started:
+        if not video_persisted:
             fail_youtube_overlay_upload(job.youtube_upload_job_id, str(exc))
         _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
     except Exception as exc:
         logger.exception("Unexpected telemetry-layout export error for %s", job_id)
         _log_job(job_id, f"Export YouTube échoué avec une erreur inattendue: {exc}")
-        if not upload_started:
+        if not video_persisted:
             fail_youtube_overlay_upload(job.youtube_upload_job_id, str(exc))
         _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
     finally:
         if work_dir is not None and work_dir.is_dir():
             os.utime(work_dir, None)
-        if not upload_started and destination is not None:
+        if not video_persisted and persisted_path is not None:
+            persisted_path.unlink(missing_ok=True)
+        if not video_persisted and destination is not None:
             destination.unlink(missing_ok=True)
         _clear_job_cancel_requested(job_id)
 

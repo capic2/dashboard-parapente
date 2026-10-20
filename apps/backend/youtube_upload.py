@@ -27,7 +27,11 @@ from spatialmedia import metadata_utils
 
 import config
 from database import SessionLocal
-from flight_storage import flight_sequence_number, temporary_video_path
+from flight_storage import (
+    flight_sequence_number,
+    flight_storage_root,
+    temporary_video_path,
+)
 from models import (
     Flight,
     GoproOverlayJob,
@@ -1095,6 +1099,21 @@ def fail_youtube_overlay_upload(job_id: str, error: str) -> None:
         db.commit()
 
 
+def discard_youtube_overlay_upload_preparation(job_id: str | None) -> None:
+    """Remove the temporary upload record used only to read download cookies."""
+    if not job_id:
+        return
+    with SessionLocal() as db:
+        job = db.get(YoutubeUploadJob, job_id)
+        if (
+            job is not None
+            and job.source_type == "youtube_overlay"
+            and job.status == _PREPARING_STATUS
+        ):
+            db.delete(job)
+            db.commit()
+
+
 def prepare_youtube_overlay_upload_retry(job_id: str) -> bool:
     """Return a failed generated-video upload to its preparation state for export retry."""
     with SessionLocal() as db:
@@ -1282,12 +1301,15 @@ def _session_offset(
 def _finish_upload(job_id: str, video_id: str) -> None:
     youtube_url = f"https://www.youtube.com/watch?v={video_id}"
     generated_overlay_path: Path | None = None
+    stale_telemetry_path: Path | None = None
     with SessionLocal() as db:
         job = db.get(YoutubeUploadJob, job_id)
         if job is None:
             return
         if job.source_type == "youtube_overlay" and job.source_path:
             generated_overlay_path = Path(job.source_path)
+        if job.source_type == "youtube_telemetry" and job.source_path:
+            stale_telemetry_path = Path(job.source_path)
         flight = db.get(Flight, job.flight_id)
         if flight is None:
             raise RuntimeError("Flight was deleted during the YouTube upload")
@@ -1319,6 +1341,8 @@ def _finish_upload(job_id: str, video_id: str) -> None:
         flight_id = flight.id
         db.commit()
         user_id = job.user_id
+        if stale_telemetry_path is not None:
+            cleanup_stale_telemetry_video(db, flight, stale_telemetry_path)
     if generated_overlay_path is not None:
         _delete_generated_overlay_source(generated_overlay_path, cleanup_workspace=True)
     _log_job(job_id, f"YouTube upload completed: {youtube_url}")
@@ -1416,6 +1440,17 @@ def _source_video_path(db: Session, job: YoutubeUploadJob) -> Path:
         if flight is None:
             raise RuntimeError("Flight is no longer available")
         return temporary_video_path(db, flight, job.source_type)
+    if job.source_type == "youtube_telemetry":
+        if not job.source_path:
+            raise RuntimeError("Telemetry upload has no video source")
+        source_path = Path(job.source_path)
+        if source_path.is_symlink():
+            raise RuntimeError("Telemetry video is not available")
+        resolved_path = source_path.resolve()
+        storage_root = flight_storage_root().resolve()
+        if storage_root not in resolved_path.parents or not resolved_path.is_file():
+            raise RuntimeError("Telemetry video is not available in flight storage")
+        return resolved_path
     if job.source_type != "gopro_overlay":
         if job.source_type != "highlight":
             raise RuntimeError("YouTube upload has an unsupported video source")
@@ -1436,6 +1471,41 @@ def _source_video_path(db: Session, job: YoutubeUploadJob) -> Path:
     if overlay is None or overlay.flight_id != job.flight_id or overlay.status != "completed":
         raise RuntimeError("GoPro overlay video is no longer available")
     return Path(overlay.output_path)
+
+
+def cleanup_stale_telemetry_video(db: Session, flight: Flight, source_path: Path) -> None:
+    """Remove a superseded telemetry export once no active upload needs it."""
+    current_path = (
+        Path(flight.youtube_telemetry_video_file_path)
+        if flight.youtube_telemetry_video_file_path
+        else None
+    )
+    try:
+        resolved_path = source_path.resolve()
+        storage_root = flight_storage_root().resolve()
+        if (
+            source_path.is_symlink()
+            or storage_root not in resolved_path.parents
+            or (current_path is not None and current_path.resolve() == resolved_path)
+            or not resolved_path.is_file()
+        ):
+            return
+    except OSError:
+        return
+    active_reference = (
+        db.query(YoutubeUploadJob.id)
+        .filter(
+            YoutubeUploadJob.source_type == "youtube_telemetry",
+            YoutubeUploadJob.source_path == str(source_path),
+            YoutubeUploadJob.status.in_(_VISIBLE_ACTIVE_STATUSES),
+        )
+        .first()
+    )
+    if active_reference is None:
+        try:
+            resolved_path.unlink(missing_ok=True)
+        except OSError:
+            logger.warning("Unable to remove stale telemetry video %s", resolved_path)
 
 
 def _panorama_upload_path(job_id: str) -> Path:
