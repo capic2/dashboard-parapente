@@ -161,6 +161,114 @@ describe('flight telemetry layout XML', () => {
     ).toEqual(grouped);
   });
 
+  it('keeps the layout unchanged when grouping would exceed two hierarchy levels', () => {
+    const layout = [
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[0],
+        id: 'nested-child',
+        groupId: 'child',
+        groupName: 'Child',
+        parentGroupId: 'target',
+        parentGroupName: 'Target',
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[1],
+        id: 'target-one',
+        groupId: 'target',
+        groupName: 'Target',
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[2],
+        id: 'target-two',
+        groupId: 'target',
+        groupName: 'Target',
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[3],
+        id: 'other-one',
+        groupId: 'other',
+        groupName: 'Other',
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[0],
+        id: 'other-two',
+        groupId: 'other',
+        groupName: 'Other',
+      },
+    ];
+
+    expect(
+      groupTelemetryLayoutSelection(
+        layout,
+        ['target-one', 'target-two', 'other-one'],
+        'new-parent',
+        'New parent'
+      )
+    ).toEqual(layout);
+  });
+
+  it('preserves the parent metadata when reusing a nested group', () => {
+    const layout = [
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[0],
+        id: 'parent-item',
+        groupId: 'parent',
+        groupName: 'Parent',
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[1],
+        id: 'child-one',
+        groupId: 'child',
+        groupName: 'Child',
+        parentGroupId: 'parent',
+        parentGroupName: 'Parent',
+        parentGroupBackgroundColor: '#123456',
+        parentGroupBackgroundOpacity: 0.4,
+        parentGroupBorderRadius: 12,
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[2],
+        id: 'child-two',
+        groupId: 'child',
+        groupName: 'Child',
+        parentGroupId: 'parent',
+        parentGroupName: 'Parent',
+        parentGroupBackgroundColor: '#123456',
+        parentGroupBackgroundOpacity: 0.4,
+        parentGroupBorderRadius: 12,
+      },
+      { ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[3], id: 'loose' },
+    ];
+
+    const grouped = groupTelemetryLayoutSelection(
+      layout,
+      ['child-one', 'loose'],
+      'new-group',
+      'New group'
+    );
+
+    expect(grouped.filter((item) => item.groupId === 'child')).toHaveLength(3);
+    expect(
+      grouped
+        .filter((item) => item.groupId === 'child')
+        .map((item) => ({
+          parentGroupId: item.parentGroupId,
+          parentGroupName: item.parentGroupName,
+          parentGroupBackgroundColor: item.parentGroupBackgroundColor,
+          parentGroupBackgroundOpacity: item.parentGroupBackgroundOpacity,
+          parentGroupBorderRadius: item.parentGroupBorderRadius,
+        }))
+    ).toEqual(
+      Array.from({ length: 3 }, () => ({
+        parentGroupId: 'parent',
+        parentGroupName: 'Parent',
+        parentGroupBackgroundColor: '#123456',
+        parentGroupBackgroundOpacity: 0.4,
+        parentGroupBorderRadius: 12,
+      }))
+    );
+  });
+
   it('merges ungrouped items into one selected group without creating a nested group', () => {
     const layout = [
       {

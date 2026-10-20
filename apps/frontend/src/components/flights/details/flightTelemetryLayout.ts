@@ -162,6 +162,11 @@ export function groupTelemetryLayoutSelection(
     completeGroupIds.size > 0 &&
     incompleteGroupIds.length === 1
   ) {
+    const selectedGroupContainsNestedGroups = layout.some(
+      (item) => item.parentGroupId && completeGroupIds.has(item.parentGroupId)
+    );
+    if (selectedGroupContainsNestedGroups) return [...layout];
+
     const targetGroupId = incompleteGroupIds[0];
     const targetGroup = layout.find((item) => item.groupId === targetGroupId);
     if (targetGroup && !targetGroup.parentGroupId) {
@@ -205,24 +210,35 @@ export function groupTelemetryLayoutSelection(
 
   const existingGroupId =
     existingGroupIds.size === 1 ? [...existingGroupIds][0] : undefined;
-  const existingGroupName = existingGroupId
-    ? layout.find((item) => item.groupId === existingGroupId)?.groupName
+  const existingGroupItem = existingGroupId
+    ? layout.find((item) => item.groupId === existingGroupId)
     : undefined;
+  const existingGroupName = existingGroupItem?.groupName;
   return layout.map((item) => {
     if (!selectedIdSet.has(item.id)) return item;
     return {
       ...item,
       groupId: existingGroupId ?? newGroupId,
       groupName: existingGroupName ?? newGroupName,
-      ...(parentGroupIds.size === 1
-        ? {}
-        : {
-            parentGroupId: undefined,
-            parentGroupName: undefined,
-            parentGroupBackgroundColor: undefined,
-            parentGroupBackgroundOpacity: undefined,
-            parentGroupBorderRadius: undefined,
-          }),
+      ...(existingGroupItem
+        ? {
+            parentGroupId: existingGroupItem.parentGroupId,
+            parentGroupName: existingGroupItem.parentGroupName,
+            parentGroupBackgroundColor:
+              existingGroupItem.parentGroupBackgroundColor,
+            parentGroupBackgroundOpacity:
+              existingGroupItem.parentGroupBackgroundOpacity,
+            parentGroupBorderRadius: existingGroupItem.parentGroupBorderRadius,
+          }
+        : parentGroupIds.size === 1
+          ? {}
+          : {
+              parentGroupId: undefined,
+              parentGroupName: undefined,
+              parentGroupBackgroundColor: undefined,
+              parentGroupBackgroundOpacity: undefined,
+              parentGroupBorderRadius: undefined,
+            }),
     };
   });
 }
