@@ -52,13 +52,19 @@ export type YoutubeUploadSource =
   | { source_type: 'pano' }
   | { source_type: 'face' }
   | { source_type: 'pilote' }
+  | { source_type: 'youtube_telemetry' }
   | { source_type: 'highlight'; highlight_video_job_id: string };
 
 type YoutubeUploadSourceFilter =
   | YoutubeUploadSource
   | { source_type: 'youtube_overlay' };
 
-export type TemporaryFlightMediaSource = 'camera' | 'pano' | 'face' | 'pilote';
+export type TemporaryFlightMediaSource =
+  | 'camera'
+  | 'pano'
+  | 'face'
+  | 'pilote'
+  | 'youtube_telemetry';
 type DeletableFlightMediaSource = 'video' | TemporaryFlightMediaSource;
 
 type YoutubeUploadInput = YoutubeUploadSource & {
@@ -73,7 +79,8 @@ export const sourceFromInput = (
   if (
     input.source_type === 'pano' ||
     input.source_type === 'face' ||
-    input.source_type === 'pilote'
+    input.source_type === 'pilote' ||
+    input.source_type === 'youtube_telemetry'
   ) {
     return { source_type: input.source_type };
   }

@@ -697,7 +697,14 @@ class YoutubePlaylistPreparationResponse(BaseModel):
 
 class YoutubeUploadCreate(BaseModel):
     source_type: Literal[
-        "gopro_overlay", "camera", "video", "pano", "face", "pilote", "highlight"
+        "gopro_overlay",
+        "camera",
+        "video",
+        "pano",
+        "face",
+        "pilote",
+        "highlight",
+        "youtube_telemetry",
     ] = "gopro_overlay"
     gopro_overlay_job_id: str | None = None
     highlight_video_job_id: str | None = None
@@ -758,7 +765,15 @@ class YoutubeUploadJobResponse(BaseModel):
     job_id: str
     flight_id: str
     source_type: Literal[
-        "gopro_overlay", "camera", "video", "pano", "face", "pilote", "highlight", "youtube_overlay"
+        "gopro_overlay",
+        "camera",
+        "video",
+        "pano",
+        "face",
+        "pilote",
+        "highlight",
+        "youtube_overlay",
+        "youtube_telemetry",
     ]
     gopro_overlay_job_id: str | None = None
     highlight_video_job_id: str | None = None
@@ -816,6 +831,8 @@ class Flight(FlightBase):
     video_export_progress: int | None = None
     video_file_path: str | None = None
     video_file_exists: bool = False
+    youtube_telemetry_video_file_path: str | None = None
+    youtube_telemetry_video_file_exists: bool = False
     pano_video_file_exists: bool = False
     pano_video_filename: str | None = None
     face_video_file_exists: bool = False

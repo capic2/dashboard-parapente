@@ -45,6 +45,13 @@ def pano_video_path(db: Session, flight: Flight) -> Path:
     return pano_video_paths(db, [flight])[flight.id]
 
 
+def youtube_telemetry_video_path(db: Session, flight: Flight) -> Path:
+    """Return the persisted interactive YouTube telemetry export for a flight."""
+    if flight.youtube_telemetry_video_file_path:
+        return Path(flight.youtube_telemetry_video_file_path)
+    return flight_directory(db, flight) / "youtube-telemetry.mp4"
+
+
 def temporary_video_path(
     db: Session,
     flight: Flight,

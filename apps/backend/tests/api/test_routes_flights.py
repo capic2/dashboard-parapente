@@ -2523,6 +2523,108 @@ class TestDeleteFlightTemporaryMedia:
         assert response.status_code == 409
         assert pano_path.read_bytes() == b"pano"
 
+    def test_old_telemetry_publication_cannot_authorize_deleting_replacement(
+        self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+        monkeypatch.setattr(
+            "routes.youtube_video_availability",
+            lambda grouped: {
+                video_id: True for video_ids in grouped.values() for video_id in video_ids
+            },
+        )
+        old_path = tmp_path / "20261020" / "01" / "youtube-telemetry-old.mp4"
+        current_path = old_path.with_name("youtube-telemetry-current.mp4")
+        old_path.parent.mkdir(parents=True)
+        old_path.write_bytes(b"old export")
+        current_path.write_bytes(b"current export")
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        flight = Flight(
+            id="flight-telemetry-replacement",
+            flight_date=date(2026, 10, 20),
+            youtube_urls=[youtube_url],
+            youtube_telemetry_video_file_path=str(current_path),
+        )
+        db_session.add(flight)
+        db_session.add(
+            YoutubeUploadJob(
+                id="youtube-telemetry-old-publication",
+                flight_id=flight.id,
+                user_id=1,
+                source_type="youtube_telemetry",
+                source_path=str(old_path),
+                status="completed",
+                progress=100,
+                title="Old telemetry export",
+                description="",
+                privacy_status="unlisted",
+                youtube_video_id="dQw4w9WgXcQ",
+                youtube_url=youtube_url,
+            )
+        )
+        db_session.commit()
+
+        response = client.delete(
+            f"{API_PREFIX}/flights/{flight.id}/temporary-media/youtube_telemetry"
+        )
+
+        assert response.status_code == 409
+        assert current_path.read_bytes() == b"current export"
+
+    def test_delete_telemetry_matches_upload_path_through_symlinked_storage_root(
+        self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
+    ) -> None:
+        storage_root = tmp_path / "storage"
+        storage_root.mkdir()
+        storage_alias = tmp_path / "storage-alias"
+        storage_alias.symlink_to(storage_root, target_is_directory=True)
+        monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(storage_alias))
+        monkeypatch.setattr(
+            "routes.youtube_video_availability",
+            lambda grouped: {
+                video_id: True for video_ids in grouped.values() for video_id in video_ids
+            },
+        )
+        flight_dir = storage_root / "20260315" / "01"
+        flight_dir.mkdir(parents=True)
+        canonical_path = flight_dir / "youtube-telemetry-export.mp4"
+        canonical_path.write_bytes(b"telemetry export")
+        alias_path = storage_alias / canonical_path.relative_to(storage_root)
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        flight = Flight(
+            id="flight-telemetry-delete-symlink",
+            flight_date=date(2026, 3, 15),
+            youtube_urls=[youtube_url],
+            youtube_telemetry_video_file_path=str(alias_path),
+        )
+        db_session.add(flight)
+        db_session.add(
+            YoutubeUploadJob(
+                id="youtube-telemetry-symlink-publication",
+                flight_id=flight.id,
+                user_id=1,
+                source_type="youtube_telemetry",
+                source_path=str(canonical_path),
+                status="completed",
+                progress=100,
+                title="Telemetry export",
+                description="",
+                privacy_status="unlisted",
+                youtube_video_id="dQw4w9WgXcQ",
+                youtube_url=youtube_url,
+            )
+        )
+        db_session.commit()
+
+        response = client.delete(
+            f"{API_PREFIX}/flights/{flight.id}/temporary-media/youtube_telemetry"
+        )
+
+        assert response.status_code == 204
+        assert not canonical_path.exists()
+        db_session.refresh(flight)
+        assert flight.youtube_telemetry_video_file_path is None
+
     def test_delete_is_rejected_when_youtube_no_longer_has_the_video(
         self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
     ) -> None:

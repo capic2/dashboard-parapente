@@ -64,9 +64,13 @@ def test_youtube_overlay_pipeline_services_share_parapente_storage():
 
     for service_name in pipeline_services:
         mounts = [
-            str(volume).rsplit(":", 1)[0]
+            (volume["source"] if isinstance(volume, dict) else str(volume).rsplit(":", 1)[0])
             for volume in services[service_name]["volumes"]
-            if str(volume).rsplit(":", 1)[-1] == "/app/parapente"
+            if (
+                volume.get("target") == "/app/parapente"
+                if isinstance(volume, dict)
+                else str(volume).rsplit(":", 1)[-1] == "/app/parapente"
+            )
         ]
 
         assert len(mounts) == 1, f"{service_name} must mount /app/parapente exactly once"
