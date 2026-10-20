@@ -253,7 +253,7 @@ export const DEFAULT_FLIGHT_TELEMETRY_LAYOUT = [
   {
     id: 'total-gain',
     type: 'widget',
-    metric: 'total_gain',
+    metric: 'climb_from_takeoff',
     x: 1574.4,
     y: 151.2,
     width: 307.2,
@@ -263,7 +263,7 @@ export const DEFAULT_FLIGHT_TELEMETRY_LAYOUT = [
   {
     id: 'total-loss',
     type: 'widget',
-    metric: 'total_loss',
+    metric: 'descent_from_takeoff',
     x: 1574.4,
     y: 280.8,
     width: 307.2,

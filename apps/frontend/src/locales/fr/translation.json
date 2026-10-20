@@ -1506,6 +1506,8 @@
     "telemetryHeartRateMax": "FC max.",
     "telemetryTotalGain": "Dénivelé positif",
     "telemetryTotalLoss": "Dénivelé négatif",
+    "telemetryClimbFromTakeoff": "Altitude au-dessus du décollage",
+    "telemetryDescentFromTakeoff": "Altitude sous le décollage",
     "telemetryDateTime": "Date et heure",
     "overlayLayerMissing": "Couche à générer",
     "overlayLayerOutdated": "Couche à régénérer",
