@@ -59,6 +59,7 @@ import {
   parseTelemetryLayoutXml,
   serializeTelemetryLayoutXml,
   alignTelemetryLayoutItems,
+  groupTelemetryLayoutSelection,
   getTelemetryLayoutGroupBounds,
   DEFAULT_TELEMETRY_PIP_VIDEO_SOURCE,
   TELEMETRY_PIP_VIDEO_SOURCES,
@@ -646,60 +647,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
 
   const groupSelected = () => {
     if (selectedIds.length < 2) return;
-    const existingGroupIds = new Set(
-      layout
-        .filter((item) => selectedIds.includes(item.id) && item.groupId)
-        .map((item) => item.groupId)
-    );
-    const selectedGroupItems = layout.filter((item) =>
-      selectedIds.includes(item.id)
-    );
-    const hasSameParentGroup =
-      new Set(selectedGroupItems.map((item) => item.parentGroupId)).size === 1;
-    const canNestGroups =
-      existingGroupIds.size >= 2 &&
-      selectedGroupItems.every((item) => item.groupId) &&
-      [...existingGroupIds].every((groupId) =>
-        layout
-          .filter((item) => item.groupId === groupId)
-          .every((item) => selectedIds.includes(item.id))
-      ) &&
-      hasSameParentGroup &&
-      selectedGroupItems.every((item) => !item.parentGroupId);
-    const existingGroupId =
-      existingGroupIds.size === 1 && !canNestGroups
-        ? [...existingGroupIds][0]
-        : undefined;
-    const existingGroupName = existingGroupId
-      ? layout.find((item) => item.groupId === existingGroupId)?.groupName
-      : undefined;
     const groupId = `group-${Date.now()}-${widgetIdCounter.current++}`;
     const groupName = `Group ${widgetIdCounter.current}`;
     setLayout((current) =>
-      current.map((item) => {
-        if (!selectedIds.includes(item.id)) return item;
-        if (canNestGroups) {
-          return {
-            ...item,
-            parentGroupId: groupId,
-            parentGroupName: groupName,
-          };
-        }
-        return {
-          ...item,
-          groupId: existingGroupId ?? groupId,
-          groupName: existingGroupName ?? groupName,
-          ...(hasSameParentGroup
-            ? {}
-            : {
-                parentGroupId: undefined,
-                parentGroupName: undefined,
-                parentGroupBackgroundColor: undefined,
-                parentGroupBackgroundOpacity: undefined,
-                parentGroupBorderRadius: undefined,
-              }),
-        };
-      })
+      groupTelemetryLayoutSelection(current, selectedIds, groupId, groupName)
     );
   };
 

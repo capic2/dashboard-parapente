@@ -131,6 +131,102 @@ export interface TelemetryLayoutGroupBounds {
   height: number;
 }
 
+export function groupTelemetryLayoutSelection(
+  layout: readonly FlightTelemetryLayoutItem[],
+  selectedIds: readonly string[],
+  newGroupId: string,
+  newGroupName: string
+): FlightTelemetryLayoutItem[] {
+  if (selectedIds.length < 2) return [...layout];
+
+  const selectedIdSet = new Set(selectedIds);
+  const selectedItems = layout.filter((item) => selectedIdSet.has(item.id));
+  const existingGroupIds = new Set(
+    selectedItems
+      .map((item) => item.groupId)
+      .filter((groupId): groupId is string => Boolean(groupId))
+  );
+  const completeGroupIds = new Set(
+    [...existingGroupIds].filter((groupId) =>
+      layout
+        .filter((item) => item.groupId === groupId)
+        .every((item) => selectedIdSet.has(item.id))
+    )
+  );
+  const incompleteGroupIds = [...existingGroupIds].filter(
+    (groupId) => !completeGroupIds.has(groupId)
+  );
+
+  if (
+    selectedItems.every((item) => item.groupId) &&
+    completeGroupIds.size > 0 &&
+    incompleteGroupIds.length === 1
+  ) {
+    const targetGroupId = incompleteGroupIds[0];
+    const targetGroup = layout.find((item) => item.groupId === targetGroupId);
+    if (targetGroup && !targetGroup.parentGroupId) {
+      return layout.map((item) =>
+        selectedIdSet.has(item.id) &&
+        item.groupId &&
+        completeGroupIds.has(item.groupId)
+          ? {
+              ...item,
+              parentGroupId: targetGroupId,
+              parentGroupName: targetGroup.groupName ?? targetGroupId,
+            }
+          : item
+      );
+    }
+  }
+
+  const parentGroupIds = new Set(
+    selectedItems.map((item) => item.parentGroupId)
+  );
+  const canCreateParentGroup =
+    completeGroupIds.size >= 2 &&
+    incompleteGroupIds.length === 0 &&
+    parentGroupIds.size === 1 &&
+    selectedItems.every((item) => item.groupId) &&
+    selectedItems.every((item) => !item.parentGroupId);
+
+  if (canCreateParentGroup) {
+    return layout.map((item) => {
+      if (!selectedIdSet.has(item.id)) return item;
+      if (item.groupId) {
+        return {
+          ...item,
+          parentGroupId: newGroupId,
+          parentGroupName: newGroupName,
+        };
+      }
+      return item;
+    });
+  }
+
+  const existingGroupId =
+    existingGroupIds.size === 1 ? [...existingGroupIds][0] : undefined;
+  const existingGroupName = existingGroupId
+    ? layout.find((item) => item.groupId === existingGroupId)?.groupName
+    : undefined;
+  return layout.map((item) => {
+    if (!selectedIdSet.has(item.id)) return item;
+    return {
+      ...item,
+      groupId: existingGroupId ?? newGroupId,
+      groupName: existingGroupName ?? newGroupName,
+      ...(parentGroupIds.size === 1
+        ? {}
+        : {
+            parentGroupId: undefined,
+            parentGroupName: undefined,
+            parentGroupBackgroundColor: undefined,
+            parentGroupBackgroundOpacity: undefined,
+            parentGroupBorderRadius: undefined,
+          }),
+    };
+  });
+}
+
 export type TelemetryAlignmentDirection =
   | 'left'
   | 'center'
