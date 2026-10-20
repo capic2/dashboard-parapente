@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react';
 import type { FlightVideoMarker } from '@dashboard-parapente/shared-types';
 import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button, Modal } from '@dashboard-parapente/design-system';
 import {
   ChevronLeft,
@@ -189,6 +190,7 @@ export function FlightTelemetryInteractivePreview({
   onCurrentYoutubePositionChange,
 }: FlightTelemetryInteractivePreviewProps) {
   const { t, i18n } = useTranslation();
+  const queryClient = useQueryClient();
   const token = useAuthStore((state) => state.token);
   const overlayPreview = useGoproOverlayPreview(flightId, true);
   const telemetry = useFlightTelemetry(flightId, true);
@@ -205,10 +207,11 @@ export function FlightTelemetryInteractivePreview({
   const startYoutubeTelemetryExport =
     useStartYoutubeTelemetryLayoutExport(flightId);
   const youtubeAssociations = useYoutubeVideoAssociations(flightId);
-  const uploadCookies = useUploadYoutubeDownloadCookies();
-  const youtubeOverlayUpload = useYoutubeUpload(flightId, {
-    source_type: 'youtube_overlay',
+  const youtubeTelemetryUpload = useYoutubeUpload(flightId, {
+    source_type: 'youtube_telemetry',
   });
+  const publishedTelemetryUrl = youtubeTelemetryUpload.data?.youtube_url;
+  const uploadCookies = useUploadYoutubeDownloadCookies();
   const clearedYoutubeExportJobIds = useRef(new Set<string>());
   const cookieFileInput = useRef<HTMLInputElement>(null);
   const [cookieUploadMessage, setCookieUploadMessage] = useState<string | null>(
@@ -219,6 +222,21 @@ export function FlightTelemetryInteractivePreview({
   );
   const { status: youtubeExportStatus, error: youtubeExportStatusError } =
     useVideoExportStatus(youtubeExportJobId);
+  useEffect(() => {
+    if (
+      youtubeExportStatus?.internal_status !== 'completed' &&
+      youtubeExportStatus?.status !== 'completed'
+    ) {
+      return;
+    }
+    void queryClient.invalidateQueries({ queryKey: ['flights'] });
+    void queryClient.invalidateQueries({ queryKey: ['flights', flightId] });
+  }, [
+    flightId,
+    queryClient,
+    youtubeExportStatus?.internal_status,
+    youtubeExportStatus?.status,
+  ]);
   useEffect(() => {
     const activeJobIds = new Set(activeYoutubeExportJobIds);
     for (const jobId of clearedYoutubeExportJobIds.current) {
@@ -242,11 +260,10 @@ export function FlightTelemetryInteractivePreview({
     setYoutubeExportJobId(activeYoutubeExportJobId);
   }, [activeYoutubeExportJobIds, flightId, youtubeExportJobId]);
   const [youtubeExportNow, setYoutubeExportNow] = useState(() => Date.now());
-  const publishedOverlayUrl = youtubeOverlayUpload.data?.youtube_url;
   const validYoutubeUrls = youtubeUrls.filter((url) => getYoutubeVideoId(url));
   const validYoutubeMainUrls = youtubeAssociations.isSuccess
     ? validYoutubeUrls.filter((url) => {
-        if (url === publishedOverlayUrl) return false;
+        if (url === publishedTelemetryUrl) return false;
         const title = youtubeAssociations.data.find(
           (association) => association.url === url
         )?.title;
@@ -257,16 +274,6 @@ export function FlightTelemetryInteractivePreview({
     : [];
   const configuredMainVideoSource =
     layout.data?.layout.mainVideoSource ?? 'auto';
-  const isYoutubeOverlayPublished = Boolean(
-    youtubeOverlayUpload.data?.status === 'completed' &&
-    publishedOverlayUrl &&
-    youtubeUrls.includes(publishedOverlayUrl) &&
-    youtubeAssociations.data?.some(
-      (association) =>
-        association.url === publishedOverlayUrl &&
-        association.exists_on_youtube === true
-    )
-  );
   const [selectedYoutubeIndex, setSelectedYoutubeIndex] = useState(0);
   const isEnrichmentPending =
     telemetry.data?.enrichment_status === 'pending' ||
@@ -578,11 +585,10 @@ export function FlightTelemetryInteractivePreview({
   );
   const shouldShowYoutubeExportProgress = Boolean(
     youtubeExportJobId &&
-    (!isYoutubeOverlayPublished ||
-      isYoutubeExportActive ||
+    (isYoutubeExportActive ||
       youtubeExportStatusValue === 'failed' ||
       youtubeExportStatusValue === 'cancelled' ||
-      youtubeOverlayUpload.isFetching)
+      youtubeExportStatusError)
   );
   const isYoutubeExportStalled =
     isYoutubeExportActive &&

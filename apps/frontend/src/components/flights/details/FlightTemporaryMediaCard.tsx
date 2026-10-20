@@ -42,6 +42,7 @@ export function FlightTemporaryMediaCard({
     pano: 'flights.panoBadge',
     face: 'flights.faceBadge',
     pilote: 'flights.piloteBadge',
+    youtube_telemetry: 'flights.youtubeTelemetryBadge',
   }[sourceType];
   let mediaPath = `temporary-media/${sourceType}`;
   if (isCamera) {
@@ -54,6 +55,8 @@ export function FlightTemporaryMediaCard({
     thumbnailAltKey = 'flights.cameraThumbnailAlt';
   } else if (sourceType === 'pano') {
     thumbnailAltKey = 'flights.panoThumbnailAlt';
+  } else if (sourceType === 'youtube_telemetry') {
+    thumbnailAltKey = 'flights.youtubeTelemetryBadge';
   }
   const title = t(titleKey);
   let filename: string | null | undefined;

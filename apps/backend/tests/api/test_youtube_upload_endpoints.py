@@ -760,6 +760,94 @@ def test_start_youtube_upload_accepts_panorama_source(
     assert enqueued == [job.id]
 
 
+def test_start_telemetry_upload_binds_the_current_export_path(
+    client, db_session, sample_flight, tmp_path, monkeypatch
+):
+    _configure_youtube(monkeypatch)
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    first_path = tmp_path / "20261020" / "01" / "youtube-telemetry-first.mp4"
+    first_path.parent.mkdir(parents=True)
+    first_path.write_bytes(b"first telemetry export")
+    sample_flight.youtube_telemetry_video_file_path = str(first_path)
+    db_session.add(
+        YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
+    )
+    db_session.commit()
+    enqueued: list[str] = []
+    monkeypatch.setattr("routes.enqueue_youtube_upload", enqueued.append)
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload",
+        json={"source_type": "youtube_telemetry", "title": "Telemetry"},
+    )
+
+    assert response.status_code == 202
+    job = db_session.get(YoutubeUploadJob, response.json()["job_id"])
+    assert job is not None
+    assert job.source_path == str(first_path)
+    second_path = first_path.with_name("youtube-telemetry-second.mp4")
+    second_path.write_bytes(b"replacement export")
+    sample_flight.youtube_telemetry_video_file_path = str(second_path)
+    db_session.commit()
+
+    assert youtube_upload._source_video_path(db_session, job) == first_path
+    assert enqueued == [job.id]
+
+
+def test_start_replacement_telemetry_upload_after_previous_version_was_published(
+    client, db_session, sample_flight, tmp_path, monkeypatch
+):
+    _configure_youtube(monkeypatch)
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    monkeypatch.setattr(
+        "routes.youtube_video_availability",
+        lambda grouped: {
+            video_id: True for video_ids in grouped.values() for video_id in video_ids
+        },
+    )
+    old_path = tmp_path / "20261020" / "01" / "youtube-telemetry-old.mp4"
+    current_path = old_path.with_name("youtube-telemetry-current.mp4")
+    old_path.parent.mkdir(parents=True)
+    old_path.write_bytes(b"old export")
+    current_path.write_bytes(b"replacement export")
+    youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    sample_flight.youtube_urls = [youtube_url]
+    sample_flight.youtube_telemetry_video_file_path = str(current_path)
+    db_session.add(
+        YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
+    )
+    db_session.add(
+        YoutubeUploadJob(
+            id="telemetry-old-version-upload",
+            flight_id=sample_flight.id,
+            user_id=1,
+            source_type="youtube_telemetry",
+            source_path=str(old_path),
+            status="completed",
+            progress=100,
+            title="Old telemetry export",
+            description="",
+            privacy_status="unlisted",
+            youtube_video_id="dQw4w9WgXcQ",
+            youtube_url=youtube_url,
+        )
+    )
+    db_session.commit()
+    enqueued: list[str] = []
+    monkeypatch.setattr("routes.enqueue_youtube_upload", enqueued.append)
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload",
+        json={"source_type": "youtube_telemetry", "title": "Replacement telemetry"},
+    )
+
+    assert response.status_code == 202
+    job = db_session.get(YoutubeUploadJob, response.json()["job_id"])
+    assert job is not None
+    assert job.source_path == str(current_path)
+    assert enqueued == [job.id]
+
+
 def test_start_youtube_upload_rejects_missing_panorama(
     client, db_session, sample_flight, tmp_path, monkeypatch
 ):

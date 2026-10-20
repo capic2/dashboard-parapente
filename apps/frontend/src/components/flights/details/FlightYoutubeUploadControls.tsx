@@ -41,10 +41,12 @@ function getDefaultYoutubeTitle(
     role = 'pano';
   } else if (source.source_type === 'pilote') {
     role = 'pilote';
+  } else if (source.source_type === 'youtube_telemetry') {
+    role = 'télémétrie';
   }
   const suffix = ` - ${role}`;
   const titleWithoutRole = baseTitle.replace(
-    /\s*-\s*(face|pilote|pano|vol)$/iu,
+    /\s*-\s*(face|pilote|pano|vol|télémétrie|telemetry)$/iu,
     ''
   );
   return `${titleWithoutRole.slice(0, YOUTUBE_TITLE_MAX_LENGTH - suffix.length).trimEnd()}${suffix}`;
