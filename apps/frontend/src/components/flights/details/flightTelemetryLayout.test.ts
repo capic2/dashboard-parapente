@@ -4,6 +4,7 @@ import {
   DEFAULT_TELEMETRY_PIP_VIDEO_SOURCE,
   TELEMETRY_PIP_VIDEO_SOURCES,
   alignTelemetryLayoutItems,
+  groupTelemetryLayoutSelection,
   getYoutubeVideoRoleFromTitle,
   parseTelemetryLayoutXml,
   serializeTelemetryLayoutXml,
@@ -104,6 +105,92 @@ describe('flight telemetry layout XML', () => {
     expect(
       parseTelemetryLayoutXml(serializeTelemetryLayoutXml(layout))
     ).toEqual(layout);
+  });
+
+  it('keeps a complete group nested inside the partially selected target group', () => {
+    const layout = [
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[0],
+        id: 'source-one',
+        groupId: 'source',
+        groupName: 'Source',
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[1],
+        id: 'source-two',
+        groupId: 'source',
+        groupName: 'Source',
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[2],
+        id: 'target-one',
+        groupId: 'target',
+        groupName: 'Target',
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[3],
+        id: 'target-two',
+        groupId: 'target',
+        groupName: 'Target',
+      },
+    ];
+
+    const grouped = groupTelemetryLayoutSelection(
+      layout,
+      ['source-one', 'source-two', 'target-one'],
+      'new-parent',
+      'New parent'
+    );
+
+    expect(grouped.slice(0, 2)).toMatchObject([
+      {
+        groupId: 'source',
+        parentGroupId: 'target',
+        parentGroupName: 'Target',
+      },
+      {
+        groupId: 'source',
+        parentGroupId: 'target',
+        parentGroupName: 'Target',
+      },
+    ]);
+    expect(grouped[2]).toMatchObject({ groupId: 'target' });
+    expect(grouped[2].parentGroupId).toBeUndefined();
+    expect(
+      parseTelemetryLayoutXml(serializeTelemetryLayoutXml(grouped))
+    ).toEqual(grouped);
+  });
+
+  it('merges ungrouped items into one selected group without creating a nested group', () => {
+    const layout = [
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[0],
+        id: 'source-one',
+        groupId: 'source',
+        groupName: 'Source',
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[1],
+        id: 'source-two',
+        groupId: 'source',
+        groupName: 'Source',
+      },
+      { ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[2], id: 'loose' },
+    ];
+
+    const grouped = groupTelemetryLayoutSelection(
+      layout,
+      ['source-one', 'source-two', 'loose'],
+      'new-parent',
+      'New parent'
+    );
+
+    expect(grouped.map((item) => item.groupId)).toEqual([
+      'source',
+      'source',
+      'source',
+    ]);
+    expect(grouped.every((item) => !item.parentGroupId)).toBe(true);
   });
 
   it('round-trips text elements', () => {
