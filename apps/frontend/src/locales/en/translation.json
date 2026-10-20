@@ -1501,6 +1501,8 @@
     "telemetryHeartRateMax": "Maximum heart rate",
     "telemetryTotalGain": "Total gain",
     "telemetryTotalLoss": "Total loss",
+    "telemetryClimbFromTakeoff": "Height above takeoff",
+    "telemetryDescentFromTakeoff": "Height below takeoff",
     "telemetryDateTime": "Date and time",
     "overlayLayerMissing": "Layer to generate",
     "overlayLayerOutdated": "Layer needs regeneration",

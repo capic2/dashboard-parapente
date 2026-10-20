@@ -20,6 +20,8 @@ export type MetricKey =
   | 'power'
   | 'total_gain'
   | 'total_loss'
+  | 'climb_from_takeoff'
+  | 'descent_from_takeoff'
   | 'datetime';
 
 export const METRIC_KEYS: MetricKey[] = [
@@ -39,6 +41,8 @@ export const METRIC_KEYS: MetricKey[] = [
   'power',
   'total_gain',
   'total_loss',
+  'climb_from_takeoff',
+  'descent_from_takeoff',
   'datetime',
 ];
 
@@ -59,6 +63,8 @@ export const METRIC_LABELS: Record<MetricKey, string> = {
   power: 'telemetryPower',
   total_gain: 'telemetryTotalGain',
   total_loss: 'telemetryTotalLoss',
+  climb_from_takeoff: 'telemetryClimbFromTakeoff',
+  descent_from_takeoff: 'telemetryDescentFromTakeoff',
   datetime: 'telemetryDateTime',
 };
 
@@ -108,6 +114,24 @@ function elevationChange(
   return total;
 }
 
+function elevationFromTakeoff(
+  point: FlightTelemetryPoint | null,
+  data: FlightTelemetryData | undefined,
+  positive: boolean
+) {
+  const takeoffElevation = data?.points[0]?.elevation;
+  if (
+    point?.elevation == null ||
+    takeoffElevation == null ||
+    !Number.isFinite(point.elevation) ||
+    !Number.isFinite(takeoffElevation)
+  ) {
+    return null;
+  }
+  const difference = point.elevation - takeoffElevation;
+  return Math.max(0, positive ? difference : -difference);
+}
+
 export function getTelemetryMetricValue(
   point: FlightTelemetryPoint | null,
   data: FlightTelemetryData | undefined,
@@ -152,6 +176,10 @@ export function getTelemetryMetricValue(
       return [elevationChange(data, true), 'm'];
     case 'total_loss':
       return [elevationChange(data, false), 'm'];
+    case 'climb_from_takeoff':
+      return [elevationFromTakeoff(point, data, true), 'm'];
+    case 'descent_from_takeoff':
+      return [elevationFromTakeoff(point, data, false), 'm'];
     case 'datetime': {
       if (!point) return null;
       const timestamp =
