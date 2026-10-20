@@ -4,9 +4,15 @@ services:
     container_name: ${CONTAINER_PREFIX:-parapente}-redis
     restart: unless-stopped
     ports:
-      - '${REDIS_HOST_PORT:-6379}:6379'
+      - target: 6379
+        published: ${REDIS_HOST_PORT:-6379}
+        protocol: tcp
     volumes:
-      - ${REDIS_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/redis}:/data
+      - type: bind
+        source: ${REDIS_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/redis}
+        target: /data
+        bind:
+          create_host_path: true
     command: redis-server --save 60 1 --loglevel warning --maxmemory 256mb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
@@ -22,7 +28,9 @@ services:
     container_name: ${CONTAINER_PREFIX:-parapente}-backend
     restart: unless-stopped
     ports:
-      - '${BACKEND_HOST_PORT:-8001}:8001'
+      - target: 8001
+        published: ${BACKEND_HOST_PORT:-8001}
+        protocol: tcp
     labels:
       project: dashboard-parapente
       service: backend
@@ -155,12 +163,36 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}:/app/db
-      - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
-      - ${VIDEO_TEMP_IMAGES_HOST_DIR:-/media/nas/DS211_Synology_2/parapente/video-temp-images}:${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
-      - ${EMAGRAM_CACHE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/emagram-cache}:${BACKEND_EMAGRAM_CACHE_DIR:-/app/emagram-cache}
-      - ${CODEX_HOME_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/codex}:/app/codex-home
-      - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
+      - type: bind
+        source: ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}
+        target: /app/db
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}
+        target: ${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${VIDEO_TEMP_IMAGES_HOST_DIR:-/media/nas/DS211_Synology_2/parapente/video-temp-images}
+        target: ${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${EMAGRAM_CACHE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/emagram-cache}
+        target: ${BACKEND_EMAGRAM_CACHE_DIR:-/app/emagram-cache}
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${CODEX_HOME_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/codex}
+        target: /app/codex-home
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}
+        target: /app/parapente
+        bind:
+          create_host_path: true
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8001/health']
       interval: 5s
@@ -191,10 +223,23 @@ services:
       backend:
         condition: service_healthy
     volumes:
-      - ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}:/app/db:ro
+      - type: bind
+        source: ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}
+        target: /app/db
+        read_only: true
+        bind:
+          create_host_path: true
       # This must be storage outside the application host (for example the NAS).
-      - ${DATABASE_BACKUP_HOST_DIR:?DATABASE_BACKUP_HOST_DIR is required}:/backups
-      - ${RCLONE_CONFIG_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/rclone}:/etc/rclone:rw
+      - type: bind
+        source: ${DATABASE_BACKUP_HOST_DIR:?DATABASE_BACKUP_HOST_DIR is required}
+        target: /backups
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${RCLONE_CONFIG_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/rclone}
+        target: /etc/rclone
+        bind:
+          create_host_path: true
     read_only: true
     tmpfs:
       - /tmp
@@ -269,10 +314,26 @@ services:
       backend:
         condition: service_healthy
     volumes:
-      - ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}:/app/db
-      - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
-      - ${VIDEO_TEMP_IMAGES_HOST_DIR:-/media/nas/DS211_Synology_2/parapente/video-temp-images}:${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
-      - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
+      - type: bind
+        source: ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}
+        target: /app/db
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}
+        target: ${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${VIDEO_TEMP_IMAGES_HOST_DIR:-/media/nas/DS211_Synology_2/parapente/video-temp-images}
+        target: ${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}
+        target: /app/parapente
+        bind:
+          create_host_path: true
     healthcheck:
       test:
         [
@@ -322,10 +383,26 @@ services:
       backend:
         condition: service_healthy
     volumes:
-      - ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}:/app/db
-      - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
-      - ${VIDEO_TEMP_IMAGES_HOST_DIR:-/media/nas/DS211_Synology_2/parapente/video-temp-images}:${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
-      - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
+      - type: bind
+        source: ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}
+        target: /app/db
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}
+        target: ${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${VIDEO_TEMP_IMAGES_HOST_DIR:-/media/nas/DS211_Synology_2/parapente/video-temp-images}
+        target: ${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}
+        target: /app/parapente
+        bind:
+          create_host_path: true
     healthcheck:
       test:
         [
@@ -377,9 +454,21 @@ services:
       backend:
         condition: service_healthy
     volumes:
-      - ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}:/app/db
-      - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
-      - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
+      - type: bind
+        source: ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}
+        target: /app/db
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}
+        target: ${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}
+        target: /app/parapente
+        bind:
+          create_host_path: true
     healthcheck:
       test:
         [
@@ -453,10 +542,26 @@ services:
       backend:
         condition: service_healthy
     volumes:
-      - ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}:/app/db
-      - ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}:${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
-      - ${VIDEO_TEMP_IMAGES_HOST_DIR:-/media/nas/DS211_Synology_2/parapente/video-temp-images}:${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
-      - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
+      - type: bind
+        source: ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}
+        target: /app/db
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${VIDEO_EXPORT_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/videos}
+        target: ${BACKEND_VIDEO_EXPORT_DIR:-/app/video-exports}
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${VIDEO_TEMP_IMAGES_HOST_DIR:-/media/nas/DS211_Synology_2/parapente/video-temp-images}
+        target: ${BACKEND_VIDEO_TEMP_IMAGES_DIR:-/app/video-temp-images}
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}
+        target: /app/parapente
+        bind:
+          create_host_path: true
     healthcheck:
       test:
         [
@@ -505,8 +610,16 @@ services:
       backend:
         condition: service_healthy
     volumes:
-      - ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}:/app/db
-      - ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}:/app/parapente
+      - type: bind
+        source: ${DATABASE_HOST_DIR:-/home/capic/docker-data/dashboard-parapente/db}
+        target: /app/db
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${GOPRO_OVERLAY_DATA_HOST_DIR:?GOPRO_OVERLAY_DATA_HOST_DIR is required}
+        target: /app/parapente
+        bind:
+          create_host_path: true
     healthcheck:
       test:
         [

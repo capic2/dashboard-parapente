@@ -132,12 +132,12 @@ export interface TelemetryLayoutGroupBounds {
 }
 
 export function groupTelemetryLayoutSelection(
-  layout: readonly FlightTelemetryLayoutItem[],
+  layout: FlightTelemetryLayoutItem[],
   selectedIds: readonly string[],
   newGroupId: string,
   newGroupName: string
 ): FlightTelemetryLayoutItem[] {
-  if (selectedIds.length < 2) return [...layout];
+  if (selectedIds.length < 2) return layout;
 
   const selectedIdSet = new Set(selectedIds);
   const selectedItems = layout.filter((item) => selectedIdSet.has(item.id));
@@ -156,89 +156,139 @@ export function groupTelemetryLayoutSelection(
   const incompleteGroupIds = [...existingGroupIds].filter(
     (groupId) => !completeGroupIds.has(groupId)
   );
+  const parentGroupIds = new Set(
+    selectedItems.map((item) => item.parentGroupId)
+  );
+  const parentMetadataFrom = (
+    targetGroupId: string,
+    targetGroup: FlightTelemetryLayoutItem
+  ) => ({
+    parentGroupId: targetGroupId,
+    parentGroupName: targetGroup.groupName ?? targetGroupId,
+    parentGroupBackgroundColor: targetGroup.groupBackgroundColor,
+    parentGroupBackgroundOpacity: targetGroup.groupBackgroundOpacity,
+    parentGroupBorderRadius: targetGroup.groupBorderRadius,
+  });
+  const isParentGroup = (groupId: string) =>
+    layout.some((item) => item.parentGroupId === groupId);
 
   if (
     selectedItems.every((item) => item.groupId) &&
     completeGroupIds.size > 0 &&
     incompleteGroupIds.length === 1
   ) {
-    const selectedGroupContainsNestedGroups = layout.some(
-      (item) => item.parentGroupId && completeGroupIds.has(item.parentGroupId)
-    );
-    if (selectedGroupContainsNestedGroups) return [...layout];
-
     const targetGroupId = incompleteGroupIds[0];
     const targetGroup = layout.find((item) => item.groupId === targetGroupId);
     if (targetGroup && !targetGroup.parentGroupId) {
+      if ([...completeGroupIds].some(isParentGroup)) return layout;
       return layout.map((item) =>
         selectedIdSet.has(item.id) &&
         item.groupId &&
         completeGroupIds.has(item.groupId)
           ? {
               ...item,
-              parentGroupId: targetGroupId,
-              parentGroupName: targetGroup.groupName ?? targetGroupId,
+              ...parentMetadataFrom(targetGroupId, targetGroup),
             }
           : item
       );
     }
   }
 
-  const parentGroupIds = new Set(
-    selectedItems.map((item) => item.parentGroupId)
-  );
-  const canCreateParentGroup =
+  const selectedWholeGroups =
     completeGroupIds.size >= 2 &&
     incompleteGroupIds.length === 0 &&
-    parentGroupIds.size === 1 &&
     selectedItems.every((item) => item.groupId) &&
-    selectedItems.every((item) => !item.parentGroupId);
+    selectedItems.every(
+      (item) => item.groupId && completeGroupIds.has(item.groupId)
+    );
 
-  if (canCreateParentGroup) {
+  if (selectedWholeGroups) {
+    const targetGroupId = selectedIds
+      .map((id) => layout.find((item) => item.id === id)?.groupId)
+      .find(
+        (groupId): groupId is string =>
+          Boolean(groupId) &&
+          !layout.find((item) => item.groupId === groupId)?.parentGroupId
+      );
+    const targetGroup = targetGroupId
+      ? layout.find((item) => item.groupId === targetGroupId)
+      : undefined;
+    if (!targetGroupId || !targetGroup) return layout;
+    if (
+      [...completeGroupIds].some(
+        (groupId) => groupId !== targetGroupId && isParentGroup(groupId)
+      )
+    )
+      return layout;
+
     return layout.map((item) => {
-      if (!selectedIdSet.has(item.id)) return item;
-      if (item.groupId) {
-        return {
-          ...item,
-          parentGroupId: newGroupId,
-          parentGroupName: newGroupName,
-        };
-      }
-      return item;
+      if (
+        !selectedIdSet.has(item.id) ||
+        item.groupId === targetGroupId ||
+        !item.groupId
+      )
+        return item;
+      return {
+        ...item,
+        ...parentMetadataFrom(targetGroupId, targetGroup),
+      };
     });
   }
 
   const existingGroupId =
     existingGroupIds.size === 1 ? [...existingGroupIds][0] : undefined;
-  const existingGroupItem = existingGroupId
-    ? layout.find((item) => item.groupId === existingGroupId)
+  const existingGroupName = existingGroupId
+    ? layout.find((item) => item.groupId === existingGroupId)?.groupName
     : undefined;
-  const existingGroupName = existingGroupItem?.groupName;
+  const existingGroupItem = existingGroupId
+    ? (layout.find(
+        (item) =>
+          item.groupId === existingGroupId && !selectedIdSet.has(item.id)
+      ) ?? layout.find((item) => item.groupId === existingGroupId))
+    : undefined;
+  let parentMetadata: Partial<
+    Pick<
+      FlightTelemetryLayoutItemBase,
+      | 'parentGroupId'
+      | 'parentGroupName'
+      | 'parentGroupBackgroundColor'
+      | 'parentGroupBackgroundOpacity'
+      | 'parentGroupBorderRadius'
+    >
+  > = {};
+  if (existingGroupItem) {
+    parentMetadata = {
+      parentGroupId: existingGroupItem.parentGroupId,
+      parentGroupName: existingGroupItem.parentGroupName,
+      parentGroupBackgroundColor: existingGroupItem.parentGroupBackgroundColor,
+      parentGroupBackgroundOpacity:
+        existingGroupItem.parentGroupBackgroundOpacity,
+      parentGroupBorderRadius: existingGroupItem.parentGroupBorderRadius,
+    };
+  } else if (parentGroupIds.size !== 1) {
+    parentMetadata = {
+      parentGroupId: undefined,
+      parentGroupName: undefined,
+      parentGroupBackgroundColor: undefined,
+      parentGroupBackgroundOpacity: undefined,
+      parentGroupBorderRadius: undefined,
+    };
+  }
+  const groupStyle = existingGroupItem
+    ? {
+        groupBackgroundColor: existingGroupItem.groupBackgroundColor,
+        groupBackgroundOpacity: existingGroupItem.groupBackgroundOpacity,
+        groupBorderRadius: existingGroupItem.groupBorderRadius,
+      }
+    : {};
   return layout.map((item) => {
     if (!selectedIdSet.has(item.id)) return item;
     return {
       ...item,
       groupId: existingGroupId ?? newGroupId,
       groupName: existingGroupName ?? newGroupName,
-      ...(existingGroupItem
-        ? {
-            parentGroupId: existingGroupItem.parentGroupId,
-            parentGroupName: existingGroupItem.parentGroupName,
-            parentGroupBackgroundColor:
-              existingGroupItem.parentGroupBackgroundColor,
-            parentGroupBackgroundOpacity:
-              existingGroupItem.parentGroupBackgroundOpacity,
-            parentGroupBorderRadius: existingGroupItem.parentGroupBorderRadius,
-          }
-        : parentGroupIds.size === 1
-          ? {}
-          : {
-              parentGroupId: undefined,
-              parentGroupName: undefined,
-              parentGroupBackgroundColor: undefined,
-              parentGroupBackgroundOpacity: undefined,
-              parentGroupBorderRadius: undefined,
-            }),
+      ...groupStyle,
+      ...parentMetadata,
     };
   });
 }

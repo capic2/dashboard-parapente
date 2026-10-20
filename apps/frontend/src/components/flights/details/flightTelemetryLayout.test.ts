@@ -161,112 +161,264 @@ describe('flight telemetry layout XML', () => {
     ).toEqual(grouped);
   });
 
-  it('keeps the layout unchanged when grouping would exceed two hierarchy levels', () => {
+  it('nests a complete selected group inside the first selected target group', () => {
     const layout = [
       {
         ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[0],
-        id: 'nested-child',
-        groupId: 'child',
-        groupName: 'Child',
-        parentGroupId: 'target',
-        parentGroupName: 'Target',
-      },
-      {
-        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[1],
         id: 'target-one',
         groupId: 'target',
         groupName: 'Target',
       },
       {
-        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[2],
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[1],
         id: 'target-two',
         groupId: 'target',
         groupName: 'Target',
       },
       {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[2],
+        id: 'source-one',
+        groupId: 'source',
+        groupName: 'Source',
+      },
+      {
         ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[3],
+        id: 'source-two',
+        groupId: 'source',
+        groupName: 'Source',
+      },
+    ];
+
+    const grouped = groupTelemetryLayoutSelection(
+      layout,
+      ['target-one', 'target-two', 'source-one', 'source-two'],
+      'new-parent',
+      'New parent'
+    );
+
+    expect(grouped).toMatchObject([
+      { id: 'target-one', groupId: 'target' },
+      { id: 'target-two', groupId: 'target' },
+      {
+        id: 'source-one',
+        groupId: 'source',
+        parentGroupId: 'target',
+        parentGroupName: 'Target',
+      },
+      {
+        id: 'source-two',
+        groupId: 'source',
+        parentGroupId: 'target',
+        parentGroupName: 'Target',
+      },
+    ]);
+    expect(grouped[0].parentGroupId).toBeUndefined();
+    expect(grouped[1].parentGroupId).toBeUndefined();
+    expect(
+      parseTelemetryLayoutXml(serializeTelemetryLayoutXml(grouped))
+    ).toEqual(grouped);
+  });
+
+  it('uses the first unparented selected group as the nesting target', () => {
+    const layout = [
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[0],
+        id: 'nested-one',
+        groupId: 'nested',
+        groupName: 'Nested',
+        parentGroupId: 'old-parent',
+        parentGroupName: 'Old parent',
+        parentGroupBackgroundColor: '#old-parent',
+        parentGroupBackgroundOpacity: 0.2,
+        parentGroupBorderRadius: 2,
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[1],
+        id: 'nested-two',
+        groupId: 'nested',
+        groupName: 'Nested',
+        parentGroupId: 'old-parent',
+        parentGroupName: 'Old parent',
+        parentGroupBackgroundColor: '#old-parent',
+        parentGroupBackgroundOpacity: 0.2,
+        parentGroupBorderRadius: 2,
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[2],
+        id: 'target-one',
+        groupId: 'target',
+        groupName: 'Target',
+        groupBackgroundColor: '#123456',
+        groupBackgroundOpacity: 0.8,
+        groupBorderRadius: 12,
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[3],
+        id: 'target-two',
+        groupId: 'target',
+        groupName: 'Target',
+        groupBackgroundColor: '#123456',
+        groupBackgroundOpacity: 0.8,
+        groupBorderRadius: 12,
+      },
+    ];
+
+    const grouped = groupTelemetryLayoutSelection(
+      layout,
+      ['nested-one', 'nested-two', 'target-one', 'target-two'],
+      'new-parent',
+      'New parent'
+    );
+
+    expect(grouped).toMatchObject([
+      {
+        id: 'nested-one',
+        groupId: 'nested',
+        parentGroupId: 'target',
+        parentGroupName: 'Target',
+        parentGroupBackgroundColor: '#123456',
+        parentGroupBackgroundOpacity: 0.8,
+        parentGroupBorderRadius: 12,
+      },
+      {
+        id: 'nested-two',
+        groupId: 'nested',
+        parentGroupId: 'target',
+        parentGroupName: 'Target',
+        parentGroupBackgroundColor: '#123456',
+        parentGroupBackgroundOpacity: 0.8,
+        parentGroupBorderRadius: 12,
+      },
+      { id: 'target-one', groupId: 'target' },
+      { id: 'target-two', groupId: 'target' },
+    ]);
+    expect(
+      parseTelemetryLayoutXml(serializeTelemetryLayoutXml(grouped))
+    ).toEqual(grouped);
+  });
+
+  it('does not nest a group that already contains a nested group', () => {
+    const layout = [
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[0],
+        id: 'source-one',
+        groupId: 'source',
+        groupName: 'Source',
+        parentGroupId: 'target',
+        parentGroupName: 'Target',
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[1],
+        id: 'source-two',
+        groupId: 'source',
+        groupName: 'Source',
+        parentGroupId: 'target',
+        parentGroupName: 'Target',
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[2],
+        id: 'target-one',
+        groupId: 'target',
+        groupName: 'Target',
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[3],
+        id: 'target-two',
+        groupId: 'target',
+        groupName: 'Target',
+      },
+      {
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[4],
         id: 'other-one',
         groupId: 'other',
         groupName: 'Other',
       },
       {
-        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[0],
+        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[5],
         id: 'other-two',
         groupId: 'other',
         groupName: 'Other',
       },
     ];
 
-    expect(
-      groupTelemetryLayoutSelection(
-        layout,
-        ['target-one', 'target-two', 'other-one'],
-        'new-parent',
-        'New parent'
-      )
-    ).toEqual(layout);
+    const partialTargetNesting = groupTelemetryLayoutSelection(
+      layout,
+      ['target-one', 'target-two', 'other-one'],
+      'new-parent',
+      'New parent'
+    );
+    const wholeGroupNesting = groupTelemetryLayoutSelection(
+      layout,
+      ['other-one', 'other-two', 'target-one', 'target-two'],
+      'new-parent',
+      'New parent'
+    );
+
+    expect(partialTargetNesting).toBe(layout);
+    expect(wholeGroupNesting).toBe(layout);
   });
 
-  it('preserves the parent metadata when reusing a nested group', () => {
+  it('preserves the existing parent when an ungrouped item joins part of a nested group', () => {
     const layout = [
+      { ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[2], id: 'loose' },
       {
         ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[0],
-        id: 'parent-item',
-        groupId: 'parent',
-        groupName: 'Parent',
+        id: 'nested-one',
+        groupId: 'nested',
+        groupName: 'Nested',
+        groupBackgroundColor: '#123456',
+        groupBackgroundOpacity: 0.8,
+        groupBorderRadius: 12,
+        parentGroupId: 'parent',
+        parentGroupName: 'Parent',
       },
       {
         ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[1],
-        id: 'child-one',
-        groupId: 'child',
-        groupName: 'Child',
+        id: 'nested-two',
+        groupId: 'nested',
+        groupName: 'Nested',
+        groupBackgroundColor: '#123456',
+        groupBackgroundOpacity: 0.8,
+        groupBorderRadius: 12,
         parentGroupId: 'parent',
         parentGroupName: 'Parent',
-        parentGroupBackgroundColor: '#123456',
-        parentGroupBackgroundOpacity: 0.4,
-        parentGroupBorderRadius: 12,
       },
-      {
-        ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[2],
-        id: 'child-two',
-        groupId: 'child',
-        groupName: 'Child',
-        parentGroupId: 'parent',
-        parentGroupName: 'Parent',
-        parentGroupBackgroundColor: '#123456',
-        parentGroupBackgroundOpacity: 0.4,
-        parentGroupBorderRadius: 12,
-      },
-      { ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[3], id: 'loose' },
     ];
 
     const grouped = groupTelemetryLayoutSelection(
       layout,
-      ['child-one', 'loose'],
-      'new-group',
-      'New group'
+      ['loose', 'nested-one'],
+      'new-parent',
+      'New parent'
     );
 
-    expect(grouped.filter((item) => item.groupId === 'child')).toHaveLength(3);
+    expect(grouped[0]).toMatchObject({
+      groupId: 'nested',
+      groupBackgroundColor: '#123456',
+      groupBackgroundOpacity: 0.8,
+      groupBorderRadius: 12,
+      parentGroupId: 'parent',
+      parentGroupName: 'Parent',
+    });
+    expect(grouped[1]).toMatchObject({
+      groupId: 'nested',
+      groupBackgroundColor: '#123456',
+      groupBackgroundOpacity: 0.8,
+      groupBorderRadius: 12,
+      parentGroupId: 'parent',
+      parentGroupName: 'Parent',
+    });
+    expect(grouped[2]).toMatchObject({
+      groupId: 'nested',
+      groupBackgroundColor: '#123456',
+      groupBackgroundOpacity: 0.8,
+      groupBorderRadius: 12,
+      parentGroupId: 'parent',
+      parentGroupName: 'Parent',
+    });
     expect(
-      grouped
-        .filter((item) => item.groupId === 'child')
-        .map((item) => ({
-          parentGroupId: item.parentGroupId,
-          parentGroupName: item.parentGroupName,
-          parentGroupBackgroundColor: item.parentGroupBackgroundColor,
-          parentGroupBackgroundOpacity: item.parentGroupBackgroundOpacity,
-          parentGroupBorderRadius: item.parentGroupBorderRadius,
-        }))
-    ).toEqual(
-      Array.from({ length: 3 }, () => ({
-        parentGroupId: 'parent',
-        parentGroupName: 'Parent',
-        parentGroupBackgroundColor: '#123456',
-        parentGroupBackgroundOpacity: 0.4,
-        parentGroupBorderRadius: 12,
-      }))
-    );
+      parseTelemetryLayoutXml(serializeTelemetryLayoutXml(grouped))
+    ).toEqual(grouped);
   });
 
   it('merges ungrouped items into one selected group without creating a nested group', () => {
