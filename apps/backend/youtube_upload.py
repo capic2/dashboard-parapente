@@ -1496,7 +1496,7 @@ def cleanup_stale_telemetry_video(db: Session, flight: Flight, source_path: Path
         db.query(YoutubeUploadJob.id)
         .filter(
             YoutubeUploadJob.source_type == "youtube_telemetry",
-            YoutubeUploadJob.source_path == str(source_path),
+            YoutubeUploadJob.source_path.in_({str(source_path), str(resolved_path)}),
             YoutubeUploadJob.status.in_(_VISIBLE_ACTIVE_STATUSES),
         )
         .first()

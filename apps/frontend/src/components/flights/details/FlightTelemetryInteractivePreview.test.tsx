@@ -6,6 +6,7 @@ import type { FlightTelemetryData } from '../../../hooks/flights/useFlightTeleme
 import { FlightTelemetryInteractivePreview } from './FlightTelemetryInteractivePreview';
 
 const hooks = vi.hoisted(() => ({
+  invalidateQueries: vi.fn(),
   overlayPreview: {
     data: null as unknown as GoproOverlayPreview | undefined,
     isPending: true,
@@ -42,6 +43,10 @@ const hooks = vi.hoisted(() => ({
     total_frames?: number;
     log_tail?: string[];
   } | null,
+}));
+
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({ invalidateQueries: hooks.invalidateQueries }),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -169,6 +174,21 @@ vi.mock('./FlightTelemetryOverlay', () => ({
 }));
 
 describe('FlightTelemetryInteractivePreview', () => {
+  it('invalidates flight detail queries when telemetry export completes', () => {
+    hooks.invalidateQueries.mockClear();
+    hooks.exportStatus = { status: 'completed' };
+
+    render(<FlightTelemetryInteractivePreview flightId="flight-1" />);
+
+    expect(hooks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['flights'],
+    });
+    expect(hooks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['flights', 'flight-1'],
+    });
+    hooks.exportStatus = null;
+  });
+
   it('shows a loading state while telemetry requests are pending', () => {
     render(<FlightTelemetryInteractivePreview flightId="flight-1" />);
 

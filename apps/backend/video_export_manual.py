@@ -1038,7 +1038,7 @@ def persist_youtube_telemetry_video(
     from youtube_upload import cleanup_stale_telemetry_video
 
     previous_path = flight.youtube_telemetry_video_file_path
-    persisted_path = flight_directory(db, flight) / f"youtube-telemetry-{export_id}.mp4"
+    persisted_path = (flight_directory(db, flight) / f"youtube-telemetry-{export_id}.mp4").resolve()
     persisted_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(generated_path), str(persisted_path))
     flight.youtube_telemetry_video_file_path = str(persisted_path)

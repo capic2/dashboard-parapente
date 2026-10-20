@@ -230,7 +230,9 @@ export function FlightTelemetryInteractivePreview({
       return;
     }
     void queryClient.invalidateQueries({ queryKey: ['flights'] });
+    void queryClient.invalidateQueries({ queryKey: ['flights', flightId] });
   }, [
+    flightId,
     queryClient,
     youtubeExportStatus?.internal_status,
     youtubeExportStatus?.status,

@@ -23,7 +23,11 @@ import youtube_overlay_export
 
 
 def test_persist_youtube_telemetry_video_replaces_flight_media(tmp_path, monkeypatch, db_session):
-    monkeypatch.setattr(video_export_manual.config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    storage_root = tmp_path / "storage"
+    storage_root.mkdir()
+    storage_alias = tmp_path / "storage-alias"
+    storage_alias.symlink_to(storage_root, target_is_directory=True)
+    monkeypatch.setattr(video_export_manual.config, "PARAGLIDING_DATA_ROOT", str(storage_alias))
     flight = Flight(id="telemetry-persist-flight", flight_date=date(2026, 10, 20))
     db_session.add(flight)
     db_session.commit()
@@ -34,6 +38,7 @@ def test_persist_youtube_telemetry_video_replaces_flight_media(tmp_path, monkeyp
         db_session, flight, first_export, "first-export"
     )
 
+    assert first_path == first_path.resolve()
     assert flight.youtube_telemetry_video_file_path == str(first_path)
     assert first_path.read_bytes() == b"first export"
     assert not first_export.exists()
@@ -52,6 +57,9 @@ def test_persist_youtube_telemetry_video_replaces_flight_media(tmp_path, monkeyp
             privacy_status="unlisted",
         )
     )
+    db_session.commit()
+    legacy_alias_path = storage_alias / first_path.relative_to(storage_root)
+    flight.youtube_telemetry_video_file_path = str(legacy_alias_path)
     db_session.commit()
     second_export = tmp_path / "second-render.mp4"
     second_export.write_bytes(b"replacement export")

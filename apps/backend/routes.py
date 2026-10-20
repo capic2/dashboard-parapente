@@ -6197,8 +6197,14 @@ def delete_flight_temporary_media(
         YoutubeUploadJob.youtube_video_id.is_not(None),
     )
     if source_type == "youtube_telemetry":
+        telemetry_path = youtube_telemetry_video_path(db, flight)
         completed_upload_query = completed_upload_query.filter(
-            YoutubeUploadJob.source_path == str(youtube_telemetry_video_path(db, flight))
+            YoutubeUploadJob.source_path.in_(
+                {
+                    str(telemetry_path),
+                    str(telemetry_path.resolve()),
+                }
+            )
         )
     completed_uploads = completed_upload_query.all()
     video_ids = {

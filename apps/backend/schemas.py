@@ -765,7 +765,15 @@ class YoutubeUploadJobResponse(BaseModel):
     job_id: str
     flight_id: str
     source_type: Literal[
-        "gopro_overlay", "camera", "video", "pano", "face", "pilote", "highlight", "youtube_overlay"
+        "gopro_overlay",
+        "camera",
+        "video",
+        "pano",
+        "face",
+        "pilote",
+        "highlight",
+        "youtube_overlay",
+        "youtube_telemetry",
     ]
     gopro_overlay_job_id: str | None = None
     highlight_video_job_id: str | None = None
