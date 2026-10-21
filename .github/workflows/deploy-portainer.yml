@@ -46,6 +46,54 @@ jobs:
               core.notice('Queued a deployment for current main ' + data.commit.sha);
             }
 
+      - name: Resolve and pin production SSH host
+        id: ssh_dns
+        if: steps.freshness.outputs.is_current == 'true'
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$SSH_HOST" ]]; then
+            echo "::error::SSH_HOST is not configured; stopping before image build and production drain."
+            exit 1
+          fi
+
+          if python3 - "$SSH_HOST" <<'PY'
+          import ipaddress
+          import sys
+
+          try:
+              ipaddress.ip_address(sys.argv[1])
+          except ValueError:
+              raise SystemExit(1)
+          PY
+          then
+            echo "SSH target is an IP address; DNS lookup is not required."
+            exit 0
+          fi
+
+          max_attempts=6
+          for attempt in $(seq 1 "$max_attempts"); do
+            resolved_addresses=$(timeout 5s getent ahosts "$SSH_HOST" 2>/dev/null | awk '!seen[$1]++ { print $1 }') || true
+            if [[ -n "$resolved_addresses" ]]; then
+              while IFS= read -r address; do
+                [[ -n "$address" ]] || continue
+                printf '%s %s\n' "$address" "$SSH_HOST" | sudo tee -a /etc/hosts >/dev/null
+              done <<< "$resolved_addresses"
+              echo "Production SSH hostname resolved and pinned for this runner on attempt $attempt/$max_attempts."
+              exit 0
+            fi
+
+            echo "Production SSH DNS lookup attempt $attempt/$max_attempts failed."
+            if [[ "$attempt" -lt "$max_attempts" ]]; then
+              sleep 5
+            fi
+          done
+
+          echo "::error::Production SSH hostname did not resolve after $max_attempts attempts; stopping before image build and production drain."
+          exit 1
+
       - name: Compute deployment version
         id: version
         if: steps.freshness.outputs.is_current == 'true'
