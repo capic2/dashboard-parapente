@@ -277,6 +277,7 @@ export const FlightSummarySchema = z.object({
         'pilote',
         'highlight',
         'youtube_overlay',
+        'youtube_telemetry',
       ])
     )
     .optional(),
