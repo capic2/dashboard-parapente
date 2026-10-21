@@ -37,12 +37,14 @@ export function TelemetrySpeedometer({
   value,
   unit,
   showUnit = true,
+  valuePrefix = '',
   variant = 'speedometer',
 }: {
   metric: MetricKey;
   value: number | string | null | undefined;
   unit: string;
   showUnit?: boolean;
+  valuePrefix?: string;
   variant?: TelemetryWidgetVariant;
 }) {
   const maximum = maximumForMetric(metric);
@@ -55,7 +57,7 @@ export function TelemetrySpeedometer({
   );
   const needleAngle = -225 + ratio * 270;
   const needle = polarPoint(needleAngle, 31);
-  const valueLabel = formatTelemetryValue(value, '');
+  const valueLabel = `${valuePrefix}${formatTelemetryValue(value, '')}`;
   const dialLabels = Array.from({ length: 6 }, (_, index) => {
     const point = polarPoint(-225 + index * 54, 28);
     return {

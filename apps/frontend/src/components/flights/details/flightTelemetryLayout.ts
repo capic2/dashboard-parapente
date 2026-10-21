@@ -94,6 +94,7 @@ interface FlightTelemetryLayoutItemBase {
 export interface FlightTelemetryWidgetLayout extends FlightTelemetryLayoutItemBase {
   type: 'widget';
   metric: MetricKey;
+  valuePrefix?: string;
   variant?: TelemetryWidgetVariant;
   valueAlign?: TelemetryValueAlignment;
   clickAction?: TelemetryInteractionAction;
@@ -681,6 +682,10 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
       )
         ? { variant: element.getAttribute('variant') as TelemetryWidgetVariant }
         : {};
+    const valuePrefix =
+      type === 'widget' && element.hasAttribute('value-prefix')
+        ? { valuePrefix: element.getAttribute('value-prefix') ?? '' }
+        : {};
     const valueAlign =
       type === 'widget' &&
       VALUE_ALIGNMENTS.includes(
@@ -770,6 +775,7 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
       styling,
       interactions,
       variant,
+      valuePrefix,
       valueAlign,
       {
         type: 'widget' as const,
@@ -887,6 +893,10 @@ export function serializeTelemetryLayoutXml(
         item.type === 'widget' && item.variant
           ? ` variant="${item.variant}"`
           : '';
+      const valuePrefix =
+        item.type === 'widget' && item.valuePrefix
+          ? ` value-prefix="${escapeXml(item.valuePrefix)}"`
+          : '';
       const valueAlign =
         item.type === 'widget' && item.valueAlign
           ? ` align="${item.valueAlign}"`
@@ -901,7 +911,7 @@ export function serializeTelemetryLayoutXml(
           : '';
       const pipSource =
         item.type === 'pip' && item.source ? ` source="${item.source}"` : '';
-      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${backgroundColor}${backgroundOpacity}${border}${labelVisibility}${unitVisibility}${fontSize}${clickAction}${longPressAction}${variant}${valueAlign}${textAlign} x="${(item.x / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" y="${(item.y / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" width="${(item.width / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" height="${(item.height / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" visible="${item.visible ? 'true' : 'false'}"`;
+      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${backgroundColor}${backgroundOpacity}${border}${labelVisibility}${unitVisibility}${fontSize}${clickAction}${longPressAction}${variant}${valuePrefix}${valueAlign}${textAlign} x="${(item.x / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" y="${(item.y / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" width="${(item.width / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" height="${(item.height / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" visible="${item.visible ? 'true' : 'false'}"`;
       if (item.type === 'icon') return `<icon ${common} name="${item.icon}" />`;
       if (item.type === 'text') {
         return `<text ${common} content="${escapeXml(item.content)}" />`;

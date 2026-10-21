@@ -2150,6 +2150,8 @@
     "visible": "Visible",
     "showLabel": "Show label",
     "showUnit": "Show unit",
+    "valuePrefix": "Value prefix",
+    "valuePrefixPlaceholder": "E.g. + or −",
     "fontSize": "Font size (px)",
     "valueAlignment": "Value alignment",
     "textAlignment": "Text alignment",
