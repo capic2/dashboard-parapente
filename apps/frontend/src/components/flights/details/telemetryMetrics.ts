@@ -80,6 +80,8 @@ const POINT_INDEPENDENT_METRICS = new Set<MetricKey>([
   'heart_rate_max',
   'total_gain',
   'total_loss',
+  'climb_from_takeoff',
+  'descent_from_takeoff',
 ]);
 
 function numericValues(
@@ -115,21 +117,23 @@ function elevationChange(
 }
 
 function elevationFromTakeoff(
-  point: FlightTelemetryPoint | null,
   data: FlightTelemetryData | undefined,
+  altitudes: readonly number[],
   positive: boolean
 ) {
   const takeoffElevation = data?.points[0]?.elevation;
+  const extremeElevation = positive ? maximum(altitudes) : minimum(altitudes);
   if (
-    point?.elevation == null ||
     takeoffElevation == null ||
-    !Number.isFinite(point.elevation) ||
-    !Number.isFinite(takeoffElevation)
+    !Number.isFinite(takeoffElevation) ||
+    extremeElevation == null
   ) {
     return null;
   }
-  const difference = point.elevation - takeoffElevation;
-  return Math.max(0, positive ? difference : -difference);
+  const difference = positive
+    ? extremeElevation - takeoffElevation
+    : takeoffElevation - extremeElevation;
+  return Math.max(0, difference);
 }
 
 export function getTelemetryMetricValue(
@@ -177,9 +181,9 @@ export function getTelemetryMetricValue(
     case 'total_loss':
       return [elevationChange(data, false), 'm'];
     case 'climb_from_takeoff':
-      return [elevationFromTakeoff(point, data, true), 'm'];
+      return [elevationFromTakeoff(data, altitudes, true), 'm'];
     case 'descent_from_takeoff':
-      return [elevationFromTakeoff(point, data, false), 'm'];
+      return [elevationFromTakeoff(data, altitudes, false), 'm'];
     case 'datetime': {
       if (!point) return null;
       const timestamp =
