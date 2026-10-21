@@ -32,6 +32,8 @@ VALID_METRICS = {
     "power",
     "total_gain",
     "total_loss",
+    "climb_from_takeoff",
+    "descent_from_takeoff",
     "datetime",
 }
 VALID_ICONS = {

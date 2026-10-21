@@ -32,6 +32,16 @@ def test_layouts_can_contain_added_widgets() -> None:
     assert 'id="extra"' in validate_telemetry_layout_xml(xml)
 
 
+@pytest.mark.parametrize("metric", ["climb_from_takeoff", "descent_from_takeoff"])
+def test_layouts_can_contain_takeoff_relative_metrics(metric: str) -> None:
+    xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
+        "</telemetry-layout>",
+        f'<widget id="{metric}" metric="{metric}" x="0.4" y="0.4" width="0.1" height="0.1" visible="true" /></telemetry-layout>',
+    )
+
+    assert f'metric="{metric}"' in validate_telemetry_layout_xml(xml)
+
+
 def test_layouts_can_contain_icons_and_groups() -> None:
     xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
         '<widget id="top-left"',
