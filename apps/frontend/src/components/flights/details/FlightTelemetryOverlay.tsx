@@ -261,7 +261,7 @@ export function FlightTelemetryOverlay({
                 }
                 if (hasClickAction) cycleMetric();
               }}
-              aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${formatTelemetryValue(value)}${slot.showUnit === false ? '' : ` ${unit}`}. ${t('flights.telemetryChangeMetric')}`}
+              aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${slot.valuePrefix ?? ''}${formatTelemetryValue(value)}${slot.showUnit === false ? '' : ` ${unit}`}. ${t('flights.telemetryChangeMetric')}`}
             >
               {slot.variant && slot.variant !== 'value' ? (
                 <TelemetrySpeedometer
@@ -269,6 +269,7 @@ export function FlightTelemetryOverlay({
                   value={value}
                   unit={unit}
                   showUnit={slot.showUnit !== false}
+                  valuePrefix={slot.valuePrefix}
                   variant={slot.variant}
                 />
               ) : null}
@@ -276,6 +277,7 @@ export function FlightTelemetryOverlay({
                 className="mt-0.5 block font-mono font-bold leading-none"
                 style={{ fontSize: '1em' }}
               >
+                {slot.valuePrefix ?? ''}
                 {formatTelemetryValue(value)}
                 {slot.showUnit !== false && (
                   <span
