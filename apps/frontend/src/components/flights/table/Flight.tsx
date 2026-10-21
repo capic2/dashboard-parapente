@@ -150,6 +150,7 @@ export function Flight({
   const youtubeTypeLabels: Record<string, string> = {
     gopro_overlay: 'flights.goproOverlayBadge',
     youtube_overlay: 'flights.goproOverlayBadge',
+    youtube_telemetry: 'flights.youtubeTelemetryBadge',
     camera: 'flights.cameraBadge',
     video: 'flights.videoBadge',
     pano: 'flights.panoBadge',
