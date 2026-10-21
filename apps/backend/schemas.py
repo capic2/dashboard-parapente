@@ -901,6 +901,7 @@ class FlightSummary(BaseModel):
             "pilote",
             "highlight",
             "youtube_overlay",
+            "youtube_telemetry",
         ]
     ] = Field(default_factory=list)
     youtube_upload_status: str | None = None
