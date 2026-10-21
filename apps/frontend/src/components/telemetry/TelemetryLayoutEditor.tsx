@@ -119,7 +119,7 @@ function clamp(value: number, minimum: number, maximum: number) {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
-async function compressBackgroundImage(file: File) {
+async function compressBackgroundImage(file: File, maxLength: number) {
   const original = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () =>
@@ -130,7 +130,7 @@ async function compressBackgroundImage(file: File) {
       reject(reader.error ?? new Error('Unable to read background image'));
     reader.readAsDataURL(file);
   });
-  if (original.length <= MAX_BACKGROUND_IMAGE_LENGTH) return original;
+  if (original.length <= maxLength) return original;
 
   const objectUrl = URL.createObjectURL(file);
   try {
@@ -165,7 +165,7 @@ async function compressBackgroundImage(file: File) {
         const compressed = webp.startsWith('data:image/webp')
           ? webp
           : canvas.toDataURL('image/jpeg', quality);
-        if (compressed.length <= MAX_BACKGROUND_IMAGE_LENGTH) {
+        if (compressed.length <= maxLength) {
           return compressed;
         }
       }
@@ -389,7 +389,25 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const handleBackgroundImage = async (file: File | undefined) => {
     if (!file) return;
     try {
-      const compressedImage = await compressBackgroundImage(file);
+      const xmlWithoutImage = serializeTelemetryLayoutXml(layout, {
+        mainVideoSource,
+      }).length;
+      const imageAttributeLength =
+        serializeTelemetryLayoutXml(layout, {
+          backgroundImage: 'x',
+          mainVideoSource,
+        }).length - xmlWithoutImage;
+      const availableImageLength = Math.min(
+        MAX_BACKGROUND_IMAGE_LENGTH,
+        MAX_LAYOUT_XML_LENGTH - xmlWithoutImage - imageAttributeLength
+      );
+      if (availableImageLength <= 0) {
+        throw new Error('Telemetry layout is too large for a background image');
+      }
+      const compressedImage = await compressBackgroundImage(
+        file,
+        availableImageLength
+      );
       setSaveError(undefined);
       setBackgroundImage(compressedImage);
     } catch {
@@ -458,7 +476,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     const emptyText = layout.find(
       (item) => item.type === 'text' && item.content.trim().length === 0
     );
-    const xmlLength = serializeTelemetryLayoutXml(layout).length;
+    const xmlLength = serializeTelemetryLayoutXml(layout, {
+      backgroundImage,
+      mainVideoSource,
+    }).length;
     let validationMessage: string | undefined;
     if (invalidName) validationMessage = t('telemetryLayout.nameTooLong');
     else if (invalidGroupName)
