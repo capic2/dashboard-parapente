@@ -30,6 +30,7 @@ import {
   useFlightOverlayLayer,
   useGoproOverlayJobStream,
 } from '../../../hooks/gopro/useGoproOverlay';
+import { isYoutubeUploadProgressVisible } from '../../../lib/flightMediaState';
 import {
   useCancelFlightHighlightVideo,
   useCreateFlightHighlightVideo,
@@ -606,7 +607,9 @@ export function FlightDetails({
     effectiveGoproOverlayJobId ||
     flight.gopro_overlay_status ||
     persistedGoproOverlays.length > 0 ||
-    youtubeUploadJob?.job_id ||
+    overlayLayer.data?.job?.job_id ||
+    (youtubeUploadJob?.job_id &&
+      isYoutubeUploadProgressVisible(youtubeUploadJob)) ||
     activeYoutubeTelemetryExportJob?.job_id ||
     latestHighlightVideo?.job_id
   );
