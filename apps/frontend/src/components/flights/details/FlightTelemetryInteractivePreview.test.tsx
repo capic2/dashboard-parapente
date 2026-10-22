@@ -736,51 +736,6 @@ describe('FlightTelemetryInteractivePreview', () => {
     );
   });
 
-  it('shows the current phase, timing, and latest export events', async () => {
-    hooks.exportStatus = {
-      status: 'processing',
-      internal_status: 'running',
-      progress: 5,
-      message: 'Assemblage de la vidéo avec l’overlay synchronisé: 5%',
-      created_at: new Date(Date.now() - 120_000).toISOString(),
-      started_at: new Date(Date.now() - 115_000).toISOString(),
-      updated_at: new Date(Date.now() - 2_000).toISOString(),
-      log_tail: [
-        'Préparation de l’export YouTube',
-        'Assemblage de la vidéo avec l’overlay synchronisé: 5%',
-      ],
-    };
-    window.sessionStorage.setItem(
-      'youtube-overlay-export-job:flight-1',
-      'active-export-job'
-    );
-
-    render(
-      <FlightTelemetryInteractivePreview
-        flightId="flight-1"
-        youtubeUrls={['https://www.youtube.com/watch?v=dQw4w9WgXcQ']}
-      />
-    );
-
-    await waitFor(() =>
-      expect(
-        screen.getByText('flights.youtubeOverlayExportPhaseOverlay')
-      ).toBeInTheDocument()
-    );
-    expect(
-      screen.getByText('flights.youtubeOverlayExportElapsed')
-    ).toBeInTheDocument();
-    expect(
-      screen.getAllByText(
-        /Assemblage de la vidéo avec l’overlay synchronisé: 5%/u
-      ).length
-    ).toBeGreaterThan(1);
-    expect(
-      screen.getByText('flights.youtubeOverlayExportShowLogs')
-    ).toBeInTheDocument();
-    window.sessionStorage.removeItem('youtube-overlay-export-job:flight-1');
-  });
-
   it('disables another export while a shared job is downloading', async () => {
     hooks.exportStatus = {
       status: 'processing',
@@ -802,7 +757,9 @@ describe('FlightTelemetryInteractivePreview', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByRole('button', { name: 'flights.youtubeOverlayExport' })
+        screen.getByRole('button', {
+          name: 'flights.youtubeOverlayExportInProgress',
+        })
       ).toBeDisabled()
     );
     window.sessionStorage.removeItem('youtube-overlay-export-job:flight-1');

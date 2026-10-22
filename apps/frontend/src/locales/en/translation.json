@@ -148,6 +148,10 @@
       "fps": "Speed (frames/s)",
       "fpsUnit": "frames/s",
       "eta": "Time remaining",
+      "phase": "Step",
+      "duration": "Duration",
+      "remaining": "remaining",
+      "latestEvent": "Latest event",
       "details": "Details",
       "technicalDetails": "Technical details"
     },
@@ -200,10 +204,12 @@
     "status": {
       "queued": "Queued",
       "running": "Starting",
+      "preparing": "Preparing",
       "initializing": "Initializing",
       "capturing": "Capturing",
       "encoding": "Encoding",
       "processing": "In progress",
+      "uploading": "Uploading",
       "completed": "Completed",
       "failed": "Error",
       "stalled": "Stuck",
