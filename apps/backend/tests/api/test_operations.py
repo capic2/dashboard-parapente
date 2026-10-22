@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 import routes
+import gopro_overlay_export
 from models import (
     BackgroundOperation,
     Flight,
@@ -142,6 +143,42 @@ def test_retry_rejects_operation_without_source(client, db_session):
     response = client.post("/api/operations/failed-operation/retry")
 
     assert response.status_code == 409
+
+
+def test_retry_resumes_failed_gopro_overlay_job(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_session.add(
+        _operation(
+            operation_id="failed-gopro-operation",
+            status="failed",
+            source_kind="gopro_overlay",
+            source_id="failed-gopro-job",
+            can_retry=True,
+        )
+    )
+    db_session.commit()
+    resumed_jobs: list[str] = []
+
+    def get_overlay_job(_job_id: str) -> dict[str, str]:
+        return {"id": "failed-gopro-job"}
+
+    def resume_overlay_job(job_id: str) -> bool:
+        resumed_jobs.append(job_id)
+        return True
+
+    monkeypatch.setattr(routes, "get_gopro_overlay_job", get_overlay_job)
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "resume_failed_gopro_overlay_job",
+        resume_overlay_job,
+    )
+
+    response = client.post("/api/operations/failed-gopro-operation/retry")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "queued"
+    assert resumed_jobs == ["failed-gopro-job"]
 
 
 def test_operation_registry_allows_same_source_for_different_users(db_session):

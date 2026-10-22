@@ -132,11 +132,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Installer GoPro Dashboard Overlay dans un venv créé dans l'image.
 COPY --from=gopro-overlay-src / /app/gopro-overlay
-# Prevent floating-point frame timestamps from repeatedly restarting the PIP decoder.
+# Enable time-bounded transparent GPX overlay renders, and prevent floating-point
+# frame timestamps from repeatedly restarting the PIP decoder.
 COPY docker/gopro-overlay/video-frame-source.patch /tmp/video-frame-source.patch
+COPY docker/gopro-overlay/enable-gpx-overlay-time-ranges.py /tmp/enable-gpx-overlay-time-ranges.py
 RUN rm -rf /app/gopro-overlay/venv && \
     patch -d /app/gopro-overlay -p1 < /tmp/video-frame-source.patch && \
-    rm /tmp/video-frame-source.patch && \
+    python /tmp/enable-gpx-overlay-time-ranges.py /app/gopro-overlay/gopro_overlay/arguments.py && \
+    rm /tmp/video-frame-source.patch /tmp/enable-gpx-overlay-time-ranges.py && \
     python -m venv /app/gopro-overlay/venv && \
     /app/gopro-overlay/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel && \
     /app/gopro-overlay/venv/bin/pip install --no-cache-dir -e /app/gopro-overlay

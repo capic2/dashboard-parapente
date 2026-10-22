@@ -1423,11 +1423,12 @@ def retry_background_operation(
         if not resume_video_export(operation.source_id):
             raise HTTPException(status_code=409, detail="Video export cannot be resumed")
     elif operation.source_kind == "gopro_overlay":
-        from gopro_overlay_export import _enqueue_existing_gopro_overlay_job
+        from gopro_overlay_export import resume_failed_gopro_overlay_job
 
         if get_gopro_overlay_job(operation.source_id) is None:
             raise HTTPException(status_code=404, detail="GoPro overlay job not found")
-        _enqueue_existing_gopro_overlay_job(operation.source_id)
+        if not resume_failed_gopro_overlay_job(operation.source_id):
+            raise HTTPException(status_code=409, detail="GoPro overlay job cannot be resumed")
     elif operation.source_kind == "highlight_video":
         job = (
             db.query(HighlightVideoJob).filter(HighlightVideoJob.id == operation.source_id).first()
