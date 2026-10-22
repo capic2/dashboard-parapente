@@ -2,13 +2,17 @@
 
 import hashlib
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from io import StringIO
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
+from sqlalchemy.orm import Session
 
+import config
 import gopro_overlay_export
 import youtube_overlay_export
 from models import GoproOverlayJob
@@ -760,25 +764,264 @@ def test_render_saved_overlay_replaces_checkpoint_when_render_settings_change(
     assert result == replacement_output
 
 
+def test_gpx_overlay_retry_reuses_rendered_segments(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    gpx_path = tmp_path / "render.gpx"
+    origin = datetime(2026, 10, 22, 9, 30, tzinfo=timezone.utc)
+    trackpoints = "".join(
+        f'<trkpt lat="45" lon="6"><time>{(origin + timedelta(seconds=i)).isoformat()}</time></trkpt>'
+        for i in range(7)
+    )
+    gpx_path.write_text(f"<gpx><trk><trkseg>{trackpoints}</trkseg></trk></gpx>")
+    video_path = tmp_path / "video.mp4"
+    video_path.write_bytes(b"video")
+    layout_path = tmp_path / "layout.xml"
+    layout_path.write_text("<layout />")
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    output_path = tmp_path / "overlay.webm"
+    temp_output_path = tmp_path / "overlay.tmp.webm"
+    job = {
+        "id": "resume-test",
+        "status": "queued",
+        "video_path": str(video_path),
+        "gpx_path": str(gpx_path),
+        "layout_path": str(layout_path),
+        "output_path": str(output_path),
+        "temp_output_path": str(temp_output_path),
+        "video_width": 1920,
+        "video_height": 1080,
+        "command": {"render_gpx_path": str(gpx_path), "overlay_only": True},
+    }
+    monkeypatch.setattr(config, "GOPRO_OVERLAY_GPX_SEGMENT_SECONDS", 3)
+    monkeypatch.setattr(
+        gopro_overlay_export, "_update_job", lambda _job, **changes: _record_job(job, changes)
+    )
+    monkeypatch.setattr(gopro_overlay_export, "_transition_job_to_running", lambda *_args: True)
+    monkeypatch.setattr(
+        gopro_overlay_export, "_finish_job", lambda _job, **changes: job.update(changes) or job
+    )
+    monkeypatch.setattr(
+        gopro_overlay_export, "get_gopro_overlay_job", lambda *_args, **_kwargs: job
+    )
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "_create_gpx_overlay_timeline_segment",
+        lambda path, _frames: path.write_bytes(b"timeline"),
+    )
+    rendered_commands: list[list[str]] = []
+
+    def render_segment(_job_id: str, command: list[str], *_args: Any) -> int:
+        rendered_commands.append(command)
+        Path(command[-1]).write_bytes(b"rendered segment")
+        return 0
+
+    monkeypatch.setattr(gopro_overlay_export, "_run_overlay_process", render_segment)
+    monkeypatch.setattr(gopro_overlay_export, "_verify_video_output", lambda _path: (True, None))
+    concat_calls = 0
+
+    def concat(segments: list[Path], destination: Path) -> None:
+        nonlocal concat_calls
+        concat_calls += 1
+        assert len(segments) == 3
+        if concat_calls == 1:
+            raise ValueError("simulated final assembly failure")
+        destination.write_bytes(b"final overlay")
+
+    monkeypatch.setattr(gopro_overlay_export, "_concat_overlay_segments", concat)
+    command = [
+        "gopro-dashboard.py",
+        "--use-gpx-only",
+        "--gpx",
+        str(gpx_path),
+        "--generate",
+        "overlay",
+        "--video-time-start",
+        "file-modified",
+        str(video_path),
+        str(temp_output_path),
+    ]
+
+    gopro_overlay_export._run_segmented_gpx_overlay_job(
+        "resume-test", job, command, tmp_path / "job.log", output_path, temp_output_path
+    )
+
+    assert job["status"] == "failed"
+    assert job["command"]["resume"]["completed_segments"] == [0, 1, 2]
+    assert len(rendered_commands) == 3
+    assert all(
+        "--generate" in call and call[call.index("--generate") + 1] == "overlay"
+        for call in rendered_commands
+    )
+    expected_starts = [
+        origin.timestamp(),
+        (origin + timedelta(seconds=3)).timestamp(),
+        (origin + timedelta(seconds=5.9)).timestamp(),
+    ]
+    timeline_paths = [Path(call[-2]) for call in rendered_commands]
+    assert [path.stat().st_mtime for path in timeline_paths] == pytest.approx(
+        expected_starts, abs=0.01
+    )
+
+    for path in (gpx_path, layout_path):
+        previous_stat = path.stat()
+        path.write_bytes(path.read_bytes())
+        os.utime(
+            path,
+            ns=(previous_stat.st_atime_ns, previous_stat.st_mtime_ns + 1_000_000_000),
+        )
+        assert path.stat().st_mtime_ns != previous_stat.st_mtime_ns
+
+    job["status"] = "queued"
+    gopro_overlay_export._run_segmented_gpx_overlay_job(
+        "resume-test", job, command, tmp_path / "job.log", output_path, temp_output_path
+    )
+
+    assert len(rendered_commands) == 3
+    assert concat_calls == 2
+    assert output_path.read_bytes() == b"final overlay"
+    assert job["status"] == "completed"
+
+
+def test_gpx_overlay_setup_failure_marks_job_failed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    gpx_path = tmp_path / "render.gpx"
+    origin = datetime(2026, 10, 22, 9, 30, tzinfo=timezone.utc)
+    gpx_path.write_text(
+        "<gpx><trk><trkseg>"
+        f'<trkpt lat="45" lon="6"><time>{origin.isoformat()}</time></trkpt>'
+        f'<trkpt lat="45" lon="6"><time>{(origin + timedelta(seconds=3)).isoformat()}</time></trkpt>'
+        "</trkseg></trk></gpx>"
+    )
+    video_path = tmp_path / "video.mp4"
+    video_path.write_bytes(b"video")
+    job = {
+        "id": "setup-failure",
+        "status": "queued",
+        "video_path": str(video_path),
+        "gpx_path": str(gpx_path),
+        "layout_path": str(tmp_path / "missing-layout.xml"),
+        "command": {"render_gpx_path": str(gpx_path)},
+    }
+    monkeypatch.setattr(
+        gopro_overlay_export, "_update_job", lambda _job, **changes: _record_job(job, changes)
+    )
+    monkeypatch.setattr(
+        gopro_overlay_export, "_finish_job", lambda _job, **changes: job.update(changes) or job
+    )
+    monkeypatch.setattr(
+        gopro_overlay_export, "get_gopro_overlay_job", lambda *_args, **_kwargs: job
+    )
+
+    gopro_overlay_export._run_segmented_gpx_overlay_job(
+        "setup-failure",
+        job,
+        ["gopro-dashboard.py", "--gpx", str(gpx_path), str(video_path), "output.webm"],
+        tmp_path / "job.log",
+        tmp_path / "output.webm",
+        tmp_path / "output.part.webm",
+    )
+
+    assert job["status"] == "failed"
+    assert "missing-layout.xml" in job["error"]
+
+
+def test_prepare_queued_job_creates_work_dir_before_preparation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    work_dir = tmp_path / "deleted-work-dir"
+    job = {
+        "id": "recreate-work-dir",
+        "status": "queued",
+        "layout_path": str(work_dir / "layout.xml"),
+        "output_path": str(tmp_path / "overlay.webm"),
+        "command": {"prepare_overlay_inputs": True},
+    }
+    monkeypatch.setattr(gopro_overlay_export, "_append_job_log", lambda *_args: None)
+    monkeypatch.setattr(gopro_overlay_export, "_claim_job_for_preparation", lambda _job_id: None)
+
+    assert gopro_overlay_export._prepare_queued_job("recreate-work-dir", job) is None
+    assert work_dir.is_dir()
+
+
+def test_run_job_cleans_segmented_gpx_work_dir_after_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job_id = "cleanup-segmented-gpx"
+    job = {
+        "id": job_id,
+        "job_id": job_id,
+        "status": "queued",
+        "video_path": str(tmp_path / "video.mp4"),
+        "gpx_path": str(tmp_path / "track.gpx"),
+        "layout_path": str(tmp_path / "work" / "layout.xml"),
+        "output_path": str(tmp_path / "overlay.webm"),
+        "temp_output_path": str(tmp_path / "work" / "overlay.part.webm"),
+        "command": {"overlay_only": True, "render_gpx_path": str(tmp_path / "track.gpx")},
+    }
+    gopro_overlay_export._JOBS[job_id] = job
+    cleanups: list[str] = []
+    monkeypatch.setattr(
+        gopro_overlay_export, "get_gopro_overlay_job", lambda *_args, **_kwargs: job
+    )
+    monkeypatch.setattr(gopro_overlay_export, "_prepare_queued_job", lambda _job_id, value: value)
+    monkeypatch.setattr(gopro_overlay_export, "gpx_duration_seconds", lambda _path: 30.0)
+    monkeypatch.setattr(gopro_overlay_export, "select_video_accelerator", lambda _setting: "cpu")
+
+    def complete_segmented_job(_job_id: str, selected_job: dict[str, Any], *_args: Any) -> None:
+        selected_job["status"] = "completed"
+
+    monkeypatch.setattr(
+        gopro_overlay_export, "_run_segmented_gpx_overlay_job", complete_segmented_job
+    )
+    monkeypatch.setattr(
+        gopro_overlay_export,
+        "_cleanup_gopro_overlay_temp_files",
+        lambda selected_job: cleanups.append(selected_job["status"]),
+    )
+
+    try:
+        gopro_overlay_export._run_job(job_id)
+    finally:
+        gopro_overlay_export._JOBS.pop(job_id, None)
+
+    assert cleanups == ["completed"]
+
+
+def _record_job(job: dict[str, Any], changes: dict[str, Any]) -> dict[str, Any]:
+    if "command_json" in changes:
+        changes["command"] = json.loads(changes.pop("command_json"))
+    job.update(changes)
+    return job
+
+
 def test_resume_failed_gopro_overlay_job_restores_original_pip_path(
-    db_session, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    db_session: Session, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source_pip = tmp_path / "source-pip.mp4"
     prepared_pip = tmp_path / "prepared-pip.mp4"
+    source_video = tmp_path / "source.mp4"
+    source_gpx = tmp_path / "track.gpx"
+    layout = tmp_path / "layout.xml"
     source_pip.write_bytes(b"source pip")
     prepared_pip.write_bytes(b"prepared pip")
+    source_video.write_bytes(b"source video")
+    source_gpx.write_text("<gpx />")
+    layout.write_text("<layout />")
     job = GoproOverlayJob(
         id="failed-youtube-overlay-with-pip",
         status="failed",
         progress=100,
         message="Overlay rendering failed",
         error="ffmpeg failed",
-        video_path=str(tmp_path / "source.mp4"),
-        gpx_path=str(tmp_path / "track.gpx"),
+        video_path=str(source_video),
+        gpx_path=str(source_gpx),
         pip_path=str(prepared_pip),
         layout_id="parapente-1920",
         layout_label="Parapente",
-        layout_path=str(tmp_path / "layout.xml"),
+        layout_path=str(layout),
         output_path=str(tmp_path / "output.mp4"),
         temp_output_path=str(tmp_path / "output.tmp.mp4"),
         output_filename="output.mp4",
@@ -808,3 +1051,35 @@ def test_resume_failed_gopro_overlay_job_restores_original_pip_path(
     assert resumed_job.pip_path == str(source_pip)
     assert json.loads(resumed_job.command_json or "{}")["resume"]["completed_segments"] == [0, 1]
     assert enqueued_jobs == [job.id]
+
+
+def test_resume_failed_gopro_overlay_job_rejects_missing_inputs(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job = GoproOverlayJob(
+        id="failed-overlay-missing-inputs",
+        status="failed",
+        progress=100,
+        message="Overlay rendering failed",
+        error="ffmpeg failed",
+        video_path="/tmp/missing-source.mp4",
+        gpx_path="/tmp/missing-track.gpx",
+        layout_id="parapente-1920",
+        layout_label="Parapente",
+        layout_path="/tmp/missing-layout.xml",
+        output_path="/tmp/output.mp4",
+        temp_output_path="/tmp/output.tmp.mp4",
+        output_filename="output.mp4",
+        command_json=json.dumps({"prepare_overlay_inputs": False}),
+    )
+    db_session.add(job)
+    db_session.commit()
+    enqueued_jobs = []
+    monkeypatch.setattr(
+        gopro_overlay_export, "_enqueue_existing_gopro_overlay_job", enqueued_jobs.append
+    )
+
+    assert gopro_overlay_export.resume_failed_gopro_overlay_job(job.id) is False
+    db_session.refresh(job)
+    assert job.status == "failed"
+    assert enqueued_jobs == []
