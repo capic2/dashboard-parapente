@@ -130,7 +130,11 @@
     "mode": {
       "goproOverlay": "Overlay GoPro",
       "highlight": "Meilleurs moments",
-      "youtubeUpload": "Upload YouTube"
+      "youtubeUpload": "Upload YouTube",
+      "youtubeTelemetryExport": "Export YouTube avec télémétrie"
+    },
+    "type": {
+      "youtubeTelemetryExport": "Export YouTube avec télémétrie"
     },
     "method": {
       "cpu": "Processeur (CPU)",
@@ -192,7 +196,7 @@
       "video": "Exports vidéo",
       "gopro": "Overlay GoPro",
       "highlight": "Meilleurs moments",
-      "youtube": "Upload YouTube"
+      "youtube": "YouTube"
     },
     "filters": {
       "all": "Tous",
