@@ -1580,7 +1580,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                           previewPoint ?? null,
                           previewTelemetry,
                           item.metric,
-                          i18n.resolvedLanguage ?? i18n.language
+                          i18n?.resolvedLanguage ?? i18n?.language
                         ) ?? ['', '']);
                   const isSelected = selectedIds.includes(item.id);
                   let textAlign: CSSProperties['textAlign'];

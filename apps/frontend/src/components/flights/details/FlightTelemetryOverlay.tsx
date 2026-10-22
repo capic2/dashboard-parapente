@@ -207,7 +207,7 @@ export function FlightTelemetryOverlay({
             point,
             data,
             metric,
-            i18n.resolvedLanguage ?? i18n.language
+            i18n?.resolvedLanguage ?? i18n?.language
           ) ?? [null, ''];
           const nextMetric =
             CYCLE_METRICS[
