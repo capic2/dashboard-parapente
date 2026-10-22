@@ -139,7 +139,8 @@ function elevationFromTakeoff(
 export function getTelemetryMetricValue(
   point: FlightTelemetryPoint | null,
   data: FlightTelemetryData | undefined,
-  metric: MetricKey
+  metric: MetricKey,
+  locale?: string
 ): [DisplayValue, string] | null {
   if (!point && !POINT_INDEPENDENT_METRICS.has(metric)) {
     return null;
@@ -190,7 +191,7 @@ export function getTelemetryMetricValue(
         point.timestamp < 1_000_000_000_000
           ? point.timestamp * 1000
           : point.timestamp;
-      return [new Date(timestamp).toLocaleString(), ''];
+      return [new Date(timestamp).toLocaleString(locale), ''];
     }
   }
 }
