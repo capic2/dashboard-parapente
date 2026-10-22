@@ -177,7 +177,7 @@ async function compressBackgroundImage(file: File, maxLength: number) {
 }
 
 export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const toast = useToast();
   const layoutQuery = useTelemetryLayout(flightId);
   const telemetryQuery = useFlightTelemetry(flightId ?? '', Boolean(flightId));
@@ -1579,7 +1579,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       : (getTelemetryMetricValue(
                           previewPoint ?? null,
                           previewTelemetry,
-                          item.metric
+                          item.metric,
+                          i18n?.resolvedLanguage ?? i18n?.language
                         ) ?? ['', '']);
                   const isSelected = selectedIds.includes(item.id);
                   let textAlign: CSSProperties['textAlign'];
