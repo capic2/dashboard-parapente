@@ -104,6 +104,16 @@ export function FlightDetails({
         .map((job) => job.job_id) ?? [],
     [activeMediaJobs.data, flight.id]
   );
+  const activeYoutubeTelemetryExportJob = useMemo(
+    () =>
+      activeMediaJobs.data?.find(
+        (job) =>
+          job.flight_id === flight.id &&
+          job.mode === 'youtube_telemetry_layout' &&
+          !['completed', 'failed', 'cancelled'].includes(job.status)
+      ) ?? null,
+    [activeMediaJobs.data, flight.id]
+  );
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -597,6 +607,7 @@ export function FlightDetails({
     flight.gopro_overlay_status ||
     persistedGoproOverlays.length > 0 ||
     youtubeUploadJob?.job_id ||
+    activeYoutubeTelemetryExportJob?.job_id ||
     latestHighlightVideo?.job_id
   );
   const visibleActiveTab =
@@ -828,6 +839,9 @@ export function FlightDetails({
       goproOverlayJobId={effectiveGoproOverlayJobId}
       goproOverlayFallbackStatus={flight.gopro_overlay_status}
       goproOverlayFallbackProgress={flight.gopro_overlay_progress}
+      youtubeTelemetryExportJobId={activeYoutubeTelemetryExportJob?.job_id}
+      youtubeTelemetryExportStatus={activeYoutubeTelemetryExportJob?.status}
+      youtubeTelemetryExportProgress={activeYoutubeTelemetryExportJob?.progress}
       youtubeUploadJob={youtubeUploadJob}
       highlightVideo={latestHighlightVideo}
     />
