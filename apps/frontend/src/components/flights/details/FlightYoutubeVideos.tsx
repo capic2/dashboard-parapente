@@ -1,8 +1,15 @@
 import { Button } from '@dashboard-parapente/design-system';
 import type { YoutubeVideoAssociation } from '@dashboard-parapente/shared-types';
-import { ExternalLink, LoaderCircle, Play, Trash2 } from 'lucide-react';
+import {
+  Clipboard,
+  ExternalLink,
+  LoaderCircle,
+  Play,
+  Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useToast } from '../../../hooks/useToast';
 import { getYoutubeEmbedUrl, getYoutubeVideoId } from '../../../lib/youtube';
 
 interface FlightYoutubeVideosProps {
@@ -21,9 +28,18 @@ export function FlightYoutubeVideos({
   onRemove,
 }: FlightYoutubeVideosProps) {
   const { t } = useTranslation();
+  const toast = useToast();
   const [activeVideoIds, setActiveVideoIds] = useState<Set<string>>(
     () => new Set()
   );
+  const copyYoutubeLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(t('flights.youtubeLinkCopied'));
+    } catch {
+      toast.error(t('flights.youtubeLinkCopyError'));
+    }
+  };
   const videos = urls.flatMap((url) => {
     const embedUrl = getYoutubeEmbedUrl(url);
     const videoId = getYoutubeVideoId(url);
@@ -131,6 +147,16 @@ export function FlightYoutubeVideos({
                       {t('flights.openOnYoutube')}
                     </span>
                   </a>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 text-gray-300 hover:bg-gray-800 hover:text-white focus-visible:ring-sky-400 focus-visible:ring-offset-gray-900"
+                    aria-label={t('flights.copyYoutubeLink')}
+                    title={t('flights.copyYoutubeLink')}
+                    onPress={() => void copyYoutubeLink(url)}
+                  >
+                    <Clipboard className="h-4 w-4" aria-hidden="true" />
+                  </Button>
                   {onRemove && (
                     <Button
                       variant="ghost"
