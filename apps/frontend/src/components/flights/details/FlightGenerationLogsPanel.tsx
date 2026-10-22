@@ -10,7 +10,10 @@ import type { VideoExportStatusPayload } from '../../../hooks/flights/useVideoEx
 import type { YoutubeUploadJob } from '../../../hooks/flights/useYoutubeUpload';
 import type { GoproOverlayJob } from '../../../hooks/gopro/useGoproOverlay';
 import type { VideoExportJob } from '../../../hooks/flights/useVideoExportJobs';
-import { isGoproOverlayInProgress } from '../../../lib/flightMediaState';
+import {
+  isGoproOverlayInProgress,
+  isYoutubeUploadProgressVisible,
+} from '../../../lib/flightMediaState';
 import { JobLogViewer } from '../job-logs/JobLogViewer';
 import { YoutubeTelemetryExportDetails } from '../video-export/VideoExportJobsPanel';
 
@@ -337,7 +340,9 @@ export function FlightGenerationLogsPanel({
     goproOverlayStatusValue || goproOverlayJob?.job_id || goproOverlayJobId
   );
   const hasOverlayLayerLogSource = Boolean(overlayLayerJob?.job_id);
-  const hasYoutubeUploadLogSource = Boolean(youtubeUploadJob?.job_id);
+  const hasYoutubeUploadLogSource = Boolean(
+    youtubeUploadJob?.job_id && isYoutubeUploadProgressVisible(youtubeUploadJob)
+  );
   const hasHighlightLogSource = Boolean(highlightVideo?.job_id);
   const hasYoutubeTelemetryExport = Boolean(youtubeTelemetryExportJobId);
 

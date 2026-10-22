@@ -43,7 +43,7 @@ describe('FlightGenerationLogsPanel', () => {
     );
   });
 
-  it('shows an indeterminate preparation state and elapsed time for YouTube uploads', () => {
+  it('shows an indeterminate upload state and elapsed time for YouTube uploads', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-22T12:01:05Z'));
 
@@ -54,8 +54,8 @@ describe('FlightGenerationLogsPanel', () => {
         youtubeUploadJob={{
           job_id: 'youtube-upload-1',
           flight_id: 'flight-1',
-          source_type: 'video',
-          status: 'preparing',
+          source_type: 'youtube_overlay',
+          status: 'uploading',
           progress: 0,
           created_at: '2026-10-22T12:00:00Z',
           updated_at: '2026-10-22T12:01:00Z',
@@ -86,8 +86,8 @@ describe('FlightGenerationLogsPanel', () => {
         youtubeUploadJob={{
           job_id: 'youtube-upload-1',
           flight_id: 'flight-1',
-          source_type: 'video',
-          status: 'uploading',
+          source_type: 'youtube_overlay',
+          status: 'preparing',
           progress: 18,
           created_at: '2026-10-22T12:00:00Z',
           updated_at: '2026-10-22T12:01:00Z',
@@ -108,9 +108,9 @@ describe('FlightGenerationLogsPanel', () => {
       'telemetry-export-1'
     );
     expect(
-      screen.getByRole('button', {
+      screen.queryByRole('button', {
         name: /flights\.generationLogs\.youtubeUploadTitle/u,
       })
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
   });
 });
