@@ -662,7 +662,11 @@ function StandardJobTechnicalDetails({ job }: { job: VideoExportJob }) {
   );
 }
 
-function YoutubeTelemetryExportDetails({ job }: { job: VideoExportJob }) {
+export function YoutubeTelemetryExportDetails({
+  job,
+}: {
+  job: VideoExportJob;
+}) {
   const { t, i18n } = useTranslation();
   const { status } = useVideoExportStatus(job.job_id, isActiveJob(job));
   const [now, setNow] = useState(() => Date.now());

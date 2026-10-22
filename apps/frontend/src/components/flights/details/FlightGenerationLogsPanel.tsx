@@ -9,8 +9,10 @@ import { parseApiUtcDate } from '../../../lib/date';
 import type { VideoExportStatusPayload } from '../../../hooks/flights/useVideoExportStatus';
 import type { YoutubeUploadJob } from '../../../hooks/flights/useYoutubeUpload';
 import type { GoproOverlayJob } from '../../../hooks/gopro/useGoproOverlay';
+import type { VideoExportJob } from '../../../hooks/flights/useVideoExportJobs';
 import { isGoproOverlayInProgress } from '../../../lib/flightMediaState';
 import { JobLogViewer } from '../job-logs/JobLogViewer';
+import { YoutubeTelemetryExportDetails } from '../video-export/VideoExportJobsPanel';
 
 type FlightGenerationLogsPanelProps = {
   videoJobId?: string | null;
@@ -22,6 +24,9 @@ type FlightGenerationLogsPanelProps = {
   goproOverlayJobId?: string | null;
   goproOverlayFallbackStatus?: string | null;
   goproOverlayFallbackProgress?: number | null;
+  youtubeTelemetryExportJobId?: string | null;
+  youtubeTelemetryExportStatus?: string | null;
+  youtubeTelemetryExportProgress?: number | null;
   youtubeUploadJob: YoutubeUploadJob | null;
   highlightVideo: HighlightVideoJob | null;
 };
@@ -311,6 +316,9 @@ export function FlightGenerationLogsPanel({
   goproOverlayJobId,
   goproOverlayFallbackStatus,
   goproOverlayFallbackProgress,
+  youtubeTelemetryExportJobId,
+  youtubeTelemetryExportStatus,
+  youtubeTelemetryExportProgress,
   youtubeUploadJob,
   highlightVideo,
 }: FlightGenerationLogsPanelProps) {
@@ -331,140 +339,179 @@ export function FlightGenerationLogsPanel({
   const hasOverlayLayerLogSource = Boolean(overlayLayerJob?.job_id);
   const hasYoutubeUploadLogSource = Boolean(youtubeUploadJob?.job_id);
   const hasHighlightLogSource = Boolean(highlightVideo?.job_id);
+  const hasYoutubeTelemetryExport = Boolean(youtubeTelemetryExportJobId);
 
   if (
     !hasVideoLogSource &&
     !hasGoproOverlayLogSource &&
     !hasOverlayLayerLogSource &&
     !hasYoutubeUploadLogSource &&
-    !hasHighlightLogSource
+    !hasHighlightLogSource &&
+    !hasYoutubeTelemetryExport
   ) {
     return null;
   }
 
+  const telemetryExportJob: VideoExportJob | null = youtubeTelemetryExportJobId
+    ? {
+        job_id: youtubeTelemetryExportJobId,
+        mode: 'youtube_telemetry_layout',
+        status: youtubeTelemetryExportStatus ?? 'running',
+        internal_status: youtubeTelemetryExportStatus ?? 'running',
+        progress: youtubeTelemetryExportProgress,
+        can_cancel: false,
+        can_delete: false,
+      }
+    : null;
+
   return (
-    <div className="my-4 rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-950/40">
-      <div className="mb-3">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-          {t('flights.generationLogs.title')}
-        </h3>
-        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-          {t('flights.generationLogs.description')}
-        </p>
+    <>
+      {telemetryExportJob && (
+        <section
+          aria-labelledby="youtube-telemetry-progress-heading"
+          className="my-4 rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-950/40"
+        >
+          <h3
+            id="youtube-telemetry-progress-heading"
+            className="mb-3 text-sm font-bold text-slate-900 dark:text-slate-100"
+          >
+            {t(
+              'flights.generationLogs.exportProgressSectionTitle',
+              'Progression de l’export'
+            )}
+          </h3>
+          <YoutubeTelemetryExportDetails job={telemetryExportJob} />
+        </section>
+      )}
+      <div className="my-4 rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-950/40">
+        <div className="mb-3">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+            {t('flights.generationLogs.title')}
+          </h3>
+          <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+            {t('flights.generationLogs.description')}
+          </p>
+        </div>
+        <div className="space-y-3">
+          {hasOverlayLayerLogSource && overlayLayerJob && (
+            <LogSourceCard
+              key={`overlay-layer-${overlayLayerJob.job_id}`}
+              title={t(
+                'flights.generationLogs.overlayLayerTitle',
+                'Couche overlay'
+              )}
+              status={overlayLayerJob.status}
+              isInProgress={isGoproOverlayInProgress(overlayLayerJob.status)}
+              statusLabel={t(
+                `flights.generationLogs.status.${overlayLayerJob.status}`
+              )}
+              progress={overlayLayerJob.progress}
+              message={overlayLayerJob.message}
+              error={overlayLayerJob.error}
+              updatedAt={overlayLayerJob.updated_at}
+              logs={overlayLayerJob.log_tail}
+            />
+          )}
+          {hasVideoLogSource && (
+            <LogSourceCard
+              key={`video-${videoStatus?.job_id ?? videoJobId ?? 'fallback'}`}
+              title={t('flights.generationLogs.videoTitle')}
+              renderMethod={videoStatus?.render_method ?? null}
+              status={videoStatusValue}
+              isInProgress={Boolean(
+                videoStatusValue &&
+                VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(videoStatusValue)
+              )}
+              statusLabel={
+                videoStatusValue
+                  ? t(`flights.generationLogs.status.${videoStatusValue}`)
+                  : null
+              }
+              progress={videoStatus?.progress ?? videoFallbackProgress}
+              message={videoStatus?.message}
+              error={videoStatus?.error}
+              createdAt={videoStatus?.created_at}
+              startedAt={videoStatus?.started_at}
+              completedAt={videoStatus?.completed_at}
+              updatedAt={videoStatus?.updated_at}
+              logs={videoStatus?.log_tail}
+            />
+          )}
+          {hasGoproOverlayLogSource && (
+            <LogSourceCard
+              key={`gopro-${goproOverlayJob?.job_id ?? goproOverlayJobId ?? 'fallback'}`}
+              title={t('flights.generationLogs.goproOverlayTitle')}
+              renderMethod={
+                goproOverlayJob &&
+                ['running', 'completed', 'failed', 'cancelled'].includes(
+                  goproOverlayJob.status
+                )
+                  ? (goproOverlayJob.render_method ?? null)
+                  : null
+              }
+              status={goproOverlayStatusValue}
+              isInProgress={isGoproOverlayInProgress(goproOverlayStatusValue)}
+              statusLabel={
+                goproOverlayStatusValue
+                  ? t(
+                      `flights.generationLogs.status.${goproOverlayStatusValue}`
+                    )
+                  : null
+              }
+              progress={
+                goproOverlayJob?.progress ?? goproOverlayFallbackProgress
+              }
+              message={goproOverlayJob?.message}
+              error={goproOverlayJob?.error}
+              createdAt={goproOverlayJob?.created_at}
+              completedAt={goproOverlayJob?.completed_at}
+              updatedAt={goproOverlayJob?.updated_at}
+              logs={goproOverlayJob?.log_tail}
+            />
+          )}
+          {hasYoutubeUploadLogSource && youtubeUploadJob && (
+            <LogSourceCard
+              key={`youtube-${youtubeUploadJob.job_id}`}
+              title={t('flights.generationLogs.youtubeUploadTitle')}
+              status={youtubeUploadJob.status}
+              isInProgress={['preparing', 'queued', 'uploading'].includes(
+                youtubeUploadJob.status
+              )}
+              statusLabel={t(
+                `flights.generationLogs.status.${youtubeUploadJob.status}`
+              )}
+              progress={youtubeUploadJob.progress}
+              createdAt={youtubeUploadJob.created_at}
+              startedAt={youtubeUploadJob.started_at}
+              completedAt={youtubeUploadJob.completed_at}
+              error={youtubeUploadJob.error}
+              updatedAt={youtubeUploadJob.updated_at}
+              logs={youtubeUploadJob.log_tail}
+            />
+          )}
+          {hasHighlightLogSource && highlightVideo && (
+            <LogSourceCard
+              key={`highlight-${highlightVideo.job_id}`}
+              title={t('flights.generationLogs.highlightVideoTitle')}
+              renderMethod={highlightVideo.render_method ?? null}
+              status={highlightVideo.status}
+              isInProgress={['queued', 'running'].includes(
+                highlightVideo.status
+              )}
+              statusLabel={t(
+                `flights.generationLogs.status.${highlightVideo.status}`
+              )}
+              progress={highlightVideo.progress}
+              message={highlightVideo.message}
+              error={highlightVideo.error}
+              createdAt={highlightVideo.created_at}
+              completedAt={highlightVideo.completed_at}
+              updatedAt={highlightVideo.updated_at}
+              logs={highlightVideo.log_tail}
+            />
+          )}
+        </div>
       </div>
-      <div className="space-y-3">
-        {hasOverlayLayerLogSource && overlayLayerJob && (
-          <LogSourceCard
-            key={`overlay-layer-${overlayLayerJob.job_id}`}
-            title={t(
-              'flights.generationLogs.overlayLayerTitle',
-              'Couche overlay'
-            )}
-            status={overlayLayerJob.status}
-            isInProgress={isGoproOverlayInProgress(overlayLayerJob.status)}
-            statusLabel={t(
-              `flights.generationLogs.status.${overlayLayerJob.status}`
-            )}
-            progress={overlayLayerJob.progress}
-            message={overlayLayerJob.message}
-            error={overlayLayerJob.error}
-            updatedAt={overlayLayerJob.updated_at}
-            logs={overlayLayerJob.log_tail}
-          />
-        )}
-        {hasVideoLogSource && (
-          <LogSourceCard
-            key={`video-${videoStatus?.job_id ?? videoJobId ?? 'fallback'}`}
-            title={t('flights.generationLogs.videoTitle')}
-            renderMethod={videoStatus?.render_method ?? null}
-            status={videoStatusValue}
-            isInProgress={Boolean(
-              videoStatusValue &&
-              VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(videoStatusValue)
-            )}
-            statusLabel={
-              videoStatusValue
-                ? t(`flights.generationLogs.status.${videoStatusValue}`)
-                : null
-            }
-            progress={videoStatus?.progress ?? videoFallbackProgress}
-            message={videoStatus?.message}
-            error={videoStatus?.error}
-            createdAt={videoStatus?.created_at}
-            startedAt={videoStatus?.started_at}
-            completedAt={videoStatus?.completed_at}
-            updatedAt={videoStatus?.updated_at}
-            logs={videoStatus?.log_tail}
-          />
-        )}
-        {hasGoproOverlayLogSource && (
-          <LogSourceCard
-            key={`gopro-${goproOverlayJob?.job_id ?? goproOverlayJobId ?? 'fallback'}`}
-            title={t('flights.generationLogs.goproOverlayTitle')}
-            renderMethod={
-              goproOverlayJob &&
-              ['running', 'completed', 'failed', 'cancelled'].includes(
-                goproOverlayJob.status
-              )
-                ? (goproOverlayJob.render_method ?? null)
-                : null
-            }
-            status={goproOverlayStatusValue}
-            isInProgress={isGoproOverlayInProgress(goproOverlayStatusValue)}
-            statusLabel={
-              goproOverlayStatusValue
-                ? t(`flights.generationLogs.status.${goproOverlayStatusValue}`)
-                : null
-            }
-            progress={goproOverlayJob?.progress ?? goproOverlayFallbackProgress}
-            message={goproOverlayJob?.message}
-            error={goproOverlayJob?.error}
-            createdAt={goproOverlayJob?.created_at}
-            completedAt={goproOverlayJob?.completed_at}
-            updatedAt={goproOverlayJob?.updated_at}
-            logs={goproOverlayJob?.log_tail}
-          />
-        )}
-        {hasYoutubeUploadLogSource && youtubeUploadJob && (
-          <LogSourceCard
-            key={`youtube-${youtubeUploadJob.job_id}`}
-            title={t('flights.generationLogs.youtubeUploadTitle')}
-            status={youtubeUploadJob.status}
-            isInProgress={['preparing', 'queued', 'uploading'].includes(
-              youtubeUploadJob.status
-            )}
-            statusLabel={t(
-              `flights.generationLogs.status.${youtubeUploadJob.status}`
-            )}
-            progress={youtubeUploadJob.progress}
-            createdAt={youtubeUploadJob.created_at}
-            startedAt={youtubeUploadJob.started_at}
-            completedAt={youtubeUploadJob.completed_at}
-            error={youtubeUploadJob.error}
-            updatedAt={youtubeUploadJob.updated_at}
-            logs={youtubeUploadJob.log_tail}
-          />
-        )}
-        {hasHighlightLogSource && highlightVideo && (
-          <LogSourceCard
-            key={`highlight-${highlightVideo.job_id}`}
-            title={t('flights.generationLogs.highlightVideoTitle')}
-            renderMethod={highlightVideo.render_method ?? null}
-            status={highlightVideo.status}
-            isInProgress={['queued', 'running'].includes(highlightVideo.status)}
-            statusLabel={t(
-              `flights.generationLogs.status.${highlightVideo.status}`
-            )}
-            progress={highlightVideo.progress}
-            message={highlightVideo.message}
-            error={highlightVideo.error}
-            createdAt={highlightVideo.created_at}
-            completedAt={highlightVideo.completed_at}
-            updatedAt={highlightVideo.updated_at}
-            logs={highlightVideo.log_tail}
-          />
-        )}
-      </div>
-    </div>
+    </>
   );
 }
