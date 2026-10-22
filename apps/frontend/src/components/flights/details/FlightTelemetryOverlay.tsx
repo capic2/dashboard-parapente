@@ -46,7 +46,7 @@ export function FlightTelemetryOverlay({
   timelineStartTimestamp,
   layout = DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
 }: FlightTelemetryOverlayProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const longPressTimer = useRef<number | null>(null);
   const longPressTriggered = useRef(false);
   const backgroundImage = (layout as TelemetryLayout).backgroundImage;
@@ -206,7 +206,8 @@ export function FlightTelemetryOverlay({
           const [value, unit] = getTelemetryMetricValue(
             point,
             data,
-            metric
+            metric,
+            i18n.resolvedLanguage ?? i18n.language
           ) ?? [null, ''];
           const nextMetric =
             CYCLE_METRICS[
