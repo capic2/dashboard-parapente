@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -505,6 +506,43 @@ def test_completed_youtube_uploads_default_missing_source_type() -> None:
     assert _completed_youtube_uploads('[{"user_id": 1, "video_id": "dQw4w9WgXcQ"}]') == [
         (1, "dQw4w9WgXcQ", "gopro_overlay")
     ]
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Vol du 30/09/2026 - télémétrie",
+        "Vol du 30/09/2026 - TELEMETRY VIDEO",
+    ],
+)
+def test_completed_youtube_uploads_recognize_telemetry_title(title: str) -> None:
+    uploads = json.dumps(
+        [
+            {
+                "user_id": 1,
+                "video_id": "dQw4w9WgXcQ",
+                "source_type": "video",
+                "title": title,
+            }
+        ]
+    )
+
+    assert _completed_youtube_uploads(uploads) == [(1, "dQw4w9WgXcQ", "youtube_telemetry")]
+
+
+def test_completed_youtube_uploads_keeps_source_type_for_near_miss_title() -> None:
+    uploads = json.dumps(
+        [
+            {
+                "user_id": 1,
+                "video_id": "dQw4w9WgXcQ",
+                "source_type": "pano",
+                "title": "Vol du 30/09/2026 - télémétrie météo",
+            }
+        ]
+    )
+
+    assert _completed_youtube_uploads(uploads) == [(1, "dQw4w9WgXcQ", "pano")]
 
 
 def test_summaries_release_db_connection_before_remote_youtube_check(
