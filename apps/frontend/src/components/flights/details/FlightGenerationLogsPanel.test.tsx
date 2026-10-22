@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { FlightGenerationLogsPanel } from './FlightGenerationLogsPanel';
 
 describe('FlightGenerationLogsPanel', () => {
@@ -35,5 +35,37 @@ describe('FlightGenerationLogsPanel', () => {
     expect(treatment).toHaveTextContent(
       'flights.generationLogs.status.running'
     );
+  });
+
+  it('shows an indeterminate preparation state and elapsed time for YouTube uploads', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-22T12:01:05Z'));
+
+    render(
+      <FlightGenerationLogsPanel
+        videoStatus={null}
+        goproOverlayJob={null}
+        youtubeUploadJob={{
+          job_id: 'youtube-upload-1',
+          flight_id: 'flight-1',
+          source_type: 'video',
+          status: 'preparing',
+          progress: 0,
+          created_at: '2026-10-22T12:00:00Z',
+          updated_at: '2026-10-22T12:01:00Z',
+          log_tail: [],
+        }}
+        highlightVideo={null}
+      />
+    );
+
+    expect(screen.getByRole('progressbar')).not.toHaveAttribute(
+      'aria-valuenow'
+    );
+    expect(
+      screen.getByText('flights.generationLogs.elapsed')
+    ).toBeInTheDocument();
+    expect(screen.getByText('1 min')).toBeInTheDocument();
+    vi.useRealTimers();
   });
 });

@@ -1614,6 +1614,8 @@
         "gpu": "GPU"
       },
       "progress": "Progress",
+      "elapsed": "Elapsed",
+      "lastActivity": "Last activity",
       "error": "Error",
       "stalled": "No progress for {{minutes}} min. The job appears to be stuck.",
       "activity": "Activity log",
