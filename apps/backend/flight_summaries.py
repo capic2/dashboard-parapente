@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import json
+import re
 import unicodedata
 from datetime import date, datetime
 from pathlib import Path
@@ -61,6 +62,11 @@ _SEARCH_REPLACEMENTS = {
     "ü": "u",
 }
 
+_YOUTUBE_TELEMETRY_TITLE_PATTERN = re.compile(
+    r"(?:^|[\s:–—-])(?:télémétrie|telemetry)(?:\s+(?:overlay|video))?\s*$",
+    re.IGNORECASE,
+)
+
 
 class InvalidFlightSummaryCursor(ValueError):
     pass
@@ -109,18 +115,24 @@ def _completed_youtube_uploads(value: str | None) -> list[tuple[int, str, str]]:
     if not isinstance(uploads, list):
         return []
 
-    return [
-        (
-            upload["user_id"],
-            upload["video_id"],
-            upload.get("source_type", "gopro_overlay"),
-        )
-        for upload in uploads
-        if isinstance(upload, dict)
-        and isinstance(upload.get("user_id"), int)
-        and isinstance(upload.get("video_id"), str)
-        and isinstance(upload.get("source_type", "gopro_overlay"), str)
-    ]
+    completed_uploads: list[tuple[int, str, str]] = []
+    for upload in uploads:
+        if (
+            not isinstance(upload, dict)
+            or not isinstance(upload.get("user_id"), int)
+            or not isinstance(upload.get("video_id"), str)
+            or not isinstance(upload.get("source_type", "gopro_overlay"), str)
+        ):
+            continue
+
+        source_type = upload.get("source_type", "gopro_overlay")
+        title = upload.get("title")
+        if isinstance(title, str) and _YOUTUBE_TELEMETRY_TITLE_PATTERN.search(title):
+            source_type = "youtube_telemetry"
+
+        completed_uploads.append((upload["user_id"], upload["video_id"], source_type))
+
+    return completed_uploads
 
 
 def _flight_directory(flight_date: date, sequence: int) -> Path:
@@ -430,6 +442,8 @@ def list_flight_summaries(
                     YoutubeUploadJob.youtube_video_id,
                     "source_type",
                     YoutubeUploadJob.source_type,
+                    "title",
+                    YoutubeUploadJob.title,
                 )
             )
         )
