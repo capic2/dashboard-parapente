@@ -39,9 +39,12 @@ export interface YoutubeUploadJob {
     | 'failed'
     | 'cancelled';
   progress: number;
+  created_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  updated_at?: string | null;
   youtube_url?: string | null;
   error?: string | null;
-  updated_at?: string | null;
   log_tail: string[];
 }
 

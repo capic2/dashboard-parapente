@@ -35,6 +35,9 @@ type LogSourceCardProps = {
   progress?: number | null;
   message?: string | null;
   error?: string | null;
+  createdAt?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
   updatedAt?: string | null;
   logs?: string[] | null;
 };
@@ -94,14 +97,18 @@ function LogSourceCard({
   progress,
   message,
   error,
+  createdAt,
+  startedAt,
+  completedAt,
   updatedAt,
   logs,
 }: LogSourceCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [openOverride, setOpenOverride] = useState<boolean | null>(null);
   const isOpen = openOverride ?? isInProgress;
   const lines = logs?.filter(Boolean) ?? [];
   const normalizedProgress = clampProgress(progress);
+  const showIndeterminateProgress = isInProgress && normalizedProgress === 0;
   const hasDetails = Boolean(message || error || lines.length > 0);
   const statusTone = getStatusTone(status);
   const showCurrentMessage = Boolean(
@@ -120,6 +127,36 @@ function LogSourceCard({
   }, [isLive]);
 
   const stalledJobMinutes = getStalledJobMinutes(status, updatedAt, now);
+  const durationStart = startedAt || createdAt;
+  const durationStartMs = durationStart
+    ? parseApiUtcDate(durationStart).getTime()
+    : Number.NaN;
+  let durationEndMs = now;
+  if (completedAt) {
+    durationEndMs = parseApiUtcDate(completedAt).getTime();
+  } else if (updatedAt && !isLive) {
+    durationEndMs = parseApiUtcDate(updatedAt).getTime();
+  }
+  const durationSeconds =
+    Number.isFinite(durationStartMs) && Number.isFinite(durationEndMs)
+      ? Math.max(0, Math.floor((durationEndMs - durationStartMs) / 1000))
+      : null;
+  const activityMs = updatedAt
+    ? parseApiUtcDate(updatedAt).getTime()
+    : Number.NaN;
+  const activityAge = Number.isFinite(activityMs)
+    ? new Intl.RelativeTimeFormat(i18n.resolvedLanguage ?? i18n.language, {
+        numeric: 'auto',
+        style: 'short',
+      }).format(-Math.max(0, Math.floor((now - activityMs) / 60_000)), 'minute')
+    : null;
+  const formatElapsed = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    if (hours > 0) return `${hours} h ${minutes % 60} min`;
+    if (minutes > 0) return `${minutes} min`;
+    return `${seconds} s`;
+  };
   const renderMethodLabel =
     renderMethod && ['cpu', 'gpu'].includes(renderMethod)
       ? t(`flights.generationLogs.method.${renderMethod}`)
@@ -168,22 +205,64 @@ function LogSourceCard({
             </p>
           )}
 
-          {normalizedProgress !== null && (
+          {(normalizedProgress !== null || showIndeterminateProgress) && (
             <div
               className="mt-3"
               aria-label={t('flights.generationLogs.progress')}
             >
               <div className="mb-1 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
                 <span>{t('flights.generationLogs.progress')}</span>
-                <span>{normalizedProgress}%</span>
+                <span>
+                  {showIndeterminateProgress
+                    ? statusLabel
+                    : `${normalizedProgress}%`}
+                </span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-                <div
-                  className="h-full rounded-full bg-sky-500 transition-all"
-                  style={{ width: `${normalizedProgress}%` }}
-                />
-              </div>
+              <progress
+                className="block h-2 w-full overflow-hidden rounded-full bg-slate-200 accent-sky-500 dark:bg-slate-800"
+                aria-label={t('flights.generationLogs.progress')}
+                aria-valuetext={
+                  showIndeterminateProgress
+                    ? (statusLabel ?? undefined)
+                    : `${normalizedProgress}%`
+                }
+                value={
+                  showIndeterminateProgress
+                    ? undefined
+                    : (normalizedProgress ?? undefined)
+                }
+                max={100}
+              >
+                {showIndeterminateProgress
+                  ? statusLabel
+                  : `${normalizedProgress}%`}
+              </progress>
             </div>
+          )}
+
+          {(durationSeconds !== null || activityAge) && (
+            <dl className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+              {durationSeconds !== null && (
+                <div className="rounded-md border border-slate-200 px-2.5 py-2 dark:border-slate-700">
+                  <dt className="text-slate-500 dark:text-slate-400">
+                    {t('flights.generationLogs.elapsed', 'Durée')}
+                  </dt>
+                  <dd className="mt-1 font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+                    {formatElapsed(durationSeconds)}
+                  </dd>
+                </div>
+              )}
+              {activityAge && (
+                <div className="rounded-md border border-slate-200 px-2.5 py-2 dark:border-slate-700">
+                  <dt className="text-slate-500 dark:text-slate-400">
+                    {t('flights.generationLogs.lastActivity', 'Activité')}
+                  </dt>
+                  <dd className="mt-1 font-semibold text-slate-800 dark:text-slate-100">
+                    {activityAge}
+                  </dd>
+                </div>
+              )}
+            </dl>
           )}
 
           {error && (
@@ -311,6 +390,9 @@ export function FlightGenerationLogsPanel({
             progress={videoStatus?.progress ?? videoFallbackProgress}
             message={videoStatus?.message}
             error={videoStatus?.error}
+            createdAt={videoStatus?.created_at}
+            startedAt={videoStatus?.started_at}
+            completedAt={videoStatus?.completed_at}
             updatedAt={videoStatus?.updated_at}
             logs={videoStatus?.log_tail}
           />
@@ -337,6 +419,8 @@ export function FlightGenerationLogsPanel({
             progress={goproOverlayJob?.progress ?? goproOverlayFallbackProgress}
             message={goproOverlayJob?.message}
             error={goproOverlayJob?.error}
+            createdAt={goproOverlayJob?.created_at}
+            completedAt={goproOverlayJob?.completed_at}
             updatedAt={goproOverlayJob?.updated_at}
             logs={goproOverlayJob?.log_tail}
           />
@@ -353,6 +437,9 @@ export function FlightGenerationLogsPanel({
               `flights.generationLogs.status.${youtubeUploadJob.status}`
             )}
             progress={youtubeUploadJob.progress}
+            createdAt={youtubeUploadJob.created_at}
+            startedAt={youtubeUploadJob.started_at}
+            completedAt={youtubeUploadJob.completed_at}
             error={youtubeUploadJob.error}
             updatedAt={youtubeUploadJob.updated_at}
             logs={youtubeUploadJob.log_tail}
@@ -371,6 +458,8 @@ export function FlightGenerationLogsPanel({
             progress={highlightVideo.progress}
             message={highlightVideo.message}
             error={highlightVideo.error}
+            createdAt={highlightVideo.created_at}
+            completedAt={highlightVideo.completed_at}
             updatedAt={highlightVideo.updated_at}
             logs={highlightVideo.log_tail}
           />

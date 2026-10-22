@@ -761,9 +761,12 @@ def job_payload(job: YoutubeUploadJob) -> dict[str, Any]:
         "highlight_video_job_id": job.highlight_video_job_id,
         "status": job.status,
         "progress": job.progress or 0,
+        "created_at": job.created_at,
+        "started_at": job.started_at,
+        "completed_at": job.completed_at,
+        "updated_at": job.updated_at,
         "youtube_url": job.youtube_url,
         "error": job.error,
-        "updated_at": job.updated_at,
         "log_tail": _job_log_tail(job.id),
     }
 

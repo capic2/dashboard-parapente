@@ -1619,6 +1619,8 @@
         "gpu": "GPU"
       },
       "progress": "Progression",
+      "elapsed": "Durée",
+      "lastActivity": "Dernière activité",
       "error": "Erreur",
       "stalled": "Aucune progression depuis {{minutes}} min. La tâche semble bloquée.",
       "activity": "Journal d’activité",
