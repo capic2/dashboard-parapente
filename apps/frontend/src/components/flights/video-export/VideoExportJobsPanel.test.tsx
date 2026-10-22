@@ -347,6 +347,26 @@ describe('VideoExportJobsPanel', () => {
     expect(screen.getByRole('menuitem', { name: 'Logs' })).toBeInTheDocument();
   });
 
+  it('shows phase, duration, progress, frames, and latest event for an active job', () => {
+    jobs[0] = {
+      ...jobs[0],
+      started_at: '2026-10-22T10:00:00.000Z',
+      updated_at: '2026-10-22T10:05:00.000Z',
+      frames_captured: 42,
+      total_frames: 100,
+    };
+
+    render(<VideoExportJobsPanel />);
+
+    expect(screen.getByText('Étape')).toBeInTheDocument();
+    expect(screen.getByText('Capture')).toBeInTheDocument();
+    expect(screen.getByText('Durée')).toBeInTheDocument();
+    expect(screen.getAllByText('Progression').length).toBeGreaterThan(0);
+    expect(screen.getByText(/42 \/ 100 · 58 restantes/u)).toBeInTheDocument();
+    expect(screen.getByText('Dernier événement')).toBeInTheDocument();
+    expect(screen.getByText('Captured 10/100 frames')).toBeInTheDocument();
+  });
+
   it('uses the FPS from the last log line when it is available', () => {
     jobs[0] = {
       ...jobs[0],

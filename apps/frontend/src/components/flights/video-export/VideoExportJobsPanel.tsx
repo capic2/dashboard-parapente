@@ -499,12 +499,16 @@ function JobTechnicalDetails({ job }: { job: VideoExportJob }) {
       ? parseApiUtcDate(job.updated_at)
       : (startedAt ?? durationStart));
   const durationSeconds =
-    durationStart && Number.isFinite(durationStart.getTime())
+    durationStart &&
+    durationEnd &&
+    Number.isFinite(durationStart.getTime()) &&
+    Number.isFinite(durationEnd.getTime())
       ? Math.max(
           0,
           Math.floor((durationEnd.getTime() - durationStart.getTime()) / 1000)
         )
       : null;
+  const capturedFrames = job.frames_captured ?? job.resume_from_frame;
   const lastActivity = getActivityAge(
     job,
     i18n.resolvedLanguage ?? i18n.language
@@ -581,18 +585,18 @@ function JobTechnicalDetails({ job }: { job: VideoExportJob }) {
             />
           </dd>
         </div>
-        {(job.frames_captured ?? job.resume_from_frame) != null && (
+        {capturedFrames != null && (
           <div className="col-span-2 sm:col-span-4">
             <dt className="text-gray-600 dark:text-gray-300">
               {t('videoJobs.table.frames', 'Images traitées')}
             </dt>
             <dd className="mt-1 font-mono font-semibold text-gray-800 dark:text-gray-100">
-              {job.frames_captured ?? job.resume_from_frame}
+              {capturedFrames}
               {job.total_frames != null && (
                 <span className="font-normal text-gray-600 dark:text-gray-300">
                   {' / '}
                   {job.total_frames} ·{' '}
-                  {Math.max(0, job.total_frames - job.frames_captured)}{' '}
+                  {Math.max(0, job.total_frames - capturedFrames)}{' '}
                   {t('videoJobs.table.remaining', 'restantes')}
                 </span>
               )}
