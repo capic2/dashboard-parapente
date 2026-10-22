@@ -358,13 +358,23 @@ describe('VideoExportJobsPanel', () => {
 
     render(<VideoExportJobsPanel />);
 
-    expect(screen.getByText('Étape')).toBeInTheDocument();
-    expect(screen.getByText('Capture')).toBeInTheDocument();
-    expect(screen.getByText('Durée')).toBeInTheDocument();
+    expect(screen.getAllByText('Étape').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Capture').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Durée').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Progression').length).toBeGreaterThan(0);
-    expect(screen.getByText(/42 \/ 100 · 58 restantes/u)).toBeInTheDocument();
-    expect(screen.getByText('Dernier événement')).toBeInTheDocument();
-    expect(screen.getByText('Captured 10/100 frames')).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByText('Images traitées')
+        .some((label) =>
+          /42\s*\/\s*100\s*·\s*58\s*restantes/u.test(
+            label.nextElementSibling?.textContent ?? ''
+          )
+        )
+    ).toBe(true);
+    expect(screen.getAllByText('Dernier événement').length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText('Captured 10/100 frames').length
+    ).toBeGreaterThan(0);
   });
 
   it('uses the FPS from the last log line when it is available', () => {
