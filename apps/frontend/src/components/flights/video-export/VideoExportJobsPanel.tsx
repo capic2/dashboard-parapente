@@ -104,6 +104,7 @@ const activeStatusLabels = new Set([
   'capturing',
   'encoding',
   'processing',
+  'uploading',
 ]);
 const STALLED_JOB_THRESHOLD_MS = 5 * 60 * 1000;
 
@@ -230,6 +231,22 @@ function formatDuration(seconds?: number | null) {
   const minutes = Math.floor(roundedSeconds / 60);
   const remainingSeconds = roundedSeconds % 60;
   return `${minutes} min${remainingSeconds > 0 ? ` ${remainingSeconds} s` : ''}`;
+}
+
+function getActivityAge(job: VideoExportJob, language: string) {
+  const rawDate = job.updated_at || job.started_at || job.created_at;
+  if (!rawDate) return null;
+  const timestamp = parseApiUtcDate(rawDate).getTime();
+  if (!Number.isFinite(timestamp)) return null;
+  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  const relativeTime = new Intl.RelativeTimeFormat(language, {
+    numeric: 'auto',
+    style: 'short',
+  });
+  if (seconds < 60) return relativeTime.format(-seconds, 'second');
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return relativeTime.format(-minutes, 'minute');
+  return relativeTime.format(-Math.floor(minutes / 60), 'hour');
 }
 
 function isJobInFilter(job: VideoExportJob, filter: StatusFilter) {
@@ -411,21 +428,6 @@ function JobRenderMethodBadge({ job }: { job: VideoExportJob }) {
   );
 }
 
-function FramesCell({ job }: { job: VideoExportJob }) {
-  const captured = job.frames_captured;
-  const total = job.total_frames ?? job.resume_from_frame;
-  if (typeof captured !== 'number' && typeof total !== 'number')
-    return <span>-</span>;
-  return (
-    <span className="whitespace-nowrap font-mono text-xs text-gray-700 dark:text-gray-200">
-      {typeof captured === 'number' ? captured : '-'}
-      {typeof total === 'number' && (
-        <span className="text-gray-500 dark:text-gray-400"> / {total}</span>
-      )}
-    </span>
-  );
-}
-
 function isActiveJob(job: VideoExportJob) {
   if (['queued', 'blocked', 'stalled'].includes(job.status)) {
     return false;
@@ -486,14 +488,117 @@ function FpsCell({ job }: { job: VideoExportJob }) {
 }
 
 function JobTechnicalDetails({ job }: { job: VideoExportJob }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const startedAt = job.started_at ? parseApiUtcDate(job.started_at) : null;
+  const endedAt = job.completed_at ? parseApiUtcDate(job.completed_at) : null;
+  const durationStart =
+    startedAt ?? (job.created_at ? parseApiUtcDate(job.created_at) : null);
+  const durationEnd =
+    endedAt ??
+    (job.updated_at
+      ? parseApiUtcDate(job.updated_at)
+      : (startedAt ?? durationStart));
+  const durationSeconds =
+    durationStart && Number.isFinite(durationStart.getTime())
+      ? Math.max(
+          0,
+          Math.floor((durationEnd.getTime() - durationStart.getTime()) / 1000)
+        )
+      : null;
+  const lastActivity = getActivityAge(
+    job,
+    i18n.resolvedLanguage ?? i18n.language
+  );
+  const lastLog =
+    job.log_tail
+      ?.slice()
+      .reverse()
+      .find((log) => log.trim()) ??
+    job.message ??
+    job.error;
+  const phase = getJobPhase(job);
+  const progress = getProgress(job);
+  const eta =
+    job.status === 'completed'
+      ? t('videoJobs.done', 'Terminé')
+      : formatDuration(getLastLogMetrics(job).etaSeconds ?? job.eta_seconds);
 
   return (
-    <details className="min-w-32 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs dark:border-gray-700 dark:bg-gray-900/50">
+    <details
+      open={job.can_cancel || isActiveJob(job)}
+      className="min-w-32 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs dark:border-gray-700 dark:bg-gray-900/50"
+    >
       <summary className="cursor-pointer font-medium text-gray-700 outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-gray-200">
         {t('videoJobs.table.technicalDetails', 'Détails techniques')}
       </summary>
-      <dl className="mt-3 grid min-w-40 grid-cols-2 gap-x-4 gap-y-2">
+      <dl className="mt-3 grid min-w-40 grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+        <div>
+          <dt className="text-gray-600 dark:text-gray-300">
+            {t('videoJobs.table.phase', 'Étape')}
+          </dt>
+          <dd className="mt-1 font-semibold text-gray-800 dark:text-gray-100">
+            {t(
+              `videoJobs.status.${phase}`,
+              statusLabelFallbacks[phase] ?? phase
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-gray-600 dark:text-gray-300">
+            {t('videoJobs.table.duration', 'Durée')}
+          </dt>
+          <dd className="mt-1 font-semibold tabular-nums text-gray-800 dark:text-gray-100">
+            {durationSeconds === null ? '-' : formatDuration(durationSeconds)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-gray-600 dark:text-gray-300">
+            {t('videoJobs.table.lastActivity', 'Dernière activité')}
+          </dt>
+          <dd className="mt-1 font-semibold text-gray-800 dark:text-gray-100">
+            {lastActivity ?? '-'}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-gray-600 dark:text-gray-300">
+            {t('videoJobs.table.eta', 'Estimation')}
+          </dt>
+          <dd className="mt-1 font-semibold tabular-nums text-gray-800 dark:text-gray-100">
+            {eta}
+          </dd>
+        </div>
+        <div className="col-span-2 sm:col-span-4">
+          <dt className="text-gray-600 dark:text-gray-300">
+            {t('videoJobs.table.progress', 'Progression')}
+          </dt>
+          <dd className="mt-1 flex items-center gap-2 font-semibold text-gray-800 dark:text-gray-100">
+            <span>{progress}%</span>
+            <progress
+              className="h-2 min-w-20 flex-1 accent-sky-500"
+              aria-label={t('videoJobs.table.progress', 'Progression')}
+              value={progress}
+              max={100}
+            />
+          </dd>
+        </div>
+        {(job.frames_captured ?? job.resume_from_frame) != null && (
+          <div className="col-span-2 sm:col-span-4">
+            <dt className="text-gray-600 dark:text-gray-300">
+              {t('videoJobs.table.frames', 'Images traitées')}
+            </dt>
+            <dd className="mt-1 font-mono font-semibold text-gray-800 dark:text-gray-100">
+              {job.frames_captured ?? job.resume_from_frame}
+              {job.total_frames != null && (
+                <span className="font-normal text-gray-600 dark:text-gray-300">
+                  {' / '}
+                  {job.total_frames} ·{' '}
+                  {Math.max(0, job.total_frames - job.frames_captured)}{' '}
+                  {t('videoJobs.table.remaining', 'restantes')}
+                </span>
+              )}
+            </dd>
+          </div>
+        )}
         <div>
           <dt className="text-gray-600 dark:text-gray-300">
             {t('videoJobs.table.method', 'Méthode de rendu')}
@@ -504,20 +609,22 @@ function JobTechnicalDetails({ job }: { job: VideoExportJob }) {
         </div>
         <div>
           <dt className="text-gray-600 dark:text-gray-300">
-            {t('videoJobs.table.frames', 'Images traitées')}
-          </dt>
-          <dd className="mt-1 font-semibold text-gray-800 dark:text-gray-100">
-            <FramesCell job={job} />
-          </dd>
-        </div>
-        <div>
-          <dt className="text-gray-600 dark:text-gray-300">
             {t('videoJobs.table.fps', 'Vitesse (images/s)')}
           </dt>
           <dd className="mt-1 font-semibold text-gray-800 dark:text-gray-100">
             <FpsCell job={job} />
           </dd>
         </div>
+        {lastLog && (
+          <div className="col-span-2 sm:col-span-4">
+            <dt className="text-gray-600 dark:text-gray-300">
+              {t('videoJobs.table.latestEvent', 'Dernier événement')}
+            </dt>
+            <dd className="mt-1 break-words font-mono text-gray-800 dark:text-gray-100">
+              {lastLog}
+            </dd>
+          </div>
+        )}
       </dl>
     </details>
   );
