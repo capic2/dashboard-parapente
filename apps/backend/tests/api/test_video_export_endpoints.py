@@ -17,6 +17,7 @@ from auth import create_job_token
 from models import GoproOverlayJob, VideoExportJob, YoutubeUploadJob
 from routes import (
     _get_video_export_jobs_payload,
+    _youtube_upload_export_job_payload,
     _video_export_can_cancel,
     _video_export_can_delete,
     serialize_sse_event,
@@ -843,6 +844,35 @@ class TestExportStatusAndCancel:
 class TestVideoExportJobsEndpoint:
     """Tests for GET /video-export-jobs."""
 
+    def test_youtube_upload_export_payload_defaults_missing_logs_to_empty_list(self):
+        job = YoutubeUploadJob(
+            id="youtube-uploading-without-logs",
+            flight_id="flight-1",
+            user_id=1,
+            status="uploading",
+            progress=42,
+        )
+
+        with patch("routes.youtube_upload_job_payload", return_value={"log_tail": None}):
+            payload = _youtube_upload_export_job_payload(job)
+
+        assert payload["log_tail"] == []
+
+    def test_youtube_upload_export_payload_skips_log_reads_for_terminal_jobs(self):
+        job = YoutubeUploadJob(
+            id="youtube-completed",
+            flight_id="flight-1",
+            user_id=1,
+            status="completed",
+            progress=100,
+        )
+
+        with patch("routes.youtube_upload_job_payload") as get_upload_payload:
+            payload = _youtube_upload_export_job_payload(job)
+
+        assert payload["log_tail"] == []
+        get_upload_payload.assert_not_called()
+
     def test_video_export_jobs_lists_jobs_with_cancel_state(
         self, client: TestClient, db_session, sample_flight
     ):
@@ -997,13 +1027,17 @@ class TestVideoExportJobsEndpoint:
             == "gpu"
         )
 
-    def test_video_export_jobs_youtube_filter_accepts_both_mode_values(self, client: TestClient):
+    def test_video_export_jobs_youtube_filter_includes_telemetry_exports(self, client: TestClient):
         with (
             patch(
                 "routes.list_exports_manual",
                 return_value=[
                     {"job_id": "youtube-upload-mode", "mode": "youtube_upload"},
                     {"job_id": "youtube-mode", "mode": "youtube"},
+                    {
+                        "job_id": "youtube-telemetry-layout",
+                        "mode": "youtube_telemetry_layout",
+                    },
                 ],
             ),
             patch("routes.list_exports_stream", return_value=[]),
@@ -1018,7 +1052,10 @@ class TestVideoExportJobsEndpoint:
         assert {job["job_id"] for job in response.json()["jobs"]} == {
             "youtube-upload-mode",
             "youtube-mode",
+            "youtube-telemetry-layout",
         }
+        assert response.json()["type_counts"]["youtube"] == 3
+        assert response.json()["type_counts"]["video"] == 0
 
     def test_video_export_jobs_supports_server_side_pagination(
         self, client: TestClient, sample_flight
@@ -1089,6 +1126,10 @@ class TestVideoExportJobsEndpoint:
             ),
             patch("routes.list_exports_stream", return_value=[]),
             patch("routes.list_gopro_overlay_jobs", return_value=[]),
+            patch(
+                "routes.youtube_upload_job_payload",
+                return_value={"log_tail": ["Upload started", "Uploading 42%"]},
+            ),
         ):
             response = client.get(f"{API_PREFIX}/video-export-jobs?active_only=true")
 
@@ -1102,6 +1143,7 @@ class TestVideoExportJobsEndpoint:
         assert jobs[0]["status"] == "uploading"
         assert jobs[0]["progress"] == 42
         assert jobs[0]["mode"] == "youtube_upload"
+        assert jobs[0]["log_tail"] == ["Upload started", "Uploading 42%"]
         assert jobs[0]["can_cancel"] is True
 
     def test_export_status_passthrough_keeps_render_method(self, client: TestClient):

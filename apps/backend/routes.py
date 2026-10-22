@@ -796,6 +796,11 @@ def _highlight_export_job_payload(job: HighlightVideoJob) -> dict[str, Any]:
 
 
 def _youtube_upload_export_job_payload(job: YoutubeUploadJob) -> dict[str, Any]:
+    log_tail = (
+        youtube_upload_job_payload(job).get("log_tail") or []
+        if job.status in {"preparing", "queued", "uploading"}
+        else []
+    )
     return {
         "job_id": job.id,
         "flight_id": job.flight_id,
@@ -811,7 +816,7 @@ def _youtube_upload_export_job_payload(job: YoutubeUploadJob) -> dict[str, Any]:
         "updated_at": to_api_utc(job.updated_at),
         "started_at": to_api_utc(job.started_at),
         "completed_at": to_api_utc(job.completed_at),
-        "log_tail": [],
+        "log_tail": log_tail,
         "has_output_file": False,
     }
 
@@ -951,7 +956,10 @@ def _get_video_export_jobs_payload(
         "video": sum(job.get("mode") in {"manual", "manual_fast", "stream"} for job in jobs),
         "gopro": sum(job.get("mode") == "gopro_overlay" for job in jobs),
         "highlight": sum(job.get("mode") == "highlight" for job in jobs),
-        "youtube": sum(job.get("mode") in {"youtube", "youtube_upload"} for job in jobs),
+        "youtube": sum(
+            job.get("mode") in {"youtube", "youtube_upload", "youtube_telemetry_layout"}
+            for job in jobs
+        ),
     }
     if type_filter == "video":
         jobs = [job for job in jobs if job.get("mode") in {"manual", "manual_fast", "stream"}]
@@ -960,7 +968,11 @@ def _get_video_export_jobs_payload(
     elif type_filter == "highlight":
         jobs = [job for job in jobs if job.get("mode") == "highlight"]
     elif type_filter == "youtube":
-        jobs = [job for job in jobs if job.get("mode") in {"youtube", "youtube_upload"}]
+        jobs = [
+            job
+            for job in jobs
+            if job.get("mode") in {"youtube", "youtube_upload", "youtube_telemetry_layout"}
+        ]
     status_counts = {
         "all": len(jobs),
         "active": sum(
