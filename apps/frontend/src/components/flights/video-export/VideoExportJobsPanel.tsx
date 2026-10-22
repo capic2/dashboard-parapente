@@ -144,6 +144,12 @@ function getModeLabelParts(mode: string) {
   if (mode === 'youtube' || mode === 'youtube_upload') {
     return { key: 'videoJobs.mode.youtubeUpload', fallback: 'Upload YouTube' };
   }
+  if (mode === 'youtube_telemetry_layout') {
+    return {
+      key: 'videoJobs.mode.youtubeTelemetryExport',
+      fallback: 'Export YouTube avec télémétrie',
+    };
+  }
   return { key: `videoJobs.mode.${mode}`, fallback: mode };
 }
 
@@ -156,6 +162,12 @@ function getJobTypeLabelParts(job: VideoExportJob) {
   }
   if (job.mode === 'youtube_upload') {
     return { key: 'videoJobs.type.youtube', fallback: 'YouTube' };
+  }
+  if (job.mode === 'youtube_telemetry_layout') {
+    return {
+      key: 'videoJobs.type.youtubeTelemetryExport',
+      fallback: 'Export YouTube avec télémétrie',
+    };
   }
 
   return { key: 'videoJobs.type.video', fallback: 'Video' };
@@ -274,6 +286,14 @@ function isYoutubeJob(job: VideoExportJob) {
   return job.mode === 'youtube' || job.mode === 'youtube_upload';
 }
 
+function isYoutubeTelemetryExportJob(job: VideoExportJob) {
+  return job.mode === 'youtube_telemetry_layout';
+}
+
+function isYoutubeProcessingJob(job: VideoExportJob) {
+  return isYoutubeJob(job) || isYoutubeTelemetryExportJob(job);
+}
+
 function getRestartMode(job: VideoExportJob) {
   if (
     job.mode === 'manual' ||
@@ -303,9 +323,9 @@ function isJobInTypeFilter(job: VideoExportJob, filter: TypeFilter) {
     (filter === 'video' &&
       !isGoproOverlayJob(job) &&
       !isHighlightJob(job) &&
-      !isYoutubeJob(job)) ||
+      !isYoutubeProcessingJob(job)) ||
     (filter === 'highlight' && isHighlightJob(job)) ||
-    (filter === 'youtube' && isYoutubeJob(job))
+    (filter === 'youtube' && isYoutubeProcessingJob(job))
   );
 }
 
@@ -488,6 +508,14 @@ function FpsCell({ job }: { job: VideoExportJob }) {
 }
 
 function JobTechnicalDetails({ job }: { job: VideoExportJob }) {
+  return job.mode === 'youtube_telemetry_layout' ? (
+    <YoutubeTelemetryExportDetails job={job} />
+  ) : (
+    <StandardJobTechnicalDetails job={job} />
+  );
+}
+
+function StandardJobTechnicalDetails({ job }: { job: VideoExportJob }) {
   const { t, i18n } = useTranslation();
   const startedAt = job.started_at ? parseApiUtcDate(job.started_at) : null;
   const endedAt = job.completed_at ? parseApiUtcDate(job.completed_at) : null;
@@ -631,6 +659,188 @@ function JobTechnicalDetails({ job }: { job: VideoExportJob }) {
         )}
       </dl>
     </details>
+  );
+}
+
+function YoutubeTelemetryExportDetails({ job }: { job: VideoExportJob }) {
+  const { t, i18n } = useTranslation();
+  const { status } = useVideoExportStatus(job.job_id, isActiveJob(job));
+  const [now, setNow] = useState(() => Date.now());
+  const currentJob = { ...job, ...status };
+  const progress = getProgress(currentJob);
+  const phase = getJobPhase(currentJob);
+  const startedAtRaw = currentJob.started_at ?? currentJob.created_at;
+  const startedAt = startedAtRaw ? parseApiUtcDate(startedAtRaw) : null;
+  const finishedAtRaw =
+    currentJob.completed_at ??
+    (isActiveJob(currentJob) ? null : currentJob.updated_at);
+  const durationSeconds =
+    startedAt && Number.isFinite(startedAt.getTime())
+      ? Math.max(
+          0,
+          Math.floor(
+            ((finishedAtRaw ? parseApiUtcDate(finishedAtRaw).getTime() : now) -
+              startedAt.getTime()) /
+              1000
+          )
+        )
+      : null;
+  const activityAge = getActivityAge(
+    currentJob,
+    i18n.resolvedLanguage ?? i18n.language
+  );
+  const lastEvent =
+    currentJob.log_tail
+      ?.slice()
+      .reverse()
+      .find((line) => line.trim()) ??
+    currentJob.message ??
+    currentJob.error;
+  const recentLogs = currentJob.log_tail?.filter((line) => line.trim()) ?? [];
+  const active = isActiveJob(currentJob);
+  const determinateProgress =
+    typeof currentJob.progress === 'number' &&
+    Number.isFinite(currentJob.progress);
+  let progressLabel = t(
+    `videoJobs.status.${phase}`,
+    statusLabelFallbacks[phase] ?? phase
+  );
+  if (determinateProgress) {
+    progressLabel = `${progress}%`;
+  } else if (active) {
+    progressLabel = t('videoJobs.status.processing', 'En cours');
+  }
+
+  useEffect(() => {
+    if (!active) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [active]);
+
+  return (
+    <section className="min-w-64 rounded-lg border border-cyan-200 bg-cyan-50/70 p-3 text-xs dark:border-cyan-900 dark:bg-cyan-950/20">
+      <div className="flex items-center justify-between gap-3 text-sm">
+        <span className="font-semibold text-slate-900 dark:text-white">
+          {t(
+            'flights.youtubeOverlayExportProgress',
+            'Progression de l’export YouTube'
+          )}
+        </span>
+        <span className="text-slate-700 dark:text-slate-200">
+          {progressLabel}
+        </span>
+      </div>
+      {(determinateProgress || active) && (
+        <progress
+          className="mt-2 block h-2 w-full overflow-hidden rounded-full bg-cyan-100 accent-cyan-500 dark:bg-cyan-950"
+          aria-label={t(
+            'flights.youtubeOverlayExportProgress',
+            'Progression de l’export YouTube'
+          )}
+          value={determinateProgress ? progress : undefined}
+          max={100}
+        >
+          {progressLabel}
+        </progress>
+      )}
+      {(currentJob.error || currentJob.message) && (
+        <p className="mt-2 break-words text-slate-700 dark:text-slate-200">
+          {currentJob.error || currentJob.message}
+        </p>
+      )}
+      <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="rounded-lg border border-cyan-200/70 bg-white/60 px-2.5 py-2 dark:border-cyan-900/70 dark:bg-slate-950/20">
+          <dt className="text-slate-500 dark:text-slate-400">
+            {t('flights.youtubeOverlayExportPhaseLabel', 'Étape')}
+          </dt>
+          <dd className="mt-1 font-semibold text-slate-800 dark:text-slate-100">
+            {t(
+              `videoJobs.status.${phase}`,
+              statusLabelFallbacks[phase] ?? phase
+            )}
+          </dd>
+        </div>
+        <div className="rounded-lg border border-cyan-200/70 bg-white/60 px-2.5 py-2 dark:border-cyan-900/70 dark:bg-slate-950/20">
+          <dt className="text-slate-500 dark:text-slate-400">
+            {t('flights.youtubeOverlayExportElapsed', 'Durée')}
+          </dt>
+          <dd className="mt-1 font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+            {durationSeconds === null ? '-' : formatDuration(durationSeconds)}
+          </dd>
+        </div>
+        <div className="rounded-lg border border-cyan-200/70 bg-white/60 px-2.5 py-2 dark:border-cyan-900/70 dark:bg-slate-950/20">
+          <dt className="text-slate-500 dark:text-slate-400">
+            {t('flights.youtubeOverlayExportLastActivity', 'Activité')}
+          </dt>
+          <dd className="mt-1 font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+            {activityAge ?? '-'}
+          </dd>
+        </div>
+        <div className="rounded-lg border border-cyan-200/70 bg-white/60 px-2.5 py-2 dark:border-cyan-900/70 dark:bg-slate-950/20">
+          <dt className="text-slate-500 dark:text-slate-400">
+            {t('flights.youtubeOverlayExportEta', 'Estimation')}
+          </dt>
+          <dd className="mt-1 font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+            {typeof currentJob.eta_seconds === 'number'
+              ? formatDuration(currentJob.eta_seconds)
+              : t('flights.youtubeOverlayExportEtaUnknown', 'Non disponible')}
+          </dd>
+        </div>
+      </dl>
+      {currentJob.frames_captured != null &&
+        currentJob.total_frames != null && (
+          <p className="mt-2 text-slate-600 dark:text-slate-300">
+            {t(
+              'flights.youtubeOverlayExportFrames',
+              '{{captured}} / {{total}} images · {{remaining}} restantes',
+              {
+                captured: currentJob.frames_captured,
+                total: currentJob.total_frames,
+                remaining: Math.max(
+                  0,
+                  currentJob.total_frames - currentJob.frames_captured
+                ),
+              }
+            )}
+          </p>
+        )}
+      {lastEvent && (
+        <p className="mt-2 truncate text-slate-600 dark:text-slate-300">
+          <span className="font-semibold">
+            {t('flights.youtubeOverlayExportLatestEvent', 'Dernier événement')}:
+          </span>{' '}
+          {lastEvent}
+        </p>
+      )}
+      {recentLogs.length > 1 && (
+        <details className="mt-2 text-slate-600 dark:text-slate-300">
+          <summary className="cursor-pointer font-semibold">
+            {t(
+              'flights.youtubeOverlayExportShowLogs',
+              'Voir les derniers événements'
+            )}
+          </summary>
+          <ul className="mt-2 space-y-1 rounded-lg bg-white/60 p-2 font-mono dark:bg-slate-950/20">
+            {recentLogs.slice(-3).map((line, index) => (
+              <li key={`${line}-${index}`} className="break-words">
+                {line}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {active && getStalledJobMinutes(currentJob) !== null && (
+        <p className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          {t(
+            'flights.youtubeOverlayExportStalled',
+            'Aucune mise à jour depuis {{minutes}} min. Le traitement est peut-être bloqué.',
+            {
+              minutes: getStalledJobMinutes(currentJob),
+            }
+          )}
+        </p>
+      )}
+    </section>
   );
 }
 
