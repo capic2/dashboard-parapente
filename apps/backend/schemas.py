@@ -779,6 +779,10 @@ class YoutubeUploadJobResponse(BaseModel):
     highlight_video_job_id: str | None = None
     status: Literal["preparing", "queued", "uploading", "completed", "failed", "cancelled"]
     progress: int = Field(ge=0, le=100)
+    created_at: datetime | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    updated_at: datetime | None = None
     youtube_url: str | None = None
     error: str | None = None
     log_tail: list[str] = Field(default_factory=list)

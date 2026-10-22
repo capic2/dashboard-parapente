@@ -938,6 +938,8 @@ def test_get_youtube_upload_includes_recent_job_logs(
         user_id=1,
         status="uploading",
         progress=42,
+        created_at=datetime(2026, 10, 22, 12, 0, tzinfo=timezone.utc),
+        started_at=datetime(2026, 10, 22, 12, 0, 30, tzinfo=timezone.utc),
         title="Envoi journalisé",
         description="",
         privacy_status="private",
@@ -952,6 +954,8 @@ def test_get_youtube_upload_includes_recent_job_logs(
 
     assert response.status_code == 200
     assert response.json()["log_tail"] == ["Upload queued", "Upload progress: 42%"]
+    assert response.json()["created_at"] == "2026-10-22T12:00:00"
+    assert response.json()["started_at"] == "2026-10-22T12:00:30"
 
 
 def test_youtube_upload_log_errors_redact_urls():
