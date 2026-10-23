@@ -177,6 +177,7 @@ export function Flight({
     hasVideo ||
     hasCamera ||
     hasYoutubeVideo ||
+    flight.youtube_telemetry_video_file_exists === true ||
     isYoutubeUploadRunning ||
     isYoutubeUploadFailed ||
     isYoutubeOverlayExportRunning ||
@@ -334,6 +335,12 @@ export function Flight({
                   {t(youtubeTypeLabels[sourceType] ?? 'flights.youtubeBadge')}
                 </span>
               ))}
+              {flight.youtube_telemetry_video_file_exists && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+                  <Video className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.youtubeTelemetryLocalBadge')}
+                </span>
+              )}
               {((hasYoutubeVideo && youtubeVideoTypes.length === 0) ||
                 isYoutubeUploadRunning ||
                 isYoutubeUploadFailed) && (

@@ -503,6 +503,7 @@ def list_flight_summaries(
         Flight.video_export_job_id,
         Flight.video_export_status,
         Flight.video_file_path,
+        Flight.youtube_telemetry_video_file_path,
         Flight.pano_video_file_path,
         Flight.youtube_urls_json,
         Flight.gopro_overlay_job_id,
@@ -618,6 +619,7 @@ def list_flight_summaries(
             has_camera=_directory_file_exists(
                 _flight_directory(row.flight_date, row.flight_sequence) / "camera.mp4"
             ),
+            youtube_telemetry_video_file_exists=_file_exists(row.youtube_telemetry_video_file_path),
             has_youtube_video=bool(uploaded_youtube_ids[row.id] & existing_youtube_ids),
             youtube_video_count=len(uploaded_youtube_ids[row.id] & existing_youtube_ids),
             youtube_video_types=[

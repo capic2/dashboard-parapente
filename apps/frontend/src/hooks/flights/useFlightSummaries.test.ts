@@ -47,6 +47,10 @@ const summary = FlightSummariesResponseSchema.parse({
 });
 
 describe('flight summary queries', () => {
+  it('defaults the local telemetry file flag when older responses omit it', () => {
+    expect(summary.flights[0].youtube_telemetry_video_file_exists).toBe(false);
+  });
+
   it('polls only the filtered active-job query', () => {
     const search = {
       gpx: 'all',
