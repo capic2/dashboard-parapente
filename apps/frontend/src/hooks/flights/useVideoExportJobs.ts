@@ -14,6 +14,7 @@ export type VideoExportJob = {
   flight_title?: string | null;
   status: string;
   internal_status?: string | null;
+  phase?: string | null;
   progress?: number | null;
   total_frames?: number | null;
   fps?: number | null;
