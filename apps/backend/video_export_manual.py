@@ -336,6 +336,19 @@ async def _ensure_export_viewer_reachable(url: str, timeout_seconds: float = 5.0
     await asyncio.to_thread(_check_url_reachable, url, timeout_seconds)
 
 
+def _youtube_telemetry_layout_phase(job: VideoExportJob) -> str | None:
+    """Derive the current phase from persisted status and progress messages."""
+    if job.mode != "youtube_telemetry_layout":
+        return None
+    if job.status in _TERMINAL_STATUSES or job.status == _STATUS_QUEUED:
+        return job.status
+    if (job.message or "").startswith("Rendu de l’overlay:"):
+        return _STATUS_CAPTURING
+    if (job.message or "").startswith("Fusion de la vidéo:"):
+        return _STATUS_ENCODING
+    return _STATUS_INITIALIZING
+
+
 def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
     resume_info = _job_resume_info(job)
     snapshot = {
@@ -375,6 +388,9 @@ def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
     with _JOB_RUNTIME_LOCK:
         runtime = _JOB_RUNTIME.get(job.id, {}).copy()
     snapshot.update(runtime)
+    telemetry_layout_phase = _youtube_telemetry_layout_phase(job)
+    if telemetry_layout_phase is not None:
+        snapshot["phase"] = telemetry_layout_phase
     return snapshot
 
 
