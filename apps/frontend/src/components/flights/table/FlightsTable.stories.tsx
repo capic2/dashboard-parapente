@@ -164,6 +164,8 @@ const summarizeFlight = (flight: Flight): FlightSummary => ({
   has_gpx: Boolean(flight.gpx_file_path),
   has_video: Boolean(flight.video_file_path),
   has_camera: flight.gopro_camera_file_exists === true,
+  youtube_telemetry_video_file_exists:
+    flight.youtube_telemetry_video_file_exists === true,
   has_youtube_video: Boolean(flight.youtube_urls?.length),
   youtube_video_count: flight.youtube_urls?.length ?? 0,
   youtube_upload_status: null,
