@@ -186,6 +186,67 @@ def test_video_export_snapshot_exposes_persisted_composition_metrics(monkeypatch
     assert snapshot["frames_captured"] == 824
     assert snapshot["total_frames"] == 1000
     assert snapshot["fps_actual"] == 5.1
+    assert snapshot["phase"] == "encoding"
+
+
+@pytest.mark.parametrize(
+    ("message", "expected_phase"),
+    [
+        ("Préparation de l’export YouTube", "initializing"),
+        ("Téléchargement YouTube: 42%", "initializing"),
+        ("Rendu de l’overlay: 421/606 instants télémétriques", "capturing"),
+        ("Fusion de la vidéo: 824/1000 images", "encoding"),
+    ],
+)
+def test_youtube_telemetry_layout_phase_uses_persisted_message(message, expected_phase):
+    job = SimpleNamespace(
+        id="youtube-job",
+        status=video_export_manual._STATUS_RUNNING,
+        mode="youtube_telemetry_layout",
+        message=message,
+    )
+
+    assert video_export_manual._youtube_telemetry_layout_phase(job) == expected_phase
+
+
+def test_video_export_snapshot_exposes_telemetry_layout_phase(monkeypatch):
+    job = SimpleNamespace(
+        id="youtube-job",
+        flight_id="flight-1",
+        status=video_export_manual._STATUS_RUNNING,
+        progress=71,
+        message="Rendu de l’overlay: 421/606 instants télémétriques",
+        started_at=None,
+        completed_at=None,
+        video_path=None,
+        error=None,
+        total_frames=None,
+        fps=30,
+        quality="1080p",
+        speed=1,
+        mode="youtube_telemetry_layout",
+        source_type="youtube",
+        youtube_url="https://youtube.com/watch?v=example",
+        overlay_job_id=None,
+        render_method=None,
+        created_at=None,
+        updated_at=None,
+        cancelled_at=None,
+        eta_seconds=None,
+        frames_processed=None,
+        fps_actual=None,
+    )
+    monkeypatch.setattr(
+        video_export_manual,
+        "_job_resume_info",
+        lambda _job: {"frames_captured": 0, "resume_from_frame": None, "can_resume": False},
+    )
+    monkeypatch.setattr(video_export_manual, "_job_log_tail", lambda _job_id: [])
+    monkeypatch.setattr(video_export_manual, "_JOB_RUNTIME", {})
+
+    snapshot = video_export_manual._snapshot_from_job(job)
+
+    assert snapshot["phase"] == "capturing"
 
 
 def test_video_export_log_survives_temp_cleanup_until_job_deletion(tmp_path, monkeypatch):

@@ -117,7 +117,7 @@ type PendingVideoConfirm = {
 };
 
 function getJobPhase(job: VideoExportJob) {
-  return job.internal_status || job.status;
+  return job.phase || job.internal_status || job.status;
 }
 
 function getStatusLabelParts(job: VideoExportJob) {
