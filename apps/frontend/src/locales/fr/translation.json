@@ -1258,7 +1258,7 @@
     "youtubeOverlayExportLatestEvent": "Dernier événement",
     "youtubeOverlayExportShowLogs": "Voir les derniers événements",
     "youtubeOverlayExportStalled": "Aucune mise à jour depuis {{minutes}} min. Le traitement est peut-être bloqué.",
-    "youtubeOverlayExportInProgress": "Téléchargement et fusion en cours…",
+    "youtubeOverlayExportInProgress": "Fusion en cours…",
     "youtubeOverlayExportCompleted": "Vidéo télémétrique enregistrée dans les médias du vol",
     "youtubeOverlayExportFailed": "Échec de l’export",
     "youtubeOverlayExportCancelled": "Export annulé",

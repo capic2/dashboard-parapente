@@ -485,6 +485,11 @@ export function FlightTelemetryInteractivePreview({
       youtubeExportStatusValue === 'capturing' ||
       youtubeExportStatusValue === 'encoding')
   );
+  const youtubeExportProgress =
+    typeof youtubeExportStatus?.progress === 'number' &&
+    Number.isFinite(youtubeExportStatus.progress)
+      ? Math.min(100, Math.max(0, Math.round(youtubeExportStatus.progress)))
+      : null;
   const isYoutubeCookieError = (errorText: string) => {
     const normalizedError = errorText.toLowerCase();
     return (
@@ -745,10 +750,19 @@ export function FlightTelemetryInteractivePreview({
                       setIsYoutubeExportDialogOpen(true);
                     }}
                   >
-                    <Upload className="h-4 w-4" aria-hidden="true" />
-                    {isYoutubeExportActive
-                      ? t('flights.youtubeOverlayExportInProgress')
-                      : t('flights.youtubeOverlayExport')}
+                    {!isYoutubeExportActive && (
+                      <Upload className="h-4 w-4" aria-hidden="true" />
+                    )}
+                    {isYoutubeExportActive ? (
+                      <>
+                        {t('flights.youtubeOverlayExportInProgress')}
+                        {youtubeExportProgress != null && (
+                          <span> {youtubeExportProgress}%</span>
+                        )}
+                      </>
+                    ) : (
+                      t('flights.youtubeOverlayExport')
+                    )}
                   </Button>
                   {(isYoutubeExportActive ||
                     (youtubeExportJobId && !isYoutubeExportTerminal)) &&

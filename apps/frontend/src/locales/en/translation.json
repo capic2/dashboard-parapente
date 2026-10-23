@@ -1254,7 +1254,7 @@
     "youtubeOverlayExportLatestEvent": "Latest event",
     "youtubeOverlayExportShowLogs": "Show latest events",
     "youtubeOverlayExportStalled": "No update for {{minutes}} min. The treatment may be stalled.",
-    "youtubeOverlayExportInProgress": "Downloading and merging…",
+    "youtubeOverlayExportInProgress": "Merging…",
     "youtubeOverlayExportCompleted": "Telemetry video saved to flight media",
     "youtubeOverlayExportFailed": "Export failed",
     "youtubeOverlayExportCancelled": "Export cancelled",
