@@ -10,6 +10,7 @@ import {
   Tabs,
 } from '@dashboard-parapente/design-system';
 import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
+import type { BackgroundOperation } from '@dashboard-parapente/shared-types';
 import type { FlightVideoMarker } from '@dashboard-parapente/shared-types';
 import type { GoproOverlayJob } from '@dashboard-parapente/shared-types';
 import type { YoutubeVideoAssociation } from '@dashboard-parapente/shared-types';
@@ -20,6 +21,7 @@ import {
 } from '../../../hooks/flights/useFlights';
 import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
 import { useActiveFlightMediaJobs } from '../../../hooks/flights/useFlightSummaries';
+import { useOperations } from '../../../hooks/useOperations';
 import {
   useRemoveYoutubeVideoAssociation,
   useYoutubeSourcePublicationStatus,
@@ -90,6 +92,16 @@ export function FlightDetails({
   onCloseMobile,
 }: FlightDetailsProps) {
   const activeMediaJobs = useActiveFlightMediaJobs(true, 2000);
+  const operationsQuery = useOperations();
+  const gpxEnrichmentOperations = useMemo(
+    () =>
+      (operationsQuery.data ?? []).filter(
+        (operation: BackgroundOperation) =>
+          operation.flight_id === flight.id &&
+          operation.operation_type === 'gpx_enrichment'
+      ),
+    [flight.id, operationsQuery.data]
+  );
   const activeYoutubeExportJobIds = useMemo(
     () =>
       activeMediaJobs.data
@@ -611,7 +623,8 @@ export function FlightDetails({
     (youtubeUploadJob?.job_id &&
       isYoutubeUploadProgressVisible(youtubeUploadJob)) ||
     activeYoutubeTelemetryExportJob?.job_id ||
-    latestHighlightVideo?.job_id
+    latestHighlightVideo?.job_id ||
+    gpxEnrichmentOperations.length > 0
   );
   const visibleActiveTab =
     !hasGenerationLogs && activeTab === 'logs' ? 'infos' : activeTab;
@@ -847,6 +860,7 @@ export function FlightDetails({
       youtubeTelemetryExportProgress={activeYoutubeTelemetryExportJob?.progress}
       youtubeUploadJob={youtubeUploadJob}
       highlightVideo={latestHighlightVideo}
+      gpxEnrichmentOperations={gpxEnrichmentOperations}
     />
   );
 

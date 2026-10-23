@@ -1,5 +1,6 @@
 import {
   VIDEO_EXPORT_IN_PROGRESS_STATUSES,
+  type BackgroundOperation,
   type HighlightVideoJob,
 } from '@dashboard-parapente/shared-types';
 import { ChevronDown } from 'lucide-react';
@@ -16,6 +17,7 @@ import {
 } from '../../../lib/flightMediaState';
 import { JobLogViewer } from '../job-logs/JobLogViewer';
 import { YoutubeTelemetryExportDetails } from '../video-export/VideoExportJobsPanel';
+import { OperationTimeline } from '../../common/OperationTimeline';
 
 type FlightGenerationLogsPanelProps = {
   videoJobId?: string | null;
@@ -32,6 +34,7 @@ type FlightGenerationLogsPanelProps = {
   youtubeTelemetryExportProgress?: number | null;
   youtubeUploadJob: YoutubeUploadJob | null;
   highlightVideo: HighlightVideoJob | null;
+  gpxEnrichmentOperations?: BackgroundOperation[];
 };
 
 type LogSourceCardProps = {
@@ -324,6 +327,7 @@ export function FlightGenerationLogsPanel({
   youtubeTelemetryExportProgress,
   youtubeUploadJob,
   highlightVideo,
+  gpxEnrichmentOperations = [],
 }: FlightGenerationLogsPanelProps) {
   const { t } = useTranslation();
   const videoStatusValue =
@@ -352,7 +356,8 @@ export function FlightGenerationLogsPanel({
     !hasOverlayLayerLogSource &&
     !hasYoutubeUploadLogSource &&
     !hasHighlightLogSource &&
-    !hasYoutubeTelemetryExport
+    !hasYoutubeTelemetryExport &&
+    gpxEnrichmentOperations.length === 0
   ) {
     return null;
   }
@@ -398,6 +403,23 @@ export function FlightGenerationLogsPanel({
           </p>
         </div>
         <div className="space-y-3">
+          {gpxEnrichmentOperations.map((operation) => (
+            <section
+              key={operation.operation_id}
+              aria-label={t(operation.title_key, operation.operation_type)}
+              className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/70"
+            >
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {t(operation.title_key, operation.operation_type)}
+                </h4>
+                <span className="shrink-0 text-xs text-slate-600 dark:text-slate-300">
+                  {t(`operations.status.${operation.status}`, operation.status)}
+                </span>
+              </div>
+              <OperationTimeline operation={operation} />
+            </section>
+          ))}
           {hasOverlayLayerLogSource && overlayLayerJob && (
             <LogSourceCard
               key={`overlay-layer-${overlayLayerJob.job_id}`}
