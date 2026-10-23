@@ -63,6 +63,7 @@ interface FlightTelemetryInteractivePreviewProps {
 const EMPTY_YOUTUBE_URLS: string[] = [];
 const EMPTY_VIDEO_MARKERS: FlightVideoMarker[] = [];
 const EMPTY_YOUTUBE_EXPORT_JOB_IDS: string[] = [];
+const YOUTUBE_COOKIE_NOTICE_DURATION_MS = 10_000;
 
 function youtubeExportJobStorageKey(flightId: string): string {
   return `youtube-overlay-export-job:${flightId}`;
@@ -424,6 +425,7 @@ export function FlightTelemetryInteractivePreview({
   };
   const handleStartYoutubeLayoutExport = async () => {
     if (!youtubeUrl) return;
+    setYoutubeCookieNoticeAttempt((attempt) => attempt + 1);
     setYoutubeExportStartError(null);
     setYoutubeExportFailure(null);
     try {
@@ -510,6 +512,24 @@ export function FlightTelemetryInteractivePreview({
           .filter(Boolean)
           .join('\n')
       );
+  const [showYoutubeCookieNotice, setShowYoutubeCookieNotice] = useState(true);
+  const [youtubeCookieNoticeAttempt, setYoutubeCookieNoticeAttempt] =
+    useState(0);
+  useEffect(() => {
+    if (!youtubeDownloadNeedsCookies) {
+      setShowYoutubeCookieNotice(true);
+      return;
+    }
+
+    setShowYoutubeCookieNotice(true);
+    const timeoutId = window.setTimeout(
+      () => setShowYoutubeCookieNotice(false),
+      YOUTUBE_COOKIE_NOTICE_DURATION_MS
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [youtubeCookieNoticeAttempt, youtubeDownloadNeedsCookies]);
+  const isYoutubeCookieNoticeVisible =
+    youtubeDownloadNeedsCookies && showYoutubeCookieNotice;
   useEffect(() => {
     if (youtubeExportStatusValue !== 'failed' || youtubeDownloadNeedsCookies) {
       return;
@@ -607,12 +627,12 @@ export function FlightTelemetryInteractivePreview({
       {validYoutubeUrls.length > 0 && (
         <div
           className={
-            youtubeDownloadNeedsCookies
+            isYoutubeCookieNoticeVisible
               ? 'border-t border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900 dark:bg-amber-950/20 sm:px-5'
               : 'border-t border-slate-200 p-4 dark:border-slate-700 sm:px-5'
           }
         >
-          {youtubeDownloadNeedsCookies && (
+          {isYoutubeCookieNoticeVisible && (
             <>
               <p className="text-sm font-semibold text-amber-950 dark:text-amber-100">
                 {t('flights.youtubeCookiesRequired')}
