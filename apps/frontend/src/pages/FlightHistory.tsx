@@ -244,6 +244,7 @@ const FLIGHT_BADGE_FILTERS = [
   { id: 'youtubePano', label: 'flights.youtubePanoFilter' },
   { id: 'youtubeFace', label: 'flights.youtubeFaceFilter' },
   { id: 'youtubePilote', label: 'flights.youtubePiloteFilter' },
+  { id: 'telemetryVideo', label: 'flights.telemetryVideoFilter' },
   { id: 'youtubeHighlight', label: 'flights.youtubeHighlightFilter' },
 ] as const;
 const PRIMARY_FLIGHT_BADGE_FILTERS = FLIGHT_BADGE_FILTERS.filter(
@@ -350,6 +351,11 @@ function flightHasBadgeFilter(
       return hasYoutubeVideoType(flight, 'face');
     case 'youtubePilote':
       return hasYoutubeVideoType(flight, 'pilote');
+    case 'telemetryVideo':
+      return (
+        flight.youtube_telemetry_video_file_exists === true ||
+        hasYoutubeVideoType(flight, 'youtube_telemetry')
+      );
     case 'youtubeHighlight':
       return hasYoutubeVideoType(flight, 'highlight');
   }
