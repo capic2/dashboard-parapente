@@ -93,15 +93,24 @@ export function FlightDetails({
 }: FlightDetailsProps) {
   const activeMediaJobs = useActiveFlightMediaJobs(true, 2000);
   const operationsQuery = useOperations();
-  const gpxEnrichmentOperations = useMemo(
-    () =>
-      (operationsQuery.data ?? []).filter(
+  const gpxEnrichmentOperations = useMemo(() => {
+    const flightOperations = (operationsQuery.data ?? [])
+      .filter(
         (operation: BackgroundOperation) =>
           operation.flight_id === flight.id &&
           operation.operation_type === 'gpx_enrichment'
-      ),
-    [flight.id, operationsQuery.data]
-  );
+      )
+      .sort((left, right) => right.created_at.localeCompare(left.created_at));
+    const latestFinishedOperation = flightOperations.find(
+      (operation) => !['queued', 'running'].includes(operation.status)
+    );
+
+    return flightOperations.filter(
+      (operation) =>
+        ['queued', 'running'].includes(operation.status) ||
+        operation.operation_id === latestFinishedOperation?.operation_id
+    );
+  }, [flight.id, operationsQuery.data]);
   const activeYoutubeExportJobIds = useMemo(
     () =>
       activeMediaJobs.data
