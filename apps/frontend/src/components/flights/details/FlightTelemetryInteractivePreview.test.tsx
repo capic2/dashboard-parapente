@@ -758,7 +758,7 @@ describe('FlightTelemetryInteractivePreview', () => {
     await waitFor(() =>
       expect(
         screen.getByRole('button', {
-          name: 'flights.youtubeOverlayExportInProgress',
+          name: 'flights.youtubeOverlayExportInProgress 18%',
         })
       ).toBeDisabled()
     );
