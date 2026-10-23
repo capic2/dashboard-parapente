@@ -893,6 +893,7 @@ class FlightSummary(BaseModel):
     video_export_progress: int | None = None
     has_video: bool
     has_camera: bool
+    youtube_telemetry_video_file_exists: bool = False
     has_youtube_video: bool
     youtube_video_count: int
     youtube_video_types: list[

@@ -264,6 +264,7 @@ export const FlightSummarySchema = z.object({
   sportstracklive_track_id: z.number().nullable().optional(),
   has_video: z.boolean(),
   has_camera: z.boolean(),
+  youtube_telemetry_video_file_exists: z.boolean().default(false),
   has_youtube_video: z.boolean(),
   youtube_video_count: z.number().int().nonnegative(),
   youtube_video_types: z

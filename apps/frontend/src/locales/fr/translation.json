@@ -1372,6 +1372,7 @@
     "cameraBadge": "Caméra",
     "panoBadge": "Pano",
     "youtubeTelemetryBadge": "Vidéo télémétrique YouTube",
+    "youtubeTelemetryLocalBadge": "Vidéo télémétrique locale",
     "osvSourcesBadge": "Sources vidéo OSV",
     "gpxEnrichmentMismatchBadge": "GPX non enrichi",
     "faceBadge": "Face",

@@ -251,6 +251,24 @@ def test_summaries_report_panorama_file(client, db_session, monkeypatch, tmp_pat
     assert flight.pano_video_file_path == str((directory / "pano.mp4").resolve())
 
 
+def test_summaries_report_local_youtube_telemetry_video(client, db_session, tmp_path) -> None:
+    video_path = tmp_path / "telemetry.mp4"
+    video_path.write_bytes(b"telemetry")
+    flight = Flight(
+        id="summary-youtube-telemetry-local",
+        title="Telemetry video",
+        flight_date=date(2026, 1, 1),
+        youtube_telemetry_video_file_path=str(video_path),
+    )
+    db_session.add(flight)
+    db_session.commit()
+
+    response = client.get(API_URL)
+
+    assert response.status_code == 200
+    assert response.json()["flights"][0]["youtube_telemetry_video_file_exists"] is True
+
+
 def test_summaries_report_face_and_pilote_files(
     client: TestClient,
     db_session: Session,

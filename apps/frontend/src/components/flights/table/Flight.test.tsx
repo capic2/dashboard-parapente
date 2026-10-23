@@ -68,6 +68,7 @@ const flight = {
   has_gpx: false,
   has_video: false,
   has_camera: false,
+  youtube_telemetry_video_file_exists: false,
   has_youtube_video: false,
   youtube_video_count: 0,
   youtube_upload_status: null,
@@ -312,4 +313,24 @@ test('renders a YouTube badge for each available video in source order', () => {
     Node.DOCUMENT_POSITION_FOLLOWING
   );
   expect(screen.queryByText('flights.youtubeBadge x2')).not.toBeInTheDocument();
+});
+
+test('renders a separate badge when the telemetry video file is available locally', () => {
+  render(
+    <Flight
+      flight={{ ...flight, youtube_telemetry_video_file_exists: true }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(
+    screen.getByText('flights.youtubeTelemetryLocalBadge')
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByText('flights.youtubeTelemetryBadge')
+  ).not.toBeInTheDocument();
 });
