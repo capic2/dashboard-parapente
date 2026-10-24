@@ -43,7 +43,7 @@ import {
 } from '../hooks/weather/useFlightDecision';
 import { useAzbaAirspace } from '../hooks/weather/useAzbaAirspace';
 import { useEmagramHours } from '../hooks/weather/useEmagramAnalysis';
-import type { FlightObjective } from '@dashboard-parapente/shared-types';
+import type { FlightObjective, Site } from '@dashboard-parapente/shared-types';
 import { useAppSettings } from '../hooks/settings/useAppSettings';
 import WeatherPageMobileLayout from './WeatherPage.mobile';
 import { getSiteDisplayName } from '../lib/siteDisplay';
@@ -173,6 +173,45 @@ const getSiteWindRank = (
         favorabilityRanks[getWindFavorability(windDirection, direction)]
     )
   );
+};
+
+const isTakeoffSite = (site: Site) =>
+  site.usage_type === 'takeoff' || site.usage_type === 'both';
+
+const sortNearbySites = (
+  sitesToSort: Site[],
+  location: { latitude: number; longitude: number } | null,
+  radiusKm: number,
+  windDirection: string | undefined
+) => {
+  if (!location) return [...sitesToSort];
+
+  return [...sitesToSort].sort((first, second) => {
+    const firstDistance = getDistanceKm(location, first);
+    const secondDistance = getDistanceKm(location, second);
+    const firstIsNearby = firstDistance !== null && firstDistance <= radiusKm;
+    const secondIsNearby =
+      secondDistance !== null && secondDistance <= radiusKm;
+
+    if (firstIsNearby !== secondIsNearby) return firstIsNearby ? -1 : 1;
+
+    if (windDirection && firstIsNearby && secondIsNearby) {
+      const firstRank =
+        first.usage_type === 'landing'
+          ? 2
+          : getSiteWindRank(windDirection, first.orientation);
+      const secondRank =
+        second.usage_type === 'landing'
+          ? 2
+          : getSiteWindRank(windDirection, second.orientation);
+
+      if (firstRank !== secondRank) return firstRank - secondRank;
+    }
+
+    if (firstDistance === null) return secondDistance === null ? 0 : 1;
+    if (secondDistance === null) return -1;
+    return firstDistance - secondDistance;
+  });
 };
 
 const getForecastDaySearch = (dayIndex: number) => {
@@ -407,46 +446,42 @@ export default function WeatherPage() {
     return matchedFavorites.length > 0 ? matchedFavorites : sites;
   }, [favoriteSiteIds, sites]);
   const nearbyFavoriteSites = useMemo(() => {
-    const location = currentLocation.location;
-    if (!location) return favoriteSites;
-
-    return [...favoriteSites].sort((first, second) => {
-      const firstDistance = getDistanceKm(location, first);
-      const secondDistance = getDistanceKm(location, second);
-      const firstIsNearby = firstDistance !== null && firstDistance <= radiusKm;
-      const secondIsNearby =
-        secondDistance !== null && secondDistance <= radiusKm;
-
-      if (firstIsNearby !== secondIsNearby) return firstIsNearby ? -1 : 1;
-
-      if (selectionWindDirection && firstIsNearby && secondIsNearby) {
-        const firstRank =
-          first.usage_type === 'landing'
-            ? 2
-            : getSiteWindRank(selectionWindDirection, first.orientation);
-        const secondRank =
-          second.usage_type === 'landing'
-            ? 2
-            : getSiteWindRank(selectionWindDirection, second.orientation);
-
-        if (firstRank !== secondRank) return firstRank - secondRank;
-      }
-
-      if (firstDistance === null) return secondDistance === null ? 0 : 1;
-      if (secondDistance === null) return -1;
-      return firstDistance - secondDistance;
-    });
+    return sortNearbySites(
+      favoriteSites,
+      currentLocation.location,
+      radiusKm,
+      selectionWindDirection
+    );
   }, [
     currentLocation.location,
     favoriteSites,
     radiusKm,
     selectionWindDirection,
   ]);
+  const nearbyTakeoffSites = useMemo(() => {
+    const favoriteTakeoffs = favoriteSites.filter(isTakeoffSite);
+    const candidates =
+      favoriteTakeoffs.length > 0
+        ? favoriteTakeoffs
+        : sites.filter(isTakeoffSite);
+    return sortNearbySites(
+      candidates,
+      currentLocation.location,
+      radiusKm,
+      selectionWindDirection
+    );
+  }, [
+    currentLocation.location,
+    favoriteSites,
+    radiusKm,
+    selectionWindDirection,
+    sites,
+  ]);
   const autoSelectionPending =
     shouldWaitForSelectionWeather && !selectionWeatherWaitExpired;
   const autoSelectedSiteId =
     !currentLocation.isLoading && !autoSelectionPending
-      ? (nearbyFavoriteSites[0]?.id ?? sites[0]?.id)
+      ? nearbyTakeoffSites[0]?.id
       : undefined;
   const selectedSiteId =
     (routeSiteExists ? routeSiteId : undefined) ?? autoSelectedSiteId ?? '';
