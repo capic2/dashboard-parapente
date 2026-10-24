@@ -17,7 +17,10 @@ import {
 } from '../../../lib/flightMediaState';
 import { JobLogViewer } from '../job-logs/JobLogViewer';
 import { YoutubeTelemetryExportDetails } from '../video-export/VideoExportJobsPanel';
-import { OperationTimeline } from '../../common/OperationTimeline';
+import {
+  OperationProgressBar,
+  OperationTimeline,
+} from '../../common/OperationTimeline';
 
 type FlightGenerationLogsPanelProps = {
   videoJobId?: string | null;
@@ -44,6 +47,12 @@ type LogSourceCardProps = {
   statusLabel: string | null;
   isInProgress: boolean;
   progress?: number | null;
+  phase?: string | null;
+  framesCaptured?: number | null;
+  totalFrames?: number | null;
+  fps?: number | null;
+  etaSeconds?: number | null;
+  metadata?: { label: string; value: string; href?: string }[];
   message?: string | null;
   error?: string | null;
   createdAt?: string | null;
@@ -83,6 +92,33 @@ function clampProgress(progress?: number | null) {
   return Math.max(0, Math.min(100, Math.round(progress)));
 }
 
+function formatJobDuration(seconds: number) {
+  const wholeSeconds = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(wholeSeconds / 60);
+  const hours = Math.floor(minutes / 60);
+  if (hours > 0) return `${hours} h ${minutes % 60} min`;
+  if (minutes > 0) return `${minutes} min`;
+  return `${wholeSeconds} s`;
+}
+
+function getSafeYoutubeUrl(value?: string | null) {
+  if (!value) return null;
+
+  try {
+    const url = new URL(value);
+    if (
+      url.protocol === 'https:' &&
+      ['youtube.com', 'www.youtube.com', 'youtu.be'].includes(url.hostname)
+    ) {
+      return url.toString();
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
 function getStatusTone(status: string | null) {
   if (status === 'failed') {
     return 'border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-100';
@@ -106,6 +142,12 @@ function LogSourceCard({
   statusLabel,
   isInProgress,
   progress,
+  phase,
+  framesCaptured,
+  totalFrames,
+  fps,
+  etaSeconds,
+  metadata,
   message,
   error,
   createdAt,
@@ -122,6 +164,7 @@ function LogSourceCard({
   const showIndeterminateProgress = isInProgress && normalizedProgress === 0;
   const hasDetails = Boolean(message || error || lines.length > 0);
   const statusTone = getStatusTone(status);
+  const detailPhase = phase && phase !== status ? phase : null;
   const showCurrentMessage = Boolean(
     message && !lines.some((line) => line.includes(message))
   );
@@ -172,6 +215,19 @@ function LogSourceCard({
     renderMethod && ['cpu', 'gpu'].includes(renderMethod)
       ? t(`flights.generationLogs.method.${renderMethod}`)
       : null;
+  const localizedLanguage = i18n.resolvedLanguage ?? i18n.language;
+  const formattedFps =
+    typeof fps === 'number' && Number.isFinite(fps)
+      ? new Intl.NumberFormat(localizedLanguage, {
+          maximumFractionDigits: 1,
+        }).format(fps)
+      : null;
+  const hasTechnicalMetrics = Boolean(
+    detailPhase ||
+    framesCaptured != null ||
+    formattedFps ||
+    (isInProgress && etaSeconds != null)
+  );
 
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900/70">
@@ -276,6 +332,81 @@ function LogSourceCard({
             </dl>
           )}
 
+          {hasTechnicalMetrics && (
+            <dl className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+              {detailPhase && (
+                <div className="rounded-md border border-slate-200 px-2.5 py-2 dark:border-slate-700">
+                  <dt className="text-slate-500 dark:text-slate-400">
+                    {t('videoJobs.table.phase', 'Étape')}
+                  </dt>
+                  <dd className="mt-1 font-semibold text-slate-800 dark:text-slate-100">
+                    {t(`videoJobs.status.${detailPhase}`, detailPhase)}
+                  </dd>
+                </div>
+              )}
+              {framesCaptured != null && (
+                <div className="rounded-md border border-slate-200 px-2.5 py-2 dark:border-slate-700">
+                  <dt className="text-slate-500 dark:text-slate-400">
+                    {t('videoJobs.table.frames', 'Images traitées')}
+                  </dt>
+                  <dd className="mt-1 font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+                    {framesCaptured}
+                    {totalFrames != null && ` / ${totalFrames}`}
+                  </dd>
+                </div>
+              )}
+              {formattedFps && (
+                <div className="rounded-md border border-slate-200 px-2.5 py-2 dark:border-slate-700">
+                  <dt className="text-slate-500 dark:text-slate-400">
+                    {t('videoJobs.table.fps', 'Vitesse (images/s)')}
+                  </dt>
+                  <dd className="mt-1 font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+                    {formattedFps} {t('videoJobs.table.fpsUnit', 'images/s')}
+                  </dd>
+                </div>
+              )}
+              {isInProgress && etaSeconds != null && (
+                <div className="rounded-md border border-slate-200 px-2.5 py-2 dark:border-slate-700">
+                  <dt className="text-slate-500 dark:text-slate-400">
+                    {t('videoJobs.table.eta', 'Temps restant')}
+                  </dt>
+                  <dd className="mt-1 font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+                    {formatElapsed(etaSeconds)}
+                  </dd>
+                </div>
+              )}
+            </dl>
+          )}
+
+          {metadata && metadata.length > 0 && (
+            <dl className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+              {metadata.map(({ label, value, href }) => (
+                <div
+                  key={label}
+                  className="min-w-0 rounded-md border border-slate-200 px-2.5 py-2 dark:border-slate-700"
+                >
+                  <dt className="text-slate-500 dark:text-slate-400">
+                    {label}
+                  </dt>
+                  <dd className="mt-1 break-words font-semibold text-slate-800 dark:text-slate-100">
+                    {href ? (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sky-700 underline decoration-sky-300 underline-offset-2 hover:text-sky-900 dark:text-sky-300 dark:decoration-sky-700 dark:hover:text-sky-100"
+                      >
+                        {value}
+                      </a>
+                    ) : (
+                      value
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+
           {error && (
             <div className="mt-3 rounded-lg border border-red-200 bg-red-950 p-2 text-xs text-red-50 dark:border-red-900">
               <div className="mb-1 font-semibold">
@@ -349,6 +480,7 @@ export function FlightGenerationLogsPanel({
   );
   const hasHighlightLogSource = Boolean(highlightVideo?.job_id);
   const hasYoutubeTelemetryExport = Boolean(youtubeTelemetryExportJobId);
+  const youtubeUploadUrl = getSafeYoutubeUrl(youtubeUploadJob?.youtube_url);
 
   if (
     !hasVideoLogSource &&
@@ -417,6 +549,26 @@ export function FlightGenerationLogsPanel({
                   {t(`operations.status.${operation.status}`, operation.status)}
                 </span>
               </div>
+              {operation.progress != null && (
+                <div className="mb-3">
+                  <div className="mb-1 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                    <span>{t('videoJobs.table.progress', 'Progression')}</span>
+                    <span className="tabular-nums">
+                      {Math.max(
+                        0,
+                        Math.min(100, Math.round(operation.progress))
+                      )}
+                      %
+                    </span>
+                  </div>
+                  <OperationProgressBar progress={operation.progress} />
+                  {operation.current_step_detail && (
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      {operation.current_step_detail}
+                    </p>
+                  )}
+                </div>
+              )}
               <OperationTimeline operation={operation} />
             </section>
           ))}
@@ -433,6 +585,36 @@ export function FlightGenerationLogsPanel({
                 `flights.generationLogs.status.${overlayLayerJob.status}`
               )}
               progress={overlayLayerJob.progress}
+              metadata={[
+                {
+                  label: t('flights.generationLogs.layout', 'Disposition'),
+                  value: overlayLayerJob.layout_label,
+                },
+                ...(overlayLayerJob.output_resolution
+                  ? [
+                      {
+                        label: t(
+                          'flights.generationLogs.resolution',
+                          'Résolution'
+                        ),
+                        value:
+                          overlayLayerJob.output_resolution === 'source'
+                            ? t(
+                                'flights.generationLogs.sourceResolution',
+                                'Source'
+                              )
+                            : overlayLayerJob.output_resolution.toUpperCase(),
+                      },
+                    ]
+                  : []),
+                {
+                  label: t(
+                    'flights.generationLogs.outputFile',
+                    'Fichier produit'
+                  ),
+                  value: overlayLayerJob.output_filename,
+                },
+              ]}
               message={overlayLayerJob.message}
               error={overlayLayerJob.error}
               updatedAt={overlayLayerJob.updated_at}
@@ -455,6 +637,11 @@ export function FlightGenerationLogsPanel({
                   : null
               }
               progress={videoStatus?.progress ?? videoFallbackProgress}
+              phase={videoStatus?.phase ?? videoStatus?.internal_status}
+              framesCaptured={videoStatus?.frames_captured}
+              totalFrames={videoStatus?.total_frames}
+              fps={videoStatus?.fps}
+              etaSeconds={videoStatus?.eta_seconds}
               message={videoStatus?.message}
               error={videoStatus?.error}
               createdAt={videoStatus?.created_at}
@@ -488,6 +675,43 @@ export function FlightGenerationLogsPanel({
               progress={
                 goproOverlayJob?.progress ?? goproOverlayFallbackProgress
               }
+              metadata={
+                goproOverlayJob
+                  ? [
+                      {
+                        label: t(
+                          'flights.generationLogs.layout',
+                          'Disposition'
+                        ),
+                        value: goproOverlayJob.layout_label,
+                      },
+                      ...(goproOverlayJob.output_resolution
+                        ? [
+                            {
+                              label: t(
+                                'flights.generationLogs.resolution',
+                                'Résolution'
+                              ),
+                              value:
+                                goproOverlayJob.output_resolution === 'source'
+                                  ? t(
+                                      'flights.generationLogs.sourceResolution',
+                                      'Source'
+                                    )
+                                  : goproOverlayJob.output_resolution.toUpperCase(),
+                            },
+                          ]
+                        : []),
+                      {
+                        label: t(
+                          'flights.generationLogs.outputFile',
+                          'Fichier produit'
+                        ),
+                        value: goproOverlayJob.output_filename,
+                      },
+                    ]
+                  : undefined
+              }
               message={goproOverlayJob?.message}
               error={goproOverlayJob?.error}
               createdAt={goproOverlayJob?.created_at}
@@ -508,6 +732,27 @@ export function FlightGenerationLogsPanel({
                 `flights.generationLogs.status.${youtubeUploadJob.status}`
               )}
               progress={youtubeUploadJob.progress}
+              metadata={[
+                {
+                  label: t('flights.generationLogs.source', 'Source'),
+                  value: t(
+                    `flights.generationLogs.sources.${youtubeUploadJob.source_type}`,
+                    youtubeUploadJob.source_type
+                  ),
+                },
+                ...(youtubeUploadUrl
+                  ? [
+                      {
+                        label: t(
+                          'flights.generationLogs.youtubeVideo',
+                          'Vidéo YouTube'
+                        ),
+                        value: youtubeUploadUrl,
+                        href: youtubeUploadUrl,
+                      },
+                    ]
+                  : []),
+              ]}
               createdAt={youtubeUploadJob.created_at}
               startedAt={youtubeUploadJob.started_at}
               completedAt={youtubeUploadJob.completed_at}
@@ -529,6 +774,32 @@ export function FlightGenerationLogsPanel({
                 `flights.generationLogs.status.${highlightVideo.status}`
               )}
               progress={highlightVideo.progress}
+              metadata={[
+                {
+                  label: t('flights.generationLogs.clips', 'Séquences'),
+                  value: t(
+                    'flights.generationLogs.clipCount',
+                    '{{count}} séquence(s)',
+                    { count: highlightVideo.selection.length }
+                  ),
+                },
+                {
+                  label: t(
+                    'flights.generationLogs.selectedDuration',
+                    'Durée sélectionnée'
+                  ),
+                  value: formatJobDuration(
+                    highlightVideo.selection.reduce(
+                      (total, clip) => total + clip.duration_seconds,
+                      0
+                    )
+                  ),
+                },
+                {
+                  label: t('flights.generationLogs.format', 'Format'),
+                  value: highlightVideo.output_format.toUpperCase(),
+                },
+              ]}
               message={highlightVideo.message}
               error={highlightVideo.error}
               createdAt={highlightVideo.created_at}
