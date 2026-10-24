@@ -241,10 +241,8 @@ const FLIGHT_BADGE_FILTERS = [
   { id: 'pano', label: 'flights.panoBadge' },
   { id: 'face', label: 'flights.faceBadge' },
   { id: 'pilote', label: 'flights.piloteBadge' },
-  { id: 'goproOverlay', label: 'flights.goproOverlayBadge' },
   { id: 'highlightVideo', label: 'flights.highlightVideoBadge' },
   { id: 'youtube', label: 'flights.youtubeBadge' },
-  { id: 'youtubeOverlay', label: 'flights.youtubeOverlayFilter' },
   { id: 'youtubeCamera', label: 'flights.youtubeCameraFilter' },
   { id: 'youtubeVideo', label: 'flights.youtubeVideoFilter' },
   { id: 'youtubePano', label: 'flights.youtubePanoFilter' },
@@ -319,12 +317,6 @@ function flightHasBadgeFilter(
       return flight.has_face_video === true;
     case 'pilote':
       return flight.has_pilote_video === true;
-    case 'goproOverlay':
-      return (
-        flight.has_gopro_overlay ||
-        isGoproOverlayInProgress(flight.gopro_overlay_status) ||
-        flight.gopro_overlay_status === 'failed'
-      );
     case 'highlightVideo':
       return (
         flight.has_highlight_video ||
@@ -342,8 +334,6 @@ function flightHasBadgeFilter(
         flight.youtube_upload_status === 'uploading' ||
         flight.youtube_upload_status === 'failed'
       );
-    case 'youtubeOverlay':
-      return hasYoutubeVideoType(flight, 'gopro_overlay', 'youtube_overlay');
     case 'youtubeCamera':
       return hasYoutubeVideoType(flight, 'camera');
     case 'youtubeVideo':
@@ -355,9 +345,19 @@ function flightHasBadgeFilter(
     case 'youtubePilote':
       return hasYoutubeVideoType(flight, 'pilote');
     case 'telemetryVideo':
-      return flight.youtube_telemetry_video_file_exists === true;
+      return (
+        flight.youtube_telemetry_video_file_exists === true ||
+        flight.has_gopro_overlay ||
+        isGoproOverlayInProgress(flight.gopro_overlay_status) ||
+        flight.gopro_overlay_status === 'failed'
+      );
     case 'youtubeTelemetry':
-      return hasYoutubeVideoType(flight, 'youtube_telemetry');
+      return hasYoutubeVideoType(
+        flight,
+        'youtube_telemetry',
+        'gopro_overlay',
+        'youtube_overlay'
+      );
     case 'youtubeHighlight':
       return hasYoutubeVideoType(flight, 'highlight');
   }

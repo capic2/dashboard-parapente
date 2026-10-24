@@ -146,9 +146,18 @@ export function Flight({
   const youtubeVideoCountLabel =
     flight.youtube_video_count > 1 ? ` x${flight.youtube_video_count}` : '';
   const youtubeVideoTypes = flight.youtube_video_types ?? [];
+  const normalizedYoutubeVideoTypes = [
+    ...new Set(
+      youtubeVideoTypes.map((sourceType) =>
+        ['gopro_overlay', 'youtube_overlay', 'youtube_telemetry'].includes(
+          sourceType
+        )
+          ? 'youtube_telemetry'
+          : sourceType
+      )
+    ),
+  ];
   const youtubeTypeLabels: Record<string, string> = {
-    gopro_overlay: 'flights.goproOverlayBadge',
-    youtube_overlay: 'flights.goproOverlayBadge',
     youtube_telemetry: 'flights.youtubeTelemetryBadge',
     camera: 'flights.cameraBadge',
     video: 'flights.videoBadge',
@@ -313,10 +322,11 @@ export function Flight({
                   {t('flights.piloteBadge')}
                 </span>
               )}
-              {hasCompletedGoproOverlay && (
+              {(hasCompletedGoproOverlay ||
+                flight.youtube_telemetry_video_file_exists) && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
-                  <Wand2 className="h-3 w-3" aria-hidden="true" />
-                  {t('flights.goproOverlayBadge')}
+                  <Camera className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.youtubeTelemetryBadge')}
                 </span>
               )}
               {hasHighlightVideo && (
@@ -325,7 +335,7 @@ export function Flight({
                   {t('flights.highlightVideoBadge')}
                 </span>
               )}
-              {youtubeVideoTypes.map((sourceType, index) => (
+              {normalizedYoutubeVideoTypes.map((sourceType, index) => (
                 <span
                   key={`${sourceType}-${index}`}
                   className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
@@ -334,12 +344,6 @@ export function Flight({
                   {t(youtubeTypeLabels[sourceType] ?? 'flights.youtubeBadge')}
                 </span>
               ))}
-              {flight.youtube_telemetry_video_file_exists && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
-                  <Camera className="h-3 w-3" aria-hidden="true" />
-                  {t('flights.youtubeTelemetryLocalBadge')}
-                </span>
-              )}
               {((hasYoutubeVideo && youtubeVideoTypes.length === 0) ||
                 isYoutubeUploadRunning ||
                 isYoutubeUploadFailed) && (
