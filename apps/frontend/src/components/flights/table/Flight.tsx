@@ -9,6 +9,7 @@ import {
   FileText,
   MapPin,
   Mountain,
+  Play,
   Ruler,
   Trash2,
   Video,
@@ -22,7 +23,6 @@ import {
   useAppSettingsStore,
 } from '../../../stores/appSettingsStore';
 import { isGoproOverlayInProgress } from '../../../lib/flightMediaState';
-import { YoutubeIcon } from '../YoutubeIcon';
 import { getFlightGpxProvider } from '../../../lib/flightGpxProvider';
 
 interface FlightProps {
@@ -330,7 +330,7 @@ export function Flight({
                   key={`${sourceType}-${index}`}
                   className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
                 >
-                  <YoutubeIcon className="h-3 w-3" />
+                  <Play className="h-3 w-3" aria-hidden="true" />
                   {t(youtubeTypeLabels[sourceType] ?? 'flights.youtubeBadge')}
                 </span>
               ))}
@@ -347,7 +347,7 @@ export function Flight({
                   aria-live={isYoutubeUploadRunning ? 'polite' : undefined}
                   className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${isYoutubeUploadFailed ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100' : 'border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200'}`}
                 >
-                  <YoutubeIcon className="h-3 w-3" />
+                  <Play className="h-3 w-3" aria-hidden="true" />
                   {isYoutubeUploadFailed
                     ? t('flights.temporarySourceFailed')
                     : youtubeLabel}
