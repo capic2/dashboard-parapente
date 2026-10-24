@@ -464,9 +464,6 @@ export default function FlightHistory() {
     } else if (filter.id.startsWith('youtube')) {
       badgeColorClassName =
         'border-red-200 bg-red-50 text-red-800 hover:border-red-300 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/70';
-    } else if (filter.id === 'goproOverlay') {
-      badgeColorClassName =
-        'border-cyan-200 bg-cyan-50 text-cyan-800 hover:border-cyan-300 hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200 dark:hover:bg-cyan-950/70';
     } else if (filter.id === 'highlightVideo') {
       badgeColorClassName =
         'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-800 hover:border-fuchsia-300 hover:bg-fuchsia-100 dark:border-fuchsia-800 dark:bg-fuchsia-950/40 dark:text-fuchsia-200 dark:hover:bg-fuchsia-950/70';

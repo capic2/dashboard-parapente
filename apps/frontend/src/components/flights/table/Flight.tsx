@@ -314,7 +314,7 @@ export function Flight({
                 </span>
               )}
               {hasCompletedGoproOverlay && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200">
+                <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
                   <Wand2 className="h-3 w-3" aria-hidden="true" />
                   {t('flights.goproOverlayBadge')}
                 </span>
