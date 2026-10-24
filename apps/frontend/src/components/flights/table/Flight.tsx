@@ -9,8 +9,6 @@ import {
   FileText,
   MapPin,
   Mountain,
-  Orbit,
-  Play,
   Ruler,
   Trash2,
   Video,
@@ -24,6 +22,7 @@ import {
   useAppSettingsStore,
 } from '../../../stores/appSettingsStore';
 import { isGoproOverlayInProgress } from '../../../lib/flightMediaState';
+import { YoutubeIcon } from '../YoutubeIcon';
 import { getFlightGpxProvider } from '../../../lib/flightGpxProvider';
 
 interface FlightProps {
@@ -273,20 +272,20 @@ export function Flight({
                 </span>
               )}
               {hasVideo && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
-                  <Video className="h-3 w-3" aria-hidden="true" />
+                <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                  <Camera className="h-3 w-3" aria-hidden="true" />
                   {t('flights.videoBadge')}
                 </span>
               )}
               {hasCamera && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
                   <Camera className="h-3 w-3" aria-hidden="true" />
                   {t('flights.cameraBadge')}
                 </span>
               )}
               {hasPanoVideo && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
-                  <Orbit className="h-3 w-3" aria-hidden="true" />
+                <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                  <Camera className="h-3 w-3" aria-hidden="true" />
                   {t('flights.panoBadge')}
                 </span>
               )}
@@ -303,14 +302,14 @@ export function Flight({
                 </span>
               )}
               {hasFaceVideo && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
-                  <Video className="h-3 w-3" aria-hidden="true" />
+                <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                  <Camera className="h-3 w-3" aria-hidden="true" />
                   {t('flights.faceBadge')}
                 </span>
               )}
               {hasPiloteVideo && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
-                  <Video className="h-3 w-3" aria-hidden="true" />
+                <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                  <Camera className="h-3 w-3" aria-hidden="true" />
                   {t('flights.piloteBadge')}
                 </span>
               )}
@@ -331,13 +330,13 @@ export function Flight({
                   key={`${sourceType}-${index}`}
                   className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
                 >
-                  <Play className="h-3 w-3" aria-hidden="true" />
+                  <YoutubeIcon className="h-3 w-3" />
                   {t(youtubeTypeLabels[sourceType] ?? 'flights.youtubeBadge')}
                 </span>
               ))}
               {flight.youtube_telemetry_video_file_exists && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
-                  <Video className="h-3 w-3" aria-hidden="true" />
+                <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                  <Camera className="h-3 w-3" aria-hidden="true" />
                   {t('flights.youtubeTelemetryLocalBadge')}
                 </span>
               )}
@@ -348,7 +347,7 @@ export function Flight({
                   aria-live={isYoutubeUploadRunning ? 'polite' : undefined}
                   className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${isYoutubeUploadFailed ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100' : 'border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200'}`}
                 >
-                  <Play className="h-3 w-3" aria-hidden="true" />
+                  <YoutubeIcon className="h-3 w-3" />
                   {isYoutubeUploadFailed
                     ? t('flights.temporarySourceFailed')
                     : youtubeLabel}
