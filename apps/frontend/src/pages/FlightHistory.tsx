@@ -40,6 +40,7 @@ import {
   Clock3,
   ExternalLink,
   FileText,
+  Play,
   Wand2,
 } from 'lucide-react';
 import { IntervalsSyncModal } from '../components/flights/intervals-sync/IntervalsSyncModal';
@@ -56,7 +57,6 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import { useFlight } from '../hooks/flights/useFlight';
 import { isGoproOverlayInProgress } from '../lib/flightMediaState';
 import { getFlightGpxProvider } from '../lib/flightGpxProvider';
-import { YoutubeIcon } from '../components/flights/YoutubeIcon';
 import {
   normalizeFlightsSearch,
   serializeFlightsSearch,
@@ -450,16 +450,34 @@ export default function FlightHistory() {
     const isIncluded = selectedBadgeFilters.included.includes(filter.id);
     const isExcluded = selectedBadgeFilters.excluded.includes(filter.id);
     const isSelected = isIncluded || isExcluded;
-    let stateClassName =
-      'border-slate-300 bg-white text-slate-700 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-950 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:hover:text-slate-100';
+    let badgeColorClassName =
+      'border-blue-200 bg-blue-50 text-blue-800 hover:border-blue-300 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-950/70';
+    if (filter.id === 'gpxNoSync') {
+      badgeColorClassName =
+        'border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-950/70';
+    } else if (filter.id.startsWith('gpx')) {
+      badgeColorClassName =
+        'border-emerald-200 bg-emerald-50 text-emerald-800 hover:border-emerald-300 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-950/70';
+    } else if (filter.id === 'sportstracklive') {
+      badgeColorClassName =
+        'border-sky-200 bg-sky-50 text-sky-800 hover:border-sky-300 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200 dark:hover:bg-sky-950/70';
+    } else if (filter.id.startsWith('youtube')) {
+      badgeColorClassName =
+        'border-red-200 bg-red-50 text-red-800 hover:border-red-300 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/70';
+    } else if (filter.id === 'goproOverlay') {
+      badgeColorClassName =
+        'border-cyan-200 bg-cyan-50 text-cyan-800 hover:border-cyan-300 hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200 dark:hover:bg-cyan-950/70';
+    } else if (filter.id === 'highlightVideo') {
+      badgeColorClassName =
+        'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-800 hover:border-fuchsia-300 hover:bg-fuchsia-100 dark:border-fuchsia-800 dark:bg-fuchsia-950/40 dark:text-fuchsia-200 dark:hover:bg-fuchsia-950/70';
+    }
+    let stateClassName = badgeColorClassName;
     let accessibleStateKey = 'flights.tagNotSelected';
     if (isIncluded) {
-      stateClassName =
-        'border-sky-600 bg-sky-100 text-sky-950 dark:border-sky-400 dark:bg-sky-900 dark:text-sky-100';
+      stateClassName = `${badgeColorClassName} ring-2 ring-sky-500 ring-offset-1 dark:ring-offset-slate-900`;
       accessibleStateKey = 'flights.tagIncluded';
     } else if (isExcluded) {
-      stateClassName =
-        'border-rose-600 bg-rose-100 text-rose-950 dark:border-rose-400 dark:bg-rose-900 dark:text-rose-100';
+      stateClassName = `${badgeColorClassName} opacity-60 line-through`;
       accessibleStateKey = 'flights.tagExcluded';
     }
 
@@ -470,7 +488,7 @@ export default function FlightHistory() {
     else if (filter.id === 'goproOverlay' || filter.id === 'highlightVideo') {
       BadgeIcon = Wand2;
     }
-    const TagIcon = filter.id.startsWith('youtube') ? YoutubeIcon : BadgeIcon;
+    const TagIcon = filter.id.startsWith('youtube') ? Play : BadgeIcon;
 
     return (
       <button
