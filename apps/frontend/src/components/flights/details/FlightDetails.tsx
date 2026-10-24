@@ -98,7 +98,8 @@ export function FlightDetails({
       .filter(
         (operation: BackgroundOperation) =>
           operation.flight_id === flight.id &&
-          operation.operation_type === 'gpx_enrichment'
+          operation.operation_type === 'gpx_enrichment' &&
+          operation.status !== 'cancelled'
       )
       .sort((left, right) => right.created_at.localeCompare(left.created_at));
     const latestFinishedOperation = flightOperations.find(
