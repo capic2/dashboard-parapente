@@ -36,6 +36,11 @@ import {
   X,
   RefreshCw,
   MoreHorizontal,
+  Camera,
+  Clock3,
+  ExternalLink,
+  FileText,
+  Wand2,
 } from 'lucide-react';
 import { IntervalsSyncModal } from '../components/flights/intervals-sync/IntervalsSyncModal';
 import { CreateFlightModal } from '../components/flights/create-flight/CreateFlightModal';
@@ -51,6 +56,7 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import { useFlight } from '../hooks/flights/useFlight';
 import { isGoproOverlayInProgress } from '../lib/flightMediaState';
 import { getFlightGpxProvider } from '../lib/flightGpxProvider';
+import { YoutubeIcon } from '../components/flights/YoutubeIcon';
 import {
   normalizeFlightsSearch,
   serializeFlightsSearch,
@@ -288,7 +294,11 @@ function flightHasBadgeFilter(
         ['external', 'zepp'].includes(getFlightGpxProvider(flight) ?? '')
       );
     case 'gpxNoSync':
-      return flight.has_gpx && flight.gopro_overlay_gpx_offset == null;
+      return (
+        flight.has_gpx &&
+        flight.gopro_overlay_gpx_offset == null &&
+        (flight.has_face_video === true || flight.has_pilote_video === true)
+      );
     case 'sportstracklive':
       return (
         flight.sportstracklive_status === 'uploaded' &&
@@ -297,35 +307,27 @@ function flightHasBadgeFilter(
     case 'video':
       return (
         flight.has_video ||
-        hasYoutubeVideoType(flight, 'video') ||
         (flight.video_export_status != null &&
           (VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(flight.video_export_status) ||
             flight.video_export_status === 'failed'))
       );
     case 'camera':
-      return flight.has_camera || hasYoutubeVideoType(flight, 'camera');
+      return flight.has_camera;
     case 'pano':
-      return flight.has_pano_video || hasYoutubeVideoType(flight, 'pano');
+      return flight.has_pano_video;
     case 'face':
-      return (
-        flight.has_face_video === true || hasYoutubeVideoType(flight, 'face')
-      );
+      return flight.has_face_video === true;
     case 'pilote':
-      return (
-        flight.has_pilote_video === true ||
-        hasYoutubeVideoType(flight, 'pilote')
-      );
+      return flight.has_pilote_video === true;
     case 'goproOverlay':
       return (
         flight.has_gopro_overlay ||
-        hasYoutubeVideoType(flight, 'gopro_overlay', 'youtube_overlay') ||
         isGoproOverlayInProgress(flight.gopro_overlay_status) ||
         flight.gopro_overlay_status === 'failed'
       );
     case 'highlightVideo':
       return (
         flight.has_highlight_video ||
-        hasYoutubeVideoType(flight, 'highlight') ||
         (flight.highlight_video_status != null &&
           (VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(
             flight.highlight_video_status
@@ -461,6 +463,15 @@ export default function FlightHistory() {
       accessibleStateKey = 'flights.tagExcluded';
     }
 
+    let BadgeIcon = Camera;
+    if (filter.id === 'gpxNoSync') BadgeIcon = Clock3;
+    else if (filter.id.startsWith('gpx')) BadgeIcon = FileText;
+    else if (filter.id === 'sportstracklive') BadgeIcon = ExternalLink;
+    else if (filter.id === 'goproOverlay' || filter.id === 'highlightVideo') {
+      BadgeIcon = Wand2;
+    }
+    const TagIcon = filter.id.startsWith('youtube') ? YoutubeIcon : BadgeIcon;
+
     return (
       <button
         key={filter.id}
@@ -470,6 +481,7 @@ export default function FlightHistory() {
         onClick={() => toggleBadgeFilter(filter.id)}
         className={`min-h-9 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 lg:min-h-8 lg:px-2.5 ${stateClassName}`}
       >
+        <TagIcon className="mr-1 inline h-3.5 w-3.5" />
         {isIncluded && (
           <Check aria-hidden="true" className="mr-1 inline h-3.5 w-3.5" />
         )}
