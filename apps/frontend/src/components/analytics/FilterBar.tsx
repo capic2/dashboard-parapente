@@ -1,5 +1,7 @@
 import { Trans, useTranslation } from 'react-i18next';
-import { DatePicker, Select, Button } from '@dashboard-parapente/design-system';
+import { DatePicker } from '@dashboard-parapente/core/DatePicker/DatePicker';
+import { Select } from '@dashboard-parapente/core/Select';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import type { Site } from '@dashboard-parapente/shared-types';
 import { getSiteDisplayName } from '../../lib/siteDisplay';
 

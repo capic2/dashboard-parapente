@@ -49,7 +49,8 @@ import { CreateSiteModal } from '../components/flights/create-site/CreateSiteMod
 import { FlightsTable } from '../components/flights/table/FlightsTable';
 import { FlightDetails } from '../components/flights/details/FlightDetails';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
-import { Modal, Button } from '@dashboard-parapente/design-system';
+import { Modal } from '@dashboard-parapente/core/Modal';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { useToast } from '../hooks/useToast';
 import { HTTPError } from 'ky';
 import { api } from '../lib/api';

@@ -48,7 +48,7 @@ import {
 import { api } from '../../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../../hooks/useToast';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { Disclosure, DisclosurePanel } from 'react-aria-components';
 import { useTranslation } from 'react-i18next';
 

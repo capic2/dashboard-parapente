@@ -1,4 +1,4 @@
-import { ToastContainer } from '@dashboard-parapente/design-system';
+import { ToastContainer } from '@dashboard-parapente/core/Toast';
 import { useToastStore } from '../../hooks/useToast';
 import { useOperationCompletionNotifications } from '../../hooks/useJobNotifications';
 

@@ -6,7 +6,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Switch, TextField, Input, Text, Link } from 'react-aria-components';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { parseApiUtcDate } from '../../lib/date';
 import type { WeatherSource } from '../../types/weatherSources';
 import {

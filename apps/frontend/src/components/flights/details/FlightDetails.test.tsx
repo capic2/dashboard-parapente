@@ -60,7 +60,45 @@ const {
   },
 }));
 
-vi.mock('@dashboard-parapente/design-system', async () => {
+vi.mock('@dashboard-parapente/core/Button/Button', () => ({
+  Button: ({
+    children,
+    isDisabled,
+    onPress,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    isDisabled?: boolean;
+    onPress?: () => void;
+  }) => (
+    <button type="button" disabled={isDisabled} onClick={onPress} {...props}>
+      {children}
+    </button>
+  ),
+}));
+
+vi.mock('@dashboard-parapente/core/Lightbox', () => ({
+  Lightbox: ({ isOpen }: { isOpen: boolean }) =>
+    isOpen ? <dialog open>Lightbox</dialog> : null,
+}));
+
+vi.mock('@dashboard-parapente/core/Modal', () => ({
+  Modal: ({
+    children,
+    isOpen,
+    title,
+  }: {
+    children: React.ReactNode;
+    isOpen: boolean;
+    title: string;
+  }) =>
+    isOpen ? (
+      <dialog open aria-label={title}>
+        {children}
+      </dialog>
+    ) : null,
+}));
+
+vi.mock('@dashboard-parapente/core/Tabs', async () => {
   const React = await import('react');
   const MockTabsContext = React.createContext<{
     selectedKey: string;
@@ -71,35 +109,6 @@ vi.mock('@dashboard-parapente/design-system', async () => {
   });
 
   return {
-    Button: ({
-      children,
-      isDisabled,
-      onPress,
-      ...props
-    }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-      isDisabled?: boolean;
-      onPress?: () => void;
-    }) => (
-      <button type="button" disabled={isDisabled} onClick={onPress} {...props}>
-        {children}
-      </button>
-    ),
-    Lightbox: ({ isOpen }: { isOpen: boolean }) =>
-      isOpen ? <dialog open>Lightbox</dialog> : null,
-    Modal: ({
-      children,
-      isOpen,
-      title,
-    }: {
-      children: React.ReactNode;
-      isOpen: boolean;
-      title: string;
-    }) =>
-      isOpen ? (
-        <dialog open aria-label={title}>
-          {children}
-        </dialog>
-      ) : null,
     Tab: ({ children, id }: { children: React.ReactNode; id: string }) => {
       const tabs = React.useContext(MockTabsContext);
       return (

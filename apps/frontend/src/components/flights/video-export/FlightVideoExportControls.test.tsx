@@ -20,7 +20,7 @@ const { apiDelete, apiPost, confirmMock, exportStatusMock, mockFlight } =
     } as Flight,
   }));
 
-vi.mock('@dashboard-parapente/design-system', () => ({
+vi.mock('@dashboard-parapente/core/Button/Button', () => ({
   Button: ({
     children,
     isDisabled,

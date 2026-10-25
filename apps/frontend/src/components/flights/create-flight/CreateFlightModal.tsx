@@ -18,15 +18,10 @@ import {
   LoaderCircle,
   Upload,
 } from 'lucide-react';
-import {
-  Button,
-  Modal,
-  Select,
-  Tab,
-  TabList,
-  TabPanel,
-  Tabs,
-} from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
+import { Modal } from '@dashboard-parapente/core/Modal';
+import { Select } from '@dashboard-parapente/core/Select';
+import { Tab, TabList, TabPanel, Tabs } from '@dashboard-parapente/core/Tabs';
 import {
   useCreateFlight,
   useCreateFlightFromGPX,

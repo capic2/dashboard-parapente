@@ -5,7 +5,12 @@ import {
   Text as AriaText,
   TextField as AriaTextField,
 } from 'react-aria-components';
-import type { ComponentProps, ReactNode } from 'react';
+import type {
+  ComponentProps,
+  HTMLInputAutoCompleteAttribute,
+  HTMLInputTypeAttribute,
+  ReactNode,
+} from 'react';
 import { twMerge } from 'tailwind-merge';
 import {
   fieldContainerClassName,
@@ -23,6 +28,8 @@ type AriaTextFieldProps = Omit<
 export interface TextFieldProps extends AriaTextFieldProps {
   label: ReactNode;
   placeholder?: string;
+  type?: HTMLInputTypeAttribute;
+  autoComplete?: HTMLInputAutoCompleteAttribute;
   description?: ReactNode;
   errorMessage?: ReactNode;
   inputClassName?: string;
@@ -31,6 +38,8 @@ export interface TextFieldProps extends AriaTextFieldProps {
 export function TextField({
   label,
   placeholder,
+  type,
+  autoComplete,
   description,
   errorMessage,
   inputClassName,
@@ -48,6 +57,8 @@ export function TextField({
     >
       <AriaLabel className={fieldLabelClassName}>{label}</AriaLabel>
       <AriaInput
+        type={type}
+        autoComplete={autoComplete}
         placeholder={placeholder}
         className={twMerge(fieldControlClassName, inputClassName)}
       />

@@ -10,7 +10,7 @@ import type {
   FlightDecisionResponse,
   FlightObjective,
 } from '@dashboard-parapente/shared-types';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import {
   FLIGHT_OBJECTIVES,
   DEFAULT_FLIGHT_OBJECTIVE,

@@ -1,4 +1,4 @@
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { JobLogViewer } from '../job-logs/JobLogViewer';
 
 type JobLiveLogsPanelProps = {

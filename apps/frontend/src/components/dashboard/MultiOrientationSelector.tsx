@@ -11,7 +11,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Site } from '../../types';
 import { WindIndicatorCompact } from '../common/WindIndicator';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { Check, ChevronDown, Layers, MapPin, Mountain } from 'lucide-react';
 import { getSiteDisplayName } from '../../lib/siteDisplay';
 
