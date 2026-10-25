@@ -12,8 +12,14 @@
     "noImplicitThis": true,
     "paths": {
       "@dashboard-parapente/shared-types": ["./libs/shared-types/src/index.ts"],
+      "@dashboard-parapente/core/*": [
+        "./libs/design-system/src/components/core/*"
+      ],
       "@dashboard-parapente/design-system": [
         "./libs/design-system/src/index.ts"
+      ],
+      "@dashboard-parapente/design-system/form": [
+        "./libs/design-system/src/components/form/index.ts"
       ]
     },
     "resolveJsonModule": true,

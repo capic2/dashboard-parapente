@@ -1,4 +1,4 @@
-import preview from '../.storybook/preview';
+import preview from '../../../.storybook/preview';
 import { expect, fn } from 'storybook/test';
 import { Select } from './Select';
 
@@ -63,7 +63,9 @@ export const WithSelection = meta.story({
 });
 
 WithSelection.test('shows selected value', async ({ canvas }) => {
-  await expect(canvas.getByText('Arguel', {selector: 'span'})).toBeInTheDocument();
+  await expect(
+    canvas.getByText('Arguel', { selector: 'span' })
+  ).toBeInTheDocument();
 });
 
 export const NoPlaceholder = meta.story({

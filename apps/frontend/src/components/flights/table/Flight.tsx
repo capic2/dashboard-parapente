@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { Button, Card } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
+import { Card } from '@dashboard-parapente/core/Card/Card';
 import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
 import {
   Camera,

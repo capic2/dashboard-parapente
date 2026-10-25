@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { TextArea, TextField } from 'react-aria-components';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 
 interface FlightNotesSectionProps {
   notes: string | null | undefined;

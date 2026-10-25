@@ -3,7 +3,7 @@ import type React from 'react';
 import { expect, test, vi } from 'vitest';
 import type { FlightSummary } from '@dashboard-parapente/shared-types';
 
-vi.mock('@dashboard-parapente/design-system', () => ({
+vi.mock('@dashboard-parapente/core/Button/Button', () => ({
   Button: ({
     children,
     ...props
@@ -12,6 +12,9 @@ vi.mock('@dashboard-parapente/design-system', () => ({
       {children}
     </button>
   ),
+}));
+
+vi.mock('@dashboard-parapente/core/Card/Card', () => ({
   Card: ({
     children,
     selected,

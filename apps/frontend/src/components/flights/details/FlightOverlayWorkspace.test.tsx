@@ -13,7 +13,7 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
-vi.mock('@dashboard-parapente/design-system', () => ({
+vi.mock('@dashboard-parapente/core/Button/Button', () => ({
   Button: ({
     children,
     isDisabled,

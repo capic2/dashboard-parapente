@@ -2,7 +2,8 @@ import { useDeferredValue, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
 import { Input, Label, TextField } from 'react-aria-components';
-import { Button, Modal } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
+import { Modal } from '@dashboard-parapente/core/Modal';
 import { ArrowDown, ArrowUp, Plus, Search, Trash2 } from 'lucide-react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import {

@@ -2,13 +2,8 @@ import type { ChangeEvent } from 'react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  Button,
-  Tab,
-  TabList,
-  TabPanel,
-  Tabs,
-} from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
+import { Tab, TabList, TabPanel, Tabs } from '@dashboard-parapente/core/Tabs';
 import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
 import type { BackgroundOperation } from '@dashboard-parapente/shared-types';
 import type { FlightVideoMarker } from '@dashboard-parapente/shared-types';

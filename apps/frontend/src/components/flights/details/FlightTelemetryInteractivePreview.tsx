@@ -4,7 +4,8 @@ import type { FlightVideoMarker } from '@dashboard-parapente/shared-types';
 import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button, Modal } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
+import { Modal } from '@dashboard-parapente/core/Modal';
 import {
   ChevronLeft,
   ChevronRight,

@@ -8,7 +8,7 @@ import {
 } from '../../hooks/weather/useWeather';
 import { useQueryClient } from '@tanstack/react-query';
 import CacheTimestamp from '../common/CacheTimestamp';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { Wind } from 'lucide-react';
 import {
   getVerdictVisual,

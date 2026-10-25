@@ -8,7 +8,9 @@ import {
   useReactTable,
   type SortingState,
 } from '@tanstack/react-table';
-import { Button, DataTable, Modal } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
+import { DataTable } from '@dashboard-parapente/core/DataTable/DataTable';
+import { Modal } from '@dashboard-parapente/core/Modal';
 import {
   Download,
   ExternalLink,

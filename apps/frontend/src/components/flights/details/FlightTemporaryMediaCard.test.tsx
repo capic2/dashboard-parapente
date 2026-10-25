@@ -14,7 +14,7 @@ const { publicationMock, mutateAsyncMock, toastSuccessMock, toastErrorMock } =
     toastErrorMock: vi.fn(),
   }));
 
-vi.mock('@dashboard-parapente/design-system', () => ({
+vi.mock('@dashboard-parapente/core/Button/Button', () => ({
   Button: ({
     children,
     isDisabled,
@@ -29,6 +29,9 @@ vi.mock('@dashboard-parapente/design-system', () => ({
       {children}
     </button>
   ),
+}));
+
+vi.mock('@dashboard-parapente/core/Modal', () => ({
   Modal: ({
     children,
     isOpen,

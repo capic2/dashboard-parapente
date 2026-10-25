@@ -10,7 +10,8 @@ import {
   Input,
   TextArea,
 } from 'react-aria-components';
-import { Select, Button } from '@dashboard-parapente/design-system';
+import { Select } from '@dashboard-parapente/core/Select';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import type { YoutubeVideoAssociation } from '@dashboard-parapente/shared-types';
 import type { Key } from 'react-aria-components';
 import type { Flight, FlightFormData, Site } from '../../../types';
