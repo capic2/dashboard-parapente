@@ -297,7 +297,7 @@ catalogs:
       specifier: 1.64.1
       version: 1.64.1
     react-aria-components:
-      specifier: ^1.5.0
+      specifier: ^1.18.0
       version: 1.22.1
     react-i18next:
       specifier: ^17.0.1

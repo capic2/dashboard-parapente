@@ -1,4 +1,4 @@
-import preview from '../.storybook/preview';
+import preview from '../../../.storybook/preview';
 import { expect } from 'storybook/test';
 import LoadingSkeleton from './LoadingSkeleton';
 
