@@ -319,4 +319,8 @@ def test_operation_payloads_include_flight_ids_for_flight_jobs(
 
     for payload in (listed_operations, stream_operations):
         assert all(payload[operation_id]["flight_id"] == flight.id for operation_id in expected_ids)
+        assert all(
+            payload[operation_id]["flight_name"] == flight.title for operation_id in expected_ids
+        )
         assert payload["missing-flight-operation"]["flight_id"] is None
+        assert payload["missing-flight-operation"]["flight_name"] is None

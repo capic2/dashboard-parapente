@@ -349,6 +349,7 @@ class BackgroundOperation(BaseModel):
     source_kind: str | None = None
     source_id: str | None = None
     flight_id: str | None = None
+    flight_name: str | None = None
     can_cancel: bool = False
     can_retry: bool = False
     unread: bool = False

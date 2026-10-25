@@ -1242,12 +1242,23 @@ def _refresh_operations(db: Session, operations: list[BackgroundOperationModel])
 
 
 def _background_operation_payload(
-    operation: BackgroundOperationModel, flight_id: str | None
+    operation: BackgroundOperationModel,
+    flight_id: str | None,
+    flight_name: str | None,
 ) -> dict[str, Any]:
     return {
         **operation_payload(operation),
         "flight_id": flight_id,
+        "flight_name": flight_name,
     }
+
+
+def _flight_names(db: Session, flight_ids: dict[str, str]) -> dict[str, str]:
+    ids = set(flight_ids.values())
+    if not ids:
+        return {}
+    flights = db.query(Flight).filter(Flight.id.in_(ids)).all()
+    return {flight.id: name for flight in flights if (name := (flight.name or flight.title))}
 
 
 def _spots_data_is_recent(last_sync_value: Any, *, now: datetime | None = None) -> bool:
@@ -1297,9 +1308,14 @@ def _read_operations_payload(user_id: int) -> list[dict[str, Any]]:
             .all()
         )
         flight_ids = _refresh_operations(db, operations)
+        flight_names = _flight_names(db, flight_ids)
         return [
             BackgroundOperation.model_validate(
-                _background_operation_payload(item, flight_ids.get(item.id))
+                _background_operation_payload(
+                    item,
+                    flight_ids.get(item.id),
+                    flight_names.get(flight_ids.get(item.id, "")),
+                )
             ).model_dump(mode="json")
             for item in operations
         ]
@@ -1318,9 +1334,14 @@ def list_background_operations(
         query = query.filter(BackgroundOperationModel.status.in_(OPERATION_ACTIVE_STATUSES))
     operations = query.order_by(BackgroundOperationModel.updated_at.desc()).limit(limit).all()
     flight_ids = _refresh_operations(db, operations)
+    flight_names = _flight_names(db, flight_ids)
     return [
         BackgroundOperation.model_validate(
-            _background_operation_payload(item, flight_ids.get(item.id))
+            _background_operation_payload(
+                item,
+                flight_ids.get(item.id),
+                flight_names.get(flight_ids.get(item.id, "")),
+            )
         )
         for item in operations
     ]
