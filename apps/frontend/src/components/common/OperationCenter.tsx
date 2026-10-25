@@ -248,11 +248,18 @@ export function OperationCenter() {
                         onPress={() => openOperation(operation)}
                         className="min-w-0 flex-1 cursor-pointer rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <span
-                            className={`truncate text-sm font-medium ${statusColor(operation.status)}`}
-                          >
-                            {title}
+                        <div className="flex min-w-0 items-start justify-between gap-2">
+                          <span className="min-w-0 flex-1">
+                            <span
+                              className={`block truncate text-sm font-medium ${statusColor(operation.status)}`}
+                            >
+                              {title}
+                            </span>
+                            {operation.flight_name && (
+                              <span className="mt-0.5 block truncate text-xs text-slate-600 dark:text-slate-300">
+                                {operation.flight_name}
+                              </span>
+                            )}
                           </span>
                           <span className="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400">
                             {progressLabel}
