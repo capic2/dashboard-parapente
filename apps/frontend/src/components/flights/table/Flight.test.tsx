@@ -145,7 +145,7 @@ test('shows enriched GPX without the generic GPX badge', () => {
   expect(screen.queryByText('flights.gpxBadge')).not.toBeInTheDocument();
 });
 
-test('keeps the GPX provider badge alongside the enriched GPX badge', () => {
+test('shows only the enriched GPX badge when the stored GPX is enriched', () => {
   render(
     <Flight
       flight={{
@@ -162,8 +162,27 @@ test('keeps the GPX provider badge alongside the enriched GPX badge', () => {
     />
   );
 
-  expect(screen.getByText('flights.gpxZeppBadge')).toBeInTheDocument();
   expect(screen.getByText('flights.gpxEnrichedBadge')).toBeInTheDocument();
+  expect(screen.queryByText('flights.gpxZeppBadge')).not.toBeInTheDocument();
+  expect(screen.queryByText('flights.gpxBadge')).not.toBeInTheDocument();
+});
+
+test('shows only the GPX provider badge when the stored GPX is not enriched', () => {
+  render(
+    <Flight
+      flight={{ ...flight, has_gpx: true, gpx_provider: 'zepp' }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(screen.getByText('flights.gpxZeppBadge')).toBeInTheDocument();
+  expect(
+    screen.queryByText('flights.gpxEnrichedBadge')
+  ).not.toBeInTheDocument();
   expect(screen.queryByText('flights.gpxBadge')).not.toBeInTheDocument();
 });
 
