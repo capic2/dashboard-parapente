@@ -16,5 +16,10 @@ if [ -z "$PNPM_BIN" ]; then
   exit 1
 fi
 
+if git diff --cached --name-only --diff-filter=ACMR -- apps/backend | grep -Eq '\.py$'; then
+  echo "Backend Python files are staged; checking local workspace dependencies..."
+  ./scripts/bootstrap-local.sh
+fi
+
 "$PNPM_BIN" exec lint-staged
 "$PNPM_BIN" knip

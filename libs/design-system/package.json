@@ -3,6 +3,16 @@
   "version": "1.0.0",
   "type": "module",
   "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./form": {
+      "types": "./src/components/form/index.ts",
+      "import": "./src/components/form/index.ts"
+    }
+  },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {

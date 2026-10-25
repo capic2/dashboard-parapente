@@ -10,9 +10,12 @@ const meta = preview.meta({
     chromatic: {
       disableSnapshot: false,
     },
-    msw: { handlers: defaultHandlers },
   },
   tags: ['!autodocs'],
+
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
+  },
 });
 
 export const InfrastructureChromatic = meta.story({

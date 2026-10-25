@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Label, Input, TextField } from 'react-aria-components';
-import { Button } from '@dashboard-parapente/design-system';
-import { Modal } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
+import { Modal } from '@dashboard-parapente/core/Modal';
 import { useCreateSite, useGeocode } from '../../../hooks/sites/useSites';
 import { useFlightGPX } from '../../../hooks/flights/useFlightGPX';
 import type { Site } from '../../../types';
@@ -76,7 +76,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
   const handleCreate = async () => {
     const lat = parseFloat(latitude);
     const lon = parseFloat(longitude);
-    const elev = elevation ? parseInt(elevation) : undefined;
+    const elev = elevation ? parseInt(elevation, 10) : undefined;
 
     if (!siteName.trim()) {
       setError(t('createSite.nameRequired'));

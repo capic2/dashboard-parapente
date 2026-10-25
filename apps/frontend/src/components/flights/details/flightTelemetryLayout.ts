@@ -73,17 +73,28 @@ interface FlightTelemetryLayoutItemBase {
   height: number;
   visible: boolean;
   transparent?: boolean;
+  backgroundColor?: string;
+  backgroundOpacity?: number;
   border?: boolean;
   showLabel?: boolean;
   showUnit?: boolean;
   fontSize?: number;
   groupId?: string;
   groupName?: string;
+  parentGroupId?: string;
+  parentGroupName?: string;
+  parentGroupBackgroundColor?: string;
+  parentGroupBackgroundOpacity?: number;
+  parentGroupBorderRadius?: number;
+  groupBackgroundColor?: string;
+  groupBackgroundOpacity?: number;
+  groupBorderRadius?: number;
 }
 
 export interface FlightTelemetryWidgetLayout extends FlightTelemetryLayoutItemBase {
   type: 'widget';
   metric: MetricKey;
+  valuePrefix?: string;
   variant?: TelemetryWidgetVariant;
   valueAlign?: TelemetryValueAlignment;
   clickAction?: TelemetryInteractionAction;
@@ -119,6 +130,171 @@ export interface TelemetryLayoutGroupBounds {
   y: number;
   width: number;
   height: number;
+}
+
+export function groupTelemetryLayoutSelection(
+  layout: FlightTelemetryLayoutItem[],
+  selectedIds: readonly string[],
+  newGroupId: string,
+  newGroupName: string
+): FlightTelemetryLayoutItem[] {
+  if (selectedIds.length < 2) return layout;
+
+  const selectedIdSet = new Set(selectedIds);
+  const selectedItems = layout.filter((item) => selectedIdSet.has(item.id));
+  const existingGroupIds = new Set(
+    selectedItems
+      .map((item) => item.groupId)
+      .filter((groupId): groupId is string => Boolean(groupId))
+  );
+  const completeGroupIds = new Set(
+    [...existingGroupIds].filter((groupId) =>
+      layout
+        .filter((item) => item.groupId === groupId)
+        .every((item) => selectedIdSet.has(item.id))
+    )
+  );
+  const incompleteGroupIds = [...existingGroupIds].filter(
+    (groupId) => !completeGroupIds.has(groupId)
+  );
+  const parentGroupIds = new Set(
+    selectedItems.map((item) => item.parentGroupId)
+  );
+  const parentMetadataFrom = (
+    targetGroupId: string,
+    targetGroup: FlightTelemetryLayoutItem
+  ) => ({
+    parentGroupId: targetGroupId,
+    parentGroupName: targetGroup.groupName ?? targetGroupId,
+    parentGroupBackgroundColor: targetGroup.groupBackgroundColor,
+    parentGroupBackgroundOpacity: targetGroup.groupBackgroundOpacity,
+    parentGroupBorderRadius: targetGroup.groupBorderRadius,
+  });
+  const isParentGroup = (groupId: string) =>
+    layout.some((item) => item.parentGroupId === groupId);
+
+  if (
+    selectedItems.every((item) => item.groupId) &&
+    completeGroupIds.size > 0 &&
+    incompleteGroupIds.length === 1
+  ) {
+    const targetGroupId = incompleteGroupIds[0];
+    const targetGroup = layout.find((item) => item.groupId === targetGroupId);
+    if (targetGroup && !targetGroup.parentGroupId) {
+      if ([...completeGroupIds].some(isParentGroup)) return layout;
+      return layout.map((item) =>
+        selectedIdSet.has(item.id) &&
+        item.groupId &&
+        completeGroupIds.has(item.groupId)
+          ? {
+              ...item,
+              ...parentMetadataFrom(targetGroupId, targetGroup),
+            }
+          : item
+      );
+    }
+  }
+
+  const selectedWholeGroups =
+    completeGroupIds.size >= 2 &&
+    incompleteGroupIds.length === 0 &&
+    selectedItems.every((item) => item.groupId) &&
+    selectedItems.every(
+      (item) => item.groupId && completeGroupIds.has(item.groupId)
+    );
+
+  if (selectedWholeGroups) {
+    const targetGroupId = selectedIds
+      .map((id) => layout.find((item) => item.id === id)?.groupId)
+      .find(
+        (groupId): groupId is string =>
+          Boolean(groupId) &&
+          !layout.find((item) => item.groupId === groupId)?.parentGroupId
+      );
+    const targetGroup = targetGroupId
+      ? layout.find((item) => item.groupId === targetGroupId)
+      : undefined;
+    if (!targetGroupId || !targetGroup) return layout;
+    if (
+      [...completeGroupIds].some(
+        (groupId) => groupId !== targetGroupId && isParentGroup(groupId)
+      )
+    )
+      return layout;
+
+    return layout.map((item) => {
+      if (
+        !selectedIdSet.has(item.id) ||
+        item.groupId === targetGroupId ||
+        !item.groupId
+      )
+        return item;
+      return {
+        ...item,
+        ...parentMetadataFrom(targetGroupId, targetGroup),
+      };
+    });
+  }
+
+  if (existingGroupIds.size > 1 && [...existingGroupIds].some(isParentGroup))
+    return layout;
+
+  const existingGroupId =
+    existingGroupIds.size === 1 ? [...existingGroupIds][0] : undefined;
+  const existingGroupName = existingGroupId
+    ? layout.find((item) => item.groupId === existingGroupId)?.groupName
+    : undefined;
+  const existingGroupItem = existingGroupId
+    ? (layout.find(
+        (item) =>
+          item.groupId === existingGroupId && !selectedIdSet.has(item.id)
+      ) ?? layout.find((item) => item.groupId === existingGroupId))
+    : undefined;
+  let parentMetadata: Partial<
+    Pick<
+      FlightTelemetryLayoutItemBase,
+      | 'parentGroupId'
+      | 'parentGroupName'
+      | 'parentGroupBackgroundColor'
+      | 'parentGroupBackgroundOpacity'
+      | 'parentGroupBorderRadius'
+    >
+  > = {};
+  if (existingGroupItem) {
+    parentMetadata = {
+      parentGroupId: existingGroupItem.parentGroupId,
+      parentGroupName: existingGroupItem.parentGroupName,
+      parentGroupBackgroundColor: existingGroupItem.parentGroupBackgroundColor,
+      parentGroupBackgroundOpacity:
+        existingGroupItem.parentGroupBackgroundOpacity,
+      parentGroupBorderRadius: existingGroupItem.parentGroupBorderRadius,
+    };
+  } else if (parentGroupIds.size !== 1) {
+    parentMetadata = {
+      parentGroupId: undefined,
+      parentGroupName: undefined,
+      parentGroupBackgroundColor: undefined,
+      parentGroupBackgroundOpacity: undefined,
+      parentGroupBorderRadius: undefined,
+    };
+  }
+  const groupStyle = existingGroupItem
+    ? {
+        groupBackgroundColor: existingGroupItem.groupBackgroundColor,
+        groupBackgroundOpacity: existingGroupItem.groupBackgroundOpacity,
+        groupBorderRadius: existingGroupItem.groupBorderRadius,
+      }
+    : {};
+  return layout.map((item) => {
+    if (!selectedIdSet.has(item.id)) return item;
+    return {
+      ...item,
+      groupId: existingGroupId ?? newGroupId,
+      groupName: existingGroupName ?? newGroupName,
+      ...groupStyle,
+      ...parentMetadata,
+    };
+  });
 }
 
 export type TelemetryAlignmentDirection =
@@ -198,7 +374,9 @@ export function getTelemetryLayoutGroupBounds(
   layout: readonly FlightTelemetryLayoutItem[],
   groupId: string
 ): TelemetryLayoutGroupBounds | null {
-  const items = layout.filter((item) => item.groupId === groupId);
+  const items = layout.filter(
+    (item) => item.groupId === groupId || item.parentGroupId === groupId
+  );
   if (!items.length) return null;
   const left = Math.min(...items.map((item) => item.x));
   const top = Math.min(...items.map((item) => item.y));
@@ -241,7 +419,7 @@ export const DEFAULT_FLIGHT_TELEMETRY_LAYOUT = [
   {
     id: 'total-gain',
     type: 'widget',
-    metric: 'total_gain',
+    metric: 'climb_from_takeoff',
     x: 1574.4,
     y: 151.2,
     width: 307.2,
@@ -251,7 +429,7 @@ export const DEFAULT_FLIGHT_TELEMETRY_LAYOUT = [
   {
     id: 'total-loss',
     type: 'widget',
-    metric: 'total_loss',
+    metric: 'descent_from_takeoff',
     x: 1574.4,
     y: 280.8,
     width: 307.2,
@@ -334,13 +512,43 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
       ':scope > widget, :scope > icon, :scope > text, :scope > pip'
     )
   );
-  const groupNames = new Map(
-    Array.from(document.documentElement.querySelectorAll(':scope > group'))
-      .map((group) => [group.getAttribute('id'), group.getAttribute('name')])
-      .filter((entry): entry is [string, string] =>
-        Boolean(entry[0] && entry[1])
-      )
-  );
+  const groupNames = new Map<
+    string,
+    {
+      name?: string;
+      parentId?: string;
+      backgroundColor?: string;
+      backgroundOpacity?: number;
+      borderRadius?: number;
+    }
+  >();
+  for (const group of document.documentElement.querySelectorAll(
+    ':scope > group'
+  )) {
+    const id = group.getAttribute('id');
+    if (!id) continue;
+    const rawBackgroundColor = group.getAttribute('background-color');
+    groupNames.set(id, {
+      name: group.getAttribute('name') ?? undefined,
+      parentId: group.getAttribute('parent') ?? undefined,
+      backgroundColor:
+        rawBackgroundColor && /^#[\da-f]{6}$/iu.test(rawBackgroundColor)
+          ? rawBackgroundColor
+          : undefined,
+      backgroundOpacity: group.hasAttribute('background-opacity')
+        ? Math.max(
+            0,
+            Math.min(1, numberAttribute(group, 'background-opacity', 1))
+          )
+        : undefined,
+      borderRadius: group.hasAttribute('border-radius')
+        ? Math.max(
+            0,
+            Math.min(120, numberAttribute(group, 'border-radius', 12))
+          )
+        : undefined,
+    });
+  }
   if (items.length < 1)
     return withLayoutMetadata(
       DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget) => ({ ...widget }))
@@ -381,40 +589,67 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
       visible: element.getAttribute('visible') !== 'false',
     };
     const groupId = element.getAttribute('group');
-    const grouping = groupId
-      ? {
-          groupId,
-          ...(groupNames.get(groupId)
-            ? { groupName: groupNames.get(groupId) ?? undefined }
-            : {}),
-        }
-      : {};
+    const grouping: Record<string, unknown> = {};
+    if (groupId) {
+      grouping.groupId = groupId;
+      const group = groupNames.get(groupId);
+      if (group?.name) grouping.groupName = group.name;
+      if (group?.backgroundColor)
+        grouping.groupBackgroundColor = group.backgroundColor;
+      if (group?.backgroundOpacity !== undefined)
+        grouping.groupBackgroundOpacity = group.backgroundOpacity;
+      if (group?.borderRadius !== undefined)
+        grouping.groupBorderRadius = group.borderRadius;
+      if (group?.parentId) {
+        grouping.parentGroupId = group.parentId;
+        const parent = groupNames.get(group.parentId);
+        if (parent?.name) grouping.parentGroupName = parent.name;
+        if (parent?.backgroundColor)
+          grouping.parentGroupBackgroundColor = parent.backgroundColor;
+        if (parent?.backgroundOpacity !== undefined)
+          grouping.parentGroupBackgroundOpacity = parent.backgroundOpacity;
+        if (parent?.borderRadius !== undefined)
+          grouping.parentGroupBorderRadius = parent.borderRadius;
+      }
+    }
     const name = element.getAttribute('label');
     const naming = name ? { name } : {};
     const backgroundAttribute = element.getAttribute('background');
     const borderAttribute = element.getAttribute('border');
-    const styling = {
-      ...(backgroundAttribute === 'transparent'
-        ? { transparent: true }
-        : backgroundAttribute === 'solid'
-          ? { transparent: false }
-          : {}),
-      ...(borderAttribute === 'true'
-        ? { border: true }
-        : borderAttribute === 'false'
-          ? { border: false }
-          : {}),
-      ...(element.getAttribute('label-visible') === 'false'
-        ? { showLabel: false }
-        : {}),
-      ...(type === 'widget' && element.getAttribute('unit-visible') === 'false'
-        ? { showUnit: false }
-        : {}),
-      ...(element.getAttribute('font-size') !== null &&
-      Number.isFinite(Number(element.getAttribute('font-size')))
-        ? { fontSize: Number(element.getAttribute('font-size')) }
-        : {}),
-    };
+    const styling: Record<string, unknown> = {};
+    if (backgroundAttribute === 'transparent') {
+      styling.transparent = true;
+    } else if (backgroundAttribute === 'solid') {
+      styling.transparent = false;
+    }
+    const rawItemBackgroundColor = element.getAttribute('background-color');
+    if (
+      rawItemBackgroundColor &&
+      /^#[\da-f]{6}$/iu.test(rawItemBackgroundColor)
+    ) {
+      styling.backgroundColor = rawItemBackgroundColor;
+    }
+    if (element.hasAttribute('background-opacity')) {
+      styling.backgroundOpacity = Math.max(
+        0,
+        Math.min(1, numberAttribute(element, 'background-opacity', 0.85))
+      );
+    }
+    if (borderAttribute === 'true') {
+      styling.border = true;
+    } else if (borderAttribute === 'false') {
+      styling.border = false;
+    }
+    if (element.getAttribute('label-visible') === 'false') {
+      styling.showLabel = false;
+    }
+    if (type === 'widget' && element.getAttribute('unit-visible') === 'false') {
+      styling.showUnit = false;
+    }
+    const rawFontSize = element.getAttribute('font-size');
+    if (rawFontSize !== null && Number.isFinite(Number(rawFontSize))) {
+      styling.fontSize = Number(rawFontSize);
+    }
     const interactions =
       type === 'widget'
         ? {
@@ -447,6 +682,10 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
       )
         ? { variant: element.getAttribute('variant') as TelemetryWidgetVariant }
         : {};
+    const valuePrefix =
+      type === 'widget' && element.hasAttribute('value-prefix')
+        ? { valuePrefix: element.getAttribute('value-prefix') ?? '' }
+        : {};
     const valueAlign =
       type === 'widget' &&
       VALUE_ALIGNMENTS.includes(
@@ -468,50 +707,56 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
           }
         : {};
     if (type === 'icon') {
-      return {
-        ...common,
-        ...grouping,
-        ...naming,
-        ...styling,
-        ...interactions,
-        ...variant,
-        ...valueAlign,
-        type: 'icon' as const,
-        icon: ICONS.includes(element.getAttribute('name') as TelemetryIconName)
-          ? (element.getAttribute('name') as TelemetryIconName)
-          : 'gauge',
-      };
+      return Object.assign(
+        {},
+        common,
+        grouping,
+        naming,
+        styling,
+        interactions,
+        variant,
+        valueAlign,
+        {
+          type: 'icon' as const,
+          icon: ICONS.includes(
+            element.getAttribute('name') as TelemetryIconName
+          )
+            ? (element.getAttribute('name') as TelemetryIconName)
+            : 'gauge',
+        }
+      ) as FlightTelemetryLayoutItem;
     }
     if (type === 'text') {
-      return {
-        ...common,
-        ...grouping,
-        ...naming,
-        ...styling,
-        ...interactions,
-        ...variant,
-        ...textAlign,
-        type: 'text' as const,
-        content: element.getAttribute('content') ?? '',
-      };
+      return Object.assign(
+        {},
+        common,
+        grouping,
+        naming,
+        styling,
+        interactions,
+        variant,
+        textAlign,
+        {
+          type: 'text' as const,
+          content: element.getAttribute('content') ?? '',
+        }
+      ) as FlightTelemetryLayoutItem;
     }
     if (type === 'pip') {
       const rawSource = element.getAttribute('source');
-      const source: TelemetryPipVideoSource =
-        rawSource === 'camera'
-          ? 'file:face'
-          : rawSource === 'flight'
-            ? 'file:vol'
-            : TELEMETRY_PIP_VIDEO_SOURCES.includes(
-                  rawSource as TelemetryPipVideoSource
-                )
-              ? (rawSource as TelemetryPipVideoSource)
-              : DEFAULT_TELEMETRY_PIP_VIDEO_SOURCE;
-      return {
-        ...common,
-        ...grouping,
-        ...naming,
-        ...styling,
+      let source = DEFAULT_TELEMETRY_PIP_VIDEO_SOURCE;
+      if (rawSource === 'camera') {
+        source = 'file:face';
+      } else if (rawSource === 'flight') {
+        source = 'file:vol';
+      } else if (
+        TELEMETRY_PIP_VIDEO_SOURCES.includes(
+          rawSource as TelemetryPipVideoSource
+        )
+      ) {
+        source = rawSource as TelemetryPipVideoSource;
+      }
+      return Object.assign({}, common, grouping, naming, styling, {
         type: 'pip' as const,
         action: PIP_ACTIONS.includes(
           element.getAttribute('action') as TelemetryPipAction
@@ -520,19 +765,23 @@ export function parseTelemetryLayoutXml(xml: string): TelemetryLayout {
           : 'switch_video',
         source,
         applyOffset: element.getAttribute('apply-offset') !== 'false',
-      };
+      }) as FlightTelemetryLayoutItem;
     }
-    return {
-      ...common,
-      ...grouping,
-      ...naming,
-      ...styling,
-      ...interactions,
-      ...variant,
-      ...valueAlign,
-      type: 'widget' as const,
-      metric: METRIC_KEYS.includes(metric) ? metric : fallback.metric,
-    };
+    return Object.assign(
+      {},
+      common,
+      grouping,
+      naming,
+      styling,
+      interactions,
+      variant,
+      valuePrefix,
+      valueAlign,
+      {
+        type: 'widget' as const,
+        metric: METRIC_KEYS.includes(metric) ? metric : fallback.metric,
+      }
+    ) as FlightTelemetryLayoutItem;
   });
   return withLayoutMetadata(
     parsed,
@@ -548,17 +797,43 @@ export function serializeTelemetryLayoutXml(
     mainVideoSource?: TelemetryMainVideoSource;
   }
 ) {
-  const groups = Array.from(
-    new Map(
+  const groupIds = Array.from(
+    new Set(
       layout
-        .filter((item) => item.groupId)
-        .map((item) => [item.groupId as string, item.groupName] as const)
+        .flatMap((item) => [item.groupId, item.parentGroupId])
+        .filter((groupId): groupId is string => Boolean(groupId))
     )
-  )
-    .map(
-      ([groupId, groupName]) =>
-        `<group id="${escapeXml(groupId)}"${groupName ? ` name="${escapeXml(groupName)}"` : ''} />`
-    )
+  );
+  const groups = groupIds
+    .map((groupId) => {
+      const groupItems = layout.filter((item) => item.groupId === groupId);
+      const nestedItems = layout.filter(
+        (item) => item.parentGroupId === groupId
+      );
+      const groupName =
+        groupItems.find((item) => item.groupName)?.groupName ??
+        nestedItems.find((item) => item.parentGroupName)?.parentGroupName;
+      const color =
+        groupItems.find((item) => item.groupBackgroundColor)
+          ?.groupBackgroundColor ??
+        nestedItems.find((item) => item.parentGroupBackgroundColor)
+          ?.parentGroupBackgroundColor;
+      const opacity =
+        groupItems.find((item) => item.groupBackgroundOpacity !== undefined)
+          ?.groupBackgroundOpacity ??
+        nestedItems.find(
+          (item) => item.parentGroupBackgroundOpacity !== undefined
+        )?.parentGroupBackgroundOpacity;
+      const borderRadius =
+        groupItems.find((item) => item.groupBorderRadius !== undefined)
+          ?.groupBorderRadius ??
+        nestedItems.find((item) => item.parentGroupBorderRadius !== undefined)
+          ?.parentGroupBorderRadius;
+      const actualParent = groupItems.length
+        ? groupItems[0].parentGroupId
+        : undefined;
+      return `<group id="${escapeXml(groupId)}"${actualParent ? ` parent="${escapeXml(actualParent)}"` : ''}${groupName ? ` name="${escapeXml(groupName)}"` : ''}${color ? ` background-color="${escapeXml(color)}"` : ''}${opacity !== undefined ? ` background-opacity="${opacity}"` : ''}${borderRadius !== undefined ? ` border-radius="${borderRadius}"` : ''} />`;
+    })
     .join('');
   const backgroundImage = options
     ? options.backgroundImage
@@ -577,18 +852,25 @@ export function serializeTelemetryLayoutXml(
     .map((item) => {
       const name = item.name ? ` label="${escapeXml(item.name)}"` : '';
       const group = item.groupId ? ` group="${escapeXml(item.groupId)}"` : '';
-      const background =
-        item.transparent === true
-          ? ' background="transparent"'
-          : item.transparent === false
-            ? ' background="solid"'
-            : '';
-      const border =
-        item.border === true
-          ? ' border="true"'
-          : item.border === false
-            ? ' border="false"'
-            : '';
+      let background = '';
+      if (item.transparent === true) {
+        background = ' background="transparent"';
+      } else if (item.transparent === false) {
+        background = ' background="solid"';
+      }
+      const backgroundColor = item.backgroundColor
+        ? ` background-color="${escapeXml(item.backgroundColor)}"`
+        : '';
+      const backgroundOpacity =
+        item.backgroundOpacity !== undefined
+          ? ` background-opacity="${item.backgroundOpacity}"`
+          : '';
+      let border = '';
+      if (item.border === true) {
+        border = ' border="true"';
+      } else if (item.border === false) {
+        border = ' border="false"';
+      }
       const labelVisibility =
         item.showLabel === false ? ' label-visible="false"' : '';
       const unitVisibility =
@@ -611,6 +893,10 @@ export function serializeTelemetryLayoutXml(
         item.type === 'widget' && item.variant
           ? ` variant="${item.variant}"`
           : '';
+      const valuePrefix =
+        item.type === 'widget' && item.valuePrefix
+          ? ` value-prefix="${escapeXml(item.valuePrefix)}"`
+          : '';
       const valueAlign =
         item.type === 'widget' && item.valueAlign
           ? ` align="${item.valueAlign}"`
@@ -625,7 +911,7 @@ export function serializeTelemetryLayoutXml(
           : '';
       const pipSource =
         item.type === 'pip' && item.source ? ` source="${item.source}"` : '';
-      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${border}${labelVisibility}${unitVisibility}${fontSize}${clickAction}${longPressAction}${variant}${valueAlign}${textAlign} x="${(item.x / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" y="${(item.y / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" width="${(item.width / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" height="${(item.height / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" visible="${item.visible ? 'true' : 'false'}"`;
+      const common = `id="${escapeXml(item.id)}"${name}${group}${background}${backgroundColor}${backgroundOpacity}${border}${labelVisibility}${unitVisibility}${fontSize}${clickAction}${longPressAction}${variant}${valuePrefix}${valueAlign}${textAlign} x="${(item.x / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" y="${(item.y / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" width="${(item.width / TELEMETRY_CANVAS_WIDTH).toFixed(12)}" height="${(item.height / TELEMETRY_CANVAS_HEIGHT).toFixed(12)}" visible="${item.visible ? 'true' : 'false'}"`;
       if (item.type === 'icon') return `<icon ${common} name="${item.icon}" />`;
       if (item.type === 'text') {
         return `<text ${common} content="${escapeXml(item.content)}" />`;
@@ -666,7 +952,7 @@ function withLayoutMetadata(
 
 function escapeXml(value: string) {
   return value.replace(
-    /[<>&'"]/g,
+    /[<>&'"]/gu,
     (character) =>
       ({
         '<': '&lt;',

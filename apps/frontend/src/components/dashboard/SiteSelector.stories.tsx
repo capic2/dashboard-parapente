@@ -84,15 +84,6 @@ const meta = preview.meta({
           'Site selector component for choosing paragliding sites. Uses React Query for data fetching.',
       },
     },
-    msw: {
-      handlers: [
-        http.get('/api/spots', () => {
-          return HttpResponse.json({
-            sites: mockSites,
-          });
-        }),
-      ],
-    },
   },
   tags: ['autodocs'],
   decorators: [
@@ -115,9 +106,19 @@ const meta = preview.meta({
       description: 'Callback when a site is selected',
     },
   },
+
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
+        http.get('/api/spots', () => {
+          return HttpResponse.json({
+            sites: mockSites,
+          });
+        }),
+      ]
+    );
+  },
 });
-
-
 
 /**
  * Default story showing Arguel selected
@@ -126,7 +127,7 @@ export const Default = meta.story({
   name: 'Default',
   args: {
     selectedSiteId: 'site-arguel',
-    onSelectSite: (siteId: string) => console.log('Site selected:', siteId),
+    onSelectSite: () => undefined,
   },
 });
 
@@ -138,7 +139,7 @@ export const MontPoupetSelected = meta.story({
   name: 'Mont Poupet Selected',
   args: {
     selectedSiteId: 'mont-poupet-nord',
-    onSelectSite: (siteId: string) => console.log('Site selected:', siteId),
+    onSelectSite: () => undefined,
   },
 });
 
@@ -149,7 +150,7 @@ export const LaCoteSelected = meta.story({
   name: 'La Cote Selected',
   args: {
     selectedSiteId: 'site-la-cote',
-    onSelectSite: (siteId: string) => console.log('Site selected:', siteId),
+    onSelectSite: () => undefined,
   },
 });
 
@@ -157,7 +158,7 @@ export const MobileCompact = meta.story({
   name: 'Mobile Compact',
   args: {
     selectedSiteId: 'mont-poupet-nord',
-    onSelectSite: (siteId: string) => console.log('Site selected:', siteId),
+    onSelectSite: () => undefined,
   },
   parameters: {
     chromatic: {

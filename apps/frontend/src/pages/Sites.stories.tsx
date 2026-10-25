@@ -105,69 +105,87 @@ export const defaultHandlers = [
 
 export const Default = meta.story({
   name: 'Default',
-  parameters: {
-    msw: { handlers: defaultHandlers },
-    /*router: {
-      routes: [{ path: '/flights', children: [] }],
-    },*/
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
+    return resetSitesDb();
   },
-  beforeEach: resetSitesDb,
 });
 
+const findSiteCard = (
+  canvas: { getByRole: typeof screen.getByRole },
+  siteName: string
+) => {
+  const heading = canvas.getByRole('heading', {
+    level: 3,
+    name: siteName,
+  });
+  const card = heading?.closest<HTMLDivElement>('div.flex.h-full.flex-col');
+
+  if (!card) {
+    throw new Error(`Could not find the site card for "${siteName}"`);
+  }
+
+  return within(card);
+};
+
 Default.test('filters by landing type', async ({ canvas, userEvent }) => {
-  await waitForElementToBeRemoved(canvas.getByText(/Loading.*/i));
-  const siteList = canvas.getByRole('listbox', { name: 'Liste des sites' });
-  await expect(within(siteList).getAllByRole('option')).toHaveLength(3);
+  await waitForElementToBeRemoved(canvas.getByText(/Loading.*/iu));
+  await expect(canvas.getAllByRole('heading', { level: 3 })).toHaveLength(3);
 
   const typeSelect = await canvas.findByDisplayValue('Tous les types');
   await userEvent.selectOptions(typeSelect, 'landing');
 
-  await expect(within(siteList).getAllByRole('option')).toHaveLength(1);
+  await expect(canvas.getAllByRole('heading', { level: 3 })).toHaveLength(1);
   await expect(
-    within(within(siteList).getByRole('option')).getByRole('heading')
-  ).toHaveTextContent("Besançon - Plaine d'Arguel");
+    canvas.getByRole('heading', {
+      level: 3,
+      name: "Besançon - Plaine d'Arguel",
+    })
+  ).toBeInTheDocument();
 });
 Default.test('filters by name', async ({ canvas, userEvent }) => {
-  await waitForElementToBeRemoved(canvas.getByText(/Loading.*/i));
-  const siteList = canvas.getByRole('listbox', { name: 'Liste des sites' });
-  await expect(within(siteList).getAllByRole('option')).toHaveLength(3);
+  await waitForElementToBeRemoved(canvas.getByText(/Loading.*/iu));
+  await expect(canvas.getAllByRole('heading', { level: 3 })).toHaveLength(3);
   await userEvent.type(
     await canvas.findByPlaceholderText(
       'Rechercher par nom, code ou localité...'
     ),
     'cha'
   );
-  await expect(within(siteList).getAllByRole('option')).toHaveLength(1);
+  await expect(canvas.getAllByRole('heading', { level: 3 })).toHaveLength(1);
   await expect(
-    within(within(siteList).getByRole('option')).getByRole('heading')
-  ).toHaveTextContent('Besançon - Chalais');
+    canvas.getByRole('heading', { level: 3, name: 'Besançon - Chalais' })
+  ).toBeInTheDocument();
 });
 Default.test(
   'it is possible to create a site',
   async ({ canvas, userEvent, step }) => {
     await step('Wait for page loaded', async () => {
-      await waitForElementToBeRemoved(canvas.getByText(/Loading.*/i));
+      await waitForElementToBeRemoved(canvas.getByText(/Loading.*/iu));
     });
 
     await step('Create a site', async () => {
       await userEvent.click(
-        await canvas.findByRole('button', { name: /.*Nouveau site/ })
+        await canvas.findByRole('button', { name: /.*Nouveau site/u })
       );
       const dialog = within(screen.getByRole('dialog'));
 
       // Fill required fields
-      await userEvent.type(dialog.getByLabelText(/Nom du site/), 'Mont Poupet');
-      await userEvent.type(dialog.getByLabelText(/Code/), 'POUPET');
-      await userEvent.clear(dialog.getByLabelText(/Latitude/));
-      await userEvent.type(dialog.getByLabelText(/Latitude/), '47.238');
-      await userEvent.clear(dialog.getByLabelText(/Longitude/));
-      await userEvent.type(dialog.getByLabelText(/Longitude/), '6.024');
+      await userEvent.type(
+        dialog.getByLabelText(/Nom du site/u),
+        'Mont Poupet'
+      );
+      await userEvent.type(dialog.getByLabelText(/Code/u), 'POUPET');
+      await userEvent.clear(dialog.getByLabelText(/Latitude/u));
+      await userEvent.type(dialog.getByLabelText(/Latitude/u), '47.238');
+      await userEvent.clear(dialog.getByLabelText(/Longitude/u));
+      await userEvent.type(dialog.getByLabelText(/Longitude/u), '6.024');
 
       // Select usage type
       await userEvent.click(dialog.getByLabelText('Décollage uniquement'));
 
       // Submit
-      await userEvent.click(dialog.getByText(/Enregistrer/));
+      await userEvent.click(dialog.getByText(/Enregistrer/u));
     });
 
     await step('Site is created', async () => {
@@ -176,7 +194,7 @@ Default.test(
         await expect(screen.queryByRole('dialog')).toBeNull();
       });
       await expect(
-        await canvas.findByRole('option', { name: 'Mont Poupet' })
+        await canvas.findByRole('heading', { level: 3, name: 'Mont Poupet' })
       ).toBeInTheDocument();
     });
   }
@@ -185,26 +203,26 @@ Default.test(
   'it is possible to update a site',
   async ({ canvas, userEvent, step }) => {
     await step('Wait for page loaded', async () => {
-      await waitForElementToBeRemoved(canvas.getByText(/Loading.*/i));
+      await waitForElementToBeRemoved(canvas.getByText(/Loading.*/iu));
     });
     await step('Update a site', async () => {
       await userEvent.click(
-        within(
-          await canvas.findByRole('option', { name: /Besançon - Arguel/u })
-        ).getByRole('button', { name: /.*Éditer/u })
+        findSiteCard(canvas, 'Besançon - Arguel').getByRole('button', {
+          name: /.*Éditer/u,
+        })
       );
 
       const dialog = within(screen.getByRole('dialog'));
 
       // Fill required fields
-      await userEvent.clear(dialog.getByLabelText(/Nom du site/));
+      await userEvent.clear(dialog.getByLabelText(/Nom du site/u));
       await userEvent.type(
-        dialog.getByLabelText(/Nom du site/),
+        dialog.getByLabelText(/Nom du site/u),
         'Arguel updated'
       );
 
       // Submit
-      await userEvent.click(dialog.getByText(/Enregistrer/));
+      await userEvent.click(dialog.getByText(/Enregistrer/u));
     });
 
     await step('Site is updated', async () => {
@@ -213,7 +231,8 @@ Default.test(
         await expect(screen.queryByRole('dialog')).toBeNull();
       });
       await expect(
-        await canvas.findByRole('option', {
+        await canvas.findByRole('heading', {
+          level: 3,
           name: /Besançon - Arguel updated/u,
         })
       ).toBeInTheDocument();
@@ -224,13 +243,13 @@ Default.test(
   'it is possible to delete a site',
   async ({ canvas, userEvent, step }) => {
     await step('Wait for page loaded', async () => {
-      await waitForElementToBeRemoved(canvas.getByText(/Loading.*/i));
+      await waitForElementToBeRemoved(canvas.getByText(/Loading.*/iu));
     });
     await step('Delete a site', async () => {
       await userEvent.click(
-        within(
-          await canvas.findByRole('option', { name: /Besançon - Arguel/u })
-        ).getByRole('button', { name: 'Supprimer le site' })
+        findSiteCard(canvas, 'Besançon - Arguel').getByRole('button', {
+          name: 'Supprimer le site',
+        })
       );
       await userEvent.click(
         within(await screen.findByRole('alertdialog')).getByRole('button', {
@@ -245,7 +264,10 @@ Default.test(
       });
       await waitFor(async () => {
         await expect(
-          canvas.queryByRole('option', { name: /Besançon - Arguel/u })
+          canvas.queryByRole('heading', {
+            level: 3,
+            name: /Besançon - Arguel/u,
+          })
         ).not.toBeInTheDocument();
       });
     });
@@ -254,24 +276,22 @@ Default.test(
 
 export const EmptyState = meta.story({
   name: 'Empty State',
-  parameters: {
-    msw: {
-      handlers: [
-        http.get('*/api/spots', () => HttpResponse.json({ sites: [] })),
-      ],
-    },
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[http.get('*/api/spots', () => HttpResponse.json({ sites: [] }))]
+    );
   },
 });
 
 export const Loading = meta.story({
   name: 'Loading',
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/spots', async () => {
           await new Promise(() => {});
         }),
-      ],
-    },
+      ]
+    );
   },
 });

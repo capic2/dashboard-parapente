@@ -16,15 +16,10 @@ import {
   useReactTable,
   type SortingState,
 } from '@tanstack/react-table';
-import {
-  Button,
-  DataTable,
-  Modal,
-  Tab,
-  TabList,
-  TabPanel,
-  Tabs,
-} from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
+import { DataTable } from '@dashboard-parapente/core/DataTable/DataTable';
+import { Modal } from '@dashboard-parapente/core/Modal';
+import { Tab, TabList, TabPanel, Tabs } from '@dashboard-parapente/core/Tabs';
 import { useToast } from '../hooks/useToast';
 import {
   useCacheOverview,
@@ -1026,7 +1021,10 @@ export default function InfrastructurePage() {
           navigateToInfrastructure(normalizeInfrastructureTab(key))
         }
       >
-        <TabList className="grid-cols-1 sm:grid-cols-3">
+        <TabList
+          aria-label={t('infrastructure.title')}
+          className="grid-cols-1 sm:grid-cols-3"
+        >
           <Tab id="intervals">
             <span className="flex items-center justify-center gap-2">
               {t('infrastructure.tabs.intervals')}

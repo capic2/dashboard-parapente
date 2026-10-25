@@ -6,7 +6,7 @@ import json
 import logging
 import uuid
 from collections.abc import Iterable
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -22,7 +22,7 @@ RETENTION_DAYS = 30
 
 
 def _utcnow() -> datetime:
-    return datetime.utcnow()
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def _clamp_progress(value: int | float | None) -> int | None:
@@ -65,6 +65,13 @@ def _compute_progress(steps: list[dict[str, Any]]) -> int | None:
     if not has_known_progress and completed == 0:
         return 0
     return _clamp_progress(((completed * 100) + partial) / len(steps))
+
+
+def operation_can_cancel(operation: BackgroundOperation) -> bool:
+    """Expose cancellation for active GPX enrichments created before support shipped."""
+    if operation.status not in ACTIVE_STATUSES:
+        return False
+    return operation.can_cancel or operation.operation_type == "gpx_enrichment"
 
 
 class OperationReporter:
@@ -271,7 +278,7 @@ def operation_payload(operation: BackgroundOperation) -> dict[str, Any]:
         "error_detail": operation.error_detail,
         "source_kind": operation.source_kind,
         "source_id": operation.source_id,
-        "can_cancel": bool(operation.can_cancel and operation.status in ACTIVE_STATUSES),
+        "can_cancel": operation_can_cancel(operation),
         "can_retry": bool(operation.can_retry and operation.status in TERMINAL_STATUSES),
         "unread": operation.read_at is None,
         "created_at": operation.created_at,

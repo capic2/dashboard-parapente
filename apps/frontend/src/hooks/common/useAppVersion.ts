@@ -66,10 +66,8 @@ export const appVersionQueryOptions = () =>
           throw new Error('Invalid version payload');
         }
 
-        console.log(`[Dashboard Parapente] Version ${data.version}`);
         return data;
-      } catch (error) {
-        console.warn('[Dashboard Parapente] Version unknown', error);
+      } catch {
         return null;
       }
     },

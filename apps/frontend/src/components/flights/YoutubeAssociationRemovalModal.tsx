@@ -1,4 +1,5 @@
-import { Button, Modal } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
+import { Modal } from '@dashboard-parapente/core/Modal';
 import type { YoutubeVideoAssociation } from '@dashboard-parapente/shared-types';
 import { TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';

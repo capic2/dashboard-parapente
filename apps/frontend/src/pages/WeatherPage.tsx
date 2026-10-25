@@ -43,12 +43,13 @@ import {
 } from '../hooks/weather/useFlightDecision';
 import { useAzbaAirspace } from '../hooks/weather/useAzbaAirspace';
 import { useEmagramHours } from '../hooks/weather/useEmagramAnalysis';
-import type { FlightObjective } from '@dashboard-parapente/shared-types';
+import type { FlightObjective, Site } from '@dashboard-parapente/shared-types';
 import { useAppSettings } from '../hooks/settings/useAppSettings';
 import WeatherPageMobileLayout from './WeatherPage.mobile';
 import { getSiteDisplayName } from '../lib/siteDisplay';
 import { useCurrentLocation } from '../hooks/useCurrentLocation';
 import { useBestSpotRadius } from '../hooks/useBestSpotRadius';
+import { getWindFavorability } from '../utils/windMatcher';
 
 const isSpotSearchTarget = (
   target: CityWeatherTarget | null
@@ -108,6 +109,109 @@ const getDistanceKm = (
       Math.sin(longitudeDifference / 2) ** 2;
 
   return 6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+};
+
+const windDirectionFromDegrees = (degrees: number | null | undefined) => {
+  if (degrees == null || !Number.isFinite(degrees)) return undefined;
+  const directions = [
+    'N',
+    'NNE',
+    'NE',
+    'ENE',
+    'E',
+    'ESE',
+    'SE',
+    'SSE',
+    'S',
+    'SSW',
+    'SW',
+    'WSW',
+    'W',
+    'WNW',
+    'NW',
+    'NNW',
+  ];
+  return directions[Math.round((((degrees % 360) + 360) % 360) / 22.5) % 16];
+};
+
+const VALID_SITE_ORIENTATIONS = new Set([
+  'N',
+  'NNE',
+  'NE',
+  'ENE',
+  'E',
+  'ESE',
+  'SE',
+  'SSE',
+  'S',
+  'SSW',
+  'SW',
+  'WSW',
+  'W',
+  'WNW',
+  'NW',
+  'NNW',
+  'ALL',
+]);
+
+const getSiteWindRank = (
+  windDirection: string | undefined,
+  orientation: string | null | undefined
+) => {
+  if (!windDirection || !orientation) return 1;
+  const orientations = orientation
+    .split(/[\s,;/]+/u)
+    .map((direction) => direction.trim().toUpperCase())
+    .filter((direction) => VALID_SITE_ORIENTATIONS.has(direction));
+  if (orientations.includes('ALL')) return 0;
+
+  const favorabilityRanks = { good: 0, moderate: 1, bad: 2 } as const;
+  if (orientations.length === 0) return 1;
+  return Math.min(
+    ...orientations.map(
+      (direction) =>
+        favorabilityRanks[getWindFavorability(windDirection, direction)]
+    )
+  );
+};
+
+const isTakeoffSite = (site: Site) =>
+  site.usage_type === 'takeoff' || site.usage_type === 'both';
+
+const sortNearbySites = (
+  sitesToSort: Site[],
+  location: { latitude: number; longitude: number } | null,
+  radiusKm: number,
+  windDirection: string | undefined
+) => {
+  if (!location) return [...sitesToSort];
+
+  return [...sitesToSort].sort((first, second) => {
+    const firstDistance = getDistanceKm(location, first);
+    const secondDistance = getDistanceKm(location, second);
+    const firstIsNearby = firstDistance !== null && firstDistance <= radiusKm;
+    const secondIsNearby =
+      secondDistance !== null && secondDistance <= radiusKm;
+
+    if (firstIsNearby !== secondIsNearby) return firstIsNearby ? -1 : 1;
+
+    if (windDirection && firstIsNearby && secondIsNearby) {
+      const firstRank =
+        first.usage_type === 'landing'
+          ? 2
+          : getSiteWindRank(windDirection, first.orientation);
+      const secondRank =
+        second.usage_type === 'landing'
+          ? 2
+          : getSiteWindRank(windDirection, second.orientation);
+
+      if (firstRank !== secondRank) return firstRank - secondRank;
+    }
+
+    if (firstDistance === null) return secondDistance === null ? 0 : 1;
+    if (secondDistance === null) return -1;
+    return firstDistance - secondDistance;
+  });
 };
 
 const getForecastDaySearch = (dayIndex: number) => {
@@ -241,6 +345,9 @@ const getSearchForTarget = (
 
 export default function WeatherPage() {
   const { t } = useTranslation();
+  const [weatherSelectionHour, setWeatherSelectionHour] = useState(() =>
+    new Date().getHours()
+  );
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: sites } = useSuspenseQuery(sitesQueryOptions());
@@ -252,23 +359,85 @@ export default function WeatherPage() {
   const { data: appSettings } = useAppSettings();
   const isMobile = useIsMobile();
   const search = useSearch({ from: '/weather' });
+  useEffect(() => {
+    const refreshHour = () => setWeatherSelectionHour(new Date().getHours());
+    const intervalId = window.setInterval(refreshHour, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
   const routeSiteId = search ? search.siteId : '';
+  const routeSiteExists = sites.some((site) => site.id === routeSiteId);
   const requestedDayIndex = getDayIndexFromSearch(search.day);
   const selectedObjective =
     parseFlightObjective(search.objective) ??
     parseFlightObjective(appSettings?.default_flight_objective) ??
     DEFAULT_FLIGHT_OBJECTIVE;
   const selectedSearchTarget = getTargetFromSearch(search);
+  const selectionWeather = useCoordinateWeather(
+    !selectedSearchTarget && currentLocation.location
+      ? {
+          ...currentLocation.location,
+          name: 'Ma position',
+        }
+      : null,
+    requestedDayIndex
+  );
+  const shouldWaitForSelectionWeather =
+    !routeSiteExists &&
+    !selectedSearchTarget &&
+    !currentLocation.isLoading &&
+    Boolean(currentLocation.location) &&
+    selectionWeather.isLoading;
+  const [selectionWeatherWaitExpired, setSelectionWeatherWaitExpired] =
+    useState(false);
+  useEffect(() => {
+    if (!shouldWaitForSelectionWeather) {
+      setSelectionWeatherWaitExpired(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(
+      () => setSelectionWeatherWaitExpired(true),
+      2_000
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    currentLocation.location?.latitude,
+    currentLocation.location?.longitude,
+    shouldWaitForSelectionWeather,
+  ]);
+  const selectionWindDirection = useMemo(() => {
+    const consensus = (selectionWeather.data?.consensus ?? []).filter(
+      (hour) =>
+        hour.wind_direction !== null &&
+        hour.wind_direction !== undefined &&
+        Number.isFinite(hour.wind_direction)
+    );
+    if (consensus.length === 0) return undefined;
+
+    const closestHour = consensus.reduce((closest, candidate) =>
+      Math.abs(candidate.hour - weatherSelectionHour) <
+      Math.abs(closest.hour - weatherSelectionHour)
+        ? candidate
+        : closest
+    );
+    return windDirectionFromDegrees(closestHour.wind_direction);
+  }, [selectionWeather.data?.consensus, weatherSelectionHour]);
   const routeSelectionTab: WeatherSelectionTab = selectedSearchTarget
     ? 'search'
     : 'favorites';
-  const [selectionTab, setSelectionTab] =
-    useState<WeatherSelectionTab>(routeSelectionTab);
+  const [selectionTabState, setSelectionTabState] = useState({
+    routeSelectionTab,
+    selectionTab: routeSelectionTab,
+  });
+  const selectionTab =
+    selectionTabState.routeSelectionTab === routeSelectionTab
+      ? selectionTabState.selectionTab
+      : routeSelectionTab;
+  const setSelectionTab = (nextTab: WeatherSelectionTab) => {
+    setSelectionTabState({ routeSelectionTab, selectionTab: nextTab });
+  };
   const [isForceRefreshing, setIsForceRefreshing] = useState(false);
   const [forceRefreshError, setForceRefreshError] = useState(false);
-  useEffect(() => {
-    setSelectionTab(routeSelectionTab);
-  }, [routeSelectionTab]);
   const favoriteSites = useMemo(() => {
     if (favoriteSiteIds.length === 0) return sites;
 
@@ -277,25 +446,46 @@ export default function WeatherPage() {
     return matchedFavorites.length > 0 ? matchedFavorites : sites;
   }, [favoriteSiteIds, sites]);
   const nearbyFavoriteSites = useMemo(() => {
-    const location = currentLocation.location;
-    if (!location) return favoriteSites;
-
-    return [...favoriteSites].sort((first, second) => {
-      const firstDistance = getDistanceKm(location, first);
-      const secondDistance = getDistanceKm(location, second);
-
-      if (firstDistance === null) return secondDistance === null ? 0 : 1;
-      if (secondDistance === null) return -1;
-      return firstDistance - secondDistance;
-    });
-  }, [currentLocation.location, favoriteSites]);
-  const routeSiteExists = sites.some((site) => site.id === routeSiteId);
+    return sortNearbySites(
+      favoriteSites,
+      currentLocation.location,
+      radiusKm,
+      selectionWindDirection
+    );
+  }, [
+    currentLocation.location,
+    favoriteSites,
+    radiusKm,
+    selectionWindDirection,
+  ]);
+  const nearbyTakeoffSites = useMemo(() => {
+    const favoriteTakeoffs = favoriteSites.filter(isTakeoffSite);
+    const candidates =
+      favoriteTakeoffs.length > 0
+        ? favoriteTakeoffs
+        : sites.filter(isTakeoffSite);
+    return sortNearbySites(
+      candidates,
+      currentLocation.location,
+      radiusKm,
+      selectionWindDirection
+    );
+  }, [
+    currentLocation.location,
+    favoriteSites,
+    radiusKm,
+    selectionWindDirection,
+    sites,
+  ]);
+  const autoSelectionPending =
+    shouldWaitForSelectionWeather && !selectionWeatherWaitExpired;
+  const autoSelectedSiteId =
+    !currentLocation.isLoading && !autoSelectionPending
+      ? nearbyTakeoffSites[0]?.id
+      : undefined;
   const selectedSiteId =
-    (routeSiteExists ? routeSiteId : undefined) ??
-    (currentLocation.isLoading
-      ? undefined
-      : (nearbyFavoriteSites[0]?.id ?? sites[0]?.id)) ??
-    '';
+    (routeSiteExists ? routeSiteId : undefined) ?? autoSelectedSiteId ?? '';
+  const isAutoSelectionPending = autoSelectionPending;
   const { data: dailySummary } = useDailySummary(
     !selectedSearchTarget && selectedSiteId ? selectedSiteId : undefined
   );
@@ -577,10 +767,25 @@ export default function WeatherPage() {
       />
     ) : undefined;
 
+  const autoSelectionLoadingPanel = isAutoSelectionPending ? (
+    <output
+      aria-live="polite"
+      aria-busy="true"
+      className="flex items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+    >
+      <span
+        className="h-4 w-4 animate-spin rounded-full border-2 border-sky-500 border-t-transparent"
+        aria-hidden="true"
+      />
+      {t('common.loading')}
+    </output>
+  ) : undefined;
+
   const mobileEmptyPanel =
-    !currentLocation.isLoading && !selectedSearchTarget && !selectedSiteId ? (
+    autoSelectionLoadingPanel ??
+    (!currentLocation.isLoading && !selectedSearchTarget && !selectedSiteId ? (
       <WeatherEmptyState />
-    ) : undefined;
+    ) : undefined);
 
   const mobileSearchResultPanel = selectedSearchTarget ? (
     <WeatherSearchResultPanel
@@ -702,7 +907,9 @@ export default function WeatherPage() {
       <div className="min-w-0 space-y-4">
         {forceRefreshControl}
 
-        {!currentLocation.isLoading &&
+        {autoSelectionLoadingPanel}
+        {!autoSelectionLoadingPanel &&
+          !currentLocation.isLoading &&
           !selectedSearchTarget &&
           !selectedSiteId && <WeatherEmptyState />}
 

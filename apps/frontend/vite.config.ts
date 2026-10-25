@@ -21,6 +21,14 @@ export default defineConfig({
     alias: {
       react: path.resolve(workspaceRoot, 'node_modules/react'),
       'react-dom': path.resolve(workspaceRoot, 'node_modules/react-dom'),
+      '@dashboard-parapente/core': path.resolve(
+        workspaceRoot,
+        'libs/design-system/src/components/core'
+      ),
+      '@dashboard-parapente/design-system/form': path.resolve(
+        workspaceRoot,
+        'libs/design-system/src/components/form/index.ts'
+      ),
     },
   },
   plugins: [

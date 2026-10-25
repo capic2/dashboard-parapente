@@ -13,6 +13,7 @@ import {
 } from 'date-fns';
 import type { Flight } from '../../types';
 import { parseApiLocalDate } from '../../lib/date';
+import { useCurrentTime } from '../../hooks/useCurrentTime';
 
 interface AnalyticsInsightsProps {
   flights: Flight[];
@@ -54,6 +55,8 @@ export default function AnalyticsInsights({
   dateFrom,
   dateTo,
 }: AnalyticsInsightsProps) {
+  const currentTime = useCurrentTime();
+
   const insights = useMemo(() => {
     const dates = flights
       .map((flight) => parseApiLocalDate(flight.flight_date))
@@ -258,14 +261,13 @@ export default function AnalyticsInsights({
       const periodDurations = periodFlights
         .map((flight) => flight.duration_minutes)
         .filter((value): value is number => value != null);
-      return {
-        ...period,
+      return Object.assign({}, period, {
         count: periodFlights.length,
         medianDuration: median(periodDurations),
-      };
+      });
     });
 
-    const calendarEnd = lastFlightDate ?? new Date();
+    const calendarEnd = lastFlightDate ?? new Date(currentTime);
     const calendarStart = subMonths(startOfMonth(calendarEnd), 11);
     const dayMinutes = new Map<string, number>();
     flights.forEach((flight) => {
@@ -321,7 +323,7 @@ export default function AnalyticsInsights({
       medianDistance: median(distances),
       longestWeekStreak,
       daysSinceLastFlight: lastFlightDate
-        ? differenceInCalendarDays(new Date(), lastFlightDate)
+        ? differenceInCalendarDays(new Date(currentTime), lastFlightDate)
         : null,
       durationBuckets,
       distanceBuckets,
@@ -342,7 +344,7 @@ export default function AnalyticsInsights({
       topFlights,
       comparison,
     };
-  }, [comparisonFlights, dateFrom, dateTo, flights]);
+  }, [comparisonFlights, currentTime, dateFrom, dateTo, flights]);
 
   if (!flights.length) return null;
 

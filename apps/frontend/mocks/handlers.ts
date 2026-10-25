@@ -1052,6 +1052,18 @@ export const handlers = [
   ),
 
   // ============================================
+  // BACKGROUND OPERATIONS
+  // ============================================
+
+  // GET /api/operations - No operations in the default mock state
+  ...createHandler('get', '/operations', () => HttpResponse.json([])),
+
+  // GET /api/operations/stream - Close the mocked event stream cleanly
+  ...createHandler('get', '/operations/stream', () =>
+    new Response(null, { status: 204 })
+  ),
+
+  // ============================================
   // APP SETTINGS
   // ============================================
 

@@ -3,9 +3,14 @@ from datetime import datetime
 import pytest
 
 import config
-from external_flight_import import import_external_activities
+from external_flight_import import (
+    _legacy_track_matches,
+    _update_existing_flight,
+    import_external_activities,
+)
 from intervals_icu import ExternalActivity
 from models import Flight
+from flight_tracks import calculate_track_stats, normalize_track
 
 GPX = b"""<gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>
 <trkpt lat="47.2000" lon="6.0000"><ele>400</ele><time>2026-07-01T10:00:00Z</time></trkpt>
@@ -60,6 +65,7 @@ async def test_import_normalizes_intervals_name_and_repairs_it_on_resync(
     assert db_session.query(Flight).count() == 1
     assert flight.external_provider == "intervals_icu"
     assert flight.external_activity_id == "unsafe/id"
+    assert flight.gpx_provider == "zepp"
     assert flight.name == "Vol du 01/07/2026 à 12:00"
     assert flight.title == "Vol du 01/07/2026 à 12:00"
     assert "intervals_unsafe_id_" in flight.gpx_file_path
@@ -79,6 +85,7 @@ async def test_import_skips_existing_intervals_flight_with_normalized_name(db_se
         title="Vol du 28/07/2026 à 19:05",
         flight_date=datetime(2026, 7, 28).date(),
         departure_time=datetime(2026, 7, 28, 19, 5),
+        gpx_file_path="/flights/intervals_i-existing.gpx",
     )
     db_session.add(flight)
     db_session.commit()
@@ -94,8 +101,9 @@ async def test_import_skips_existing_intervals_flight_with_normalized_name(db_se
 
     result = await import_external_activities(db_session, "intervals_icu", Provider(), [activity])
 
-    assert result["updated"] == 0
-    assert result["skipped"] == 1
+    assert result["updated"] == 1
+    assert result["skipped"] == 0
+    assert flight.gpx_provider == "zepp"
     assert flight.name == "Vol du 28/07/2026 à 19:05"
 
 
@@ -133,7 +141,43 @@ async def test_import_reconciles_one_legacy_strava_flight(db_session, tmp_path):
     assert db_session.query(Flight).count() == 1
     assert legacy.external_provider == "intervals_icu"
     assert legacy.external_activity_id == "i123"
+    assert legacy.gpx_provider == "strava"
     assert legacy.name == "Existing flight"
+
+
+def test_external_import_uses_original_track_after_enrichment(tmp_path):
+    source_path = tmp_path / "intervals_source.gpx"
+    source_path.write_bytes(GPX)
+    enriched_path = tmp_path / "merged-gopro-overlay.gpx"
+    enriched_path.write_text(
+        '<gpx><trk><trkseg><trkpt lat="45" lon="5">'
+        "<time>2026-07-01T09:59:00Z</time></trkpt></trkseg></trk></gpx>",
+        encoding="utf-8",
+    )
+    flight = Flight(
+        id="enriched",
+        flight_date=datetime(2026, 7, 1).date(),
+        departure_time=datetime(2026, 7, 1, 10),
+        gpx_file_path=str(enriched_path),
+        gpx_source_file_path=str(source_path),
+    )
+    _, points = normalize_track(GPX, "gpx")
+    stats = calculate_track_stats(points)
+
+    assert _legacy_track_matches(flight, points, stats)
+
+    activity = ExternalActivity(
+        id="source-check",
+        name="Source check",
+        start_date=datetime(2026, 7, 1, 10),
+        activity_type="Other",
+        source="ZEPP",
+        file_type="GPX",
+        external_url=None,
+    )
+    flight.gpx_provider = None
+    _update_existing_flight(flight, activity)
+    assert flight.gpx_provider == "zepp"
 
 
 @pytest.mark.asyncio

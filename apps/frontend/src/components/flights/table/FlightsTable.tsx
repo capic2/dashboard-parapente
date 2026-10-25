@@ -7,8 +7,13 @@ import type {
   SortingState,
 } from '@tanstack/react-table';
 import type { Selection } from 'react-aria-components';
-import { DataList } from '@dashboard-parapente/design-system';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight } from 'lucide-react';
+import { DataList } from '@dashboard-parapente/core/DataList/DataList';
+import {
+  ChevronDown,
+  ChevronRight,
+  ChevronsDown,
+  ChevronsUp,
+} from 'lucide-react';
 import { Flight, formatFlightDate } from './Flight';
 import { useFlightsTable } from './useFlightsTable';
 import type { FlightSummary } from '@dashboard-parapente/shared-types';
@@ -27,6 +32,7 @@ interface FlightsTableProps {
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
   emptyMessage?: string;
+  desktopPaneLayout?: boolean;
 }
 
 export function FlightsTable({
@@ -43,6 +49,7 @@ export function FlightsTable({
   isLoadingMore = false,
   onLoadMore,
   emptyMessage,
+  desktopPaneLayout = false,
 }: FlightsTableProps) {
   const { t, i18n } = useTranslation();
   const { table } = useFlightsTable({
@@ -56,6 +63,7 @@ export function FlightsTable({
   const [expandedDays, setExpandedDays] = useState<Set<string>>(
     () => new Set()
   );
+  const [expandAllDays, setExpandAllDays] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const loadMoreRequestedRef = useRef(false);
   const wasLoadingMoreRef = useRef(isLoadingMore);
@@ -72,6 +80,30 @@ export function FlightsTable({
   }, [flights, groupByDate]);
 
   useEffect(() => {
+    if (!groupByDate || !selectedFlightId) return;
+
+    const selectedDay = dayGroups.find(([, dayFlights]) =>
+      dayFlights.some((flight) => flight.id === selectedFlightId)
+    )?.[0];
+
+    if (selectedDay) {
+      setExpandedDays((previous) => {
+        if (previous.has(selectedDay)) return previous;
+        return new Set(previous).add(selectedDay);
+      });
+    }
+  }, [dayGroups, groupByDate, selectedFlightId]);
+
+  useEffect(() => {
+    if (!expandAllDays) return;
+    setExpandedDays((previous) => {
+      const next = new Set(previous);
+      for (const [date] of dayGroups) next.add(date);
+      return next;
+    });
+  }, [dayGroups, expandAllDays]);
+
+  useEffect(() => {
     if (isLoadingMore) {
       wasLoadingMoreRef.current = true;
     } else if (wasLoadingMoreRef.current) {
@@ -79,17 +111,6 @@ export function FlightsTable({
       loadMoreRequestedRef.current = false;
     }
   }, [isLoadingMore]);
-  const sortableColumns = useMemo(
-    () => [
-      { id: 'flight_date', label: t('flights.sortDate') },
-      { id: 'site_name', label: t('flights.sortSite') },
-      { id: 'duration_minutes', label: t('flights.sortDuration') },
-      { id: 'max_altitude_m', label: t('flights.sortAltitude') },
-      { id: 'distance_km', label: t('flights.sortDistance') },
-    ],
-    [t]
-  );
-
   // Convert TanStack RowSelectionState to react-aria Selection
   const selectedKeys = useMemo<Selection>(
     () => new Set(Object.keys(rowSelection).filter((k) => rowSelection[k])),
@@ -158,62 +179,53 @@ export function FlightsTable({
     [selectionMode, selectedFlightId, onSelectFlight, onDeleteFlight]
   );
 
-  const renderSortControls = () => (
-    <fieldset className="mb-3 flex flex-wrap gap-1.5">
-      <legend className="sr-only">{t('dataList.sortOptions')}</legend>
-      {sortableColumns.map((column) => {
-        const currentSort = sorting.find((sort) => sort.id === column.id);
-        return (
-          <button
-            key={column.id}
-            type="button"
-            aria-pressed={Boolean(currentSort)}
-            aria-label={
-              currentSort
-                ? t(
-                    currentSort.desc
-                      ? 'dataList.sortByDesc'
-                      : 'dataList.sortByAsc',
-                    { column: column.label }
-                  )
-                : t('dataList.sortBy', { column: column.label })
-            }
-            className={`rounded-md px-3 py-2 text-xs font-medium transition-colors sm:px-2 sm:py-1 ${
-              currentSort
-                ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
-            }`}
-            onClick={() => table.getColumn(column.id)?.toggleSorting()}
-          >
-            {column.label}
-            {currentSort && (
-              <span aria-hidden="true" className="ml-1">
-                {currentSort.desc ? (
-                  <ArrowDown
-                    aria-hidden="true"
-                    className="ml-1 inline h-3.5 w-3.5"
-                  />
-                ) : (
-                  <ArrowUp
-                    aria-hidden="true"
-                    className="ml-1 inline h-3.5 w-3.5"
-                  />
-                )}
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </fieldset>
-  );
-
   if (groupByDate) {
+    const hasExpandedDays = dayGroups.some(([date]) => expandedDays.has(date));
+    const allDaysExpanded =
+      dayGroups.length > 0 &&
+      dayGroups.every(([date]) => expandedDays.has(date));
+
     return (
-      <div className="flex flex-col">
-        {renderSortControls()}
+      <div
+        className={`flex flex-col ${
+          desktopPaneLayout ? 'lg:min-h-0 lg:flex-1' : ''
+        }`}
+      >
+        {dayGroups.length > 0 && (
+          <div className="mb-1 flex justify-end gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                setExpandAllDays(true);
+                setExpandedDays(new Set(dayGroups.map(([date]) => date)));
+              }}
+              disabled={allDaysExpanded}
+              className="flex min-h-9 cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-default disabled:opacity-50 dark:text-sky-300 dark:hover:bg-slate-800 lg:min-h-8 lg:px-1.5"
+            >
+              <ChevronsDown aria-hidden="true" className="h-3.5 w-3.5" />
+              {t('flights.expandAllDays')}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setExpandAllDays(false);
+                setExpandedDays(new Set());
+              }}
+              disabled={!hasExpandedDays}
+              className="flex min-h-9 cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-default disabled:opacity-50 dark:text-sky-300 dark:hover:bg-slate-800 lg:min-h-8 lg:px-1.5"
+            >
+              <ChevronsUp aria-hidden="true" className="h-3.5 w-3.5" />
+              {t('flights.collapseAllDays')}
+            </button>
+          </div>
+        )}
         <section
           aria-label={t('flights.listAriaLabel')}
-          className="h-[calc(100vh-23rem)] min-h-72 overflow-y-auto pr-1 xl:h-[calc(100vh-19rem)]"
+          className={`min-h-72 overflow-y-auto pr-1 ${
+            desktopPaneLayout
+              ? 'lg:min-h-0 lg:flex-1'
+              : 'h-[calc(100vh-23rem)] xl:h-[calc(100vh-19rem)]'
+          }`}
         >
           {dayGroups.length === 0 ? (
             <div className="rounded-xl bg-white p-8 text-center shadow-sm dark:bg-gray-800">
@@ -251,6 +263,7 @@ export function FlightsTable({
                       )}
                       className="flex min-h-16 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none transition-colors hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 dark:hover:bg-gray-800"
                       onClick={() => {
+                        setExpandAllDays(false);
                         setExpandedDays((previous) => {
                           const next = new Set(previous);
                           if (next.has(date)) next.delete(date);
@@ -329,26 +342,38 @@ export function FlightsTable({
   }
 
   return (
-    <DataList
-      table={table}
-      renderItem={renderFlightCard}
-      sortableColumns={sortableColumns}
-      emptyMessage={emptyMessage ?? t('flights.noFlights')}
-      ariaLabel={t('flights.listAriaLabel')}
-      isVirtualized
-      className="flex flex-col"
-      itemsClassName="h-[calc(100vh-23rem)] min-h-72 overflow-y-auto pr-1 xl:h-[calc(100vh-19rem)]"
-      virtualizedLayoutOptions={{ estimatedRowSize: 132, gap: 8 }}
-      renderDependencies={[selectedFlightId, selectionMode, rowSelection]}
-      selectionMode={selectionMode ? 'multiple' : 'none'}
-      selectedKeys={selectedKeys}
-      onSelectionChange={handleSelectionChange}
-      onLoadMore={hasMoreFlights ? onLoadMore : undefined}
-      isLoadingMore={isLoadingMore}
-      loadingMoreMessage={t('flights.loadingMore')}
-      getTextValue={(row) =>
-        row.original.title || row.original.site_name || t('common.flight_one')
-      }
-    />
+    <div
+      className={`flex flex-col ${
+        desktopPaneLayout ? 'lg:min-h-0 lg:flex-1' : ''
+      }`}
+    >
+      <DataList
+        table={table}
+        renderItem={renderFlightCard}
+        sortableColumns={[]}
+        emptyMessage={emptyMessage ?? t('flights.noFlights')}
+        ariaLabel={t('flights.listAriaLabel')}
+        isVirtualized
+        className={`flex flex-col ${
+          desktopPaneLayout ? 'lg:min-h-0 lg:flex-1' : ''
+        }`}
+        itemsClassName={`min-h-72 overflow-y-auto pr-1 ${
+          desktopPaneLayout
+            ? 'lg:min-h-0 lg:flex-1'
+            : 'h-[calc(100vh-23rem)] xl:h-[calc(100vh-19rem)]'
+        }`}
+        virtualizedLayoutOptions={{ estimatedRowSize: 132, gap: 8 }}
+        renderDependencies={[selectedFlightId, selectionMode, rowSelection]}
+        selectionMode={selectionMode ? 'multiple' : 'none'}
+        selectedKeys={selectedKeys}
+        onSelectionChange={handleSelectionChange}
+        onLoadMore={hasMoreFlights ? onLoadMore : undefined}
+        isLoadingMore={isLoadingMore}
+        loadingMoreMessage={t('flights.loadingMore')}
+        getTextValue={(row) =>
+          row.original.title || row.original.site_name || t('common.flight_one')
+        }
+      />
+    </div>
   );
 }

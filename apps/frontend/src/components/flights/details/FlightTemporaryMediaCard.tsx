@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
+import { Modal } from '@dashboard-parapente/core/Modal';
 import { CircleAlert, Trash2 } from 'lucide-react';
 import type { Flight } from '../../../types';
 import {
@@ -42,6 +43,7 @@ export function FlightTemporaryMediaCard({
     pano: 'flights.panoBadge',
     face: 'flights.faceBadge',
     pilote: 'flights.piloteBadge',
+    youtube_telemetry: 'flights.youtubeTelemetryBadge',
   }[sourceType];
   let mediaPath = `temporary-media/${sourceType}`;
   if (isCamera) {
@@ -54,8 +56,18 @@ export function FlightTemporaryMediaCard({
     thumbnailAltKey = 'flights.cameraThumbnailAlt';
   } else if (sourceType === 'pano') {
     thumbnailAltKey = 'flights.panoThumbnailAlt';
+  } else if (sourceType === 'youtube_telemetry') {
+    thumbnailAltKey = 'flights.youtubeTelemetryBadge';
   }
   const title = t(titleKey);
+  let filename: string | null | undefined;
+  if (sourceType === 'pano') {
+    filename = flight.pano_video_filename;
+  } else if (sourceType === 'face') {
+    filename = flight.face_video_filename;
+  } else if (sourceType === 'pilote') {
+    filename = flight.pilote_video_filename;
+  }
 
   let publicationStatus = t('flights.temporarySourceReady');
   let publicationStatusStyle =
@@ -99,9 +111,19 @@ export function FlightTemporaryMediaCard({
           />
         </div>
         <div className="min-w-0 self-center">
-          <h4 className="font-semibold text-slate-950 dark:text-white">
-            {title}
-          </h4>
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+            <h4 className="font-semibold text-slate-950 dark:text-white">
+              {title}
+            </h4>
+            {filename && (
+              <span
+                className="max-w-full truncate text-xs text-slate-600 dark:text-slate-300"
+                title={filename}
+              >
+                {filename}
+              </span>
+            )}
+          </div>
           <p
             className={`mt-1 inline-flex min-h-7 items-center rounded-md border px-2 py-1 text-xs font-semibold ${publicationStatusStyle}`}
             aria-live={isUploading ? 'polite' : undefined}

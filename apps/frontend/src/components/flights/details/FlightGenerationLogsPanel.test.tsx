@@ -1,6 +1,12 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { FlightGenerationLogsPanel } from './FlightGenerationLogsPanel';
+
+vi.mock('../video-export/VideoExportJobsPanel', () => ({
+  YoutubeTelemetryExportDetails: ({ job }: { job: { job_id: string } }) => (
+    <div data-testid="youtube-telemetry-export" data-job-id={job.job_id} />
+  ),
+}));
 
 describe('FlightGenerationLogsPanel', () => {
   it('shows the highlight render method as a tag beside the treatment title', () => {
@@ -35,5 +41,76 @@ describe('FlightGenerationLogsPanel', () => {
     expect(treatment).toHaveTextContent(
       'flights.generationLogs.status.running'
     );
+  });
+
+  it('shows an indeterminate upload state and elapsed time for YouTube uploads', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-22T12:01:05Z'));
+
+    render(
+      <FlightGenerationLogsPanel
+        videoStatus={null}
+        goproOverlayJob={null}
+        youtubeUploadJob={{
+          job_id: 'youtube-upload-1',
+          flight_id: 'flight-1',
+          source_type: 'youtube_overlay',
+          status: 'uploading',
+          progress: 0,
+          created_at: '2026-10-22T12:00:00Z',
+          updated_at: '2026-10-22T12:01:00Z',
+          log_tail: [],
+        }}
+        highlightVideo={null}
+      />
+    );
+
+    expect(screen.getByRole('progressbar')).not.toHaveAttribute(
+      'aria-valuenow'
+    );
+    expect(
+      screen.getByText('flights.generationLogs.elapsed')
+    ).toBeInTheDocument();
+    expect(screen.getByText('1 min')).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
+  it('shows telemetry export progress in its own section, separate from YouTube upload logs', () => {
+    render(
+      <FlightGenerationLogsPanel
+        videoStatus={null}
+        goproOverlayJob={null}
+        youtubeTelemetryExportJobId="telemetry-export-1"
+        youtubeTelemetryExportStatus="running"
+        youtubeTelemetryExportProgress={42}
+        youtubeUploadJob={{
+          job_id: 'youtube-upload-1',
+          flight_id: 'flight-1',
+          source_type: 'youtube_overlay',
+          status: 'preparing',
+          progress: 18,
+          created_at: '2026-10-22T12:00:00Z',
+          updated_at: '2026-10-22T12:01:00Z',
+          log_tail: [],
+        }}
+        highlightVideo={null}
+      />
+    );
+
+    const exportSection = screen.getByRole('region', {
+      name: 'flights.generationLogs.exportProgressSectionTitle',
+    });
+    expect(exportSection).toContainElement(
+      screen.getByTestId('youtube-telemetry-export')
+    );
+    expect(screen.getByTestId('youtube-telemetry-export')).toHaveAttribute(
+      'data-job-id',
+      'telemetry-export-1'
+    );
+    expect(
+      screen.queryByRole('button', {
+        name: /flights\.generationLogs\.youtubeUploadTitle/u,
+      })
+    ).not.toBeInTheDocument();
   });
 });

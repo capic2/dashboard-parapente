@@ -5,7 +5,7 @@ Description: Seeds emagram_max_age_minutes in app_settings for existing deployme
 """
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import create_engine, text
 
@@ -34,7 +34,7 @@ def upgrade() -> None:
             {
                 "key": SETTING_KEY,
                 "value": SETTING_VALUE,
-                "updated_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.now(UTC).replace(tzinfo=None).isoformat(),
             },
         )
         conn.commit()

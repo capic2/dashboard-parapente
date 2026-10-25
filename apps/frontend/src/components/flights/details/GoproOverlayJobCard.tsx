@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { Download, LoaderCircle, Trash2, Wand2 } from 'lucide-react';
 import type { GoproOverlayJob } from '../../../hooks/gopro/useGoproOverlay';
 import { isGoproOverlayInProgress } from '../../../lib/flightMediaState';

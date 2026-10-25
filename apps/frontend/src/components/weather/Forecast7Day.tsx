@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useCurrentTime } from '../../hooks/useCurrentTime';
 import { getStaleTime } from '../../lib/cacheConfig';
 import { parseApiLocalDate } from '../../lib/date';
 import {
@@ -7,7 +8,7 @@ import {
 } from '../../hooks/weather/useWeather';
 import { useQueryClient } from '@tanstack/react-query';
 import CacheTimestamp from '../common/CacheTimestamp';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { Wind } from 'lucide-react';
 import {
   getVerdictVisual,
@@ -27,10 +28,11 @@ export default function Forecast7Day({
   onSelectDay,
 }: Forecast7DayProps) {
   const { t, i18n } = useTranslation();
+  const currentTime = useCurrentTime();
 
   const formatDate = (dateStr: string): string => {
     const date = parseApiLocalDate(dateStr);
-    const today = new Date();
+    const today = new Date(currentTime);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 

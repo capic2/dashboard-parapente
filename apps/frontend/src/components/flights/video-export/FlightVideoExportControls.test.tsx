@@ -20,15 +20,17 @@ const { apiDelete, apiPost, confirmMock, exportStatusMock, mockFlight } =
     } as Flight,
   }));
 
-vi.mock('@dashboard-parapente/design-system', () => ({
+vi.mock('@dashboard-parapente/core/Button/Button', () => ({
   Button: ({
     children,
     isDisabled,
+    onPress,
     ...props
   }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
     isDisabled?: boolean;
+    onPress?: () => void;
   }) => (
-    <button type="button" disabled={isDisabled} {...props}>
+    <button type="button" disabled={isDisabled} onClick={onPress} {...props}>
       {children}
     </button>
   ),

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PointerEvent } from 'react';
+import type { CSSProperties, PointerEvent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import {
   Download,
   ChevronDown,
@@ -59,6 +59,7 @@ import {
   parseTelemetryLayoutXml,
   serializeTelemetryLayoutXml,
   alignTelemetryLayoutItems,
+  groupTelemetryLayoutSelection,
   getTelemetryLayoutGroupBounds,
   DEFAULT_TELEMETRY_PIP_VIDEO_SOURCE,
   TELEMETRY_PIP_VIDEO_SOURCES,
@@ -97,11 +98,28 @@ function displayWidgetName(name: string) {
   return name.replace(/_/gu, ' ');
 }
 
+function getHierarchyLabel(item: FlightTelemetryLayoutItem): string {
+  let label: string;
+  if (item.name) label = item.name;
+  else if (item.type === 'widget') label = item.metric;
+  else if (item.type === 'icon') label = item.icon;
+  else if (item.type === 'text') label = item.content;
+  else label = 'PiP vidéo';
+  return displayWidgetName(label);
+}
+
+function getHierarchySymbol(item: FlightTelemetryLayoutItem): string {
+  if (item.type === 'widget') return '◈';
+  if (item.type === 'icon') return '◆';
+  if (item.type === 'text') return 'T';
+  return '▣';
+}
+
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
-async function compressBackgroundImage(file: File) {
+async function compressBackgroundImage(file: File, maxLength: number) {
   const original = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () =>
@@ -112,7 +130,7 @@ async function compressBackgroundImage(file: File) {
       reject(reader.error ?? new Error('Unable to read background image'));
     reader.readAsDataURL(file);
   });
-  if (original.length <= MAX_BACKGROUND_IMAGE_LENGTH) return original;
+  if (original.length <= maxLength) return original;
 
   const objectUrl = URL.createObjectURL(file);
   try {
@@ -147,7 +165,7 @@ async function compressBackgroundImage(file: File) {
         const compressed = webp.startsWith('data:image/webp')
           ? webp
           : canvas.toDataURL('image/jpeg', quality);
-        if (compressed.length <= MAX_BACKGROUND_IMAGE_LENGTH) {
+        if (compressed.length <= maxLength) {
           return compressed;
         }
       }
@@ -159,7 +177,7 @@ async function compressBackgroundImage(file: File) {
 }
 
 export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const toast = useToast();
   const layoutQuery = useTelemetryLayout(flightId);
   const telemetryQuery = useFlightTelemetry(flightId ?? '', Boolean(flightId));
@@ -230,11 +248,9 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     setSelectedIds((current) => {
       const validIds = new Set(previous.map((item) => item.id));
       const retained = current.filter((id) => validIds.has(id));
-      return retained.length
-        ? retained
-        : previous[0]?.id
-          ? [previous[0].id]
-          : [];
+      if (retained.length) return retained;
+      if (previous[0]?.id) return [previous[0].id];
+      return [];
     });
   }, []);
 
@@ -252,30 +268,87 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
 
   const selected = layout.find((item) => item.id === selectedIds[0]) ?? null;
   const selectedGroupId = (() => {
-    const groupIds = new Set(
-      layout
-        .filter((item) => selectedIds.includes(item.id) && item.groupId)
-        .map((item) => item.groupId)
+    const candidateIds = Array.from(
+      new Set(
+        layout
+          .filter((item) => selectedIds.includes(item.id))
+          .flatMap((item) => [item.groupId, item.parentGroupId])
+          .filter((id): id is string => Boolean(id))
+      )
     );
-    if (groupIds.size !== 1) return undefined;
-    const groupId = [...groupIds][0];
-    const children = layout.filter((item) => item.groupId === groupId);
-    return children.length === selectedIds.length &&
-      children.every((item) => selectedIds.includes(item.id))
-      ? groupId
-      : undefined;
+    return candidateIds.find((groupId) => {
+      const children = layout.filter(
+        (item) => item.groupId === groupId || item.parentGroupId === groupId
+      );
+      return (
+        children.length === selectedIds.length &&
+        children.every((item) => selectedIds.includes(item.id))
+      );
+    });
   })();
   const selectedGroupName = selectedGroupId
     ? (layout.find((item) => item.groupId === selectedGroupId)?.groupName ??
+      layout.find((item) => item.parentGroupId === selectedGroupId)
+        ?.parentGroupName ??
       selectedGroupId)
     : undefined;
-  const groups = Array.from(
-    new Map(
-      layout
-        .filter((item) => item.groupId)
-        .map((item) => [item.groupId as string, item.groupName ?? item.groupId])
-    )
+  const selectedGroupItem = selectedGroupId
+    ? layout.find((item) => item.groupId === selectedGroupId)
+    : undefined;
+  const selectedParentGroupItem = selectedGroupId
+    ? layout.find((item) => item.parentGroupId === selectedGroupId)
+    : undefined;
+  const selectedGroupStyle = selectedGroupItem
+    ? selectedGroupItem
+    : selectedParentGroupItem
+      ? {
+          groupBackgroundColor:
+            selectedParentGroupItem.parentGroupBackgroundColor,
+          groupBackgroundOpacity:
+            selectedParentGroupItem.parentGroupBackgroundOpacity,
+          groupBorderRadius: selectedParentGroupItem.parentGroupBorderRadius,
+        }
+      : undefined;
+  const selectedGroupOpacity = Math.max(
+    0,
+    Math.min(1, selectedGroupStyle?.groupBackgroundOpacity ?? 0.25)
   );
+  const groupMap = new Map<
+    string,
+    readonly [string, string, string | undefined]
+  >();
+  for (const item of layout) {
+    if (item.groupId) {
+      groupMap.set(item.groupId, [
+        item.groupId,
+        item.groupName ?? item.groupId,
+        item.parentGroupId,
+      ]);
+    }
+    if (item.parentGroupId) {
+      groupMap.set(item.parentGroupId, [
+        item.parentGroupId,
+        item.parentGroupName ?? item.parentGroupId,
+        undefined,
+      ]);
+    }
+  }
+  const groups = Array.from(groupMap.values()).sort(
+    (left, right) => Number(Boolean(left[2])) - Number(Boolean(right[2]))
+  );
+  const groupItems = useCallback(
+    (groupId: string) =>
+      layout.filter(
+        (item) => item.groupId === groupId || item.parentGroupId === groupId
+      ),
+    [layout]
+  );
+  const directGroupItems = (groupId: string) =>
+    layout.filter(
+      (item) =>
+        item.groupId === groupId ||
+        (item.parentGroupId === groupId && !item.groupId)
+    );
   const ungroupedItems = layout.filter((item) => !item.groupId);
   const previewTelemetry = localTelemetry ?? telemetryQuery.data;
   const previewPoint =
@@ -316,7 +389,25 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
   const handleBackgroundImage = async (file: File | undefined) => {
     if (!file) return;
     try {
-      const compressedImage = await compressBackgroundImage(file);
+      const xmlWithoutImage = serializeTelemetryLayoutXml(layout, {
+        mainVideoSource,
+      }).length;
+      const imageAttributeLength =
+        serializeTelemetryLayoutXml(layout, {
+          backgroundImage: 'x',
+          mainVideoSource,
+        }).length - xmlWithoutImage;
+      const availableImageLength = Math.min(
+        MAX_BACKGROUND_IMAGE_LENGTH,
+        MAX_LAYOUT_XML_LENGTH - xmlWithoutImage - imageAttributeLength
+      );
+      if (availableImageLength <= 0) {
+        throw new Error('Telemetry layout is too large for a background image');
+      }
+      const compressedImage = await compressBackgroundImage(
+        file,
+        availableImageLength
+      );
       setSaveError(undefined);
       setBackgroundImage(compressedImage);
     } catch {
@@ -377,21 +468,25 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       (item) => item.name !== undefined && item.name.length > 100
     );
     const invalidGroupName = layout.find(
-      (item) => item.groupName !== undefined && item.groupName.length > 100
+      (item) =>
+        (item.groupName !== undefined && item.groupName.length > 100) ||
+        (item.parentGroupName !== undefined &&
+          item.parentGroupName.length > 100)
     );
     const emptyText = layout.find(
       (item) => item.type === 'text' && item.content.trim().length === 0
     );
-    const xmlLength = serializeTelemetryLayoutXml(layout).length;
-    const validationMessage = invalidName
-      ? t('telemetryLayout.nameTooLong')
-      : invalidGroupName
-        ? t('telemetryLayout.groupNameTooLong')
-        : emptyText
-          ? t('telemetryLayout.textRequired')
-          : xmlLength > MAX_LAYOUT_XML_LENGTH
-            ? t('telemetryLayout.layoutTooLarge')
-            : undefined;
+    const xmlLength = serializeTelemetryLayoutXml(layout, {
+      backgroundImage,
+      mainVideoSource,
+    }).length;
+    let validationMessage: string | undefined;
+    if (invalidName) validationMessage = t('telemetryLayout.nameTooLong');
+    else if (invalidGroupName)
+      validationMessage = t('telemetryLayout.groupNameTooLong');
+    else if (emptyText) validationMessage = t('telemetryLayout.textRequired');
+    else if (xmlLength > MAX_LAYOUT_XML_LENGTH)
+      validationMessage = t('telemetryLayout.layoutTooLarge');
 
     if (validationMessage) {
       setSaveError(validationMessage);
@@ -418,17 +513,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     }
   };
 
-  const hierarchyLabel = (item: FlightTelemetryLayoutItem) =>
-    displayWidgetName(
-      item.name ??
-        (item.type === 'widget'
-          ? item.metric
-          : item.type === 'icon'
-            ? item.icon
-            : item.type === 'text'
-              ? item.content
-              : 'PiP vidéo')
-    );
+  const hierarchyLabel = getHierarchyLabel;
 
   const selectFromHierarchy = (ids: string[], additive: boolean) => {
     setSelectedIds((current) => {
@@ -583,27 +668,34 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
 
   const groupSelected = () => {
     if (selectedIds.length < 2) return;
-    const existingGroupIds = new Set(
-      layout
-        .filter((item) => selectedIds.includes(item.id) && item.groupId)
-        .map((item) => item.groupId)
-    );
-    const existingGroupId =
-      existingGroupIds.size === 1 ? [...existingGroupIds][0] : undefined;
-    const existingGroupName = existingGroupId
-      ? layout.find((item) => item.groupId === existingGroupId)?.groupName
-      : undefined;
-    const groupId =
-      existingGroupId ?? `group-${Date.now()}-${widgetIdCounter.current++}`;
-    const groupName = existingGroupName ?? `Group ${widgetIdCounter.current}`;
+    const groupId = `group-${Date.now()}-${widgetIdCounter.current++}`;
+    const groupName = `Group ${widgetIdCounter.current}`;
     setLayout((current) =>
-      current.map((item) =>
-        selectedIds.includes(item.id) ? { ...item, groupId, groupName } : item
-      )
+      groupTelemetryLayoutSelection(current, selectedIds, groupId, groupName)
     );
   };
 
   const ungroupSelected = () => {
+    if (
+      selectedGroupId &&
+      layout.some((item) => item.parentGroupId === selectedGroupId)
+    ) {
+      setLayout((current) =>
+        current.map((item) =>
+          item.parentGroupId === selectedGroupId
+            ? {
+                ...item,
+                parentGroupId: undefined,
+                parentGroupName: undefined,
+                parentGroupBackgroundColor: undefined,
+                parentGroupBackgroundOpacity: undefined,
+                parentGroupBorderRadius: undefined,
+              }
+            : item
+        )
+      );
+      return;
+    }
     const groupIds = new Set(
       layout
         .filter((item) => selectedIds.includes(item.id) && item.groupId)
@@ -613,7 +705,16 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     setLayout((current) =>
       current.map((item) =>
         item.groupId && groupIds.has(item.groupId)
-          ? { ...item, groupId: undefined, groupName: undefined }
+          ? {
+              ...item,
+              groupId: undefined,
+              groupName: undefined,
+              parentGroupId: undefined,
+              parentGroupName: undefined,
+              parentGroupBackgroundColor: undefined,
+              parentGroupBackgroundOpacity: undefined,
+              parentGroupBorderRadius: undefined,
+            }
           : item
       )
     );
@@ -648,11 +749,18 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
       );
       return;
     }
-    const groupItems = isWholeGroupSelected(item)
-      ? layout.filter((candidate) => candidate.groupId === item.groupId)
-      : selectedIds.includes(item.id)
-        ? layout.filter((candidate) => selectedIds.includes(candidate.id))
-        : [item];
+    let groupItems: FlightTelemetryLayoutItem[];
+    if (isWholeGroupSelected(item)) {
+      groupItems = layout.filter(
+        (candidate) => candidate.groupId === item.groupId
+      );
+    } else if (selectedIds.includes(item.id)) {
+      groupItems = layout.filter((candidate) =>
+        selectedIds.includes(candidate.id)
+      );
+    } else {
+      groupItems = [item];
+    }
     const movingItems = mode === 'resize' ? [item] : groupItems;
     setSnapGuides({});
     setSelectedIds(movingItems.map((candidate) => candidate.id));
@@ -814,7 +922,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
 
   const copySelected = useCallback(() => {
     const items = selectedGroupId
-      ? layout.filter((item) => item.groupId === selectedGroupId)
+      ? groupItems(selectedGroupId)
       : layout.filter((item) => selectedIds.includes(item.id));
     if (!items.length) {
       toast.error(t('telemetryLayout.nothingToCopy'));
@@ -822,7 +930,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     }
     setCopiedItems(items);
     toast.success(t('telemetryLayout.copySuccess'));
-  }, [layout, selectedGroupId, selectedIds, t, toast]);
+  }, [groupItems, layout, selectedGroupId, selectedIds, t, toast]);
 
   const pasteCopied = useCallback(() => {
     if (!copiedItems.length) {
@@ -842,6 +950,22 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
         })
     );
     const groupIdMap = new Map<string, string>();
+    const copiedParentGroupIds = new Set(
+      copiedItems
+        .map((item) => item.parentGroupId)
+        .filter((id): id is string => Boolean(id))
+        .filter((id) =>
+          layout
+            .filter((item) => item.parentGroupId === id)
+            .every((item) => copiedIds.has(item.id))
+        )
+    );
+    const parentGroupIdMap = new Map(
+      [...copiedParentGroupIds].map((id) => [
+        id,
+        `group-${Date.now()}-${widgetIdCounter.current++}`,
+      ])
+    );
     const pastedItems = copiedItems.map((item) => {
       const id = `${item.type}-${Date.now()}-${widgetIdCounter.current++}`;
       const groupId =
@@ -860,6 +984,18 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
         ...(groupId
           ? { groupId, groupName: item.groupName }
           : { groupId: undefined, groupName: undefined }),
+        ...(item.parentGroupId && parentGroupIdMap.has(item.parentGroupId)
+          ? {
+              parentGroupId: parentGroupIdMap.get(item.parentGroupId),
+              parentGroupName: item.parentGroupName,
+            }
+          : {
+              parentGroupId: undefined,
+              parentGroupName: undefined,
+              parentGroupBackgroundColor: undefined,
+              parentGroupBackgroundOpacity: undefined,
+              parentGroupBorderRadius: undefined,
+            }),
       };
     });
     setLayout((current) => [...current, ...pastedItems]);
@@ -907,7 +1043,6 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
             movement[1] * multiplier
           );
         }
-        return;
       }
     };
     const editor = editorRef.current;
@@ -1387,15 +1522,45 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                 {groups.map(([groupId, groupName]) => {
                   const bounds = getTelemetryLayoutGroupBounds(layout, groupId);
                   if (!bounds) return null;
+                  const groupStyle = layout.find(
+                    (item) => item.groupId === groupId
+                  );
+                  const parentStyle = layout.find(
+                    (item) => item.parentGroupId === groupId
+                  );
+                  const groupColor =
+                    groupStyle?.groupBackgroundColor ??
+                    parentStyle?.parentGroupBackgroundColor;
+                  const groupOpacity =
+                    groupStyle?.groupBackgroundOpacity ??
+                    parentStyle?.parentGroupBackgroundOpacity ??
+                    0.25;
+                  const groupBorderRadius = Math.max(
+                    0,
+                    Math.min(
+                      120,
+                      groupStyle?.groupBorderRadius ??
+                        parentStyle?.parentGroupBorderRadius ??
+                        12
+                    )
+                  );
+                  const groupBackground = groupColor
+                    ? `${groupColor}${Math.round(groupOpacity * 255)
+                        .toString(16)
+                        .padStart(2, '0')}`
+                    : undefined;
                   return (
                     <div
                       key={groupId}
-                      className="pointer-events-none absolute rounded-xl border border-dashed border-sky-400/70 bg-sky-400/5"
+                      className="pointer-events-none absolute rounded-xl border border-dashed border-sky-400/70"
                       style={{
                         left: `${bounds.x}px`,
                         top: `${bounds.y}px`,
                         width: `${bounds.width}px`,
                         height: `${bounds.height}px`,
+                        borderRadius: `${groupBorderRadius}px`,
+                        backgroundColor:
+                          groupBackground ?? 'rgb(56 189 248 / 5%)',
                       }}
                     >
                       <span className="absolute -top-5 left-2 rounded-t bg-sky-500/80 px-2 py-0.5 text-[10px] font-semibold text-white">
@@ -1414,9 +1579,111 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       : (getTelemetryMetricValue(
                           previewPoint ?? null,
                           previewTelemetry,
-                          item.metric
+                          item.metric,
+                          i18n?.resolvedLanguage ?? i18n?.language
                         ) ?? ['', '']);
                   const isSelected = selectedIds.includes(item.id);
+                  let textAlign: CSSProperties['textAlign'];
+                  if (item.type === 'widget')
+                    textAlign = item.valueAlign ?? 'left';
+                  else if (item.type === 'text')
+                    textAlign = item.textAlign ?? 'left';
+
+                  let backgroundClass = 'bg-transparent';
+                  if (item.transparent === false) {
+                    backgroundClass = item.backgroundColor
+                      ? 'bg-transparent'
+                      : 'bg-slate-950/85';
+                  }
+                  const itemBackgroundColor =
+                    item.transparent === false && item.backgroundColor
+                      ? `${item.backgroundColor}${Math.round(
+                          Math.max(
+                            0,
+                            Math.min(1, item.backgroundOpacity ?? 0.85)
+                          ) * 255
+                        )
+                          .toString(16)
+                          .padStart(2, '0')}`
+                      : undefined;
+                  const visibilityClass = item.visible ? '' : 'opacity-35';
+                  let borderClass = 'border-transparent';
+                  if (isSelected)
+                    borderClass = 'border-sky-400 ring-2 ring-sky-400/40';
+                  else if (item.border === true)
+                    borderClass = 'border-white/20';
+
+                  let itemPreview: ReactNode;
+                  if (isPip) {
+                    itemPreview = (
+                      <>
+                        <PictureInPicture2 className="mx-auto h-1/2 w-1/2" />
+                        <span className="mt-1 block truncate text-center text-[10px] font-semibold text-slate-300">
+                          {item.name ?? t('telemetryLayout.pip')}
+                        </span>
+                      </>
+                    );
+                  } else if (isText) {
+                    itemPreview = (
+                      <span
+                        className="block truncate font-semibold"
+                        style={{ fontSize: '1em' }}
+                      >
+                        {item.content}
+                      </span>
+                    );
+                  } else if (isIcon) {
+                    itemPreview = (
+                      <>
+                        <TelemetryLayoutIcon
+                          name={item.icon}
+                          className="mx-auto h-1/2 w-1/2"
+                        />
+                        <span className="mt-1 block truncate text-center text-[10px] font-semibold text-slate-300">
+                          {item.name ?? item.icon}
+                        </span>
+                      </>
+                    );
+                  } else if (item.variant && item.variant !== 'value') {
+                    itemPreview = (
+                      <TelemetrySpeedometer
+                        metric={item.metric}
+                        value={value}
+                        unit={unit}
+                        showUnit={item.showUnit !== false}
+                        valuePrefix={item.valuePrefix}
+                        variant={item.variant}
+                      />
+                    );
+                  } else {
+                    itemPreview = (
+                      <>
+                        {item.showLabel !== false && (
+                          <span
+                            className="block font-semibold uppercase tracking-wide text-slate-300"
+                            style={{ fontSize: '0.35em' }}
+                          >
+                            {displayWidgetName(item.name ?? item.metric)}
+                          </span>
+                        )}
+                        <span
+                          className="mt-1 block truncate font-mono font-bold"
+                          style={{ fontSize: '1em' }}
+                        >
+                          {item.valuePrefix ?? ''}
+                          {formatTelemetryValue(value, '')}
+                          {item.showUnit !== false && (
+                            <span
+                              className="ml-1 font-normal text-slate-300"
+                              style={{ fontSize: '0.45em' }}
+                            >
+                              {unit}
+                            </span>
+                          )}
+                        </span>
+                      </>
+                    );
+                  }
                   return (
                     <button
                       type="button"
@@ -1445,79 +1712,18 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                           return;
                         setSelectedIds([item.id]);
                       }}
-                      className={`absolute flex min-h-0 min-w-0 touch-none flex-col overflow-hidden rounded-lg border px-3 py-2 text-left text-white shadow-lg ${item.transparent === false ? 'bg-slate-950/85' : 'bg-transparent'} ${item.visible ? '' : 'opacity-35'} ${isSelected ? 'border-sky-400 ring-2 ring-sky-400/40' : item.border === true ? 'border-white/20' : 'border-transparent'}`}
+                      className={`absolute flex min-h-0 min-w-0 touch-none flex-col overflow-hidden rounded-lg border px-3 py-2 text-left text-white shadow-lg ${backgroundClass} ${visibilityClass} ${borderClass}`}
                       style={{
                         left: `${item.x}px`,
                         top: `${item.y}px`,
                         width: `${item.width}px`,
                         height: `${item.height}px`,
                         fontSize: `${item.fontSize ?? 32}px`,
-                        textAlign:
-                          item.type === 'widget'
-                            ? (item.valueAlign ?? 'left')
-                            : item.type === 'text'
-                              ? (item.textAlign ?? 'left')
-                              : undefined,
+                        textAlign,
+                        backgroundColor: itemBackgroundColor,
                       }}
                     >
-                      {isPip ? (
-                        <>
-                          <PictureInPicture2 className="mx-auto h-1/2 w-1/2" />
-                          <span className="mt-1 block truncate text-center text-[10px] font-semibold text-slate-300">
-                            {item.name ?? t('telemetryLayout.pip')}
-                          </span>
-                        </>
-                      ) : isText ? (
-                        <span
-                          className="block truncate font-semibold"
-                          style={{ fontSize: '1em' }}
-                        >
-                          {item.content}
-                        </span>
-                      ) : isIcon ? (
-                        <>
-                          <TelemetryLayoutIcon
-                            name={item.icon}
-                            className="mx-auto h-1/2 w-1/2"
-                          />
-                          <span className="mt-1 block truncate text-center text-[10px] font-semibold text-slate-300">
-                            {item.name ?? item.icon}
-                          </span>
-                        </>
-                      ) : item.variant && item.variant !== 'value' ? (
-                        <TelemetrySpeedometer
-                          metric={item.metric}
-                          value={value}
-                          unit={unit}
-                          showUnit={item.showUnit !== false}
-                          variant={item.variant}
-                        />
-                      ) : (
-                        <>
-                          {item.showLabel !== false && (
-                            <span
-                              className="block font-semibold uppercase tracking-wide text-slate-300"
-                              style={{ fontSize: '0.35em' }}
-                            >
-                              {displayWidgetName(item.name ?? item.metric)}
-                            </span>
-                          )}
-                          <span
-                            className="mt-1 block truncate font-mono font-bold"
-                            style={{ fontSize: '1em' }}
-                          >
-                            {formatTelemetryValue(value, '')}
-                            {item.showUnit !== false && (
-                              <span
-                                className="ml-1 font-normal text-slate-300"
-                                style={{ fontSize: '0.45em' }}
-                              >
-                                {unit}
-                              </span>
-                            )}
-                          </span>
-                        </>
-                      )}
+                      {itemPreview}
                       {isSelected && (
                         <span
                           className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-se-resize rounded-sm border border-white bg-sky-400"
@@ -1560,89 +1766,166 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   }
                 >
                   <span className="mr-2 text-slate-400">
-                    {item.type === 'widget'
-                      ? '◈'
-                      : item.type === 'icon'
-                        ? '◆'
-                        : item.type === 'text'
-                          ? 'T'
-                          : '▣'}
+                    {getHierarchySymbol(item)}
                   </span>
                   <span className="truncate">{hierarchyLabel(item)}</span>
                 </button>
               ))}
-              {groups.map(([groupId, groupName]) => {
-                const children = layout.filter(
-                  (item) => item.groupId === groupId
-                );
-                const isGroupSelected = children.every((item) =>
-                  selectedIds.includes(item.id)
-                );
-                const isCollapsed = collapsedGroupIds.has(groupId);
-                return (
-                  <div key={groupId}>
-                    <div className="flex items-center">
-                      <button
-                        type="button"
-                        className={`flex min-w-0 flex-1 items-center truncate rounded-md px-2 py-1.5 text-left text-xs font-semibold transition ${isGroupSelected ? 'bg-violet-100 text-violet-800 dark:bg-violet-950/50 dark:text-violet-200' : 'text-slate-800 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-700'}`}
-                        aria-pressed={isGroupSelected}
-                        onClick={(event) =>
-                          selectFromHierarchy(
-                            children.map((item) => item.id),
-                            event.ctrlKey || event.metaKey
-                          )
-                        }
-                      >
-                        <span className="truncate">{groupName}</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded p-1 text-violet-500 hover:bg-slate-100 dark:hover:bg-slate-700"
-                        aria-label={t(
-                          isCollapsed
-                            ? 'telemetryLayout.expandGroup'
-                            : 'telemetryLayout.collapseGroup'
-                        )}
-                        onClick={() =>
-                          setCollapsedGroupIds((current) => {
-                            const next = new Set(current);
-                            if (next.has(groupId)) next.delete(groupId);
-                            else next.add(groupId);
-                            return next;
-                          })
-                        }
-                      >
-                        <ChevronDown
-                          className={`h-3.5 w-3.5 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
-                        />
-                      </button>
-                    </div>
-                    {!isCollapsed && (
-                      <div className="ml-4 border-l border-slate-200 pl-2 dark:border-slate-700">
-                        {children.map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            className={`flex w-full items-center truncate rounded-md px-2 py-1.5 text-left text-xs transition ${selectedIds.includes(item.id) ? 'bg-sky-100 font-semibold text-sky-800 dark:bg-sky-950/50 dark:text-sky-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700'}`}
-                            aria-pressed={selectedIds.includes(item.id)}
-                            onClick={(event) =>
-                              selectFromHierarchy(
-                                [item.id],
-                                event.ctrlKey || event.metaKey
-                              )
-                            }
-                          >
-                            <span className="mr-2 text-slate-400">└</span>
-                            <span className="truncate">
-                              {hierarchyLabel(item)}
-                            </span>
-                          </button>
-                        ))}
+              {groups
+                .filter(([, , parentGroupId]) => !parentGroupId)
+                .map(([groupId, groupName]) => {
+                  const children = groupItems(groupId);
+                  const isGroupSelected =
+                    children.length > 0 &&
+                    children.every((item) => selectedIds.includes(item.id));
+                  const nestedGroups = groups.filter(
+                    ([, , parentGroupId]) => parentGroupId === groupId
+                  );
+                  const isCollapsed = collapsedGroupIds.has(groupId);
+                  return (
+                    <div key={groupId}>
+                      <div className="flex items-center">
+                        <button
+                          type="button"
+                          className={`flex min-w-0 flex-1 items-center truncate rounded-md px-2 py-1.5 text-left text-xs font-semibold transition ${isGroupSelected ? 'bg-violet-100 text-violet-800 dark:bg-violet-950/50 dark:text-violet-200' : 'text-slate-800 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-700'}`}
+                          aria-pressed={isGroupSelected}
+                          onClick={(event) =>
+                            selectFromHierarchy(
+                              children.map((item) => item.id),
+                              event.ctrlKey || event.metaKey
+                            )
+                          }
+                        >
+                          <span className="truncate">{groupName}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded p-1 text-violet-500 hover:bg-slate-100 dark:hover:bg-slate-700"
+                          aria-label={t(
+                            isCollapsed
+                              ? 'telemetryLayout.expandGroup'
+                              : 'telemetryLayout.collapseGroup'
+                          )}
+                          onClick={() =>
+                            setCollapsedGroupIds((current) => {
+                              const next = new Set(current);
+                              if (next.has(groupId)) next.delete(groupId);
+                              else next.add(groupId);
+                              return next;
+                            })
+                          }
+                        >
+                          <ChevronDown
+                            className={`h-3.5 w-3.5 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                          />
+                        </button>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                      {!isCollapsed && (
+                        <div className="ml-4 border-l border-slate-200 pl-2 dark:border-slate-700">
+                          {directGroupItems(groupId).map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              className={`flex w-full items-center truncate rounded-md px-2 py-1.5 text-left text-xs transition ${selectedIds.includes(item.id) ? 'bg-sky-100 font-semibold text-sky-800 dark:bg-sky-950/50 dark:text-sky-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700'}`}
+                              aria-pressed={selectedIds.includes(item.id)}
+                              onClick={(event) =>
+                                selectFromHierarchy(
+                                  [item.id],
+                                  event.ctrlKey || event.metaKey
+                                )
+                              }
+                            >
+                              <span className="mr-2 text-slate-400">└</span>
+                              <span className="truncate">
+                                {hierarchyLabel(item)}
+                              </span>
+                            </button>
+                          ))}
+                          {nestedGroups.map(([nestedId, nestedName]) => {
+                            const nestedItems = layout.filter(
+                              (item) => item.groupId === nestedId
+                            );
+                            const nestedCollapsed =
+                              collapsedGroupIds.has(nestedId);
+                            return (
+                              <div
+                                key={nestedId}
+                                className="ml-2 border-l border-violet-300 pl-2 dark:border-violet-800"
+                              >
+                                <div className="flex items-center">
+                                  <button
+                                    type="button"
+                                    className={`min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-left text-xs font-semibold transition ${nestedItems.length > 0 && nestedItems.every((item) => selectedIds.includes(item.id)) ? 'bg-violet-100 text-violet-800 dark:bg-violet-950/50 dark:text-violet-200' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700'}`}
+                                    aria-pressed={
+                                      nestedItems.length > 0 &&
+                                      nestedItems.every((item) =>
+                                        selectedIds.includes(item.id)
+                                      )
+                                    }
+                                    onClick={(event) =>
+                                      selectFromHierarchy(
+                                        nestedItems.map((item) => item.id),
+                                        event.ctrlKey || event.metaKey
+                                      )
+                                    }
+                                  >
+                                    {nestedName}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="rounded p-1 text-violet-500 hover:bg-slate-100 dark:hover:bg-slate-700"
+                                    aria-label={t(
+                                      nestedCollapsed
+                                        ? 'telemetryLayout.expandGroup'
+                                        : 'telemetryLayout.collapseGroup'
+                                    )}
+                                    onClick={() =>
+                                      setCollapsedGroupIds((current) => {
+                                        const next = new Set(current);
+                                        if (next.has(nestedId))
+                                          next.delete(nestedId);
+                                        else next.add(nestedId);
+                                        return next;
+                                      })
+                                    }
+                                  >
+                                    <ChevronDown
+                                      className={`h-3.5 w-3.5 transition-transform ${nestedCollapsed ? '-rotate-90' : ''}`}
+                                    />
+                                  </button>
+                                </div>
+                                {!nestedCollapsed &&
+                                  nestedItems.map((item) => (
+                                    <button
+                                      key={item.id}
+                                      type="button"
+                                      className={`flex w-full items-center truncate rounded-md px-2 py-1.5 text-left text-xs transition ${selectedIds.includes(item.id) ? 'bg-sky-100 font-semibold text-sky-800 dark:bg-sky-950/50 dark:text-sky-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700'}`}
+                                      aria-pressed={selectedIds.includes(
+                                        item.id
+                                      )}
+                                      onClick={(event) =>
+                                        selectFromHierarchy(
+                                          [item.id],
+                                          event.ctrlKey || event.metaKey
+                                        )
+                                      }
+                                    >
+                                      <span className="mr-2 text-slate-400">
+                                        └
+                                      </span>
+                                      <span className="truncate">
+                                        {hierarchyLabel(item)}
+                                      </span>
+                                    </button>
+                                  ))}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
             </div>
           </details>
           <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
@@ -1706,7 +1989,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
               </TooltipTrigger>
             ))}
           </div>
-          {selectedGroupId ? (
+          {selectedGroupId && (
             <div className="space-y-4">
               <div className="rounded-lg bg-violet-100 p-3 text-sm dark:bg-violet-950/40">
                 <div className="font-semibold text-violet-900 dark:text-violet-100">
@@ -1729,7 +2012,109 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       current.map((item) =>
                         item.groupId === selectedGroupId
                           ? { ...item, groupName: event.target.value }
-                          : item
+                          : item.parentGroupId === selectedGroupId
+                            ? { ...item, parentGroupName: event.target.value }
+                            : item
+                      )
+                    )
+                  }
+                />
+              </label>
+              <label className="flex items-center justify-between gap-3 text-sm">
+                <span className="text-slate-600 dark:text-slate-300">
+                  {t('telemetryLayout.groupBackgroundColor')}
+                </span>
+                <input
+                  aria-label={t('telemetryLayout.groupBackgroundColor')}
+                  className="h-9 w-14 cursor-pointer rounded border border-slate-300 bg-white p-1 dark:border-slate-600 dark:bg-slate-900"
+                  type="color"
+                  value={selectedGroupStyle?.groupBackgroundColor ?? '#38bdf8'}
+                  onChange={(event) =>
+                    setLayout((current) =>
+                      current.map((item) =>
+                        item.groupId === selectedGroupId
+                          ? {
+                              ...item,
+                              groupBackgroundColor: event.target.value,
+                            }
+                          : item.parentGroupId === selectedGroupId
+                            ? {
+                                ...item,
+                                parentGroupBackgroundColor: event.target.value,
+                              }
+                            : item
+                      )
+                    )
+                  }
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 flex justify-between text-slate-600 dark:text-slate-300">
+                  <span>{t('telemetryLayout.groupBorderRadius')}</span>
+                  <span>
+                    {Math.round(selectedGroupStyle?.groupBorderRadius ?? 12)} px
+                  </span>
+                </span>
+                <input
+                  aria-label={t('telemetryLayout.groupBorderRadius')}
+                  className="w-full accent-sky-600"
+                  type="range"
+                  min="0"
+                  max="120"
+                  value={selectedGroupStyle?.groupBorderRadius ?? 12}
+                  onChange={(event) =>
+                    setLayout((current) =>
+                      current.map((item) =>
+                        item.groupId === selectedGroupId
+                          ? {
+                              ...item,
+                              groupBorderRadius: Number(event.target.value),
+                            }
+                          : item.parentGroupId === selectedGroupId
+                            ? {
+                                ...item,
+                                parentGroupBorderRadius: Number(
+                                  event.target.value
+                                ),
+                              }
+                            : item
+                      )
+                    )
+                  }
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 flex justify-between text-slate-600 dark:text-slate-300">
+                  <span>{t('telemetryLayout.groupBackgroundOpacity')}</span>
+                  <span>{Math.round(selectedGroupOpacity * 100)}%</span>
+                </span>
+                <input
+                  aria-label={t('telemetryLayout.groupBackgroundOpacity')}
+                  className="w-full accent-sky-600"
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round(selectedGroupOpacity * 100)}
+                  onChange={(event) =>
+                    setLayout((current) =>
+                      current.map((item) =>
+                        item.groupId === selectedGroupId
+                          ? {
+                              ...item,
+                              groupBackgroundColor:
+                                item.groupBackgroundColor ?? '#38bdf8',
+                              groupBackgroundOpacity:
+                                Number(event.target.value) / 100,
+                            }
+                          : item.parentGroupId === selectedGroupId
+                            ? {
+                                ...item,
+                                parentGroupBackgroundColor:
+                                  item.parentGroupBackgroundColor ?? '#38bdf8',
+                                parentGroupBackgroundOpacity:
+                                  Number(event.target.value) / 100,
+                              }
+                            : item
                       )
                     )
                   }
@@ -1739,7 +2124,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                 {t('telemetryLayout.groupSelectionHint')}
               </p>
             </div>
-          ) : selected ? (
+          )}
+          {!selectedGroupId && selected && (
             <div className="space-y-4">
               <div className="rounded-lg bg-slate-100 p-3 text-sm font-medium dark:bg-slate-900">
                 <div className="flex items-center justify-between gap-2">
@@ -1800,7 +2186,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       />
                     </label>
                   )}
-                  {selected.type === 'icon' ? (
+                  {selected.type === 'icon' && (
                     <label className="block text-sm">
                       <span className="mb-1 block text-slate-600 dark:text-slate-300">
                         {t('telemetryLayout.icon')}
@@ -1833,7 +2219,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                         ))}
                       </select>
                     </label>
-                  ) : selected.type === 'text' ? (
+                  )}
+                  {selected.type === 'text' && (
                     <label className="block text-sm">
                       <span className="mb-1 block text-slate-600 dark:text-slate-300">
                         {t('telemetryLayout.text')}
@@ -1850,7 +2237,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                         }
                       />
                     </label>
-                  ) : selected.type === 'pip' ? (
+                  )}
+                  {selected.type === 'pip' && (
                     <div className="space-y-3">
                       <label className="block text-sm">
                         <span className="mb-1 block text-slate-600 dark:text-slate-300">
@@ -1912,7 +2300,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                         {t('telemetryLayout.pipApplyOffset')}
                       </label>
                     </div>
-                  ) : (
+                  )}
+                  {selected.type === 'widget' && (
                     <label className="block text-sm">
                       <span className="mb-1 block text-slate-600 dark:text-slate-300">
                         {t('telemetryLayout.metric')}
@@ -1932,6 +2321,26 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                           </option>
                         ))}
                       </select>
+                    </label>
+                  )}
+                  {selected.type === 'widget' && (
+                    <label className="block text-sm">
+                      <span className="mb-1 block text-slate-600 dark:text-slate-300">
+                        {t('telemetryLayout.valuePrefix')}
+                      </span>
+                      <input
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        type="text"
+                        value={selected.valuePrefix ?? ''}
+                        onChange={(event) =>
+                          updateItem(selected.id, {
+                            valuePrefix: event.target.value,
+                          })
+                        }
+                        placeholder={t(
+                          'telemetryLayout.valuePrefixPlaceholder'
+                        )}
+                      />
                     </label>
                   )}
                   {selected.type === 'widget' && (
@@ -2182,6 +2591,51 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                     />
                     {t('telemetryLayout.transparentBackground')}
                   </label>
+                  <label className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-slate-600 dark:text-slate-300">
+                      {t('telemetryLayout.fieldBackgroundColor')}
+                    </span>
+                    <input
+                      aria-label={t('telemetryLayout.fieldBackgroundColor')}
+                      className="h-9 w-14 cursor-pointer rounded border border-slate-300 bg-white p-1 dark:border-slate-600 dark:bg-slate-900"
+                      type="color"
+                      value={selected.backgroundColor ?? '#020617'}
+                      onChange={(event) =>
+                        updateItem(selected.id, {
+                          transparent: false,
+                          backgroundColor: event.target.value,
+                          backgroundOpacity: selected.backgroundOpacity ?? 0.85,
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="mb-1 flex justify-between text-slate-600 dark:text-slate-300">
+                      <span>{t('telemetryLayout.fieldBackgroundOpacity')}</span>
+                      <span>
+                        {Math.round((selected.backgroundOpacity ?? 0.85) * 100)}
+                        %
+                      </span>
+                    </span>
+                    <input
+                      aria-label={t('telemetryLayout.fieldBackgroundOpacity')}
+                      className="w-full accent-sky-600"
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={Math.round(
+                        (selected.backgroundOpacity ?? 0.85) * 100
+                      )}
+                      onChange={(event) =>
+                        updateItem(selected.id, {
+                          transparent: false,
+                          backgroundColor:
+                            selected.backgroundColor ?? '#020617',
+                          backgroundOpacity: Number(event.target.value) / 100,
+                        })
+                      }
+                    />
+                  </label>
                   <label className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
@@ -2274,7 +2728,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                 </div>
               </details>
             </div>
-          ) : (
+          )}
+          {!selectedGroupId && !selected && (
             <p className="text-sm text-slate-500">
               {t('telemetryLayout.selectWidget')}
             </p>

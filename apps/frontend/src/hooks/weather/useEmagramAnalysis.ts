@@ -30,8 +30,8 @@ export function useLatestEmagram(
   const { i18n } = useTranslation();
   return useQuery({
     queryKey: emagramKeys.latest(siteId, dayIndex, hour),
-    queryFn: async (): Promise<EmagramAnalysis | null> => {
-      if (!siteId) return null;
+    queryFn: (): Promise<EmagramAnalysis | null> => {
+      if (!siteId) return Promise.resolve(null);
 
       const params = new URLSearchParams({
         site_id: siteId,
@@ -77,7 +77,7 @@ export function useEmagramHours(
 ) {
   return useQuery({
     queryKey: emagramKeys.hours(siteId, dayIndex),
-    queryFn: async (): Promise<EmagramHoursResponse> => {
+    queryFn: (): Promise<EmagramHoursResponse> => {
       const params = new URLSearchParams({
         site_id: siteId,
         day_index: dayIndex.toString(),
@@ -106,9 +106,9 @@ export function useEmagramHistory(
 ) {
   return useQuery({
     queryKey: emagramKeys.history(userLat || 0, userLon || 0, days),
-    queryFn: async (): Promise<EmagramListItem[]> => {
+    queryFn: (): Promise<EmagramListItem[]> => {
       if (userLat === null || userLon === null) {
-        return [];
+        return Promise.resolve([]);
       }
 
       const params = new URLSearchParams({
@@ -133,7 +133,7 @@ export function useTriggerEmagram() {
   const { i18n } = useTranslation();
 
   return useMutation({
-    mutationFn: async (request: {
+    mutationFn: (request: {
       site_id?: string;
       user_latitude?: number;
       user_longitude?: number;

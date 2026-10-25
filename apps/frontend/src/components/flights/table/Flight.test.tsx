@@ -3,7 +3,7 @@ import type React from 'react';
 import { expect, test, vi } from 'vitest';
 import type { FlightSummary } from '@dashboard-parapente/shared-types';
 
-vi.mock('@dashboard-parapente/design-system', () => ({
+vi.mock('@dashboard-parapente/core/Button/Button', () => ({
   Button: ({
     children,
     ...props
@@ -12,12 +12,26 @@ vi.mock('@dashboard-parapente/design-system', () => ({
       {children}
     </button>
   ),
+}));
+
+vi.mock('@dashboard-parapente/core/Card/Card', () => ({
   Card: ({
     children,
     selected,
+    interactive,
+    borderWidth,
     ...props
-  }: React.HTMLAttributes<HTMLDivElement> & { selected?: boolean }) => (
-    <div data-selected={selected ? 'true' : 'false'} {...props}>
+  }: React.HTMLAttributes<HTMLDivElement> & {
+    selected?: boolean;
+    interactive?: boolean;
+    borderWidth?: string;
+  }) => (
+    <div
+      data-selected={selected ? 'true' : 'false'}
+      data-interactive={interactive ? 'true' : 'false'}
+      data-border-width={borderWidth}
+      {...props}
+    >
       {children}
     </div>
   ),
@@ -42,6 +56,7 @@ import { Flight } from './Flight';
 
 const flight = {
   id: 'flight-1',
+  tags: [],
   flight_date: '2024-03-15',
   title: 'Vol thermique',
   name: 'Vol thermique',
@@ -56,12 +71,14 @@ const flight = {
   has_gpx: false,
   has_video: false,
   has_camera: false,
+  youtube_telemetry_video_file_exists: false,
   has_youtube_video: false,
   youtube_video_count: 0,
   youtube_upload_status: null,
   youtube_upload_progress: null,
   has_gopro_overlay: false,
   has_pano_video: false,
+  has_osv: false,
   has_highlight_video: false,
   video_export_job_id: null,
   video_export_status: null,
@@ -95,10 +112,10 @@ test('does not render the selected flight badge', () => {
   expect(screen.getByText('Besançon - Puy de Dôme')).toBeInTheDocument();
 });
 
-test('renders media as a passive status in the flight list', () => {
+test('renders media and OSV sources as passive statuses in the flight list', () => {
   render(
     <Flight
-      flight={{ ...flight, has_gpx: true }}
+      flight={{ ...flight, has_gpx: true, has_osv: true }}
       isActive={false}
       isSelected={false}
       selectionMode={false}
@@ -108,10 +125,68 @@ test('renders media as a passive status in the flight list', () => {
   );
 
   expect(screen.getByText('flights.gpxBadge')).toBeInTheDocument();
+  expect(screen.getByText('flights.osvSourcesBadge')).toBeInTheDocument();
   expect(
     screen.queryByRole('button', { name: 'flights.downloadGpx' })
   ).not.toBeInTheDocument();
   expect(screen.queryByText('flights.youtubeBadge')).not.toBeInTheDocument();
+});
+
+test('shows enriched GPX without the generic GPX badge', () => {
+  render(
+    <Flight
+      flight={{ ...flight, has_gpx: true, has_gpx_enrichment: true }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(screen.getByText('flights.gpxEnrichedBadge')).toBeInTheDocument();
+  expect(screen.queryByText('flights.gpxBadge')).not.toBeInTheDocument();
+});
+
+test('shows only the enriched GPX badge when the stored GPX is enriched', () => {
+  render(
+    <Flight
+      flight={{
+        ...flight,
+        has_gpx: true,
+        has_gpx_enrichment: true,
+        gpx_provider: 'zepp',
+      }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(screen.getByText('flights.gpxEnrichedBadge')).toBeInTheDocument();
+  expect(screen.queryByText('flights.gpxZeppBadge')).not.toBeInTheDocument();
+  expect(screen.queryByText('flights.gpxBadge')).not.toBeInTheDocument();
+});
+
+test('shows only the GPX provider badge when the stored GPX is not enriched', () => {
+  render(
+    <Flight
+      flight={{ ...flight, has_gpx: true, gpx_provider: 'zepp' }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(screen.getByText('flights.gpxZeppBadge')).toBeInTheDocument();
+  expect(
+    screen.queryByText('flights.gpxEnrichedBadge')
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText('flights.gpxBadge')).not.toBeInTheDocument();
 });
 
 test('shows a queued GoPro overlay as waiting instead of in progress', () => {
@@ -164,7 +239,7 @@ test('renders available media badges in the expected order', () => {
     'flights.videoBadge',
     'flights.cameraBadge',
     'flights.panoBadge',
-    'flights.goproOverlayBadge',
+    'flights.youtubeTelemetryBadge',
     'flights.highlightVideoBadge',
     'flights.youtubeBadge',
   ].map((label) => screen.getByText(label));
@@ -298,4 +373,19 @@ test('renders a YouTube badge for each available video in source order', () => {
     Node.DOCUMENT_POSITION_FOLLOWING
   );
   expect(screen.queryByText('flights.youtubeBadge x2')).not.toBeInTheDocument();
+});
+
+test('renders the telemetry video badge when the file is available locally', () => {
+  render(
+    <Flight
+      flight={{ ...flight, youtube_telemetry_video_file_exists: true }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(screen.getByText('flights.youtubeTelemetryBadge')).toBeInTheDocument();
 });

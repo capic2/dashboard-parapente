@@ -125,7 +125,7 @@ def initialize_database():
 
     # Step 3: Seed sites
     try:
-        from datetime import datetime
+        from datetime import UTC, datetime
 
         sites_data = [
             {
@@ -209,7 +209,7 @@ def initialize_database():
         ]
 
         db = SessionLocal()
-        now = datetime.utcnow()
+        now = datetime.now(UTC).replace(tzinfo=None)
 
         for site_data in sites_data:
             # Check if site already exists
@@ -449,12 +449,15 @@ async def lifespan(app: FastAPI):
     stop_gopro_overlay_worker()
     stop_video_export_worker()
     stop_scheduler()
+    if config.SCHEDULER_ENABLED:
+        from emagram_scheduler.emagram_scheduler import stop_scheduler as stop_emagram
+
+        stop_emagram()
 
     # Close Redis connection
     from cache import close_redis
 
     await close_redis()
-    # Emagram scheduler shutdown handled by registered event
 
 
 app = FastAPI(

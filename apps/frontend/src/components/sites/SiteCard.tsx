@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Site } from '@dashboard-parapente/shared-types';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { Compass, List, MapPin, Pencil, Plane, Trash2 } from 'lucide-react';
 import { getSiteDisplayName } from '../../lib/siteDisplay';
 
@@ -175,11 +175,12 @@ export const SiteCard: React.FC<SiteCardProps> = ({
         </Button>
         <Button
           onClick={() => onDelete(site)}
-          className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2.5 text-sm text-white transition-colors hover:bg-red-700 sm:px-3 sm:py-1.5"
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 py-2.5 text-sm text-white transition-colors hover:bg-red-700 sm:px-3 sm:py-1.5"
           title={t('sites.deleteSite')}
           aria-label={t('sites.deleteSite')}
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
+          <span>{t('common.delete')}</span>
         </Button>
       </div>
     </div>

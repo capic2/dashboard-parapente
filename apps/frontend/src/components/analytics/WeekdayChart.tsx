@@ -47,7 +47,7 @@ export default function WeekdayChart({ flights }: WeekdayChartProps) {
         const dayIndex = getDay(date);
         dayCounts[dayIndex]++;
       } catch {
-        console.warn('Invalid flight_date format:', flight.flight_date);
+        // Ignore malformed dates so they do not affect the chart.
       }
     });
 

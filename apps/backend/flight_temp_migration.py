@@ -13,7 +13,7 @@ from models import Flight, VideoExportJob
 logger = logging.getLogger(__name__)
 
 _LEGACY_THUMBNAIL_NAME = re.compile(
-    r"^\.(?P<video_name>.+)\.thumbnail\.(?P<extension>jpg|json|lock)$"
+    r"^\.?(?P<video_name>.+)\.thumbnail\.(?P<extension>jpg|json|lock)$"
 )
 _LEGACY_PREVIEW_NAMES = {
     ".camera.preview.json",
@@ -34,7 +34,7 @@ def _legacy_hidden_file_destination(temporary_root: Path, source: Path) -> Path:
     thumbnail_match = _LEGACY_THUMBNAIL_NAME.fullmatch(source.name)
     if thumbnail_match:
         return (
-            temporary_root
+            temporary_root.parent
             / "thumbnails"
             / (
                 f"{thumbnail_match.group('video_name')}.thumbnail."
@@ -62,6 +62,22 @@ def migrate_legacy_flight_temporary_files() -> int:
                 directory = flight_directory(db, flight)
                 temporary_root = directory / "temp"
                 hidden_temporary_root = directory / ".tmp"
+
+                if temporary_root.is_dir():
+                    for legacy_thumbnails in temporary_root.rglob("thumbnails"):
+                        video_parent = legacy_thumbnails.parent.parent
+                        relative_video_parent = video_parent.relative_to(directory)
+                        persistent_thumbnails = directory / "thumbnails" / relative_video_parent
+                        for thumbnail in legacy_thumbnails.iterdir():
+                            if not _LEGACY_THUMBNAIL_NAME.fullmatch(thumbnail.name):
+                                continue
+                            if _move_if_destination_is_empty(
+                                thumbnail, persistent_thumbnails / thumbnail.name
+                            ):
+                                moved += 1
+                        if not any(legacy_thumbnails.iterdir()):
+                            legacy_thumbnails.rmdir()
+
                 if hidden_temporary_root.is_dir():
                     temporary_root.mkdir(parents=True, exist_ok=True)
                     for child in hidden_temporary_root.iterdir():

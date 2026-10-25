@@ -1,14 +1,16 @@
 from datetime import date, datetime, timedelta
+import json
 from pathlib import Path
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+import pytest
 from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 import config
 from flight_summaries import _completed_youtube_uploads, _directory_file_exists
-from models import Flight, GoproOverlayJob, HighlightVideoJob, YoutubeUploadJob
+from models import Flight, GoproOverlayJob, HighlightVideoJob, Site, YoutubeUploadJob
 
 API_URL = "/api/flights/summaries"
 
@@ -85,6 +87,64 @@ def test_summaries_paginate_with_exact_total_and_opaque_cursor(client, db_sessio
     assert "summary-003" not in first["next_cursor"]
 
 
+def test_duration_sort_and_cursor_use_marker_derived_duration(client, db_session, arguel_site):
+    db_session.add_all(
+        [
+            Flight(
+                id="marker-duration-20",
+                site_id=arguel_site.id,
+                flight_date=date(2026, 1, 1),
+                duration_minutes=1,
+                real_duration_minutes=1,
+                video_markers=[
+                    {"id": "takeoff-20", "kind": "takeoff", "timestamp_seconds": 0},
+                    {"id": "landing-20", "kind": "landing", "timestamp_seconds": 1200},
+                ],
+            ),
+            Flight(
+                id="marker-duration-10",
+                site_id=arguel_site.id,
+                flight_date=date(2026, 1, 2),
+                duration_minutes=50,
+                real_duration_minutes=50,
+                video_markers=[
+                    {"id": "takeoff-10", "kind": "takeoff", "timestamp_seconds": 0},
+                    {"id": "landing-10", "kind": "landing", "timestamp_seconds": 600},
+                ],
+            ),
+            Flight(
+                id="marker-duration-5",
+                site_id=arguel_site.id,
+                flight_date=date(2026, 1, 3),
+                duration_minutes=5,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    first = client.get(
+        API_URL,
+        params={"page_size": 2, "sort_by": "duration_minutes", "sort_order": "desc"},
+    ).json()
+    second = client.get(
+        API_URL,
+        params={
+            "page_size": 2,
+            "sort_by": "duration_minutes",
+            "sort_order": "desc",
+            "cursor": first["next_cursor"],
+        },
+    ).json()
+
+    assert [(flight["id"], flight["duration_minutes"]) for flight in first["flights"]] == [
+        ("marker-duration-20", 20),
+        ("marker-duration-10", 10),
+    ]
+    assert [(flight["id"], flight["duration_minutes"]) for flight in second["flights"]] == [
+        ("marker-duration-5", 5)
+    ]
+
+
 def test_summaries_filter_search_sort_and_hide_paths(client, db_session, arguel_site):
     _add_flights(db_session, count=4)
 
@@ -120,6 +180,49 @@ def test_summaries_filter_search_sort_and_hide_paths(client, db_session, arguel_
     assert body["flights"][1]["has_youtube_video"] is False
 
 
+def test_summaries_include_gpx_provider_and_null_provider(
+    client: TestClient,
+    db_session: Session,
+    arguel_site: Site,
+    tmp_path: Path,
+) -> None:
+    imported_gpx = tmp_path / "intervals.gpx"
+    manual_gpx = tmp_path / "manual.gpx"
+    imported_gpx.write_text("<gpx />")
+    manual_gpx.write_text("<gpx />")
+    db_session.add_all(
+        [
+            Flight(
+                id="summary-icu-provider",
+                site_id=arguel_site.id,
+                flight_date=date(2026, 1, 2),
+                external_provider="intervals_icu",
+                gpx_file_path=str(imported_gpx),
+                gopro_overlay_gpx_offset=2.5,
+            ),
+            Flight(
+                id="summary-null-provider",
+                site_id=arguel_site.id,
+                flight_date=date(2026, 1, 1),
+                gpx_file_path=str(manual_gpx),
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(API_URL)
+
+    assert response.status_code == 200
+    flights = {flight["id"]: flight for flight in response.json()["flights"]}
+    assert flights["summary-icu-provider"]["has_gpx"] is True
+    assert flights["summary-icu-provider"]["external_provider"] == "intervals_icu"
+    assert flights["summary-icu-provider"]["gpx_provider"] is None
+    assert flights["summary-icu-provider"]["gopro_overlay_gpx_offset"] == 2.5
+    assert flights["summary-null-provider"]["has_gpx"] is True
+    assert flights["summary-null-provider"]["external_provider"] is None
+    assert flights["summary-null-provider"]["gopro_overlay_gpx_offset"] is None
+
+
 def test_summaries_default_query_does_not_require_a_tag(client: TestClient) -> None:
     response = client.get(API_URL)
     assert response.status_code == 200
@@ -146,6 +249,59 @@ def test_summaries_report_panorama_file(client, db_session, monkeypatch, tmp_pat
     assert response.json()["flights"][0]["has_pano_video"] is True
     db_session.refresh(flight)
     assert flight.pano_video_file_path == str((directory / "pano.mp4").resolve())
+
+
+def test_summaries_report_local_youtube_telemetry_video(client, db_session, tmp_path) -> None:
+    video_path = tmp_path / "telemetry.mp4"
+    video_path.write_bytes(b"telemetry")
+    flight = Flight(
+        id="summary-youtube-telemetry-local",
+        title="Telemetry video",
+        flight_date=date(2026, 1, 1),
+        youtube_telemetry_video_file_path=str(video_path),
+    )
+    db_session.add(flight)
+    db_session.commit()
+
+    response = client.get(API_URL)
+
+    assert response.status_code == 200
+    assert response.json()["flights"][0]["youtube_telemetry_video_file_exists"] is True
+
+
+def test_summaries_report_face_and_pilote_files(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    flight = Flight(
+        id="summary-camera-views",
+        title="Face et pilote",
+        flight_date=date(2026, 1, 1),
+        departure_time=datetime(2026, 1, 1, 10),
+    )
+    db_session.add(flight)
+    db_session.commit()
+    directory = tmp_path / "20260101" / "01"
+    directory.mkdir(parents=True)
+    (directory / "face.mp4").write_bytes(b"face")
+
+    response = client.get(API_URL)
+
+    assert response.status_code == 200
+    summary = response.json()["flights"][0]
+    assert summary["has_face_video"] is True
+    assert summary["has_pilote_video"] is False
+
+    (directory / "pilote.mp4").write_bytes(b"pilote")
+    response = client.get(API_URL)
+
+    assert response.status_code == 200
+    summary = response.json()["flights"][0]
+    assert summary["has_face_video"] is True
+    assert summary["has_pilote_video"] is True
 
 
 def test_summaries_report_generated_highlight_video(
@@ -192,6 +348,26 @@ def test_summaries_search_is_case_and_accent_insensitive(client, db_session) -> 
 
     assert response.status_code == 200
     assert [item["id"] for item in response.json()["flights"]] == ["accented-flight"]
+
+
+def test_summaries_search_folds_accents_in_site_name(
+    client: TestClient, db_session: Session, arguel_site: Site
+) -> None:
+    arguel_site.name = "École du ciel"
+    db_session.add(
+        Flight(
+            id="site-accented-flight",
+            site_id=arguel_site.id,
+            title="Parapente",
+            flight_date=date(2026, 1, 1),
+        )
+    )
+    db_session.commit()
+
+    response = client.get(API_URL, params={"q": "ecole"})
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["flights"]] == ["site-accented-flight"]
 
 
 def test_summaries_only_report_completed_uploads_that_still_exist(client, db_session) -> None:
@@ -300,10 +476,91 @@ def test_summaries_only_report_completed_uploads_that_still_exist(client, db_ses
     verify_videos.assert_called_once_with({1: {"dQw4w9WgXcQ", "9bZkp7q19f0", "aaaaaaaaaaa"}})
 
 
+def test_summary_uses_newest_youtube_upload_even_when_older_job_updates_later(
+    client, db_session
+) -> None:
+    flight = Flight(
+        id="youtube-upload-status-order",
+        title="Upload status order",
+        flight_date=date(2026, 1, 1),
+    )
+    db_session.add(flight)
+    db_session.add_all(
+        [
+            YoutubeUploadJob(
+                id="youtube-upload-older",
+                flight_id=flight.id,
+                user_id=1,
+                status="completed",
+                progress=100,
+                title="Older upload",
+                description="",
+                created_at=datetime(2026, 1, 1),
+                updated_at=datetime(2026, 1, 3),
+            ),
+            YoutubeUploadJob(
+                id="youtube-upload-newer",
+                flight_id=flight.id,
+                user_id=1,
+                status="failed",
+                progress=25,
+                title="Newer upload",
+                description="",
+                created_at=datetime(2026, 1, 2),
+                updated_at=datetime(2026, 1, 2),
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(API_URL)
+
+    assert response.status_code == 200
+    flight_summary = next(item for item in response.json()["flights"] if item["id"] == flight.id)
+    assert flight_summary["youtube_upload_status"] == "failed"
+
+
 def test_completed_youtube_uploads_default_missing_source_type() -> None:
     assert _completed_youtube_uploads('[{"user_id": 1, "video_id": "dQw4w9WgXcQ"}]') == [
         (1, "dQw4w9WgXcQ", "gopro_overlay")
     ]
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Vol du 30/09/2026 - télémétrie",
+        "Vol du 30/09/2026 - TELEMETRY VIDEO",
+    ],
+)
+def test_completed_youtube_uploads_recognize_telemetry_title(title: str) -> None:
+    uploads = json.dumps(
+        [
+            {
+                "user_id": 1,
+                "video_id": "dQw4w9WgXcQ",
+                "source_type": "video",
+                "title": title,
+            }
+        ]
+    )
+
+    assert _completed_youtube_uploads(uploads) == [(1, "dQw4w9WgXcQ", "youtube_telemetry")]
+
+
+def test_completed_youtube_uploads_keeps_source_type_for_near_miss_title() -> None:
+    uploads = json.dumps(
+        [
+            {
+                "user_id": 1,
+                "video_id": "dQw4w9WgXcQ",
+                "source_type": "pano",
+                "title": "Vol du 30/09/2026 - télémétrie météo",
+            }
+        ]
+    )
+
+    assert _completed_youtube_uploads(uploads) == [(1, "dQw4w9WgXcQ", "pano")]
 
 
 def test_summaries_release_db_connection_before_remote_youtube_check(
@@ -348,7 +605,13 @@ def test_summaries_require_completed_generations_and_existing_files(
     gpx_path = available_dir / "track.gpx"
     video_path = available_dir / "video.mp4"
     overlay_path = available_dir / "final.mp4"
-    for path in (gpx_path, video_path, overlay_path, available_dir / "camera.mp4"):
+    for path in (
+        gpx_path,
+        video_path,
+        overlay_path,
+        available_dir / "camera.mp4",
+        available_dir / "telemetry.OSV",
+    ):
         path.write_bytes(b"media")
 
     available = Flight(
@@ -398,17 +661,78 @@ def test_summaries_require_completed_generations_and_existing_files(
     assert response.status_code == 200
     assert {
         key: summaries["media-available"][key]
-        for key in ("has_gpx", "has_video", "has_camera", "has_gopro_overlay")
+        for key in (
+            "has_gpx",
+            "has_video",
+            "has_camera",
+            "has_gopro_overlay",
+            "has_osv",
+        )
     } == {
         "has_gpx": True,
         "has_video": True,
         "has_camera": True,
         "has_gopro_overlay": True,
+        "has_osv": True,
     }
     assert summaries["media-incomplete"]["has_gpx"] is False
     assert summaries["media-incomplete"]["has_video"] is False
     assert summaries["media-incomplete"]["has_camera"] is False
     assert summaries["media-incomplete"]["has_gopro_overlay"] is False
+    assert summaries["media-incomplete"]["has_osv"] is False
+
+
+def test_summaries_flag_gpx_path_that_does_not_point_to_enriched_track(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("flight_summaries.config.PARAGLIDING_DATA_ROOT", str(tmp_path))
+    source_gpx_path = tmp_path / "source.gpx"
+    source_gpx_path.write_text("source GPX", encoding="utf-8")
+    flights: list[Flight] = []
+    for sequence, (flight_id, departure_hour, current_path, create_enriched_gpx) in enumerate(
+        (
+            ("mismatch", 10, source_gpx_path, False),
+            ("enriched", 11, "merged-gopro-overlay.gpx", True),
+            ("missing-path", 12, None, False),
+            ("missing-enriched", 13, "merged-gopro-overlay.gpx", False),
+        ),
+        start=1,
+    ):
+        flight_directory = tmp_path / "20260102" / f"{sequence:02d}"
+        flight_directory.mkdir(parents=True)
+        (flight_directory / "telemetry.osv").write_bytes(b"osv")
+        if isinstance(current_path, str):
+            current_path = flight_directory / current_path
+            if create_enriched_gpx:
+                current_path.write_text("enriched GPX", encoding="utf-8")
+        flights.append(
+            Flight(
+                id=flight_id,
+                title=flight_id,
+                flight_date=date(2026, 1, 2),
+                departure_time=datetime(2026, 1, 2, departure_hour),
+                gpx_file_path=str(current_path) if current_path else None,
+                gpx_source_file_path=str(source_gpx_path),
+            )
+        )
+    db_session.add_all(flights)
+    db_session.commit()
+
+    response = client.get(API_URL)
+    summaries = {item["id"]: item for item in response.json()["flights"]}
+
+    assert response.status_code == 200
+    assert summaries["mismatch"]["has_gpx_enrichment"] is False
+    assert summaries["enriched"]["has_gpx_enrichment"] is True
+    assert summaries["missing-path"]["has_gpx_enrichment"] is False
+    assert summaries["missing-enriched"]["has_gpx_enrichment"] is False
+    assert summaries["mismatch"]["has_gpx_enrichment_mismatch"] is True
+    assert summaries["enriched"]["has_gpx_enrichment_mismatch"] is False
+    assert summaries["missing-path"]["has_gpx_enrichment_mismatch"] is True
+    assert summaries["missing-enriched"]["has_gpx_enrichment_mismatch"] is True
 
 
 def test_summaries_put_nulls_last_and_keyset_ties_by_id(client, db_session, arguel_site):

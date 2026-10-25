@@ -19,6 +19,7 @@ const {
   refetch,
   jobs,
   typeCounts,
+  tempFilesAvailable,
 } = vi.hoisted(() => ({
   cancelJob: vi.fn(),
   cancelHighlightJob: vi.fn(),
@@ -31,6 +32,7 @@ const {
   toastSuccess: vi.fn(),
   refetch: vi.fn(),
   typeCounts: { all: 0 },
+  tempFilesAvailable: { value: false },
   jobs: [
     {
       job_id: 'job-active',
@@ -130,6 +132,7 @@ vi.mock('../../../hooks/flights/useVideoExportJobs', () => ({
       total: jobs.length,
       totalPages: 1,
       typeCounts,
+      tempFilesAvailable: tempFilesAvailable.value,
     },
     isLoading: false,
     isError: false,
@@ -231,6 +234,7 @@ describe('VideoExportJobsPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     typeCounts.all = 0;
+    tempFilesAvailable.value = false;
     jobs.splice(
       0,
       jobs.length,
@@ -341,6 +345,36 @@ describe('VideoExportJobsPanel', () => {
       screen.getByRole('menuitem', { name: 'Stopper' })
     ).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Logs' })).toBeInTheDocument();
+  });
+
+  it('shows phase, duration, progress, frames, and latest event for an active job', () => {
+    jobs[0] = {
+      ...jobs[0],
+      started_at: '2026-10-22T10:00:00.000Z',
+      updated_at: '2026-10-22T10:05:00.000Z',
+      frames_captured: 42,
+      total_frames: 100,
+    };
+
+    render(<VideoExportJobsPanel />);
+
+    expect(screen.getAllByText('Étape').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Capture').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Durée').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Progression').length).toBeGreaterThan(0);
+    expect(
+      screen
+        .getAllByText('Images traitées')
+        .some((label) =>
+          /42\s*\/\s*100\s*·\s*58\s*restantes/u.test(
+            label.nextElementSibling?.textContent ?? ''
+          )
+        )
+    ).toBe(true);
+    expect(screen.getAllByText('Dernier événement').length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText('Captured 10/100 frames').length
+    ).toBeGreaterThan(0);
   });
 
   it('uses the FPS from the last log line when it is available', () => {
@@ -591,6 +625,7 @@ describe('VideoExportJobsPanel', () => {
   });
 
   it('cleans temporary files after confirmation', async () => {
+    tempFilesAvailable.value = true;
     cleanupTempFiles.mockResolvedValue({
       files_deleted: 2,
       dirs_deleted: 1,
@@ -612,6 +647,14 @@ describe('VideoExportJobsPanel', () => {
     expect(toastSuccess).toHaveBeenCalledWith(
       '3 élément(s) temporaire(s) supprimé(s)'
     );
+  });
+
+  it('hides temporary-file cleanup when no files remain', () => {
+    render(<VideoExportJobsPanel />);
+
+    expect(
+      screen.queryByRole('button', { name: 'Nettoyer les temporaires' })
+    ).not.toBeInTheDocument();
   });
 
   it('shows an empty state when there are no jobs', () => {

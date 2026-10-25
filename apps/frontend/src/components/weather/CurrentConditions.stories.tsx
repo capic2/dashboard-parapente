@@ -175,17 +175,17 @@ export const GoodConditions = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherGood);
         }),
         http.get('*/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -195,17 +195,17 @@ export const ModerateConditions = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherModerate);
         }),
         http.get('*/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -215,11 +215,11 @@ ModerateConditions.test(
     await canvas.findByText('65', { selector: 'span' });
     await canvas.findByText('/100', { selector: 'span' });
 
-    await expect(canvas.getByText(/MOYEN/)).toBeInTheDocument();
+    await expect(canvas.getByText(/MOYEN/u)).toBeInTheDocument();
     await expect(canvas.getByText('18°C')).toBeInTheDocument();
-    await expect(canvas.getByText(/20 km\/h NE/)).toBeInTheDocument();
-    await expect(canvas.getByText(/28 km\/h/)).toBeInTheDocument();
-    await expect(canvas.getByText(/50% nuages, Sec/)).toBeInTheDocument();
+    await expect(canvas.getByText(/20\.0 km\/h NE/u)).toBeInTheDocument();
+    await expect(canvas.getByText(/28\.0 km\/h/u)).toBeInTheDocument();
+    await expect(canvas.getByText(/50% nuages, Sec/u)).toBeInTheDocument();
   }
 );
 
@@ -229,17 +229,17 @@ export const LimiteConditions = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherLimite);
         }),
         http.get('*/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -249,11 +249,11 @@ LimiteConditions.test(
     await canvas.findByText('45', { selector: 'span' });
     await canvas.findByText('/100', { selector: 'span' });
 
-    await expect(canvas.getByText(/LIMITE/)).toBeInTheDocument();
+    await expect(canvas.getByText(/LIMITE/u)).toBeInTheDocument();
     await expect(canvas.getByText('15°C')).toBeInTheDocument();
-    await expect(canvas.getByText(/28 km\/h S/)).toBeInTheDocument();
-    await expect(canvas.getByText(/35 km\/h/)).toBeInTheDocument();
-    await expect(canvas.getByText(/75% nuages, Sec/)).toBeInTheDocument();
+    await expect(canvas.getByText(/28\.0 km\/h S/u)).toBeInTheDocument();
+    await expect(canvas.getByText(/35\.0 km\/h/u)).toBeInTheDocument();
+    await expect(canvas.getByText(/75% nuages, Sec/u)).toBeInTheDocument();
   }
 );
 
@@ -263,17 +263,17 @@ export const BadConditions = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherBad);
         }),
         http.get('*/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -281,12 +281,12 @@ BadConditions.test('displays bad conditions correctly', async ({ canvas }) => {
   await canvas.findByText('25', { selector: 'span' });
   await canvas.findByText('/100', { selector: 'span' });
 
-  await expect(canvas.getByText(/MAUVAIS/)).toBeInTheDocument();
+  await expect(canvas.getByText(/MAUVAIS/u)).toBeInTheDocument();
   await expect(canvas.getByText('10°C')).toBeInTheDocument();
-  await expect(canvas.getByText(/35 km\/h E/)).toBeInTheDocument();
-  await expect(canvas.getByText(/45 km\/h/)).toBeInTheDocument();
+  await expect(canvas.getByText(/35\.0 km\/h E/u)).toBeInTheDocument();
+  await expect(canvas.getByText(/45\.0 km\/h/u)).toBeInTheDocument();
   await expect(
-    canvas.getByText(/90% nuages, 5\.0mm pluie/)
+    canvas.getByText(/90% nuages, 5\.0mm pluie/u)
   ).toBeInTheDocument();
 });
 
@@ -296,17 +296,17 @@ export const NoGustsData = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherNoGusts);
         }),
         http.get('*/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -316,17 +316,17 @@ export const Loading = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('http://localhost:5000/api/weather/:spotId', async () => {
           await new Promise(() => {}); // Never resolves
         }),
         http.get('*/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -336,17 +336,17 @@ export const Error = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId', () => {
           return new HttpResponse(null, { status: 500 });
         }),
         http.get('*/api/spots/:id', () => {
           return HttpResponse.json(mockSite);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -356,17 +356,17 @@ export const NoSiteOrientation = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId', () => {
           return HttpResponse.json(mockWeatherGood);
         }),
         http.get('*/api/spots/:id', () => {
           return HttpResponse.json({ ...mockSite, orientation: null });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 

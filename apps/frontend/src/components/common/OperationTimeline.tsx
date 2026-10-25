@@ -67,39 +67,49 @@ export function OperationTimeline({
       className="space-y-3"
       aria-label={t('operations.timeline', 'Progression du traitement')}
     >
-      {operation.steps.map((step) => (
-        <div key={step.key} className="flex items-start gap-2.5">
-          <div className="mt-0.5 shrink-0">{stepIcon(step)}</div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2 text-sm">
-              <span
-                className={
-                  step.status === 'running'
-                    ? 'font-semibold text-sky-700 dark:text-sky-300'
-                    : 'text-slate-700 dark:text-slate-200'
-                }
-              >
-                {t(`operations.steps.${step.key}`, step.key)}
-              </span>
-              {step.status === 'running' && step.progress != null && (
-                <span className="text-xs tabular-nums text-slate-500 dark:text-slate-400">
-                  {step.progress}%
+      {operation.steps.map((step) => {
+        const progress =
+          operation.operation_type === 'gpx_enrichment' &&
+          operation.status === 'running' &&
+          step.status === 'running' &&
+          step.progress === 0
+            ? null
+            : step.progress;
+
+        return (
+          <div key={step.key} className="flex items-start gap-2.5">
+            <div className="mt-0.5 shrink-0">{stepIcon(step)}</div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <span
+                  className={
+                    step.status === 'running'
+                      ? 'font-semibold text-sky-700 dark:text-sky-300'
+                      : 'text-slate-700 dark:text-slate-200'
+                  }
+                >
+                  {t(`operations.steps.${step.key}`, step.key)}
                 </span>
+                {step.status === 'running' && progress != null && (
+                  <span className="text-xs tabular-nums text-slate-500 dark:text-slate-400">
+                    {progress}%
+                  </span>
+                )}
+              </div>
+              {step.status === 'running' && (
+                <div className="mt-1.5">
+                  <OperationProgressBar progress={progress} />
+                </div>
+              )}
+              {step.detail && (
+                <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
+                  {step.detail}
+                </p>
               )}
             </div>
-            {step.status === 'running' && (
-              <div className="mt-1.5">
-                <OperationProgressBar progress={step.progress} />
-              </div>
-            )}
-            {step.detail && (
-              <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
-                {step.detail}
-              </p>
-            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
       {operation.status === 'failed' && (
         <div className="flex items-start gap-2 rounded-lg bg-red-50 p-2.5 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
           <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />

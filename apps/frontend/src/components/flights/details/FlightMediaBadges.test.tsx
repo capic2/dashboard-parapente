@@ -3,7 +3,7 @@ import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { Flight } from '../../../types';
 
-vi.mock('@dashboard-parapente/design-system', () => ({
+vi.mock('@dashboard-parapente/core/Button/Button', () => ({
   Button: ({ children }: { children: React.ReactNode }) => (
     <button type="button">{children}</button>
   ),
@@ -102,6 +102,15 @@ describe('FlightMediaBadges temporary sources', () => {
 
     expect(
       screen.queryByRole('heading', { name: 'Temporary sources to publish' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides the GPX-video card when only a temporary video source is available', () => {
+    renderMedia(true, false, false);
+
+    expect(screen.getByTestId('temporary-pano')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Video' })
     ).not.toBeInTheDocument();
   });
 });

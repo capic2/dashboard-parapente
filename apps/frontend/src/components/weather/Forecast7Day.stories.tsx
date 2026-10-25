@@ -35,8 +35,6 @@ const meta = preview.meta({
   tags: ['autodocs'],
 });
 
-
-
 // Mock daily summary data
 const mockDailySummaryGood = {
   site_id: '1',
@@ -196,14 +194,14 @@ export const MixedConditions = meta.story({
     spotId: '1',
     selectedDayIndex: 0,
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryGood);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -211,7 +209,7 @@ MixedConditions.test(
   'displays mixed conditions correctly',
   async ({ canvas }) => {
     // Wait for data to load
-    await canvas.findByText(/85/);
+    await canvas.findByText(/85/u);
 
     // Verify para_index values for all 7 days (these are unique identifiers)
     await expect(canvas.getByText('85')).toBeInTheDocument();
@@ -226,7 +224,7 @@ MixedConditions.test(
     await expect(canvas.getByText('15° - 25°')).toBeInTheDocument();
 
     // Verify wind speed for first day
-    await expect(canvas.getByText(/12 km\/h/)).toBeInTheDocument();
+    await expect(canvas.getByText(/12 km\/h/u)).toBeInTheDocument();
 
     // Verify mixed verdicts exist (multiple instances expected)
     const bonElements = canvas.getAllByText('bon');
@@ -248,14 +246,14 @@ export const AllGoodConditions = meta.story({
     spotId: '1',
     selectedDayIndex: 0,
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryAllGood);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -263,7 +261,7 @@ AllGoodConditions.test(
   'displays all good conditions correctly',
   async ({ canvas }) => {
     // Wait for data to load
-    await canvas.findByText(/85/);
+    await canvas.findByText(/85/u);
 
     // Verify all days show "bon" verdict (should appear 3 times)
     const bonElements = canvas.getAllByText('bon');
@@ -278,7 +276,7 @@ AllGoodConditions.test(
     await expect(canvas.getByText('18° - 28°')).toBeInTheDocument();
 
     // Verify wind speed for first day
-    await expect(canvas.getByText(/12 km\/h/)).toBeInTheDocument();
+    await expect(canvas.getByText(/12 km\/h/u)).toBeInTheDocument();
   }
 );
 
@@ -289,14 +287,14 @@ export const AllBadConditions = meta.story({
     spotId: '1',
     selectedDayIndex: 0,
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryAllBad);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -304,7 +302,7 @@ AllBadConditions.test(
   'displays all bad conditions correctly',
   async ({ canvas }) => {
     // Wait for data to load
-    await canvas.findByText(/25/);
+    await canvas.findByText(/25/u);
 
     // Verify all days show "mauvais" verdict (should appear 3 times)
     const mauvaisElements = canvas.getAllByText('mauvais');
@@ -319,7 +317,7 @@ AllBadConditions.test(
     await expect(canvas.getByText('8° - 15°')).toBeInTheDocument();
 
     // Verify wind speed for first day
-    await expect(canvas.getByText(/40 km\/h/)).toBeInTheDocument();
+    await expect(canvas.getByText(/40 km\/h/u)).toBeInTheDocument();
   }
 );
 
@@ -330,14 +328,14 @@ export const SecondDaySelected = meta.story({
     spotId: '1',
     selectedDayIndex: 1,
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryGood);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -347,14 +345,14 @@ export const NoSelection = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryGood);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -366,14 +364,14 @@ export const WithCallback = meta.story({
     selectedDayIndex: 0,
     onSelectDay: fn(),
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json(mockDailySummaryGood);
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -383,14 +381,14 @@ export const Loading = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/daily-summary/:spotId', async () => {
           await new Promise(() => {}); // Never resolves
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -400,14 +398,14 @@ export const Error = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return new HttpResponse(null, { status: 500 });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -417,14 +415,14 @@ export const EmptyDays = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json({ days: [] });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -434,14 +432,14 @@ export const NoDaysField = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return HttpResponse.json({});
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
@@ -487,20 +485,20 @@ export const ShowsLoadingState = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/daily-summary/:spotId', async () => {
           await new Promise(() => {});
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
 ShowsLoadingState.test('shows loading state', async ({ canvas }) => {
   await waitFor(() => {
-    expect(canvas.getByText(/Chargement\.\.\./)).toBeInTheDocument();
+    expect(canvas.getByText(/Chargement\.\.\./u)).toBeInTheDocument();
   });
 });
 
@@ -509,20 +507,20 @@ export const ShowsErrorState = meta.story({
   args: {
     spotId: '1',
   },
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/weather/:spotId/daily-summary', () => {
           return new HttpResponse(null, { status: 500 });
         }),
-      ],
-    },
+      ]
+    );
   },
 });
 
 ShowsErrorState.test('shows error state', async ({ canvas }) => {
   await waitFor(() => {
-    expect(canvas.getByText(/Données non disponibles/)).toBeInTheDocument();
+    expect(canvas.getByText(/Données non disponibles/u)).toBeInTheDocument();
   });
 });
 

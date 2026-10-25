@@ -11,13 +11,8 @@ import { Link } from '@tanstack/react-router';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { Input, Label, TextField } from 'react-aria-components';
 import { Search } from 'lucide-react';
-import {
-  Button,
-  Tab,
-  TabList,
-  TabPanel,
-  Tabs,
-} from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
+import { Tab, TabList, TabPanel, Tabs } from '@dashboard-parapente/core/Tabs';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import {
   useWeatherSources,
@@ -1391,6 +1386,7 @@ export default function Settings() {
 
       <Link
         to="/settings/telemetry-layout"
+        search={{ tab: undefined }}
         className="flex items-center justify-between gap-4 rounded-2xl border border-violet-200 bg-violet-50/70 p-4 text-violet-950 transition-colors hover:bg-violet-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:border-violet-900 dark:bg-violet-950/20 dark:text-violet-100 dark:hover:bg-violet-950/40"
       >
         <span>
@@ -1420,7 +1416,10 @@ export default function Settings() {
         className="space-y-4"
       >
         {/* Tabs Navigation */}
-        <TabList className="mb-4 grid-cols-2 sm:flex">
+        <TabList
+          aria-label={t('settings.title')}
+          className="mb-4 grid-cols-2 sm:flex"
+        >
           {settingsTabs.map((tabKey) => (
             <Tab key={tabKey} id={tabKey} className="flex-1">
               {tabKey === 'general' && (

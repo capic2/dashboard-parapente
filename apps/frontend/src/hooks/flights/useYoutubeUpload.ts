@@ -11,6 +11,12 @@ export interface YoutubeConnectionStatus {
   connected: boolean;
 }
 
+export interface YoutubePlaylistPreparation {
+  title: string;
+  url: string;
+  created: boolean;
+}
+
 export interface YoutubeUploadJob {
   job_id: string;
   flight_id: string;
@@ -33,9 +39,12 @@ export interface YoutubeUploadJob {
     | 'failed'
     | 'cancelled';
   progress: number;
+  created_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  updated_at?: string | null;
   youtube_url?: string | null;
   error?: string | null;
-  updated_at?: string | null;
   log_tail: string[];
 }
 
@@ -46,13 +55,20 @@ export type YoutubeUploadSource =
   | { source_type: 'pano' }
   | { source_type: 'face' }
   | { source_type: 'pilote' }
+  | { source_type: 'youtube_telemetry' }
   | { source_type: 'highlight'; highlight_video_job_id: string };
 
 type YoutubeUploadSourceFilter =
   | YoutubeUploadSource
   | { source_type: 'youtube_overlay' };
 
-export type TemporaryFlightMediaSource = 'camera' | 'pano' | 'face' | 'pilote';
+export type TemporaryFlightMediaSource =
+  | 'camera'
+  | 'pano'
+  | 'face'
+  | 'pilote'
+  | 'youtube_telemetry';
+type DeletableFlightMediaSource = 'video' | TemporaryFlightMediaSource;
 
 type YoutubeUploadInput = YoutubeUploadSource & {
   title: string;
@@ -66,7 +82,8 @@ export const sourceFromInput = (
   if (
     input.source_type === 'pano' ||
     input.source_type === 'face' ||
-    input.source_type === 'pilote'
+    input.source_type === 'pilote' ||
+    input.source_type === 'youtube_telemetry'
   ) {
     return { source_type: input.source_type };
   }
@@ -90,6 +107,15 @@ export function useYoutubeStatus() {
     queryKey: ['youtube', 'status'],
     queryFn: () => api.get('youtube/status').json<YoutubeConnectionStatus>(),
     staleTime: 60_000,
+  });
+}
+
+export function usePrepareYoutubePlaylist(flightId: string) {
+  return useMutation({
+    mutationFn: () =>
+      api
+        .post(`flights/${flightId}/youtube-playlist/prepare`)
+        .json<YoutubePlaylistPreparation>(),
   });
 }
 
@@ -184,30 +210,10 @@ export function useDeleteFlightTemporaryMedia(flightId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (sourceType: TemporaryFlightMediaSource) => {
+    mutationFn: async (sourceType: DeletableFlightMediaSource) => {
       await api.delete(`flights/${flightId}/temporary-media/${sourceType}`);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['flights'] }),
-  });
-}
-
-export function useStartYoutubeOverlayExport(flightId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: {
-      youtube_url: string;
-      pip_youtube_url?: string;
-      pip_apply_offset?: boolean;
-    }) =>
-      api
-        .post(`flights/${flightId}/youtube-overlay-export`, { json: input })
-        .json<{ job_id: string; status: string }>(),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['video-export-jobs'] });
-      void queryClient.invalidateQueries({
-        queryKey: ['youtube-upload', flightId],
-      });
-    },
   });
 }
 
@@ -257,6 +263,32 @@ export function useStartYoutubeUpload(flightId: string) {
       );
       void queryClient.invalidateQueries({
         queryKey: ['video-export-jobs', 'active'],
+      });
+    },
+  });
+}
+
+export function useStartYoutubeTelemetryLayoutExport(flightId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: {
+      youtube_url: string;
+      offset_seconds: number;
+      pip_exports: {
+        slot_id: string;
+        source: string;
+        youtube_url: string;
+        offset_seconds: number;
+      }[];
+    }) =>
+      api
+        .post(`flights/${flightId}/youtube-telemetry-layout-export`, {
+          json: payload,
+        })
+        .json<{ job_id: string; operation_id: string; status: string }>(),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['youtube-upload', flightId],
       });
     },
   });

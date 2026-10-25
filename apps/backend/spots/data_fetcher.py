@@ -10,7 +10,7 @@ import hashlib
 import json
 import logging
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import requests
@@ -399,7 +399,7 @@ def sync_to_database(db: Session) -> dict[str, int]:
     # Sync to database
     added = 0
     updated = 0
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
 
     for spot_data in all_spots:
         try:

@@ -20,7 +20,8 @@ import {
 import { useSite } from '../hooks/sites/useSites';
 import { parseAlerts, getScoreColor } from '../types/emagram';
 import type { EmagramListItem } from '../types/emagram';
-import { DataTable, Button } from '@dashboard-parapente/design-system';
+import { DataTable } from '@dashboard-parapente/core/DataTable/DataTable';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { parseApiUtcDate } from '../lib/date';
 import { getApiUrlWithSearchParams } from '../lib/api';
 import { useAuthStore } from '../stores/authStore';

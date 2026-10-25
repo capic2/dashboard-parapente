@@ -29,3 +29,4 @@ def test_migration_cancels_active_uploads_without_overlay_source() -> None:
     ).fetchone()
     assert active == ("cancelled", None, None)
     assert completed == ("completed",)
+    connection.close()

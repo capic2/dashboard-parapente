@@ -34,7 +34,11 @@ def _lock_path(video_path: Path) -> Path:
 
 
 def _thumbnail_directory(video_path: Path) -> Path:
-    return video_path.parent / "temp" / "thumbnails"
+    for parent in (video_path.parent, *video_path.parent.parents):
+        if parent.name == "temp":
+            storage_root = parent.parent
+            return storage_root / "thumbnails" / video_path.parent.relative_to(storage_root)
+    return video_path.parent / "thumbnails"
 
 
 def _source_fingerprint(video_path: Path) -> dict[str, int]:

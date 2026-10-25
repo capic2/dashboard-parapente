@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 
 interface VideoExportConfig {
   quality: '720p' | '1080p' | '4K';

@@ -3,7 +3,9 @@ import type { GeoPoint } from '../../../types/flight';
 export type GoproSyncTelemetry = GeoPoint & { speedKmh: number };
 
 const EARTH_RADIUS_M = 6_371_000;
-type TelemetrySample = Pick<GeoPoint, 'lat' | 'lon' | 'timestamp'>;
+type TelemetrySample = Pick<GeoPoint, 'lat' | 'lon' | 'timestamp'> & {
+  speed_kmh?: number | null;
+};
 
 export function telemetryTimestampAtVideoTime(
   timelineStartTimestamp: number,
@@ -65,7 +67,22 @@ export function telemetryAtTimestamp(
   const durationMs = next.timestamp - previous.timestamp;
   const progress =
     durationMs > 0 ? (timestamp - previous.timestamp) / durationMs : 0;
-  const speedKmh = telemetrySpeedKmhBetween(previous, next);
+  const previousSpeed = previous.speed_kmh;
+  const nextSpeed = next.speed_kmh;
+  const hasPreviousSpeed =
+    typeof previousSpeed === 'number' && Number.isFinite(previousSpeed);
+  const hasNextSpeed =
+    typeof nextSpeed === 'number' && Number.isFinite(nextSpeed);
+  let speedKmh: number;
+  if (hasPreviousSpeed && hasNextSpeed) {
+    speedKmh = previousSpeed + (nextSpeed - previousSpeed) * progress;
+  } else if (hasPreviousSpeed) {
+    speedKmh = previousSpeed;
+  } else if (hasNextSpeed) {
+    speedKmh = nextSpeed;
+  } else {
+    speedKmh = telemetrySpeedKmhBetween(previous, next);
+  }
   return {
     lat: previous.lat + (next.lat - previous.lat) * progress,
     lon: previous.lon + (next.lon - previous.lon) * progress,

@@ -203,7 +203,9 @@ const mockVideoJobs: VideoExportJob[] = initialMockVideoJobs.map((job) => ({
 
 export const resetMockVideoJobs = () => {
   mockVideoJobs.length = 0;
-  mockVideoJobs.push(...initialMockVideoJobs.map((job) => ({ ...job })));
+  mockVideoJobs.push(
+    ...initialMockVideoJobs.map((job) => Object.assign({}, job))
+  );
 };
 
 export const resetCacheDb = () => {
@@ -284,9 +286,9 @@ function buildOverview() {
     }
 
     const resolved =
-      typeof entry.resolved !== 'undefined'
-        ? entry.resolved
-        : resolveKey(entry.key);
+      typeof entry.resolved === 'undefined'
+        ? resolveKey(entry.key)
+        : entry.resolved;
 
     groups[prefix].count += 1;
     groups[prefix].keys.push({
@@ -330,7 +332,7 @@ export const cacheHandlers = [
   http.get('*/api/admin/cache/:key', ({ request }) => {
     const url = new URL(request.url);
     const key = decodeURIComponent(
-      url.pathname.replace(/.*\/api\/admin\/cache\//, '')
+      url.pathname.replace(/.*\/api\/admin\/cache\//u, '')
     );
     const resolveKey = () => {
       if (key.startsWith('weather:forecast:')) {
@@ -380,7 +382,7 @@ export const cacheHandlers = [
     }
 
     const resolved =
-      typeof entry.resolved !== 'undefined' ? entry.resolved : resolveKey();
+      typeof entry.resolved === 'undefined' ? resolveKey() : entry.resolved;
 
     let value: unknown;
     let type: 'json' | 'string';
@@ -404,11 +406,11 @@ export const cacheHandlers = [
   http.delete('*/api/admin/cache/:key', ({ request }) => {
     const url = new URL(request.url);
     const key = decodeURIComponent(
-      url.pathname.replace(/.*\/api\/admin\/cache\//, '')
+      url.pathname.replace(/.*\/api\/admin\/cache\//u, '')
     );
 
     if (key.includes('*')) {
-      const pattern = key.replace(/\*/g, '');
+      const pattern = key.replace(/\*/gu, '');
       const before = cacheDb.length;
       for (let i = cacheDb.length - 1; i >= 0; i--) {
         if (cacheDb[i].key.startsWith(pattern)) {
@@ -438,6 +440,7 @@ export const videoExportHandlers = [
       page_size: 25,
       total: 26,
       total_pages: 2,
+      temp_files_available: true,
     })
   ),
   http.get(

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Lightbox } from '@dashboard-parapente/design-system';
+import { Lightbox } from '@dashboard-parapente/core/Lightbox';
 import { ImageOff, LoaderCircle, Maximize2, Play } from 'lucide-react';
 import { api, getApiUrl } from '../../../lib/api';
 

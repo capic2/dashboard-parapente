@@ -238,7 +238,7 @@ class TestWeatherEndpoints:
         db_session.commit()
 
         # This may fail if weather sources aren't available, but endpoint should exist
-        response = client.get("/api/weather/site-test?day_index=0", timeout=10)
+        response = client.get("/api/weather/site-test?day_index=0")
         assert response.status_code in [200, 500]  # Either success or service error
 
 

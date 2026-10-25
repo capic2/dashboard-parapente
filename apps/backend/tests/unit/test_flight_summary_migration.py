@@ -25,3 +25,4 @@ def test_flight_summary_indexes_are_idempotent() -> None:
     indexes = {row[1] for row in connection.execute("PRAGMA index_list(flights)")}
     assert "idx_flights_summary_default" in indexes
     assert "idx_flights_summary_site_default" in indexes
+    connection.close()

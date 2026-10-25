@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     BigInteger,
@@ -47,8 +47,15 @@ class YoutubeCredential(Base):
         nullable=False,
         default="https://www.googleapis.com/auth/youtube.force-ssl",
     )
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), nullable=False
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+        nullable=False,
+    )
 
 
 class SportstrackLiveCredential(Base):
@@ -59,8 +66,15 @@ class SportstrackLiveCredential(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     upload_key_encrypted = Column(Text, nullable=False)
     auto_upload = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), nullable=False
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+        nullable=False,
+    )
 
 
 class AppSetting(Base):
@@ -70,7 +84,11 @@ class AppSetting(Base):
 
     key = Column(String, primary_key=True)
     value = Column(String, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+    )
 
 
 class TelemetryLayout(Base):
@@ -98,8 +116,15 @@ class TelemetryLayout(Base):
     flight_id = Column(String, ForeignKey("flights.id", ondelete="CASCADE"), nullable=True)
     xml_content = Column(Text, nullable=False)
     format_version = Column(Integer, nullable=False, default=1)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), nullable=False
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+        nullable=False,
+    )
 
 
 class ParaglidingSpot(Base):
@@ -124,8 +149,12 @@ class ParaglidingSpot(Base):
     paraglidingspots_id = Column(Integer, unique=True)
     raw_metadata = Column(Text)  # JSON string with original data
     last_synced = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+    )
 
     # Relationship to sites that link to this spot
     linked_sites = relationship("Site", back_populates="linked_spot")
@@ -170,8 +199,12 @@ class Site(Base):
     camera_transition_percent = Column(
         Integer, default=12
     )  # Percentage of flight used to transition between close and normal distance
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+    )
 
     flights = relationship("Flight", back_populates="site")
     weather_forecasts = relationship("WeatherForecast", back_populates="site")
@@ -215,7 +248,7 @@ class SiteLandingAssociation(Base):
     is_primary = Column(Boolean, default=False)
     distance_km = Column(Float)
     notes = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
 
     takeoff_site = relationship(
         "Site", foreign_keys=[takeoff_site_id], back_populates="landing_associations"
@@ -256,6 +289,8 @@ class Flight(Base):
     conditions_feedback = Column(Text)
     decision_snapshot = Column(Text)
     gpx_file_path = Column(String)
+    gpx_source_file_path = Column(String, nullable=True)
+    gpx_provider = Column(String, nullable=True)
     gpx_metrics_excluded = Column(Boolean, nullable=False, default=False)
     gpx_max_altitude_m = Column(Integer)
     gpx_elevation_gain_m = Column(Integer)
@@ -269,18 +304,23 @@ class Flight(Base):
     video_export_status = Column(String, nullable=True)  # "processing", "completed", "failed"
     video_file_path = Column(String, nullable=True)  # Path to generated MP4 file
     pano_video_file_path = Column(String, nullable=True)
+    youtube_telemetry_video_file_path = Column(String, nullable=True)
     # GoPro overlay export fields
     gopro_overlay_job_id = Column(String, nullable=True)
     gopro_overlay_status = Column(String, nullable=True)
     gopro_overlay_file_path = Column(String, nullable=True)
-    gopro_overlay_gpx_offset = Column(Float, nullable=False, default=0.0)
+    gopro_overlay_gpx_offset = Column(Float, nullable=True, default=None)
     sportstracklive_status = Column(String, nullable=True)
     sportstracklive_track_id = Column(Integer, nullable=True)
     sportstracklive_error = Column(Text, nullable=True)
     sportstracklive_upload_started_at = Column(DateTime, nullable=True)
     sportstracklive_uploaded_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+    )
 
     site = relationship("Site", back_populates="flights")
     export_jobs = relationship(
@@ -349,6 +389,21 @@ class Flight(Base):
         self.tags_json = json.dumps(value or [])
 
 
+class YoutubeFlightPlaylist(Base):
+    """YouTube playlist ID assigned to one flight for one application user."""
+
+    __tablename__ = "youtube_flight_playlists"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    flight_id = Column(String, ForeignKey("flights.id", ondelete="CASCADE"), primary_key=True)
+    playlist_id = Column(String, nullable=False, index=True)
+    created_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        nullable=False,
+    )
+
+
 Index(
     "idx_flights_summary_default",
     Flight.flight_date.desc(),
@@ -386,16 +441,24 @@ class VideoExportJob(Base):
     auth_token = Column(Text)
     video_path = Column(String)
     total_frames = Column(Integer)
+    eta_seconds = Column(Integer)
+    frames_processed = Column(Integer)
+    fps_actual = Column(Float)
     error = Column(Text)
-    started_at = Column(DateTime, default=datetime.utcnow)
+    started_at = Column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
     completed_at = Column(DateTime)
     cancelled_at = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+    )
     source_type = Column(String(32), nullable=True, default="flight")
     youtube_url = Column(Text, nullable=True)
     pip_youtube_url = Column(Text, nullable=True)
     pip_apply_offset = Column(Boolean, nullable=False, default=True)
+    pip_exports = Column(Text, nullable=True)
     overlay_job_id = Column(String, nullable=True)
     overlay_offset_seconds = Column(Float, nullable=True)
     youtube_upload_job_id = Column(String, nullable=True)
@@ -434,8 +497,12 @@ class GoproOverlayJob(Base):
     started_at = Column(DateTime)
     completed_at = Column(DateTime)
     cancelled_at = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+    )
 
     flight = relationship("Flight", back_populates="gopro_overlay_jobs")
 
@@ -466,8 +533,12 @@ class HighlightVideoJob(Base):
     started_at = Column(DateTime)
     completed_at = Column(DateTime)
     cancelled_at = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+    )
 
     flight = relationship("Flight", back_populates="highlight_video_jobs")
 
@@ -499,10 +570,17 @@ class YoutubeUploadJob(Base):
     youtube_video_id = Column(String(32))
     youtube_url = Column(String)
     error = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), nullable=False
+    )
     started_at = Column(DateTime)
     completed_at = Column(DateTime)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+        nullable=False,
+    )
 
     flight = relationship("Flight", back_populates="youtube_upload_jobs")
 
@@ -535,8 +613,15 @@ class BackgroundOperation(Base):
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     expires_at = Column(DateTime, nullable=True, index=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(
+        DateTime, nullable=False, default=lambda: datetime.now(UTC).replace(tzinfo=None)
+    )
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+    )
 
 
 Index(
@@ -582,7 +667,7 @@ class WeatherForecast(Base):
     verdict = Column(String)  # BON, MOYEN, LIMITE, MAUVAIS
     flyable_slots = Column(Text)  # JSON string of time slots
     source = Column(String)  # open-meteo, weatherapi, etc
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
 
     site = relationship("Site", back_populates="weather_forecasts")
 
@@ -620,8 +705,15 @@ class WeatherSourceConfig(Base):
     total_response_time_ms = Column(BigInteger, default=0, nullable=False)  # For avg calculation
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), nullable=False
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+        nullable=False,
+    )
 
     @property
     def success_rate(self) -> float:
@@ -667,7 +759,9 @@ class StravaTokenLog(Base):
     __tablename__ = "strava_token_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    timestamp = Column(
+        DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), nullable=False, index=True
+    )
     success = Column(Boolean, nullable=False)
     message = Column(String, nullable=True)
     expires_at = Column(DateTime, nullable=True)
@@ -704,8 +798,15 @@ class EmagramFeedback(Base):
     would_recommend = Column(Boolean, nullable=True)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), nullable=False
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+        nullable=False,
+    )
 
 
 class EmagramAnalysis(Base):
@@ -798,8 +899,15 @@ class EmagramAnalysis(Base):
     error_message = Column(Text, nullable=True)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), nullable=False
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+        nullable=False,
+    )
 
     @property
     def is_from_llm(self) -> bool:

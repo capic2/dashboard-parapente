@@ -10,12 +10,12 @@ import {
   Input,
   TextArea,
 } from 'react-aria-components';
-import { Select, Button } from '@dashboard-parapente/design-system';
+import { Select } from '@dashboard-parapente/core/Select';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import type { YoutubeVideoAssociation } from '@dashboard-parapente/shared-types';
 import type { Key } from 'react-aria-components';
 import type { Flight, FlightFormData, Site } from '../../../types';
 import { getSiteDisplayName } from '../../../lib/siteDisplay';
-import { getYoutubeVideoId } from '../../../lib/youtube';
 import { Plus, Trash2 } from 'lucide-react';
 import { YoutubeAssociationRemovalModal } from '../YoutubeAssociationRemovalModal';
 
@@ -139,11 +139,6 @@ export function FlightEditForm({
       const youtubeUrls = youtubeRows
         .map((row) => row.value.trim())
         .filter((url) => Boolean(url) && !removedUrls.has(url));
-      const submittedVideoIds = new Set(
-        youtubeUrls
-          .map((url) => getYoutubeVideoId(url))
-          .filter((videoId): videoId is string => videoId !== null)
-      );
       await onSubmit({
         values: {
           name: value.name,
@@ -159,9 +154,7 @@ export function FlightEditForm({
           notes: value.notes,
           gpx_metrics_excluded: value.gpx_metrics_excluded,
           youtube_urls: youtubeUrls,
-          video_markers: (flight.video_markers ?? []).filter((marker) =>
-            submittedVideoIds.has(marker.youtube_video_id)
-          ),
+          video_markers: flight.video_markers ?? [],
         },
         pendingYoutubeRemovals,
       });
@@ -288,13 +281,13 @@ export function FlightEditForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-4">
         {/* Date */}
         <div>
-          <span className={s.label()}>{t('flights.dateLabel')}</span>
           <form.Field name="flight_date">
             {(field) => (
               <TextField
                 value={field.state.value}
                 onChange={field.handleChange}
               >
+                <Label className={s.label()}>{t('flights.dateLabel')}</Label>
                 <Input type="date" className={s.input()} />
               </TextField>
             )}
@@ -303,7 +296,6 @@ export function FlightEditForm({
 
         {/* Heure de départ */}
         <div>
-          <span className={s.label()}>{t('flights.departureTime')}</span>
           <form.Field name="departure_time">
             {(field) => (
               <TextField
@@ -317,6 +309,9 @@ export function FlightEditForm({
                   }
                 }}
               >
+                <Label className={s.label()}>
+                  {t('flights.departureTime')}
+                </Label>
                 <Input type="time" className={s.input()} />
               </TextField>
             )}
@@ -325,13 +320,12 @@ export function FlightEditForm({
 
         {/* Site */}
         <div className="col-span-2 md:col-span-3">
-          <span className={s.label()}>{t('flights.siteLabel')}</span>
           <form.Field name="site_id">
             {(field) => (
               <div className="flex flex-col sm:flex-row gap-2 mt-1">
                 <div className="flex-1">
                   <Select
-                    label=""
+                    label={t('flights.siteLabel')}
                     options={siteOptions}
                     value={field.state.value ?? null}
                     onChange={(key: Key | null) =>
@@ -359,12 +353,14 @@ export function FlightEditForm({
         <form.Field name="duration_minutes">
           {(field) => (
             <div>
-              <span className={s.label()}>{t('flights.durationLabel')}</span>
               <NumberField
                 value={field.state.value}
                 onChange={field.handleChange}
                 minValue={0}
               >
+                <Label className={s.label()}>
+                  {t('flights.durationLabel')}
+                </Label>
                 <Input className={s.input()} />
               </NumberField>
             </div>
@@ -375,13 +371,15 @@ export function FlightEditForm({
         <form.Field name="distance_km">
           {(field) => (
             <div>
-              <span className={s.label()}>{t('flights.distanceLabel')}</span>
               <NumberField
                 value={field.state.value}
                 onChange={field.handleChange}
                 minValue={0}
                 step={0.1}
               >
+                <Label className={s.label()}>
+                  {t('flights.distanceLabel')}
+                </Label>
                 <Input className={s.input()} />
               </NumberField>
             </div>
@@ -392,12 +390,14 @@ export function FlightEditForm({
         <form.Field name="max_altitude_m">
           {(field) => (
             <div>
-              <span className={s.label()}>{t('flights.maxAltitudeLabel')}</span>
               <NumberField
                 value={field.state.value}
                 onChange={field.handleChange}
                 minValue={0}
               >
+                <Label className={s.label()}>
+                  {t('flights.maxAltitudeLabel')}
+                </Label>
                 <Input className={s.input()} />
               </NumberField>
             </div>
@@ -408,14 +408,14 @@ export function FlightEditForm({
         <form.Field name="elevation_gain_m">
           {(field) => (
             <div>
-              <span className={s.label()}>
-                {t('flights.elevationGainLabel')}
-              </span>
               <NumberField
                 value={field.state.value}
                 onChange={field.handleChange}
                 minValue={0}
               >
+                <Label className={s.label()}>
+                  {t('flights.elevationGainLabel')}
+                </Label>
                 <Input className={s.input()} />
               </NumberField>
             </div>
@@ -426,13 +426,15 @@ export function FlightEditForm({
         <form.Field name="max_speed_kmh">
           {(field) => (
             <div>
-              <span className={s.label()}>{t('flights.maxSpeedLabel')}</span>
               <NumberField
                 value={field.state.value}
                 onChange={field.handleChange}
                 minValue={0}
                 step={0.1}
               >
+                <Label className={s.label()}>
+                  {t('flights.maxSpeedLabel')}
+                </Label>
                 <Input className={s.input()} />
               </NumberField>
             </div>
@@ -512,14 +514,13 @@ export function FlightEditForm({
 
       {/* Notes */}
       <div>
-        <label htmlFor="flight-notes" className={md.label() + ' mb-2 block'}>
-          {t('flights.notesLabel')}
-        </label>
         <form.Field name="notes">
           {(field) => (
             <TextField value={field.state.value} onChange={field.handleChange}>
+              <Label className={md.label() + ' mb-2 block'}>
+                {t('flights.notesLabel')}
+              </Label>
               <TextArea
-                id="flight-notes"
                 placeholder={t('flights.notesPlaceholder')}
                 rows={4}
                 className={s.textarea()}

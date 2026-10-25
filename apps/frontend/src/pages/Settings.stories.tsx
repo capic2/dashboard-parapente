@@ -112,7 +112,9 @@ export const defaultHandlers = [
 
 export const Default = meta.story({
   name: 'Default',
-  parameters: { msw: { handlers: defaultHandlers } },
+  beforeEach: (context) => {
+    context.msw.use(...defaultHandlers);
+  },
 });
 
 Default.test(
@@ -127,7 +129,7 @@ Default.test(
 
     const canvas = within(canvasElement);
     const economyButton = await canvas.findByRole('button', {
-      name: /Économie/,
+      name: /Économie/u,
     });
     await userEvent.click(economyButton);
 
@@ -144,7 +146,7 @@ Default.test(
 
     const canvas = within(canvasElement);
     const autoRefreshCheckbox = await canvas.findByRole('checkbox', {
-      name: /Rafraîchissement automatique de la météo/,
+      name: /Rafraîchissement automatique de la météo/u,
     });
     await userEvent.click(autoRefreshCheckbox);
     await expect(useCacheSettingsStore.getState().autoRefreshWeather).toBe(
@@ -168,9 +170,9 @@ Default.test(
 
 export const Loading = meta.story({
   name: 'Loading',
-  parameters: {
-    msw: {
-      handlers: [
+  beforeEach: (context) => {
+    context.msw.use(
+      ...[
         http.get('*/api/spots', async () => {
           await new Promise(() => {});
         }),
@@ -180,7 +182,7 @@ export const Loading = meta.story({
         http.get('*/api/weather-sources/stats', async () => {
           await new Promise(() => {});
         }),
-      ],
-    },
+      ]
+    );
   },
 });

@@ -184,9 +184,19 @@ export const TanstackRouterDecorator: Decorator = (
     }
   });
 
+  const initialPathname = new URL(initialPath, 'http://storybook.local').pathname;
+  const initialIndex = allPaths.findIndex(
+    (path) =>
+      new URL(path, 'http://storybook.local').pathname === initialPathname
+  );
+  const initialEntries = [...allPaths];
+  if (initialIndex >= 0) {
+    initialEntries[initialIndex] = initialPath;
+  }
+
   const history = createMemoryHistory({
-    initialEntries: allPaths,
-    initialIndex: allPaths.findIndex((path) => path === initialPath),
+    initialEntries,
+    initialIndex: Math.max(initialIndex, 0),
   });
 
   const router = createRouter({

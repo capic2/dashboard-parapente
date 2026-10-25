@@ -1,13 +1,8 @@
 import { useEffect, useState } from 'react';
-import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button } from '@dashboard-parapente/design-system';
-import { CheckCircle2, CircleAlert, LoaderCircle, Wand2 } from 'lucide-react';
+import { Wand2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import {
-  useFlightOverlayLayer,
-  useGenerateFlightOverlayLayer,
-} from '../../../hooks/gopro/useGoproOverlay';
+import { useFlightOverlayLayer } from '../../../hooks/gopro/useGoproOverlay';
 import { GoproOverlaySyncPreview } from './GoproOverlaySyncPreview';
 
 interface FlightOverlayWorkspaceProps {
@@ -16,10 +11,11 @@ interface FlightOverlayWorkspaceProps {
   onOffsetPreviewChange?: (offset: string) => void;
   onSaveOffset: (offset: string) => Promise<void>;
   youtubeUrls?: string[];
+  onCurrentYoutubePositionChange?: (
+    position: { videoId: string; seconds: number } | null
+  ) => void;
   showHeader?: boolean;
 }
-
-const ACTIVE_LAYER_STATUSES = new Set(['queued', 'preparing', 'running']);
 
 async function invalidateOverlaySyncQueries(
   queryClient: ReturnType<typeof useQueryClient>,
@@ -41,66 +37,21 @@ export function FlightOverlayWorkspace({
   onOffsetPreviewChange,
   onSaveOffset,
   youtubeUrls,
+  onCurrentYoutubePositionChange,
   showHeader = true,
 }: FlightOverlayWorkspaceProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const layer = useFlightOverlayLayer(flightId);
-  const generateLayer = useGenerateFlightOverlayLayer(flightId);
   const [offset, setOffset] = useState(initialOffset);
-  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => setOffset(initialOffset), [initialOffset]);
 
-  const isDirty = offset !== initialOffset;
-  const hasValidOffset =
-    offset.trim() !== '' && Number.isFinite(Number(offset));
-  const isGenerating = ACTIVE_LAYER_STATUSES.has(
-    layer.data?.status ?? 'missing'
-  );
   const layerJob = layer.data?.job;
   const progress = Math.max(
     0,
     Math.min(100, Math.round(layerJob?.progress ?? 0))
   );
-  const isReady = layer.data?.status === 'completed' && !isDirty;
-
-  const saveOffset = async () => {
-    if (!isDirty || !hasValidOffset) return;
-    setIsSaving(true);
-    try {
-      await onSaveOffset(offset);
-      await invalidateOverlaySyncQueries(queryClient, flightId);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const saveAndGenerate = async () => {
-    if (isGenerating || generateLayer.isPending) return;
-    await saveOffset();
-    await generateLayer.mutateAsync();
-    await invalidateOverlaySyncQueries(queryClient, flightId);
-  };
-
-  let status = t('flights.overlayLayerMissing');
-  let statusIcon: ReactNode = (
-    <CircleAlert className="h-3.5 w-3.5" aria-hidden="true" />
-  );
-  if (isGenerating) {
-    status = t('flights.overlayLayerGenerating');
-    statusIcon = (
-      <LoaderCircle
-        className="h-3.5 w-3.5 motion-safe:animate-spin"
-        aria-hidden="true"
-      />
-    );
-  } else if (isReady) {
-    status = t('flights.overlayLayerReady');
-    statusIcon = <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />;
-  } else if (isDirty) {
-    status = t('flights.overlayLayerOutdated');
-  }
 
   return (
     <section
@@ -129,16 +80,13 @@ export function FlightOverlayWorkspace({
               </p>
             </div>
           </div>
-          <span className="flex items-center gap-1.5 rounded-full border border-cyan-200 bg-white px-3 py-1.5 text-xs font-semibold text-cyan-900 dark:border-cyan-800 dark:bg-slate-900 dark:text-cyan-100">
-            {statusIcon}
-            {status}
-          </span>
         </div>
       )}
 
       <GoproOverlaySyncPreview
         flightId={flightId}
         youtubeUrls={youtubeUrls}
+        onCurrentYoutubePositionChange={onCurrentYoutubePositionChange}
         offset={offset}
         onOffsetChange={(nextOffset) => {
           setOffset(nextOffset);
@@ -150,60 +98,33 @@ export function FlightOverlayWorkspace({
         }}
       />
 
-      {isGenerating && layerJob && (
-        <div
-          className="mt-4 rounded-xl border border-cyan-200 bg-white/80 p-3 dark:border-cyan-800 dark:bg-slate-900/50"
-          aria-live="polite"
-        >
-          <div className="flex items-center justify-between gap-3 text-sm font-semibold text-cyan-950 dark:text-cyan-100">
-            <span>
-              {layerJob.message || t('flights.overlayLayerGenerating')}
-            </span>
-            <span>{progress}%</span>
-          </div>
-          <progress
-            className="mt-2 h-2 w-full overflow-hidden rounded-full bg-cyan-100 accent-cyan-600 dark:bg-cyan-950 dark:accent-cyan-400"
-            aria-label={t('flights.overlayLayerProgress')}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={progress}
-            value={progress}
-            max={100}
-          />
-          <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
-            {t('flights.overlayLayerJobId', { jobId: layerJob.job_id })}
-          </p>
-        </div>
-      )}
-
-      <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-cyan-200 pt-4 dark:border-cyan-900">
-        <Button
-          onPress={() => void saveAndGenerate()}
-          isDisabled={
-            isSaving ||
-            generateLayer.isPending ||
-            isGenerating ||
-            !hasValidOffset
-          }
-        >
-          {isSaving || generateLayer.isPending || isGenerating ? (
-            <LoaderCircle
-              className="h-4 w-4 motion-safe:animate-spin"
-              aria-hidden="true"
+      {layer.data?.status &&
+        ['queued', 'preparing', 'running'].includes(layer.data.status) &&
+        layerJob && (
+          <div
+            className="mt-4 rounded-xl border border-cyan-200 bg-white/80 p-3 dark:border-cyan-800 dark:bg-slate-900/50"
+            aria-live="polite"
+          >
+            <div className="flex items-center justify-between gap-3 text-sm font-semibold text-cyan-950 dark:text-cyan-100">
+              <span>
+                {layerJob.message || t('flights.overlayLayerGenerating')}
+              </span>
+              <span>{progress}%</span>
+            </div>
+            <progress
+              className="mt-2 h-2 w-full overflow-hidden rounded-full bg-cyan-100 accent-cyan-600 dark:bg-cyan-950 dark:accent-cyan-400"
+              aria-label={t('flights.overlayLayerProgress')}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress}
+              value={progress}
+              max={100}
             />
-          ) : (
-            <Wand2 className="h-4 w-4" aria-hidden="true" />
-          )}
-          {isReady
-            ? t('flights.overlayRegenerateLayer')
-            : t('flights.overlayGenerateLayer')}
-        </Button>
-      </div>
-      {generateLayer.isError && (
-        <p role="alert" className="mt-3 text-sm text-red-700 dark:text-red-300">
-          {t('flights.overlayLayerGenerationError')}
-        </p>
-      )}
+            <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+              {t('flights.overlayLayerJobId', { jobId: layerJob.job_id })}
+            </p>
+          </div>
+        )}
     </section>
   );
 }

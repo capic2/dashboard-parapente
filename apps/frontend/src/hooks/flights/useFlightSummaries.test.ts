@@ -47,6 +47,10 @@ const summary = FlightSummariesResponseSchema.parse({
 });
 
 describe('flight summary queries', () => {
+  it('defaults the local telemetry file flag when older responses omit it', () => {
+    expect(summary.flights[0].youtube_telemetry_video_file_exists).toBe(false);
+  });
+
   it('polls only the filtered active-job query', () => {
     const search = {
       gpx: 'all',
@@ -61,6 +65,13 @@ describe('flight summary queries', () => {
     expect(interval({ state: { data: undefined } } as never)).toBe(10000);
     expect(interval({ state: { data: [] } } as never)).toBe(false);
     expect(interval({ state: { data: [{}] } } as never)).toBe(10000);
+    const detailInterval = activeFlightMediaJobsQueryOptions(
+      true,
+      2000
+    ).refetchInterval;
+    expect(detailInterval).toBeTypeOf('function');
+    if (typeof detailInterval !== 'function') return;
+    expect(detailInterval({ state: { data: [] } } as never)).toBe(2000);
   });
 
   it('serializes the backend query contract', () => {

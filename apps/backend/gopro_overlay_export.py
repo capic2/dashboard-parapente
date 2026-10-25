@@ -1,13 +1,14 @@
 import asyncio
 import fcntl
 import fnmatch
+import hashlib
 import json
 import logging
 import math
 import os
 import re
-import shlex
 import select
+import shlex
 import shutil
 import subprocess
 import sys
@@ -22,14 +23,14 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import UploadFile
+from sqlalchemy.exc import OperationalError
 
 import config
-from datetime_utils import to_api_utc
 from database import SessionLocal
+from datetime_utils import to_api_utc
 from deployment_drain import job_admission
 from flight_storage import flight_temporary_directory
 from models import Flight, GoproOverlayJob
-from sqlalchemy.exc import OperationalError
 from video_acceleration import (
     VideoAccelerator,
     ffmpeg_supports_cuda_overlay,
@@ -38,6 +39,11 @@ from video_acceleration import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class EnrichedGpxCancelled(Exception):
+    """Raised when a background GPX enrichment is cancelled by its owner."""
+
 
 _STATUS_QUEUED = "queued"
 _STATUS_PREPARING = "preparing"
@@ -236,6 +242,8 @@ def _merge_osv_files_with_gpx(
     video_duration: float | None = None,
     first_gpx_at: float | None = None,
     job_id: str | None = None,
+    progress_callback: Callable[[int], None] | None = None,
+    cancellation_check: Callable[[], bool] | None = None,
 ) -> Path:
     if not osv_paths:
         return gpx_path
@@ -296,12 +304,18 @@ def _merge_osv_files_with_gpx(
     deadline = time.monotonic() + config.GOPRO_OVERLAY_OSV_MERGE_TIMEOUT_SECONDS
     last_heartbeat = time.monotonic()
     last_cancellation_check = last_heartbeat
+    last_operation_cancellation_check = last_heartbeat
     try:
         while True:
             now = time.monotonic()
             if now >= deadline:
                 process.terminate()
                 raise ValueError("OSV merge timed out")
+            if cancellation_check is not None and now - last_operation_cancellation_check >= 1:
+                if cancellation_check():
+                    process.terminate()
+                    raise EnrichedGpxCancelled
+                last_operation_cancellation_check = now
 
             stream = process.stdout
             if stream is None:
@@ -336,6 +350,11 @@ def _merge_osv_files_with_gpx(
                 progress_match = _OSV_PROGRESS_RE.fullmatch(line)
                 if progress_match:
                     merge_progress = max(0, min(100, int(progress_match.group("percent"))))
+                    if progress_callback is not None:
+                        try:
+                            progress_callback(merge_progress)
+                        except Exception:
+                            logger.warning("Unable to report enriched GPX progress", exc_info=True)
                     if job_id:
                         _update_job(
                             job_id,
@@ -392,6 +411,8 @@ def ensure_enriched_gpx(
     *,
     video_duration: float | None = None,
     first_gpx_at: float | None = None,
+    progress_callback: Callable[[int], None] | None = None,
+    cancellation_check: Callable[[], bool] | None = None,
 ) -> Path:
     """Return a cached GPX containing the GPX track enriched with OSV data.
 
@@ -404,16 +425,22 @@ def ensure_enriched_gpx(
 
     input_dir.mkdir(parents=True, exist_ok=True)
     merged_gpx_path = input_dir / _ENRICHED_GPX_FILENAME
-    metadata_path = input_dir / _ENRICHED_GPX_METADATA_FILENAME
+    metadata_path = input_dir / "temp" / _ENRICHED_GPX_METADATA_FILENAME
+    legacy_metadata_path = input_dir / _ENRICHED_GPX_METADATA_FILENAME
+    staging_root = input_dir / "temp" / "gpx-enrichment"
+    source_signatures = []
+    for index, path in enumerate([gpx_path, *osv_paths]):
+        stat = path.stat()
+        source_signature = {
+            "path": str(path.resolve()),
+            "size": stat.st_size,
+            "mtime_ns": stat.st_mtime_ns,
+        }
+        if index == 0:
+            source_signature["sha256"] = _file_sha256(path)
+        source_signatures.append(source_signature)
     signature = {
-        "sources": [
-            {
-                "path": str(path.resolve()),
-                "size": path.stat().st_size,
-                "mtime_ns": path.stat().st_mtime_ns,
-            }
-            for path in [gpx_path, *osv_paths]
-        ],
+        "sources": source_signatures,
         "video_duration": video_duration,
         "first_gpx_at": first_gpx_at,
     }
@@ -421,6 +448,17 @@ def ensure_enriched_gpx(
     with lock_path.open("a+") as lock_file:
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
         try:
+            if not metadata_path.is_file() and legacy_metadata_path.is_file():
+                try:
+                    legacy_metadata = json.loads(legacy_metadata_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    legacy_metadata = None
+                if legacy_metadata == signature:
+                    metadata_path.parent.mkdir(parents=True, exist_ok=True)
+                    legacy_metadata_path.replace(metadata_path)
+                else:
+                    legacy_metadata_path.unlink(missing_ok=True)
+
             if merged_gpx_path.is_file() and metadata_path.is_file():
                 try:
                     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
@@ -429,28 +467,81 @@ def ensure_enriched_gpx(
                 if metadata == signature and _has_usable_gpx_timestamps(merged_gpx_path):
                     return merged_gpx_path
 
-            staging_dir = input_dir / f".merged-gopro-overlay-{uuid.uuid4().hex}"
-            staging_dir.mkdir()
-            try:
-                staged_gpx_path = _merge_osv_files_with_gpx(
-                    osv_paths,
-                    gpx_path,
-                    staging_dir,
-                    gpx_offset=0.0,
-                    video_duration=video_duration,
-                    first_gpx_at=first_gpx_at,
-                )
-                if not _has_usable_gpx_timestamps(staged_gpx_path):
-                    logger.warning(
-                        "OSV merge produced an unusable GPX; falling back to source GPX %s",
-                        gpx_path,
-                    )
-                    return gpx_path
-                staged_gpx_path.replace(merged_gpx_path)
-            finally:
-                shutil.rmtree(staging_dir, ignore_errors=True)
+            staging_root.mkdir(parents=True, exist_ok=True)
+            for attempt in range(2):
+                staging_dir = staging_root / f".merged-gopro-overlay-{uuid.uuid4().hex}"
+                staging_dir.mkdir()
+                try:
+                    try:
+                        staged_gpx_path = _merge_osv_files_with_gpx(
+                            osv_paths,
+                            gpx_path,
+                            staging_dir,
+                            gpx_offset=0.0,
+                            video_duration=video_duration,
+                            first_gpx_at=first_gpx_at,
+                            progress_callback=progress_callback,
+                            cancellation_check=cancellation_check,
+                        )
+                    except ValueError as exc:
+                        if str(exc) != "OSV merge did not create a GPX file" or attempt == 1:
+                            raise
+                        logger.warning("OSV merge created no staged GPX; retrying merge")
+                        continue
+                    if not staged_gpx_path.is_file():
+                        if attempt == 1:
+                            raise FileNotFoundError(
+                                f"Staged enriched GPX disappeared during validation: "
+                                f"{staged_gpx_path}"
+                            )
+                        logger.warning(
+                            "Staged enriched GPX disappeared during validation; retrying merge"
+                        )
+                        continue
+                    try:
+                        has_usable_timestamps = _has_usable_gpx_timestamps(staged_gpx_path)
+                    except FileNotFoundError:
+                        # The merge helper or another process may remove the
+                        # staged output after is_file() but before it is read.
+                        if attempt == 1:
+                            raise
+                        logger.warning(
+                            "Staged enriched GPX disappeared while checking timestamps; "
+                            "retrying merge"
+                        )
+                        continue
+                    if not staged_gpx_path.is_file():
+                        if attempt == 1:
+                            raise FileNotFoundError(
+                                f"Staged enriched GPX disappeared during validation: "
+                                f"{staged_gpx_path}"
+                            )
+                        logger.warning(
+                            "Staged enriched GPX disappeared during validation; retrying merge"
+                        )
+                        continue
+                    if not has_usable_timestamps:
+                        logger.warning(
+                            "OSV merge produced an unusable GPX; falling back to source GPX %s",
+                            gpx_path,
+                        )
+                        return gpx_path
+                    try:
+                        staged_gpx_path.replace(merged_gpx_path)
+                    except FileNotFoundError:
+                        if attempt == 1:
+                            raise
+                        logger.warning(
+                            "Staged enriched GPX disappeared before publication; retrying merge"
+                        )
+                        continue
+                finally:
+                    shutil.rmtree(staging_dir, ignore_errors=True)
+                break
 
-            temporary_metadata_path = input_dir / f".{metadata_path.name}.{uuid.uuid4().hex}.tmp"
+            temporary_metadata_path = metadata_path.parent / (
+                f".{metadata_path.name}.{uuid.uuid4().hex}.tmp"
+            )
             temporary_metadata_path.write_text(
                 json.dumps(signature, separators=(",", ":")),
                 encoding="utf-8",
@@ -468,6 +559,33 @@ def _has_usable_gpx_timestamps(gpx_path: Path) -> bool:
 def enriched_gpx_path(input_dir: Path) -> Path:
     """Return the stable location used for the persisted enriched GPX."""
     return input_dir / _ENRICHED_GPX_FILENAME
+
+
+def enriched_gpx_matches_source(enriched_path: Path, source_path: Path) -> bool:
+    """Return whether the cache metadata describes the current source GPX."""
+    metadata_path = enriched_path.parent / "temp" / _ENRICHED_GPX_METADATA_FILENAME
+    if not metadata_path.is_file():
+        metadata_path = enriched_path.with_suffix(".json")
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        cached_source = metadata["sources"][0]
+        stat = source_path.stat()
+        return (
+            cached_source["path"] == str(source_path.resolve())
+            and cached_source["size"] == stat.st_size
+            and cached_source["mtime_ns"] == stat.st_mtime_ns
+            and cached_source["sha256"] == _file_sha256(source_path)
+        )
+    except (OSError, KeyError, IndexError, TypeError, json.JSONDecodeError):
+        return False
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source_file:
+        for chunk in iter(lambda: source_file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _output_path_for_video(video_path: Path, output_name: str) -> Path:
@@ -614,6 +732,7 @@ def _job_preparation_metadata(
     overlay_size: tuple[int, int] | None = None,
     video_start_override: datetime | None = None,
     pip_offset_seconds: float | None = None,
+    preserve_work_dir_on_failure: bool = False,
 ) -> dict[str, Any]:
     metadata = {
         "prepare_overlay_inputs": True,
@@ -623,6 +742,8 @@ def _job_preparation_metadata(
         "gpx_offset": gpx_offset,
         "overlay_only": overlay_only,
     }
+    if preserve_work_dir_on_failure:
+        metadata["preserve_work_dir_on_failure"] = True
     if overlay_size:
         metadata["overlay_size"] = list(overlay_size)
     if video_start_override is not None:
@@ -1720,6 +1841,7 @@ def _prepare_queued_job(job_id: str, job: dict[str, Any]) -> dict[str, Any] | No
     log_path = Path(str(job.get("log_path") or Path(str(job["output_path"])).with_suffix(".log")))
 
     try:
+        Path(str(job["layout_path"])).parent.mkdir(parents=True, exist_ok=True)
         _append_job_log(log_path, "Preparing overlay files")
         current_job = _claim_job_for_preparation(job_id)
         if not current_job or current_job.get("status") != _STATUS_PREPARING:
@@ -1924,8 +2046,14 @@ def _finish_job(job_id: str, **changes: Any) -> dict[str, Any]:
         return job.copy()
 
 
-def _overlay_segment_path(work_dir: Path, job_id: str, index: int, kind: str) -> Path:
-    return work_dir / f"{kind}-{job_id}-{index:05d}.mp4"
+def _overlay_segment_path(
+    work_dir: Path,
+    job_id: str,
+    index: int,
+    kind: str,
+    suffix: str = ".mp4",
+) -> Path:
+    return work_dir / f"{kind}-{job_id}-{index:05d}{suffix}"
 
 
 def _segment_video_start(
@@ -1993,6 +2121,57 @@ def _create_overlay_segment(
     if result.returncode != 0 or not destination.exists():
         detail = result.stderr.strip() or "Unable to create overlay segment"
         raise ValueError(detail)
+
+
+def _create_gpx_overlay_timeline_segment(destination: Path, frame_count: int) -> None:
+    """Create a tiny video used only to bound one transparent GPX render segment."""
+    expected_duration = (frame_count - 1) / _PIP_FRAME_RATE
+    if destination.is_file():
+        existing_duration = probe_video_duration(destination)
+        if existing_duration is not None and abs(existing_duration - expected_duration) <= 0.02:
+            return
+        destination.unlink(missing_ok=True)
+    if frame_count < 2:
+        raise ValueError("A GPX overlay segment must contain at least two frames")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = destination.with_name(f".{destination.stem}.tmp{destination.suffix}")
+    result = subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=black:s=16x16:r=10",
+            "-frames:v",
+            str(frame_count - 1),
+            "-an",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-pix_fmt",
+            "yuv420p",
+            str(temporary_path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    actual_duration = probe_video_duration(temporary_path) if temporary_path.is_file() else None
+    if (
+        result.returncode != 0
+        or not temporary_path.is_file()
+        or actual_duration is None
+        or abs(actual_duration - expected_duration) > 0.02
+    ):
+        temporary_path.unlink(missing_ok=True)
+        detail = result.stderr.strip() or "Unable to create GPX overlay timeline segment"
+        raise ValueError(detail)
+    temporary_path.replace(destination)
 
 
 def _concat_overlay_segments(segment_paths: list[Path], destination: Path) -> None:
@@ -2144,6 +2323,193 @@ def _run_segmented_overlay_job(
         current = get_gopro_overlay_job(job_id)
         if current and current.get("status") == _STATUS_CANCELLED:
             return
+        _finish_job(
+            job_id,
+            status=_STATUS_FAILED,
+            progress=100,
+            message="Overlay rendering failed",
+            error=str(exc) or exc.__class__.__name__,
+            completed_at=_utc_now(),
+        )
+
+
+def _run_segmented_gpx_overlay_job(
+    job_id: str,
+    job: dict[str, Any],
+    command: list[str],
+    log_path: Path,
+    output_path: Path,
+    temp_output_path: Path,
+) -> None:
+    """Run the resumable GPX renderer and fail the job on setup errors."""
+    try:
+        _run_segmented_gpx_overlay_job_impl(
+            job_id, job, command, log_path, output_path, temp_output_path
+        )
+    except Exception as exc:
+        current = get_gopro_overlay_job(job_id)
+        if current and current.get("status") == _STATUS_CANCELLED:
+            return
+        logger.exception("Failed to prepare GPX overlay segments for job %s", job_id)
+        _finish_job(
+            job_id,
+            status=_STATUS_FAILED,
+            progress=100,
+            message="Overlay rendering failed",
+            error=str(exc) or exc.__class__.__name__,
+            completed_at=_utc_now(),
+        )
+
+
+def _run_segmented_gpx_overlay_job_impl(
+    job_id: str,
+    job: dict[str, Any],
+    command: list[str],
+    log_path: Path,
+    output_path: Path,
+    temp_output_path: Path,
+) -> None:
+    """Render a transparent GPX layer in resumable, frame-aligned segments."""
+    work_dir = Path(str(job["layout_path"])).parent
+    metadata = job.get("command") if isinstance(job.get("command"), dict) else {}
+    render_gpx_path = Path(str(metadata.get("render_gpx_path") or job["gpx_path"]))
+    gpx_start = first_gpx_timestamp(render_gpx_path)
+    duration = gpx_duration_seconds(render_gpx_path)
+    if gpx_start is None or duration is None or duration <= 0:
+        raise ValueError("GPX overlay timeline has no usable duration")
+
+    segment_seconds = max(1, config.GOPRO_OVERLAY_GPX_SEGMENT_SECONDS)
+    frames_per_segment = max(2, segment_seconds * _PIP_FRAME_RATE)
+    total_frames = math.floor(duration * _PIP_FRAME_RATE + 1e-6) + 1
+    ranges: list[tuple[int, int]] = []
+    start_frame = 0
+    while start_frame < total_frames:
+        end_frame = min(total_frames, start_frame + frames_per_segment)
+        ranges.append((start_frame, end_frame))
+        start_frame = end_frame
+    if len(ranges) > 1 and ranges[-1][1] - ranges[-1][0] == 1:
+        previous_start, previous_end = ranges[-2]
+        ranges[-2] = (previous_start, previous_end - 1)
+        ranges[-1] = (previous_end - 1, ranges[-1][1])
+
+    def input_signature(path: Path, *, hash_content: bool) -> dict[str, Any]:
+        stat = path.stat()
+        if hash_content:
+            return {"size": stat.st_size, "sha256": _file_sha256(path)}
+        signature: dict[str, Any] = {
+            "path": str(path.resolve()),
+            "size": stat.st_size,
+            "mtime_ns": stat.st_mtime_ns,
+        }
+        return signature
+
+    resume = metadata.get("resume") if isinstance(metadata.get("resume"), dict) else {}
+    signature = {
+        "cache_version": 1,
+        "video": input_signature(Path(str(job["video_path"])), hash_content=False),
+        "gpx": input_signature(render_gpx_path, hash_content=True),
+        "layout": input_signature(Path(str(job["layout_path"])), hash_content=True),
+        "gpx_offset": metadata.get("gpx_offset"),
+        "overlay_size": [job.get("video_width"), job.get("video_height")],
+        "segment_seconds": segment_seconds,
+        "renderer_command": command[:-2],
+    }
+    render_key = hashlib.sha256(json.dumps(signature, sort_keys=True).encode("utf-8")).hexdigest()
+    cache_expires_at = resume.get("cache_expires_at")
+    cache_expired = False
+    if isinstance(cache_expires_at, str):
+        try:
+            cache_expired = datetime.fromisoformat(cache_expires_at) <= _utc_now_dt()
+        except ValueError:
+            cache_expired = True
+    if resume.get("render_key") != render_key or cache_expired:
+        for pattern in (f"overlay-{job_id}-*.webm", f"timeline-{job_id}-*.mp4"):
+            for segment_path in work_dir.glob(pattern):
+                segment_path.unlink(missing_ok=True)
+        completed: set[int] = set()
+    else:
+        completed = {
+            int(index)
+            for index in resume.get("completed_segments", [])
+            if isinstance(index, int) or str(index).isdigit()
+        }
+
+    metadata = dict(metadata)
+    metadata["resume"] = {
+        "cache_kind": "gpx-overlay-segments",
+        "render_key": render_key,
+        "segment_seconds": segment_seconds,
+        "total_segments": len(ranges),
+        "completed_segments": sorted(completed),
+    }
+    _update_job(job_id, command_json=json.dumps(metadata), message="Overlay queued")
+    if not _transition_job_to_running(job_id, command, "cpu"):
+        return
+
+    rendered_segments: list[Path] = []
+    try:
+        for index, (start_frame, end_frame) in enumerate(ranges):
+            frame_count = end_frame - start_frame
+            timeline_segment = _overlay_segment_path(work_dir, job_id, index, "timeline")
+            rendered_segment = _overlay_segment_path(
+                work_dir, job_id, index, "overlay", suffix=".webm"
+            )
+            segment_timestamp = (
+                gpx_start + timedelta(seconds=start_frame / _PIP_FRAME_RATE)
+            ).timestamp()
+            _create_gpx_overlay_timeline_segment(timeline_segment, frame_count)
+            os.utime(timeline_segment, (segment_timestamp, segment_timestamp))
+
+            cached_segment_valid = False
+            if index in completed and rendered_segment.is_file():
+                cached_segment_valid, _ = _verify_video_output(rendered_segment)
+            if not cached_segment_valid:
+                segment_command = command[:-2] + [str(timeline_segment), str(rendered_segment)]
+                _set_segment_video_time_start(segment_command)
+                rendered_segment.unlink(missing_ok=True)
+                return_code = _run_overlay_process(
+                    job_id,
+                    segment_command,
+                    segment_command,
+                    False,
+                    log_path,
+                    index,
+                    len(ranges),
+                )
+                if return_code != 0:
+                    raise RuntimeError(_tail_lines(log_path) or f"Segment {index} failed")
+                is_valid, validation_error = _verify_video_output(rendered_segment)
+                if not is_valid:
+                    raise ValueError(validation_error or f"Overlay segment {index} is invalid")
+                completed.add(index)
+                metadata["resume"]["completed_segments"] = sorted(completed)
+                _update_job(
+                    job_id,
+                    progress=math.floor(len(completed) * 100 / len(ranges)),
+                    message=f"Overlay segment {index + 1}/{len(ranges)} completed",
+                    command_json=json.dumps(metadata),
+                )
+            rendered_segments.append(rendered_segment)
+
+        _unlink_if_exists(temp_output_path)
+        _concat_overlay_segments(rendered_segments, temp_output_path)
+        is_valid, validation_error = _verify_video_output(temp_output_path)
+        if not is_valid:
+            raise ValueError(validation_error or "ffprobe validation failed")
+        temp_output_path.replace(output_path)
+        _finish_job(
+            job_id,
+            status=_STATUS_COMPLETED,
+            progress=100,
+            message="Overlay ready",
+            completed_at=_utc_now(),
+        )
+    except Exception as exc:
+        current = get_gopro_overlay_job(job_id)
+        if current and current.get("status") == _STATUS_CANCELLED:
+            return
+        metadata["resume"]["cache_expires_at"] = (_utc_now_dt() + timedelta(hours=24)).isoformat()
+        _update_job(job_id, command_json=json.dumps(metadata))
         _finish_job(
             job_id,
             status=_STATUS_FAILED,
@@ -2464,6 +2830,7 @@ def _create_gopro_overlay_job_from_paths(
         overlay_size=overlay_size,
         video_start_override=video_start_override,
         pip_offset_seconds=pip_offset_seconds,
+        preserve_work_dir_on_failure=output_name.startswith("youtube-overlay-"),
     )
 
     now = _utc_now_dt()
@@ -2583,6 +2950,8 @@ def _run_job(job_id: str) -> None:
 
     prepared_command = job.get("command") if isinstance(job.get("command"), dict) else {}
     render_gpx_path = Path(str(prepared_command.get("render_gpx_path") or job["gpx_path"]))
+    overlay_only = bool(prepared_command.get("overlay_only"))
+    gpx_overlay_duration = gpx_duration_seconds(render_gpx_path) if overlay_only else None
 
     command = [
         config.GOPRO_OVERLAY_BIN,
@@ -2599,9 +2968,13 @@ def _run_job(job_id: str) -> None:
         "--layout-xml",
         job["layout_path"],
     ]
-    if video_time_start := prepared_command.get("video_time_start"):
+    video_time_start = prepared_command.get("video_time_start")
+    if video_time_start and not overlay_only:
         command[4:4] = ["--video-time-start", str(video_time_start)]
-    overlay_only = bool(prepared_command.get("overlay_only"))
+    if overlay_only and gpx_overlay_duration is not None and gpx_overlay_duration > 0:
+        # The source video is used only as a time window by --generate overlay;
+        # the patched GPX-only mode still emits transparent frames, not camera pixels.
+        command.extend(["--generate", "overlay", "--video-time-start", "file-modified"])
     if config.GOPRO_OVERLAY_FONT:
         command.extend(["--font", config.GOPRO_OVERLAY_FONT])
     if config.GOPRO_OVERLAY_CONFIG_DIR:
@@ -2661,12 +3034,10 @@ def _run_job(job_id: str) -> None:
     log_path = Path(job.get("log_path") or temp_output_path.with_suffix(".log"))
     temp_output_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    # GoPro Dashboard renders a transparent movie for a GPX-only command with
-    # no input video. Passing the camera here makes FFmpeg composite the
-    # overlay onto that camera, which is not the reusable layer we want. The
-    # camera path is retained by job preparation only to establish the
-    # calibrated GPX range.
-    if not overlay_only:
+    # Overlay-only segments use tiny synthetic timeline videos and the
+    # renderer's overlay-only output mode. They are not composited over the
+    # source camera.
+    if not overlay_only or (gpx_overlay_duration is not None and gpx_overlay_duration > 0):
         common_args.append(job["video_path"])
     common_args.append(str(temp_output_path))
     command.extend(common_args)
@@ -2681,6 +3052,20 @@ def _run_job(job_id: str) -> None:
         config.GOPRO_OVERLAY_EXTRA_ARGS or "<none>",
         render_method,
     )
+
+    if overlay_only and gpx_overlay_duration is not None and gpx_overlay_duration > 0:
+        _run_segmented_gpx_overlay_job(
+            job_id,
+            job,
+            command,
+            log_path,
+            output_path,
+            temp_output_path,
+        )
+        finished_job = get_gopro_overlay_job(job_id)
+        if finished_job and finished_job.get("status") in _TERMINAL_STATUSES:
+            _cleanup_gopro_overlay_temp_files(finished_job)
+        return
 
     video_duration = None if overlay_only else probe_video_duration(Path(str(job["video_path"])))
     if (
@@ -3018,6 +3403,26 @@ def _can_delete_work_dir(work_dir: Path) -> bool:
 
 
 def _cleanup_gopro_overlay_temp_files(job: dict[str, Any]) -> None:
+    job_id = str(job.get("id") or job.get("job_id") or "")
+    if job_id and job.get("status") in {_STATUS_FAILED, _STATUS_CANCELLED}:
+        full_job = get_gopro_overlay_job(job_id, include_command=True)
+        metadata = full_job.get("command") if full_job else None
+        resume = metadata.get("resume") if isinstance(metadata, dict) else None
+        preserve_gpx_cache = False
+        if isinstance(resume, dict) and (
+            resume.get("cache_kind") == "gpx-overlay-segments" and resume.get("completed_segments")
+        ):
+            try:
+                expires_at = datetime.fromisoformat(str(resume.get("cache_expires_at")))
+                preserve_gpx_cache = expires_at > _utc_now_dt()
+            except ValueError:
+                preserve_gpx_cache = False
+        if isinstance(metadata, dict) and (
+            metadata.get("preserve_work_dir_on_failure") or preserve_gpx_cache
+        ):
+            # Keep validated segments for up to 24 hours so a failed job can resume.
+            return
+
     temp_output_path = job.get("temp_output_path")
     if temp_output_path:
         _unlink_if_exists(Path(str(temp_output_path)))
@@ -3081,6 +3486,83 @@ def _enqueue_existing_gopro_overlay_job(job_id: str) -> None:
         _enqueue_gopro_overlay_job_in_rq(job_id)
     elif not config.TESTING:
         start_gopro_overlay_worker()
+
+
+def _overlay_retry_inputs_exist(job: Any, metadata: dict[str, Any]) -> bool:
+    def job_value(name: str) -> Any:
+        if isinstance(job, dict):
+            return job.get(name)
+        return getattr(job, name, None)
+
+    required_paths = [job_value("video_path"), job_value("gpx_path")]
+    if metadata.get("prepare_overlay_inputs"):
+        pip_path = metadata.get("source_pip_path") or job_value("pip_path")
+    else:
+        required_paths.append(job_value("layout_path"))
+        pip_path = metadata.get("source_pip_path") or job_value("pip_path")
+    if pip_path:
+        required_paths.append(pip_path)
+    return all(value and Path(str(value)).is_file() for value in required_paths)
+
+
+def resume_failed_gopro_overlay_job(job_id: str) -> bool:
+    """Requeue a failed overlay job, preserving any validated render segments."""
+    try:
+        with SessionLocal() as db:
+            job = db.get(GoproOverlayJob, job_id)
+            if job is None or job.status not in {_STATUS_FAILED, _STATUS_CANCELLED}:
+                return False
+            try:
+                metadata = json.loads(job.command_json or "{}")
+            except (TypeError, ValueError):
+                metadata = {}
+            if not isinstance(metadata, dict):
+                metadata = {}
+            if not _overlay_retry_inputs_exist(job, metadata):
+                return False
+            original_pip_path = metadata.get("source_pip_path")
+            if job.pip_path and original_pip_path:
+                source_pip_path = Path(str(original_pip_path))
+                if not source_pip_path.is_file():
+                    return False
+                job.pip_path = str(source_pip_path)
+            job.status = _STATUS_QUEUED
+            job.progress = 0
+            job.message = "Overlay retry queued"
+            job.error = None
+            job.completed_at = None
+            job.cancelled_at = None
+            job.updated_at = _utc_now_dt()
+            db.commit()
+    except OperationalError as exc:
+        if "no such table: gopro_overlay_jobs" not in str(exc):
+            raise
+        with _LOCK:
+            job = _JOBS.get(job_id)
+            metadata = job.get("command") if job else None
+            if not job or job.get("status") not in {_STATUS_FAILED, _STATUS_CANCELLED}:
+                return False
+            if not isinstance(metadata, dict):
+                metadata = {}
+            if not _overlay_retry_inputs_exist(job, metadata):
+                return False
+            original_pip_path = metadata.get("source_pip_path")
+            if job.get("pip_path") and original_pip_path:
+                source_pip_path = Path(str(original_pip_path))
+                if not source_pip_path.is_file():
+                    return False
+                job["pip_path"] = str(source_pip_path)
+            job.update(
+                status=_STATUS_QUEUED,
+                progress=0,
+                message="Overlay retry queued",
+                error=None,
+                completed_at=None,
+                cancelled_at=None,
+            )
+
+    _enqueue_existing_gopro_overlay_job(job_id)
+    return True
 
 
 def _delete_rq_gopro_overlay_job(job_id: str) -> bool:

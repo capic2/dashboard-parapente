@@ -13,7 +13,7 @@ ARGUEL_LON = 6.0
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="API may be down", strict=False)
+@pytest.mark.integration
 async def test_fetch_open_meteo_success():
     result = await fetch_open_meteo(ARGUEL_LAT, ARGUEL_LON, days=2)
     assert "success" in result
@@ -25,6 +25,7 @@ async def test_fetch_open_meteo_success():
 
 
 @pytest.mark.asyncio
+@pytest.mark.integration
 async def test_fetch_open_meteo_timeout():
     import time
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Switch } from 'react-aria-components';
 import { Upload } from 'lucide-react';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import {
   useRemoveSportstrackliveSettings,
   useSaveSportstrackliveSettings,

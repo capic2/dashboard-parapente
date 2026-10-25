@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from '@tanstack/react-router';
 import { Bell, CheckCircle2, Square, Trash2, XCircle } from 'lucide-react';
 import {
   Button as AriaButton,
@@ -39,6 +40,16 @@ function resultSummary(result: BackgroundOperation['result']) {
 
 function operationProgress(operation: BackgroundOperation) {
   if (
+    operation.status === 'running' &&
+    operation.operation_type === 'gpx_enrichment' &&
+    operation.progress === 0
+  ) {
+    // GPX enrichment can spend a while preparing inputs before the merger
+    // emits its first measured progress update.
+    return null;
+  }
+
+  if (
     operation.source_kind === 'video_export' &&
     typeof operation.current_step_progress === 'number' &&
     Number.isFinite(operation.current_step_progress)
@@ -52,8 +63,31 @@ function operationProgress(operation: BackgroundOperation) {
   return operation.progress;
 }
 
+function operationElapsed(operation: BackgroundOperation, now: number) {
+  if (
+    operation.status !== 'running' ||
+    operation.operation_type !== 'gpx_enrichment'
+  ) {
+    return null;
+  }
+
+  const startedAtValue = operation.started_at?.trim();
+  if (!startedAtValue) return null;
+
+  // Backend datetimes are UTC even when the database/API serialization omits
+  // the timezone suffix. Date.parse would otherwise treat them as local time.
+  const hasTimezone = /(?:z|[+-]\d{2}:?\d{2})$/i.test(startedAtValue);
+  const startedAt = Date.parse(
+    hasTimezone ? startedAtValue : `${startedAtValue}Z`
+  );
+  if (!Number.isFinite(startedAt)) return null;
+
+  return Math.floor(Math.max(0, now - startedAt) / 60_000);
+}
+
 export function OperationCenter() {
   const { t } = useTranslation();
+  const [now, setNow] = useState(0);
   const [notificationPermission, setNotificationPermission] =
     useState<NotificationPermission | null>(() =>
       typeof window !== 'undefined' && 'Notification' in window
@@ -68,6 +102,12 @@ export function OperationCenter() {
   const toast = useToast();
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [selected, setSelected] = useState<BackgroundOperation | null>(null);
+
+  useEffect(() => {
+    setNow(Date.now());
+    const interval = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
   const displayableOperations = useMemo(
     () => operations.filter((operation) => operation.status !== 'cancelled'),
     [operations]
@@ -169,6 +209,26 @@ export function OperationCenter() {
                     operation.operation_type
                   );
                   const progress = operationProgress(operation);
+                  const elapsed =
+                    now > 0 ? operationElapsed(operation, now) : null;
+                  let progressLabel = '—';
+                  if (progress != null) {
+                    progressLabel = `${progress}%`;
+                  } else if (operation.status === 'running') {
+                    progressLabel = t(
+                      'operations.progressUnavailable',
+                      'En cours'
+                    );
+                  }
+                  const operationDetail =
+                    (operation.status === 'failed' && operation.error_detail) ||
+                    operation.current_step_detail ||
+                    (operation.current_step_key
+                      ? t(
+                          `operations.steps.${operation.current_step_key}`,
+                          operation.current_step_key
+                        )
+                      : null);
                   const isCancelling =
                     cancel.isPending &&
                     cancel.variables === operation.operation_id;
@@ -188,27 +248,41 @@ export function OperationCenter() {
                         onPress={() => openOperation(operation)}
                         className="min-w-0 flex-1 cursor-pointer rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <span
-                            className={`truncate text-sm font-medium ${statusColor(operation.status)}`}
-                          >
-                            {title}
+                        <div className="flex min-w-0 items-start justify-between gap-2">
+                          <span className="min-w-0 flex-1">
+                            <span
+                              className={`block truncate text-sm font-medium ${statusColor(operation.status)}`}
+                            >
+                              {title}
+                            </span>
+                            {operation.flight_name && (
+                              <span className="mt-0.5 block truncate text-xs text-slate-600 dark:text-slate-300">
+                                {operation.flight_name}
+                              </span>
+                            )}
                           </span>
                           <span className="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400">
-                            {progress == null ? '—' : `${progress}%`}
+                            {progressLabel}
                           </span>
                         </div>
                         <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
-                          {operation.current_step_detail ||
-                            (operation.current_step_key
-                              ? t(
-                                  `operations.steps.${operation.current_step_key}`,
-                                  operation.current_step_key
-                                )
-                              : t(
-                                  `operations.status.${operation.status}`,
-                                  operation.status
-                                ))}
+                          {t(
+                            `operations.status.${operation.status}`,
+                            operation.status
+                          )}
+                          {elapsed !== null &&
+                            ` · ${
+                              elapsed === 0
+                                ? t(
+                                    'operations.elapsed.lessThanMinute',
+                                    'Depuis moins d’une minute'
+                                  )
+                                : t('operations.elapsed.minutes', {
+                                    count: elapsed,
+                                    defaultValue: `Depuis ${elapsed} min`,
+                                  })
+                            }`}
+                          {operationDetail && ` · ${operationDetail}`}
                         </p>
                         <div className="mt-2">
                           <OperationProgressBar progress={progress} />
@@ -219,7 +293,6 @@ export function OperationCenter() {
                           onPress={() => void cancelOperation(operation)}
                           isDisabled={isCancelling}
                           aria-label={`${t('operations.cancel', 'Stopper')} ${title}`}
-                          title={t('operations.cancel', 'Stopper')}
                           className="inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center rounded-md border border-red-200 text-red-700 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-wait disabled:opacity-60 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"
                         >
                           <Square className="h-4 w-4" aria-hidden="true" />
@@ -230,7 +303,6 @@ export function OperationCenter() {
                           onPress={() => void removeOperation(operation)}
                           isDisabled={isDeleting}
                           aria-label={`${t('operations.delete', 'Supprimer')} ${title}`}
-                          title={t('operations.delete', 'Supprimer')}
                           className="inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center rounded-md border border-slate-300 text-slate-600 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-wait disabled:opacity-60 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
                         >
                           <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -303,6 +375,16 @@ export function OperationCenter() {
                       ))}
                     </dl>
                   </div>
+                )}
+                {selected.flight_id && (
+                  <Link
+                    to="/flights/$flightId"
+                    params={{ flightId: selected.flight_id }}
+                    onClick={() => setSelected(null)}
+                    className="mt-5 inline-flex min-h-10 cursor-pointer items-center rounded-md border border-sky-200 px-3 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-sky-900 dark:text-sky-300 dark:hover:bg-sky-950/30"
+                  >
+                    {t('operations.openFlight', 'Ouvrir le vol')}
+                  </Link>
                 )}
                 {selected.can_cancel && (
                   <button

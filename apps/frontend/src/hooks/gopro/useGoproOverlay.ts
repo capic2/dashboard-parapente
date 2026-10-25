@@ -28,6 +28,7 @@ export type GoproOverlayPreview = {
     duration_seconds: number;
     coordinates: GeoPoint[];
     enrichment_status?: 'missing' | 'pending' | 'ready' | 'failed';
+    enrichment_progress?: number | null;
     enrichment_error?: string | null;
   };
   alignment: {
@@ -60,15 +61,6 @@ export function useFlightOverlayLayer(flightId: string) {
         ? STATUS_POLL_INTERVAL_MS
         : false;
     },
-  });
-}
-
-export function useGenerateFlightOverlayLayer(flightId: string) {
-  return useMutation({
-    mutationFn: () =>
-      api
-        .post(`flights/${flightId}/overlay-layer`, { timeout: false })
-        .json<GoproOverlayJob>(),
   });
 }
 
@@ -134,19 +126,6 @@ export function useGenerateGoproMerge(flightId: string) {
           queryKey: ['flights', flightId, 'telemetry'],
         }),
       ]),
-  });
-}
-
-export function useCreateFlightGoproOverlayJob(flightId: string) {
-  return useMutation({
-    mutationFn: async (formData: FormData) => {
-      return await api
-        .post(`flights/${flightId}/gopro-overlay`, {
-          body: formData,
-          timeout: false,
-        })
-        .json<GoproOverlayJob>();
-    },
   });
 }
 

@@ -46,6 +46,54 @@ jobs:
               core.notice('Queued a deployment for current main ' + data.commit.sha);
             }
 
+      - name: Resolve and pin production SSH host
+        id: ssh_dns
+        if: steps.freshness.outputs.is_current == 'true'
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$SSH_HOST" ]]; then
+            echo "::error::SSH_HOST is not configured; stopping before image build and production drain."
+            exit 1
+          fi
+
+          if python3 - "$SSH_HOST" <<'PY'
+          import ipaddress
+          import sys
+
+          try:
+              ipaddress.ip_address(sys.argv[1])
+          except ValueError:
+              raise SystemExit(1)
+          PY
+          then
+            echo "SSH target is an IP address; DNS lookup is not required."
+            exit 0
+          fi
+
+          max_attempts=6
+          for attempt in $(seq 1 "$max_attempts"); do
+            resolved_addresses=$(timeout 5s getent ahosts "$SSH_HOST" 2>/dev/null | awk '!seen[$1]++ { print $1 }') || true
+            if [[ -n "$resolved_addresses" ]]; then
+              while IFS= read -r address; do
+                [[ -n "$address" ]] || continue
+                printf '%s %s\n' "$address" "$SSH_HOST" | sudo tee -a /etc/hosts >/dev/null
+              done <<< "$resolved_addresses"
+              echo "Production SSH hostname resolved and pinned for this runner on attempt $attempt/$max_attempts."
+              exit 0
+            fi
+
+            echo "Production SSH DNS lookup attempt $attempt/$max_attempts failed."
+            if [[ "$attempt" -lt "$max_attempts" ]]; then
+              sleep 5
+            fi
+          done
+
+          echo "::error::Production SSH hostname did not resolve after $max_attempts attempts; stopping before image build and production drain."
+          exit 1
+
       - name: Compute deployment version
         id: version
         if: steps.freshness.outputs.is_current == 'true'
@@ -130,12 +178,19 @@ jobs:
                 : parsedDeployTags
                     .filter((tag) => tag.sha !== currentSha)
                     .at(-1);
+            const previousSuccessfulTag = parsedSuccessTags
+              .filter((tag) => tag.sha !== currentSha)
+              .at(-1);
 
             core.setOutput('version', version);
             core.setOutput('tag_name', `deploy/${version}`);
             core.setOutput('success_tag_name', `deploy-success/${version}`);
             core.setOutput('label_name', `version:${version}`);
             core.setOutput('previous_deploy_sha', latestSuccessfulTag ? latestSuccessfulTag.sha : '');
+            core.setOutput(
+              'previous_success_tag_name',
+              previousSuccessfulTag ? previousSuccessfulTag.ref.replace('refs/tags/', '') : ''
+            );
 
             if (latestSuccessfulTag) {
               core.info(`Previous successful deployment tag: ${latestSuccessfulTag.ref} (${latestSuccessfulTag.sha})`);
@@ -223,6 +278,7 @@ jobs:
           push: true
           build-args: |
             BACKEND_DEPLOY_VERSION=${{ steps.version.outputs.version }}
+            BACKEND_RELEASE_NOTES_URL=https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag_name }}
           secrets: |
             VITE_CESIUM_ION_TOKEN=${{ secrets.VITE_CESIUM_ION_TOKEN }}
           build-contexts: |
@@ -844,6 +900,7 @@ jobs:
             );
 
       - name: Mark deployment as successful
+        id: mark_deployment_successful
         if: steps.trigger_deploy.outcome == 'success' && steps.verify_deploy.outcome == 'success' && steps.label_deployed_prs.outcome == 'success' && (vars.DEPLOY_DRAIN_ENABLED != 'true' || ((steps.begin_drain.outputs.drain_bootstrap == 'true') && (steps.begin_drain.outputs.drain_cleanup_required != 'true' || steps.release_drain.outcome == 'success')) || (steps.begin_drain.outcome == 'success' && steps.wait_drain.outcome == 'success' && steps.mark_drain_deploying.outcome == 'success' && steps.release_drain.outcome == 'success'))
         uses: actions/github-script@v9
         env:
@@ -886,6 +943,80 @@ jobs:
                 throw error;
               }
             }
+
+      - name: Publish automatic release summary
+        id: publish_release_summary
+        if: steps.mark_deployment_successful.outcome == 'success'
+        continue-on-error: true
+        uses: actions/github-script@v9
+        env:
+          TAG_NAME: ${{ steps.version.outputs.tag_name }}
+          PREVIOUS_TAG_NAME: ${{ steps.version.outputs.previous_success_tag_name }}
+          DEPLOYMENT_VERSION: ${{ steps.version.outputs.version }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const tagName = process.env.TAG_NAME;
+            const version = process.env.DEPLOYMENT_VERSION;
+            const previousTagName = process.env.PREVIOUS_TAG_NAME;
+
+            const generatedNotes = await github.request(
+              'POST /repos/{owner}/{repo}/releases/generate-notes',
+              {
+                owner,
+                repo,
+                tag_name: tagName,
+                target_commitish: context.sha,
+                ...(previousTagName ? { previous_tag_name: previousTagName } : {}),
+              }
+            );
+            const body = generatedNotes.data.body || 'No user-facing changes in this deployment.';
+            const release = {
+              owner,
+              repo,
+              tag_name: tagName,
+              target_commitish: context.sha,
+              name: `Version ${version}`,
+              body,
+              draft: false,
+              prerelease: false,
+            };
+
+            try {
+              const existing = await github.request(
+                'GET /repos/{owner}/{repo}/releases/tags/{tag}',
+                { owner, repo, tag: tagName }
+              );
+              await github.request('PATCH /repos/{owner}/{repo}/releases/{release_id}', {
+                ...release,
+                release_id: existing.data.id,
+              });
+              core.info(`Updated release summary for ${tagName}`);
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              const created = await github.request('POST /repos/{owner}/{repo}/releases', release);
+              core.info(`Published release summary: ${created.data.html_url}`);
+            }
+
+      - name: Clean old deployment version labels
+        if: steps.mark_deployment_successful.outcome == 'success'
+        id: cleanup_deployment_version_labels
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_LABELS_TO_KEEP: '500'
+        run: bash .github/scripts/cleanup-deployment-version-labels.sh
+
+      - name: Report deployment label cleanup warning
+        if: steps.mark_deployment_successful.outcome == 'success' && steps.cleanup_deployment_version_labels.outcome == 'failure'
+        run: |
+          echo "::warning::Production deployment succeeded, but old deployment version labels could not be cleaned."
+          {
+            echo "### Deployment label cleanup needs attention"
+            echo
+            echo "The production deployment succeeded, but pruning old version labels failed. Run the **Clean old deployment version labels** workflow to retry."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Label merged PRs as non deployed when deployment fails
         if: >-
@@ -1028,6 +1159,7 @@ jobs:
             echo "| Image build | ${{ steps.build_image.outcome }} |"
             echo "| SSH deployment | ${{ steps.trigger_deploy.outcome }} |"
             echo "| Version verification | ${{ steps.verify_deploy.outcome }} |"
+            echo "| Release summary | ${{ steps.publish_release_summary.outcome }} |"
             echo "| Deployment labels | ${{ steps.label_deployed_prs.outcome }} |"
             echo "| Target version | ${{ steps.version.outputs.version }} |"
             echo "| Run | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |"

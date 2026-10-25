@@ -19,17 +19,29 @@ import {
   MenuItem,
   MenuTrigger,
   Popover,
+  Separator,
   TextField,
 } from 'react-aria-components';
 import {
+  ArrowDown,
+  ArrowUp,
   CheckSquare,
+  Check,
+  ChevronDown,
   FilePlus2,
+  Mountain,
   Upload,
   Search,
   Trash2,
   X,
   RefreshCw,
   MoreHorizontal,
+  Camera,
+  Clock3,
+  ExternalLink,
+  FileText,
+  Play,
+  Wand2,
 } from 'lucide-react';
 import { IntervalsSyncModal } from '../components/flights/intervals-sync/IntervalsSyncModal';
 import { CreateFlightModal } from '../components/flights/create-flight/CreateFlightModal';
@@ -37,13 +49,15 @@ import { CreateSiteModal } from '../components/flights/create-site/CreateSiteMod
 import { FlightsTable } from '../components/flights/table/FlightsTable';
 import { FlightDetails } from '../components/flights/details/FlightDetails';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
-import { Modal, Button } from '@dashboard-parapente/design-system';
+import { Modal } from '@dashboard-parapente/core/Modal';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { useToast } from '../hooks/useToast';
 import { HTTPError } from 'ky';
 import { api } from '../lib/api';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useFlight } from '../hooks/flights/useFlight';
 import { isGoproOverlayInProgress } from '../lib/flightMediaState';
+import { getFlightGpxProvider } from '../lib/flightGpxProvider';
 import {
   normalizeFlightsSearch,
   serializeFlightsSearch,
@@ -122,29 +136,145 @@ function FlightSearchInput({
         <Input
           maxLength={200}
           placeholder={t('flights.searchPlaceholder')}
-          className="min-h-11 w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+          className="min-h-11 w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 outline-none transition-colors focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 lg:min-h-10 lg:py-1.5"
         />
       </div>
     </TextField>
   );
 }
 
+function FlightSortMenu({
+  sort,
+  order,
+  onChange,
+}: {
+  sort: FlightsSearch['sort'];
+  order: FlightsSearch['order'];
+  onChange: (
+    sort: FlightsSearch['sort'],
+    order: FlightsSearch['order']
+  ) => void;
+}) {
+  const { t } = useTranslation();
+  const sortableColumns = [
+    { id: 'flight_date', label: t('flights.sortDate') },
+    { id: 'site_name', label: t('flights.sortSite') },
+    { id: 'duration_minutes', label: t('flights.sortDuration') },
+    { id: 'max_altitude_m', label: t('flights.sortAltitude') },
+    { id: 'distance_km', label: t('flights.sortDistance') },
+  ] as const;
+  const currentSortColumn =
+    sortableColumns.find((column) => column.id === sort) ?? sortableColumns[0];
+  const isDescending = order === 'desc';
+
+  return (
+    <MenuTrigger>
+      <AriaButton
+        aria-label={t(
+          isDescending ? 'dataList.sortByDesc' : 'dataList.sortByAsc',
+          { column: currentSortColumn.label }
+        )}
+        className="flex min-h-11 min-w-0 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700 lg:min-h-10"
+      >
+        <span className="max-w-20 truncate">{currentSortColumn.label}</span>
+        {isDescending ? (
+          <ArrowDown aria-hidden="true" className="h-4 w-4 shrink-0" />
+        ) : (
+          <ArrowUp aria-hidden="true" className="h-4 w-4 shrink-0" />
+        )}
+        <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+      </AriaButton>
+      <Popover
+        placement="bottom end"
+        className="z-40 mt-2 w-56 rounded-xl border border-gray-200 bg-white p-1 shadow-xl dark:border-gray-700 dark:bg-gray-800"
+      >
+        <Menu aria-label={t('flights.sortBy')} className="outline-none">
+          {sortableColumns.map((column) => {
+            const isCurrentColumn = column.id === currentSortColumn.id;
+            return (
+              <MenuItem
+                key={column.id}
+                aria-label={
+                  isCurrentColumn
+                    ? `${column.label}, ${t('flights.currentSort')}`
+                    : column.label
+                }
+                onAction={() => onChange(column.id, order)}
+                className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+              >
+                <Check
+                  aria-hidden="true"
+                  className={`h-4 w-4 shrink-0 ${isCurrentColumn ? '' : 'invisible'}`}
+                />
+                {column.label}
+              </MenuItem>
+            );
+          })}
+          <Separator className="my-1 border-t border-gray-200 dark:border-gray-700" />
+          <MenuItem
+            onAction={() => onChange(sort, isDescending ? 'asc' : 'desc')}
+            className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 focus:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+          >
+            {isDescending ? (
+              <ArrowUp aria-hidden="true" className="h-4 w-4 shrink-0" />
+            ) : (
+              <ArrowDown aria-hidden="true" className="h-4 w-4 shrink-0" />
+            )}
+            {t(
+              isDescending ? 'flights.sortAscending' : 'flights.sortDescending'
+            )}
+          </MenuItem>
+        </Menu>
+      </Popover>
+    </MenuTrigger>
+  );
+}
+
 const FLIGHT_BADGE_FILTERS = [
   { id: 'gpx', label: 'flights.gpxBadge' },
+  { id: 'gpxIcu', label: 'flights.gpxIcuBadge' },
+  { id: 'gpxStrava', label: 'flights.gpxStravaBadge' },
+  { id: 'gpxZepp', label: 'flights.gpxZeppBadge' },
+  { id: 'gpxNoSync', label: 'flights.gpxNoSyncBadge' },
   { id: 'sportstracklive', label: 'flights.sportstrackliveBadge' },
   { id: 'video', label: 'flights.videoBadge' },
   { id: 'camera', label: 'flights.cameraBadge' },
   { id: 'pano', label: 'flights.panoBadge' },
-  { id: 'goproOverlay', label: 'flights.goproOverlayBadge' },
+  { id: 'face', label: 'flights.faceBadge' },
+  { id: 'pilote', label: 'flights.piloteBadge' },
   { id: 'highlightVideo', label: 'flights.highlightVideoBadge' },
   { id: 'youtube', label: 'flights.youtubeBadge' },
+  { id: 'youtubeCamera', label: 'flights.youtubeCameraFilter' },
+  { id: 'youtubeVideo', label: 'flights.youtubeVideoFilter' },
+  { id: 'youtubePano', label: 'flights.youtubePanoFilter' },
+  { id: 'youtubeFace', label: 'flights.youtubeFaceFilter' },
+  { id: 'youtubePilote', label: 'flights.youtubePiloteFilter' },
+  { id: 'telemetryVideo', label: 'flights.telemetryVideoFilter' },
+  { id: 'youtubeTelemetry', label: 'flights.youtubeTelemetryFilter' },
+  { id: 'youtubeHighlight', label: 'flights.youtubeHighlightFilter' },
 ] as const;
+const PRIMARY_FLIGHT_BADGE_FILTERS = FLIGHT_BADGE_FILTERS.filter(
+  ({ id }) => id === 'gpx' || id === 'video'
+);
+const ADVANCED_FLIGHT_BADGE_FILTERS = FLIGHT_BADGE_FILTERS.filter(
+  ({ id }) => id !== 'gpx' && id !== 'video'
+);
 
 type FlightBadgeFilter = (typeof FLIGHT_BADGE_FILTERS)[number]['id'];
+type YoutubeVideoType = NonNullable<
+  FlightSummary['youtube_video_types']
+>[number];
 type BadgeFilterSelection = {
   included: FlightBadgeFilter[];
   excluded: FlightBadgeFilter[];
 };
+
+function hasYoutubeVideoType(
+  flight: FlightSummary,
+  ...types: YoutubeVideoType[]
+) {
+  return types.some((type) => flight.youtube_video_types?.includes(type));
+}
 
 function flightHasBadgeFilter(
   flight: FlightSummary,
@@ -153,6 +283,21 @@ function flightHasBadgeFilter(
   switch (filter) {
     case 'gpx':
       return flight.has_gpx;
+    case 'gpxIcu':
+      return flight.has_gpx && getFlightGpxProvider(flight) === 'intervals_icu';
+    case 'gpxStrava':
+      return flight.has_gpx && getFlightGpxProvider(flight) === 'strava';
+    case 'gpxZepp':
+      return (
+        flight.has_gpx &&
+        ['external', 'zepp'].includes(getFlightGpxProvider(flight) ?? '')
+      );
+    case 'gpxNoSync':
+      return (
+        flight.has_gpx &&
+        flight.gopro_overlay_gpx_offset == null &&
+        (flight.has_face_video === true || flight.has_pilote_video === true)
+      );
     case 'sportstracklive':
       return (
         flight.sportstracklive_status === 'uploaded' &&
@@ -169,12 +314,10 @@ function flightHasBadgeFilter(
       return flight.has_camera;
     case 'pano':
       return flight.has_pano_video;
-    case 'goproOverlay':
-      return (
-        flight.has_gopro_overlay ||
-        isGoproOverlayInProgress(flight.gopro_overlay_status) ||
-        flight.gopro_overlay_status === 'failed'
-      );
+    case 'face':
+      return flight.has_face_video === true;
+    case 'pilote':
+      return flight.has_pilote_video === true;
     case 'highlightVideo':
       return (
         flight.has_highlight_video ||
@@ -187,9 +330,37 @@ function flightHasBadgeFilter(
     case 'youtube':
       return (
         flight.has_youtube_video ||
+        (flight.youtube_video_types?.length ?? 0) > 0 ||
         flight.youtube_upload_status === 'queued' ||
-        flight.youtube_upload_status === 'uploading'
+        flight.youtube_upload_status === 'uploading' ||
+        flight.youtube_upload_status === 'failed'
       );
+    case 'youtubeCamera':
+      return hasYoutubeVideoType(flight, 'camera');
+    case 'youtubeVideo':
+      return hasYoutubeVideoType(flight, 'video');
+    case 'youtubePano':
+      return hasYoutubeVideoType(flight, 'pano');
+    case 'youtubeFace':
+      return hasYoutubeVideoType(flight, 'face');
+    case 'youtubePilote':
+      return hasYoutubeVideoType(flight, 'pilote');
+    case 'telemetryVideo':
+      return (
+        flight.youtube_telemetry_video_file_exists === true ||
+        flight.has_gopro_overlay ||
+        isGoproOverlayInProgress(flight.gopro_overlay_status) ||
+        flight.gopro_overlay_status === 'failed'
+      );
+    case 'youtubeTelemetry':
+      return hasYoutubeVideoType(
+        flight,
+        'youtube_telemetry',
+        'gopro_overlay',
+        'youtube_overlay'
+      );
+    case 'youtubeHighlight':
+      return hasYoutubeVideoType(flight, 'highlight');
   }
 }
 
@@ -226,6 +397,11 @@ export default function FlightHistory() {
   }, [flights, selectedBadgeFilters]);
   const activeBadgeFilterCount =
     selectedBadgeFilters.included.length + selectedBadgeFilters.excluded.length;
+  const advancedBadgeFilterCount = ADVANCED_FLIGHT_BADGE_FILTERS.filter(
+    ({ id }) =>
+      selectedBadgeFilters.included.includes(id) ||
+      selectedBadgeFilters.excluded.includes(id)
+  ).length;
   const totalFlights = summariesQuery.data?.pages[0]?.total ?? 0;
   const { fetchNextPage, hasNextPage, isFetchingNextPage } = summariesQuery;
   let flightCountLabel = t('flights.registered', { count: totalFlights });
@@ -249,6 +425,7 @@ export default function FlightHistory() {
 
   const selectedFlightId = params.flightId ?? null;
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [isTagFilterExpanded, setIsTagFilterExpanded] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [flightToDelete, setFlightToDelete] = useState<FlightSummary | null>(
     null
@@ -269,6 +446,70 @@ export default function FlightHistory() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const previousActiveJobs = useRef(activeJobsQuery.data ?? []);
+
+  const renderBadgeFilter = (filter: (typeof FLIGHT_BADGE_FILTERS)[number]) => {
+    const isIncluded = selectedBadgeFilters.included.includes(filter.id);
+    const isExcluded = selectedBadgeFilters.excluded.includes(filter.id);
+    const isSelected = isIncluded || isExcluded;
+    let badgeColorClassName =
+      'border-blue-200 bg-blue-50 text-blue-800 hover:border-blue-300 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-950/70';
+    if (filter.id === 'gpxNoSync') {
+      badgeColorClassName =
+        'border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-950/70';
+    } else if (filter.id.startsWith('gpx')) {
+      badgeColorClassName =
+        'border-emerald-200 bg-emerald-50 text-emerald-800 hover:border-emerald-300 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-950/70';
+    } else if (filter.id === 'sportstracklive') {
+      badgeColorClassName =
+        'border-sky-200 bg-sky-50 text-sky-800 hover:border-sky-300 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200 dark:hover:bg-sky-950/70';
+    } else if (filter.id.startsWith('youtube')) {
+      badgeColorClassName =
+        'border-red-200 bg-red-50 text-red-800 hover:border-red-300 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/70';
+    } else if (filter.id === 'highlightVideo') {
+      badgeColorClassName =
+        'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-800 hover:border-fuchsia-300 hover:bg-fuchsia-100 dark:border-fuchsia-800 dark:bg-fuchsia-950/40 dark:text-fuchsia-200 dark:hover:bg-fuchsia-950/70';
+    }
+    let stateClassName = badgeColorClassName;
+    let accessibleStateKey = 'flights.tagNotSelected';
+    if (isIncluded) {
+      stateClassName = `${badgeColorClassName} ring-2 ring-sky-500 ring-offset-1 dark:ring-offset-slate-900`;
+      accessibleStateKey = 'flights.tagIncluded';
+    } else if (isExcluded) {
+      stateClassName = `${badgeColorClassName} opacity-60 line-through`;
+      accessibleStateKey = 'flights.tagExcluded';
+    }
+
+    let BadgeIcon = Camera;
+    if (filter.id === 'gpxNoSync') BadgeIcon = Clock3;
+    else if (filter.id.startsWith('gpx')) BadgeIcon = FileText;
+    else if (filter.id === 'sportstracklive') BadgeIcon = ExternalLink;
+    else if (filter.id === 'highlightVideo') {
+      BadgeIcon = Wand2;
+    }
+    const TagIcon = filter.id.startsWith('youtube') ? Play : BadgeIcon;
+
+    return (
+      <button
+        key={filter.id}
+        type="button"
+        aria-pressed={isSelected}
+        aria-label={t(accessibleStateKey, { tag: t(filter.label) })}
+        onClick={() => toggleBadgeFilter(filter.id)}
+        className={`min-h-9 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 lg:min-h-8 lg:px-2.5 ${stateClassName}`}
+      >
+        <TagIcon className="mr-1 inline h-3.5 w-3.5" />
+        {isIncluded && (
+          <Check aria-hidden="true" className="mr-1 inline h-3.5 w-3.5" />
+        )}
+        {isExcluded && (
+          <span aria-hidden="true" className="mr-1 font-bold">
+            −
+          </span>
+        )}
+        {t(filter.label)}
+      </button>
+    );
+  };
 
   const renderDetailPanel = (mobileMode: boolean) => {
     if (selectedFlightId && selectedFlight) {
@@ -314,8 +555,15 @@ export default function FlightHistory() {
     }
 
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-12 shadow-md text-center">
-        <p className="text-gray-600 dark:text-gray-300">
+      <div className="flex min-h-72 flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center dark:border-slate-700 dark:bg-gray-800 lg:min-h-full">
+        <Mountain
+          aria-hidden="true"
+          className="mb-4 h-8 w-8 text-sky-700 dark:text-sky-300"
+        />
+        <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+          {t('flights.selectFlightTitle')}
+        </h2>
+        <p className="mt-2 max-w-sm text-sm text-gray-600 dark:text-gray-300">
           {t('flights.selectFlightHint')}
         </p>
       </div>
@@ -363,6 +611,7 @@ export default function FlightHistory() {
         }}
         hasMoreFlights={hasNextPage}
         isLoadingMore={isFetchingNextPage}
+        desktopPaneLayout
         onLoadMore={() => void fetchNextPage()}
         emptyMessage={
           activeBadgeFilterCount > 0
@@ -554,18 +803,13 @@ export default function FlightHistory() {
         setFlightToDelete(null);
       }
     } catch (err) {
-      let errorMessage = t('flights.unknownError');
-      if (err instanceof HTTPError) {
-        try {
-          const errorBody = await err.response.json();
-          errorMessage = errorBody.message || errorBody.detail || err.message;
-        } catch {
-          errorMessage = err.message;
-        }
-      } else if (err instanceof Error) {
-        errorMessage = err.message;
-      }
-      toast.error(t('flights.deleteError', { error: errorMessage }));
+      toast.error(
+        t(
+          err instanceof HTTPError && err.response.status === 404
+            ? 'flights.deleteNotFoundError'
+            : 'flights.deleteError'
+        )
+      );
     } finally {
       setIsDeleting(false);
     }
@@ -582,7 +826,7 @@ export default function FlightHistory() {
   ]);
 
   return (
-    <div>
+    <div className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
       <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-950 dark:text-white">
@@ -636,99 +880,23 @@ export default function FlightHistory() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(22rem,26rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(22rem,26rem)_minmax(0,1fr)] lg:grid-rows-1">
         {/* Flight List */}
         {(!isMobile || !showMobileDetail) && (
-          <aside className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/40">
-            {!selectionMode ? (
-              <div className="mb-3 space-y-2 border-b border-slate-200 pb-3 dark:border-slate-700">
-                <FlightSearchInput
-                  key={search.q ?? ''}
-                  initialQuery={search.q ?? ''}
-                  onQueryChange={handleSearchQueryChange}
-                />
-                <fieldset className="min-w-0 space-y-2">
-                  <legend className="text-xs font-semibold text-gray-600 dark:text-gray-300">
-                    {t('flights.tagFilter')}
-                  </legend>
-                  <div className="flex flex-wrap gap-1.5">
-                    {FLIGHT_BADGE_FILTERS.map((filter) => {
-                      const isIncluded = selectedBadgeFilters.included.includes(
-                        filter.id
-                      );
-                      const isExcluded = selectedBadgeFilters.excluded.includes(
-                        filter.id
-                      );
-                      const isSelected = isIncluded || isExcluded;
-                      let stateClassName =
-                        'border-slate-300 bg-white text-slate-700 hover:border-sky-400 hover:bg-sky-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700';
-                      let accessibleStateKey = 'flights.tagNotSelected';
-                      if (isIncluded) {
-                        stateClassName =
-                          'border-sky-600 bg-sky-600 text-white dark:border-sky-400 dark:bg-sky-400 dark:text-slate-950';
-                        accessibleStateKey = 'flights.tagIncluded';
-                      }
-                      if (isExcluded) {
-                        stateClassName =
-                          'border-rose-600 bg-rose-600 text-white dark:border-rose-400 dark:bg-rose-400 dark:text-slate-950';
-                        accessibleStateKey = 'flights.tagExcluded';
-                      }
-                      return (
-                        <button
-                          key={filter.id}
-                          type="button"
-                          aria-pressed={isSelected}
-                          aria-label={t(accessibleStateKey, {
-                            tag: t(filter.label),
-                          })}
-                          onClick={() => toggleBadgeFilter(filter.id)}
-                          className={`min-h-9 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${stateClassName}`}
-                        >
-                          {isExcluded && (
-                            <span aria-hidden="true" className="mr-1 font-bold">
-                              −
-                            </span>
-                          )}
-                          {t(filter.label)}
-                        </button>
-                      );
-                    })}
-                    {activeBadgeFilterCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSelectedBadgeFilters({
-                            included: [],
-                            excluded: [],
-                          })
-                        }
-                        className="min-h-9 rounded-full px-3 py-1 text-xs font-medium text-sky-700 underline underline-offset-2 hover:text-sky-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-sky-300 dark:hover:text-sky-100"
-                      >
-                        {t('flights.allTags')}
-                      </button>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {t('flights.tagFilterInstructions')}
-                  </p>
-                </fieldset>
-                <div className="flex justify-end">
-                  <Button
-                    variant="ghost"
-                    onClick={handleToggleSelectionMode}
-                    className="min-h-10 rounded-lg px-3 py-2 text-sm"
-                  >
-                    <CheckSquare className="h-4 w-4" aria-hidden="true" />
-                    {t('flights.select')}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-800 dark:bg-sky-950/30">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <span className="text-sm font-semibold text-sky-900 dark:text-sky-100">
+          <aside className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/40 lg:flex lg:min-h-0 lg:flex-col lg:p-2.5">
+            {selectionMode ? (
+              <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-800 dark:bg-sky-950/30 lg:max-h-[55%] lg:shrink-0 lg:overflow-y-auto">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-sky-900 dark:text-sky-100">
                     {t('flights.selected', { count: selectedCount })}
                   </span>
+                  <FlightSortMenu
+                    sort={search.sort}
+                    order={search.order}
+                    onChange={(sort, order) =>
+                      void navigateWithSearch({ ...search, sort, order })
+                    }
+                  />
                   <Button
                     variant="ghost"
                     size="icon"
@@ -765,6 +933,110 @@ export default function FlightHistory() {
                   </Button>
                 </div>
               </div>
+            ) : (
+              <div className="mb-3 space-y-2 border-b border-slate-200 pb-3 dark:border-slate-700 lg:mb-2 lg:space-y-1.5 lg:pb-2 lg:max-h-[55%] lg:shrink-0 lg:overflow-y-auto">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <FlightSearchInput
+                      key={search.q ?? ''}
+                      initialQuery={search.q ?? ''}
+                      onQueryChange={handleSearchQueryChange}
+                    />
+                  </div>
+                  <FlightSortMenu
+                    sort={search.sort}
+                    order={search.order}
+                    onChange={(sort, order) =>
+                      void navigateWithSearch({ ...search, sort, order })
+                    }
+                  />
+                </div>
+                <fieldset className="min-w-0 space-y-2 lg:space-y-1">
+                  <legend className="flex w-full items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      aria-expanded={isTagFilterExpanded}
+                      aria-controls="flight-tag-filter-options"
+                      aria-label={
+                        activeBadgeFilterCount > 0
+                          ? t('flights.tagFilterActive', {
+                              count: activeBadgeFilterCount,
+                            })
+                          : undefined
+                      }
+                      onClick={() =>
+                        setIsTagFilterExpanded((expanded) => !expanded)
+                      }
+                      className="flex min-h-9 min-w-0 items-center gap-2 text-left text-xs font-semibold text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-gray-300 lg:min-h-8"
+                    >
+                      {t('flights.tagFilter')}
+                      {activeBadgeFilterCount > 0 && (
+                        <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-sky-800 dark:bg-sky-900 dark:text-sky-100">
+                          {activeBadgeFilterCount}
+                        </span>
+                      )}
+                      <ChevronDown
+                        className={`h-4 w-4 shrink-0 transition-transform ${
+                          isTagFilterExpanded ? 'rotate-180' : ''
+                        }`}
+                        aria-hidden="true"
+                      />
+                    </button>
+                    <Button
+                      variant="ghost"
+                      onClick={handleToggleSelectionMode}
+                      className="min-h-10 shrink-0 rounded-lg px-2 py-1 text-xs sm:text-sm lg:min-h-8"
+                    >
+                      <CheckSquare className="h-4 w-4" aria-hidden="true" />
+                      {t('flights.select')}
+                    </Button>
+                  </legend>
+                  <div
+                    id="flight-tag-filter-options"
+                    hidden={!isTagFilterExpanded}
+                    className="space-y-2 lg:space-y-1"
+                  >
+                    <div className="flex flex-wrap gap-1.5">
+                      {PRIMARY_FLIGHT_BADGE_FILTERS.map(renderBadgeFilter)}
+                    </div>
+                    <details className="group rounded-lg">
+                      <summary className="flex min-h-9 cursor-pointer list-none items-center gap-1 rounded-md text-xs font-medium text-sky-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-sky-300 lg:min-h-8">
+                        {advancedBadgeFilterCount > 0
+                          ? t('flights.moreTagFiltersActive', {
+                              count: advancedBadgeFilterCount,
+                            })
+                          : t('flights.moreTagFilters')}
+                        <ChevronDown
+                          aria-hidden="true"
+                          className="h-3.5 w-3.5 transition-transform group-open:rotate-180"
+                        />
+                      </summary>
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {ADVANCED_FLIGHT_BADGE_FILTERS.map(renderBadgeFilter)}
+                      </div>
+                    </details>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {t('flights.tagFilterInstructions')}
+                    </p>
+                    {activeBadgeFilterCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedBadgeFilters({
+                            included: [],
+                            excluded: [],
+                          })
+                        }
+                        className="min-h-9 rounded-md px-2 text-xs font-medium text-sky-700 underline underline-offset-2 hover:text-sky-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-sky-300 dark:hover:text-sky-100"
+                      >
+                        {t('flights.clearTagFilters', {
+                          count: activeBadgeFilterCount,
+                        })}
+                      </button>
+                    )}
+                  </div>
+                </fieldset>
+              </div>
             )}
             {renderListPanel()}
           </aside>
@@ -772,7 +1044,9 @@ export default function FlightHistory() {
 
         {/* Detail Panel + 3D Viewer (desktop) */}
         {!isMobile && (
-          <main className="min-w-0 space-y-4">{renderDetailPanel(false)}</main>
+          <main className="min-h-0 min-w-0 space-y-4 overflow-y-auto pr-1">
+            {renderDetailPanel(false)}
+          </main>
         )}
 
         {/* Detail Panel + 3D Viewer (mobile) */}

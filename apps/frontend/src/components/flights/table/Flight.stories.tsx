@@ -5,6 +5,7 @@ import { fn } from 'storybook/test';
 
 const mockFlight: FlightSummary = {
   id: 'flight-1',
+  tags: [],
   flight_date: '2024-03-15',
   site_name: 'Puy de Dome',
   site_id: 'site-1',
@@ -19,12 +20,14 @@ const mockFlight: FlightSummary = {
   has_gpx: true,
   has_video: true,
   has_camera: true,
+  youtube_telemetry_video_file_exists: false,
   has_youtube_video: false,
   youtube_video_count: 0,
   youtube_upload_status: null,
   youtube_upload_progress: null,
   has_gopro_overlay: true,
   has_pano_video: false,
+  has_osv: false,
   has_highlight_video: false,
   video_export_job_id: null,
   video_export_status: null,

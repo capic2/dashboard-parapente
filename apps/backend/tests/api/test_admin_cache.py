@@ -65,25 +65,25 @@ class TestGetCacheOverview:
         r = seeded_redis
         # Seed data
         for i in range(3):
-            await r.setex(
+            await r.set(
                 f"weather:forecast:hash{i}",
-                3600,
                 json.dumps({"temperature": 15 + i, "cached_at": "2026-01-15T10:00:00+00:00"}),
+                ex=3600,
             )
-        await r.setex(
+        await r.set(
             "best_spot:day_0",
-            3600,
             json.dumps({"site": "arguel", "cached_at": "2026-01-15T10:00:00+00:00"}),
+            ex=3600,
         )
-        await r.setex(
+        await r.set(
             "best_spot:day_1",
-            1800,
             json.dumps({"site": "chalais", "cached_at": "2026-01-15T10:00:00+00:00"}),
+            ex=1800,
         )
-        await r.setex(
+        await r.set(
             "emagram:sounding:07145:12:2026-01-15",
-            86400,
             json.dumps({"success": True, "cached_at": "2026-01-15T10:00:00+00:00"}),
+            ex=86400,
         )
 
         response = client.get("/api/admin/cache")
@@ -121,25 +121,25 @@ class TestGetCacheOverview:
             day_index=2,
         )
 
-        await seeded_redis.setex(
+        await seeded_redis.set(
             forecast_key,
-            3600,
             json.dumps({"temperature": 16, "cached_at": "2026-01-15T10:00:00+00:00"}),
+            ex=3600,
         )
-        await seeded_redis.setex(
+        await seeded_redis.set(
             "best_spot:day_2",
-            3600,
             json.dumps({"site": "arguel", "cached_at": "2026-01-15T10:00:00+00:00"}),
+            ex=3600,
         )
-        await seeded_redis.setex(
+        await seeded_redis.set(
             "emagram:sounding:07145:12:2026-01-15",
-            3600,
             json.dumps({"station_code": "07145", "cached_at": "2026-01-15T10:00:00+00:00"}),
+            ex=3600,
         )
-        await seeded_redis.setex(
+        await seeded_redis.set(
             "emagram:analysis:site-arguel:2026-01-15:12",
-            3600,
             json.dumps({"analysis_id": "abc123", "cached_at": "2026-01-15T10:00:00+00:00"}),
+            ex=3600,
         )
 
         response = client.get("/api/admin/cache")
@@ -180,11 +180,7 @@ class TestGetCacheOverview:
     @pytest.mark.anyio
     async def test_cache_overview_unresolved_key(self, client, db_session, seeded_redis):
         """Unknown cache keys keep compatibility by returning null resolution."""
-        await seeded_redis.setex(
-            "custom:key:raw",
-            300,
-            json.dumps({"payload": "value"}),
-        )
+        await seeded_redis.set("custom:key:raw", json.dumps({"payload": "value"}), ex=300)
 
         response = client.get("/api/admin/cache")
         assert response.status_code == 200
@@ -228,10 +224,10 @@ class TestGetCacheOverview:
         db_session,
         seeded_redis,
     ):
-        await seeded_redis.setex(
+        await seeded_redis.set(
             "weather:forecast:abc123",
-            3600,
             json.dumps({"temperature": 16, "cached_at": "2026-01-15T10:00:00+00:00"}),
+            ex=3600,
         )
 
         with patch(
@@ -252,10 +248,10 @@ class TestGetCacheKeyDetail:
     @pytest.mark.anyio
     async def test_key_detail_found(self, client, db_session, seeded_redis):
         """Existing JSON key returns parsed value with metadata."""
-        await seeded_redis.setex(
+        await seeded_redis.set(
             "best_spot:day_0",
-            3600,
             json.dumps({"site": "arguel", "score": 75, "cached_at": "2026-01-15T10:00:00+00:00"}),
+            ex=3600,
         )
 
         response = client.get("/api/admin/cache/best_spot:day_0")
@@ -277,7 +273,7 @@ class TestGetCacheKeyDetail:
     @pytest.mark.anyio
     async def test_key_detail_non_json(self, client, db_session, seeded_redis):
         """Non-JSON value returns type=string."""
-        await seeded_redis.setex("test:plain", 300, "just a string value")
+        await seeded_redis.set("test:plain", "just a string value", ex=300)
 
         response = client.get("/api/admin/cache/test:plain")
         assert response.status_code == 200
@@ -307,7 +303,7 @@ class TestGetCacheKeyDetail:
         db_session,
         seeded_redis,
     ):
-        await seeded_redis.setex("custom:key:raw", 300, json.dumps({"payload": "value"}))
+        await seeded_redis.set("custom:key:raw", json.dumps({"payload": "value"}), ex=300)
 
         response = client.get("/api/admin/cache/custom:key:raw")
         assert response.status_code == 200
@@ -326,10 +322,10 @@ class TestGetCacheKeyDetail:
             day_index=1,
         )
 
-        await seeded_redis.setex(
+        await seeded_redis.set(
             forecast_key,
-            3600,
             json.dumps({"site": "arguel", "cached_at": "2026-01-15T10:00:00+00:00"}),
+            ex=3600,
         )
 
         response = client.get(f"/api/admin/cache/{forecast_key}")
@@ -342,10 +338,10 @@ class TestGetCacheKeyDetail:
 
     @pytest.mark.anyio
     async def test_key_detail_best_spot_includes_resolution(self, client, db_session, seeded_redis):
-        await seeded_redis.setex(
+        await seeded_redis.set(
             "best_spot:day_3",
-            3600,
             json.dumps({"site": "arguel", "cached_at": "2026-01-15T10:00:00+00:00"}),
+            ex=3600,
         )
 
         response = client.get("/api/admin/cache/best_spot:day_3")
@@ -362,10 +358,10 @@ class TestGetCacheKeyDetail:
         db_session,
         seeded_redis,
     ):
-        await seeded_redis.setex(
+        await seeded_redis.set(
             "weather:forecast:abc123",
-            3600,
             json.dumps({"temperature": 16, "cached_at": "2026-01-15T10:00:00+00:00"}),
+            ex=3600,
         )
 
         with patch(
@@ -379,10 +375,10 @@ class TestGetCacheKeyDetail:
 
     @pytest.mark.anyio
     async def test_key_detail_emagram_includes_resolution(self, client, db_session, seeded_redis):
-        await seeded_redis.setex(
+        await seeded_redis.set(
             "emagram:sounding:07145:12:2026-01-15",
-            3600,
             json.dumps({"station_code": "07145", "cached_at": "2026-01-15T10:00:00+00:00"}),
+            ex=3600,
         )
 
         response = client.get("/api/admin/cache/emagram:sounding:07145:12:2026-01-15")
@@ -401,7 +397,7 @@ class TestDeleteCacheKey:
     @pytest.mark.anyio
     async def test_delete_single_key(self, client, db_session, seeded_redis):
         """Deleting a single key removes it from cache."""
-        await seeded_redis.setex("best_spot:day_0", 3600, json.dumps({"site": "arguel"}))
+        await seeded_redis.set("best_spot:day_0", json.dumps({"site": "arguel"}), ex=3600)
 
         response = client.delete("/api/admin/cache/best_spot:day_0")
         assert response.status_code == 200
@@ -417,8 +413,8 @@ class TestDeleteCacheKey:
     async def test_delete_pattern(self, client, db_session, seeded_redis):
         """Deleting with wildcard pattern removes matching keys."""
         for i in range(3):
-            await seeded_redis.setex(f"weather:forecast:hash{i}", 3600, json.dumps({"temp": i}))
-        await seeded_redis.setex("best_spot:day_0", 3600, json.dumps({"site": "arguel"}))
+            await seeded_redis.set(f"weather:forecast:hash{i}", json.dumps({"temp": i}), ex=3600)
+        await seeded_redis.set("best_spot:day_0", json.dumps({"site": "arguel"}), ex=3600)
 
         response = client.delete("/api/admin/cache/weather:forecast:*")
         assert response.status_code == 200
@@ -472,16 +468,10 @@ class TestClearEmagramCache:
             )
         db_session.commit()
 
-        await seeded_redis.setex(
-            "emagram:sounding:07145:12:2026-01-15",
-            3600,
-            json.dumps({"station_code": "07145"}),
+        await seeded_redis.set(
+            "emagram:sounding:07145:12:2026-01-15", json.dumps({"station_code": "07145"}), ex=3600
         )
-        await seeded_redis.setex(
-            "weather:forecast:day_0",
-            3600,
-            json.dumps({"site_code": "ARG"}),
-        )
+        await seeded_redis.set("weather:forecast:day_0", json.dumps({"site_code": "ARG"}), ex=3600)
 
         response = client.post("/api/admin/clear-emagram-cache")
         assert response.status_code == 200

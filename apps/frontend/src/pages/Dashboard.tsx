@@ -6,7 +6,7 @@ import { CalendarDays, CloudSun, MapPinned } from 'lucide-react';
 import StatsPanel from '../components/dashboard/StatsPanel';
 import AllSitesConditions from '../components/dashboard/AllSitesConditions';
 import { BestSpotSuggestion } from '../components/weather/BestSpotSuggestion';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import {
   useBestSpotAPI,
@@ -167,8 +167,6 @@ export default function Dashboard() {
       </section>
 
       <div className="space-y-4">
-        <StatsPanel />
-
         <BestSpotSuggestion
           bestSpot={bestSpot ?? null}
           hourlyBestSpots={hourlyBestSpots?.hours ?? []}
@@ -189,6 +187,8 @@ export default function Dashboard() {
           entries={siteWeatherEntries}
           onRefresh={refreshFailedWeather}
         />
+
+        <StatsPanel />
       </div>
     </div>
   );

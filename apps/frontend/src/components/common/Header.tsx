@@ -5,6 +5,7 @@ import {
   Button as AriaButton,
   Dialog,
   DialogTrigger,
+  Heading,
   Menu,
   MenuItem,
   MenuTrigger,
@@ -13,7 +14,7 @@ import {
   Popover,
 } from 'react-aria-components';
 import { MonitorCog, Moon, Sun } from 'lucide-react';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore, type ThemePreference } from '../../stores/themeStore';
 import { appTitle } from '../../lib/appEnvironment';
@@ -68,7 +69,12 @@ export default function Header() {
           <Link to="/sites" className={linkClassName} onClick={onNavigate}>
             {t('header.sites')}
           </Link>
-          <Link to="/settings" className={linkClassName} onClick={onNavigate}>
+          <Link
+            to="/settings"
+            search={{ tab: undefined }}
+            className={linkClassName}
+            onClick={onNavigate}
+          >
             {t('header.settings')}
           </Link>
           <Link to="/infrastructure" className={linkClass} onClick={onNavigate}>
@@ -235,9 +241,12 @@ export default function Header() {
                 {({ close }: { close: () => void }) => (
                   <>
                     <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-                      <span className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+                      <Heading
+                        slot="title"
+                        className="text-lg font-semibold text-gray-800 dark:text-gray-100"
+                      >
                         {t('header.menu', 'Menu')}
-                      </span>
+                      </Heading>
                       <AriaButton
                         onPress={close}
                         aria-label={t('header.closeMenu', 'Fermer le menu')}

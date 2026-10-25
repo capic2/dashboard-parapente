@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSites } from '../../hooks/sites/useSites';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import {
   useLandingAssociations,
   useAddLandingAssociation,
@@ -139,7 +139,7 @@ export default function LandingAssociationsManager({
                     {assoc.landing_site?.name || assoc.landing_site_id}
                   </span>
                   <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {assoc.distance_km != null ? `${assoc.distance_km} km` : ''}
+                    {assoc.distance_km == null ? '' : `${assoc.distance_km} km`}
                     {assoc.notes && ` - ${assoc.notes}`}
                   </span>
                 </div>
@@ -160,17 +160,7 @@ export default function LandingAssociationsManager({
       )}
 
       {/* Add new association */}
-      {!showAddDropdown ? (
-        <Button
-          type="button"
-          onClick={() => setShowAddDropdown(true)}
-          variant="ghost"
-          className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-          isDisabled={availableLandings.length === 0}
-        >
-          + {t('landings.addLanding')}
-        </Button>
-      ) : (
+      {showAddDropdown ? (
         <div className="space-y-2 bg-gray-50 dark:bg-gray-700 rounded p-2">
           <select
             value={selectedLandingId}
@@ -216,6 +206,16 @@ export default function LandingAssociationsManager({
             </Button>
           </div>
         </div>
+      ) : (
+        <Button
+          type="button"
+          onClick={() => setShowAddDropdown(true)}
+          variant="ghost"
+          className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+          isDisabled={availableLandings.length === 0}
+        >
+          + {t('landings.addLanding')}
+        </Button>
       )}
     </div>
   );

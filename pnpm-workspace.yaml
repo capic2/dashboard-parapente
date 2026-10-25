@@ -5,6 +5,10 @@ packages:
 enableGlobalVirtualStore: false
 minimumReleaseAge: 0
 
+overrides:
+  react: 19.3.1
+  react-dom: 19.3.1
+
 allowBuilds:
   core-js: true
   esbuild: true
@@ -15,10 +19,10 @@ allowBuilds:
 
 catalog:
   '@chromatic-com/storybook': ^5.1.1
-  '@nx/playwright': ^23.0.0
-  '@nx/vite': ^23.0.0
-  '@nx/vitest': ^23.0.0
-  '@playwright/test': 1.63.0
+  '@nx/playwright': ^24.0.0
+  '@nx/vite': ^24.0.0
+  '@nx/vitest': ^24.0.0
+  '@playwright/test': 1.64.1
   '@storybook/addon-a11y': ^10.3.3
   '@storybook/addon-docs': ^10.3.3
   '@storybook/addon-vitest': ^10.3.4
@@ -37,14 +41,14 @@ catalog:
   '@types/react': ^19.0.0
   '@types/react-dom': ^19.0.0
   '@vitejs/plugin-react': ^6.0.0
-  '@vitest/browser-playwright': 5.0.3
-  '@vitest/coverage-v8': 5.0.3
-  '@vitest/ui': 5.0.3
+  '@vitest/browser-playwright': 5.0.5
+  '@vitest/coverage-v8': 5.0.5
+  '@vitest/ui': 5.0.5
   '@internationalized/date': ^3.7.0
   cesium: ^1.139.1
   chromatic: ^18.0.0
   date-fns: ^4.0.0
-  happy-dom: ^20.8.9
+  happy-dom: ^21.0.0
   husky: ^9.1.7
   i18next: ^26.0.1
   i18next-browser-languagedetector: ^8.2.1
@@ -54,24 +58,24 @@ catalog:
   lucide-react: ^1.7.0
   msw: ^3.0.0
   msw-storybook-addon: ^3.0.0
-  nx: ^23.0.0
-  oxfmt: ^0.71.0
+  nx: ^24.0.0
+  oxfmt: ^0.74.0
   oxlint: ^1.57.0
-  playwright: 1.63.0
-  react: 19.3.0
-  react-aria-components: ^1.5.0
-  react-dom: 19.3.0
+  playwright: 1.64.1
+  react: 19.3.1
+  react-aria-components: ^1.18.0
+  react-dom: 19.3.1
   react-i18next: ^17.0.1
   react-is: ^19.2.4
   recharts: ^3.8.0
-  storybook: 10.6.1
+  storybook: 10.6.3
   storybook-react-i18next: ^10.1.1
   tailwind-merge: ^3.5.0
   tailwind-variants: ^3.2.2
   tailwindcss: ^4.2.1
   typescript: ^7.0.0
-  vite: 8.3.2
+  vite: 8.3.5
   vite-plugin-cesium: 1.2.23
-  vitest: 5.0.3
+  vitest: 5.0.5
   zod: ^4.3.6
   zustand: ^5.0.11
