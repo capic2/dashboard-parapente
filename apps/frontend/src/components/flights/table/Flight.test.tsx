@@ -129,6 +129,63 @@ test('renders media and OSV sources as passive statuses in the flight list', () 
   expect(screen.queryByText('flights.youtubeBadge')).not.toBeInTheDocument();
 });
 
+test('shows enriched GPX without the generic GPX badge', () => {
+  render(
+    <Flight
+      flight={{ ...flight, has_gpx: true, has_gpx_enrichment: true }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(screen.getByText('flights.gpxEnrichedBadge')).toBeInTheDocument();
+  expect(screen.queryByText('flights.gpxBadge')).not.toBeInTheDocument();
+});
+
+test('shows only the enriched GPX badge when the stored GPX is enriched', () => {
+  render(
+    <Flight
+      flight={{
+        ...flight,
+        has_gpx: true,
+        has_gpx_enrichment: true,
+        gpx_provider: 'zepp',
+      }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(screen.getByText('flights.gpxEnrichedBadge')).toBeInTheDocument();
+  expect(screen.queryByText('flights.gpxZeppBadge')).not.toBeInTheDocument();
+  expect(screen.queryByText('flights.gpxBadge')).not.toBeInTheDocument();
+});
+
+test('shows only the GPX provider badge when the stored GPX is not enriched', () => {
+  render(
+    <Flight
+      flight={{ ...flight, has_gpx: true, gpx_provider: 'zepp' }}
+      isActive={false}
+      isSelected={false}
+      selectionMode={false}
+      onSelectFlight={() => undefined}
+      onDeleteFlight={() => undefined}
+    />
+  );
+
+  expect(screen.getByText('flights.gpxZeppBadge')).toBeInTheDocument();
+  expect(
+    screen.queryByText('flights.gpxEnrichedBadge')
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText('flights.gpxBadge')).not.toBeInTheDocument();
+});
+
 test('shows a queued GoPro overlay as waiting instead of in progress', () => {
   render(
     <Flight
