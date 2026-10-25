@@ -1,5 +1,5 @@
 import preview from '../../../.storybook/preview';
-import { TextField } from './TextField';
+import { TextField } from '@dashboard-parapente/design-system/form';
 
 const meta = preview.meta({
   title: 'Components/Form/TextField',
