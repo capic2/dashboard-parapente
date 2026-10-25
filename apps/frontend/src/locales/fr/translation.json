@@ -1359,6 +1359,7 @@
     "temporarySourceDeleted": "Fichier local supprimé",
     "temporarySourceDeleteError": "Impossible de supprimer le fichier local",
     "gpxBadge": "GPX",
+    "gpxEnrichedBadge": "GPX · enrichi",
     "gpxNoSyncBadge": "Non synchronisé",
     "gpxIcuBadge": "GPX · ICU",
     "gpxStravaBadge": "GPX · Strava",
