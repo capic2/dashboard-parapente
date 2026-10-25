@@ -236,7 +236,7 @@ test('renders available media badges in the expected order', () => {
     'flights.videoBadge',
     'flights.cameraBadge',
     'flights.panoBadge',
-    'flights.goproOverlayBadge',
+    'flights.youtubeTelemetryBadge',
     'flights.highlightVideoBadge',
     'flights.youtubeBadge',
   ].map((label) => screen.getByText(label));
@@ -372,7 +372,7 @@ test('renders a YouTube badge for each available video in source order', () => {
   expect(screen.queryByText('flights.youtubeBadge x2')).not.toBeInTheDocument();
 });
 
-test('renders a separate badge when the telemetry video file is available locally', () => {
+test('renders the telemetry video badge when the file is available locally', () => {
   render(
     <Flight
       flight={{ ...flight, youtube_telemetry_video_file_exists: true }}
@@ -384,10 +384,5 @@ test('renders a separate badge when the telemetry video file is available locall
     />
   );
 
-  expect(
-    screen.getByText('flights.youtubeTelemetryLocalBadge')
-  ).toBeInTheDocument();
-  expect(
-    screen.queryByText('flights.youtubeTelemetryBadge')
-  ).not.toBeInTheDocument();
+  expect(screen.getByText('flights.youtubeTelemetryBadge')).toBeInTheDocument();
 });
