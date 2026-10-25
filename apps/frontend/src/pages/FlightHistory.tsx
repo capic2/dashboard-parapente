@@ -482,7 +482,7 @@ export default function FlightHistory() {
     if (filter.id === 'gpxNoSync') BadgeIcon = Clock3;
     else if (filter.id.startsWith('gpx')) BadgeIcon = FileText;
     else if (filter.id === 'sportstracklive') BadgeIcon = ExternalLink;
-    else if (filter.id === 'goproOverlay' || filter.id === 'highlightVideo') {
+    else if (filter.id === 'highlightVideo') {
       BadgeIcon = Wand2;
     }
     const TagIcon = filter.id.startsWith('youtube') ? Play : BadgeIcon;
