@@ -725,6 +725,10 @@ def test_summaries_flag_gpx_path_that_does_not_point_to_enriched_track(
     summaries = {item["id"]: item for item in response.json()["flights"]}
 
     assert response.status_code == 200
+    assert summaries["mismatch"]["has_gpx_enrichment"] is False
+    assert summaries["enriched"]["has_gpx_enrichment"] is True
+    assert summaries["missing-path"]["has_gpx_enrichment"] is False
+    assert summaries["missing-enriched"]["has_gpx_enrichment"] is False
     assert summaries["mismatch"]["has_gpx_enrichment_mismatch"] is True
     assert summaries["enriched"]["has_gpx_enrichment_mismatch"] is False
     assert summaries["missing-path"]["has_gpx_enrichment_mismatch"] is True

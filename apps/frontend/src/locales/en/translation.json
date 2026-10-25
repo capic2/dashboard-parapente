@@ -1355,6 +1355,7 @@
     "temporarySourceDeleted": "Local file deleted",
     "temporarySourceDeleteError": "Unable to delete the local file",
     "gpxBadge": "GPX",
+    "gpxEnrichedBadge": "GPX · enriched",
     "gpxNoSyncBadge": "No sync",
     "gpxIcuBadge": "GPX · ICU",
     "gpxStravaBadge": "GPX · Strava",

@@ -559,6 +559,7 @@ def list_flight_summaries(
     face_flags: dict[str, bool] = {}
     pilote_flags: dict[str, bool] = {}
     osv_flags: dict[str, bool] = {}
+    gpx_enrichment_flags: dict[str, bool] = {}
     gpx_enrichment_mismatch_flags: dict[str, bool] = {}
     for row in rows:
         flight_directory = _flight_directory(row.flight_date, row.flight_sequence)
@@ -576,6 +577,11 @@ def list_flight_summaries(
         osv_flags[row.id] = _directory_has_osv_files(flight_directory)
         source_gpx_path = _resolve_file_path(row.gpx_source_file_path or row.gpx_file_path)
         current_gpx_path = _resolve_file_path(row.gpx_file_path)
+        gpx_enrichment_flags[row.id] = bool(
+            current_gpx_path
+            and current_gpx_path.is_file()
+            and current_gpx_path.resolve() == enriched_gpx_path(flight_directory).resolve()
+        )
         gpx_enrichment_mismatch_flags[row.id] = bool(
             source_gpx_path
             and source_gpx_path.is_file()
@@ -644,6 +650,7 @@ def list_flight_summaries(
             ),
             has_pano_video=pano_flags[row.id],
             has_osv=osv_flags[row.id],
+            has_gpx_enrichment=gpx_enrichment_flags[row.id],
             has_gpx_enrichment_mismatch=gpx_enrichment_mismatch_flags[row.id],
             has_face_video=face_flags[row.id],
             has_pilote_video=pilote_flags[row.id],
