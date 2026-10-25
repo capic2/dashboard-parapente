@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { CloudUpload } from 'lucide-react';
 import { useUploadFlightToSportstracklive } from '../../../hooks/flights/useSportstrackliveUpload';
 import { useToast } from '../../../hooks/useToast';

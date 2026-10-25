@@ -12,7 +12,7 @@ import {
   Waves,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { useFlightStats } from '../../hooks/flights/useFlights';
 import { parseApiLocalDate } from '../../lib/date';
 

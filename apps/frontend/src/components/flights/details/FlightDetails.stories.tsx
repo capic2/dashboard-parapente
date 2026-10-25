@@ -1,7 +1,7 @@
 import preview from '../../../../.storybook/preview';
 import { expect, fn, userEvent, waitFor } from 'storybook/test';
 import { FlightDetails } from './FlightDetails';
-import { ToastContainer } from '@dashboard-parapente/design-system';
+import { ToastContainer } from '@dashboard-parapente/core/Toast';
 import { useToastStore } from '../../../hooks/useToast';
 import type { Flight, Site } from '../../../types';
 import { defaultHandlers, fullFlight } from './FlightDetails.story-mocks';

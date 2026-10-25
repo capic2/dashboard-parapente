@@ -1,12 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, ChevronDown, MapPin, Search, X } from 'lucide-react';
-import {
-  Tab,
-  TabList,
-  TabPanel,
-  Tabs,
-} from '@dashboard-parapente/design-system';
+import { Tab, TabList, TabPanel, Tabs } from '@dashboard-parapente/core/Tabs';
 import type { Site } from '@dashboard-parapente/shared-types';
 import { getSiteDisplayName } from '../../lib/siteDisplay';
 import CityWeatherSearch, { type CityWeatherTarget } from './CityWeatherSearch';

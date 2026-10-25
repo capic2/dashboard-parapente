@@ -6,7 +6,7 @@ import { FlightMediaThumbnail } from './FlightMediaThumbnail';
 
 const { apiGet } = vi.hoisted(() => ({ apiGet: vi.fn() }));
 
-vi.mock('@dashboard-parapente/design-system', () => ({
+vi.mock('@dashboard-parapente/core/Lightbox', () => ({
   Lightbox: ({
     isOpen,
     images,

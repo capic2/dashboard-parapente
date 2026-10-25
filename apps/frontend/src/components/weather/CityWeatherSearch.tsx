@@ -7,7 +7,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Input, Label, TextField } from 'react-aria-components';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import type {
   BackendWeatherResponse,
   LocationSuggestion,

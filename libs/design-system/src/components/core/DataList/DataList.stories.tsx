@@ -1,4 +1,4 @@
-import preview from '../../../.storybook/preview';
+import preview from '../../../../.storybook/preview';
 import type { Row } from '@tanstack/react-table';
 import {
   createColumnHelper,

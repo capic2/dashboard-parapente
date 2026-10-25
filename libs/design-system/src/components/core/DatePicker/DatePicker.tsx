@@ -18,7 +18,7 @@ import {
 import type { DateValue } from 'react-aria-components';
 import { parseDate } from '@internationalized/date';
 import { useTranslation } from 'react-i18next';
-import { getToday } from '../../utils/dateUtils';
+import { getToday } from '../../../utils/dateUtils';
 
 function getCalendarValue(value: string): DateValue | null {
   if (!value) {

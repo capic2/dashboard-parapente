@@ -14,7 +14,7 @@ import {
   createColumnHelper,
   type SortingState,
 } from '@tanstack/react-table';
-import { DataTable } from '@dashboard-parapente/design-system';
+import { DataTable } from '@dashboard-parapente/core/DataTable/DataTable';
 import type { Flight } from '../../types';
 
 const COLORS = [

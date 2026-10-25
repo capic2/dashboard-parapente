@@ -1,4 +1,4 @@
-import preview from '../.storybook/preview';
+import preview from '../../../.storybook/preview';
 import { expect } from 'storybook/test';
 import { Tab, TabList, TabPanel, Tabs } from './Tabs';
 

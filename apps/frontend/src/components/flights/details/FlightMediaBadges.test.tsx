@@ -3,7 +3,7 @@ import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { Flight } from '../../../types';
 
-vi.mock('@dashboard-parapente/design-system', () => ({
+vi.mock('@dashboard-parapente/core/Button/Button', () => ({
   Button: ({ children }: { children: React.ReactNode }) => (
     <button type="button">{children}</button>
   ),

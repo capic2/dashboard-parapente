@@ -9,7 +9,7 @@ import React, {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextField, Label, Input } from 'react-aria-components';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { Camera, Check, Loader2, MapPin, Save } from 'lucide-react';
 import type {
   LocationSuggestion,
@@ -18,7 +18,7 @@ import type {
   SiteUpdate,
   CreateSiteData,
 } from '@dashboard-parapente/shared-types';
-import { Modal } from '@dashboard-parapente/design-system';
+import { Modal } from '@dashboard-parapente/core/Modal';
 import { getApiErrorMessage } from '../../lib/api';
 import LandingAssociationsManager from './LandingAssociationsManager';
 import {
