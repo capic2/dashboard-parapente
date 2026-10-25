@@ -8,10 +8,23 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
+const workspaceRoot = path.resolve(dirname, '../..');
 
 process.env.NODE_ENV = 'test';
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@dashboard-parapente/core': path.resolve(
+        workspaceRoot,
+        'libs/design-system/src/components/core'
+      ),
+      '@dashboard-parapente/design-system/form': path.resolve(
+        workspaceRoot,
+        'libs/design-system/src/components/form/index.ts'
+      ),
+    },
+  },
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
   },
