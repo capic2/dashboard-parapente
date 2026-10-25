@@ -110,3 +110,4 @@ apps/backend/db
 .github/agents/impeccable-*.agent.md
 .github/hooks/impeccable.json
 .github/skills/impeccable/
+/libs/design-system/tsconfig.node.tsbuildinfo
