@@ -37,7 +37,6 @@ import {
   RefreshCw,
   MoreHorizontal,
   Camera,
-  Clock3,
   ExternalLink,
   FileText,
   Play,
@@ -231,20 +230,16 @@ function FlightSortMenu({
 }
 
 const FLIGHT_BADGE_FILTERS = [
-  { id: 'gpx', label: 'flights.gpxBadge' },
   { id: 'gpxIcu', label: 'flights.gpxIcuBadge' },
   { id: 'gpxStrava', label: 'flights.gpxStravaBadge' },
   { id: 'gpxZepp', label: 'flights.gpxZeppBadge' },
-  { id: 'gpxNoSync', label: 'flights.gpxNoSyncBadge' },
+  { id: 'gpxMerged', label: 'flights.gpxEnrichedBadge' },
   { id: 'sportstracklive', label: 'flights.sportstrackliveBadge' },
   { id: 'video', label: 'flights.videoBadge' },
-  { id: 'camera', label: 'flights.cameraBadge' },
   { id: 'pano', label: 'flights.panoBadge' },
   { id: 'face', label: 'flights.faceBadge' },
   { id: 'pilote', label: 'flights.piloteBadge' },
   { id: 'highlightVideo', label: 'flights.highlightVideoBadge' },
-  { id: 'youtube', label: 'flights.youtubeBadge' },
-  { id: 'youtubeCamera', label: 'flights.youtubeCameraFilter' },
   { id: 'youtubeVideo', label: 'flights.youtubeVideoFilter' },
   { id: 'youtubePano', label: 'flights.youtubePanoFilter' },
   { id: 'youtubeFace', label: 'flights.youtubeFaceFilter' },
@@ -253,12 +248,42 @@ const FLIGHT_BADGE_FILTERS = [
   { id: 'youtubeTelemetry', label: 'flights.youtubeTelemetryFilter' },
   { id: 'youtubeHighlight', label: 'flights.youtubeHighlightFilter' },
 ] as const;
-const PRIMARY_FLIGHT_BADGE_FILTERS = FLIGHT_BADGE_FILTERS.filter(
-  ({ id }) => id === 'gpx' || id === 'video'
-);
-const ADVANCED_FLIGHT_BADGE_FILTERS = FLIGHT_BADGE_FILTERS.filter(
-  ({ id }) => id !== 'gpx' && id !== 'video'
-);
+const FLIGHT_BADGE_FILTER_SECTIONS = [
+  {
+    id: 'links',
+    label: 'flights.tagSectionLinks',
+    filterIds: ['sportstracklive'],
+  },
+  {
+    id: 'gpx',
+    label: 'flights.tagSectionGpx',
+    filterIds: ['gpxIcu', 'gpxStrava', 'gpxZepp', 'gpxMerged'],
+  },
+  {
+    id: 'local',
+    label: 'flights.tagSectionLocal',
+    filterIds: [
+      'video',
+      'pano',
+      'face',
+      'pilote',
+      'telemetryVideo',
+      'highlightVideo',
+    ],
+  },
+  {
+    id: 'youtube',
+    label: 'flights.tagSectionYoutube',
+    filterIds: [
+      'youtubeVideo',
+      'youtubePano',
+      'youtubeFace',
+      'youtubePilote',
+      'youtubeTelemetry',
+      'youtubeHighlight',
+    ],
+  },
+] as const;
 
 type FlightBadgeFilter = (typeof FLIGHT_BADGE_FILTERS)[number]['id'];
 type YoutubeVideoType = NonNullable<
@@ -281,8 +306,6 @@ function flightHasBadgeFilter(
   filter: FlightBadgeFilter
 ) {
   switch (filter) {
-    case 'gpx':
-      return flight.has_gpx;
     case 'gpxIcu':
       return flight.has_gpx && getFlightGpxProvider(flight) === 'intervals_icu';
     case 'gpxStrava':
@@ -292,12 +315,8 @@ function flightHasBadgeFilter(
         flight.has_gpx &&
         ['external', 'zepp'].includes(getFlightGpxProvider(flight) ?? '')
       );
-    case 'gpxNoSync':
-      return (
-        flight.has_gpx &&
-        flight.gopro_overlay_gpx_offset == null &&
-        (flight.has_face_video === true || flight.has_pilote_video === true)
-      );
+    case 'gpxMerged':
+      return flight.has_gpx && flight.has_gpx_enrichment === true;
     case 'sportstracklive':
       return (
         flight.sportstracklive_status === 'uploaded' &&
@@ -310,8 +329,6 @@ function flightHasBadgeFilter(
           (VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(flight.video_export_status) ||
             flight.video_export_status === 'failed'))
       );
-    case 'camera':
-      return flight.has_camera;
     case 'pano':
       return flight.has_pano_video;
     case 'face':
@@ -327,16 +344,6 @@ function flightHasBadgeFilter(
           ) ||
             flight.highlight_video_status === 'failed'))
       );
-    case 'youtube':
-      return (
-        flight.has_youtube_video ||
-        (flight.youtube_video_types?.length ?? 0) > 0 ||
-        flight.youtube_upload_status === 'queued' ||
-        flight.youtube_upload_status === 'uploading' ||
-        flight.youtube_upload_status === 'failed'
-      );
-    case 'youtubeCamera':
-      return hasYoutubeVideoType(flight, 'camera');
     case 'youtubeVideo':
       return hasYoutubeVideoType(flight, 'video');
     case 'youtubePano':
@@ -397,11 +404,6 @@ export default function FlightHistory() {
   }, [flights, selectedBadgeFilters]);
   const activeBadgeFilterCount =
     selectedBadgeFilters.included.length + selectedBadgeFilters.excluded.length;
-  const advancedBadgeFilterCount = ADVANCED_FLIGHT_BADGE_FILTERS.filter(
-    ({ id }) =>
-      selectedBadgeFilters.included.includes(id) ||
-      selectedBadgeFilters.excluded.includes(id)
-  ).length;
   const totalFlights = summariesQuery.data?.pages[0]?.total ?? 0;
   const { fetchNextPage, hasNextPage, isFetchingNextPage } = summariesQuery;
   let flightCountLabel = t('flights.registered', { count: totalFlights });
@@ -453,10 +455,7 @@ export default function FlightHistory() {
     const isSelected = isIncluded || isExcluded;
     let badgeColorClassName =
       'border-blue-200 bg-blue-50 text-blue-800 hover:border-blue-300 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-950/70';
-    if (filter.id === 'gpxNoSync') {
-      badgeColorClassName =
-        'border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-950/70';
-    } else if (filter.id.startsWith('gpx')) {
+    if (filter.id.startsWith('gpx')) {
       badgeColorClassName =
         'border-emerald-200 bg-emerald-50 text-emerald-800 hover:border-emerald-300 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-950/70';
     } else if (filter.id === 'sportstracklive') {
@@ -480,8 +479,7 @@ export default function FlightHistory() {
     }
 
     let BadgeIcon = Camera;
-    if (filter.id === 'gpxNoSync') BadgeIcon = Clock3;
-    else if (filter.id.startsWith('gpx')) BadgeIcon = FileText;
+    if (filter.id.startsWith('gpx')) BadgeIcon = FileText;
     else if (filter.id === 'sportstracklive') BadgeIcon = ExternalLink;
     else if (filter.id === 'highlightVideo') {
       BadgeIcon = Wand2;
@@ -996,25 +994,20 @@ export default function FlightHistory() {
                     hidden={!isTagFilterExpanded}
                     className="space-y-2 lg:space-y-1"
                   >
-                    <div className="flex flex-wrap gap-1.5">
-                      {PRIMARY_FLIGHT_BADGE_FILTERS.map(renderBadgeFilter)}
-                    </div>
-                    <details className="group rounded-lg">
-                      <summary className="flex min-h-9 cursor-pointer list-none items-center gap-1 rounded-md text-xs font-medium text-sky-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-sky-300 lg:min-h-8">
-                        {advancedBadgeFilterCount > 0
-                          ? t('flights.moreTagFiltersActive', {
-                              count: advancedBadgeFilterCount,
-                            })
-                          : t('flights.moreTagFilters')}
-                        <ChevronDown
-                          aria-hidden="true"
-                          className="h-3.5 w-3.5 transition-transform group-open:rotate-180"
-                        />
-                      </summary>
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {ADVANCED_FLIGHT_BADGE_FILTERS.map(renderBadgeFilter)}
-                      </div>
-                    </details>
+                    {FLIGHT_BADGE_FILTER_SECTIONS.map((section) => (
+                      <section key={section.id} className="space-y-1">
+                        <h3 className="text-xs font-semibold text-sky-700 dark:text-sky-300">
+                          {t(section.label)}
+                        </h3>
+                        <div className="flex flex-wrap gap-1.5">
+                          {FLIGHT_BADGE_FILTERS.filter(({ id }) =>
+                            (section.filterIds as readonly string[]).includes(
+                              id
+                            )
+                          ).map(renderBadgeFilter)}
+                        </div>
+                      </section>
+                    ))}
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       {t('flights.tagFilterInstructions')}
                     </p>
