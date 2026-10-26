@@ -124,7 +124,7 @@ test('renders media and OSV sources as passive statuses in the flight list', () 
     />
   );
 
-  expect(screen.getByText('flights.gpxBadge')).toBeInTheDocument();
+  expect(screen.queryByText('flights.gpxBadge')).not.toBeInTheDocument();
   expect(screen.getByText('flights.osvSourcesBadge')).toBeInTheDocument();
   expect(
     screen.queryByRole('button', { name: 'flights.downloadGpx' })
@@ -235,9 +235,7 @@ test('renders available media badges in the expected order', () => {
   );
 
   const badges = [
-    'flights.gpxBadge',
     'flights.videoBadge',
-    'flights.cameraBadge',
     'flights.panoBadge',
     'flights.youtubeTelemetryBadge',
     'flights.highlightVideoBadge',
@@ -250,6 +248,7 @@ test('renders available media badges in the expected order', () => {
       return position & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
     })
   );
+  expect(screen.queryByText('flights.cameraBadge')).not.toBeInTheDocument();
 });
 
 test('renders a panorama badge when pano.mp4 exists', () => {
