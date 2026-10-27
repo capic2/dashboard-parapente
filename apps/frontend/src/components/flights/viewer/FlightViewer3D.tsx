@@ -145,6 +145,9 @@ const interpolatePosition = (
     start.z + (end.z - start.z) * ratio
   );
 
+const CAMERA_FOLLOW_SMOOTHING_MS = 200;
+const MAX_CAMERA_FRAME_DELTA_MS = 80;
+
 const getViewerScene = (viewer: CesiumViewer | null | undefined) => {
   try {
     if (!viewer || viewer.isDestroyed()) {
@@ -450,6 +453,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     DEFAULT_CAMERA_TRANSITION_PERCENT
   );
   const cameraTargetRef = useRef<Cartesian3 | null>(null);
+  const cameraFrameTimeRef = useRef<number | null>(null);
   const currentTimestampRef = useRef<number | null>(null);
   const containerDivRef = useRef<HTMLDivElement>(null);
   const viewerUnitsRef = useRef<ViewerUnits>(viewerUnits);
@@ -809,6 +813,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       currentTimestampRef.current = null;
       setCurrentFlightTimestamp(timestamps[0] > 0 ? timestamps[0] : null);
       cameraTargetRef.current = null;
+      cameraFrameTimeRef.current = null;
       visiblePositionsRef.current = [];
 
       // Expose data globally for video export (Playwright)
@@ -1427,7 +1432,11 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   );
 
   const applyScenePosition = useCallback(
-    (scenePosition: ScenePositionState, smoothCamera: boolean) => {
+    (
+      scenePosition: ScenePositionState,
+      smoothCamera: boolean,
+      frameTime = performance.now()
+    ) => {
       const lastIndex = allPositionsRef.current.length - 1;
       if (lastIndex < 0) {
         return { index: 0, progress: 0, ratio: 0, tilesLoaded: false };
@@ -1494,13 +1503,24 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
         if (!smoothCamera || !cameraTargetRef.current) {
           cameraTargetRef.current = scenePosition.position;
+          cameraFrameTimeRef.current = null;
         } else {
-          const lerpFactor = 0.08;
+          const previousFrameTime = cameraFrameTimeRef.current;
+          const elapsedFrameTime =
+            previousFrameTime === null
+              ? 1000 / 60
+              : Math.min(
+                  Math.max(frameTime - previousFrameTime, 0),
+                  MAX_CAMERA_FRAME_DELTA_MS
+                );
+          const lerpFactor =
+            1 - Math.exp(-elapsedFrameTime / CAMERA_FOLLOW_SMOOTHING_MS);
           cameraTargetRef.current = interpolatePosition(
             cameraTargetRef.current,
             scenePosition.position,
             lerpFactor
           );
+          cameraFrameTimeRef.current = frameTime;
         }
 
         viewer.camera.setView({
@@ -1625,6 +1645,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
 
     isPlayingRef.current = true;
+    cameraFrameTimeRef.current = null;
     setIsPlaying(true);
 
     realTimeStartRef.current = performance.now();
@@ -1653,7 +1674,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       if (!scenePosition || scenePosition.timestamp >= lastTimestamp) {
         const endPosition = getScenePositionFromProgress(1);
         if (endPosition) {
-          applyScenePosition(endPosition, true);
+          applyScenePosition(endPosition, true, now);
         }
         animationFrameRef.current = null;
         isPlayingRef.current = false;
@@ -1661,7 +1682,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         return;
       }
 
-      applyScenePosition(scenePosition, true);
+      applyScenePosition(scenePosition, true, now);
       animationFrameRef.current = requestAnimationFrame(step);
     };
 
@@ -1695,6 +1716,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     currentIndexRef.current = 0;
     currentTimestampRef.current = null;
     cameraTargetRef.current = null;
+    cameraFrameTimeRef.current = null;
     setCurrentProgress(0);
     setCurrentElapsedTime(0);
     setCurrentFlightTimestamp(
@@ -1868,6 +1890,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       // Update refs for replay mode
       cameraHeadingRef.current = CesiumMath.toRadians(angle);
       cameraDistanceRef.current = distance;
+      cameraFrameTimeRef.current = null;
 
       // Calculate opposite heading (camera looks back at takeoff)
       const oppositeHeading = (angle + 180) % 360;
