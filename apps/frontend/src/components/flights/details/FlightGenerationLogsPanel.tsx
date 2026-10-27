@@ -92,6 +92,18 @@ function clampProgress(progress?: number | null) {
   return Math.max(0, Math.min(100, Math.round(progress)));
 }
 
+function getLoggedFps(logs?: string[] | null) {
+  for (const line of logs?.slice().reverse() ?? []) {
+    const fpsValue = line.match(/\(([\d.,]+)\s*fps\b/iu)?.[1];
+    if (!fpsValue) continue;
+
+    const fps = Number.parseFloat(fpsValue.replace(',', '.'));
+    if (Number.isFinite(fps)) return fps;
+  }
+
+  return null;
+}
+
 function formatJobDuration(seconds: number) {
   const wholeSeconds = Math.max(0, Math.floor(seconds));
   const minutes = Math.floor(wholeSeconds / 60);
@@ -216,11 +228,13 @@ function LogSourceCard({
       ? t(`flights.generationLogs.method.${renderMethod}`)
       : null;
   const localizedLanguage = i18n.resolvedLanguage ?? i18n.language;
+  const actualFps =
+    typeof fps === 'number' && Number.isFinite(fps) ? fps : getLoggedFps(logs);
   const formattedFps =
-    typeof fps === 'number' && Number.isFinite(fps)
+    actualFps !== null
       ? new Intl.NumberFormat(localizedLanguage, {
           maximumFractionDigits: 1,
-        }).format(fps)
+        }).format(actualFps)
       : null;
   const hasTechnicalMetrics = Boolean(
     detailPhase ||
@@ -640,7 +654,7 @@ export function FlightGenerationLogsPanel({
               phase={videoStatus?.phase ?? videoStatus?.internal_status}
               framesCaptured={videoStatus?.frames_captured}
               totalFrames={videoStatus?.total_frames}
-              fps={videoStatus?.fps}
+              fps={videoStatus?.fps_actual}
               etaSeconds={videoStatus?.eta_seconds}
               message={videoStatus?.message}
               error={videoStatus?.error}
