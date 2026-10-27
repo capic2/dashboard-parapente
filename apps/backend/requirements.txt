@@ -41,7 +41,7 @@ beautifulsoup4==4.15.0
 # HTTP Clients
 # ============================================
 requests==2.34.2
-yt-dlp==2026.10.21
+yt-dlp==2026.10.26
 httpx==0.28.1
 httpx2==2.16.0
 fitdecode==0.11.0
