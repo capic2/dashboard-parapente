@@ -12,6 +12,7 @@ type LoginFormProps = {
 
 type LoginFieldViewProps = {
   id: 'email' | 'password';
+  name: 'username' | 'password';
   type: 'email' | 'password';
   autoComplete: 'username' | 'current-password';
   label: string;
@@ -35,6 +36,7 @@ const styles = tv({
 
 function LoginFieldView({
   id,
+  name,
   type,
   autoComplete,
   label,
@@ -44,6 +46,7 @@ function LoginFieldView({
   return (
     <TextField
       id={id}
+      name={name}
       isRequired
       label={label}
       type={type}
@@ -82,6 +85,7 @@ export function LoginForm({ onSubmit, errorMessage }: LoginFormProps) {
               {(field) => (
                 <LoginFieldView
                   id="email"
+                  name="username"
                   type="email"
                   autoComplete="username"
                   label={t('login.email')}
@@ -95,6 +99,7 @@ export function LoginForm({ onSubmit, errorMessage }: LoginFormProps) {
               {(field) => (
                 <LoginFieldView
                   id="password"
+                  name="password"
                   type="password"
                   autoComplete="current-password"
                   label={t('login.password')}
