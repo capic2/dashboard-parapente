@@ -26,6 +26,7 @@ export type VideoExportStatusPayload = {
   updated_at?: string | null;
   total_frames?: number | null;
   fps?: number | null;
+  fps_actual?: number | null;
   eta_seconds?: number;
   can_resume?: boolean;
   frames_captured?: number;
@@ -87,6 +88,10 @@ export const toStatusPayload = (
         ? Math.max(0, value.total_frames)
         : null,
     fps: typeof value.fps === 'number' ? Math.max(0, value.fps) : null,
+    fps_actual:
+      typeof value.fps_actual === 'number'
+        ? Math.max(0, value.fps_actual)
+        : null,
     eta_seconds:
       typeof value.eta_seconds === 'number'
         ? Math.max(0, value.eta_seconds)
