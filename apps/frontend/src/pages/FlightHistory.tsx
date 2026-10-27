@@ -380,6 +380,9 @@ export default function FlightHistory() {
   const summariesQuery = useFlightSummaries(search);
   const [selectedBadgeFilters, setSelectedBadgeFilters] =
     useState<BadgeFilterSelection>({ included: [], excluded: [] });
+  const [badgeFilterMatchMode, setBadgeFilterMatchMode] = useState<
+    'or' | 'and'
+  >('or');
   const activeJobsQuery = useActiveFlightMediaJobs();
   const flights = useMemo(
     () =>
@@ -395,13 +398,15 @@ export default function FlightHistory() {
     return flights.filter((flight) => {
       const matchesIncluded =
         included.length === 0 ||
-        included.some((filter) => flightHasBadgeFilter(flight, filter));
+        (badgeFilterMatchMode === 'or'
+          ? included.some((filter) => flightHasBadgeFilter(flight, filter))
+          : included.every((filter) => flightHasBadgeFilter(flight, filter)));
       const matchesExcluded = excluded.every(
         (filter) => !flightHasBadgeFilter(flight, filter)
       );
       return matchesIncluded && matchesExcluded;
     });
-  }, [flights, selectedBadgeFilters]);
+  }, [badgeFilterMatchMode, flights, selectedBadgeFilters]);
   const activeBadgeFilterCount =
     selectedBadgeFilters.included.length + selectedBadgeFilters.excluded.length;
   const totalFlights = summariesQuery.data?.pages[0]?.total ?? 0;
@@ -994,6 +999,42 @@ export default function FlightHistory() {
                     hidden={!isTagFilterExpanded}
                     className="space-y-2 lg:space-y-1"
                   >
+                    {selectedBadgeFilters.included.length >= 2 && (
+                      <fieldset className="flex min-w-0 flex-wrap items-center gap-2 border-0 p-0">
+                        <legend className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                          {t('flights.tagMatchLogic')}
+                        </legend>
+                        <div className="inline-flex rounded-lg border border-gray-300 p-0.5 dark:border-gray-600">
+                          {(['or', 'and'] as const).map((mode) => {
+                            const isSelected = badgeFilterMatchMode === mode;
+                            return (
+                              <button
+                                key={mode}
+                                type="button"
+                                aria-pressed={isSelected}
+                                aria-label={t(
+                                  mode === 'or'
+                                    ? 'flights.tagMatchAnyAriaLabel'
+                                    : 'flights.tagMatchAllAriaLabel'
+                                )}
+                                onClick={() => setBadgeFilterMatchMode(mode)}
+                                className={`min-h-9 min-w-11 cursor-pointer rounded-md px-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
+                                  isSelected
+                                    ? 'bg-sky-600 text-white dark:bg-sky-500'
+                                    : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700'
+                                }`}
+                              >
+                                {t(
+                                  mode === 'or'
+                                    ? 'flights.tagMatchAny'
+                                    : 'flights.tagMatchAll'
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </fieldset>
+                    )}
                     {FLIGHT_BADGE_FILTER_SECTIONS.map((section) => (
                       <section key={section.id} className="space-y-1">
                         <h3 className="text-xs font-semibold text-sky-700 dark:text-sky-300">
