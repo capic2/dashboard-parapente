@@ -772,7 +772,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
   // Load GPX data
   useEffect(() => {
-    if (!repairedCoordinates?.length) {
+    if (!repairedCoordinates?.length || !gpxData) {
       return;
     }
 
@@ -813,9 +813,24 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
       // Expose data globally for video export (Playwright)
       if (typeof window !== 'undefined' && window._exportMode) {
+        const altitudeBounds = coordinates.reduce(
+          (bounds, point) => ({
+            max: Math.max(bounds.max, point.elevation),
+            min: Math.min(bounds.min, point.elevation),
+          }),
+          {
+            max: coordinates[0]?.elevation ?? 0,
+            min: coordinates[0]?.elevation ?? 0,
+          }
+        );
         window._gpxData = {
           ...gpxData,
           coordinates,
+          max_altitude_m: gpxData.max_altitude_m ?? altitudeBounds.max,
+          min_altitude_m: gpxData.min_altitude_m ?? altitudeBounds.min,
+          elevation_gain_m: gpxData.elevation_gain_m ?? 0,
+          elevation_loss_m: gpxData.elevation_loss_m ?? 0,
+          total_distance_km: gpxData.total_distance_km ?? 0,
           positions,
           timestamps,
         };
