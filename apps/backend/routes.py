@@ -6222,16 +6222,27 @@ def delete_flight_temporary_media(
     if flight is None:
         raise HTTPException(status_code=404, detail="Flight not found")
 
+    active_upload_query = db.query(YoutubeUploadJob).filter(
+        YoutubeUploadJob.flight_id == flight.id,
+        YoutubeUploadJob.source_type == source_type,
+        YoutubeUploadJob.status.in_(("preparing", "queued", "uploading")),
+    )
+    telemetry_path = None
+    if source_type == "youtube_telemetry":
+        telemetry_path = youtube_telemetry_video_path(db, flight)
+        active_upload_query = active_upload_query.filter(
+            YoutubeUploadJob.source_path.in_({str(telemetry_path), str(telemetry_path.resolve())})
+        )
+    if active_upload_query.first() is not None:
+        raise HTTPException(status_code=409, detail="A YouTube upload is in progress")
+
     completed_upload_query = db.query(YoutubeUploadJob).filter(
         YoutubeUploadJob.flight_id == flight.id,
         YoutubeUploadJob.user_id == user.id,
         YoutubeUploadJob.source_type == source_type,
         YoutubeUploadJob.status == "completed",
-        YoutubeUploadJob.youtube_url.in_(flight.youtube_urls or []),
-        YoutubeUploadJob.youtube_video_id.is_not(None),
     )
     if source_type == "youtube_telemetry":
-        telemetry_path = youtube_telemetry_video_path(db, flight)
         completed_upload_query = completed_upload_query.filter(
             YoutubeUploadJob.source_path.in_(
                 {
@@ -6241,11 +6252,12 @@ def delete_flight_temporary_media(
             )
         )
     completed_uploads = completed_upload_query.all()
-    video_ids = {
-        job.youtube_video_id for job in completed_uploads if job.youtube_video_id is not None
-    }
+    video_ids = {job.youtube_video_id for job in completed_uploads if job.youtube_video_id}
     availability = youtube_video_availability({user.id: video_ids}) if video_ids else {}
-    if not any(availability.get(video_id) is True for video_id in video_ids):
+    if completed_uploads and any(
+        job.youtube_video_id is None or availability.get(job.youtube_video_id) is not True
+        for job in completed_uploads
+    ):
         raise HTTPException(
             status_code=409,
             detail="Publish this source to YouTube before deleting its local file",

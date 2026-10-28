@@ -69,6 +69,8 @@ vi.mock('react-i18next', () => ({
         'flights.temporarySourceDeleteDescription': `Delete the local ${options?.title ?? ''} file?`,
         'flights.temporarySourceDeleteYoutubeNote':
           'The video stays on YouTube.',
+        'flights.temporarySourceDeleteLocalNote':
+          'Only the local file will be deleted.',
         'flights.temporarySourceDeleting': 'Deleting…',
         'common.cancel': 'Cancel',
         'flights.temporarySourceDeleted': 'Local file deleted',
@@ -126,7 +128,7 @@ describe('FlightTemporaryMediaCard', () => {
     toastErrorMock.mockReset();
   });
 
-  it('shows the source role, ready state, and YouTube action without offering deletion', () => {
+  it('shows the source role, ready state, YouTube action, and local deletion', () => {
     render(<FlightTemporaryMediaCard flight={flight} sourceType="pano" />);
 
     expect(screen.getByRole('heading', { name: 'Pano' })).toBeInTheDocument();
@@ -135,8 +137,12 @@ describe('FlightTemporaryMediaCard', () => {
       screen.getByRole('button', { name: 'Publish to YouTube' })
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Delete local file' })
-    ).not.toBeInTheDocument();
+      screen.getByRole('button', { name: 'Delete local file' })
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete local file' }));
+    expect(
+      screen.getByText('Only the local file will be deleted.')
+    ).toBeInTheDocument();
   });
 
   it('shows upload progress and failure as text statuses', () => {

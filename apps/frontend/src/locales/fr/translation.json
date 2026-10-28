@@ -1362,6 +1362,7 @@
     "temporarySourceDeleteTitle": "Supprimer la source locale",
     "temporarySourceDeleteDescription": "Supprimer le fichier local « {{title}} » ? Cette action est irréversible.",
     "temporarySourceDeleteYoutubeNote": "La vidéo publiée restera disponible sur YouTube.",
+    "temporarySourceDeleteLocalNote": "Seul le fichier local sera supprimé.",
     "temporarySourceDeleted": "Fichier local supprimé",
     "temporarySourceDeleteError": "Impossible de supprimer le fichier local",
     "gpxBadge": "GPX",
