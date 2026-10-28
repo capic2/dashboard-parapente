@@ -15,6 +15,7 @@ beforeEach(() => {
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
+    i18n: { language: 'en' },
     t: (key: string, options?: Record<string, string | number>) => {
       if (key === 'flights.goproOverlayAutomaticOffset') {
         return `Automatic alignment: ${String(options?.offset)} s`;
@@ -139,5 +140,9 @@ describe('GoproOverlaySyncPreview calibration mapping', () => {
     expect(container).toHaveTextContent('1009 m');
     expect(container).toHaveTextContent('45.00092, 6.00092');
     expect(container).toHaveTextContent('7.4 s');
+    expect(container.querySelector('time')).toHaveAttribute(
+      'datetime',
+      '1970-01-01T00:33:20.000Z'
+    );
   });
 });
