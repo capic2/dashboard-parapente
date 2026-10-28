@@ -1361,6 +1361,7 @@
     "temporarySourceDeleteLocalNote": "Only the local file will be deleted.",
     "temporarySourceDeleted": "Local file deleted",
     "temporarySourceDeleteError": "Unable to delete the local file",
+    "temporarySourceDeleteConflict": "Deletion blocked: a YouTube upload is in progress or a previously published video is unavailable. Check the publication before deleting this file.",
     "gpxBadge": "GPX",
     "gpxEnrichedBadge": "GPX · merged",
     "gpxIcuBadge": "GPX · ICU",

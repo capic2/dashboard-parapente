@@ -1365,6 +1365,7 @@
     "temporarySourceDeleteLocalNote": "Seul le fichier local sera supprimé.",
     "temporarySourceDeleted": "Fichier local supprimé",
     "temporarySourceDeleteError": "Impossible de supprimer le fichier local",
+    "temporarySourceDeleteConflict": "Suppression refusée : un upload YouTube est en cours ou une vidéo déjà publiée n’est plus disponible. Vérifiez la publication avant de supprimer ce fichier.",
     "gpxBadge": "GPX",
     "gpxEnrichedBadge": "GPX · mergé",
     "gpxIcuBadge": "GPX · ICU",

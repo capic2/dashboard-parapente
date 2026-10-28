@@ -5,6 +5,11 @@ type ApiErrorPayload = {
   detail?: unknown;
 };
 
+type ApiErrorStatusMessage = {
+  message: string;
+  details: readonly string[];
+};
+
 const apiBaseUrl = import.meta.env.VITE_API_URL?.replace(/\/$/u, '');
 const appBasePath = import.meta.env.BASE_URL.replace(/\/$/u, '');
 const apiPrefix = apiBaseUrl ? `${apiBaseUrl}/api` : `${appBasePath}/api`;
@@ -76,7 +81,11 @@ export function overrideApi(options: Parameters<typeof api.extend>[0]) {
   api = api.extend(options);
 }
 
-export async function getApiErrorMessage(error: unknown, fallback: string) {
+export async function getApiErrorMessage(
+  error: unknown,
+  fallback: string,
+  statusMessages: Partial<Record<number, ApiErrorStatusMessage>> = {}
+) {
   if (!(error instanceof Error) || !('response' in error)) {
     return fallback;
   }
@@ -86,13 +95,22 @@ export async function getApiErrorMessage(error: unknown, fallback: string) {
     return fallback;
   }
 
+  const statusMessage = statusMessages[response.status];
+
   try {
     const payload = (await response.clone().json()) as ApiErrorPayload;
     if (typeof payload.detail === 'string' && payload.detail.trim()) {
+      if (statusMessage?.details.includes(payload.detail)) {
+        return statusMessage.message;
+      }
       return payload.detail;
     }
   } catch {
     // Keep the fallback and HTTP status when the response is not JSON.
+  }
+
+  if (statusMessage) {
+    return statusMessage.message;
   }
 
   const status = response.statusText
