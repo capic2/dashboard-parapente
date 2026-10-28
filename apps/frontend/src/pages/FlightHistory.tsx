@@ -413,6 +413,8 @@ export default function FlightHistory() {
   }, [badgeFilterMatchMode, flights, selectedBadgeFilters]);
   const activeBadgeFilterCount =
     selectedBadgeFilters.included.length + selectedBadgeFilters.excluded.length;
+  const showBadgeFilterMatchMode =
+    selectedBadgeFilters.included.length > 0 && activeBadgeFilterCount >= 2;
   const totalFlights = summariesQuery.data?.pages[0]?.total ?? 0;
   const { fetchNextPage, hasNextPage, isFetchingNextPage } = summariesQuery;
   let flightCountLabel = t('flights.registered', { count: totalFlights });
@@ -1006,7 +1008,7 @@ export default function FlightHistory() {
                     hidden={!isTagFilterExpanded}
                     className="space-y-2 lg:space-y-1"
                   >
-                    {selectedBadgeFilters.included.length >= 2 && (
+                    {showBadgeFilterMatchMode && (
                       <fieldset className="flex min-w-0 flex-wrap items-center gap-2 border-0 p-0">
                         <legend className="text-xs font-medium text-gray-600 dark:text-gray-300">
                           {t('flights.tagMatchLogic')}
