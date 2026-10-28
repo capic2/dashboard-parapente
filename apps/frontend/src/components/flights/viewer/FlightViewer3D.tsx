@@ -146,7 +146,39 @@ const interpolatePosition = (
   );
 
 const CAMERA_FOLLOW_SMOOTHING_MS = 200;
+const CAMERA_HEADING_SMOOTHING_MS = 900;
 const MAX_CAMERA_FRAME_DELTA_MS = 80;
+const CAMERA_HEADING_LOOKAHEAD_POINTS = 8;
+
+const getTrackHeading = (positions: Cartesian3[], fromIndex: number) => {
+  if (positions.length < 2) return null;
+
+  const lastIndex = positions.length - 1;
+  let startIndex = Math.min(Math.max(Math.floor(fromIndex), 0), lastIndex);
+  let endIndex = Math.min(
+    startIndex + CAMERA_HEADING_LOOKAHEAD_POINTS,
+    lastIndex
+  );
+  if (endIndex === startIndex) {
+    startIndex = Math.max(0, startIndex - CAMERA_HEADING_LOOKAHEAD_POINTS);
+    endIndex = lastIndex;
+  }
+
+  const start = Cartographic.fromCartesian(positions[startIndex]);
+  const end = Cartographic.fromCartesian(positions[endIndex]);
+  return getBearingRadians(
+    {
+      lat: CesiumMath.toDegrees(start.latitude),
+      lon: CesiumMath.toDegrees(start.longitude),
+      elevation: start.height,
+    },
+    {
+      lat: CesiumMath.toDegrees(end.latitude),
+      lon: CesiumMath.toDegrees(end.longitude),
+      elevation: end.height,
+    }
+  );
+};
 
 const getViewerScene = (viewer: CesiumViewer | null | undefined) => {
   try {
@@ -453,6 +485,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     DEFAULT_CAMERA_TRANSITION_PERCENT
   );
   const cameraTargetRef = useRef<Cartesian3 | null>(null);
+  const cameraFollowHeadingRef = useRef<number | null>(null);
+  const cameraInitialTrackHeadingRef = useRef<number | null>(null);
   const cameraFrameTimeRef = useRef<number | null>(null);
   const currentTimestampRef = useRef<number | null>(null);
   const containerDivRef = useRef<HTMLDivElement>(null);
@@ -652,6 +686,17 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           return;
         }
 
+        // Request a little more terrain and imagery detail than Cesium's
+        // default while keeping a bounded cache for the moving camera.
+        scene.globe.maximumScreenSpaceError = 1.25;
+        scene.globe.tileCacheSize = 256;
+        if (!exportOnly) {
+          viewer.resolutionScale = Math.min(
+            Math.max(window.devicePixelRatio || 1, 1.15),
+            1.5
+          );
+        }
+
         // Enable terrain collision detection
         scene.screenSpaceCameraController.enableCollisionDetection = true;
 
@@ -688,7 +733,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         setViewerReady(false);
       }
     };
-  }, []);
+  }, [exportOnly]);
 
   // Monitor terrain loading status
   useEffect(() => {
@@ -969,6 +1014,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
         cameraHeadingRef.current = heading;
         cameraDistanceRef.current = distance;
+        cameraInitialTrackHeadingRef.current = getTrackHeading(positions, 0);
+        cameraFollowHeadingRef.current = null;
 
         viewer.camera.flyToBoundingSphere(boundingSphere, {
           duration: 2,
@@ -1435,7 +1482,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     (
       scenePosition: ScenePositionState,
       smoothCamera: boolean,
-      frameTime = performance.now()
+      frameTime = performance.now(),
+      smoothHeading = smoothCamera
     ) => {
       const lastIndex = allPositionsRef.current.length - 1;
       if (lastIndex < 0) {
@@ -1474,6 +1522,15 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       const scene = getViewerScene(viewer);
       if (viewer && scene) {
         const baseHeading = cameraHeadingRef.current;
+        const trackHeading = getTrackHeading(
+          allPositionsRef.current,
+          scenePosition.previousIndex
+        );
+        const initialTrackHeading = cameraInitialTrackHeadingRef.current;
+        const headingOffset =
+          trackHeading !== null && initialTrackHeading !== null
+            ? CesiumMath.negativePiToPi(baseHeading - initialTrackHeading)
+            : 0;
         const progress =
           lastIndex > 0
             ? (scenePosition.previousIndex + scenePosition.ratio) / lastIndex
@@ -1495,15 +1552,17 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                 0.01
               )
             : 0;
-        const heading =
+        const thermalOrbitHeading =
           thermalWindow && thermalProgress >= 0 && thermalProgress <= 1
-            ? baseHeading +
-              thermalWindow.direction * thermalProgress * Math.PI * 2
-            : baseHeading;
+            ? thermalWindow.direction * thermalProgress * Math.PI * 2
+            : 0;
+        const targetHeading =
+          trackHeading !== null && initialTrackHeading !== null
+            ? trackHeading + headingOffset + thermalOrbitHeading
+            : baseHeading + thermalOrbitHeading;
 
         if (!smoothCamera || !cameraTargetRef.current) {
           cameraTargetRef.current = scenePosition.position;
-          cameraFrameTimeRef.current = null;
         } else {
           const previousFrameTime = cameraFrameTimeRef.current;
           const elapsedFrameTime =
@@ -1520,8 +1579,27 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             scenePosition.position,
             lerpFactor
           );
-          cameraFrameTimeRef.current = frameTime;
         }
+
+        const previousFrameTime = cameraFrameTimeRef.current;
+        const elapsedFrameTime =
+          previousFrameTime === null
+            ? 1000 / 60
+            : Math.min(
+                Math.max(frameTime - previousFrameTime, 0),
+                MAX_CAMERA_FRAME_DELTA_MS
+              );
+        const currentFollowHeading = cameraFollowHeadingRef.current;
+        cameraFollowHeadingRef.current =
+          !smoothHeading || currentFollowHeading === null
+            ? targetHeading
+            : currentFollowHeading +
+              CesiumMath.negativePiToPi(targetHeading - currentFollowHeading) *
+                (1 - Math.exp(-elapsedFrameTime / CAMERA_HEADING_SMOOTHING_MS));
+        cameraFrameTimeRef.current =
+          smoothHeading || smoothCamera ? frameTime : null;
+
+        const heading = cameraFollowHeadingRef.current ?? targetHeading;
 
         viewer.camera.setView({
           destination: cameraTargetRef.current,
@@ -1616,7 +1694,18 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         return { index: 0, progress: 0, ratio: 0, tilesLoaded: false };
       }
 
-      return applyScenePosition(scenePosition, false);
+      // Export frames are rendered sequentially at 30 fps. Use frame time
+      // instead of wall-clock time so heading smoothing is repeatable.
+      if (frameIndex === 0) {
+        cameraFrameTimeRef.current = null;
+        cameraFollowHeadingRef.current = null;
+      }
+      return applyScenePosition(
+        scenePosition,
+        false,
+        (frameIndex * 1000) / 30,
+        true
+      );
     };
 
     window._getExportMetadata = () => ({
@@ -1674,7 +1763,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       if (!scenePosition || scenePosition.timestamp >= lastTimestamp) {
         const endPosition = getScenePositionFromProgress(1);
         if (endPosition) {
-          applyScenePosition(endPosition, true, now);
+          applyScenePosition(endPosition, false, now);
         }
         animationFrameRef.current = null;
         isPlayingRef.current = false;
@@ -1716,6 +1805,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     currentIndexRef.current = 0;
     currentTimestampRef.current = null;
     cameraTargetRef.current = null;
+    cameraFollowHeadingRef.current = null;
     cameraFrameTimeRef.current = null;
     setCurrentProgress(0);
     setCurrentElapsedTime(0);
@@ -1890,6 +1980,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       // Update refs for replay mode
       cameraHeadingRef.current = CesiumMath.toRadians(angle);
       cameraDistanceRef.current = distance;
+      cameraFollowHeadingRef.current = null;
       cameraFrameTimeRef.current = null;
 
       // Calculate opposite heading (camera looks back at takeoff)
@@ -2105,7 +2196,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       {/* Controls - only show when data is loaded */}
       {gpxData?.coordinates && !exportOnly && (
         <div
-          className={`absolute left-4 top-4 z-20 flex max-h-[calc(100%-11rem)] flex-col overflow-hidden rounded-2xl border border-white/15 bg-slate-950/75 text-white shadow-2xl backdrop-blur-xl transition-all ${panelClassName} ${isPanelCollapsed ? 'w-48 max-w-[calc(100%_-_5rem)]' : ''}`}
+          className={`absolute left-4 top-4 z-20 flex max-h-[calc(100%-14rem)] flex-col overflow-hidden rounded-2xl border border-white/15 bg-slate-950/75 text-white shadow-2xl backdrop-blur-xl transition-all ${panelClassName} ${isPanelCollapsed ? 'w-48 max-w-[calc(100%_-_5rem)]' : ''}`}
         >
           <div className="flex items-center justify-between mb-2">
             <div className="min-w-0">
@@ -2519,7 +2610,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       )}
 
       {!!gpxData?.coordinates?.length && !exportOnly && (
-        <div className="absolute bottom-4 left-1/2 z-20 w-[calc(100%-2rem)] max-w-4xl -translate-x-1/2 rounded-2xl border border-white/15 bg-slate-950/80 p-3 text-white shadow-2xl backdrop-blur-xl sm:p-4">
+        <div className="absolute bottom-12 left-1/2 z-20 w-[calc(100%-2rem)] max-w-4xl -translate-x-1/2 rounded-2xl border border-white/15 bg-slate-950/80 p-3 text-white shadow-2xl backdrop-blur-xl sm:p-4">
           <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
             <div className="flex min-w-0 items-center gap-3 sm:gap-5">
               <div className="min-w-0">
