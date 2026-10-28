@@ -151,16 +151,15 @@ export function FlightTemporaryMediaCard({
             compact
           />
 
-          {isPublished && (
-            <Button
-              variant="danger"
-              className="min-h-10 w-full rounded-lg px-3 py-2 text-sm sm:w-auto"
-              onPress={() => setIsConfirmOpen(true)}
-            >
-              <Trash2 className="h-4 w-4" aria-hidden="true" />
-              {t('flights.temporarySourceDelete')}
-            </Button>
-          )}
+          <Button
+            variant="danger"
+            className="min-h-10 w-full rounded-lg px-3 py-2 text-sm sm:w-auto"
+            onPress={() => setIsConfirmOpen(true)}
+            isDisabled={isUploading || deleteMedia.isPending}
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+            {t('flights.temporarySourceDelete')}
+          </Button>
         </div>
       </article>
 
@@ -182,7 +181,13 @@ export function FlightTemporaryMediaCard({
               className="mt-0.5 h-5 w-5 shrink-0"
               aria-hidden="true"
             />
-            <span>{t('flights.temporarySourceDeleteYoutubeNote')}</span>
+            <span>
+              {t(
+                isPublished
+                  ? 'flights.temporarySourceDeleteYoutubeNote'
+                  : 'flights.temporarySourceDeleteLocalNote'
+              )}
+            </span>
           </div>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
