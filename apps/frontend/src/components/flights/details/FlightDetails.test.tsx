@@ -335,6 +335,13 @@ vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
     isPending: false,
     mutateAsync: vi.fn(),
   }),
+  useFlightTemporaryMediaDeleteWarnings: () => ({
+    data: { warnings: {} },
+    isPending: false,
+    isFetching: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
   useYoutubeVideoAssociations: () => ({
     data: youtubeAssociationsMock.current,
   }),

@@ -177,6 +177,7 @@ from schemas import (
     GoproPreviewState,
     GoproOverlayLayoutsResponse,
     GoproOverlayProbeResponse,
+    FlightTemporaryMediaDeleteWarnings,
     HighlightVideoClipResponse,
     HighlightVideoDeleteResponse,
     HighlightVideoJobResponse,
@@ -1704,6 +1705,65 @@ def remove_flight_youtube_video(
     except YoutubeRemoteDeletionError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     return Response(status_code=204)
+
+
+def _temporary_media_delete_warnings(
+    db: Session,
+    flight: Flight,
+    *,
+    user_id: int,
+) -> dict[str, bool]:
+    source_types = ("video", "camera", "pano", "face", "pilote", "youtube_telemetry")
+    completed_uploads = (
+        db.query(YoutubeUploadJob)
+        .filter(
+            YoutubeUploadJob.flight_id == flight.id,
+            YoutubeUploadJob.user_id == user_id,
+            YoutubeUploadJob.source_type.in_(source_types),
+            YoutubeUploadJob.status == "completed",
+        )
+        .all()
+    )
+    telemetry_path = youtube_telemetry_video_path(db, flight)
+    telemetry_paths = {str(telemetry_path), str(telemetry_path.resolve())}
+    uploads_by_source = {
+        source_type: [
+            job
+            for job in completed_uploads
+            if job.source_type == source_type
+            and (source_type != "youtube_telemetry" or job.source_path in telemetry_paths)
+        ]
+        for source_type in source_types
+    }
+    video_ids = {
+        job.youtube_video_id
+        for jobs in uploads_by_source.values()
+        for job in jobs
+        if job.youtube_video_id
+    }
+    availability = youtube_video_availability({user_id: video_ids}) if video_ids else {}
+    return {
+        source_type: any(
+            job.youtube_video_id is None or availability.get(job.youtube_video_id) is not True
+            for job in jobs
+        )
+        for source_type, jobs in uploads_by_source.items()
+    }
+
+
+@router.get(
+    "/flights/{flight_id}/temporary-media-delete-warnings",
+    response_model=FlightTemporaryMediaDeleteWarnings,
+)
+def get_flight_temporary_media_delete_warnings(
+    flight_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, dict[str, bool]]:
+    flight = db.get(Flight, flight_id)
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    return {"warnings": _temporary_media_delete_warnings(db, flight, user_id=user.id)}
 
 
 @router.get(
@@ -6235,33 +6295,6 @@ def delete_flight_temporary_media(
         )
     if active_upload_query.first() is not None:
         raise HTTPException(status_code=409, detail="A YouTube upload is in progress")
-
-    completed_upload_query = db.query(YoutubeUploadJob).filter(
-        YoutubeUploadJob.flight_id == flight.id,
-        YoutubeUploadJob.user_id == user.id,
-        YoutubeUploadJob.source_type == source_type,
-        YoutubeUploadJob.status == "completed",
-    )
-    if source_type == "youtube_telemetry":
-        completed_upload_query = completed_upload_query.filter(
-            YoutubeUploadJob.source_path.in_(
-                {
-                    str(telemetry_path),
-                    str(telemetry_path.resolve()),
-                }
-            )
-        )
-    completed_uploads = completed_upload_query.all()
-    video_ids = {job.youtube_video_id for job in completed_uploads if job.youtube_video_id}
-    availability = youtube_video_availability({user.id: video_ids}) if video_ids else {}
-    if completed_uploads and any(
-        job.youtube_video_id is None or availability.get(job.youtube_video_id) is not True
-        for job in completed_uploads
-    ):
-        raise HTTPException(
-            status_code=409,
-            detail="Publish this source to YouTube before deleting its local file",
-        )
 
     if source_type == "camera":
         media_path = _flight_gopro_camera_path(db, flight)
