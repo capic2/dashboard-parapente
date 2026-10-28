@@ -168,13 +168,13 @@ const getTrackHeading = (positions: Cartesian3[], fromIndex: number) => {
   const end = Cartographic.fromCartesian(positions[endIndex]);
   return getBearingRadians(
     {
-      lat: CesiumMath.toDegrees(start.latitude),
-      lon: CesiumMath.toDegrees(start.longitude),
+      lat: (start.latitude * 180) / Math.PI,
+      lon: (start.longitude * 180) / Math.PI,
       elevation: start.height,
     },
     {
-      lat: CesiumMath.toDegrees(end.latitude),
-      lon: CesiumMath.toDegrees(end.longitude),
+      lat: (end.latitude * 180) / Math.PI,
+      lon: (end.longitude * 180) / Math.PI,
       elevation: end.height,
     }
   );
