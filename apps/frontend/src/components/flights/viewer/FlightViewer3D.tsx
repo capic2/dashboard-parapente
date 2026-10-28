@@ -149,6 +149,8 @@ const CAMERA_FOLLOW_SMOOTHING_MS = 200;
 const CAMERA_HEADING_SMOOTHING_MS = 900;
 const MAX_CAMERA_FRAME_DELTA_MS = 80;
 const CAMERA_HEADING_LOOKAHEAD_POINTS = 8;
+const normalizeAngleRadians = (angle: number) =>
+  Math.atan2(Math.sin(angle), Math.cos(angle));
 
 const getTrackHeading = (positions: Cartesian3[], fromIndex: number) => {
   if (positions.length < 2) return null;
@@ -1529,7 +1531,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         const initialTrackHeading = cameraInitialTrackHeadingRef.current;
         const headingOffset =
           trackHeading !== null && initialTrackHeading !== null
-            ? CesiumMath.negativePiToPi(baseHeading - initialTrackHeading)
+            ? normalizeAngleRadians(baseHeading - initialTrackHeading)
             : 0;
         const progress =
           lastIndex > 0
@@ -1594,7 +1596,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           !smoothHeading || currentFollowHeading === null
             ? targetHeading
             : currentFollowHeading +
-              CesiumMath.negativePiToPi(targetHeading - currentFollowHeading) *
+              normalizeAngleRadians(targetHeading - currentFollowHeading) *
                 (1 - Math.exp(-elapsedFrameTime / CAMERA_HEADING_SMOOTHING_MS));
         cameraFrameTimeRef.current =
           smoothHeading || smoothCamera ? frameTime : null;
