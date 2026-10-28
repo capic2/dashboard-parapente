@@ -102,6 +102,7 @@ from gopro_overlay_export import (
     enriched_gpx_path,
     ensure_enriched_gpx,
     first_gpx_timestamp,
+    gpx_metadata_timestamp,
     _first_gpx_at_for_camera_timeline,
     get_gopro_overlay_job,
     gpx_duration_seconds,
@@ -5903,6 +5904,7 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
     # The remaining work is file parsing only. Do not keep the request's DB
     # connection checked out while reading the GPX/OSV cache.
     db.close()
+    metadata_time = gpx_metadata_timestamp(source_path)
 
     try:
         file_type = telemetry_path.name.rsplit(".", 1)[-1]
@@ -5952,6 +5954,7 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
         enrichment_error=(
             "Unable to generate enriched GPX" if enrichment_status == "failed" else None
         ),
+        metadata_time=metadata_time,
         start_time=start_time,
         end_time=end_time,
         duration_seconds=duration_seconds,
@@ -9112,6 +9115,7 @@ def get_flight_gopro_overlay_preview(
     osv_paths = _matching_files_by_mtime(camera_path.parent, "*.osv")
     video_duration = probe_video_duration(camera_path)
     gpx_start = first_gpx_timestamp(gpx_path)
+    gpx_metadata_time = gpx_metadata_timestamp(source_gpx_path)
     gpx_duration = gpx_duration_seconds(gpx_path)
     video_start = resolve_gopro_video_start_time(camera_path, gpx_start)
     if video_duration is None or video_start is None:
@@ -9207,6 +9211,7 @@ def get_flight_gopro_overlay_preview(
         },
         gpx={
             "start_time": gpx_start,
+            "metadata_time": gpx_metadata_time,
             "end_time": gpx_start + timedelta(seconds=gpx_duration),
             "duration_seconds": gpx_duration,
             "coordinates": coordinates,

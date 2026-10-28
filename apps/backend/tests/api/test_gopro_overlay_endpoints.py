@@ -1,3 +1,4 @@
+import gzip
 import json
 import logging
 import os
@@ -1095,6 +1096,67 @@ def test_first_gpx_timestamp_ignores_metadata_time(tmp_path) -> None:
     assert gopro_overlay_export.first_gpx_timestamp(gpx_path) == datetime.fromisoformat(
         "2026-03-15T10:00:00+00:00"
     )
+
+
+@pytest.mark.parametrize(
+    ("metadata", "expected"),
+    [
+        (
+            "<metadata><time>2026-03-15T11:00:00Z</time></metadata>",
+            datetime.fromisoformat("2026-03-15T11:00:00+00:00"),
+        ),
+        (
+            "<time>2026-03-15T11:00:00Z</time>",
+            datetime.fromisoformat("2026-03-15T11:00:00+00:00"),
+        ),
+        ("", None),
+        ("<metadata><time> </time></metadata>", None),
+        ("<metadata><time>not-a-date</time></metadata>", None),
+    ],
+)
+def test_gpx_metadata_timestamp_reads_only_metadata_time(
+    tmp_path: Path, metadata: str, expected: datetime | None
+) -> None:
+    gpx_path = tmp_path / "track.gpx"
+    gpx_path.write_text(
+        '<gpx xmlns="http://www.topografix.com/GPX/1/1">'
+        f'{metadata}<trk><trkseg><trkpt lat="45" lon="5">'
+        "<time>2026-03-15T10:00:00Z</time></trkpt></trkseg></trk></gpx>"
+    )
+
+    assert gopro_overlay_export.gpx_metadata_timestamp(gpx_path) == expected
+
+
+def test_gpx_metadata_timestamp_reads_compressed_gpx(tmp_path: Path) -> None:
+    gpx_path = tmp_path / "track.gpx.gz"
+    gpx_path.write_bytes(
+        gzip.compress(b"<gpx><metadata><time>2026-03-15T11:00:00Z</time></metadata></gpx>")
+    )
+
+    assert gopro_overlay_export.gpx_metadata_timestamp(gpx_path) == datetime.fromisoformat(
+        "2026-03-15T11:00:00+00:00"
+    )
+
+
+def test_flight_telemetry_includes_metadata_time_without_camera(
+    client: TestClient, db_session, sample_flight, tmp_path: Path
+) -> None:
+    gpx_path = tmp_path / "track.gpx"
+    gpx_path.write_text(
+        "<gpx><metadata><time>2026-03-15T11:00:00Z</time></metadata>"
+        '<trk><trkseg><trkpt lat="45" lon="5">'
+        "<ele>1200</ele><time>2026-03-15T10:00:00Z</time></trkpt>"
+        '<trkpt lat="45.1" lon="5.1"><ele>1210</ele>'
+        "<time>2026-03-15T10:01:00Z</time></trkpt></trkseg></trk></gpx>"
+    )
+    sample_flight.gpx_file_path = str(gpx_path)
+    db_session.commit()
+
+    response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/telemetry")
+
+    assert response.status_code == 200
+    assert response.json()["metadata_time"] == "2026-03-15T11:00:00Z"
+    assert response.json()["start_time"] == "2026-03-15T10:00:00Z"
 
 
 def test_gopro_overlay_job_access_status_accepts_job_token(client: TestClient):

@@ -1553,6 +1553,7 @@
     "goproOverlayHeartRateUnavailable": "BPM unavailable",
     "goproOverlayTelemetryUnavailable": "unavailable",
     "goproOverlayGpxPosition": "GPX position",
+    "goproOverlayGpxDate": "GPX date",
     "goproOverlayOutsideTrack": "Outside GPX track",
     "goproOverlayEffectiveOffset": "Total offset",
     "goproOverlayAutomaticOffset": "Automatic alignment: {{offset}} s",

@@ -1558,6 +1558,7 @@
     "goproOverlayHeartRateUnavailable": "BPM non disponible",
     "goproOverlayTelemetryUnavailable": "non disponible",
     "goproOverlayGpxPosition": "Position GPX",
+    "goproOverlayGpxDate": "Date du GPX",
     "goproOverlayOutsideTrack": "Hors de la trace GPX",
     "goproOverlayEffectiveOffset": "Décalage total",
     "goproOverlayAutomaticOffset": "Alignement automatique : {{offset}} s",
