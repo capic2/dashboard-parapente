@@ -797,6 +797,10 @@ class YoutubeVideoAssociation(BaseModel):
     title: str | None = None
 
 
+class FlightTemporaryMediaDeleteWarnings(BaseModel):
+    warnings: dict[Literal["video", "camera", "pano", "face", "pilote", "youtube_telemetry"], bool]
+
+
 class YoutubeVideoRemoveRequest(BaseModel):
     delete_from_youtube: bool
 

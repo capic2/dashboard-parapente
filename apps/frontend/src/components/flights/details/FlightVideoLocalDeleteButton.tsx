@@ -6,6 +6,7 @@ import { CircleAlert, Trash2 } from 'lucide-react';
 import type { Flight } from '../../../types';
 import {
   useDeleteFlightTemporaryMedia,
+  useFlightTemporaryMediaDeleteWarnings,
   useYoutubeSourcePublicationStatus,
 } from '../../../hooks/flights/useYoutubeUpload';
 import { useToast } from '../../../hooks/useToast';
@@ -28,6 +29,13 @@ export function FlightVideoLocalDeleteButton({
     flight.youtube_urls ?? []
   );
   const deleteMedia = useDeleteFlightTemporaryMedia(flight.id);
+  const deleteWarnings = useFlightTemporaryMediaDeleteWarnings(flight.id);
+  const isCheckingDeleteWarnings =
+    deleteWarnings.isPending || deleteWarnings.isFetching;
+  const openDeleteConfirmation = () => {
+    setIsConfirmOpen(true);
+    void deleteWarnings.refetch();
+  };
 
   const handleDelete = async () => {
     try {
@@ -65,7 +73,7 @@ export function FlightVideoLocalDeleteButton({
       <Button
         variant="danger"
         className="min-h-10 w-full rounded-lg px-3 py-2 text-sm sm:w-auto"
-        onPress={() => setIsConfirmOpen(true)}
+        onPress={openDeleteConfirmation}
         isDisabled={isUploading || deleteMedia.isPending}
       >
         <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -92,9 +100,15 @@ export function FlightVideoLocalDeleteButton({
             />
             <span>
               {t(
-                isPublished
-                  ? 'flights.temporarySourceDeleteYoutubeNote'
-                  : 'flights.temporarySourceDeleteLocalNote'
+                isCheckingDeleteWarnings
+                  ? 'flights.temporarySourceDeleteChecking'
+                  : deleteWarnings.isError
+                    ? 'flights.temporarySourceDeleteWarningUnavailable'
+                    : deleteWarnings.data?.warnings.video
+                      ? 'flights.temporarySourceDeleteUnavailableYoutubeNote'
+                      : isPublished
+                        ? 'flights.temporarySourceDeleteYoutubeNote'
+                        : 'flights.temporarySourceDeleteLocalNote'
               )}
             </span>
           </div>
@@ -109,7 +123,7 @@ export function FlightVideoLocalDeleteButton({
             <Button
               variant="danger"
               onPress={() => void handleDelete()}
-              isDisabled={deleteMedia.isPending}
+              isDisabled={deleteMedia.isPending || isCheckingDeleteWarnings}
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
               {deleteMedia.isPending

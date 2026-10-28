@@ -70,6 +70,10 @@ export type TemporaryFlightMediaSource =
   | 'youtube_telemetry';
 type DeletableFlightMediaSource = 'video' | TemporaryFlightMediaSource;
 
+interface FlightTemporaryMediaDeleteWarnings {
+  warnings: Partial<Record<DeletableFlightMediaSource, boolean>>;
+}
+
 type YoutubeUploadInput = YoutubeUploadSource & {
   title: string;
   description: string;
@@ -184,6 +188,17 @@ export function useYoutubeVideoAssociations(flightId: string) {
       const data = await api.get(`flights/${flightId}/youtube-videos`).json();
       return YoutubeVideoAssociationsSchema.parse(data);
     },
+  });
+}
+
+export function useFlightTemporaryMediaDeleteWarnings(flightId: string) {
+  return useQuery({
+    queryKey: ['temporary-media-delete-warnings', flightId],
+    queryFn: () =>
+      api
+        .get(`flights/${flightId}/temporary-media-delete-warnings`)
+        .json<FlightTemporaryMediaDeleteWarnings>(),
+    staleTime: 60_000,
   });
 }
 
