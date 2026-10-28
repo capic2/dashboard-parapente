@@ -147,39 +147,8 @@ const interpolatePosition = (
 const CAMERA_FOLLOW_SMOOTHING_MS = 700;
 const CAMERA_HEADING_SMOOTHING_MS = 2800;
 const MAX_CAMERA_FRAME_DELTA_MS = 80;
-const CAMERA_HEADING_LOOKAHEAD_POINTS = 24;
 const normalizeAngleRadians = (angle: number) =>
   Math.atan2(Math.sin(angle), Math.cos(angle));
-
-const getTrackHeading = (positions: Cartesian3[], fromIndex: number) => {
-  if (positions.length < 2) return null;
-
-  const lastIndex = positions.length - 1;
-  let startIndex = Math.min(Math.max(Math.floor(fromIndex), 0), lastIndex);
-  let endIndex = Math.min(
-    startIndex + CAMERA_HEADING_LOOKAHEAD_POINTS,
-    lastIndex
-  );
-  if (endIndex === startIndex) {
-    startIndex = Math.max(0, startIndex - CAMERA_HEADING_LOOKAHEAD_POINTS);
-    endIndex = lastIndex;
-  }
-
-  const start = Cartographic.fromCartesian(positions[startIndex]);
-  const end = Cartographic.fromCartesian(positions[endIndex]);
-  return getBearingRadians(
-    {
-      lat: (start.latitude * 180) / Math.PI,
-      lon: (start.longitude * 180) / Math.PI,
-      elevation: start.height,
-    },
-    {
-      lat: (end.latitude * 180) / Math.PI,
-      lon: (end.longitude * 180) / Math.PI,
-      elevation: end.height,
-    }
-  );
-};
 
 const getViewerScene = (viewer: CesiumViewer | null | undefined) => {
   try {
@@ -411,9 +380,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const [sunTime, setSunTime] = useState(10); // 10:00
   const [lightIntensity, setLightIntensity] = useState(1.2);
   const [visualPreset, setVisualPreset] = useState<VisualPreset>('natural');
-  const [disabledAutoShots, setDisabledAutoShots] = useState<
-    ('highlight' | 'thermal')[]
-  >([]);
+  const [disabledAutoShots, setDisabledAutoShots] = useState<'highlight'[]>([]);
   const applyVisualPreset = useCallback((preset: VisualPreset) => {
     const settings = VISUAL_PRESETS[preset];
     setVisualPreset(preset);
@@ -483,7 +450,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   );
   const cameraTargetRef = useRef<Cartesian3 | null>(null);
   const cameraFollowHeadingRef = useRef<number | null>(null);
-  const cameraInitialTrackHeadingRef = useRef<number | null>(null);
   const cameraFrameTimeRef = useRef<number | null>(null);
   const currentTimestampRef = useRef<number | null>(null);
   const containerDivRef = useRef<HTMLDivElement>(null);
@@ -1011,7 +977,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
         cameraHeadingRef.current = heading;
         cameraDistanceRef.current = distance;
-        cameraInitialTrackHeadingRef.current = getTrackHeading(positions, 0);
         cameraFollowHeadingRef.current = null;
 
         viewer.camera.flyToBoundingSphere(boundingSphere, {
@@ -1519,15 +1484,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       const scene = getViewerScene(viewer);
       if (viewer && scene) {
         const baseHeading = cameraHeadingRef.current;
-        const trackHeading = getTrackHeading(
-          allPositionsRef.current,
-          scenePosition.previousIndex
-        );
-        const initialTrackHeading = cameraInitialTrackHeadingRef.current;
-        const headingOffset =
-          trackHeading !== null && initialTrackHeading !== null
-            ? normalizeAngleRadians(baseHeading - initialTrackHeading)
-            : 0;
         const progress =
           lastIndex > 0
             ? (scenePosition.previousIndex + scenePosition.ratio) / lastIndex
@@ -1541,10 +1497,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             ? undefined
             : editableHighlightProgress,
         });
-        const targetHeading =
-          trackHeading !== null && initialTrackHeading !== null
-            ? trackHeading + headingOffset
-            : baseHeading;
+        const targetHeading = baseHeading;
 
         if (!smoothCamera || !cameraTargetRef.current) {
           cameraTargetRef.current = scenePosition.position;
@@ -2243,16 +2196,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                     Déco, suivi et atterrissage restent actifs pendant la
                     prévisualisation.
                   </p>
-                  {(['highlight', 'thermal'] as const).map((shot) => (
+                  {(['highlight'] as const).map((shot) => (
                     <label
                       key={shot}
                       className="flex items-center justify-between text-sm py-1"
                     >
-                      <span>
-                        {shot === 'highlight'
-                          ? 'Point fort'
-                          : 'Orbite thermique'}
-                      </span>
+                      <span>Point fort</span>
                       <input
                         type="checkbox"
                         checked={!disabledAutoShots.includes(shot)}
