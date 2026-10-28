@@ -98,7 +98,7 @@ describe('flightViewerTelemetry', () => {
       DEFAULT_VIEWER_UNITS
     );
 
-    expect(startLabel).toBe('900 m\n0 km/h');
+    expect(startLabel).toBe('900 m\n—');
     expect(scrubbedLabel).toBe('1000 m\n60 km/h');
   });
 });
