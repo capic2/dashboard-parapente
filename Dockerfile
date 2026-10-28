@@ -9,8 +9,8 @@ ARG VITE_BASE_PATH=/
 ENV VITE_BASE_PATH=${VITE_BASE_PATH}
 ENV NX_NO_CLOUD=true
 
-# Installer pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Node 25+ no longer bundles Corepack; keep pnpm aligned with package.json.
+RUN npm install --global pnpm@12.5.1
 
 # Copier fichiers de configuration Nx et pnpm
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig.base.json ./
