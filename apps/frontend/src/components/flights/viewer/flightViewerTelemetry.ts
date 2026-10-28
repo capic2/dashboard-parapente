@@ -87,13 +87,13 @@ export const computeCursorTelemetryLabel = (
   const altitudeUnit = units.altitude;
 
   if (!coordinates?.length || index < 0) {
-    return `0 ${altitudeUnit}\n0 ${speedUnit}`;
+    return `0 ${altitudeUnit}\n—`;
   }
 
   const safeIndex = Math.min(index, coordinates.length - 1);
   const current = coordinates[safeIndex];
   if (!current) {
-    return `0 ${altitudeUnit}\n0 ${speedUnit}`;
+    return `0 ${altitudeUnit}\n—`;
   }
 
   const altitudeMeters = current.elevation + elevationOffset;
@@ -101,7 +101,7 @@ export const computeCursorTelemetryLabel = (
   const recordedSpeedKmh = current.speed_kmh;
   const hasRecordedSpeed =
     typeof recordedSpeedKmh === 'number' && Number.isFinite(recordedSpeedKmh);
-  let speedKmh = hasRecordedSpeed ? recordedSpeedKmh : 0;
+  let speedKmh: number | null = hasRecordedSpeed ? recordedSpeedKmh : null;
   if (!hasRecordedSpeed && safeIndex > 0) {
     const previous = coordinates[safeIndex - 1];
     const dtMilliseconds = current.timestamp - previous.timestamp;
@@ -119,9 +119,17 @@ export const computeCursorTelemetryLabel = (
 
   const altitudeValue =
     units.altitude === 'ft' ? altitudeMeters * FEET_PER_METER : altitudeMeters;
-  const speedValue = units.speed === 'mph' ? speedKmh * MPH_PER_KMH : speedKmh;
+  const speedValue =
+    speedKmh === null
+      ? null
+      : units.speed === 'mph'
+        ? speedKmh * MPH_PER_KMH
+        : speedKmh;
 
   const altitudeText = `${formatTelemetryNumber(altitudeValue)} ${altitudeUnit}`;
-  const speedText = `${formatTelemetryNumber(speedValue)} ${speedUnit}`;
+  const speedText =
+    speedValue === null
+      ? '—'
+      : `${formatTelemetryNumber(speedValue)} ${speedUnit}`;
   return `${altitudeText}\n${speedText}`;
 };
