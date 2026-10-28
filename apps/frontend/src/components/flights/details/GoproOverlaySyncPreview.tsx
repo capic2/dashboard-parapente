@@ -297,31 +297,24 @@ export function GoproOverlaySyncPreview({
       preview.data.gpx.coordinates[0]?.timestamp ??
       parseApiUtcDate(preview.data.gpx.start_time).getTime();
   }
-  const telemetry = gpxCoordinates.length
-    ? telemetryAtTimestamp(
-        gpxCoordinates,
-        calibrationTelemetryTimestampAtVideoTime(
+  const gpxTimestampAtPlayback =
+    Number.isFinite(gpxStartTimestamp) && gpxStartTimestamp > 0
+      ? calibrationTelemetryTimestampAtVideoTime(
           gpxStartTimestamp,
           sourceVideoTime,
           automaticOffset,
           displayOffset
         )
-      )
-    : null;
-  const heartRate = telemetry?.heart_rate ?? null;
-  const gpxPointTimestamp =
-    flightTelemetry.data?.points[0]?.timestamp ??
-    preview.data?.gpx.coordinates[0]?.timestamp;
-  const gpxPointTime =
-    gpxPointTimestamp != null && Number.isFinite(gpxPointTimestamp)
-      ? new Date(gpxPointTimestamp).toISOString()
       : null;
+  const telemetry =
+    gpxCoordinates.length && gpxTimestampAtPlayback !== null
+      ? telemetryAtTimestamp(gpxCoordinates, gpxTimestampAtPlayback)
+      : null;
+  const heartRate = telemetry?.heart_rate ?? null;
   const gpxDateTime =
-    gpxPointTime ??
-    flightTelemetry.data?.start_time ??
-    preview.data?.gpx.start_time ??
-    flightTelemetry.data?.metadata_time ??
-    preview.data?.gpx.metadata_time;
+    telemetry && Number.isFinite(telemetry.timestamp)
+      ? new Date(telemetry.timestamp).toISOString()
+      : null;
   const parsedGpxDateTime = gpxDateTime ? parseApiUtcDate(gpxDateTime) : null;
   const formattedGpxDateTime =
     parsedGpxDateTime && Number.isFinite(parsedGpxDateTime.getTime())
