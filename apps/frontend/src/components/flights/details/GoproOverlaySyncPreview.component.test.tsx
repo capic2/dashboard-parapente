@@ -135,6 +135,7 @@ describe('GoproOverlaySyncPreview calibration mapping', () => {
       configurable: true,
       value: 16.6,
     });
+    expect(container.querySelector('time')).not.toHaveAttribute('datetime');
     fireEvent.timeUpdate(camera);
 
     expect(container).toHaveTextContent('1009 m');
@@ -142,7 +143,18 @@ describe('GoproOverlaySyncPreview calibration mapping', () => {
     expect(container).toHaveTextContent('7.4 s');
     expect(container.querySelector('time')).toHaveAttribute(
       'datetime',
-      '1970-01-01T00:33:20.000Z'
+      '1970-01-01T00:33:29.200Z'
+    );
+
+    Object.defineProperty(camera, 'currentTime', {
+      configurable: true,
+      value: 17.6,
+    });
+    fireEvent.timeUpdate(camera);
+
+    expect(container.querySelector('time')).toHaveAttribute(
+      'datetime',
+      '1970-01-01T00:33:30.200Z'
     );
   });
 });
