@@ -309,17 +309,26 @@ export function GoproOverlaySyncPreview({
       )
     : null;
   const heartRate = telemetry?.heart_rate ?? null;
-  const gpxMetadataTime =
-    flightTelemetry.data?.metadata_time ?? preview.data?.gpx.metadata_time;
-  const parsedGpxMetadataTime = gpxMetadataTime
-    ? parseApiUtcDate(gpxMetadataTime)
-    : null;
-  const formattedGpxMetadataTime =
-    parsedGpxMetadataTime && Number.isFinite(parsedGpxMetadataTime.getTime())
+  const gpxPointTimestamp =
+    flightTelemetry.data?.points[0]?.timestamp ??
+    preview.data?.gpx.coordinates[0]?.timestamp;
+  const gpxPointTime =
+    gpxPointTimestamp != null && Number.isFinite(gpxPointTimestamp)
+      ? new Date(gpxPointTimestamp).toISOString()
+      : null;
+  const gpxDateTime =
+    gpxPointTime ??
+    flightTelemetry.data?.start_time ??
+    preview.data?.gpx.start_time ??
+    flightTelemetry.data?.metadata_time ??
+    preview.data?.gpx.metadata_time;
+  const parsedGpxDateTime = gpxDateTime ? parseApiUtcDate(gpxDateTime) : null;
+  const formattedGpxDateTime =
+    parsedGpxDateTime && Number.isFinite(parsedGpxDateTime.getTime())
       ? new Intl.DateTimeFormat(i18n.language, {
           dateStyle: 'short',
           timeStyle: 'medium',
-        }).format(parsedGpxMetadataTime)
+        }).format(parsedGpxDateTime)
       : t('flights.goproOverlayTelemetryUnavailable');
   const videoUrl = getApiUrlWithSearchParams(
     `flights/${flightId}/gopro-camera/preview`,
@@ -798,9 +807,9 @@ export function GoproOverlaySyncPreview({
           </div>
           <time
             className="mt-1 block font-mono text-sm"
-            dateTime={gpxMetadataTime ?? undefined}
+            dateTime={gpxDateTime ?? undefined}
           >
-            {formattedGpxMetadataTime}
+            {formattedGpxDateTime}
           </time>
         </div>
         <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 dark:border-sky-900 dark:bg-sky-950/30">
