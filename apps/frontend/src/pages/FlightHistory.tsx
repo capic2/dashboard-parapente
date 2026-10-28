@@ -235,6 +235,7 @@ const FLIGHT_BADGE_FILTERS = [
   { id: 'gpxZepp', label: 'flights.gpxZeppBadge' },
   { id: 'gpxMerged', label: 'flights.gpxEnrichedBadge' },
   { id: 'sportstracklive', label: 'flights.sportstrackliveBadge' },
+  { id: 'osvSources', label: 'flights.osvSourcesBadge' },
   { id: 'video', label: 'flights.videoBadge' },
   { id: 'pano', label: 'flights.panoBadge' },
   { id: 'face', label: 'flights.faceBadge' },
@@ -263,6 +264,7 @@ const FLIGHT_BADGE_FILTER_SECTIONS = [
     id: 'local',
     label: 'flights.tagSectionLocal',
     filterIds: [
+      'osvSources',
       'video',
       'pano',
       'face',
@@ -322,6 +324,8 @@ function flightHasBadgeFilter(
         flight.sportstracklive_status === 'uploaded' &&
         flight.sportstracklive_track_id != null
       );
+    case 'osvSources':
+      return flight.has_osv;
     case 'video':
       return (
         flight.has_video ||
@@ -466,6 +470,9 @@ export default function FlightHistory() {
     } else if (filter.id === 'sportstracklive') {
       badgeColorClassName =
         'border-sky-200 bg-sky-50 text-sky-800 hover:border-sky-300 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200 dark:hover:bg-sky-950/70';
+    } else if (filter.id === 'osvSources') {
+      badgeColorClassName =
+        'border-teal-200 bg-teal-50 text-teal-800 hover:border-teal-300 hover:bg-teal-100 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-200 dark:hover:bg-teal-950/70';
     } else if (filter.id.startsWith('youtube')) {
       badgeColorClassName =
         'border-red-200 bg-red-50 text-red-800 hover:border-red-300 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/70';
