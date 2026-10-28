@@ -95,7 +95,19 @@ export function FlightTemporaryMediaCard({
       toast.success(t('flights.temporarySourceDeleted'));
     } catch (error) {
       toast.error(
-        await getApiErrorMessage(error, t('flights.temporarySourceDeleteError'))
+        await getApiErrorMessage(
+          error,
+          t('flights.temporarySourceDeleteError'),
+          {
+            409: {
+              message: t('flights.temporarySourceDeleteConflict'),
+              details: [
+                'A YouTube upload is in progress',
+                'Publish this source to YouTube before deleting its local file',
+              ],
+            },
+          }
+        )
       );
     }
   };

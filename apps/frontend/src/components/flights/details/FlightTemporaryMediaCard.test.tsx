@@ -75,6 +75,8 @@ vi.mock('react-i18next', () => ({
         'common.cancel': 'Cancel',
         'flights.temporarySourceDeleted': 'Local file deleted',
         'flights.temporarySourceDeleteError': 'Unable to delete local file',
+        'flights.temporarySourceDeleteConflict':
+          'Deletion blocked by YouTube publication safety.',
         'flights.cameraThumbnailAlt': 'Camera thumbnail',
         'flights.panoThumbnailAlt': 'Pano thumbnail',
         'flights.temporaryVideoThumbnailAlt': `${options?.role ?? ''} video thumbnail`,
@@ -97,8 +99,26 @@ vi.mock('../../../hooks/useToast', () => ({
 }));
 
 vi.mock('../../../lib/api', () => ({
-  getApiErrorMessage: vi.fn((_error: unknown, fallback: string) =>
-    Promise.resolve(fallback)
+  getApiErrorMessage: vi.fn(
+    (
+      error: unknown,
+      fallback: string,
+      statusMessages?: Partial<
+        Record<number, { message: string; details: readonly string[] }>
+      >
+    ) => {
+      const status =
+        error instanceof Error &&
+        'response' in error &&
+        error.response instanceof Response
+          ? error.response.status
+          : undefined;
+      return Promise.resolve(
+        (status === undefined
+          ? undefined
+          : statusMessages?.[status]?.message) ?? fallback
+      );
+    }
   ),
 }));
 
@@ -195,5 +215,31 @@ describe('FlightTemporaryMediaCard', () => {
     });
     fireEvent.click(deleteButtons[deleteButtons.length - 1]);
     await waitFor(() => expect(mutateAsyncMock).toHaveBeenCalledWith('pano'));
+  });
+
+  it('explains when YouTube safety blocks local deletion', async () => {
+    mutateAsyncMock.mockRejectedValueOnce(
+      Object.assign(new Error('Conflict'), {
+        response: new Response(null, { status: 409 }),
+      })
+    );
+    render(
+      <FlightTemporaryMediaCard
+        flight={flight}
+        sourceType="youtube_telemetry"
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete local file' }));
+    const deleteButtons = screen.getAllByRole('button', {
+      name: 'Delete local file',
+    });
+    fireEvent.click(deleteButtons[deleteButtons.length - 1]);
+
+    await waitFor(() =>
+      expect(toastErrorMock).toHaveBeenCalledWith(
+        'Deletion blocked by YouTube publication safety.'
+      )
+    );
   });
 });
