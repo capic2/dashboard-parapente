@@ -1,6 +1,7 @@
 import asyncio
 import fcntl
 import fnmatch
+import gzip
 import hashlib
 import json
 import logging
@@ -1299,6 +1300,33 @@ def first_gpx_timestamp(gpx_path: Path) -> datetime | None:
             if parsed := _parse_utc_datetime(element.text):
                 return parsed
     return None
+
+
+def gpx_metadata_timestamp(gpx_path: Path) -> datetime | None:
+    """Return the GPX metadata time without substituting a trackpoint time."""
+    try:
+        if gpx_path.suffix.lower() == ".gz":
+            with gzip.open(gpx_path, "rb") as source:
+                root = ET.parse(source).getroot()
+        else:
+            root = ET.parse(gpx_path).getroot()
+    except (ET.ParseError, EOFError, OSError):
+        return None
+
+    metadata = next(
+        (element for element in root if element.tag.rsplit("}", 1)[-1] == "metadata"),
+        None,
+    )
+    timestamp = next(
+        (element for element in metadata or () if element.tag.rsplit("}", 1)[-1] == "time"),
+        None,
+    )
+    if timestamp is None:
+        timestamp = next(
+            (element for element in root if element.tag.rsplit("}", 1)[-1] == "time"),
+            None,
+        )
+    return _parse_utc_datetime(timestamp.text) if timestamp is not None and timestamp.text else None
 
 
 def resolve_gopro_video_start_time(video_path: Path, gpx_start: datetime | None) -> datetime | None:

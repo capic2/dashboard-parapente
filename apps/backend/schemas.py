@@ -190,6 +190,7 @@ class FlightTelemetryResponse(BaseModel):
     enrichment_status: Literal["missing", "pending", "ready", "failed"]
     enrichment_progress: int | None = None
     enrichment_error: str | None = None
+    metadata_time: datetime | None = None
     start_time: datetime | None = None
     end_time: datetime | None = None
     duration_seconds: float
@@ -214,6 +215,7 @@ class GoproOverlayEnrichmentResponse(BaseModel):
 
 class GoproOverlayPreviewGpx(BaseModel):
     start_time: datetime
+    metadata_time: datetime | None = None
     end_time: datetime
     duration_seconds: float
     coordinates: list[GoproOverlayPreviewCoordinate]
