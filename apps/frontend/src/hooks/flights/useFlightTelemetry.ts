@@ -27,6 +27,7 @@ export interface FlightTelemetryData {
   enrichment_status: 'missing' | 'ready' | 'pending' | 'failed';
   enrichment_progress?: number | null;
   enrichment_error?: string | null;
+  metadata_time?: string | null;
   start_time: string | null;
   end_time: string | null;
   duration_seconds: number;

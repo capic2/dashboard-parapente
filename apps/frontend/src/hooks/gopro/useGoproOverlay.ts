@@ -24,6 +24,7 @@ export type GoproOverlayPreview = {
   };
   gpx: {
     start_time: string;
+    metadata_time?: string | null;
     end_time: string;
     duration_seconds: number;
     coordinates: GeoPoint[];

@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Gauge, HeartPulse, MapPin, Mountain, TimerReset } from 'lucide-react';
+import {
+  CalendarClock,
+  Gauge,
+  HeartPulse,
+  MapPin,
+  Mountain,
+  TimerReset,
+} from 'lucide-react';
 import {
   useGenerateGoproPreview,
   useGenerateGoproMerge,
@@ -162,7 +169,7 @@ export function GoproOverlaySyncPreview({
   youtubeUrls = EMPTY_YOUTUBE_URLS,
   onCurrentYoutubePositionChange,
 }: GoproOverlaySyncPreviewProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const token = useAuthStore((state) => state.token);
   const queryClient = useQueryClient();
   const youtubeAssociations = useYoutubeVideoAssociations(flightId);
@@ -302,6 +309,18 @@ export function GoproOverlaySyncPreview({
       )
     : null;
   const heartRate = telemetry?.heart_rate ?? null;
+  const gpxMetadataTime =
+    flightTelemetry.data?.metadata_time ?? preview.data?.gpx.metadata_time;
+  const parsedGpxMetadataTime = gpxMetadataTime
+    ? parseApiUtcDate(gpxMetadataTime)
+    : null;
+  const formattedGpxMetadataTime =
+    parsedGpxMetadataTime && Number.isFinite(parsedGpxMetadataTime.getTime())
+      ? new Intl.DateTimeFormat(i18n.language, {
+          dateStyle: 'short',
+          timeStyle: 'medium',
+        }).format(parsedGpxMetadataTime)
+      : t('flights.goproOverlayTelemetryUnavailable');
   const videoUrl = getApiUrlWithSearchParams(
     `flights/${flightId}/gopro-camera/preview`,
     {
@@ -771,6 +790,18 @@ export function GoproOverlaySyncPreview({
               ? `${telemetry.lat.toFixed(5)}, ${telemetry.lon.toFixed(5)}`
               : t('flights.goproOverlayTelemetryUnavailable')}
           </div>
+        </div>
+        <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+            <CalendarClock className="h-4 w-4" aria-hidden="true" />
+            {t('flights.goproOverlayGpxDate')}
+          </div>
+          <time
+            className="mt-1 block font-mono text-sm"
+            dateTime={gpxMetadataTime ?? undefined}
+          >
+            {formattedGpxMetadataTime}
+          </time>
         </div>
         <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 dark:border-sky-900 dark:bg-sky-950/30">
           <div className="flex items-center justify-between gap-3 text-sm">
