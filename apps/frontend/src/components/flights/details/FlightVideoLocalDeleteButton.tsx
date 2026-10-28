@@ -22,7 +22,7 @@ export function FlightVideoLocalDeleteButton({
   const toast = useToast();
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const source = { source_type: 'video' } as const;
-  const { isPublished } = useYoutubeSourcePublicationStatus(
+  const { upload, isPublished } = useYoutubeSourcePublicationStatus(
     flight.id,
     source,
     flight.youtube_urls ?? []
@@ -41,7 +41,10 @@ export function FlightVideoLocalDeleteButton({
     }
   };
 
-  if (!isPublished) return null;
+  const isUploading =
+    upload.data?.status === 'preparing' ||
+    upload.data?.status === 'queued' ||
+    upload.data?.status === 'uploading';
 
   const title = t('flights.videoBadge');
 
@@ -51,6 +54,7 @@ export function FlightVideoLocalDeleteButton({
         variant="danger"
         className="min-h-10 w-full rounded-lg px-3 py-2 text-sm sm:w-auto"
         onPress={() => setIsConfirmOpen(true)}
+        isDisabled={isUploading || deleteMedia.isPending}
       >
         <Trash2 className="h-4 w-4" aria-hidden="true" />
         {t('flights.temporarySourceDelete')}
@@ -74,7 +78,13 @@ export function FlightVideoLocalDeleteButton({
               className="mt-0.5 h-5 w-5 shrink-0"
               aria-hidden="true"
             />
-            <span>{t('flights.temporarySourceDeleteYoutubeNote')}</span>
+            <span>
+              {t(
+                isPublished
+                  ? 'flights.temporarySourceDeleteYoutubeNote'
+                  : 'flights.temporarySourceDeleteLocalNote'
+              )}
+            </span>
           </div>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
