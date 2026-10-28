@@ -43,7 +43,6 @@ import { getExportFrameTarget } from '../../../utils/videoExportFrame';
 import {
   getHighestAltitudeHighlightProgress,
   getStrongestTurnHighlightProgress,
-  getThermalWindow,
 } from '../../../utils/flightHighlight';
 import { api } from '../../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
@@ -145,10 +144,10 @@ const interpolatePosition = (
     start.z + (end.z - start.z) * ratio
   );
 
-const CAMERA_FOLLOW_SMOOTHING_MS = 200;
-const CAMERA_HEADING_SMOOTHING_MS = 900;
+const CAMERA_FOLLOW_SMOOTHING_MS = 700;
+const CAMERA_HEADING_SMOOTHING_MS = 2800;
 const MAX_CAMERA_FRAME_DELTA_MS = 80;
-const CAMERA_HEADING_LOOKAHEAD_POINTS = 8;
+const CAMERA_HEADING_LOOKAHEAD_POINTS = 24;
 const normalizeAngleRadians = (angle: number) =>
   Math.atan2(Math.sin(angle), Math.cos(angle));
 
@@ -396,10 +395,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     () =>
       getStrongestTurnHighlightProgress(gpxData?.coordinates ?? []) ??
       getHighestAltitudeHighlightProgress(gpxData?.coordinates ?? []),
-    [gpxData?.coordinates]
-  );
-  const thermalWindow = useMemo(
-    () => getThermalWindow(gpxData?.coordinates ?? []),
     [gpxData?.coordinates]
   );
   const [editableHighlightProgress, setEditableHighlightProgress] = useState<
@@ -1546,22 +1541,10 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             ? undefined
             : editableHighlightProgress,
         });
-        const thermalProgress =
-          thermalWindow && !disabledAutoShots.includes('thermal')
-            ? (progress - thermalWindow.startProgress) /
-              Math.max(
-                thermalWindow.endProgress - thermalWindow.startProgress,
-                0.01
-              )
-            : 0;
-        const thermalOrbitHeading =
-          thermalWindow && thermalProgress >= 0 && thermalProgress <= 1
-            ? thermalWindow.direction * thermalProgress * Math.PI * 2
-            : 0;
         const targetHeading =
           trackHeading !== null && initialTrackHeading !== null
-            ? trackHeading + headingOffset + thermalOrbitHeading
-            : baseHeading + thermalOrbitHeading;
+            ? trackHeading + headingOffset
+            : baseHeading;
 
         if (!smoothCamera || !cameraTargetRef.current) {
           cameraTargetRef.current = scenePosition.position;
@@ -1665,12 +1648,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         tilesLoaded: Boolean(getViewerScene(viewer)?.globe.tilesLoaded),
       };
     },
-    [
-      disabledAutoShots,
-      editableHighlightProgress,
-      syncTrackEntity,
-      thermalWindow,
-    ]
+    [disabledAutoShots, editableHighlightProgress, syncTrackEntity]
   );
 
   useEffect(() => {
