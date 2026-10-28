@@ -3,16 +3,29 @@ import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Flight } from '../../../types';
 
-const { publicationMock, mutateAsyncMock, toastSuccessMock, toastErrorMock } =
-  vi.hoisted(() => ({
-    publicationMock: {
-      upload: { data: null as unknown },
-      isPublished: false,
-    },
-    mutateAsyncMock: vi.fn(),
-    toastSuccessMock: vi.fn(),
-    toastErrorMock: vi.fn(),
-  }));
+const {
+  publicationMock,
+  deleteWarningsMock,
+  refetchDeleteWarningsMock,
+  mutateAsyncMock,
+  toastSuccessMock,
+  toastErrorMock,
+} = vi.hoisted(() => ({
+  publicationMock: {
+    upload: { data: null as unknown },
+    isPublished: false,
+  },
+  deleteWarningsMock: {
+    data: { warnings: {} as Record<string, boolean> },
+    isPending: false,
+    isFetching: false,
+    isError: false,
+  },
+  refetchDeleteWarningsMock: vi.fn(),
+  mutateAsyncMock: vi.fn(),
+  toastSuccessMock: vi.fn(),
+  toastErrorMock: vi.fn(),
+}));
 
 vi.mock('@dashboard-parapente/core/Button/Button', () => ({
   Button: ({
@@ -71,6 +84,12 @@ vi.mock('react-i18next', () => ({
           'The video stays on YouTube.',
         'flights.temporarySourceDeleteLocalNote':
           'Only the local file will be deleted.',
+        'flights.temporarySourceDeleteUnavailableYoutubeNote':
+          'A previously published video cannot be found on YouTube. Deleting this file means it cannot be recovered. Continue?',
+        'flights.temporarySourceDeleteChecking':
+          'Checking availability of previous YouTube videos…',
+        'flights.temporarySourceDeleteWarningUnavailable':
+          'Could not check previous YouTube videos. Delete only if you accept that an uploaded video might not be recoverable.',
         'flights.temporarySourceDeleting': 'Deleting…',
         'common.cancel': 'Cancel',
         'flights.temporarySourceDeleted': 'Local file deleted',
@@ -88,6 +107,10 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
   useYoutubeSourcePublicationStatus: () => publicationMock,
+  useFlightTemporaryMediaDeleteWarnings: () => ({
+    ...deleteWarningsMock,
+    refetch: refetchDeleteWarningsMock,
+  }),
   useDeleteFlightTemporaryMedia: () => ({
     isPending: false,
     mutateAsync: mutateAsyncMock,
@@ -143,6 +166,11 @@ describe('FlightTemporaryMediaCard', () => {
   beforeEach(() => {
     publicationMock.upload = { data: null };
     publicationMock.isPublished = false;
+    deleteWarningsMock.data = { warnings: {} };
+    deleteWarningsMock.isPending = false;
+    deleteWarningsMock.isFetching = false;
+    deleteWarningsMock.isError = false;
+    refetchDeleteWarningsMock.mockReset();
     mutateAsyncMock.mockReset().mockResolvedValue(undefined);
     toastSuccessMock.mockReset();
     toastErrorMock.mockReset();
@@ -160,6 +188,7 @@ describe('FlightTemporaryMediaCard', () => {
       screen.getByRole('button', { name: 'Delete local file' })
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Delete local file' }));
+    expect(refetchDeleteWarningsMock).toHaveBeenCalledOnce();
     expect(
       screen.getByText('Only the local file will be deleted.')
     ).toBeInTheDocument();
@@ -215,6 +244,40 @@ describe('FlightTemporaryMediaCard', () => {
     });
     fireEvent.click(deleteButtons[deleteButtons.length - 1]);
     await waitFor(() => expect(mutateAsyncMock).toHaveBeenCalledWith('pano'));
+  });
+
+  it('asks for explicit confirmation when a previous YouTube upload is unavailable', () => {
+    deleteWarningsMock.data = { warnings: { youtube_telemetry: true } };
+    render(
+      <FlightTemporaryMediaCard
+        flight={flight}
+        sourceType="youtube_telemetry"
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete local file' }));
+
+    expect(
+      screen.getByText(
+        'A previously published video cannot be found on YouTube. Deleting this file means it cannot be recovered. Continue?'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('refreshes YouTube availability when opening confirmation and waits for the check', () => {
+    deleteWarningsMock.isFetching = true;
+    render(<FlightTemporaryMediaCard flight={flight} sourceType="pano" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete local file' }));
+
+    expect(refetchDeleteWarningsMock).toHaveBeenCalledOnce();
+    expect(
+      screen.getByText('Checking availability of previous YouTube videos…')
+    ).toBeInTheDocument();
+    const deleteButtons = screen.getAllByRole('button', {
+      name: 'Delete local file',
+    });
+    expect(deleteButtons[deleteButtons.length - 1]).toBeDisabled();
   });
 
   it('explains when YouTube safety blocks local deletion', async () => {

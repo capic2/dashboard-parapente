@@ -2670,7 +2670,7 @@ class TestDeleteFlightTemporaryMedia:
         db_session.refresh(flight)
         assert flight.youtube_telemetry_video_file_path is None
 
-    def test_delete_is_rejected_when_youtube_no_longer_has_the_video(
+    def test_delete_is_allowed_when_youtube_no_longer_has_the_video(
         self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
     ) -> None:
         monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
@@ -2694,10 +2694,12 @@ class TestDeleteFlightTemporaryMedia:
 
         response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/pano")
 
-        assert response.status_code == 409
-        assert pano_path.read_bytes() == b"pano"
+        assert response.status_code == 204
+        assert not pano_path.exists()
+        db_session.refresh(flight)
+        assert flight.pano_video_file_path is None
 
-    def test_delete_is_rejected_for_unlinked_upload_missing_from_youtube(
+    def test_delete_is_allowed_for_unlinked_upload_missing_from_youtube(
         self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
     ) -> None:
         monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
@@ -2723,10 +2725,12 @@ class TestDeleteFlightTemporaryMedia:
 
         response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/pano")
 
-        assert response.status_code == 409
-        assert pano_path.read_bytes() == b"pano"
+        assert response.status_code == 204
+        assert not pano_path.exists()
+        db_session.refresh(flight)
+        assert flight.pano_video_file_path is None
 
-    def test_delete_is_rejected_when_any_unlinked_upload_is_missing_from_youtube(
+    def test_delete_is_allowed_when_any_unlinked_upload_is_missing_from_youtube(
         self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
     ) -> None:
         monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
@@ -2769,8 +2773,35 @@ class TestDeleteFlightTemporaryMedia:
 
         response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/pano")
 
-        assert response.status_code == 409
-        assert pano_path.read_bytes() == b"new pano"
+        assert response.status_code == 204
+        assert not pano_path.exists()
+        db_session.refresh(flight)
+        assert flight.pano_video_file_path is None
+
+    def test_delete_warnings_report_unavailable_youtube_uploads(
+        self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(
+            "routes.youtube_video_availability",
+            lambda grouped: {
+                video_id: False for video_ids in grouped.values() for video_id in video_ids
+            },
+        )
+        flight = Flight(
+            id="flight-temp-pano-unavailable-warning",
+            flight_date=date(2026, 3, 15),
+            pano_video_file_path=str(tmp_path / "20260315" / "01" / "pano.mp4"),
+        )
+        db_session.add(flight)
+        db_session.flush()
+        self._completed_upload(db_session, flight, source_type="pano")
+        flight.youtube_urls = []
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/{flight.id}/temporary-media-delete-warnings")
+
+        assert response.status_code == 200
+        assert response.json()["warnings"]["pano"] is True
 
     def test_delete_pano_removes_only_the_local_file_and_clears_its_path(
         self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
