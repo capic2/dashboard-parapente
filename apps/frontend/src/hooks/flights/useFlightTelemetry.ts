@@ -1,9 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import {
-  telemetrySpeedKmhBetween,
-  telemetryTimestampAtVideoTime,
-} from '../../components/flights/details/goproSyncTelemetry';
+import { telemetryTimestampAtVideoTime } from '../../components/flights/details/goproSyncTelemetry';
 
 export interface FlightTelemetryPoint {
   timestamp: number;
@@ -124,11 +121,21 @@ export function interpolateTelemetryAtVideoTime(
   const duration = next.timestamp - previous.timestamp;
   const ratio =
     duration > 0 ? (targetTimestamp - previous.timestamp) / duration : 0;
-  const recordedSpeed = interpolateOptional(
-    previous.speed_kmh,
-    next.speed_kmh,
-    ratio
-  );
+  const previousSpeed = previous.speed_kmh;
+  const nextSpeed = next.speed_kmh;
+  const hasPreviousSpeed =
+    previousSpeed != null && Number.isFinite(previousSpeed);
+  const hasNextSpeed = nextSpeed != null && Number.isFinite(nextSpeed);
+  const recordedSpeed =
+    hasPreviousSpeed && hasNextSpeed
+      ? ratio < 0.5
+        ? previousSpeed
+        : nextSpeed
+      : hasPreviousSpeed
+        ? previousSpeed
+        : hasNextSpeed
+          ? nextSpeed
+          : null;
   return {
     timestamp: targetTimestamp,
     lat: previous.lat + (next.lat - previous.lat) * ratio,
@@ -136,10 +143,7 @@ export function interpolateTelemetryAtVideoTime(
     elevation:
       previous.elevation + (next.elevation - previous.elevation) * ratio,
     segment: previous.segment,
-    speed_kmh:
-      recordedSpeed != null && Number.isFinite(recordedSpeed)
-        ? recordedSpeed
-        : telemetrySpeedKmhBetween(previous, next),
+    speed_kmh: recordedSpeed,
     vario_ms: interpolateOptional(previous.vario_ms, next.vario_ms, ratio),
     heading_deg: interpolateHeading(
       previous.heading_deg,
