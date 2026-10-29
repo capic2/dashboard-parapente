@@ -422,6 +422,19 @@ export function GoproOverlaySyncPreview({
     setVideoTime(time);
   };
 
+  const seekBy = (delta: number) => {
+    const isYoutubePlayerActive = Boolean(youtubeId && !youtubeFailed);
+    const playerTime = isYoutubePlayerActive
+      ? (youtubeRef.current?.getCurrentTime() ?? videoTime)
+      : (cameraRef.current?.currentTime ?? videoTime);
+    const duration = isYoutubePlayerActive
+      ? youtubeDuration
+      : (cameraRef.current?.duration ?? previewEndTime);
+    const maxTime =
+      Number.isFinite(duration) && duration > 0 ? duration : previewEndTime;
+    seekToPreviewBoundary(Math.min(maxTime, Math.max(0, playerTime + delta)));
+  };
+
   useEffect(() => {
     if (!youtubeId || youtubeFailed || !youtubeHostElement) return;
     let cancelled = false;
@@ -473,6 +486,8 @@ export function GoproOverlaySyncPreview({
     let frame = 0;
     const update = () => {
       setVideoTime(youtubeRef.current?.getCurrentTime() ?? 0);
+      const duration = youtubeRef.current?.getDuration() ?? 0;
+      if (duration > 0) setYoutubeDuration(duration);
       frame = requestAnimationFrame(update);
     };
     frame = requestAnimationFrame(update);
@@ -611,6 +626,17 @@ export function GoproOverlaySyncPreview({
     );
   }
 
+  const seekControls = [
+    { delta: -1, label: t('flights.goproPreviewSeekBackwardSecond') },
+    { delta: -0.1, label: t('flights.goproPreviewSeekBackwardTenthSecond') },
+    { delta: 0.1, label: t('flights.goproPreviewSeekForwardTenthSecond') },
+    { delta: 1, label: t('flights.goproPreviewSeekForwardSecond') },
+  ] as const;
+  const isYoutubePlayerActive = Boolean(youtubeId && !youtubeFailed);
+  const seekControlsDisabled = isYoutubePlayerActive
+    ? youtubeDuration <= 0 || !youtubeReady
+    : !youtubeFailed && previewEndTime <= 0;
+
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(17rem,1fr)]">
       <div>
@@ -650,6 +676,24 @@ export function GoproOverlaySyncPreview({
           <div className="flex items-center justify-between px-3 py-2 font-mono text-xs text-gray-200">
             <span>{t('flights.goproOverlayVideoTime')}</span>
             <span>{formatSeconds(sourceVideoTime)}</span>
+          </div>
+          <div className="grid grid-cols-4 border-t border-gray-800 text-center text-xs font-medium text-white">
+            {seekControls.map(({ delta, label }) => (
+              <button
+                key={delta}
+                type="button"
+                onClick={() => seekBy(delta)}
+                disabled={seekControlsDisabled}
+                aria-label={label}
+                className="cursor-pointer px-2 py-2 transition-colors hover:bg-gray-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {delta < 0 ? '−' : '+'}
+                {Math.abs(delta).toLocaleString(i18n.language, {
+                  maximumFractionDigits: 1,
+                })}{' '}
+                s
+              </button>
+            ))}
           </div>
           {previewSegments.length > 1 && (
             <div className="grid grid-cols-2 border-t border-gray-800 text-center text-xs font-medium text-white">
