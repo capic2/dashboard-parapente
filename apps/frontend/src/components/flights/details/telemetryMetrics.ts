@@ -196,9 +196,14 @@ export function getTelemetryMetricValue(
   }
 }
 
-export function formatTelemetryValue(value: DisplayValue, emptyValue = '—') {
+export function formatTelemetryValue(
+  value: DisplayValue,
+  emptyValue = '—',
+  roundToInteger = false
+) {
   if (typeof value === 'string') return value;
   if (value == null || !Number.isFinite(value)) return emptyValue;
+  if (roundToInteger) return Math.round(value).toString();
   return Math.abs(value) >= 100
     ? Math.round(value).toString()
     : value.toFixed(1);
