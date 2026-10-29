@@ -11,10 +11,13 @@ from unittest.mock import patch
 
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 from auth import create_job_token
-from models import GoproOverlayJob, VideoExportJob, YoutubeUploadJob
+from deployment_drain import DeploymentDrainActive
+from models import Flight, GoproOverlayJob, VideoExportJob, YoutubeUploadJob
 from routes import (
     _get_video_export_jobs_payload,
     _youtube_upload_export_job_payload,
@@ -253,6 +256,52 @@ class TestVideoExportStartEndpoint:
         assert mock_start.call_args.kwargs["overlay_job_id"] == "saved-legacy-overlay"
         assert mock_start.call_args.kwargs["overlay_offset_seconds"] == 12.5
 
+    def test_youtube_overlay_export_maps_deployment_drain_to_retryable_503(
+        self,
+        client: TestClient,
+        db_session: Session,
+        sample_flight: Flight,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        sample_flight.youtube_urls = [youtube_url]
+        sample_flight.gopro_overlay_gpx_offset = 12.5
+        db_session.add(
+            GoproOverlayJob(
+                id="saved-overlay-for-drain",
+                flight_id=sample_flight.id,
+                status="completed",
+                video_path="/data/source.mp4",
+                gpx_path="/data/flight.gpx",
+                layout_id="default",
+                layout_label="Default",
+                layout_path="/data/layout.json",
+                output_path="/data/render.mp4",
+                temp_output_path="/data/render.mp4.tmp",
+                output_filename="render.mp4",
+                command_json=json.dumps({"overlay_only": False}),
+            )
+        )
+        db_session.commit()
+        monkeypatch.setattr("routes.is_youtube_configured", lambda: True)
+        monkeypatch.setattr("routes.is_youtube_connected", lambda db, user_id: True)
+
+        with patch(
+            "routes.start_youtube_overlay_export",
+            side_effect=DeploymentDrainActive(
+                "A deployment is draining jobs; retry this operation in 5 minutes"
+            ),
+        ):
+            response = client.post(
+                f"{API_PREFIX}/flights/{sample_flight.id}/youtube-overlay-export",
+                json={"youtube_url": youtube_url},
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        assert response.status_code == 503
+        assert response.headers["retry-after"] == "300"
+        assert "retry" in response.json()["detail"].lower()
+
     def test_youtube_telemetry_layout_export_rejects_active_upload(
         self, client, db_session, sample_flight, monkeypatch
     ):
@@ -306,6 +355,35 @@ class TestVideoExportStartEndpoint:
         assert response.json()["status"] == "queued"
         assert response.json()["operation_id"]
         assert mock_start.call_args.kwargs["offset_seconds"] == 3.5
+
+    def test_youtube_telemetry_layout_export_maps_deployment_drain_to_retryable_503(
+        self,
+        client: TestClient,
+        db_session: Session,
+        sample_flight: Flight,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        sample_flight.youtube_urls = [youtube_url]
+        db_session.commit()
+        monkeypatch.setattr("routes.is_youtube_configured", lambda: True)
+        monkeypatch.setattr("routes.is_youtube_connected", lambda db, user_id: True)
+
+        with patch(
+            "routes.start_youtube_telemetry_layout_export",
+            side_effect=DeploymentDrainActive(
+                "A deployment is draining jobs; retry this operation in 5 minutes"
+            ),
+        ):
+            response = client.post(
+                f"{API_PREFIX}/flights/{sample_flight.id}/youtube-telemetry-layout-export",
+                json={"youtube_url": youtube_url, "offset_seconds": 3.5},
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        assert response.status_code == 503
+        assert response.headers["retry-after"] == "300"
+        assert "retry" in response.json()["detail"].lower()
 
     def test_youtube_telemetry_layout_export_maps_concurrent_duplicate_to_conflict(
         self, client, db_session, sample_flight, monkeypatch
