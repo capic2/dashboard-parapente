@@ -126,6 +126,29 @@ def _youtube_download_eta_seconds(message: str) -> int | None:
     return seconds
 
 
+def _youtube_download_eta_update_fields(
+    message: str,
+    download_percent: int | None,
+    elapsed_seconds: float | None,
+) -> dict[str, int | None]:
+    is_download_message = message.startswith(("yt-dlp:", "Téléchargement YouTube"))
+    if is_download_message:
+        eta_seconds = _youtube_download_eta_seconds(message)
+        if (
+            eta_seconds is None
+            and download_percent is not None
+            and 0 < download_percent < 100
+            and elapsed_seconds is not None
+            and elapsed_seconds >= 5
+        ):
+            eta_seconds = round(elapsed_seconds * (100 - download_percent) / download_percent)
+        return {"eta_seconds": eta_seconds}
+
+    if message.startswith("Rendu de l’overlay:"):
+        return {"eta_seconds": None}
+    return {}
+
+
 _ACTIVE_STATUSES = {
     _STATUS_QUEUED,
     _STATUS_RUNNING,
@@ -361,7 +384,7 @@ def _youtube_telemetry_layout_phase(job: VideoExportJob) -> str | None:
     if job.status in _TERMINAL_STATUSES or job.status == _STATUS_QUEUED:
         return job.status
     if (job.message or "").startswith(("yt-dlp:", "Téléchargement YouTube")):
-        return "downloading"
+        return "downloading_source_video"
     if (job.message or "").startswith("Finalizing video export"):
         return _STATUS_FINALIZING
     if (job.message or "").startswith("Rendu de l’overlay:"):
@@ -1139,7 +1162,6 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
             raise YoutubeExportError("Export annulé")
         _log_job(job_id, message)
         progress_percent = None
-        update_fields: dict[str, Any] = {}
         is_download_message = message.startswith(("yt-dlp:", "Téléchargement YouTube"))
         if message == "Téléchargement YouTube démarré":
             download_started_at = time.monotonic()
@@ -1148,22 +1170,14 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
                 progress_percent = 40 + round(download_percent * 45 / 100)
             elif is_download_message:
                 progress_percent = 1 + round(download_percent * 39 / 100)
-        if is_download_message:
-            eta_seconds = _youtube_download_eta_seconds(message)
-            if (
-                eta_seconds is None
-                and download_percent is not None
-                and 0 < download_percent < 100
-                and download_started_at is not None
-            ):
-                elapsed_seconds = time.monotonic() - download_started_at
-                if elapsed_seconds >= 5:
-                    eta_seconds = round(
-                        elapsed_seconds * (100 - download_percent) / download_percent
-                    )
-            update_fields["eta_seconds"] = eta_seconds
-        elif message.startswith("Rendu de l’overlay:"):
-            update_fields["eta_seconds"] = None
+        elapsed_seconds = (
+            time.monotonic() - download_started_at if download_started_at is not None else None
+        )
+        update_fields = _youtube_download_eta_update_fields(
+            message,
+            download_percent,
+            elapsed_seconds,
+        )
         _update_job(
             job_id,
             status=_STATUS_RUNNING,
@@ -1208,6 +1222,7 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
             raise YoutubeExportError("Export annulé")
         if destination is None:
             raise YoutubeExportError("Chemin du fichier YouTube introuvable")
+        _set_job_runtime(job_id, phase=_STATUS_FINALIZING, eta_seconds=None)
         _update_job(
             job_id,
             status=_STATUS_RUNNING,
@@ -3073,13 +3088,14 @@ async def _export_video_manual_render(job_id: str):
             if not encoding_completed:
                 return
 
+            _set_job_runtime(job_id, phase=_STATUS_FINALIZING, eta_seconds=None)
             _update_job(
                 job_id,
                 status=_STATUS_RUNNING,
                 progress=99,
                 message="Finalizing video export",
+                eta_seconds=None,
             )
-            _set_job_runtime(job_id, phase=_STATUS_FINALIZING, eta_seconds=None)
             timestamp = datetime.now(UTC).replace(tzinfo=None).strftime("%Y%m%d-%H%M%S")
             output_file = _video_output_path(flight_id, timestamp)
             await asyncio.to_thread(shutil.move, str(encoding_output_file), str(output_file))
