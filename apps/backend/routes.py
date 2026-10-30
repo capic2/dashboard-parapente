@@ -1184,6 +1184,7 @@ def _refresh_operation_from_source(db: Session, operation: BackgroundOperationMo
         return operation.source_id.split(":", 1)[0] or None
 
     status: str | None = None
+    phase: str | None = None
     progress: int | float | None = None
     detail: str | None = None
     error: str | None = None
@@ -1193,6 +1194,7 @@ def _refresh_operation_from_source(db: Session, operation: BackgroundOperationMo
         if snapshot:
             flight_id = snapshot.get("flight_id")
             status = snapshot.get("internal_status") or snapshot.get("status")
+            phase = snapshot.get("phase")
             progress = snapshot.get("progress")
             detail = snapshot.get("message")
             error = snapshot.get("error")
@@ -1227,6 +1229,7 @@ def _refresh_operation_from_source(db: Session, operation: BackgroundOperationMo
             db,
             operation,
             status=status,
+            phase=phase,
             progress=progress,
             detail=detail,
             error=error,

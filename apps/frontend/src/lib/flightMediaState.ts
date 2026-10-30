@@ -28,10 +28,7 @@ export function isGoproOverlayInProgress(status?: string | null): boolean {
 export function isYoutubeUploadProgressVisible(
   job?: { source_type?: string | null; status?: string | null } | null
 ): boolean {
-  return Boolean(
-    job &&
-    !(job.source_type === 'youtube_overlay' && job.status === 'preparing')
-  );
+  return Boolean(job);
 }
 
 export function isUnavailableMediaError(error: unknown): boolean {
