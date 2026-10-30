@@ -327,6 +327,7 @@ def sync_operation_from_snapshot(
         "preparing": "prepare",
         "started": "prepare",
         "downloading": "prepare",
+        "downloading_source_video": "prepare",
         "selecting": "select",
         "capturing": "render",
         "encoding": "render",

@@ -377,6 +377,23 @@ describe('VideoExportJobsPanel', () => {
     ).toBeGreaterThan(0);
   });
 
+  it('shows a specific translated phase while downloading the YouTube source video', () => {
+    jobs[0] = {
+      ...jobs[0],
+      status: 'running',
+      internal_status: 'running',
+      phase: 'downloading_source_video',
+      mode: 'youtube_telemetry_layout',
+      progress: 12,
+    } as VideoExportJob;
+
+    render(<VideoExportJobsPanel />);
+
+    expect(
+      screen.getAllByText('Téléchargement de la vidéo YouTube').length
+    ).toBeGreaterThan(0);
+  });
+
   it('uses the FPS from the last log line when it is available', () => {
     jobs[0] = {
       ...jobs[0],

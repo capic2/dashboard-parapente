@@ -7,6 +7,7 @@ export type VideoExportPhase =
   | 'running'
   | 'initializing'
   | 'downloading'
+  | 'downloading_source_video'
   | 'capturing'
   | 'encoding'
   | 'finalizing'
