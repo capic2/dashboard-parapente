@@ -8821,6 +8821,7 @@ def get_flight_overlay_layer(flight_id: str, db: Session = Depends(get_db)) -> F
 
 
 @router.post("/flights/{flight_id}/youtube-overlay-export", status_code=202)
+@_map_deployment_drain_rejection
 def create_youtube_overlay_export(
     flight_id: str,
     payload: YoutubeOverlayExportCreate,
@@ -8895,6 +8896,7 @@ def create_youtube_overlay_export(
 
 
 @router.post("/flights/{flight_id}/youtube-telemetry-layout-export", status_code=202)
+@_map_deployment_drain_rejection
 def create_youtube_telemetry_layout_export(
     flight_id: str,
     payload: YoutubeTelemetryLayoutExportCreate,
