@@ -125,7 +125,22 @@ type PendingVideoConfirm = {
 };
 
 function getJobPhase(job: VideoExportJob) {
-  return job.phase || job.internal_status || job.status;
+  const phase = job.phase || job.internal_status || job.status;
+  const lastLog = job.log_tail
+    ?.slice()
+    .reverse()
+    .find((line) => line.trim());
+
+  if (
+    phase === 'queued' &&
+    isActiveJob(job) &&
+    lastLog &&
+    /\bCaptured\s+\d+\/\d+\s+frames\b/iu.test(lastLog)
+  ) {
+    return 'capturing';
+  }
+
+  return phase;
 }
 
 function getStatusLabelParts(job: VideoExportJob) {
