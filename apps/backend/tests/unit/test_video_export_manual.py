@@ -193,7 +193,7 @@ def test_video_export_snapshot_exposes_persisted_composition_metrics(monkeypatch
     ("message", "expected_phase"),
     [
         ("Préparation de l’export YouTube", "initializing"),
-        ("Téléchargement YouTube: 42%", "downloading"),
+        ("Téléchargement YouTube: 42%", "downloading_source_video"),
         ("Rendu de l’overlay: 421/606 instants télémétriques", "capturing"),
         ("Fusion de la vidéo: 824/1000 images", "encoding"),
     ],
@@ -207,6 +207,46 @@ def test_youtube_telemetry_layout_phase_uses_persisted_message(message, expected
     )
 
     assert video_export_manual._youtube_telemetry_layout_phase(job) == expected_phase
+
+
+def test_youtube_download_eta_uses_reported_value():
+    fields = video_export_manual._youtube_download_eta_update_fields(
+        "yt-dlp: [download] 6.8% at 11.81MiB/s ETA 06:10 (frag 34/488)",
+        download_percent=7,
+        elapsed_seconds=43,
+    )
+
+    assert fields == {"eta_seconds": 370}
+
+
+def test_youtube_download_eta_stays_unknown_without_enough_elapsed_time():
+    fields = video_export_manual._youtube_download_eta_update_fields(
+        "yt-dlp: [download] 6.8% ETA Unknown (frag 34/488)",
+        download_percent=7,
+        elapsed_seconds=3,
+    )
+
+    assert fields == {"eta_seconds": None}
+
+
+def test_youtube_download_eta_estimates_remaining_time_when_unknown():
+    fields = video_export_manual._youtube_download_eta_update_fields(
+        "yt-dlp: [download] 50% ETA Unknown (frag 244/488)",
+        download_percent=50,
+        elapsed_seconds=20,
+    )
+
+    assert fields == {"eta_seconds": 20}
+
+
+def test_youtube_render_phase_clears_download_eta():
+    fields = video_export_manual._youtube_download_eta_update_fields(
+        "Rendu de l’overlay: 421/606 instants télémétriques",
+        download_percent=50,
+        elapsed_seconds=20,
+    )
+
+    assert fields == {"eta_seconds": None}
 
 
 def test_video_export_snapshot_exposes_telemetry_layout_phase(monkeypatch):

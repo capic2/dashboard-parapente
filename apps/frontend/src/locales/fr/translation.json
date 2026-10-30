@@ -211,6 +211,7 @@
       "preparing": "Préparation",
       "initializing": "Initialisation",
       "downloading": "Téléchargement",
+      "downloading_source_video": "Téléchargement de la vidéo YouTube",
       "analyzing": "Analyse",
       "assembling": "Assemblage",
       "rendering": "Rendu",
