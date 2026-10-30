@@ -112,6 +112,9 @@ _STATUS_CANCELLED = "cancelled"
 _YOUTUBE_DOWNLOAD_ETA_RE = re.compile(
     r"\bETA\s+(?P<eta>Unknown|\d+(?::\d{2}){1,2})\b", re.IGNORECASE
 )
+_YOUTUBE_OVERLAY_PROGRESS_RE = re.compile(
+    r"^Rendu de l’overlay:\s*(?P<rendered>\d+)/(?P<total>\d+)"
+)
 
 
 def _youtube_download_eta_seconds(message: str) -> int | None:
@@ -145,7 +148,14 @@ def _youtube_download_eta_update_fields(
         return {"eta_seconds": eta_seconds}
 
     if message.startswith("Rendu de l’overlay:"):
-        return {"eta_seconds": None}
+        match = _YOUTUBE_OVERLAY_PROGRESS_RE.match(message)
+        if match is None or elapsed_seconds is None or elapsed_seconds < 5:
+            return {"eta_seconds": None}
+        rendered = int(match.group("rendered"))
+        total = int(match.group("total"))
+        if rendered <= 0 or rendered >= total:
+            return {"eta_seconds": None}
+        return {"eta_seconds": round(elapsed_seconds * (total - rendered) / rendered)}
     return {}
 
 
@@ -1155,23 +1165,28 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
     persisted_path: Path | None = None
     video_persisted = False
     download_started_at: float | None = None
+    overlay_started_at: float | None = None
 
     def progress(message: str, download_percent: int | None = None) -> None:
-        nonlocal download_started_at
+        nonlocal download_started_at, overlay_started_at
         if _is_cancelled(job_id):
             raise YoutubeExportError("Export annulé")
         _log_job(job_id, message)
         progress_percent = None
         is_download_message = message.startswith(("yt-dlp:", "Téléchargement YouTube"))
+        is_overlay_message = message.startswith("Rendu de l’overlay:")
         if message == "Téléchargement YouTube démarré":
             download_started_at = time.monotonic()
+        if is_overlay_message and overlay_started_at is None:
+            overlay_started_at = time.monotonic()
         if download_percent is not None:
-            if message.startswith("Rendu de l’overlay:"):
+            if is_overlay_message:
                 progress_percent = 40 + round(download_percent * 45 / 100)
             elif is_download_message:
                 progress_percent = 1 + round(download_percent * 39 / 100)
+        phase_started_at = overlay_started_at if is_overlay_message else download_started_at
         elapsed_seconds = (
-            time.monotonic() - download_started_at if download_started_at is not None else None
+            time.monotonic() - phase_started_at if phase_started_at is not None else None
         )
         update_fields = _youtube_download_eta_update_fields(
             message,
