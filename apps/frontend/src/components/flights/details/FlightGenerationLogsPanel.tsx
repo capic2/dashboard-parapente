@@ -300,8 +300,15 @@ function LogSourceCard({
     detailPhase ||
     framesCaptured != null ||
     formattedFps ||
-    (isInProgress && displayedEtaSeconds != null)
+    (isInProgress &&
+      (displayedEtaSeconds != null ||
+        (normalizedProgress != null && normalizedProgress > 0)))
   );
+  const etaPending =
+    isInProgress &&
+    displayedEtaSeconds == null &&
+    normalizedProgress != null &&
+    normalizedProgress > 0;
 
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900/70">
@@ -450,6 +457,16 @@ function LogSourceCard({
                     {estimatedEtaSeconds !== null && etaSeconds == null
                       ? `≈ ${formatElapsed(displayedEtaSeconds)}`
                       : formatElapsed(displayedEtaSeconds)}
+                  </dd>
+                </div>
+              )}
+              {etaPending && (
+                <div className="rounded-md border border-slate-200 px-2.5 py-2 dark:border-slate-700">
+                  <dt className="text-slate-500 dark:text-slate-400">
+                    {t('flights.generationLogs.estimatedEta', 'ETA estimée')}
+                  </dt>
+                  <dd className="mt-1 font-semibold text-slate-800 dark:text-slate-100">
+                    {t('flights.generationLogs.etaPending', 'Calcul en cours…')}
                   </dd>
                 </div>
               )}
@@ -915,6 +932,31 @@ export function FlightGenerationLogsPanel({
               progress={youtubeUploadJob.progress}
               phase={youtubeUploadJob.status}
               metadata={[
+                ...(youtubeUploadJob.title
+                  ? [
+                      {
+                        label: t(
+                          'flights.generationLogs.youtubeTitle',
+                          'Titre YouTube'
+                        ),
+                        value: youtubeUploadJob.title,
+                      },
+                    ]
+                  : []),
+                ...(youtubeUploadJob.privacy_status
+                  ? [
+                      {
+                        label: t(
+                          'flights.generationLogs.visibility',
+                          'Visibilité'
+                        ),
+                        value: t(
+                          `flights.generationLogs.privacy.${youtubeUploadJob.privacy_status}`,
+                          youtubeUploadJob.privacy_status
+                        ),
+                      },
+                    ]
+                  : []),
                 {
                   label: t('flights.generationLogs.source', 'Source'),
                   value: t(

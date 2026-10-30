@@ -1653,6 +1653,14 @@
       "outputFile": "Fichier produit",
       "source": "Source",
       "youtubeVideo": "Vidéo YouTube",
+      "youtubeTitle": "Titre YouTube",
+      "visibility": "Visibilité",
+      "privacy": {
+        "private": "Privée",
+        "unlisted": "Non répertoriée",
+        "public": "Publique"
+      },
+      "etaPending": "Calcul en cours…",
       "clips": "Séquences",
       "clipCount": "{{count}} séquence(s)",
       "selectedDuration": "Durée sélectionnée",
