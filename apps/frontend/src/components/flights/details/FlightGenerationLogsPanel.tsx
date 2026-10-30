@@ -92,6 +92,61 @@ function clampProgress(progress?: number | null) {
   return Math.max(0, Math.min(100, Math.round(progress)));
 }
 
+function estimateRemainingSeconds(
+  progress: number | null | undefined,
+  elapsedSeconds: number | null
+) {
+  if (
+    typeof progress !== 'number' ||
+    progress <= 0 ||
+    progress >= 100 ||
+    elapsedSeconds === null ||
+    elapsedSeconds < 5
+  ) {
+    return null;
+  }
+
+  return Math.round((elapsedSeconds * (100 - progress)) / progress);
+}
+
+function getTreatmentPhase(
+  status: string | null,
+  phase: string | null | undefined,
+  message: string | null | undefined
+) {
+  if (phase && !['running', 'processing'].includes(phase)) return phase;
+  if (status && ['queued', 'preparing', 'uploading'].includes(status)) {
+    return status;
+  }
+
+  const normalizedMessage = message?.toLocaleLowerCase() ?? '';
+  if (/download|télécharg/iu.test(normalizedMessage)) return 'downloading';
+  if (/upload|publication|envoi/iu.test(normalizedMessage)) return 'uploading';
+  if (
+    /prepar|initialis|waiting|reading|attente|merging osv/iu.test(
+      normalizedMessage
+    )
+  ) {
+    return 'preparing';
+  }
+  if (
+    /analys|sélection|selection|calage|détection|detection/iu.test(
+      normalizedMessage
+    )
+  ) {
+    return 'analyzing';
+  }
+  if (/assemblage|assembly|mux/iu.test(normalizedMessage)) return 'assembling';
+  if (/encod|encoding|ffmpeg|fusion/iu.test(normalizedMessage))
+    return 'encoding';
+  if (/captur|capture/iu.test(normalizedMessage)) return 'capturing';
+  if (/finalis|finaliz|ready|terminée|terminé/iu.test(normalizedMessage)) {
+    return 'finalizing';
+  }
+  if (/rendu|render|overlay|clip/iu.test(normalizedMessage)) return 'rendering';
+  return phase ?? status;
+}
+
 function getLoggedFps(logs?: string[] | null) {
   for (const line of logs?.slice().reverse() ?? []) {
     const fpsValue = line.match(/\(([\d.,]+)\s*fps\b/iu)?.[1];
@@ -176,7 +231,7 @@ function LogSourceCard({
   const showIndeterminateProgress = isInProgress && normalizedProgress === 0;
   const hasDetails = Boolean(message || error || lines.length > 0);
   const statusTone = getStatusTone(status);
-  const detailPhase = phase && phase !== status ? phase : null;
+  const detailPhase = getTreatmentPhase(status, phase, message);
   const showCurrentMessage = Boolean(
     message && !lines.some((line) => line.includes(message))
   );
@@ -207,6 +262,11 @@ function LogSourceCard({
     Number.isFinite(durationStartMs) && Number.isFinite(durationEndMs)
       ? Math.max(0, Math.floor((durationEndMs - durationStartMs) / 1000))
       : null;
+  const estimatedEtaSeconds = estimateRemainingSeconds(
+    normalizedProgress,
+    durationSeconds
+  );
+  const displayedEtaSeconds = etaSeconds ?? estimatedEtaSeconds;
   const activityMs = updatedAt
     ? parseApiUtcDate(updatedAt).getTime()
     : Number.NaN;
@@ -240,7 +300,7 @@ function LogSourceCard({
     detailPhase ||
     framesCaptured != null ||
     formattedFps ||
-    (isInProgress && etaSeconds != null)
+    (isInProgress && displayedEtaSeconds != null)
   );
 
   return (
@@ -379,13 +439,17 @@ function LogSourceCard({
                   </dd>
                 </div>
               )}
-              {isInProgress && etaSeconds != null && (
+              {isInProgress && displayedEtaSeconds != null && (
                 <div className="rounded-md border border-slate-200 px-2.5 py-2 dark:border-slate-700">
                   <dt className="text-slate-500 dark:text-slate-400">
-                    {t('videoJobs.table.eta', 'Temps restant')}
+                    {estimatedEtaSeconds !== null && etaSeconds == null
+                      ? t('flights.generationLogs.estimatedEta', 'ETA estimée')
+                      : t('videoJobs.table.eta', 'Temps restant')}
                   </dt>
                   <dd className="mt-1 font-semibold tabular-nums text-slate-800 dark:text-slate-100">
-                    {formatElapsed(etaSeconds)}
+                    {estimatedEtaSeconds !== null && etaSeconds == null
+                      ? `≈ ${formatElapsed(displayedEtaSeconds)}`
+                      : formatElapsed(displayedEtaSeconds)}
                   </dd>
                 </div>
               )}
@@ -474,7 +538,20 @@ export function FlightGenerationLogsPanel({
   highlightVideo,
   gpxEnrichmentOperations = [],
 }: FlightGenerationLogsPanelProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const [now, setNow] = useState(() => Date.now());
+  const hasActiveEnrichment = gpxEnrichmentOperations.some(
+    (operation) =>
+      !['completed', 'failed', 'cancelled'].includes(operation.status)
+  );
+
+  useEffect(() => {
+    if (!hasActiveEnrichment) return;
+
+    const interval = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(interval);
+  }, [hasActiveEnrichment]);
+
   const videoStatusValue =
     videoStatus?.internal_status ??
     videoStatus?.status ??
@@ -495,6 +572,10 @@ export function FlightGenerationLogsPanel({
   const hasHighlightLogSource = Boolean(highlightVideo?.job_id);
   const hasYoutubeTelemetryExport = Boolean(youtubeTelemetryExportJobId);
   const youtubeUploadUrl = getSafeYoutubeUrl(youtubeUploadJob?.youtube_url);
+  const youtubeUploadLatestEvent = youtubeUploadJob?.log_tail
+    ?.slice()
+    .reverse()
+    .find((line) => line.trim());
 
   if (
     !hasVideoLogSource &&
@@ -549,43 +630,126 @@ export function FlightGenerationLogsPanel({
           </p>
         </div>
         <div className="space-y-3">
-          {gpxEnrichmentOperations.map((operation) => (
-            <section
-              key={operation.operation_id}
-              aria-label={t(operation.title_key, operation.operation_type)}
-              className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/70"
-            >
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  {t(operation.title_key, operation.operation_type)}
-                </h4>
-                <span className="shrink-0 text-xs text-slate-600 dark:text-slate-300">
-                  {t(`operations.status.${operation.status}`, operation.status)}
-                </span>
-              </div>
-              {operation.progress != null && (
-                <div className="mb-3">
-                  <div className="mb-1 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
-                    <span>{t('videoJobs.table.progress', 'Progression')}</span>
-                    <span className="tabular-nums">
-                      {Math.max(
-                        0,
-                        Math.min(100, Math.round(operation.progress))
-                      )}
-                      %
-                    </span>
-                  </div>
-                  <OperationProgressBar progress={operation.progress} />
-                  {operation.current_step_detail && (
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      {operation.current_step_detail}
-                    </p>
-                  )}
+          {gpxEnrichmentOperations.map((operation) => {
+            const startTime = parseApiUtcDate(
+              operation.started_at ?? operation.created_at
+            ).getTime();
+            const isTerminal = ['completed', 'failed', 'cancelled'].includes(
+              operation.status
+            );
+            const endTime =
+              isTerminal && operation.completed_at
+                ? parseApiUtcDate(operation.completed_at).getTime()
+                : now;
+            const elapsedSeconds =
+              Number.isFinite(startTime) && Number.isFinite(endTime)
+                ? Math.max(0, Math.floor((endTime - startTime) / 1000))
+                : null;
+            const estimatedEta = estimateRemainingSeconds(
+              operation.progress,
+              elapsedSeconds
+            );
+            const updatedTime = operation.updated_at
+              ? parseApiUtcDate(operation.updated_at).getTime()
+              : Number.NaN;
+            const activityAge = Number.isFinite(updatedTime)
+              ? new Intl.RelativeTimeFormat(
+                  i18n.resolvedLanguage ?? i18n.language,
+                  {
+                    numeric: 'auto',
+                    style: 'short',
+                  }
+                ).format(
+                  -Math.max(0, Math.floor((now - updatedTime) / 60_000)),
+                  'minute'
+                )
+              : null;
+
+            return (
+              <section
+                key={operation.operation_id}
+                aria-label={t(operation.title_key, operation.operation_type)}
+                className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/70"
+              >
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {t(operation.title_key, operation.operation_type)}
+                  </h4>
+                  <span className="shrink-0 text-xs text-slate-600 dark:text-slate-300">
+                    {t(
+                      `operations.status.${operation.status}`,
+                      operation.status
+                    )}
+                  </span>
                 </div>
-              )}
-              <OperationTimeline operation={operation} />
-            </section>
-          ))}
+                {operation.progress != null && (
+                  <div className="mb-3">
+                    <div className="mb-1 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                      <span>
+                        {t('videoJobs.table.progress', 'Progression')}
+                      </span>
+                      <span className="tabular-nums">
+                        {Math.max(
+                          0,
+                          Math.min(100, Math.round(operation.progress))
+                        )}
+                        %
+                      </span>
+                    </div>
+                    <OperationProgressBar progress={operation.progress} />
+                    {operation.current_step_detail && (
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        {operation.current_step_detail}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {(elapsedSeconds !== null ||
+                  activityAge ||
+                  estimatedEta !== null) && (
+                  <dl className="mb-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+                    {elapsedSeconds !== null && (
+                      <div className="rounded-md border border-slate-200 px-2.5 py-2 dark:border-slate-700">
+                        <dt className="text-slate-500 dark:text-slate-400">
+                          {t('flights.generationLogs.elapsed', 'Durée')}
+                        </dt>
+                        <dd className="mt-1 font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+                          {formatJobDuration(elapsedSeconds)}
+                        </dd>
+                      </div>
+                    )}
+                    {activityAge && (
+                      <div className="rounded-md border border-slate-200 px-2.5 py-2 dark:border-slate-700">
+                        <dt className="text-slate-500 dark:text-slate-400">
+                          {t(
+                            'flights.generationLogs.lastActivity',
+                            'Dernière activité'
+                          )}
+                        </dt>
+                        <dd className="mt-1 font-semibold text-slate-800 dark:text-slate-100">
+                          {activityAge}
+                        </dd>
+                      </div>
+                    )}
+                    {estimatedEta !== null && (
+                      <div className="rounded-md border border-slate-200 px-2.5 py-2 dark:border-slate-700">
+                        <dt className="text-slate-500 dark:text-slate-400">
+                          {t(
+                            'flights.generationLogs.estimatedEta',
+                            'ETA estimée'
+                          )}
+                        </dt>
+                        <dd className="mt-1 font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+                          ≈ {formatJobDuration(estimatedEta)}
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+                )}
+                <OperationTimeline operation={operation} />
+              </section>
+            );
+          })}
           {hasOverlayLayerLogSource && overlayLayerJob && (
             <LogSourceCard
               key={`overlay-layer-${overlayLayerJob.job_id}`}
@@ -599,6 +763,7 @@ export function FlightGenerationLogsPanel({
                 `flights.generationLogs.status.${overlayLayerJob.status}`
               )}
               progress={overlayLayerJob.progress}
+              phase={overlayLayerJob.status}
               metadata={[
                 {
                   label: t('flights.generationLogs.layout', 'Disposition'),
@@ -629,6 +794,8 @@ export function FlightGenerationLogsPanel({
                   value: overlayLayerJob.output_filename,
                 },
               ]}
+              createdAt={overlayLayerJob.created_at}
+              completedAt={overlayLayerJob.completed_at}
               message={overlayLayerJob.message}
               error={overlayLayerJob.error}
               updatedAt={overlayLayerJob.updated_at}
@@ -746,6 +913,7 @@ export function FlightGenerationLogsPanel({
                 `flights.generationLogs.status.${youtubeUploadJob.status}`
               )}
               progress={youtubeUploadJob.progress}
+              phase={youtubeUploadJob.status}
               metadata={[
                 {
                   label: t('flights.generationLogs.source', 'Source'),
@@ -770,6 +938,7 @@ export function FlightGenerationLogsPanel({
               createdAt={youtubeUploadJob.created_at}
               startedAt={youtubeUploadJob.started_at}
               completedAt={youtubeUploadJob.completed_at}
+              message={youtubeUploadLatestEvent}
               error={youtubeUploadJob.error}
               updatedAt={youtubeUploadJob.updated_at}
               logs={youtubeUploadJob.log_tail}
@@ -788,6 +957,7 @@ export function FlightGenerationLogsPanel({
                 `flights.generationLogs.status.${highlightVideo.status}`
               )}
               progress={highlightVideo.progress}
+              phase={highlightVideo.status}
               metadata={[
                 {
                   label: t('flights.generationLogs.clips', 'Séquences'),

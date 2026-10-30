@@ -11,6 +11,7 @@ import base64
 import json
 import logging
 import os
+import re
 import shutil
 import threading
 import uuid
@@ -104,9 +105,26 @@ _STATUS_RUNNING = "running"
 _STATUS_CAPTURING = "capturing"
 _STATUS_ENCODING = "encoding"
 _STATUS_INITIALIZING = "initializing"
+_STATUS_FINALIZING = "finalizing"
 _STATUS_COMPLETED = "completed"
 _STATUS_FAILED = "failed"
 _STATUS_CANCELLED = "cancelled"
+_YOUTUBE_DOWNLOAD_ETA_RE = re.compile(
+    r"\bETA\s+(?P<eta>Unknown|\d+(?::\d{2}){1,2})\b", re.IGNORECASE
+)
+
+
+def _youtube_download_eta_seconds(message: str) -> int | None:
+    match = _YOUTUBE_DOWNLOAD_ETA_RE.search(message)
+    if match is None or match.group("eta").lower() == "unknown":
+        return None
+
+    parts = [int(part) for part in match.group("eta").split(":")]
+    seconds = 0
+    for part in parts:
+        seconds = seconds * 60 + part
+    return seconds
+
 
 _ACTIVE_STATUSES = {
     _STATUS_QUEUED,
@@ -342,6 +360,10 @@ def _youtube_telemetry_layout_phase(job: VideoExportJob) -> str | None:
         return None
     if job.status in _TERMINAL_STATUSES or job.status == _STATUS_QUEUED:
         return job.status
+    if (job.message or "").startswith(("yt-dlp:", "Téléchargement YouTube")):
+        return "downloading"
+    if (job.message or "").startswith("Finalizing video export"):
+        return _STATUS_FINALIZING
     if (job.message or "").startswith("Rendu de l’overlay:"):
         return _STATUS_CAPTURING
     if (job.message or "").startswith("Fusion de la vidéo:"):
@@ -391,6 +413,10 @@ def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
     telemetry_layout_phase = _youtube_telemetry_layout_phase(job)
     if telemetry_layout_phase is not None:
         snapshot["phase"] = telemetry_layout_phase
+    elif job.status not in _TERMINAL_STATUSES and (job.message or "").startswith(
+        "Finalizing video export"
+    ):
+        snapshot["phase"] = _STATUS_FINALIZING
     return snapshot
 
 
@@ -1105,21 +1131,44 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
     destination: Path | None = None
     persisted_path: Path | None = None
     video_persisted = False
+    download_started_at: float | None = None
 
     def progress(message: str, download_percent: int | None = None) -> None:
+        nonlocal download_started_at
         if _is_cancelled(job_id):
             raise YoutubeExportError("Export annulé")
         _log_job(job_id, message)
         progress_percent = None
+        update_fields: dict[str, Any] = {}
+        is_download_message = message.startswith(("yt-dlp:", "Téléchargement YouTube"))
+        if message == "Téléchargement YouTube démarré":
+            download_started_at = time.monotonic()
         if download_percent is not None:
             if message.startswith("Rendu de l’overlay:"):
                 progress_percent = 40 + round(download_percent * 45 / 100)
-            elif message.startswith("yt-dlp:") or message.startswith("Téléchargement YouTube"):
+            elif is_download_message:
                 progress_percent = 1 + round(download_percent * 39 / 100)
+        if is_download_message:
+            eta_seconds = _youtube_download_eta_seconds(message)
+            if (
+                eta_seconds is None
+                and download_percent is not None
+                and 0 < download_percent < 100
+                and download_started_at is not None
+            ):
+                elapsed_seconds = time.monotonic() - download_started_at
+                if elapsed_seconds >= 5:
+                    eta_seconds = round(
+                        elapsed_seconds * (100 - download_percent) / download_percent
+                    )
+            update_fields["eta_seconds"] = eta_seconds
+        elif message.startswith("Rendu de l’overlay:"):
+            update_fields["eta_seconds"] = None
         _update_job(
             job_id,
             status=_STATUS_RUNNING,
             message=message,
+            **update_fields,
             **({"progress": progress_percent} if progress_percent is not None else {}),
         )
 
@@ -1159,6 +1208,13 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
             raise YoutubeExportError("Export annulé")
         if destination is None:
             raise YoutubeExportError("Chemin du fichier YouTube introuvable")
+        _update_job(
+            job_id,
+            status=_STATUS_RUNNING,
+            progress=99,
+            message="Finalizing video export",
+            eta_seconds=None,
+        )
         with SessionLocal() as db:
             flight = db.get(Flight, job.flight_id)
             if flight is None:
@@ -3017,6 +3073,13 @@ async def _export_video_manual_render(job_id: str):
             if not encoding_completed:
                 return
 
+            _update_job(
+                job_id,
+                status=_STATUS_RUNNING,
+                progress=99,
+                message="Finalizing video export",
+            )
+            _set_job_runtime(job_id, phase=_STATUS_FINALIZING, eta_seconds=None)
             timestamp = datetime.now(UTC).replace(tzinfo=None).strftime("%Y%m%d-%H%M%S")
             output_file = _video_output_path(flight_id, timestamp)
             await asyncio.to_thread(shutil.move, str(encoding_output_file), str(output_file))

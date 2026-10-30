@@ -193,7 +193,7 @@ def test_video_export_snapshot_exposes_persisted_composition_metrics(monkeypatch
     ("message", "expected_phase"),
     [
         ("Préparation de l’export YouTube", "initializing"),
-        ("Téléchargement YouTube: 42%", "initializing"),
+        ("Téléchargement YouTube: 42%", "downloading"),
         ("Rendu de l’overlay: 421/606 instants télémétriques", "capturing"),
         ("Fusion de la vidéo: 824/1000 images", "encoding"),
     ],
