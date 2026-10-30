@@ -780,6 +780,8 @@ class YoutubeUploadJobResponse(BaseModel):
     ]
     gopro_overlay_job_id: str | None = None
     highlight_video_job_id: str | None = None
+    title: str
+    privacy_status: Literal["private", "unlisted", "public"]
     status: Literal["preparing", "queued", "uploading", "completed", "failed", "cancelled"]
     progress: int = Field(ge=0, le=100)
     created_at: datetime | None = None

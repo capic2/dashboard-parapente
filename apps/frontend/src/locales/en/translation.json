@@ -1648,6 +1648,14 @@
       "outputFile": "Output file",
       "source": "Source",
       "youtubeVideo": "YouTube video",
+      "youtubeTitle": "YouTube title",
+      "visibility": "Visibility",
+      "privacy": {
+        "private": "Private",
+        "unlisted": "Unlisted",
+        "public": "Public"
+      },
+      "etaPending": "Calculating…",
       "clips": "Clips",
       "clipCount": "{{count}} clip(s)",
       "selectedDuration": "Selected duration",

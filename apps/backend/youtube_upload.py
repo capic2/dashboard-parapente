@@ -759,6 +759,8 @@ def job_payload(job: YoutubeUploadJob) -> dict[str, Any]:
         "source_type": job.source_type,
         "gopro_overlay_job_id": job.gopro_overlay_job_id,
         "highlight_video_job_id": job.highlight_video_job_id,
+        "title": job.title,
+        "privacy_status": job.privacy_status,
         "status": job.status,
         "progress": job.progress or 0,
         "created_at": job.created_at,

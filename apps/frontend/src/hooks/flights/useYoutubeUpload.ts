@@ -31,6 +31,8 @@ export interface YoutubeUploadJob {
     | 'youtube_overlay';
   gopro_overlay_job_id?: string | null;
   highlight_video_job_id?: string | null;
+  title?: string | null;
+  privacy_status?: 'private' | 'unlisted' | 'public' | null;
   status:
     | 'preparing'
     | 'queued'
