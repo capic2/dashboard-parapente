@@ -239,10 +239,30 @@ def test_youtube_download_eta_estimates_remaining_time_when_unknown():
     assert fields == {"eta_seconds": 20}
 
 
-def test_youtube_render_phase_clears_download_eta():
+def test_youtube_render_eta_uses_reported_frame_count():
     fields = video_export_manual._youtube_download_eta_update_fields(
         "Rendu de l’overlay: 421/606 instants télémétriques",
         download_percent=50,
+        elapsed_seconds=20,
+    )
+
+    assert fields == {"eta_seconds": 9}
+
+
+def test_youtube_render_eta_stays_unknown_during_first_five_seconds():
+    fields = video_export_manual._youtube_download_eta_update_fields(
+        "Rendu de l’overlay: 121/2681 instants télémétriques",
+        download_percent=5,
+        elapsed_seconds=4.9,
+    )
+
+    assert fields == {"eta_seconds": None}
+
+
+def test_youtube_render_eta_is_unknown_when_rendering_is_complete():
+    fields = video_export_manual._youtube_download_eta_update_fields(
+        "Rendu de l’overlay: 606/606 instants télémétriques",
+        download_percent=100,
         elapsed_seconds=20,
     )
 
