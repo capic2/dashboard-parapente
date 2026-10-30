@@ -953,6 +953,8 @@ def test_get_youtube_upload_includes_recent_job_logs(
     response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload")
 
     assert response.status_code == 200
+    assert response.json()["title"] == "Envoi journalisé"
+    assert response.json()["privacy_status"] == "private"
     assert response.json()["log_tail"] == ["Upload queued", "Upload progress: 42%"]
     assert response.json()["created_at"] == "2026-10-22T12:00:00"
     assert response.json()["started_at"] == "2026-10-22T12:00:30"
