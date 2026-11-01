@@ -7,18 +7,18 @@ description: Captures and exports Storybook screenshots for UI work in the dashb
 
 ## Purpose
 
-Use this skill to produce a concrete visual preview of a Storybook story after frontend or design-system work.
+Use this skill to produce a concrete visual preview of a Storybook story before and after frontend or design-system visual changes.
 
 Important limitation: some chat/API clients do not render images read from tools, and some users do not have access to local workspace files. In that case, do not claim the screenshot is visible to the user. Report the limitation clearly and ask for, or use, an accessible delivery channel such as a PR comment, GitHub artifact, public/internal file hosting, or a client that supports image attachments.
 
 The workflow is:
 
-1. Run the relevant Storybook server.
-2. Capture one or more stories with Playwright.
-3. Export the generated PNG to a stable preview path.
-4. Try reading the PNG so clients that support inline images can display it.
-5. Always provide the PNG path and a Markdown image link for users with workspace access.
-6. If the user is chat-only, provide a short visual diagnosis and explain that a viewable image requires an attachment-capable client or upload target.
+1. Before editing an existing visual surface, capture its current state as the **before** image. Use the same story, sample data, theme, and viewport for the after image. If work is already complete and no before image was captured, recover the baseline from the target branch or commit in an isolated checkout when practical; never overwrite the user's edited work to get it.
+2. Run the relevant Storybook server and capture the updated story with Playwright.
+3. Export both PNGs to stable preview paths, with matching viewport names such as `<story-id>-desktop-before.png` and `<story-id>-desktop-after.png`.
+4. Read both PNGs and inspect the comparison for visible regressions.
+5. Present the pair with clear **Before** and **After** labels, using inline images or a side-by-side layout when supported. Always provide both PNG paths and Markdown image links for users with workspace access.
+6. If no meaningful before state exists (for example, a wholly new surface), capture the after state and briefly explain why there is no before image. If the client cannot display the images, provide a short visual diagnosis and explain that an attachment-capable client or upload target is needed.
 ## Project Defaults
 
 - Frontend Storybook target: `nx storybook frontend`, port `6006`.
@@ -43,15 +43,25 @@ Capture a story by id:
 node .agents/skills/storybook-visual-preview/scripts/capture-storybook.mjs \
   --base-url http://localhost:6006 \
   --story-id components-button--primary \
-  --output .codenomad/storybook-previews/button-primary.png
+  --output .codenomad/storybook-previews/button-primary-desktop-before.png \
+  --width 1440 --height 1000
+
+# After making the visual change, capture the same story and viewport.
+node .agents/skills/storybook-visual-preview/scripts/capture-storybook.mjs \
+  --base-url http://localhost:6006 \
+  --story-id components-button--primary \
+  --output .codenomad/storybook-previews/button-primary-desktop-after.png \
+  --width 1440 --height 1000
 ```
 
-Then use the Read tool on the PNG path and include this fallback:
+Read both PNGs and show them as a labeled pair:
 
 ```md
-Preview: `.codenomad/storybook-previews/button-primary.png`
+**Before**
+![Before](.codenomad/storybook-previews/button-primary-desktop-before.png)
 
-![Storybook preview](.codenomad/storybook-previews/button-primary.png)
+**After**
+![After](.codenomad/storybook-previews/button-primary-desktop-after.png)
 ```
 
 ## Workflow
@@ -62,9 +72,10 @@ Preview: `.codenomad/storybook-previews/button-primary.png`
 - Wait until the server prints its local URL or the capture script can load the page.
 - Capture desktop first at `1440x1000` unless the user requested another viewport.
 - For responsive work, also capture mobile at `390x844`.
-- Prefer writing preview PNGs to `.codenomad/storybook-previews/<story-id>-<viewport>.png` so the user can open them from the workspace.
+- For a visual change, capture both before and after at each selected viewport. Use the exact same story and state so the comparison is meaningful.
+- Prefer writing preview PNGs to `.codenomad/storybook-previews/<story-id>-<viewport>-before.png` and `...-after.png` so the user can open them from the workspace.
 - Read every generated PNG that should be shown to the user, but do not assume the chat client will render the image.
-- In the final response, always include the file path and a Markdown image link for every generated PNG.
+- In the final response, include the before/after images as a clearly labeled pair, plus the file paths and Markdown image links for every generated PNG.
 - Stop the background Storybook process when the preview is complete unless it was already running before the task.
 
 ## Script Options
