@@ -2,14 +2,10 @@ import type { ChangeEvent } from 'react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  Button,
-  Tab,
-  TabList,
-  TabPanel,
-  Tabs,
-} from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
+import { Tab, TabList, TabPanel, Tabs } from '@dashboard-parapente/core/Tabs';
 import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
+import type { BackgroundOperation } from '@dashboard-parapente/shared-types';
 import type { FlightVideoMarker } from '@dashboard-parapente/shared-types';
 import type { GoproOverlayJob } from '@dashboard-parapente/shared-types';
 import type { YoutubeVideoAssociation } from '@dashboard-parapente/shared-types';
@@ -20,6 +16,7 @@ import {
 } from '../../../hooks/flights/useFlights';
 import { useVideoExportStatus } from '../../../hooks/flights/useVideoExportStatus';
 import { useActiveFlightMediaJobs } from '../../../hooks/flights/useFlightSummaries';
+import { useOperations } from '../../../hooks/useOperations';
 import {
   useRemoveYoutubeVideoAssociation,
   useYoutubeSourcePublicationStatus,
@@ -30,6 +27,7 @@ import {
   useFlightOverlayLayer,
   useGoproOverlayJobStream,
 } from '../../../hooks/gopro/useGoproOverlay';
+import { isYoutubeUploadProgressVisible } from '../../../lib/flightMediaState';
 import {
   useCancelFlightHighlightVideo,
   useCreateFlightHighlightVideo,
@@ -88,7 +86,27 @@ export function FlightDetails({
   mobileMode = false,
   onCloseMobile,
 }: FlightDetailsProps) {
-  const activeMediaJobs = useActiveFlightMediaJobs(true);
+  const activeMediaJobs = useActiveFlightMediaJobs(true, 2000);
+  const operationsQuery = useOperations();
+  const gpxEnrichmentOperations = useMemo(() => {
+    const flightOperations = (operationsQuery.data ?? [])
+      .filter(
+        (operation: BackgroundOperation) =>
+          operation.flight_id === flight.id &&
+          operation.operation_type === 'gpx_enrichment' &&
+          operation.status !== 'cancelled'
+      )
+      .sort((left, right) => right.created_at.localeCompare(left.created_at));
+    const latestFinishedOperation = flightOperations.find(
+      (operation) => !['queued', 'running'].includes(operation.status)
+    );
+
+    return flightOperations.filter(
+      (operation) =>
+        ['queued', 'running'].includes(operation.status) ||
+        operation.operation_id === latestFinishedOperation?.operation_id
+    );
+  }, [flight.id, operationsQuery.data]);
   const activeYoutubeExportJobIds = useMemo(
     () =>
       activeMediaJobs.data
@@ -102,6 +120,16 @@ export function FlightDetails({
             job.status !== 'cancelled'
         )
         .map((job) => job.job_id) ?? [],
+    [activeMediaJobs.data, flight.id]
+  );
+  const activeYoutubeTelemetryExportJob = useMemo(
+    () =>
+      activeMediaJobs.data?.find(
+        (job) =>
+          job.flight_id === flight.id &&
+          job.mode === 'youtube_telemetry_layout' &&
+          !['completed', 'failed', 'cancelled'].includes(job.status)
+      ) ?? null,
     [activeMediaJobs.data, flight.id]
   );
   const { t, i18n } = useTranslation();
@@ -134,6 +162,7 @@ export function FlightDetails({
   const [isOverlayWorkspaceExpanded, setIsOverlayWorkspaceExpanded] = useState(
     !hasSavedOverlaySynchronization
   );
+  const overlayWorkspaceFlightIdRef = useRef(flight.id);
   const [videoMarkersDraft, setVideoMarkersDraft] = useState(
     flight.video_markers ?? []
   );
@@ -595,8 +624,12 @@ export function FlightDetails({
     effectiveGoproOverlayJobId ||
     flight.gopro_overlay_status ||
     persistedGoproOverlays.length > 0 ||
-    youtubeUploadJob?.job_id ||
-    latestHighlightVideo?.job_id
+    overlayLayer.data?.job?.job_id ||
+    (youtubeUploadJob?.job_id &&
+      isYoutubeUploadProgressVisible(youtubeUploadJob)) ||
+    activeYoutubeTelemetryExportJob?.job_id ||
+    latestHighlightVideo?.job_id ||
+    gpxEnrichmentOperations.length > 0
   );
   const visibleActiveTab =
     !hasGenerationLogs && activeTab === 'logs' ? 'infos' : activeTab;
@@ -704,8 +737,10 @@ export function FlightDetails({
     />
   );
   useEffect(() => {
+    if (overlayWorkspaceFlightIdRef.current === flight.id) return;
+    overlayWorkspaceFlightIdRef.current = flight.id;
     setIsOverlayWorkspaceExpanded(!hasSavedOverlaySynchronization);
-  }, [hasSavedOverlaySynchronization]);
+  }, [flight.id, hasSavedOverlaySynchronization]);
   useEffect(() => {
     const previous = lastPersistedVideoMarkersRef.current;
     const flightChanged = previous.flightId !== flight.id;
@@ -825,8 +860,12 @@ export function FlightDetails({
       goproOverlayJobId={effectiveGoproOverlayJobId}
       goproOverlayFallbackStatus={flight.gopro_overlay_status}
       goproOverlayFallbackProgress={flight.gopro_overlay_progress}
+      youtubeTelemetryExportJobId={activeYoutubeTelemetryExportJob?.job_id}
+      youtubeTelemetryExportStatus={activeYoutubeTelemetryExportJob?.status}
+      youtubeTelemetryExportProgress={activeYoutubeTelemetryExportJob?.progress}
       youtubeUploadJob={youtubeUploadJob}
       highlightVideo={latestHighlightVideo}
+      gpxEnrichmentOperations={gpxEnrichmentOperations}
     />
   );
 

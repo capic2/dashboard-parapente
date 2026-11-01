@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { HTTPError } from 'ky';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import {
   CheckCircle2,
   Gauge,
@@ -126,6 +126,54 @@ const getHttpErrorDetail = async (error: HTTPError): Promise<string | null> => {
   }
 
   return null;
+};
+
+const getVideoExportStartErrorMessage = async (
+  error: HTTPError,
+  messages: {
+    deploymentDrain: (retryAfterMinutes: number | null) => string;
+    retryAfter: (retryAfterMinutes: number) => string;
+    unavailable: string;
+    fallback: string;
+  }
+): Promise<string> => {
+  if (error.response.status !== 503) {
+    return (await getHttpErrorDetail(error)) || messages.fallback;
+  }
+
+  const detail = await getHttpErrorDetail(error);
+  const isDeploymentDrain = detail
+    ?.toLowerCase()
+    .includes('deployment is draining jobs');
+  const retryAfterMinutes = getRetryAfterMinutes(
+    error.response.headers.get('Retry-After')
+  );
+
+  if (isDeploymentDrain) {
+    return messages.deploymentDrain(retryAfterMinutes);
+  }
+
+  if (retryAfterMinutes !== null) {
+    return messages.retryAfter(retryAfterMinutes);
+  }
+
+  return detail || messages.unavailable;
+};
+
+const getRetryAfterMinutes = (retryAfter: string | null): number | null => {
+  if (!retryAfter?.trim()) {
+    return null;
+  }
+
+  const retryAfterSeconds = Number(retryAfter);
+  const retryAt = Number.isFinite(retryAfterSeconds)
+    ? Date.now() + retryAfterSeconds * 1000
+    : Date.parse(retryAfter);
+  if (!Number.isFinite(retryAt) || retryAt <= Date.now()) {
+    return null;
+  }
+
+  return Math.max(1, Math.ceil((retryAt - Date.now()) / 60_000));
 };
 
 export function FlightVideoExportControls({
@@ -270,12 +318,18 @@ export function FlightVideoExportControls({
       }
     } catch (error) {
       if (error instanceof HTTPError) {
-        const detail = await getHttpErrorDetail(error);
-        const unavailableMessage =
-          error.response.status === 503
-            ? t('flights.viewer.videoStartUnavailable')
-            : t('flights.viewer.videoStartError');
-        toast.error(detail || unavailableMessage);
+        toast.error(
+          await getVideoExportStartErrorMessage(error, {
+            deploymentDrain: (minutes) =>
+              minutes === null
+                ? t('flights.viewer.videoStartDeploymentDrainUnknown')
+                : t('flights.viewer.videoStartDeploymentDrain', { minutes }),
+            retryAfter: (minutes) =>
+              t('flights.viewer.videoStartRetryAfter', { minutes }),
+            unavailable: t('flights.viewer.videoStartUnavailable'),
+            fallback: t('flights.viewer.videoStartError'),
+          })
+        );
         return;
       }
 
@@ -317,12 +371,18 @@ export function FlightVideoExportControls({
       await startVideoExport();
     } catch (error) {
       if (error instanceof HTTPError) {
-        const detail = await getHttpErrorDetail(error);
-        const unavailableMessage =
-          error.response.status === 503
-            ? t('flights.viewer.videoStartUnavailable')
-            : t('flights.viewer.regenerateStartError');
-        toast.error(detail || unavailableMessage);
+        toast.error(
+          await getVideoExportStartErrorMessage(error, {
+            deploymentDrain: (minutes) =>
+              minutes === null
+                ? t('flights.viewer.videoStartDeploymentDrainUnknown')
+                : t('flights.viewer.videoStartDeploymentDrain', { minutes }),
+            retryAfter: (minutes) =>
+              t('flights.viewer.videoStartRetryAfter', { minutes }),
+            unavailable: t('flights.viewer.videoStartUnavailable'),
+            fallback: t('flights.viewer.regenerateStartError'),
+          })
+        );
         return;
       }
 

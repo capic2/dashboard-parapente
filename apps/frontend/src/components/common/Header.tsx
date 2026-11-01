@@ -14,7 +14,7 @@ import {
   Popover,
 } from 'react-aria-components';
 import { MonitorCog, Moon, Sun } from 'lucide-react';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore, type ThemePreference } from '../../stores/themeStore';
 import { appTitle } from '../../lib/appEnvironment';

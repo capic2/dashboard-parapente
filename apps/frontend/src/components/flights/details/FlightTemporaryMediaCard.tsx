@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
+import { Modal } from '@dashboard-parapente/core/Modal';
 import { CircleAlert, Trash2 } from 'lucide-react';
 import type { Flight } from '../../../types';
 import {
   useDeleteFlightTemporaryMedia,
+  useFlightTemporaryMediaDeleteWarnings,
   useYoutubeSourcePublicationStatus,
   type TemporaryFlightMediaSource,
 } from '../../../hooks/flights/useYoutubeUpload';
@@ -32,6 +34,13 @@ export function FlightTemporaryMediaCard({
     flight.youtube_urls ?? []
   );
   const deleteMedia = useDeleteFlightTemporaryMedia(flight.id);
+  const deleteWarnings = useFlightTemporaryMediaDeleteWarnings(flight.id);
+  const isCheckingDeleteWarnings =
+    deleteWarnings.isPending || deleteWarnings.isFetching;
+  const openDeleteConfirmation = () => {
+    setIsConfirmOpen(true);
+    void deleteWarnings.refetch();
+  };
   const isUploading =
     upload.data?.status === 'preparing' ||
     upload.data?.status === 'queued' ||
@@ -42,6 +51,7 @@ export function FlightTemporaryMediaCard({
     pano: 'flights.panoBadge',
     face: 'flights.faceBadge',
     pilote: 'flights.piloteBadge',
+    youtube_telemetry: 'flights.youtubeTelemetryBadge',
   }[sourceType];
   let mediaPath = `temporary-media/${sourceType}`;
   if (isCamera) {
@@ -54,6 +64,8 @@ export function FlightTemporaryMediaCard({
     thumbnailAltKey = 'flights.cameraThumbnailAlt';
   } else if (sourceType === 'pano') {
     thumbnailAltKey = 'flights.panoThumbnailAlt';
+  } else if (sourceType === 'youtube_telemetry') {
+    thumbnailAltKey = 'flights.youtubeTelemetryBadge';
   }
   const title = t(titleKey);
   let filename: string | null | undefined;
@@ -91,7 +103,19 @@ export function FlightTemporaryMediaCard({
       toast.success(t('flights.temporarySourceDeleted'));
     } catch (error) {
       toast.error(
-        await getApiErrorMessage(error, t('flights.temporarySourceDeleteError'))
+        await getApiErrorMessage(
+          error,
+          t('flights.temporarySourceDeleteError'),
+          {
+            409: {
+              message: t('flights.temporarySourceDeleteConflict'),
+              details: [
+                'A YouTube upload is in progress',
+                'Publish this source to YouTube before deleting its local file',
+              ],
+            },
+          }
+        )
       );
     }
   };
@@ -147,16 +171,15 @@ export function FlightTemporaryMediaCard({
             compact
           />
 
-          {isPublished && (
-            <Button
-              variant="danger"
-              className="min-h-10 w-full rounded-lg px-3 py-2 text-sm sm:w-auto"
-              onPress={() => setIsConfirmOpen(true)}
-            >
-              <Trash2 className="h-4 w-4" aria-hidden="true" />
-              {t('flights.temporarySourceDelete')}
-            </Button>
-          )}
+          <Button
+            variant="danger"
+            className="min-h-10 w-full rounded-lg px-3 py-2 text-sm sm:w-auto"
+            onPress={openDeleteConfirmation}
+            isDisabled={isUploading || deleteMedia.isPending}
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+            {t('flights.temporarySourceDelete')}
+          </Button>
         </div>
       </article>
 
@@ -178,7 +201,19 @@ export function FlightTemporaryMediaCard({
               className="mt-0.5 h-5 w-5 shrink-0"
               aria-hidden="true"
             />
-            <span>{t('flights.temporarySourceDeleteYoutubeNote')}</span>
+            <span>
+              {t(
+                isCheckingDeleteWarnings
+                  ? 'flights.temporarySourceDeleteChecking'
+                  : deleteWarnings.isError
+                    ? 'flights.temporarySourceDeleteWarningUnavailable'
+                    : deleteWarnings.data?.warnings[sourceType]
+                      ? 'flights.temporarySourceDeleteUnavailableYoutubeNote'
+                      : isPublished
+                        ? 'flights.temporarySourceDeleteYoutubeNote'
+                        : 'flights.temporarySourceDeleteLocalNote'
+              )}
+            </span>
           </div>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
@@ -191,7 +226,7 @@ export function FlightTemporaryMediaCard({
             <Button
               variant="danger"
               onPress={() => void handleDelete()}
-              isDisabled={deleteMedia.isPending}
+              isDisabled={deleteMedia.isPending || isCheckingDeleteWarnings}
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
               {deleteMedia.isPending

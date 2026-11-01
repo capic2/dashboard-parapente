@@ -24,10 +24,12 @@ export type GoproOverlayPreview = {
   };
   gpx: {
     start_time: string;
+    metadata_time?: string | null;
     end_time: string;
     duration_seconds: number;
     coordinates: GeoPoint[];
     enrichment_status?: 'missing' | 'pending' | 'ready' | 'failed';
+    enrichment_progress?: number | null;
     enrichment_error?: string | null;
   };
   alignment: {

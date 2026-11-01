@@ -16,7 +16,7 @@ import {
   Timer,
   TrendingUp,
 } from 'lucide-react';
-import { IconCard } from '@dashboard-parapente/design-system';
+import { IconCard } from '@dashboard-parapente/core/IconCard/IconCard';
 import type { FlightStats } from '../../types';
 
 interface AchievementBadge {

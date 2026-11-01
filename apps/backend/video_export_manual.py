@@ -11,13 +11,14 @@ import base64
 import json
 import logging
 import os
+import re
 import shutil
 import threading
 import uuid
 import traceback
 import time
 from collections import deque
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -34,7 +35,12 @@ from datetime_utils import to_api_utc
 from deployment_drain import DeploymentDrainActive, job_admission
 from auth import create_job_token, decode_job_token
 from database import SessionLocal
-from flight_storage import flight_directory, flight_temporary_directory, get_video_output_path
+from flight_file_paths import resolve_flight_file_path
+from flight_storage import (
+    flight_directory,
+    flight_temporary_directory,
+    get_video_output_path,
+)
 from models import Flight, VideoExportJob
 from video_acceleration import (
     VideoAccelerator,
@@ -99,9 +105,59 @@ _STATUS_RUNNING = "running"
 _STATUS_CAPTURING = "capturing"
 _STATUS_ENCODING = "encoding"
 _STATUS_INITIALIZING = "initializing"
+_STATUS_FINALIZING = "finalizing"
 _STATUS_COMPLETED = "completed"
 _STATUS_FAILED = "failed"
 _STATUS_CANCELLED = "cancelled"
+_YOUTUBE_DOWNLOAD_ETA_RE = re.compile(
+    r"\bETA\s+(?P<eta>Unknown|\d+(?::\d{2}){1,2})\b", re.IGNORECASE
+)
+_YOUTUBE_OVERLAY_PROGRESS_RE = re.compile(
+    r"^Rendu de l’overlay:\s*(?P<rendered>\d+)/(?P<total>\d+)"
+)
+
+
+def _youtube_download_eta_seconds(message: str) -> int | None:
+    match = _YOUTUBE_DOWNLOAD_ETA_RE.search(message)
+    if match is None or match.group("eta").lower() == "unknown":
+        return None
+
+    parts = [int(part) for part in match.group("eta").split(":")]
+    seconds = 0
+    for part in parts:
+        seconds = seconds * 60 + part
+    return seconds
+
+
+def _youtube_download_eta_update_fields(
+    message: str,
+    download_percent: int | None,
+    elapsed_seconds: float | None,
+) -> dict[str, int | None]:
+    is_download_message = message.startswith(("yt-dlp:", "Téléchargement YouTube"))
+    if is_download_message:
+        eta_seconds = _youtube_download_eta_seconds(message)
+        if (
+            eta_seconds is None
+            and download_percent is not None
+            and 0 < download_percent < 100
+            and elapsed_seconds is not None
+            and elapsed_seconds >= 5
+        ):
+            eta_seconds = round(elapsed_seconds * (100 - download_percent) / download_percent)
+        return {"eta_seconds": eta_seconds}
+
+    if message.startswith("Rendu de l’overlay:"):
+        match = _YOUTUBE_OVERLAY_PROGRESS_RE.match(message)
+        if match is None or elapsed_seconds is None or elapsed_seconds < 5:
+            return {"eta_seconds": None}
+        rendered = int(match.group("rendered"))
+        total = int(match.group("total"))
+        if rendered <= 0 or rendered >= total:
+            return {"eta_seconds": None}
+        return {"eta_seconds": round(elapsed_seconds * (total - rendered) / rendered)}
+    return {}
+
 
 _ACTIVE_STATUSES = {
     _STATUS_QUEUED,
@@ -331,6 +387,23 @@ async def _ensure_export_viewer_reachable(url: str, timeout_seconds: float = 5.0
     await asyncio.to_thread(_check_url_reachable, url, timeout_seconds)
 
 
+def _youtube_telemetry_layout_phase(job: VideoExportJob) -> str | None:
+    """Derive the current phase from persisted status and progress messages."""
+    if job.mode != "youtube_telemetry_layout":
+        return None
+    if job.status in _TERMINAL_STATUSES or job.status == _STATUS_QUEUED:
+        return job.status
+    if (job.message or "").startswith(("yt-dlp:", "Téléchargement YouTube")):
+        return "downloading_source_video"
+    if (job.message or "").startswith("Finalizing video export"):
+        return _STATUS_FINALIZING
+    if (job.message or "").startswith("Rendu de l’overlay:"):
+        return _STATUS_CAPTURING
+    if (job.message or "").startswith("Fusion de la vidéo:"):
+        return _STATUS_ENCODING
+    return _STATUS_INITIALIZING
+
+
 def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
     resume_info = _job_resume_info(job)
     snapshot = {
@@ -358,11 +431,25 @@ def _snapshot_from_job(job: VideoExportJob) -> dict[str, Any]:
         "cancelled_at": _to_iso(job.cancelled_at),
         "log_tail": _job_log_tail(job.id),
         **resume_info,
+        "eta_seconds": job.eta_seconds,
+        "frames_captured": (
+            job.frames_processed
+            if job.frames_processed is not None
+            else resume_info["frames_captured"]
+        ),
+        "fps_actual": job.fps_actual,
     }
 
     with _JOB_RUNTIME_LOCK:
         runtime = _JOB_RUNTIME.get(job.id, {}).copy()
     snapshot.update(runtime)
+    telemetry_layout_phase = _youtube_telemetry_layout_phase(job)
+    if telemetry_layout_phase is not None:
+        snapshot["phase"] = telemetry_layout_phase
+    elif job.status not in _TERMINAL_STATUSES and (job.message or "").startswith(
+        "Finalizing video export"
+    ):
+        snapshot["phase"] = _STATUS_FINALIZING
     return snapshot
 
 
@@ -959,6 +1046,88 @@ def _export_youtube_telemetry_layout_job(job_id: str) -> None:
         _clear_job_auth_token(job_id)
 
 
+def _set_youtube_composition_progress(
+    job_id: str,
+    frames_processed: int,
+    total_frames: int,
+    eta_seconds: int | None,
+    completion: float,
+    encoding_fps: float | None,
+) -> None:
+    _set_job_runtime(
+        job_id,
+        phase=_STATUS_ENCODING,
+        eta_seconds=eta_seconds,
+        frames_captured=frames_processed,
+        total_frames=total_frames,
+        fps_actual=encoding_fps,
+    )
+    _update_job(
+        job_id,
+        status=_STATUS_RUNNING,
+        progress=min(99, 85 + round(completion * 14)),
+        message=f"Fusion de la vidéo: {frames_processed}/{total_frames} images",
+        eta_seconds=eta_seconds,
+        frames_processed=frames_processed,
+        total_frames=total_frames,
+        fps_actual=encoding_fps,
+    )
+
+
+def _make_youtube_composition_progress_callback(
+    job_id: str,
+) -> Callable[[int, int, int | None, float, float | None], None]:
+    """Throttle persisted FFmpeg progress updates while always publishing completion."""
+    last_published_at: float | None = None
+
+    def publish(
+        frames_processed: int,
+        total_frames: int,
+        eta_seconds: int | None,
+        completion: float,
+        encoding_fps: float | None,
+    ) -> None:
+        nonlocal last_published_at
+        now = time.monotonic()
+        is_complete = completion >= 1.0 or frames_processed >= total_frames
+        if last_published_at is not None and now - last_published_at < 1.0 and not is_complete:
+            return
+
+        _set_youtube_composition_progress(
+            job_id,
+            frames_processed,
+            total_frames,
+            eta_seconds,
+            completion,
+            encoding_fps,
+        )
+        last_published_at = now
+
+    return publish
+
+
+def persist_youtube_telemetry_video(
+    db: Session, flight: Flight, generated_path: Path, export_id: str
+) -> Path:
+    """Move an export into flight media and replace the flight's current telemetry video."""
+    from youtube_upload import cleanup_stale_telemetry_video
+
+    previous_path = flight.youtube_telemetry_video_file_path
+    persisted_path = (flight_directory(db, flight) / f"youtube-telemetry-{export_id}.mp4").resolve()
+    persisted_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(generated_path), str(persisted_path))
+    flight.youtube_telemetry_video_file_path = str(persisted_path)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        persisted_path.unlink(missing_ok=True)
+        raise
+    if previous_path:
+        cleanup_stale_telemetry_video(db, flight, Path(previous_path))
+    return persisted_path
+
+
 def _run_youtube_telemetry_layout_job(job_id: str) -> None:
     """Run the render while the public wrapper guarantees token cleanup."""
     from gopro_overlay_export import first_gpx_timestamp
@@ -969,8 +1138,8 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
     )
     from youtube_telemetry_layout_export import export_youtube_telemetry_layout
     from youtube_upload import (
+        discard_youtube_overlay_upload_preparation,
         download_cookies_for_upload_job,
-        enqueue_youtube_overlay_upload,
         fail_youtube_overlay_upload,
     )
 
@@ -982,7 +1151,8 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
 
     with SessionLocal() as db:
         flight = db.get(Flight, job.flight_id)
-        gpx_path = Path(flight.gpx_file_path) if flight and flight.gpx_file_path else None
+        source_file_path = flight.gpx_source_file_path or flight.gpx_file_path if flight else None
+        gpx_path = resolve_flight_file_path(source_file_path)
     timeline_start = first_gpx_timestamp(gpx_path) if gpx_path and gpx_path.is_file() else None
     if timeline_start is None:
         error = "L’origine temporelle du GPX est introuvable"
@@ -992,31 +1162,60 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
 
     work_dir: Path | None = None
     destination: Path | None = None
-    upload_started = False
+    persisted_path: Path | None = None
+    video_persisted = False
+    download_started_at: float | None = None
+    overlay_started_at: float | None = None
 
     def progress(message: str, download_percent: int | None = None) -> None:
+        nonlocal download_started_at, overlay_started_at
         if _is_cancelled(job_id):
             raise YoutubeExportError("Export annulé")
         _log_job(job_id, message)
         progress_percent = None
+        is_download_message = message.startswith(("yt-dlp:", "Téléchargement YouTube"))
+        is_overlay_message = message.startswith("Rendu de l’overlay:")
+        if message == "Téléchargement YouTube démarré":
+            download_started_at = time.monotonic()
+        if is_overlay_message and overlay_started_at is None:
+            overlay_started_at = time.monotonic()
         if download_percent is not None:
-            if message.startswith("Rendu de l’overlay:"):
+            if is_overlay_message:
                 progress_percent = 40 + round(download_percent * 45 / 100)
-            elif message.startswith("yt-dlp:") or message.startswith("Téléchargement YouTube"):
+            elif is_download_message:
                 progress_percent = 1 + round(download_percent * 39 / 100)
+        phase_started_at = overlay_started_at if is_overlay_message else download_started_at
+        elapsed_seconds = (
+            time.monotonic() - phase_started_at if phase_started_at is not None else None
+        )
+        update_fields = _youtube_download_eta_update_fields(
+            message,
+            download_percent,
+            elapsed_seconds,
+        )
         _update_job(
             job_id,
             status=_STATUS_RUNNING,
             message=message,
+            **update_fields,
             **({"progress": progress_percent} if progress_percent is not None else {}),
         )
+
+    composition_progress = _make_youtube_composition_progress_callback(job_id)
 
     try:
         work_dir = new_work_dir(job_id, job.flight_id)
         destination = output_path(job_id, job.flight_id)
         _log_job(job_id, "Préparation de l’export avec le layout de télémétrie")
         _update_job(
-            job_id, status=_STATUS_RUNNING, message="Préparation de l’export YouTube", progress=1
+            job_id,
+            status=_STATUS_RUNNING,
+            message="Préparation de l’export YouTube",
+            progress=1,
+            eta_seconds=None,
+            frames_processed=None,
+            total_frames=None,
+            fps_actual=None,
         )
         download_cookies = download_cookies_for_upload_job(job.youtube_upload_job_id)
         export_youtube_telemetry_layout(
@@ -1029,6 +1228,7 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
             job_token=get_video_export_job_token(job_id),
             work_dir=work_dir,
             progress=progress,
+            composition_progress=composition_progress,
             is_cancelled=lambda: _is_cancelled(job_id),
             cookies=download_cookies,
             pip_exports=json.loads(job.pip_exports) if job.pip_exports else [],
@@ -1037,35 +1237,53 @@ def _run_youtube_telemetry_layout_job(job_id: str) -> None:
             raise YoutubeExportError("Export annulé")
         if destination is None:
             raise YoutubeExportError("Chemin du fichier YouTube introuvable")
-        enqueue_youtube_overlay_upload(job.youtube_upload_job_id, destination)
-        upload_started = True
-        _log_job(job_id, "Vidéo composée et upload YouTube lancé")
+        _set_job_runtime(job_id, phase=_STATUS_FINALIZING, eta_seconds=None)
+        _update_job(
+            job_id,
+            status=_STATUS_RUNNING,
+            progress=99,
+            message="Finalizing video export",
+            eta_seconds=None,
+        )
+        with SessionLocal() as db:
+            flight = db.get(Flight, job.flight_id)
+            if flight is None:
+                raise YoutubeExportError("Le vol associé à l’export est introuvable")
+            persisted_path = persist_youtube_telemetry_video(db, flight, destination, job_id)
+        video_persisted = True
+        try:
+            discard_youtube_overlay_upload_preparation(job.youtube_upload_job_id)
+        except Exception:
+            logger.exception("Unable to clean up export upload preparation %s", job_id)
+        _log_job(job_id, "Vidéo télémétrique enregistrée dans les médias du vol")
         try:
             _update_job(
                 job_id,
                 status=_STATUS_COMPLETED,
                 progress=100,
-                message="Vidéo composée, envoi YouTube en cours",
-                video_path=str(destination),
+                message="Vidéo télémétrique prête dans les médias du vol",
+                video_path=str(persisted_path),
             )
         except Exception as exc:
             logger.exception("Unable to finalize telemetry-layout export %s", job_id)
-            _log_job(job_id, f"Upload YouTube lancé, statut d’export non mis à jour: {exc}")
+            _log_job(job_id, f"Vidéo enregistrée, statut d’export non mis à jour: {exc}")
     except YoutubeExportError as exc:
         _log_job(job_id, f"Export YouTube échoué: {exc}")
-        if not upload_started:
+        if not video_persisted:
             fail_youtube_overlay_upload(job.youtube_upload_job_id, str(exc))
         _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
     except Exception as exc:
         logger.exception("Unexpected telemetry-layout export error for %s", job_id)
         _log_job(job_id, f"Export YouTube échoué avec une erreur inattendue: {exc}")
-        if not upload_started:
+        if not video_persisted:
             fail_youtube_overlay_upload(job.youtube_upload_job_id, str(exc))
         _update_job(job_id, status=_STATUS_FAILED, error=str(exc), message="Export YouTube échoué")
     finally:
         if work_dir is not None and work_dir.is_dir():
             os.utime(work_dir, None)
-        if not upload_started and destination is not None:
+        if not video_persisted and persisted_path is not None:
+            persisted_path.unlink(missing_ok=True)
+        if not video_persisted and destination is not None:
             destination.unlink(missing_ok=True)
         _clear_job_cancel_requested(job_id)
 
@@ -2885,6 +3103,14 @@ async def _export_video_manual_render(job_id: str):
             if not encoding_completed:
                 return
 
+            _set_job_runtime(job_id, phase=_STATUS_FINALIZING, eta_seconds=None)
+            _update_job(
+                job_id,
+                status=_STATUS_RUNNING,
+                progress=99,
+                message="Finalizing video export",
+                eta_seconds=None,
+            )
             timestamp = datetime.now(UTC).replace(tzinfo=None).strftime("%Y%m%d-%H%M%S")
             output_file = _video_output_path(flight_id, timestamp)
             await asyncio.to_thread(shutil.move, str(encoding_output_file), str(output_file))

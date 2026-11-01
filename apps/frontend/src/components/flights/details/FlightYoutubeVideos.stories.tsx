@@ -1,4 +1,5 @@
 import preview from '../../../../.storybook/preview';
+import { fn } from 'storybook/test';
 import { FlightYoutubeVideos } from './FlightYoutubeVideos';
 
 const meta = preview.meta({
@@ -13,6 +14,7 @@ const meta = preview.meta({
 export const Idle = meta.story({
   name: 'Published videos at rest',
   args: {
+    onRemove: fn(),
     urls: [
       'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
       'https://youtu.be/9bZkp7q19f0',
@@ -28,6 +30,12 @@ export const Idle = meta.story({
       {
         url: 'https://youtu.be/9bZkp7q19f0',
         video_id: '9bZkp7q19f0',
+        title: 'Vol du soir - télémétrie',
+        can_delete_from_youtube: false,
+      },
+      {
+        url: 'https://youtu.be/jNQXAC9IVRw',
+        video_id: 'jNQXAC9IVRw',
         title:
           'Parapente — une longue balade entre les crêtes et la vallée, des premiers thermiques jusqu’à l’atterrissage',
         can_delete_from_youtube: false,

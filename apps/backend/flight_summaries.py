@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import json
+import re
 import unicodedata
 from datetime import date, datetime
 from pathlib import Path
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Query, Session, aliased
 from sqlalchemy.sql.elements import ColumnElement
 
 from flight_storage import flight_storage_root, resolve_temporary_video_path
+from gopro_overlay_export import enriched_gpx_path
 import config
 from models import Flight, GoproOverlayJob, HighlightVideoJob, Site, YoutubeUploadJob
 from schemas import FlightSummariesResponse, FlightSummary, youtube_video_id_from_url
@@ -59,6 +61,11 @@ _SEARCH_REPLACEMENTS = {
     "û": "u",
     "ü": "u",
 }
+
+_YOUTUBE_TELEMETRY_TITLE_PATTERN = re.compile(
+    r"(?:^|[\s:–—-])(?:télémétrie|telemetry)(?:\s+(?:overlay|video))?\s*$",
+    re.IGNORECASE,
+)
 
 
 class InvalidFlightSummaryCursor(ValueError):
@@ -108,18 +115,24 @@ def _completed_youtube_uploads(value: str | None) -> list[tuple[int, str, str]]:
     if not isinstance(uploads, list):
         return []
 
-    return [
-        (
-            upload["user_id"],
-            upload["video_id"],
-            upload.get("source_type", "gopro_overlay"),
-        )
-        for upload in uploads
-        if isinstance(upload, dict)
-        and isinstance(upload.get("user_id"), int)
-        and isinstance(upload.get("video_id"), str)
-        and isinstance(upload.get("source_type", "gopro_overlay"), str)
-    ]
+    completed_uploads: list[tuple[int, str, str]] = []
+    for upload in uploads:
+        if (
+            not isinstance(upload, dict)
+            or not isinstance(upload.get("user_id"), int)
+            or not isinstance(upload.get("video_id"), str)
+            or not isinstance(upload.get("source_type", "gopro_overlay"), str)
+        ):
+            continue
+
+        source_type = upload.get("source_type", "gopro_overlay")
+        title = upload.get("title")
+        if isinstance(title, str) and _YOUTUBE_TELEMETRY_TITLE_PATTERN.search(title):
+            source_type = "youtube_telemetry"
+
+        completed_uploads.append((upload["user_id"], upload["video_id"], source_type))
+
+    return completed_uploads
 
 
 def _flight_directory(flight_date: date, sequence: int) -> Path:
@@ -429,6 +442,8 @@ def list_flight_summaries(
                     YoutubeUploadJob.youtube_video_id,
                     "source_type",
                     YoutubeUploadJob.source_type,
+                    "title",
+                    YoutubeUploadJob.title,
                 )
             )
         )
@@ -482,11 +497,13 @@ def list_flight_summaries(
         Flight.gpx_provider,
         Flight.gopro_overlay_gpx_offset,
         Flight.gpx_file_path,
+        Flight.gpx_source_file_path,
         Flight.sportstracklive_status,
         Flight.sportstracklive_track_id,
         Flight.video_export_job_id,
         Flight.video_export_status,
         Flight.video_file_path,
+        Flight.youtube_telemetry_video_file_path,
         Flight.pano_video_file_path,
         Flight.youtube_urls_json,
         Flight.gopro_overlay_job_id,
@@ -542,7 +559,10 @@ def list_flight_summaries(
     face_flags: dict[str, bool] = {}
     pilote_flags: dict[str, bool] = {}
     osv_flags: dict[str, bool] = {}
+    gpx_enrichment_flags: dict[str, bool] = {}
+    gpx_enrichment_mismatch_flags: dict[str, bool] = {}
     for row in rows:
+        flight_directory = _flight_directory(row.flight_date, row.flight_sequence)
         path = (
             Path(row.pano_video_file_path)
             if row.pano_video_file_path
@@ -554,8 +574,23 @@ def list_flight_summaries(
         pano_flags[row.id] = _directory_file_exists(resolve_temporary_video_path(path, "pano"))
         face_flags[row.id] = _directory_file_exists(resolve_temporary_video_path(path, "face"))
         pilote_flags[row.id] = _directory_file_exists(resolve_temporary_video_path(path, "pilote"))
-        osv_flags[row.id] = _directory_has_osv_files(
-            _flight_directory(row.flight_date, row.flight_sequence)
+        osv_flags[row.id] = _directory_has_osv_files(flight_directory)
+        source_gpx_path = _resolve_file_path(row.gpx_source_file_path or row.gpx_file_path)
+        current_gpx_path = _resolve_file_path(row.gpx_file_path)
+        gpx_enrichment_flags[row.id] = bool(
+            current_gpx_path
+            and current_gpx_path.is_file()
+            and current_gpx_path.resolve() == enriched_gpx_path(flight_directory).resolve()
+        )
+        gpx_enrichment_mismatch_flags[row.id] = bool(
+            source_gpx_path
+            and source_gpx_path.is_file()
+            and osv_flags[row.id]
+            and (
+                current_gpx_path is None
+                or not current_gpx_path.is_file()
+                or current_gpx_path.resolve() != enriched_gpx_path(flight_directory).resolve()
+            )
         )
         if pano_flags[row.id] and not row.pano_video_file_path:
             detected_pano_paths.append({"id": row.id, "pano_video_file_path": str(path.resolve())})
@@ -590,6 +625,7 @@ def list_flight_summaries(
             has_camera=_directory_file_exists(
                 _flight_directory(row.flight_date, row.flight_sequence) / "camera.mp4"
             ),
+            youtube_telemetry_video_file_exists=_file_exists(row.youtube_telemetry_video_file_path),
             has_youtube_video=bool(uploaded_youtube_ids[row.id] & existing_youtube_ids),
             youtube_video_count=len(uploaded_youtube_ids[row.id] & existing_youtube_ids),
             youtube_video_types=[
@@ -614,6 +650,8 @@ def list_flight_summaries(
             ),
             has_pano_video=pano_flags[row.id],
             has_osv=osv_flags[row.id],
+            has_gpx_enrichment=gpx_enrichment_flags[row.id],
+            has_gpx_enrichment_mismatch=gpx_enrichment_mismatch_flags[row.id],
             has_face_video=face_flags[row.id],
             has_pilote_video=pilote_flags[row.id],
             has_highlight_video=bool(_file_exists(row.completed_highlight_path)),

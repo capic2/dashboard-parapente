@@ -203,7 +203,7 @@ vi.mock('cesium', () => {
   };
 });
 
-vi.mock('@dashboard-parapente/design-system', () => ({
+vi.mock('@dashboard-parapente/core/Button/Button', () => ({
   Button: ({
     children,
     isDisabled,

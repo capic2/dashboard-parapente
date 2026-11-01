@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
+import { Modal } from '@dashboard-parapente/core/Modal';
 import { CircleAlert, Trash2 } from 'lucide-react';
 import type { Flight } from '../../../types';
 import {
   useDeleteFlightTemporaryMedia,
+  useFlightTemporaryMediaDeleteWarnings,
   useYoutubeSourcePublicationStatus,
 } from '../../../hooks/flights/useYoutubeUpload';
 import { useToast } from '../../../hooks/useToast';
@@ -21,12 +23,19 @@ export function FlightVideoLocalDeleteButton({
   const toast = useToast();
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const source = { source_type: 'video' } as const;
-  const { isPublished } = useYoutubeSourcePublicationStatus(
+  const { upload, isPublished } = useYoutubeSourcePublicationStatus(
     flight.id,
     source,
     flight.youtube_urls ?? []
   );
   const deleteMedia = useDeleteFlightTemporaryMedia(flight.id);
+  const deleteWarnings = useFlightTemporaryMediaDeleteWarnings(flight.id);
+  const isCheckingDeleteWarnings =
+    deleteWarnings.isPending || deleteWarnings.isFetching;
+  const openDeleteConfirmation = () => {
+    setIsConfirmOpen(true);
+    void deleteWarnings.refetch();
+  };
 
   const handleDelete = async () => {
     try {
@@ -35,12 +44,27 @@ export function FlightVideoLocalDeleteButton({
       toast.success(t('flights.temporarySourceDeleted'));
     } catch (error) {
       toast.error(
-        await getApiErrorMessage(error, t('flights.temporarySourceDeleteError'))
+        await getApiErrorMessage(
+          error,
+          t('flights.temporarySourceDeleteError'),
+          {
+            409: {
+              message: t('flights.temporarySourceDeleteConflict'),
+              details: [
+                'A YouTube upload is in progress',
+                'Publish this source to YouTube before deleting its local file',
+              ],
+            },
+          }
+        )
       );
     }
   };
 
-  if (!isPublished) return null;
+  const isUploading =
+    upload.data?.status === 'preparing' ||
+    upload.data?.status === 'queued' ||
+    upload.data?.status === 'uploading';
 
   const title = t('flights.videoBadge');
 
@@ -49,7 +73,8 @@ export function FlightVideoLocalDeleteButton({
       <Button
         variant="danger"
         className="min-h-10 w-full rounded-lg px-3 py-2 text-sm sm:w-auto"
-        onPress={() => setIsConfirmOpen(true)}
+        onPress={openDeleteConfirmation}
+        isDisabled={isUploading || deleteMedia.isPending}
       >
         <Trash2 className="h-4 w-4" aria-hidden="true" />
         {t('flights.temporarySourceDelete')}
@@ -73,7 +98,19 @@ export function FlightVideoLocalDeleteButton({
               className="mt-0.5 h-5 w-5 shrink-0"
               aria-hidden="true"
             />
-            <span>{t('flights.temporarySourceDeleteYoutubeNote')}</span>
+            <span>
+              {t(
+                isCheckingDeleteWarnings
+                  ? 'flights.temporarySourceDeleteChecking'
+                  : deleteWarnings.isError
+                    ? 'flights.temporarySourceDeleteWarningUnavailable'
+                    : deleteWarnings.data?.warnings.video
+                      ? 'flights.temporarySourceDeleteUnavailableYoutubeNote'
+                      : isPublished
+                        ? 'flights.temporarySourceDeleteYoutubeNote'
+                        : 'flights.temporarySourceDeleteLocalNote'
+              )}
+            </span>
           </div>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
@@ -86,7 +123,7 @@ export function FlightVideoLocalDeleteButton({
             <Button
               variant="danger"
               onPress={() => void handleDelete()}
-              isDisabled={deleteMedia.isPending}
+              isDisabled={deleteMedia.isPending || isCheckingDeleteWarnings}
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
               {deleteMedia.isPending

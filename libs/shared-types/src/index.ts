@@ -199,6 +199,8 @@ export const FlightSchema = z
     video_export_progress: z.number().nullish(),
     video_file_path: z.string().nullish(),
     video_file_exists: z.boolean().nullish(),
+    youtube_telemetry_video_file_path: z.string().nullish(),
+    youtube_telemetry_video_file_exists: z.boolean().nullish(),
     pano_video_file_exists: z.boolean().nullish(),
     pano_video_filename: z.string().nullish(),
     face_video_file_exists: z.boolean().nullish(),
@@ -262,6 +264,7 @@ export const FlightSummarySchema = z.object({
   sportstracklive_track_id: z.number().nullable().optional(),
   has_video: z.boolean(),
   has_camera: z.boolean(),
+  youtube_telemetry_video_file_exists: z.boolean().default(false),
   has_youtube_video: z.boolean(),
   youtube_video_count: z.number().int().nonnegative(),
   youtube_video_types: z
@@ -275,6 +278,7 @@ export const FlightSummarySchema = z.object({
         'pilote',
         'highlight',
         'youtube_overlay',
+        'youtube_telemetry',
       ])
     )
     .optional(),
@@ -285,6 +289,8 @@ export const FlightSummarySchema = z.object({
   has_gopro_overlay: z.boolean(),
   has_pano_video: z.boolean(),
   has_osv: z.boolean().default(false),
+  has_gpx_enrichment: z.boolean().optional(),
+  has_gpx_enrichment_mismatch: z.boolean().optional(),
   has_face_video: z.boolean().optional(),
   has_pilote_video: z.boolean().optional(),
   has_highlight_video: z.boolean(),
@@ -348,6 +354,8 @@ export const BackgroundOperationSchema = z.object({
   error_detail: z.string().nullable().optional(),
   source_kind: z.string().nullable().optional(),
   source_id: z.string().nullable().optional(),
+  flight_id: z.string().nullable().optional(),
+  flight_name: z.string().nullable().optional(),
   can_cancel: z.boolean(),
   can_retry: z.boolean(),
   unread: z.boolean(),

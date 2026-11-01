@@ -6,7 +6,7 @@ import { MultiOrientationSelector } from './MultiOrientationSelector';
 import { useQueryClient } from '@tanstack/react-query';
 import { createWeatherQueryFn } from '../../hooks/weather/useWeather';
 import type { Site } from '../../types';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { Check, MapPin, Mountain, RefreshCw, Search } from 'lucide-react';
 import { getSiteDisplayName } from '../../lib/siteDisplay';

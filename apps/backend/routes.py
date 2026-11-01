@@ -8,6 +8,7 @@ import logging
 import math
 import os
 import subprocess
+import time
 import uuid
 import xml.etree.ElementTree as ET
 from dataclasses import asdict
@@ -35,8 +36,8 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func, update
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel, Field
 
@@ -80,6 +81,7 @@ from flight_storage import (
     pano_video_path,
     pano_video_paths,
     temporary_video_path,
+    youtube_telemetry_video_path,
     write_flight_text_file,
 )
 from flight_tracks import (
@@ -88,6 +90,7 @@ from flight_tracks import (
     normalize_track,
 )
 from gopro_overlay_export import (
+    EnrichedGpxCancelled,
     align_video_start_time_to_gpx,
     cancel_gopro_overlay_job,
     check_gopro_overlay_dependencies,
@@ -95,9 +98,11 @@ from gopro_overlay_export import (
     create_gopro_overlay_job_from_paths,
     delete_gopro_overlay_job,
     delete_gopro_overlay_output,
+    enriched_gpx_matches_source,
     enriched_gpx_path,
     ensure_enriched_gpx,
     first_gpx_timestamp,
+    gpx_metadata_timestamp,
     _first_gpx_at_for_camera_timeline,
     get_gopro_overlay_job,
     gpx_duration_seconds,
@@ -173,6 +178,7 @@ from schemas import (
     GoproPreviewState,
     GoproOverlayLayoutsResponse,
     GoproOverlayProbeResponse,
+    FlightTemporaryMediaDeleteWarnings,
     HighlightVideoClipResponse,
     HighlightVideoDeleteResponse,
     HighlightVideoJobResponse,
@@ -273,6 +279,7 @@ from operations import (
     ACTIVE_STATUSES as OPERATION_ACTIVE_STATUSES,
     OperationReporter,
     get_user_operation,
+    operation_can_cancel,
     operation_payload,
     purge_expired_operations,
     sync_operation_from_snapshot,
@@ -359,6 +366,11 @@ def _mark_flight_export_processing(db: Session, flight: Flight, job_id: str):
 def _flight_video_file_exists(flight: Flight) -> bool:
     video_path = _resolve_flight_file_path(flight.video_file_path)
     return bool(video_path and video_path.exists())
+
+
+def _flight_youtube_telemetry_video_file_exists(flight: Flight) -> bool:
+    video_path = _resolve_flight_file_path(flight.youtube_telemetry_video_file_path)
+    return bool(video_path and video_path.is_file())
 
 
 def _resolve_gopro_paragliding_path(file_path: str | None) -> Path | None:
@@ -448,12 +460,18 @@ def _flight_gopro_camera_path(db: Session, flight: Flight) -> Path:
 def _flight_gopro_preview_inputs(db: Session, flight: Flight) -> tuple[Path, Path]:
     camera_path = _flight_gopro_camera_path(db, flight)
     input_dir = camera_path.parent
-    gpx_path = _resolve_flight_file_path(flight.gpx_file_path)
+    gpx_path = _flight_source_gpx_path(flight)
     if not gpx_path or not gpx_path.is_file():
         gpx_path = first_matching_file(input_dir, "Zepp*.gpx")
     if not gpx_path or not gpx_path.is_file():
         raise HTTPException(status_code=404, detail="Flight GPX file not found")
     return camera_path, gpx_path
+
+
+def _flight_source_gpx_path(flight: Flight) -> Path | None:
+    """Resolve the original recorded track after gpx_file_path is enriched."""
+    source_file_path = getattr(flight, "gpx_source_file_path", None) or flight.gpx_file_path
+    return _resolve_flight_file_path(source_file_path)
 
 
 _GOPRO_OVERLAY_IN_PROGRESS_STATUSES = {"queued", "preparing", "running"}
@@ -780,6 +798,11 @@ def _highlight_export_job_payload(job: HighlightVideoJob) -> dict[str, Any]:
 
 
 def _youtube_upload_export_job_payload(job: YoutubeUploadJob) -> dict[str, Any]:
+    log_tail = (
+        youtube_upload_job_payload(job).get("log_tail") or []
+        if job.status in {"preparing", "queued", "uploading"}
+        else []
+    )
     return {
         "job_id": job.id,
         "flight_id": job.flight_id,
@@ -795,7 +818,7 @@ def _youtube_upload_export_job_payload(job: YoutubeUploadJob) -> dict[str, Any]:
         "updated_at": to_api_utc(job.updated_at),
         "started_at": to_api_utc(job.started_at),
         "completed_at": to_api_utc(job.completed_at),
-        "log_tail": [],
+        "log_tail": log_tail,
         "has_output_file": False,
     }
 
@@ -935,7 +958,10 @@ def _get_video_export_jobs_payload(
         "video": sum(job.get("mode") in {"manual", "manual_fast", "stream"} for job in jobs),
         "gopro": sum(job.get("mode") == "gopro_overlay" for job in jobs),
         "highlight": sum(job.get("mode") == "highlight" for job in jobs),
-        "youtube": sum(job.get("mode") in {"youtube", "youtube_upload"} for job in jobs),
+        "youtube": sum(
+            job.get("mode") in {"youtube", "youtube_upload", "youtube_telemetry_layout"}
+            for job in jobs
+        ),
     }
     if type_filter == "video":
         jobs = [job for job in jobs if job.get("mode") in {"manual", "manual_fast", "stream"}]
@@ -944,7 +970,11 @@ def _get_video_export_jobs_payload(
     elif type_filter == "highlight":
         jobs = [job for job in jobs if job.get("mode") == "highlight"]
     elif type_filter == "youtube":
-        jobs = [job for job in jobs if job.get("mode") in {"youtube", "youtube_upload"}]
+        jobs = [
+            job
+            for job in jobs
+            if job.get("mode") in {"youtube", "youtube_upload", "youtube_telemetry_layout"}
+        ]
     status_counts = {
         "all": len(jobs),
         "active": sum(
@@ -1147,23 +1177,31 @@ def _ensure_job_operation(
     ).operation
 
 
-def _refresh_operation_from_source(db: Session, operation: BackgroundOperationModel) -> None:
+def _refresh_operation_from_source(db: Session, operation: BackgroundOperationModel) -> str | None:
     if not operation.source_kind or not operation.source_id:
-        return
+        return None
+    if operation.source_kind == "gpx_enrichment":
+        return operation.source_id.split(":", 1)[0] or None
+
     status: str | None = None
+    phase: str | None = None
     progress: int | float | None = None
     detail: str | None = None
     error: str | None = None
+    flight_id: str | None = None
     if operation.source_kind == "video_export":
         snapshot = _resolve_export_status(operation.source_id)
         if snapshot:
+            flight_id = snapshot.get("flight_id")
             status = snapshot.get("internal_status") or snapshot.get("status")
+            phase = snapshot.get("phase")
             progress = snapshot.get("progress")
             detail = snapshot.get("message")
             error = snapshot.get("error")
     elif operation.source_kind == "gopro_overlay":
         snapshot = get_gopro_overlay_job(operation.source_id)
         if snapshot:
+            flight_id = snapshot.get("flight_id")
             status = snapshot.get("status")
             progress = snapshot.get("progress")
             detail = snapshot.get("message")
@@ -1173,6 +1211,7 @@ def _refresh_operation_from_source(db: Session, operation: BackgroundOperationMo
             db.query(HighlightVideoJob).filter(HighlightVideoJob.id == operation.source_id).first()
         )
         if job:
+            flight_id = job.flight_id
             status = job.status
             progress = job.progress
             detail = job.message
@@ -1180,6 +1219,7 @@ def _refresh_operation_from_source(db: Session, operation: BackgroundOperationMo
     elif operation.source_kind == "youtube_upload":
         job = db.query(YoutubeUploadJob).filter(YoutubeUploadJob.id == operation.source_id).first()
         if job:
+            flight_id = job.flight_id
             status = job.status
             progress = job.progress
             detail = job.title
@@ -1189,15 +1229,41 @@ def _refresh_operation_from_source(db: Session, operation: BackgroundOperationMo
             db,
             operation,
             status=status,
+            phase=phase,
             progress=progress,
             detail=detail,
             error=error,
         )
+    return str(flight_id) if flight_id else None
 
 
-def _refresh_operations(db: Session, operations: list[BackgroundOperationModel]) -> None:
+def _refresh_operations(db: Session, operations: list[BackgroundOperationModel]) -> dict[str, str]:
+    flight_ids: dict[str, str] = {}
     for operation in operations:
-        _refresh_operation_from_source(db, operation)
+        flight_id = _refresh_operation_from_source(db, operation)
+        if flight_id:
+            flight_ids[operation.id] = flight_id
+    return flight_ids
+
+
+def _background_operation_payload(
+    operation: BackgroundOperationModel,
+    flight_id: str | None,
+    flight_name: str | None,
+) -> dict[str, Any]:
+    return {
+        **operation_payload(operation),
+        "flight_id": flight_id,
+        "flight_name": flight_name,
+    }
+
+
+def _flight_names(db: Session, flight_ids: dict[str, str]) -> dict[str, str]:
+    ids = set(flight_ids.values())
+    if not ids:
+        return {}
+    flights = db.query(Flight).filter(Flight.id.in_(ids)).all()
+    return {flight.id: name for flight in flights if (name := (flight.name or flight.title))}
 
 
 def _spots_data_is_recent(last_sync_value: Any, *, now: datetime | None = None) -> bool:
@@ -1246,9 +1312,16 @@ def _read_operations_payload(user_id: int) -> list[dict[str, Any]]:
             .limit(100)
             .all()
         )
-        _refresh_operations(db, operations)
+        flight_ids = _refresh_operations(db, operations)
+        flight_names = _flight_names(db, flight_ids)
         return [
-            BackgroundOperation.model_validate(operation_payload(item)).model_dump(mode="json")
+            BackgroundOperation.model_validate(
+                _background_operation_payload(
+                    item,
+                    flight_ids.get(item.id),
+                    flight_names.get(flight_ids.get(item.id, "")),
+                )
+            ).model_dump(mode="json")
             for item in operations
         ]
 
@@ -1265,8 +1338,18 @@ def list_background_operations(
     if not include_completed:
         query = query.filter(BackgroundOperationModel.status.in_(OPERATION_ACTIVE_STATUSES))
     operations = query.order_by(BackgroundOperationModel.updated_at.desc()).limit(limit).all()
-    _refresh_operations(db, operations)
-    return [BackgroundOperation.model_validate(operation_payload(item)) for item in operations]
+    flight_ids = _refresh_operations(db, operations)
+    flight_names = _flight_names(db, flight_ids)
+    return [
+        BackgroundOperation.model_validate(
+            _background_operation_payload(
+                item,
+                flight_ids.get(item.id),
+                flight_names.get(flight_ids.get(item.id, "")),
+            )
+        )
+        for item in operations
+    ]
 
 
 @router.get("/operations/stream")
@@ -1349,7 +1432,7 @@ def cancel_background_operation(
     operation = get_user_operation(db, operation_id, user.id)
     if operation is None:
         raise HTTPException(status_code=404, detail="Operation not found")
-    if operation.status not in OPERATION_ACTIVE_STATUSES or not operation.can_cancel:
+    if operation.status not in OPERATION_ACTIVE_STATUSES or not operation_can_cancel(operation):
         raise HTTPException(status_code=409, detail="Operation cannot be cancelled")
     _cancel_operation_source(db, operation)
     reporter = OperationReporter(db, operation)
@@ -1378,11 +1461,12 @@ def retry_background_operation(
         if not resume_video_export(operation.source_id):
             raise HTTPException(status_code=409, detail="Video export cannot be resumed")
     elif operation.source_kind == "gopro_overlay":
-        from gopro_overlay_export import _enqueue_existing_gopro_overlay_job
+        from gopro_overlay_export import resume_failed_gopro_overlay_job
 
         if get_gopro_overlay_job(operation.source_id) is None:
             raise HTTPException(status_code=404, detail="GoPro overlay job not found")
-        _enqueue_existing_gopro_overlay_job(operation.source_id)
+        if not resume_failed_gopro_overlay_job(operation.source_id):
+            raise HTTPException(status_code=409, detail="GoPro overlay job cannot be resumed")
     elif operation.source_kind == "highlight_video":
         job = (
             db.query(HighlightVideoJob).filter(HighlightVideoJob.id == operation.source_id).first()
@@ -1627,6 +1711,65 @@ def remove_flight_youtube_video(
     return Response(status_code=204)
 
 
+def _temporary_media_delete_warnings(
+    db: Session,
+    flight: Flight,
+    *,
+    user_id: int,
+) -> dict[str, bool]:
+    source_types = ("video", "camera", "pano", "face", "pilote", "youtube_telemetry")
+    completed_uploads = (
+        db.query(YoutubeUploadJob)
+        .filter(
+            YoutubeUploadJob.flight_id == flight.id,
+            YoutubeUploadJob.user_id == user_id,
+            YoutubeUploadJob.source_type.in_(source_types),
+            YoutubeUploadJob.status == "completed",
+        )
+        .all()
+    )
+    telemetry_path = youtube_telemetry_video_path(db, flight)
+    telemetry_paths = {str(telemetry_path), str(telemetry_path.resolve())}
+    uploads_by_source = {
+        source_type: [
+            job
+            for job in completed_uploads
+            if job.source_type == source_type
+            and (source_type != "youtube_telemetry" or job.source_path in telemetry_paths)
+        ]
+        for source_type in source_types
+    }
+    video_ids = {
+        job.youtube_video_id
+        for jobs in uploads_by_source.values()
+        for job in jobs
+        if job.youtube_video_id
+    }
+    availability = youtube_video_availability({user_id: video_ids}) if video_ids else {}
+    return {
+        source_type: any(
+            job.youtube_video_id is None or availability.get(job.youtube_video_id) is not True
+            for job in jobs
+        )
+        for source_type, jobs in uploads_by_source.items()
+    }
+
+
+@router.get(
+    "/flights/{flight_id}/temporary-media-delete-warnings",
+    response_model=FlightTemporaryMediaDeleteWarnings,
+)
+def get_flight_temporary_media_delete_warnings(
+    flight_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, dict[str, bool]]:
+    flight = db.get(Flight, flight_id)
+    if flight is None:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    return {"warnings": _temporary_media_delete_warnings(db, flight, user_id=user.id)}
+
+
 @router.get(
     "/flights/{flight_id}/youtube-upload",
     response_model=YoutubeUploadJobResponse | None,
@@ -1643,6 +1786,7 @@ def get_flight_youtube_upload(
             "pilote",
             "highlight",
             "youtube_overlay",
+            "youtube_telemetry",
         ]
         | None
     ) = None,
@@ -1705,6 +1849,16 @@ def start_flight_youtube_upload(
         video_path = Path(highlight.output_path)
         if not video_path.is_file():
             raise HTTPException(status_code=409, detail="Best-moments video is not available")
+    elif payload.source_type == "youtube_telemetry":
+        source_path = youtube_telemetry_video_path(db, flight)
+        if source_path.is_symlink():
+            raise HTTPException(status_code=409, detail="Telemetry video is not available")
+        video_path = source_path.resolve()
+        storage_root = flight_storage_root().resolve()
+        if storage_root not in video_path.parents:
+            raise HTTPException(status_code=409, detail="Telemetry video is outside flight storage")
+        if not video_path.is_file():
+            raise HTTPException(status_code=409, detail="Telemetry video is not available")
     elif payload.source_type in {"pano", "face", "pilote"}:
         video_path = temporary_video_path(db, flight, payload.source_type)
         if not _directory_file_exists(video_path):
@@ -1725,6 +1879,10 @@ def start_flight_youtube_upload(
         YoutubeUploadJob.status == "completed",
         YoutubeUploadJob.youtube_url.in_(flight.youtube_urls),
     )
+    if payload.source_type == "youtube_telemetry":
+        completed_source_query = completed_source_query.filter(
+            YoutubeUploadJob.source_path == str(video_path)
+        )
     if overlay is not None:
         completed_source_query = completed_source_query.filter(
             YoutubeUploadJob.gopro_overlay_job_id == overlay.id
@@ -1782,6 +1940,7 @@ def start_flight_youtube_upload(
         active_source_key=source_key,
         gopro_overlay_job_id=overlay.id if overlay is not None else None,
         highlight_video_job_id=highlight.id if highlight is not None else None,
+        source_path=str(video_path) if payload.source_type == "youtube_telemetry" else None,
         status="queued",
         progress=0,
         title=payload.title,
@@ -4833,6 +4992,10 @@ def get_flights(
             "video_export_progress": video_export["progress"],
             "video_file_path": flight.video_file_path,
             "video_file_exists": _flight_video_file_exists(flight),
+            "youtube_telemetry_video_file_path": flight.youtube_telemetry_video_file_path,
+            "youtube_telemetry_video_file_exists": _flight_youtube_telemetry_video_file_exists(
+                flight
+            ),
             "pano_video_file_exists": pano_video_exists,
             "pano_video_filename": pano_video.name if pano_video_exists else None,
             "face_video_file_exists": face_video_exists,
@@ -5491,6 +5654,8 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "video_export_progress": video_export["progress"],
         "video_file_path": flight.video_file_path,
         "video_file_exists": _flight_video_file_exists(flight),
+        "youtube_telemetry_video_file_path": flight.youtube_telemetry_video_file_path,
+        "youtube_telemetry_video_file_exists": _flight_youtube_telemetry_video_file_exists(flight),
         "pano_video_file_exists": pano_video_exists,
         "pano_video_filename": pano_video.name if pano_video_exists else None,
         "face_video_file_exists": face_video_exists,
@@ -5548,7 +5713,13 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/flights/{flight_id}")
-async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session = Depends(get_db)):
+async def update_flight(
+    flight_id: str,
+    flight_data: FlightUpdate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     """
     Update flight details
 
@@ -5584,10 +5755,10 @@ async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session =
     if (
         gpx_metrics_excluded is not None
         and gpx_metrics_excluded != flight.gpx_metrics_excluded
-        and flight.gpx_file_path
+        and _flight_source_gpx_path(flight)
     ):
         try:
-            coordinates = parse_gpx_file(Path(flight.gpx_file_path))
+            coordinates = parse_gpx_file(_flight_source_gpx_path(flight))
             stats = calculate_track_stats(coordinates)
             flight.max_climb_rate_ms = stats["max_climb_rate_ms"]
             flight.max_sink_rate_ms = stats["max_sink_rate_ms"]
@@ -5610,6 +5781,19 @@ async def update_flight(flight_id: str, flight_data: FlightUpdate, db: Session =
         db.commit()
         db.refresh(flight)
         logger.info(f" Updated flight {flight_id}: {list(update_data.keys())}")
+
+        if (
+            "gopro_overlay_gpx_offset" in update_data
+            and flight.gopro_overlay_gpx_offset is not None
+        ):
+            try:
+                _schedule_enriched_gpx_for_saved_offset(db, flight, background_tasks, user.id)
+            except Exception:
+                logger.warning(
+                    "Unable to schedule enriched GPX for flight %s",
+                    flight_id,
+                    exc_info=True,
+                )
 
         # Return in the format expected by frontend (ApiResponseSchema)
         response_flight = FlightSchema.model_validate(flight).model_dump(mode="json")
@@ -5639,10 +5823,10 @@ def get_flight_gpx_data(flight_id: str, db: Session = Depends(get_db)):
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
 
-    if not flight.gpx_file_path:
+    gpx_path = _flight_source_gpx_path(flight)
+    if gpx_path is None:
         raise HTTPException(status_code=404, detail="No GPX file available for this flight")
 
-    gpx_path = Path(flight.gpx_file_path)
     if not gpx_path.exists():
         raise HTTPException(status_code=404, detail="GPX file not found on disk")
 
@@ -5690,8 +5874,8 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
     if not flight.gpx_file_path:
         raise HTTPException(status_code=404, detail="No GPX file available for this flight")
 
-    source_path = Path(flight.gpx_file_path)
-    if not source_path.is_file():
+    source_path = _flight_source_gpx_path(flight)
+    if source_path is None or not source_path.is_file():
         raise HTTPException(status_code=404, detail="GPX file not found on disk")
 
     telemetry_path = source_path
@@ -5705,7 +5889,7 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
             # The overlay preview endpoint prepares this cache asynchronously;
             # telemetry must remain responsive while that work is in progress.
             cached_path = enriched_gpx_path(camera_path.parent)
-            enrichment_status = _enriched_gpx_status(camera_path.parent)
+            enrichment_status = _enriched_gpx_status(camera_path.parent, source_path)
             if enrichment_status == "ready":
                 telemetry_path = cached_path
             else:
@@ -5716,9 +5900,14 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
     except (OSError, ValueError) as exc:
         logger.warning("Unable to enrich telemetry for %s: %s", flight_id, exc)
 
+    enrichment_progress = (
+        _read_enriched_gpx_progress(camera_path.parent, enrichment_status) if osv_paths else None
+    )
+
     # The remaining work is file parsing only. Do not keep the request's DB
     # connection checked out while reading the GPX/OSV cache.
     db.close()
+    metadata_time = gpx_metadata_timestamp(source_path)
 
     try:
         file_type = telemetry_path.name.rsplit(".", 1)[-1]
@@ -5764,9 +5953,11 @@ def get_flight_telemetry(flight_id: str, db: Session = Depends(get_db)) -> Fligh
         source="gpx+osv" if osv_paths else "gpx",
         has_osv=bool(osv_paths),
         enrichment_status=enrichment_status,
+        enrichment_progress=enrichment_progress,
         enrichment_error=(
             "Unable to generate enriched GPX" if enrichment_status == "failed" else None
         ),
+        metadata_time=metadata_time,
         start_time=start_time,
         end_time=end_time,
         duration_seconds=duration_seconds,
@@ -5956,10 +6147,10 @@ def get_flight_gpx_data_debug(flight_id: str, db: Session = Depends(get_db)):
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
 
-    if not flight.gpx_file_path:
+    gpx_path = _flight_source_gpx_path(flight)
+    if gpx_path is None:
         raise HTTPException(status_code=404, detail="No GPX file available for this flight")
 
-    gpx_path = Path(flight.gpx_file_path)
     if not gpx_path.exists():
         raise HTTPException(status_code=404, detail="GPX file not found on disk")
 
@@ -5984,10 +6175,10 @@ def download_flight_gpx(flight_id: str, db: Session = Depends(get_db)):
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
 
-    if not flight.gpx_file_path:
+    gpx_path = _flight_source_gpx_path(flight)
+    if gpx_path is None:
         raise HTTPException(status_code=404, detail="No GPX file available for this flight")
 
-    gpx_path = Path(flight.gpx_file_path)
     if not gpx_path.exists():
         raise HTTPException(status_code=404, detail="GPX file not found on disk")
 
@@ -6089,7 +6280,7 @@ def stream_flight_pano(flight_id: str, db: Session = Depends(get_db)) -> FileRes
 )
 def delete_flight_temporary_media(
     flight_id: str,
-    source_type: Literal["video", "camera", "pano", "face", "pilote"],
+    source_type: Literal["video", "camera", "pano", "face", "pilote", "youtube_telemetry"],
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Response:
@@ -6097,27 +6288,19 @@ def delete_flight_temporary_media(
     if flight is None:
         raise HTTPException(status_code=404, detail="Flight not found")
 
-    completed_uploads = (
-        db.query(YoutubeUploadJob)
-        .filter(
-            YoutubeUploadJob.flight_id == flight.id,
-            YoutubeUploadJob.user_id == user.id,
-            YoutubeUploadJob.source_type == source_type,
-            YoutubeUploadJob.status == "completed",
-            YoutubeUploadJob.youtube_url.in_(flight.youtube_urls or []),
-            YoutubeUploadJob.youtube_video_id.is_not(None),
-        )
-        .all()
+    active_upload_query = db.query(YoutubeUploadJob).filter(
+        YoutubeUploadJob.flight_id == flight.id,
+        YoutubeUploadJob.source_type == source_type,
+        YoutubeUploadJob.status.in_(("preparing", "queued", "uploading")),
     )
-    video_ids = {
-        job.youtube_video_id for job in completed_uploads if job.youtube_video_id is not None
-    }
-    availability = youtube_video_availability({user.id: video_ids}) if video_ids else {}
-    if not any(availability.get(video_id) is True for video_id in video_ids):
-        raise HTTPException(
-            status_code=409,
-            detail="Publish this source to YouTube before deleting its local file",
+    telemetry_path = None
+    if source_type == "youtube_telemetry":
+        telemetry_path = youtube_telemetry_video_path(db, flight)
+        active_upload_query = active_upload_query.filter(
+            YoutubeUploadJob.source_path.in_({str(telemetry_path), str(telemetry_path.resolve())})
         )
+    if active_upload_query.first() is not None:
+        raise HTTPException(status_code=409, detail="A YouTube upload is in progress")
 
     if source_type == "camera":
         media_path = _flight_gopro_camera_path(db, flight)
@@ -6132,6 +6315,15 @@ def delete_flight_temporary_media(
                 status_code=409,
                 detail="Video is outside flight storage",
             )
+        media_path = resolved_source_path
+    elif source_type == "youtube_telemetry":
+        source_path = _resolve_flight_file_path(str(youtube_telemetry_video_path(db, flight)))
+        if source_path is None or source_path.is_symlink() or not source_path.is_file():
+            raise HTTPException(status_code=404, detail="Telemetry video not found")
+        resolved_source_path = source_path.resolve()
+        storage_root = flight_storage_root().resolve()
+        if storage_root not in resolved_source_path.parents:
+            raise HTTPException(status_code=409, detail="Video is outside flight storage")
         media_path = resolved_source_path
     else:
         source_path = _resolve_flight_file_path(str(temporary_video_path(db, flight, source_type)))
@@ -6162,19 +6354,26 @@ def delete_flight_temporary_media(
     elif source_type == "pano":
         flight.pano_video_file_path = None
         db.commit()
+    elif source_type == "youtube_telemetry":
+        flight.youtube_telemetry_video_file_path = None
+        db.commit()
     return Response(status_code=204)
 
 
 @router.get("/flights/{flight_id}/temporary-media/{source_type}/thumbnail")
 def get_flight_temporary_media_thumbnail(
     flight_id: str,
-    source_type: Literal["face", "pilote"],
+    source_type: Literal["face", "pilote", "youtube_telemetry"],
     db: Session = Depends(get_db),
 ) -> FileResponse:
     flight = db.get(Flight, flight_id)
     if flight is None:
         raise HTTPException(status_code=404, detail="Flight not found")
-    media_path = temporary_video_path(db, flight, source_type)
+    media_path = (
+        youtube_telemetry_video_path(db, flight)
+        if source_type == "youtube_telemetry"
+        else temporary_video_path(db, flight, source_type)
+    )
     if not _directory_file_exists(media_path):
         raise HTTPException(status_code=404, detail=f"{source_type.title()} video not found")
     return _video_thumbnail_response(media_path)
@@ -6183,13 +6382,17 @@ def get_flight_temporary_media_thumbnail(
 @router.get("/flights/{flight_id}/temporary-media/{source_type}")
 def stream_flight_temporary_media(
     flight_id: str,
-    source_type: Literal["face", "pilote"],
+    source_type: Literal["face", "pilote", "youtube_telemetry"],
     db: Session = Depends(get_db),
 ) -> FileResponse:
     flight = db.get(Flight, flight_id)
     if flight is None:
         raise HTTPException(status_code=404, detail="Flight not found")
-    media_path = temporary_video_path(db, flight, source_type)
+    media_path = (
+        youtube_telemetry_video_path(db, flight)
+        if source_type == "youtube_telemetry"
+        else temporary_video_path(db, flight, source_type)
+    )
     if not _directory_file_exists(media_path):
         raise HTTPException(status_code=404, detail=f"{source_type.title()} video not found")
     return FileResponse(
@@ -6565,6 +6768,8 @@ def create_flight(flight_data: FlightCreate, db: Session = Depends(get_db)):
         "video_export_progress": None,
         "video_file_path": None,
         "video_file_exists": False,
+        "youtube_telemetry_video_file_path": None,
+        "youtube_telemetry_video_file_exists": False,
         "pano_video_file_exists": False,
         "face_video_file_exists": False,
         "pilote_video_file_exists": False,
@@ -6612,6 +6817,7 @@ async def upload_gpx_to_flight(
 
         # Keep the upload successful even if historical/statistical data is malformed.
         flight.gpx_file_path = str(file_path)
+        flight.gpx_source_file_path = str(file_path)
         if gpx_provider is not None:
             flight.gpx_provider = gpx_provider
         # A replacement GPX is a new track; allow it to be sent again.
@@ -6635,7 +6841,15 @@ async def upload_gpx_to_flight(
             flight.gpx_elevation_gain_m = stats["elevation_gain_m"]
             flight.max_climb_rate_ms = stats["max_climb_rate_ms"]
             flight.max_sink_rate_ms = stats["max_sink_rate_ms"]
-            flight.departure_time = stats["departure_time"]
+            departure_time = stats["departure_time"]
+            if departure_time is not None:
+                if departure_time.tzinfo is None:
+                    departure_time = departure_time.replace(tzinfo=UTC)
+                flight.departure_time = departure_time.astimezone(ZoneInfo("Europe/Paris")).replace(
+                    tzinfo=None
+                )
+            else:
+                flight.departure_time = None
         except Exception as exc:
             logger.warning(
                 "Could not calculate GPX stats for uploaded track on %s: %s", flight_id, exc
@@ -6643,6 +6857,15 @@ async def upload_gpx_to_flight(
 
         db.commit()
         db.refresh(flight)
+
+        try:
+            camera_path = _flight_gopro_camera_path(db, flight)
+            enriched_gpx_path(camera_path.parent).unlink(missing_ok=True)
+            enriched_gpx_path(camera_path.parent).with_suffix(".json").unlink(missing_ok=True)
+            _enriched_gpx_error_path(camera_path.parent).unlink(missing_ok=True)
+        except (HTTPException, OSError):
+            # A GPX replacement remains valid even when no camera cache exists.
+            pass
 
         queue_sportstracklive_upload(db, flight, user.id, background_tasks)
 
@@ -6824,6 +7047,7 @@ async def create_flight_from_gpx(
         file_name = f"watch.{file_type}"
         file_path = write_flight_text_file(db, flight, file_name, file_str)
         flight.gpx_file_path = str(file_path)
+        flight.gpx_source_file_path = str(file_path)
 
         # 7. Enregistrer en base
         db.commit()
@@ -6893,11 +7117,13 @@ async def delete_flight(flight_id: str, db: Session = Depends(get_db)):
 
     try:
         # 2. Supprimer le fichier GPX si présent
-        if flight.gpx_file_path:
-            gpx_path = Path(__file__).parent / flight.gpx_file_path
+        for gpx_file_path in {flight.gpx_file_path, flight.gpx_source_file_path} - {None, ""}:
+            gpx_path = _resolve_flight_file_path(gpx_file_path)
+            if gpx_path is None:
+                continue
             if gpx_path.exists():
                 gpx_path.unlink()
-                logger.info(f"Deleted GPX file: {flight.gpx_file_path}")
+                logger.info("Deleted GPX file: %s", gpx_file_path)
 
         # 3. Supprimer le vol de la base
         flight_title = flight.title
@@ -8166,38 +8392,273 @@ def _prepare_enriched_gpx_in_background(
     gpx_path: Path,
     input_dir: Path,
     *,
-    video_duration: float,
-    first_gpx_at: float | None,
+    video_duration: float | None = None,
+    first_gpx_at: float | None = None,
+    flight_id: str | None = None,
+    operation_id: str | None = None,
 ) -> None:
+    last_cancellation_check_error = 0.0
+
+    def cancellation_requested() -> bool:
+        nonlocal last_cancellation_check_error
+        if operation_id is None:
+            return False
+        try:
+            with SessionLocal() as db:
+                operation = (
+                    db.query(BackgroundOperationModel)
+                    .filter(BackgroundOperationModel.id == operation_id)
+                    .first()
+                )
+                return operation is None or operation.status == "cancelled"
+        except SQLAlchemyError:
+            now = time.monotonic()
+            if now - last_cancellation_check_error >= 30:
+                logger.warning(
+                    "Unable to check cancellation for GPX enrichment %s",
+                    operation_id,
+                    exc_info=True,
+                )
+                last_cancellation_check_error = now
+            return False
+
+    def report_progress(progress: int) -> None:
+        _write_enriched_gpx_progress(input_dir, progress)
+        _update_gpx_enrichment_operation(
+            operation_id,
+            status="running",
+            progress=progress,
+        )
+
+    _write_enriched_gpx_progress(input_dir, None)
+    _update_gpx_enrichment_operation(operation_id, status="running", progress=0)
     try:
-        ensure_enriched_gpx(
+        enriched_path = ensure_enriched_gpx(
             osv_paths,
             gpx_path,
             input_dir,
             video_duration=video_duration,
             first_gpx_at=first_gpx_at,
+            progress_callback=report_progress,
+            cancellation_check=cancellation_requested,
         )
+        if cancellation_requested():
+            raise EnrichedGpxCancelled
+        if flight_id is not None:
+            _persist_enriched_gpx_for_flight(flight_id, gpx_path, enriched_path)
         try:
             _enriched_gpx_error_path(input_dir).unlink(missing_ok=True)
         except OSError:
             logger.warning("Unable to clear enriched GPX error marker in %s", input_dir)
+        _remove_enriched_gpx_progress(input_dir)
+        _update_gpx_enrichment_operation(operation_id, status="completed", progress=100)
+    except EnrichedGpxCancelled:
+        _remove_enriched_gpx_progress(input_dir)
     except Exception as exc:
         try:
             _enriched_gpx_error_path(input_dir).touch()
         except OSError:
             logger.warning("Unable to persist enriched GPX error marker in %s", input_dir)
+        _remove_enriched_gpx_progress(input_dir)
+        _update_gpx_enrichment_operation(operation_id, status="failed", error=str(exc))
         logger.warning("Unable to prepare enriched GPX in background: %s", exc)
+
+
+def _create_gpx_enrichment_operation(db: Session, user_id: int, flight_id: str) -> str:
+    operation = OperationReporter.create(
+        db,
+        user_id=user_id,
+        operation_type="gpx_enrichment",
+        title_key="operations.gpxEnrichment",
+        steps=["enrich_gpx"],
+        source_kind="gpx_enrichment",
+        source_id=f"{flight_id}:{uuid.uuid4().hex}",
+        can_cancel=True,
+    ).operation
+    return operation.id
+
+
+def _update_gpx_enrichment_operation(
+    operation_id: str | None,
+    *,
+    status: Literal["running", "completed", "failed"],
+    progress: int | None = None,
+    error: str | None = None,
+) -> None:
+    if operation_id is None:
+        return
+    try:
+        with SessionLocal() as db:
+            operation = (
+                db.query(BackgroundOperationModel)
+                .filter(BackgroundOperationModel.id == operation_id)
+                .first()
+            )
+            if operation is None or operation.status in {"cancelled", "failed", "completed"}:
+                return
+            reporter = OperationReporter(db, operation)
+            if status == "running":
+                if operation.status == "queued":
+                    reporter.start_step("enrich_gpx")
+                reporter.update_step("enrich_gpx", progress)
+            elif status == "completed":
+                reporter.complete_step("enrich_gpx")
+                reporter.complete()
+            else:
+                reporter.fail(error or "Échec de la fusion GPX/OSV")
+    except Exception:
+        logger.exception("Unable to update GPX enrichment operation %s", operation_id)
+
+
+def _enriched_gpx_progress_path(input_dir: Path) -> Path:
+    return input_dir / "temp" / "gpx-enrichment" / "progress.json"
+
+
+def _write_enriched_gpx_progress(input_dir: Path, progress: int | None) -> None:
+    path = _enriched_gpx_progress_path(input_dir)
+    temporary_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path.write_text(json.dumps({"progress": progress}), encoding="utf-8")
+        temporary_path.replace(path)
+    except OSError:
+        logger.warning("Unable to persist enriched GPX progress in %s", input_dir)
+        temporary_path.unlink(missing_ok=True)
+
+
+def _remove_enriched_gpx_progress(input_dir: Path) -> None:
+    try:
+        _enriched_gpx_progress_path(input_dir).unlink(missing_ok=True)
+    except OSError:
+        logger.warning("Unable to clear enriched GPX progress in %s", input_dir)
+
+
+def _read_enriched_gpx_progress(input_dir: Path, status: str) -> int | None:
+    if status == "ready":
+        return 100
+    if status != "pending":
+        return None
+    try:
+        payload = json.loads(_enriched_gpx_progress_path(input_dir).read_text(encoding="utf-8"))
+        progress = payload.get("progress")
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return None
+    if not isinstance(progress, int) or isinstance(progress, bool):
+        return None
+    return max(0, min(100, progress))
+
+
+def _persist_enriched_gpx_for_flight(
+    flight_id: str,
+    source_path: Path,
+    enriched_path: Path,
+) -> None:
+    try:
+        with SessionLocal() as db:
+            flight = db.query(Flight).filter(Flight.id == flight_id).first()
+            if flight is None:
+                return
+            current_source_path = flight.gpx_source_file_path or flight.gpx_file_path
+            resolved_source_path = _resolve_flight_file_path(current_source_path)
+            if (
+                resolved_source_path is None
+                or resolved_source_path.resolve() != source_path.resolve()
+            ):
+                return
+            if not enriched_gpx_matches_source(enriched_path, source_path):
+                logger.info(
+                    "Skipping stale enriched GPX for flight %s; source GPX changed",
+                    flight_id,
+                )
+                return
+            current_gpx_path = _resolve_flight_file_path(flight.gpx_file_path)
+            if (
+                current_gpx_path is not None
+                and current_gpx_path.resolve() == enriched_path.resolve()
+            ):
+                return
+
+            # Guard the write with the same source value read above. An upload
+            # can replace the source between the SELECT and UPDATE. Checking
+            # the canonical path also avoids changing updated_at on repeated
+            # ready previews.
+            db.execute(
+                update(Flight)
+                .where(
+                    Flight.id == flight_id,
+                    func.coalesce(Flight.gpx_source_file_path, Flight.gpx_file_path)
+                    == current_source_path,
+                    Flight.gpx_file_path == flight.gpx_file_path,
+                )
+                .values(
+                    gpx_source_file_path=current_source_path,
+                    gpx_file_path=str(enriched_path),
+                    updated_at=datetime.now(UTC).replace(tzinfo=None),
+                )
+            )
+            db.commit()
+    except Exception:
+        logger.exception("Unable to persist enriched GPX path for flight %s", flight_id)
+
+
+def _schedule_enriched_gpx_for_saved_offset(
+    db: Session,
+    flight: Flight,
+    background_tasks: BackgroundTasks,
+    user_id: int,
+) -> None:
+    """Prepare the durable GPX/OSV merge after a user saves a sync offset.
+
+    YouTube calibration can save an offset without a local GoPro camera file.
+    The merge uses absolute GPX/OSV timestamps, so the camera is not required.
+    """
+    source_file_path = flight.gpx_source_file_path or flight.gpx_file_path
+    if flight.gopro_overlay_gpx_offset is None or not source_file_path:
+        return
+
+    try:
+        input_dir = _gopro_overlay_flight_directory(db, flight, create=False)
+        gpx_path = _resolve_flight_file_path(source_file_path)
+        if gpx_path is None or not gpx_path.is_file():
+            return
+
+        osv_paths = _matching_files_by_mtime(input_dir, "*.osv")
+        if not osv_paths:
+            return
+
+        if _enriched_gpx_status(input_dir, gpx_path) in {"ready", "pending"}:
+            return
+
+        _clear_enriched_gpx_error(input_dir)
+        operation_id = _create_gpx_enrichment_operation(db, user_id, flight.id)
+        background_tasks.add_task(
+            _prepare_enriched_gpx_in_background,
+            osv_paths,
+            gpx_path,
+            input_dir,
+            video_duration=None,
+            first_gpx_at=None,
+            flight_id=flight.id,
+            operation_id=operation_id,
+        )
+    except (HTTPException, OSError, ValueError) as exc:
+        logger.warning(
+            "Unable to schedule enriched GPX for flight %s after offset update: %s",
+            flight.id,
+            exc,
+        )
 
 
 def _enriched_gpx_error_path(input_dir: Path) -> Path:
     return input_dir / "merged-gopro-overlay.error"
 
 
-def _enriched_gpx_status(input_dir: Path) -> str:
-    if enriched_gpx_path(input_dir).is_file():
+def _enriched_gpx_status(input_dir: Path, source_path: Path | None = None) -> str:
+    cached_path = enriched_gpx_path(input_dir)
+    if cached_path.is_file() and (
+        source_path is None or enriched_gpx_matches_source(cached_path, source_path)
+    ):
         return "ready"
-    if _enriched_gpx_error_path(input_dir).is_file():
-        return "failed"
     lock_path = input_dir / "merged-gopro-overlay.lock"
     try:
         with lock_path.open("a+") as lock_file:
@@ -8212,6 +8673,8 @@ def _enriched_gpx_status(input_dir: Path) -> str:
                     pass
     except OSError:
         return "missing"
+    if _enriched_gpx_error_path(input_dir).is_file():
+        return "failed"
     return "missing"
 
 
@@ -8361,6 +8824,7 @@ def get_flight_overlay_layer(flight_id: str, db: Session = Depends(get_db)) -> F
 
 
 @router.post("/flights/{flight_id}/youtube-overlay-export", status_code=202)
+@_map_deployment_drain_rejection
 def create_youtube_overlay_export(
     flight_id: str,
     payload: YoutubeOverlayExportCreate,
@@ -8435,6 +8899,7 @@ def create_youtube_overlay_export(
 
 
 @router.post("/flights/{flight_id}/youtube-telemetry-layout-export", status_code=202)
+@_map_deployment_drain_rejection
 def create_youtube_telemetry_layout_export(
     flight_id: str,
     payload: YoutubeTelemetryLayoutExportCreate,
@@ -8581,21 +9046,28 @@ def start_flight_gopro_overlay_merge(
     flight_id: str,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ) -> GoproOverlayEnrichmentResponse:
     flight = db.query(Flight).filter(Flight.id == flight_id).first()
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
 
     camera_path, gpx_path = _flight_gopro_preview_inputs(db, flight)
+    source_gpx_path = gpx_path
     osv_paths = _matching_files_by_mtime(camera_path.parent, "*.osv")
     if not osv_paths:
         return GoproOverlayEnrichmentResponse(status="ready")
 
-    status = _enriched_gpx_status(camera_path.parent)
+    status = _enriched_gpx_status(camera_path.parent, source_gpx_path)
     if status == "failed":
         _clear_enriched_gpx_error(camera_path.parent)
         status = "missing"
     if status == "ready":
+        _persist_enriched_gpx_for_flight(
+            flight_id,
+            source_gpx_path,
+            enriched_gpx_path(camera_path.parent),
+        )
         return GoproOverlayEnrichmentResponse(status="ready")
     if status == "pending":
         return GoproOverlayEnrichmentResponse(status="pending")
@@ -8609,6 +9081,7 @@ def start_flight_gopro_overlay_merge(
     if aligned_video_start is None:
         raise HTTPException(status_code=422, detail="Unable to align camera video and GPX")
 
+    operation_id = _create_gpx_enrichment_operation(db, user.id, flight.id)
     background_tasks.add_task(
         _prepare_enriched_gpx_in_background,
         osv_paths,
@@ -8616,6 +9089,8 @@ def start_flight_gopro_overlay_merge(
         camera_path.parent,
         video_duration=video_duration,
         first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
+        flight_id=flight_id,
+        operation_id=operation_id,
     )
     return GoproOverlayEnrichmentResponse(status="pending")
 
@@ -8629,6 +9104,7 @@ def get_flight_gopro_overlay_preview(
     response: Response,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ) -> GoproOverlayPreview:
     response.headers["Cache-Control"] = "no-store"
 
@@ -8637,12 +9113,14 @@ def get_flight_gopro_overlay_preview(
         raise HTTPException(status_code=404, detail="Flight not found")
 
     camera_path, gpx_path = _flight_gopro_preview_inputs(db, flight)
+    source_gpx_path = gpx_path
     # Everything below probes/parses files and schedules background work. The
     # database connection is no longer needed for this request.
     db.close()
     osv_paths = _matching_files_by_mtime(camera_path.parent, "*.osv")
     video_duration = probe_video_duration(camera_path)
     gpx_start = first_gpx_timestamp(gpx_path)
+    gpx_metadata_time = gpx_metadata_timestamp(source_gpx_path)
     gpx_duration = gpx_duration_seconds(gpx_path)
     video_start = resolve_gopro_video_start_time(camera_path, gpx_start)
     if video_duration is None or video_start is None:
@@ -8657,13 +9135,16 @@ def get_flight_gopro_overlay_preview(
     # The enriched GPX is the only source exposed to the preview once OSV
     # enrichment is complete. While the merge is running, expose no
     # coordinates at all.
-    enrichment_status = _enriched_gpx_status(camera_path.parent) if osv_paths else "ready"
+    enrichment_status = (
+        _enriched_gpx_status(camera_path.parent, source_gpx_path) if osv_paths else "ready"
+    )
     if enrichment_status == "missing" and osv_paths:
         # A preview request is also the entry point used by the YouTube
         # calibration UI. That UI does not have a rendered GoPro overlay to
         # trigger the old manual merge action, so make the durable enriched
         # GPX generation self-starting when the cache is absent.
         _clear_enriched_gpx_error(camera_path.parent)
+        operation_id = _create_gpx_enrichment_operation(db, user.id, flight.id)
         background_tasks.add_task(
             _prepare_enriched_gpx_in_background,
             osv_paths,
@@ -8671,10 +9152,17 @@ def get_flight_gopro_overlay_preview(
             camera_path.parent,
             video_duration=video_duration,
             first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
+            flight_id=flight_id,
+            operation_id=operation_id,
         )
         enrichment_status = "pending"
     if enrichment_status == "ready" and osv_paths:
         gpx_path = enriched_gpx_path(camera_path.parent)
+        _persist_enriched_gpx_for_flight(
+            flight_id,
+            source_gpx_path,
+            gpx_path,
+        )
     if enrichment_status != "ready" and osv_paths:
         coordinates = []
     else:
@@ -8728,10 +9216,16 @@ def get_flight_gopro_overlay_preview(
         },
         gpx={
             "start_time": gpx_start,
+            "metadata_time": gpx_metadata_time,
             "end_time": gpx_start + timedelta(seconds=gpx_duration),
             "duration_seconds": gpx_duration,
             "coordinates": coordinates,
             "enrichment_status": enrichment_status,
+            "enrichment_progress": (
+                _read_enriched_gpx_progress(camera_path.parent, enrichment_status)
+                if osv_paths
+                else None
+            ),
             "enrichment_error": (
                 "Unable to generate enriched GPX" if enrichment_status == "failed" else None
             ),
@@ -8915,9 +9409,7 @@ async def create_flight_gopro_overlay_job(
         )
         if not resolved_video_path and auto_video_path.exists():
             resolved_video_path = auto_video_path
-        fallback_gpx_path = (
-            resolved_gpx_path or auto_gpx_path or _resolve_flight_file_path(flight.gpx_file_path)
-        )
+        fallback_gpx_path = resolved_gpx_path or auto_gpx_path or _flight_source_gpx_path(flight)
         fallback_pip_path = resolved_pip_path or auto_pip_path or generated_video_path
         gpx_file_for_job = gpx_file
         pin_overlay_inputs = bool(auto_osv_paths)

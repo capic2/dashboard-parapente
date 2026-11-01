@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, DatePicker, Button } from '@dashboard-parapente/design-system';
+import { Modal } from '@dashboard-parapente/core/Modal';
+import { DatePicker } from '@dashboard-parapente/core/DatePicker/DatePicker';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { CheckCircle2, CircleAlert, LoaderCircle } from 'lucide-react';
 import {
   useIntervalsPreview,

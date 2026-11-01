@@ -6,6 +6,7 @@ import type { FlightTelemetryData } from '../../../hooks/flights/useFlightTeleme
 import { FlightTelemetryInteractivePreview } from './FlightTelemetryInteractivePreview';
 
 const hooks = vi.hoisted(() => ({
+  invalidateQueries: vi.fn(),
   overlayPreview: {
     data: null as unknown as GoproOverlayPreview | undefined,
     isPending: true,
@@ -44,6 +45,10 @@ const hooks = vi.hoisted(() => ({
   } | null,
 }));
 
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({ invalidateQueries: hooks.invalidateQueries }),
+}));
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
@@ -80,7 +85,10 @@ vi.mock('../../../hooks/flights/useVideoExportStatus', () => ({
 }));
 
 vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
-  useYoutubeVideoAssociations: () => ({ data: hooks.youtubeAssociations }),
+  useYoutubeVideoAssociations: () => ({
+    data: hooks.youtubeAssociations,
+    isSuccess: true,
+  }),
   useUploadYoutubeDownloadCookies: () => ({ mutateAsync: vi.fn() }),
   useYoutubeUpload: () => ({ data: null }),
   useStartYoutubeTelemetryLayoutExport: () => ({
@@ -166,6 +174,21 @@ vi.mock('./FlightTelemetryOverlay', () => ({
 }));
 
 describe('FlightTelemetryInteractivePreview', () => {
+  it('invalidates flight detail queries when telemetry export completes', () => {
+    hooks.invalidateQueries.mockClear();
+    hooks.exportStatus = { status: 'completed' };
+
+    render(<FlightTelemetryInteractivePreview flightId="flight-1" />);
+
+    expect(hooks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['flights'],
+    });
+    expect(hooks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['flights', 'flight-1'],
+    });
+    hooks.exportStatus = null;
+  });
+
   it('shows a loading state while telemetry requests are pending', () => {
     render(<FlightTelemetryInteractivePreview flightId="flight-1" />);
 
@@ -246,6 +269,76 @@ describe('FlightTelemetryInteractivePreview', () => {
     hooks.telemetry.isPending = true;
     hooks.telemetry.isSuccess = false;
     hooks.telemetry.isError = false;
+    hooks.layout.data = undefined;
+    hooks.layout.isPending = true;
+    hooks.layout.isSuccess = false;
+    hooks.youtubeAssociations = [];
+  });
+
+  it('keeps the dynamic overlay and skips the YouTube telemetry export in auto mode', () => {
+    const youtubeUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+    const youtubeTelemetryUrl = 'https://www.youtube.com/watch?v=AbCdEfGh123';
+    hooks.youtubeAssociations = [
+      { url: youtubeUrl, title: 'Vol du 02/10/2026 - vol' },
+      {
+        url: youtubeTelemetryUrl,
+        title: 'Vol du 02/10/2026 - télémétrie',
+      },
+    ];
+    hooks.overlayPreview.data = {
+      video: { preview_segments: [] },
+      alignment: { automatic_offset_seconds: 0, manual_offset_seconds: 0 },
+      gpx: { coordinates: [] },
+    } as unknown as GoproOverlayPreview;
+    hooks.overlayPreview.isPending = false;
+    hooks.overlayPreview.isSuccess = true;
+    hooks.telemetry.data = {
+      points: [
+        {
+          timestamp: 0,
+          lat: 0,
+          lon: 0,
+          elevation: 0,
+          segment: 0,
+        },
+      ],
+      source: 'gpx',
+      has_osv: false,
+      enrichment_status: 'ready',
+      start_time: null,
+      end_time: null,
+      duration_seconds: 0,
+    } as FlightTelemetryData;
+    hooks.telemetry.isPending = false;
+    hooks.telemetry.isSuccess = true;
+    hooks.layout.data = {
+      layout: Object.assign([], { mainVideoSource: 'auto' }),
+    };
+    hooks.layout.isPending = false;
+    hooks.layout.isSuccess = true;
+
+    render(
+      <FlightTelemetryInteractivePreview
+        flightId="flight-1"
+        youtubeUrls={[youtubeUrl, youtubeTelemetryUrl]}
+      />
+    );
+
+    expect(
+      screen.getByText('flights.overlayInteractivePreview')
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('player-youtube-main')).toHaveAttribute(
+      'data-url',
+      youtubeUrl
+    );
+    expect(screen.getByTestId('telemetry-overlay')).toBeInTheDocument();
+
+    hooks.overlayPreview.data = undefined;
+    hooks.overlayPreview.isPending = true;
+    hooks.overlayPreview.isSuccess = false;
+    hooks.telemetry.data = undefined;
+    hooks.telemetry.isPending = true;
+    hooks.telemetry.isSuccess = false;
     hooks.layout.data = undefined;
     hooks.layout.isPending = true;
     hooks.layout.isSuccess = false;
@@ -643,48 +736,32 @@ describe('FlightTelemetryInteractivePreview', () => {
     );
   });
 
-  it('shows the current phase, timing, and latest export events', async () => {
+  it('disables another export while a shared job is downloading', async () => {
     hooks.exportStatus = {
       status: 'processing',
-      internal_status: 'running',
-      progress: 5,
-      message: 'Assemblage de la vidéo avec l’overlay synchronisé: 5%',
-      created_at: new Date(Date.now() - 120_000).toISOString(),
-      started_at: new Date(Date.now() - 115_000).toISOString(),
-      updated_at: new Date(Date.now() - 2_000).toISOString(),
-      log_tail: [
-        'Préparation de l’export YouTube',
-        'Assemblage de la vidéo avec l’overlay synchronisé: 5%',
-      ],
+      internal_status: 'downloading',
+      progress: 18,
     };
     window.sessionStorage.setItem(
       'youtube-overlay-export-job:flight-1',
-      'active-export-job'
+      'local-export-job'
     );
 
     render(
       <FlightTelemetryInteractivePreview
         flightId="flight-1"
         youtubeUrls={['https://www.youtube.com/watch?v=dQw4w9WgXcQ']}
+        activeYoutubeExportJobIds={['shared-export-job']}
       />
     );
 
     await waitFor(() =>
       expect(
-        screen.getByText('flights.youtubeOverlayExportPhaseOverlay')
-      ).toBeInTheDocument()
+        screen.getByRole('button', {
+          name: 'flights.youtubeOverlayExportInProgress 18%',
+        })
+      ).toBeDisabled()
     );
-    expect(
-      screen.getByText('flights.youtubeOverlayExportElapsed')
-    ).toBeInTheDocument();
-    expect(
-      screen.getAllByText(
-        /Assemblage de la vidéo avec l’overlay synchronisé: 5%/u
-      ).length
-    ).toBeGreaterThan(1);
-    expect(
-      screen.getByText('flights.youtubeOverlayExportShowLogs')
-    ).toBeInTheDocument();
     window.sessionStorage.removeItem('youtube-overlay-export-job:flight-1');
   });
 });

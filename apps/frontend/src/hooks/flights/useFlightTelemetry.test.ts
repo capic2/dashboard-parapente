@@ -36,15 +36,15 @@ const data: FlightTelemetryData = {
 };
 
 describe('interpolateTelemetryAtVideoTime', () => {
-  it('interpolates a GPX point at the video time and applies the offset', () => {
+  it('uses the nearest recorded GPX speed without interpolating it', () => {
     const point = interpolateTelemetryAtVideoTime(data, 6, 1);
 
     expect(point?.elevation).toBe(1050);
-    expect(point?.speed_kmh).toBe(25);
+    expect(point?.speed_kmh).toBe(30);
     expect(point?.lat).toBeCloseTo(46.005);
   });
 
-  it('derives speed from track coordinates when no speed is recorded', () => {
+  it('does not derive speed from track coordinates when GPX speed is missing', () => {
     const point = interpolateTelemetryAtVideoTime(
       {
         ...data,
@@ -54,7 +54,7 @@ describe('interpolateTelemetryAtVideoTime', () => {
       1
     );
 
-    expect(point?.speed_kmh).toBeCloseTo(487.4, 0);
+    expect(point?.speed_kmh).toBeNull();
   });
 
   it('returns no telemetry outside the track time range', () => {

@@ -4,7 +4,7 @@ import asyncio
 import os
 import time
 from collections import deque
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -15,11 +15,298 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from auth import create_access_token, create_job_token, decode_job_token
 from deployment_drain import DeploymentDrainActive, deployment_drain
-from models import Flight, VideoExportJob
+from models import Flight, VideoExportJob, YoutubeUploadJob
 
 import video_export
 import video_export_manual
 import youtube_overlay_export
+
+
+def test_persist_youtube_telemetry_video_replaces_flight_media(tmp_path, monkeypatch, db_session):
+    storage_root = tmp_path / "storage"
+    storage_root.mkdir()
+    storage_alias = tmp_path / "storage-alias"
+    storage_alias.symlink_to(storage_root, target_is_directory=True)
+    monkeypatch.setattr(video_export_manual.config, "PARAGLIDING_DATA_ROOT", str(storage_alias))
+    flight = Flight(id="telemetry-persist-flight", flight_date=date(2026, 10, 20))
+    db_session.add(flight)
+    db_session.commit()
+
+    first_export = tmp_path / "first-render.mp4"
+    first_export.write_bytes(b"first export")
+    first_path = video_export_manual.persist_youtube_telemetry_video(
+        db_session, flight, first_export, "first-export"
+    )
+
+    assert first_path == first_path.resolve()
+    assert flight.youtube_telemetry_video_file_path == str(first_path)
+    assert first_path.read_bytes() == b"first export"
+    assert not first_export.exists()
+
+    db_session.add(
+        YoutubeUploadJob(
+            id="telemetry-upload-in-progress",
+            flight_id=flight.id,
+            user_id=1,
+            source_type="youtube_telemetry",
+            source_path=str(first_path),
+            status="uploading",
+            progress=40,
+            title="Telemetry",
+            description="",
+            privacy_status="unlisted",
+        )
+    )
+    db_session.commit()
+    legacy_alias_path = storage_alias / first_path.relative_to(storage_root)
+    flight.youtube_telemetry_video_file_path = str(legacy_alias_path)
+    db_session.commit()
+    second_export = tmp_path / "second-render.mp4"
+    second_export.write_bytes(b"replacement export")
+
+    second_path = video_export_manual.persist_youtube_telemetry_video(
+        db_session, flight, second_export, "second-export"
+    )
+
+    assert flight.youtube_telemetry_video_file_path == str(second_path)
+    assert second_path.read_bytes() == b"replacement export"
+    assert first_path.read_bytes() == b"first export"
+
+
+def test_youtube_composition_progress_updates_runtime_and_job_status(monkeypatch):
+    runtime_updates: list[tuple[str, dict[str, Any]]] = []
+    job_updates: list[tuple[str, dict[str, Any]]] = []
+    monkeypatch.setattr(
+        video_export_manual,
+        "_set_job_runtime",
+        lambda job_id, **values: runtime_updates.append((job_id, values)),
+    )
+    monkeypatch.setattr(
+        video_export_manual,
+        "_update_job",
+        lambda job_id, **values: job_updates.append((job_id, values)),
+    )
+
+    video_export_manual._set_youtube_composition_progress(
+        "youtube-job",
+        frames_processed=824,
+        total_frames=1000,
+        eta_seconds=74,
+        completion=0.824,
+        encoding_fps=5.1,
+    )
+
+    assert runtime_updates == [
+        (
+            "youtube-job",
+            {
+                "phase": video_export_manual._STATUS_ENCODING,
+                "eta_seconds": 74,
+                "frames_captured": 824,
+                "total_frames": 1000,
+                "fps_actual": 5.1,
+            },
+        )
+    ]
+    assert job_updates == [
+        (
+            "youtube-job",
+            {
+                "status": video_export_manual._STATUS_RUNNING,
+                "progress": 97,
+                "message": "Fusion de la vidéo: 824/1000 images",
+                "eta_seconds": 74,
+                "frames_processed": 824,
+                "total_frames": 1000,
+                "fps_actual": 5.1,
+            },
+        )
+    ]
+
+
+def test_youtube_composition_progress_throttles_and_publishes_final_update(monkeypatch):
+    current_time = 10.0
+    updates: list[tuple[int, int, int | None, float, float | None]] = []
+    monkeypatch.setattr(video_export_manual.time, "monotonic", lambda: current_time)
+    monkeypatch.setattr(
+        video_export_manual,
+        "_set_youtube_composition_progress",
+        lambda _job_id, *values: updates.append(values),
+    )
+    publish = video_export_manual._make_youtube_composition_progress_callback("youtube-job")
+
+    publish(1, 100, 20, 0.01, 5.0)
+    current_time = 10.5
+    publish(20, 100, 16, 0.20, 5.0)
+    current_time = 11.1
+    publish(30, 100, 14, 0.30, 5.0)
+    current_time = 11.2
+    publish(100, 100, 0, 1.0, 5.0)
+
+    assert [update[0] for update in updates] == [1, 30, 100]
+
+
+def test_video_export_snapshot_exposes_persisted_composition_metrics(monkeypatch):
+    job = SimpleNamespace(
+        id="youtube-job",
+        flight_id="flight-1",
+        status=video_export_manual._STATUS_RUNNING,
+        progress=97,
+        message="Fusion de la vidéo: 824/1000 images",
+        started_at=None,
+        completed_at=None,
+        video_path=None,
+        error=None,
+        total_frames=1000,
+        fps=30,
+        quality="1080p",
+        speed=1,
+        mode="youtube_telemetry_layout",
+        source_type="youtube",
+        youtube_url="https://youtube.com/watch?v=example",
+        overlay_job_id=None,
+        render_method=None,
+        created_at=None,
+        updated_at=None,
+        cancelled_at=None,
+        eta_seconds=74,
+        frames_processed=824,
+        fps_actual=5.1,
+    )
+    monkeypatch.setattr(
+        video_export_manual,
+        "_job_resume_info",
+        lambda _job: {"frames_captured": 0, "resume_from_frame": None, "can_resume": False},
+    )
+    monkeypatch.setattr(video_export_manual, "_job_log_tail", lambda _job_id: [])
+
+    snapshot = video_export_manual._snapshot_from_job(job)
+
+    assert snapshot["eta_seconds"] == 74
+    assert snapshot["frames_captured"] == 824
+    assert snapshot["total_frames"] == 1000
+    assert snapshot["fps_actual"] == 5.1
+    assert snapshot["phase"] == "encoding"
+
+
+@pytest.mark.parametrize(
+    ("message", "expected_phase"),
+    [
+        ("Préparation de l’export YouTube", "initializing"),
+        ("Téléchargement YouTube: 42%", "downloading_source_video"),
+        ("Rendu de l’overlay: 421/606 instants télémétriques", "capturing"),
+        ("Fusion de la vidéo: 824/1000 images", "encoding"),
+    ],
+)
+def test_youtube_telemetry_layout_phase_uses_persisted_message(message, expected_phase):
+    job = SimpleNamespace(
+        id="youtube-job",
+        status=video_export_manual._STATUS_RUNNING,
+        mode="youtube_telemetry_layout",
+        message=message,
+    )
+
+    assert video_export_manual._youtube_telemetry_layout_phase(job) == expected_phase
+
+
+def test_youtube_download_eta_uses_reported_value():
+    fields = video_export_manual._youtube_download_eta_update_fields(
+        "yt-dlp: [download] 6.8% at 11.81MiB/s ETA 06:10 (frag 34/488)",
+        download_percent=7,
+        elapsed_seconds=43,
+    )
+
+    assert fields == {"eta_seconds": 370}
+
+
+def test_youtube_download_eta_stays_unknown_without_enough_elapsed_time():
+    fields = video_export_manual._youtube_download_eta_update_fields(
+        "yt-dlp: [download] 6.8% ETA Unknown (frag 34/488)",
+        download_percent=7,
+        elapsed_seconds=3,
+    )
+
+    assert fields == {"eta_seconds": None}
+
+
+def test_youtube_download_eta_estimates_remaining_time_when_unknown():
+    fields = video_export_manual._youtube_download_eta_update_fields(
+        "yt-dlp: [download] 50% ETA Unknown (frag 244/488)",
+        download_percent=50,
+        elapsed_seconds=20,
+    )
+
+    assert fields == {"eta_seconds": 20}
+
+
+def test_youtube_render_eta_uses_reported_frame_count():
+    fields = video_export_manual._youtube_download_eta_update_fields(
+        "Rendu de l’overlay: 421/606 instants télémétriques",
+        download_percent=50,
+        elapsed_seconds=20,
+    )
+
+    assert fields == {"eta_seconds": 9}
+
+
+def test_youtube_render_eta_stays_unknown_during_first_five_seconds():
+    fields = video_export_manual._youtube_download_eta_update_fields(
+        "Rendu de l’overlay: 121/2681 instants télémétriques",
+        download_percent=5,
+        elapsed_seconds=4.9,
+    )
+
+    assert fields == {"eta_seconds": None}
+
+
+def test_youtube_render_eta_is_unknown_when_rendering_is_complete():
+    fields = video_export_manual._youtube_download_eta_update_fields(
+        "Rendu de l’overlay: 606/606 instants télémétriques",
+        download_percent=100,
+        elapsed_seconds=20,
+    )
+
+    assert fields == {"eta_seconds": None}
+
+
+def test_video_export_snapshot_exposes_telemetry_layout_phase(monkeypatch):
+    job = SimpleNamespace(
+        id="youtube-job",
+        flight_id="flight-1",
+        status=video_export_manual._STATUS_RUNNING,
+        progress=71,
+        message="Rendu de l’overlay: 421/606 instants télémétriques",
+        started_at=None,
+        completed_at=None,
+        video_path=None,
+        error=None,
+        total_frames=None,
+        fps=30,
+        quality="1080p",
+        speed=1,
+        mode="youtube_telemetry_layout",
+        source_type="youtube",
+        youtube_url="https://youtube.com/watch?v=example",
+        overlay_job_id=None,
+        render_method=None,
+        created_at=None,
+        updated_at=None,
+        cancelled_at=None,
+        eta_seconds=None,
+        frames_processed=None,
+        fps_actual=None,
+    )
+    monkeypatch.setattr(
+        video_export_manual,
+        "_job_resume_info",
+        lambda _job: {"frames_captured": 0, "resume_from_frame": None, "can_resume": False},
+    )
+    monkeypatch.setattr(video_export_manual, "_job_log_tail", lambda _job_id: [])
+    monkeypatch.setattr(video_export_manual, "_JOB_RUNTIME", {})
+
+    snapshot = video_export_manual._snapshot_from_job(job)
+
+    assert snapshot["phase"] == "capturing"
 
 
 def test_video_export_log_survives_temp_cleanup_until_job_deletion(tmp_path, monkeypatch):

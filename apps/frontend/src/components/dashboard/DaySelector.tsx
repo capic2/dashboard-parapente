@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { addDays } from 'date-fns';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
 
 interface DaySelectorProps {

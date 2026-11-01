@@ -43,6 +43,36 @@ function isAppVersionPayload(value: unknown): value is AppVersionPayload {
   );
 }
 
+function getReleaseNotesUrlFromCurrentVersion(
+  releaseNotesUrl: string | null,
+  currentVersion: string,
+  latestVersion: string
+): string | null {
+  if (!releaseNotesUrl) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(releaseNotesUrl);
+    const releaseTagPath = parsed.pathname.match(
+      /^(.*)\/releases\/tag\/(.+)$/u
+    );
+
+    if (
+      parsed.hostname !== 'github.com' ||
+      !releaseTagPath ||
+      decodeURIComponent(releaseTagPath[2]) !== `deploy/${latestVersion}`
+    ) {
+      return releaseNotesUrl;
+    }
+
+    parsed.pathname = `${releaseTagPath[1]}/compare/deploy/${currentVersion}...deploy/${latestVersion}`;
+    return parsed.toString();
+  } catch {
+    return releaseNotesUrl;
+  }
+}
+
 export function useVersionUpdates(
   currentVersion: string | null
 ): VersionUpdateState {
@@ -77,6 +107,11 @@ export function useVersionUpdates(
       const nextReleaseNotesUrl = sanitizeReleaseNotesUrl(
         parsed.release_notes_url
       );
+      const versionRangeUrl = getReleaseNotesUrlFromCurrentVersion(
+        nextReleaseNotesUrl,
+        currentVersion,
+        nextVersion
+      );
 
       setState((previous) => {
         if (!isVersionNewer(nextVersion, currentVersion)) {
@@ -92,7 +127,7 @@ export function useVersionUpdates(
 
         return {
           latestVersion: nextVersion,
-          releaseNotesUrl: nextReleaseNotesUrl,
+          releaseNotesUrl: versionRangeUrl,
         };
       });
     };

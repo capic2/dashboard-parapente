@@ -43,7 +43,7 @@ describe('FlightTelemetryOverlay', () => {
     );
 
     expect(screen.getByText('1234')).toBeInTheDocument();
-    expect(screen.getByText('42.5')).toBeInTheDocument();
+    expect(screen.getByText('43')).toBeInTheDocument();
     expect(screen.getByText('1.2')).toBeInTheDocument();
     expect(screen.getByText('3.4')).toBeInTheDocument();
     expect(screen.getAllByRole('button')).toHaveLength(7);
@@ -83,7 +83,7 @@ describe('FlightTelemetryOverlay', () => {
 
     fireEvent.click(screen.getAllByRole('button')[0]);
 
-    expect(screen.getAllByText('42.5')).toHaveLength(2);
+    expect(screen.getAllByText('43')).toHaveLength(2);
     expect(
       screen.queryByText('flights.telemetrySpeed')
     ).not.toBeInTheDocument();

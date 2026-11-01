@@ -108,20 +108,72 @@ def download_youtube(
     directory.mkdir(parents=True, exist_ok=True)
     manifest_path = directory / ".youtube-download-complete.json"
     url_digest = hashlib.sha256(url.encode("utf-8")).hexdigest()
+    cookies_digest = hashlib.sha256(cookies.encode("utf-8")).hexdigest() if cookies else None
+
+    def write_download_manifest(filename: str) -> None:
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "cache_version": 2,
+                    "url_sha256": url_digest,
+                    "cookies_sha256": cookies_digest,
+                    "filename": filename,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    def completed_download_in(cache_directory: Path) -> Path | None:
+        candidate_manifest = cache_directory / ".youtube-download-complete.json"
+        try:
+            manifest = json.loads(candidate_manifest.read_text(encoding="utf-8"))
+            cached_path = cache_directory / str(manifest["filename"])
+            if (
+                manifest.get("cache_version") == 2
+                and manifest.get("url_sha256") == url_digest
+                and manifest.get("cookies_sha256") == cookies_digest
+                and cached_path.parent == cache_directory
+                and cached_path.suffix.lower() in _YOUTUBE_VIDEO_EXTENSIONS
+                and cached_path.is_file()
+                and not cached_path.is_symlink()
+                and cached_path.stat().st_size > 0
+            ):
+                return cached_path
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+        return None
+
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        cached_path = directory / str(manifest["filename"])
-        if (
-            manifest.get("url_sha256") == url_digest
-            and cached_path.parent == directory
-            and cached_path.suffix.lower() in _YOUTUBE_VIDEO_EXTENSIONS
-            and cached_path.is_file()
-            and not cached_path.is_symlink()
-            and cached_path.stat().st_size > 0
-        ):
+        cached_path = completed_download_in(directory)
+        if cached_path is not None:
             progress(f"Vidéo YouTube téléchargée réutilisée: {cached_path.name}", 100)
             return cached_path
-    except (OSError, ValueError, KeyError, TypeError):
+
+        # Reuse completed source and nested PiP downloads from sibling jobs.
+        for sibling_directory in _sibling_export_cache_directories(directory):
+            cached_path = completed_download_in(sibling_directory)
+            if cached_path is None:
+                continue
+            local_path = directory / cached_path.name
+            temporary_copy_path: Path | None = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    prefix=".youtube-source-reuse-",
+                    suffix=cached_path.suffix,
+                    dir=directory,
+                    delete=False,
+                ) as temporary_copy:
+                    temporary_copy_path = Path(temporary_copy.name)
+                shutil.copy2(cached_path, temporary_copy_path)
+                temporary_copy_path.replace(local_path)
+            finally:
+                if temporary_copy_path is not None:
+                    temporary_copy_path.unlink(missing_ok=True)
+            write_download_manifest(local_path.name)
+            progress(f"Vidéo YouTube téléchargée réutilisée: {cached_path.name}", 100)
+            return local_path
+    except OSError:
+        # A stale cache must never prevent a fresh download.
         pass
 
     manifest_path.unlink(missing_ok=True)
@@ -183,16 +235,49 @@ def download_youtube(
         )
         if not files:
             raise YoutubeExportError("YouTube n’a fourni aucun fichier vidéo exploitable")
-        manifest_path.write_text(
-            json.dumps({"url_sha256": url_digest, "filename": files[0].name}),
-            encoding="utf-8",
-        )
+        write_download_manifest(files[0].name)
     finally:
         if cookie_path is not None:
             cookie_path.unlink(missing_ok=True)
         shutil.rmtree(temp_directory, ignore_errors=True)
     progress(f"Téléchargement YouTube terminé: {files[0].name}", 100)
     return files[0]
+
+
+def _is_export_directory(path: Path) -> bool:
+    try:
+        return str(uuid.UUID(path.name)) == path.name.lower()
+    except ValueError:
+        return False
+
+
+def _sibling_export_cache_directories(directory: Path) -> list[Path]:
+    export_directory = next(
+        (parent for parent in (directory, *directory.parents) if _is_export_directory(parent)),
+        None,
+    )
+    if export_directory is None:
+        return []
+
+    relative_cache_path = directory.relative_to(export_directory)
+    try:
+        sibling_export_directories = sorted(
+            path
+            for path in export_directory.parent.iterdir()
+            if path != export_directory
+            and path.is_dir()
+            and not path.is_symlink()
+            and _is_export_directory(path)
+        )
+    except OSError:
+        return []
+
+    return [
+        sibling_directory / relative_cache_path
+        for sibling_directory in sibling_export_directories
+        if (sibling_directory / relative_cache_path).is_dir()
+        and not (sibling_directory / relative_cache_path).is_symlink()
+    ]
 
 
 def _render_file_identity(path: Path | None) -> dict[str, str | int] | None:

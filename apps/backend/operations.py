@@ -67,6 +67,13 @@ def _compute_progress(steps: list[dict[str, Any]]) -> int | None:
     return _clamp_progress(((completed * 100) + partial) / len(steps))
 
 
+def operation_can_cancel(operation: BackgroundOperation) -> bool:
+    """Expose cancellation for active GPX enrichments created before support shipped."""
+    if operation.status not in ACTIVE_STATUSES:
+        return False
+    return operation.can_cancel or operation.operation_type == "gpx_enrichment"
+
+
 class OperationReporter:
     """Small transaction-aware API used by routes and background workers."""
 
@@ -271,7 +278,7 @@ def operation_payload(operation: BackgroundOperation) -> dict[str, Any]:
         "error_detail": operation.error_detail,
         "source_kind": operation.source_kind,
         "source_id": operation.source_id,
-        "can_cancel": bool(operation.can_cancel and operation.status in ACTIVE_STATUSES),
+        "can_cancel": operation_can_cancel(operation),
         "can_retry": bool(operation.can_retry and operation.status in TERMINAL_STATUSES),
         "unread": operation.read_at is None,
         "created_at": operation.created_at,
@@ -304,6 +311,7 @@ def sync_operation_from_snapshot(
     operation: BackgroundOperation,
     *,
     status: str | None,
+    phase: str | None = None,
     progress: int | float | None,
     detail: str | None = None,
     error: str | None = None,
@@ -318,6 +326,8 @@ def sync_operation_from_snapshot(
         "initializing": "prepare",
         "preparing": "prepare",
         "started": "prepare",
+        "downloading": "prepare",
+        "downloading_source_video": "prepare",
         "selecting": "select",
         "capturing": "render",
         "encoding": "render",
@@ -326,7 +336,11 @@ def sync_operation_from_snapshot(
         "uploading": "upload",
         "finalizing": "finalize",
     }
-    current = phase_by_status.get(normalized_status, operation.current_step_key)
+    normalized_phase = str(phase or "").lower()
+    current = phase_by_status.get(
+        normalized_phase,
+        phase_by_status.get(normalized_status, operation.current_step_key),
+    )
     if current not in step_by_key:
         current = operation.current_step_key
     if current not in step_by_key and steps:

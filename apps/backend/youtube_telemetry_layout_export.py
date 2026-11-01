@@ -5,18 +5,101 @@ from __future__ import annotations
 import asyncio
 import json
 import math
+import re
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import urlencode
 
 import config
-from video_acceleration import chromium_launch_args, select_video_accelerator
+from video_acceleration import chromium_launch_args, h264_encode_args, select_video_accelerator
 from youtube_overlay_export import YoutubeExportError, _run, download_youtube
 
 ProgressCallback = Callable[[str, int | None], None]
+CompositionProgressCallback = Callable[[int, int, int | None, float, float | None], None]
 LAYOUT_CANVAS_WIDTH = 1920
 LAYOUT_CANVAS_HEIGHT = 1080
+COMPOSITION_THREADS = 4
+_FFMPEG_STATS_RE = re.compile(
+    r"frame=\s*(?P<frame>\d+).*?fps=\s*(?P<fps>[\d.]+).*?"
+    r"time=(?P<time>\d{2}:\d{2}:\d{2}(?:\.\d+)?).*?"
+    r"speed=\s*(?P<speed>[\d.]+)x",
+    re.IGNORECASE,
+)
+
+
+def _parse_ffmpeg_stats(line: str) -> tuple[int, float, float, float] | None:
+    match = _FFMPEG_STATS_RE.search(line)
+    if match is None:
+        return None
+    hours, minutes, seconds = match.group("time").split(":")
+    try:
+        return (
+            int(match.group("frame")),
+            float(match.group("fps")),
+            int(hours) * 3600 + int(minutes) * 60 + float(seconds),
+            float(match.group("speed")),
+        )
+    except ValueError:
+        return None
+
+
+def _video_frame_count(video_path: Path, duration: float) -> int:
+    """Read the source frame count, with a duration-based fallback."""
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=nb_frames,avg_frame_rate",
+                "-of",
+                "json",
+                str(video_path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        streams = json.loads(result.stdout).get("streams", [])
+        if streams:
+            stream = streams[0]
+            try:
+                frame_count = int(stream.get("nb_frames", 0))
+            except (TypeError, ValueError):
+                frame_count = 0
+            if frame_count > 0:
+                return frame_count
+            numerator, denominator = stream.get("avg_frame_rate", "0/1").split("/")
+            frame_rate = float(numerator) / float(denominator)
+            if frame_rate > 0 and duration > 0:
+                return max(1, round(duration * frame_rate))
+    except (OSError, subprocess.SubprocessError, ValueError, TypeError, ZeroDivisionError):
+        pass
+    return max(1, round(duration * 30))
+
+
+def _report_composition_output(
+    line: str,
+    *,
+    progress: ProgressCallback,
+    composition_progress: CompositionProgressCallback | None,
+    total_frames: int,
+    duration: float,
+) -> None:
+    progress(line, None)
+    stats = _parse_ffmpeg_stats(line)
+    if stats is None or composition_progress is None:
+        return
+    frame, encoding_fps, encoded_seconds, speed = stats
+    completion = min(max(frame / max(total_frames, 1), 0.0), 1.0)
+    remaining_seconds = max(duration - encoded_seconds, 0.0)
+    eta_seconds = max(0, round(remaining_seconds / speed)) if speed > 0 else None
+    composition_progress(frame, total_frames, eta_seconds, completion, encoding_fps)
 
 
 def _normalize_pip_layouts(
@@ -324,6 +407,7 @@ def export_youtube_telemetry_layout(
     work_dir: Path,
     progress: ProgressCallback,
     is_cancelled: Callable[[], bool],
+    composition_progress: CompositionProgressCallback | None = None,
     cookies: str | None = None,
     pip_exports: list[dict[str, object]] | None = None,
 ) -> None:
@@ -373,6 +457,7 @@ def export_youtube_telemetry_layout(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     progress("Fusion du layout et de la vidéo YouTube", None)
+    total_frames = _video_frame_count(source, duration)
     pip_durations = [_video_duration(path) for path in pip_video_paths]
     ffmpeg_inputs, filter_graph = _build_ffmpeg_composition(
         source=source,
@@ -388,6 +473,8 @@ def export_youtube_telemetry_layout(
         [
             "ffmpeg",
             "-y",
+            "-filter_complex_threads",
+            str(COMPOSITION_THREADS),
             *ffmpeg_inputs,
             "-filter_complex",
             filter_graph,
@@ -395,16 +482,14 @@ def export_youtube_telemetry_layout(
             "[outv]",
             "-map",
             "0:a?",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "fast",
-            "-crf",
-            "18",
-            "-pix_fmt",
-            "yuv420p",
-            "-c:a",
-            "aac",
+            *h264_encode_args(
+                select_video_accelerator(config.VIDEO_ACCELERATOR),
+                quality="18",
+                cpu_preset="fast",
+                include_audio=True,
+                audio_codec="aac",
+                cpu_threads=COMPOSITION_THREADS,
+            ),
             "-b:a",
             "192k",
             "-shortest",
@@ -412,7 +497,13 @@ def export_youtube_telemetry_layout(
             "+faststart",
             str(output_path),
         ],
-        on_output=lambda line: progress(line, None),
+        on_output=lambda line: _report_composition_output(
+            line,
+            progress=progress,
+            composition_progress=composition_progress,
+            total_frames=total_frames,
+            duration=duration,
+        ),
     )
     if not output_path.is_file() or output_path.stat().st_size == 0:
         raise YoutubeExportError("Le fichier MP4 final est vide")

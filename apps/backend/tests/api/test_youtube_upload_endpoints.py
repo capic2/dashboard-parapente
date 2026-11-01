@@ -11,7 +11,13 @@ import job_queue
 import pytest
 import youtube_upload
 from fastapi.testclient import TestClient
-from models import Flight, GoproOverlayJob, YoutubeCredential, YoutubeUploadJob
+from models import (
+    Flight,
+    GoproOverlayJob,
+    YoutubeCredential,
+    YoutubeFlightPlaylist,
+    YoutubeUploadJob,
+)
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from youtube_upload import (
@@ -55,6 +61,186 @@ def test_prepare_flight_playlist_returns_playlist_link_and_creation_state(
         "created": expected_created,
     }
     find_or_create.assert_called_once_with(user_id=1, title=result["title"])
+    mapping = db_session.get(YoutubeFlightPlaylist, (1, flight.id))
+    assert mapping is not None
+    assert mapping.playlist_id == "playlist-id"
+
+
+def test_add_video_to_flight_playlist_keeps_generic_lookup_errors(
+    db_session: Session,
+    sample_flight: Flight,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(youtube_upload, "_access_token", lambda _user_id: "access-token")
+    monkeypatch.setattr(
+        youtube_upload.httpx,
+        "get",
+        lambda *_args, **_kwargs: httpx.Response(403),
+    )
+
+    with pytest.raises(RuntimeError, match=r"YouTube API request failed \(403\)"):
+        youtube_upload.add_video_to_flight_playlist(
+            db_session,
+            flight=sample_flight,
+            user_id=1,
+            video_id="dQw4w9WgXcQ",
+        )
+
+
+def test_flight_playlist_creation_uses_concurrent_saved_mapping(
+    db_session: Session,
+    sample_flight: Flight,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def create_playlist(*, user_id: int, title: str) -> tuple[str, bool]:
+        assert user_id == 1
+        assert title == playlist_title_for_flight(db_session, sample_flight)
+        with Session(bind=db_session.get_bind()) as other_session:
+            other_session.add(
+                YoutubeFlightPlaylist(
+                    user_id=user_id,
+                    flight_id=sample_flight.id,
+                    playlist_id="concurrent-playlist-id",
+                )
+            )
+            other_session.commit()
+        return "new-playlist-id", True
+
+    monkeypatch.setattr(youtube_upload, "_find_or_create_playlist", create_playlist)
+
+    playlist_id, created = youtube_upload._get_or_create_flight_playlist(
+        db_session,
+        flight=sample_flight,
+        user_id=1,
+    )
+
+    assert playlist_id == "concurrent-playlist-id"
+    assert created is False
+
+
+def test_add_video_to_flight_playlist_recreates_a_deleted_mapped_playlist(
+    db_session: Session,
+    sample_flight: Flight,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_session.add(
+        YoutubeFlightPlaylist(
+            user_id=1,
+            flight_id=sample_flight.id,
+            playlist_id="deleted-playlist-id",
+        )
+    )
+    db_session.commit()
+    monkeypatch.setattr(youtube_upload, "_access_token", lambda _user_id: "access-token")
+    monkeypatch.setattr(
+        youtube_upload.httpx,
+        "get",
+        lambda *_args, **_kwargs: httpx.Response(404),
+    )
+    post_calls: list[dict[str, Any]] = []
+
+    def post(url: str, **kwargs: Any) -> httpx.Response:
+        post_calls.append({"url": url, **kwargs})
+        if url == youtube_upload._PLAYLISTS_URL:
+            return httpx.Response(200, json={"id": "new-playlist-id"})
+        return httpx.Response(200, json={"id": "new-playlist-item-id"})
+
+    monkeypatch.setattr(youtube_upload.httpx, "post", post)
+
+    result = youtube_upload.add_video_to_flight_playlist(
+        db_session,
+        flight=sample_flight,
+        user_id=1,
+        video_id="dQw4w9WgXcQ",
+    )
+
+    assert result is True
+    assert [call["url"] for call in post_calls] == [
+        youtube_upload._PLAYLISTS_URL,
+        youtube_upload._PLAYLIST_ITEMS_URL,
+    ]
+    assert post_calls[1]["json"]["snippet"]["playlistId"] == "new-playlist-id"
+    mapping = db_session.get(YoutubeFlightPlaylist, (1, sample_flight.id))
+    assert mapping is not None
+    assert mapping.playlist_id == "new-playlist-id"
+
+
+def test_add_video_after_concurrent_playlist_recovery_uses_saved_playlist(
+    db_session: Session,
+    sample_flight: Flight,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_session.add(
+        YoutubeFlightPlaylist(
+            user_id=1,
+            flight_id=sample_flight.id,
+            playlist_id="deleted-playlist-id",
+        )
+    )
+    db_session.commit()
+    monkeypatch.setattr(youtube_upload, "_access_token", lambda _user_id: "access-token")
+
+    def get(_url: str, **kwargs: Any) -> httpx.Response:
+        playlist_id = kwargs["params"]["playlistId"]
+        if playlist_id == "deleted-playlist-id":
+            return httpx.Response(404)
+        assert playlist_id == "concurrent-playlist-id"
+        return httpx.Response(
+            200,
+            json={
+                "items": [
+                    {
+                        "snippet": {
+                            "resourceId": {"videoId": "dQw4w9WgXcQ"},
+                        }
+                    }
+                ]
+            },
+        )
+
+    monkeypatch.setattr(youtube_upload.httpx, "get", get)
+    post_calls: list[dict[str, Any]] = []
+
+    def post(url: str, **kwargs: Any) -> httpx.Response:
+        post_calls.append({"url": url, **kwargs})
+        return httpx.Response(200, json={"id": "orphan-playlist-id"})
+
+    monkeypatch.setattr(youtube_upload.httpx, "post", post)
+    save_mapping = youtube_upload._save_flight_playlist
+
+    def save_with_concurrent_mapping(
+        db: Session, *, flight: Flight, user_id: int, playlist_id: str
+    ) -> YoutubeFlightPlaylist:
+        with Session(bind=db.get_bind()) as other_session:
+            other_session.add(
+                YoutubeFlightPlaylist(
+                    user_id=user_id,
+                    flight_id=flight.id,
+                    playlist_id="concurrent-playlist-id",
+                )
+            )
+            other_session.commit()
+        return save_mapping(
+            db,
+            flight=flight,
+            user_id=user_id,
+            playlist_id=playlist_id,
+        )
+
+    monkeypatch.setattr(youtube_upload, "_save_flight_playlist", save_with_concurrent_mapping)
+
+    result = youtube_upload.add_video_to_flight_playlist(
+        db_session,
+        flight=sample_flight,
+        user_id=1,
+        video_id="dQw4w9WgXcQ",
+    )
+
+    assert result is False
+    assert [call["url"] for call in post_calls] == [youtube_upload._PLAYLISTS_URL]
+    mapping = db_session.get(YoutubeFlightPlaylist, (1, sample_flight.id))
+    assert mapping is not None
+    assert mapping.playlist_id == "concurrent-playlist-id"
 
 
 def test_prepare_youtube_playlist_endpoint_returns_playlist_details(
@@ -574,6 +760,94 @@ def test_start_youtube_upload_accepts_panorama_source(
     assert enqueued == [job.id]
 
 
+def test_start_telemetry_upload_binds_the_current_export_path(
+    client, db_session, sample_flight, tmp_path, monkeypatch
+):
+    _configure_youtube(monkeypatch)
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    first_path = tmp_path / "20261020" / "01" / "youtube-telemetry-first.mp4"
+    first_path.parent.mkdir(parents=True)
+    first_path.write_bytes(b"first telemetry export")
+    sample_flight.youtube_telemetry_video_file_path = str(first_path)
+    db_session.add(
+        YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
+    )
+    db_session.commit()
+    enqueued: list[str] = []
+    monkeypatch.setattr("routes.enqueue_youtube_upload", enqueued.append)
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload",
+        json={"source_type": "youtube_telemetry", "title": "Telemetry"},
+    )
+
+    assert response.status_code == 202
+    job = db_session.get(YoutubeUploadJob, response.json()["job_id"])
+    assert job is not None
+    assert job.source_path == str(first_path)
+    second_path = first_path.with_name("youtube-telemetry-second.mp4")
+    second_path.write_bytes(b"replacement export")
+    sample_flight.youtube_telemetry_video_file_path = str(second_path)
+    db_session.commit()
+
+    assert youtube_upload._source_video_path(db_session, job) == first_path
+    assert enqueued == [job.id]
+
+
+def test_start_replacement_telemetry_upload_after_previous_version_was_published(
+    client, db_session, sample_flight, tmp_path, monkeypatch
+):
+    _configure_youtube(monkeypatch)
+    monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+    monkeypatch.setattr(
+        "routes.youtube_video_availability",
+        lambda grouped: {
+            video_id: True for video_ids in grouped.values() for video_id in video_ids
+        },
+    )
+    old_path = tmp_path / "20261020" / "01" / "youtube-telemetry-old.mp4"
+    current_path = old_path.with_name("youtube-telemetry-current.mp4")
+    old_path.parent.mkdir(parents=True)
+    old_path.write_bytes(b"old export")
+    current_path.write_bytes(b"replacement export")
+    youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    sample_flight.youtube_urls = [youtube_url]
+    sample_flight.youtube_telemetry_video_file_path = str(current_path)
+    db_session.add(
+        YoutubeCredential(user_id=1, refresh_token_encrypted=encrypt_secret("refresh-token"))
+    )
+    db_session.add(
+        YoutubeUploadJob(
+            id="telemetry-old-version-upload",
+            flight_id=sample_flight.id,
+            user_id=1,
+            source_type="youtube_telemetry",
+            source_path=str(old_path),
+            status="completed",
+            progress=100,
+            title="Old telemetry export",
+            description="",
+            privacy_status="unlisted",
+            youtube_video_id="dQw4w9WgXcQ",
+            youtube_url=youtube_url,
+        )
+    )
+    db_session.commit()
+    enqueued: list[str] = []
+    monkeypatch.setattr("routes.enqueue_youtube_upload", enqueued.append)
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload",
+        json={"source_type": "youtube_telemetry", "title": "Replacement telemetry"},
+    )
+
+    assert response.status_code == 202
+    job = db_session.get(YoutubeUploadJob, response.json()["job_id"])
+    assert job is not None
+    assert job.source_path == str(current_path)
+    assert enqueued == [job.id]
+
+
 def test_start_youtube_upload_rejects_missing_panorama(
     client, db_session, sample_flight, tmp_path, monkeypatch
 ):
@@ -664,6 +938,8 @@ def test_get_youtube_upload_includes_recent_job_logs(
         user_id=1,
         status="uploading",
         progress=42,
+        created_at=datetime(2026, 10, 22, 12, 0, tzinfo=timezone.utc),
+        started_at=datetime(2026, 10, 22, 12, 0, 30, tzinfo=timezone.utc),
         title="Envoi journalisé",
         description="",
         privacy_status="private",
@@ -677,7 +953,11 @@ def test_get_youtube_upload_includes_recent_job_logs(
     response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/youtube-upload")
 
     assert response.status_code == 200
+    assert response.json()["title"] == "Envoi journalisé"
+    assert response.json()["privacy_status"] == "private"
     assert response.json()["log_tail"] == ["Upload queued", "Upload progress: 42%"]
+    assert response.json()["created_at"] == "2026-10-22T12:00:00"
+    assert response.json()["started_at"] == "2026-10-22T12:00:30"
 
 
 def test_youtube_upload_log_errors_redact_urls():
@@ -1340,10 +1620,26 @@ def test_youtube_video_metadata_reports_a_video_deleted_directly_from_youtube(
 
 
 def test_remove_youtube_video_can_unlink_locally(
-    client: TestClient, db_session: Session, sample_flight: Flight
+    client: TestClient,
+    db_session: Session,
+    sample_flight: Flight,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sample_flight.youtube_urls = ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
+    db_session.add(
+        YoutubeCredential(
+            user_id=1,
+            refresh_token_encrypted=encrypt_secret("refresh-token"),
+            oauth_scope="https://www.googleapis.com/auth/youtube.force-ssl",
+        )
+    )
     db_session.commit()
+    monkeypatch.setattr(youtube_upload, "_access_token", lambda _user_id: "access-token")
+    monkeypatch.setattr(
+        youtube_upload.httpx,
+        "get",
+        lambda *_args, **_kwargs: httpx.Response(200, json={"items": []}),
+    )
 
     response = client.post(
         f"{API_PREFIX}/flights/{sample_flight.id}/youtube-videos/dQw4w9WgXcQ/remove",
@@ -1353,6 +1649,233 @@ def test_remove_youtube_video_can_unlink_locally(
     assert response.status_code == 204
     db_session.refresh(sample_flight)
     assert sample_flight.youtube_urls == []
+
+
+def test_remove_youtube_video_keeps_association_when_youtube_is_disconnected(
+    client: TestClient,
+    db_session: Session,
+    sample_flight: Flight,
+) -> None:
+    youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    sample_flight.youtube_urls = [youtube_url]
+    db_session.commit()
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-videos/dQw4w9WgXcQ/remove",
+        json={"delete_from_youtube": False},
+    )
+
+    assert response.status_code == 409
+    db_session.refresh(sample_flight)
+    assert sample_flight.youtube_urls == [youtube_url]
+
+
+def test_remove_youtube_video_also_removes_its_flight_playlist_item(
+    client: TestClient,
+    db_session: Session,
+    sample_flight: Flight,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sample_flight.youtube_urls = ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
+    db_session.add(
+        YoutubeCredential(
+            user_id=1,
+            refresh_token_encrypted=encrypt_secret("refresh-token"),
+            oauth_scope="https://www.googleapis.com/auth/youtube.force-ssl",
+        )
+    )
+    db_session.commit()
+    monkeypatch.setattr(youtube_upload, "_access_token", lambda _user_id: "access-token")
+
+    playlist_title = playlist_title_for_flight(db_session, sample_flight)
+    get_calls: list[dict[str, Any]] = []
+    responses = [
+        httpx.Response(
+            200,
+            json={"items": [{"id": "playlist-id", "snippet": {"title": playlist_title}}]},
+        ),
+        httpx.Response(
+            200,
+            json={
+                "items": [
+                    {
+                        "id": "playlist-item-id",
+                        "snippet": {"resourceId": {"videoId": "dQw4w9WgXcQ"}},
+                    },
+                    {
+                        "id": "other-playlist-item-id",
+                        "snippet": {"resourceId": {"videoId": "another-video"}},
+                    },
+                ]
+            },
+        ),
+    ]
+
+    def get(url: str, **kwargs: Any) -> httpx.Response:
+        get_calls.append({"url": url, **kwargs})
+        return responses.pop(0)
+
+    delete_calls: list[dict[str, Any]] = []
+
+    def delete(url: str, **kwargs: Any) -> httpx.Response:
+        delete_calls.append({"url": url, **kwargs})
+        return httpx.Response(204)
+
+    monkeypatch.setattr(youtube_upload.httpx, "get", get)
+    monkeypatch.setattr(youtube_upload.httpx, "delete", delete)
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-videos/dQw4w9WgXcQ/remove",
+        json={"delete_from_youtube": False},
+    )
+
+    assert response.status_code == 204
+    assert [call["params"]["part"] for call in get_calls] == ["snippet", "id,snippet"]
+    assert delete_calls[0]["url"] == youtube_upload._PLAYLIST_ITEMS_URL
+    assert delete_calls[0]["params"] == {"id": "playlist-item-id"}
+    db_session.refresh(sample_flight)
+    assert sample_flight.youtube_urls == []
+    mapping = db_session.get(YoutubeFlightPlaylist, (1, sample_flight.id))
+    assert mapping is not None
+    assert mapping.playlist_id == "playlist-id"
+
+
+def test_remove_youtube_video_uses_saved_playlist_id_when_titles_are_duplicated(
+    client: TestClient,
+    db_session: Session,
+    sample_flight: Flight,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sample_flight.youtube_urls = ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
+    db_session.add_all(
+        [
+            YoutubeCredential(
+                user_id=1,
+                refresh_token_encrypted=encrypt_secret("refresh-token"),
+                oauth_scope="https://www.googleapis.com/auth/youtube.force-ssl",
+            ),
+            YoutubeFlightPlaylist(
+                user_id=1,
+                flight_id=sample_flight.id,
+                playlist_id="saved-flight-playlist-id",
+            ),
+        ]
+    )
+    db_session.commit()
+    monkeypatch.setattr(youtube_upload, "_access_token", lambda _user_id: "access-token")
+    get_calls: list[dict[str, Any]] = []
+
+    def get(url: str, **kwargs: Any) -> httpx.Response:
+        get_calls.append({"url": url, **kwargs})
+        return httpx.Response(
+            200,
+            json={
+                "items": [
+                    {
+                        "id": "playlist-item-id",
+                        "snippet": {"resourceId": {"videoId": "dQw4w9WgXcQ"}},
+                    }
+                ]
+            },
+        )
+
+    delete_calls: list[dict[str, Any]] = []
+
+    def delete(url: str, **kwargs: Any) -> httpx.Response:
+        delete_calls.append({"url": url, **kwargs})
+        return httpx.Response(204)
+
+    monkeypatch.setattr(youtube_upload.httpx, "get", get)
+    monkeypatch.setattr(youtube_upload.httpx, "delete", delete)
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-videos/dQw4w9WgXcQ/remove",
+        json={"delete_from_youtube": False},
+    )
+
+    assert response.status_code == 204
+    assert len(get_calls) == 1
+    assert get_calls[0]["params"]["playlistId"] == "saved-flight-playlist-id"
+    assert delete_calls[0]["params"] == {"id": "playlist-item-id"}
+
+
+def test_remove_youtube_video_unlinks_when_mapped_playlist_is_gone(
+    client: TestClient,
+    db_session: Session,
+    sample_flight: Flight,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sample_flight.youtube_urls = ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
+    db_session.add_all(
+        [
+            YoutubeCredential(
+                user_id=1,
+                refresh_token_encrypted=encrypt_secret("refresh-token"),
+                oauth_scope="https://www.googleapis.com/auth/youtube.force-ssl",
+            ),
+            YoutubeFlightPlaylist(
+                user_id=1,
+                flight_id=sample_flight.id,
+                playlist_id="deleted-playlist-id",
+            ),
+        ]
+    )
+    db_session.commit()
+    monkeypatch.setattr(youtube_upload, "_access_token", lambda _user_id: "access-token")
+    get_calls: list[str] = []
+
+    def get(url: str, **_kwargs: Any) -> httpx.Response:
+        get_calls.append(url)
+        return httpx.Response(404)
+
+    monkeypatch.setattr(youtube_upload.httpx, "get", get)
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-videos/dQw4w9WgXcQ/remove",
+        json={"delete_from_youtube": False},
+    )
+
+    assert response.status_code == 204
+    assert get_calls == [youtube_upload._PLAYLIST_ITEMS_URL]
+    db_session.refresh(sample_flight)
+    assert sample_flight.youtube_urls == []
+    assert db_session.get(YoutubeFlightPlaylist, (1, sample_flight.id)) is None
+
+
+def test_remove_youtube_video_keeps_association_when_playlist_lookup_fails(
+    client: TestClient,
+    db_session: Session,
+    sample_flight: Flight,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    sample_flight.youtube_urls = [youtube_url]
+    db_session.add(
+        YoutubeCredential(
+            user_id=1,
+            refresh_token_encrypted=encrypt_secret("refresh-token"),
+            oauth_scope="https://www.googleapis.com/auth/youtube.force-ssl",
+        )
+    )
+    db_session.commit()
+    monkeypatch.setattr(youtube_upload, "_access_token", lambda _user_id: "access-token")
+    monkeypatch.setattr(
+        youtube_upload.httpx,
+        "get",
+        lambda *_args, **_kwargs: httpx.Response(
+            403,
+            json={"error": {"errors": [{"reason": "quotaExceeded"}]}},
+        ),
+    )
+
+    response = client.post(
+        f"{API_PREFIX}/flights/{sample_flight.id}/youtube-videos/dQw4w9WgXcQ/remove",
+        json={"delete_from_youtube": False},
+    )
+
+    assert response.status_code == 502
+    db_session.refresh(sample_flight)
+    assert sample_flight.youtube_urls == [youtube_url]
 
 
 @pytest.mark.parametrize("remote_status", [204, 404])
@@ -1365,12 +1888,41 @@ def test_remove_youtube_video_unlinks_after_remote_success(
 ) -> None:
     sample_flight.youtube_urls = ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
     job = _completed_youtube_job(db_session, sample_flight)
+    db_session.add_all(
+        [
+            YoutubeCredential(
+                user_id=1,
+                refresh_token_encrypted=encrypt_secret("refresh-token"),
+                oauth_scope="https://www.googleapis.com/auth/youtube.force-ssl",
+            ),
+            YoutubeFlightPlaylist(
+                user_id=1,
+                flight_id=sample_flight.id,
+                playlist_id="flight-playlist-id",
+            ),
+        ]
+    )
     db_session.commit()
 
     def access_token(_user_id: int) -> str:
         return "access-token"
 
     monkeypatch.setattr(youtube_upload, "_access_token", access_token)
+    monkeypatch.setattr(
+        youtube_upload.httpx,
+        "get",
+        lambda *_args, **_kwargs: httpx.Response(
+            200,
+            json={
+                "items": [
+                    {
+                        "id": "playlist-item-id",
+                        "snippet": {"resourceId": {"videoId": "dQw4w9WgXcQ"}},
+                    }
+                ]
+            },
+        ),
+    )
     requests: list[dict[str, Any]] = []
 
     def delete_video(url: str, **kwargs: Any) -> httpx.Response:
@@ -1387,6 +1939,7 @@ def test_remove_youtube_video_unlinks_after_remote_success(
     assert response.status_code == 204
     assert requests[0]["params"] == {"id": "dQw4w9WgXcQ"}
     assert requests[0]["headers"] == {"Authorization": "Bearer access-token"}
+    assert requests[1]["params"] == {"id": "playlist-item-id"}
     db_session.refresh(sample_flight)
     db_session.refresh(job)
     assert sample_flight.youtube_urls == []

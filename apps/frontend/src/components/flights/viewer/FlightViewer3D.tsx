@@ -43,14 +43,24 @@ import { getExportFrameTarget } from '../../../utils/videoExportFrame';
 import {
   getHighestAltitudeHighlightProgress,
   getStrongestTurnHighlightProgress,
-  getThermalWindow,
 } from '../../../utils/flightHighlight';
 import { api } from '../../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../../hooks/useToast';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { Disclosure, DisclosurePanel } from 'react-aria-components';
 import { useTranslation } from 'react-i18next';
+import {
+  ChevronDown,
+  ChevronLeft,
+  Expand,
+  Gauge,
+  Minimize2,
+  Pause,
+  Play,
+  RotateCcw,
+  Settings2,
+} from 'lucide-react';
 
 import type { GPXData } from '@dashboard-parapente/shared-types';
 import type { Flight } from '@dashboard-parapente/shared-types';
@@ -60,6 +70,7 @@ import {
 } from './flightViewerTelemetry';
 import {
   getBearingRadians,
+  getInterpolatedElevationOffset,
   getRenderedTrackElevation,
   getTerrainElevationOffset,
   repairTrackEndpointElevations,
@@ -132,6 +143,12 @@ const interpolatePosition = (
     start.y + (end.y - start.y) * ratio,
     start.z + (end.z - start.z) * ratio
   );
+
+const CAMERA_FOLLOW_SMOOTHING_MS = 700;
+const CAMERA_HEADING_SMOOTHING_MS = 2800;
+const MAX_CAMERA_FRAME_DELTA_MS = 80;
+const normalizeAngleRadians = (angle: number) =>
+  Math.atan2(Math.sin(angle), Math.cos(angle));
 
 const getViewerScene = (viewer: CesiumViewer | null | undefined) => {
   try {
@@ -241,39 +258,36 @@ const getTrackCurtainMinimumHeights = (
  */
 interface AccordionSectionProps {
   title: string;
-  emoji?: string;
   defaultOpen?: boolean;
   children: React.ReactNode;
 }
 
 const AccordionSection: React.FC<AccordionSectionProps> = ({
   title,
-  emoji = '',
   defaultOpen = false,
   children,
 }) => {
   return (
     <Disclosure
       defaultExpanded={defaultOpen}
-      className="border-b border-gray-200 dark:border-gray-700 last:border-0"
+      className="border-b border-white/10 last:border-0"
     >
       {({ isExpanded }) => (
         <>
           <Button
             slot="trigger"
-            className="w-full flex items-center justify-between py-2 px-1 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded"
+            className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
           >
-            <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              {emoji && <span className="mr-1.5">{emoji}</span>}
+            <span className="text-sm font-semibold text-slate-100">
               {title}
             </span>
             <span
-              className="text-gray-400 dark:text-gray-400 text-xs transition-transform"
+              className="text-slate-400 transition-transform"
               style={{
-                transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
               }}
             >
-              ▶
+              <ChevronDown size={14} />
             </span>
           </Button>
           <DisclosurePanel className="pb-3 pt-1 space-y-3">
@@ -308,6 +322,13 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     exportToken,
   });
   const { data: flight } = useFlight(flightId, { exportJobId, exportToken });
+  const repairedCoordinates = useMemo(
+    () =>
+      gpxData?.coordinates
+        ? repairTrackEndpointElevations(gpxData.coordinates)
+        : undefined,
+    [gpxData?.coordinates]
+  );
   const queryClient = useQueryClient();
   const toast = useToast();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -325,7 +346,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   >(null);
   const [isCalculatingOffset, setIsCalculatingOffset] = useState(false);
   const [currentProgress, setCurrentProgress] = useState(0);
-  const [isPanelCollapsed, setIsPanelCollapsed] = useState(compact);
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentElapsedTime, setCurrentElapsedTime] = useState(0);
   const [currentFlightTimestamp, setCurrentFlightTimestamp] = useState<
@@ -345,10 +366,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       getHighestAltitudeHighlightProgress(gpxData?.coordinates ?? []),
     [gpxData?.coordinates]
   );
-  const thermalWindow = useMemo(
-    () => getThermalWindow(gpxData?.coordinates ?? []),
-    [gpxData?.coordinates]
-  );
   const [editableHighlightProgress, setEditableHighlightProgress] = useState<
     number | undefined
   >(undefined);
@@ -363,9 +380,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const [sunTime, setSunTime] = useState(10); // 10:00
   const [lightIntensity, setLightIntensity] = useState(1.2);
   const [visualPreset, setVisualPreset] = useState<VisualPreset>('natural');
-  const [disabledAutoShots, setDisabledAutoShots] = useState<
-    ('highlight' | 'thermal')[]
-  >([]);
+  const [disabledAutoShots, setDisabledAutoShots] = useState<'highlight'[]>([]);
   const applyVisualPreset = useCallback((preset: VisualPreset) => {
     const settings = VISUAL_PRESETS[preset];
     setVisualPreset(preset);
@@ -394,6 +409,22 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   const allPositionsRef = useRef<Cartesian3[]>([]);
   const timestampsRef = useRef<number[]>([]);
   const currentIndexRef = useRef(0);
+  const currentTelemetryElevationOffset = repairedCoordinates?.length
+    ? getInterpolatedElevationOffset(
+        currentIndexRef.current,
+        repairedCoordinates.length,
+        elevationOffset,
+        landingElevationOffset
+      )
+    : elevationOffset;
+  const currentTelemetry = repairedCoordinates?.length
+    ? computeCursorTelemetryLabel(
+        Math.min(currentIndexRef.current, repairedCoordinates.length - 1),
+        repairedCoordinates,
+        currentTelemetryElevationOffset,
+        viewerUnits
+      ).split('\n')
+    : null;
   const isPlayingRef = useRef(false);
   const speedRef = useRef(10);
   const realTimeStartRef = useRef<number>(0);
@@ -418,6 +449,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     DEFAULT_CAMERA_TRANSITION_PERCENT
   );
   const cameraTargetRef = useRef<Cartesian3 | null>(null);
+  const cameraFollowHeadingRef = useRef<number | null>(null);
+  const cameraFrameTimeRef = useRef<number | null>(null);
   const currentTimestampRef = useRef<number | null>(null);
   const containerDivRef = useRef<HTMLDivElement>(null);
   const viewerUnitsRef = useRef<ViewerUnits>(viewerUnits);
@@ -616,6 +649,17 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
           return;
         }
 
+        // Request a little more terrain and imagery detail than Cesium's
+        // default while keeping a bounded cache for the moving camera.
+        scene.globe.maximumScreenSpaceError = 1.25;
+        scene.globe.tileCacheSize = 256;
+        if (!exportOnly) {
+          viewer.resolutionScale = Math.min(
+            Math.max(window.devicePixelRatio || 1, 1.15),
+            1.5
+          );
+        }
+
         // Enable terrain collision detection
         scene.screenSpaceCameraController.enableCollisionDetection = true;
 
@@ -652,7 +696,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         setViewerReady(false);
       }
     };
-  }, []);
+  }, [exportOnly]);
 
   // Monitor terrain loading status
   useEffect(() => {
@@ -740,7 +784,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
   // Load GPX data
   useEffect(() => {
-    if (!gpxData?.coordinates || gpxData.coordinates.length === 0) {
+    if (!repairedCoordinates?.length || !gpxData) {
       return;
     }
 
@@ -753,7 +797,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     let isEffectActive = true;
 
     try {
-      const coordinates = repairTrackEndpointElevations(gpxData.coordinates);
+      const coordinates = repairedCoordinates;
       // Convert GPX coordinates to Cartesian3 avec offset d'élévation
       const positions = coordinates.map((point, index) =>
         Cartesian3.fromDegrees(
@@ -777,13 +821,29 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       currentTimestampRef.current = null;
       setCurrentFlightTimestamp(timestamps[0] > 0 ? timestamps[0] : null);
       cameraTargetRef.current = null;
+      cameraFrameTimeRef.current = null;
       visiblePositionsRef.current = [];
 
       // Expose data globally for video export (Playwright)
       if (typeof window !== 'undefined' && window._exportMode) {
+        const altitudeBounds = coordinates.reduce(
+          (bounds, point) => ({
+            max: Math.max(bounds.max, point.elevation),
+            min: Math.min(bounds.min, point.elevation),
+          }),
+          {
+            max: coordinates[0]?.elevation ?? 0,
+            min: coordinates[0]?.elevation ?? 0,
+          }
+        );
         window._gpxData = {
           ...gpxData,
           coordinates,
+          max_altitude_m: gpxData.max_altitude_m ?? altitudeBounds.max,
+          min_altitude_m: gpxData.min_altitude_m ?? altitudeBounds.min,
+          elevation_gain_m: gpxData.elevation_gain_m ?? 0,
+          elevation_loss_m: gpxData.elevation_loss_m ?? 0,
+          total_distance_km: gpxData.total_distance_km ?? 0,
           positions,
           timestamps,
         };
@@ -826,7 +886,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
               computeCursorTelemetryLabel(
                 currentIndexRef.current,
                 coordinates,
-                elevationOffset,
+                getInterpolatedElevationOffset(
+                  currentIndexRef.current,
+                  coordinates.length,
+                  elevationOffset,
+                  landingElevationOffset
+                ),
                 viewerUnitsRef.current
               ),
             false
@@ -912,6 +977,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
         cameraHeadingRef.current = heading;
         cameraDistanceRef.current = distance;
+        cameraFollowHeadingRef.current = null;
 
         viewer.camera.flyToBoundingSphere(boundingSphere, {
           duration: 2,
@@ -947,6 +1013,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       setIsPlaying(false);
       currentIndexRef.current = 0;
       setCurrentProgress(0);
+      setCurrentElapsedTime(0);
       setCurrentFlightTimestamp(null);
 
       if (typeof window !== 'undefined' && window._cesiumViewer === viewer) {
@@ -989,6 +1056,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     gpxData,
     isActiveViewer,
     landingElevationOffset,
+    repairedCoordinates,
     viewerReady,
   ]);
 
@@ -1193,7 +1261,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   }, []);
 
   useEffect(() => {
-    setIsPanelCollapsed(compact);
+    setIsPanelCollapsed(true);
   }, [compact]);
 
   let panelClassName: string;
@@ -1373,7 +1441,12 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
   );
 
   const applyScenePosition = useCallback(
-    (scenePosition: ScenePositionState, smoothCamera: boolean) => {
+    (
+      scenePosition: ScenePositionState,
+      smoothCamera: boolean,
+      frameTime = performance.now(),
+      smoothHeading = smoothCamera
+    ) => {
       const lastIndex = allPositionsRef.current.length - 1;
       if (lastIndex < 0) {
         return { index: 0, progress: 0, ratio: 0, tilesLoaded: false };
@@ -1424,30 +1497,47 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
             ? undefined
             : editableHighlightProgress,
         });
-        const thermalProgress =
-          thermalWindow && !disabledAutoShots.includes('thermal')
-            ? (progress - thermalWindow.startProgress) /
-              Math.max(
-                thermalWindow.endProgress - thermalWindow.startProgress,
-                0.01
-              )
-            : 0;
-        const heading =
-          thermalWindow && thermalProgress >= 0 && thermalProgress <= 1
-            ? baseHeading +
-              thermalWindow.direction * thermalProgress * Math.PI * 2
-            : baseHeading;
+        const targetHeading = baseHeading;
 
         if (!smoothCamera || !cameraTargetRef.current) {
           cameraTargetRef.current = scenePosition.position;
         } else {
-          const lerpFactor = 0.08;
+          const previousFrameTime = cameraFrameTimeRef.current;
+          const elapsedFrameTime =
+            previousFrameTime === null
+              ? 1000 / 60
+              : Math.min(
+                  Math.max(frameTime - previousFrameTime, 0),
+                  MAX_CAMERA_FRAME_DELTA_MS
+                );
+          const lerpFactor =
+            1 - Math.exp(-elapsedFrameTime / CAMERA_FOLLOW_SMOOTHING_MS);
           cameraTargetRef.current = interpolatePosition(
             cameraTargetRef.current,
             scenePosition.position,
             lerpFactor
           );
         }
+
+        const previousFrameTime = cameraFrameTimeRef.current;
+        const elapsedFrameTime =
+          previousFrameTime === null
+            ? 1000 / 60
+            : Math.min(
+                Math.max(frameTime - previousFrameTime, 0),
+                MAX_CAMERA_FRAME_DELTA_MS
+              );
+        const currentFollowHeading = cameraFollowHeadingRef.current;
+        cameraFollowHeadingRef.current =
+          !smoothHeading || currentFollowHeading === null
+            ? targetHeading
+            : currentFollowHeading +
+              normalizeAngleRadians(targetHeading - currentFollowHeading) *
+                (1 - Math.exp(-elapsedFrameTime / CAMERA_HEADING_SMOOTHING_MS));
+        cameraFrameTimeRef.current =
+          smoothHeading || smoothCamera ? frameTime : null;
+
+        const heading = cameraFollowHeadingRef.current ?? targetHeading;
 
         viewer.camera.setView({
           destination: cameraTargetRef.current,
@@ -1511,12 +1601,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         tilesLoaded: Boolean(getViewerScene(viewer)?.globe.tilesLoaded),
       };
     },
-    [
-      disabledAutoShots,
-      editableHighlightProgress,
-      syncTrackEntity,
-      thermalWindow,
-    ]
+    [disabledAutoShots, editableHighlightProgress, syncTrackEntity]
   );
 
   useEffect(() => {
@@ -1542,7 +1627,18 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         return { index: 0, progress: 0, ratio: 0, tilesLoaded: false };
       }
 
-      return applyScenePosition(scenePosition, false);
+      // Export frames are rendered sequentially at 30 fps. Use frame time
+      // instead of wall-clock time so heading smoothing is repeatable.
+      if (frameIndex === 0) {
+        cameraFrameTimeRef.current = null;
+        cameraFollowHeadingRef.current = null;
+      }
+      return applyScenePosition(
+        scenePosition,
+        false,
+        (frameIndex * 1000) / 30,
+        true
+      );
     };
 
     window._getExportMetadata = () => ({
@@ -1571,6 +1667,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     }
 
     isPlayingRef.current = true;
+    cameraFrameTimeRef.current = null;
     setIsPlaying(true);
 
     realTimeStartRef.current = performance.now();
@@ -1599,7 +1696,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       if (!scenePosition || scenePosition.timestamp >= lastTimestamp) {
         const endPosition = getScenePositionFromProgress(1);
         if (endPosition) {
-          applyScenePosition(endPosition, true);
+          applyScenePosition(endPosition, false, now);
         }
         animationFrameRef.current = null;
         isPlayingRef.current = false;
@@ -1607,7 +1704,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
         return;
       }
 
-      applyScenePosition(scenePosition, true);
+      applyScenePosition(scenePosition, true, now);
       animationFrameRef.current = requestAnimationFrame(step);
     };
 
@@ -1641,6 +1738,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
     currentIndexRef.current = 0;
     currentTimestampRef.current = null;
     cameraTargetRef.current = null;
+    cameraFollowHeadingRef.current = null;
+    cameraFrameTimeRef.current = null;
     setCurrentProgress(0);
     setCurrentElapsedTime(0);
     setCurrentFlightTimestamp(
@@ -1814,6 +1913,8 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       // Update refs for replay mode
       cameraHeadingRef.current = CesiumMath.toRadians(angle);
       cameraDistanceRef.current = distance;
+      cameraFollowHeadingRef.current = null;
+      cameraFrameTimeRef.current = null;
 
       // Calculate opposite heading (camera looks back at takeoff)
       const oppositeHeading = (angle + 180) % 360;
@@ -2004,152 +2105,103 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
       {gpxData?.coordinates && !exportOnly && (
         <Button
           onClick={toggleFullscreen}
-          className={`absolute top-4 right-4 z-10 bg-gray-800 text-white rounded-lg shadow-lg hover:bg-gray-700 ${fullscreenButtonClassName}`}
+          className={`absolute right-4 top-4 z-20 inline-flex items-center gap-2 rounded-xl border border-white/15 bg-slate-950/75 text-white shadow-xl backdrop-blur-md transition-colors hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${fullscreenButtonClassName}`}
           title={
             isFullscreen
               ? t('flights.viewer.exitFullscreen')
               : t('flights.viewer.fullscreen')
           }
+          aria-label={
+            isFullscreen
+              ? t('flights.viewer.exitFullscreen')
+              : t('flights.viewer.fullscreen')
+          }
         >
-          {isFullscreen
-            ? `🗗 ${t('flights.viewer.exit')}`
-            : `⛶ ${t('flights.viewer.fullscreen')}`}
+          {isFullscreen ? <Minimize2 size={16} /> : <Expand size={16} />}
+          <span className="hidden sm:inline">
+            {isFullscreen
+              ? t('flights.viewer.exit')
+              : t('flights.viewer.fullscreen')}
+          </span>
         </Button>
       )}
 
       {/* Controls - only show when data is loaded */}
       {gpxData?.coordinates && !exportOnly && (
         <div
-          className={`absolute top-4 left-4 z-10 bg-white dark:bg-gray-800 rounded-lg shadow-lg transition-all ${panelClassName} max-h-[calc(100%-2rem)] overflow-hidden flex flex-col`}
+          className={`absolute left-4 top-4 z-20 flex max-h-[calc(100%-14rem)] flex-col overflow-hidden rounded-2xl border border-white/15 bg-slate-950/75 text-white shadow-2xl backdrop-blur-xl transition-all ${panelClassName} ${isPanelCollapsed ? 'w-48 max-w-[calc(100%_-_5rem)]' : ''}`}
         >
           <div className="flex items-center justify-between mb-2">
-            {!isPanelCollapsed && (
-              <h3 className={compactTitleClass}>🪂 {resolvedFlightTitle}</h3>
-            )}
+            <div className="min-w-0">
+              {isPanelCollapsed ? (
+                <h3 className="truncate pr-2 text-xs font-semibold">
+                  {resolvedFlightTitle}
+                </h3>
+              ) : (
+                <>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-300">
+                    {flight?.site?.name || t('flights.viewer.playbackSection')}
+                  </p>
+                  <h3 className={`${compactTitleClass} truncate`}>
+                    {resolvedFlightTitle}
+                  </h3>
+                </>
+              )}
+            </div>
             <Button
               onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
-              className={`${compactToggleButtonClassName} bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300 dark:hover:bg-gray-600 dark:text-gray-200`}
+              className={`${compactToggleButtonClassName} rounded-lg text-slate-200 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300`}
               title={
                 isPanelCollapsed
                   ? t('flights.viewer.openPanel')
                   : t('flights.viewer.collapsePanel')
               }
+              aria-label={
+                isPanelCollapsed
+                  ? t('flights.viewer.openPanel')
+                  : t('flights.viewer.collapsePanel')
+              }
             >
-              {isPanelCollapsed ? '▶' : '◀'}
+              {isPanelCollapsed ? (
+                <Settings2 size={16} />
+              ) : (
+                <ChevronLeft size={16} />
+              )}
             </Button>
           </div>
 
           {!isPanelCollapsed && (
-            <div className="min-h-0 overflow-y-auto pr-1">
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+            <div className="min-h-0 overflow-y-auto pr-1 text-slate-100">
+              <p className="mb-3 text-xs text-slate-400">
                 {t('flights.viewer.points')}:{' '}
                 {gpxData?.coordinates?.length || 0}
               </p>
 
-              <div className="divide-y divide-gray-200 dark:divide-gray-700">
+              <div className="divide-y divide-white/10">
                 {/* Terrain Loading Indicator - Outside accordion, always visible */}
                 {!terrainReady && (
-                  <div className="bg-blue-100 dark:bg-blue-900/30 border border-blue-400 rounded p-2 mb-3">
-                    <p className="text-xs text-blue-800 dark:text-blue-200 flex items-center gap-2">
-                      <span className="animate-spin">⏳</span>
+                  <div className="mb-3 rounded-xl border border-sky-300/20 bg-sky-400/10 p-2">
+                    <p className="flex items-center gap-2 text-xs text-sky-100">
+                      <span className="h-2 w-2 animate-pulse rounded-full bg-sky-300" />
                       {t('flights.viewer.loadingTerrainTextures')}
                     </p>
                   </div>
                 )}
 
-                {/* ========== SECTION 1: LECTURE ========== */}
-                <AccordionSection
-                  title={t('flights.viewer.playbackSection')}
-                  emoji="🎮"
-                  defaultOpen={true}
-                >
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={togglePlayPause}
-                      className={`${compactControlButtonClassName} bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400`}
-                      data-testid="flight-play-toggle"
-                    >
-                      {isPlaying
-                        ? `⏸ ${t('flights.viewer.pause')}`
-                        : `▶ ${t('flights.viewer.play')}`}
-                    </Button>
-                    <Button
-                      onClick={reset}
-                      className={`${compactControlButtonClassName} bg-gray-600 text-white rounded hover:bg-gray-700 disabled:bg-gray-400`}
-                    >
-                      ⏮ {t('common.reset')}
-                    </Button>
-                  </div>
-
-                  {/* Progress Slider */}
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      {t('flights.viewer.position')}:{' '}
-                      {currentIndexRef.current + 1}/
-                      {allPositionsRef.current.length}
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      value={currentProgress}
-                      onChange={(e) =>
-                        handleProgressChange(Number(e.target.value))
-                      }
-                      className="w-full"
-                      data-testid="flight-progress-slider"
-                    />
-                  </div>
-
-                  {/* Flight Time Display */}
-                  <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">
-                    ⏱️ {formatFlightTime(currentElapsedTime)} /{' '}
-                    {formatFlightTime(gpxData?.flight_duration_seconds || 0)}
-                  </div>
-
-                  <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">
-                    🕒 {t('flights.viewer.flightTime')}:{' '}
-                    {formatFlightClock(currentFlightTimestamp)}
-                  </div>
-
-                  {/* Speed Slider */}
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      {t('flights.viewer.speed')}: {replaySpeed}x
-                    </label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="32"
-                      value={replaySpeed}
-                      onChange={(e) =>
-                        handleSpeedChange(Number(e.target.value))
-                      }
-                      className="w-full"
-                    />
-                  </div>
-                </AccordionSection>
-
                 <AccordionSection
                   title="Plans automatiques"
-                  emoji="🎬"
                   defaultOpen={false}
                 >
-                  <p className="text-xs text-gray-600 dark:text-gray-300 mb-2">
+                  <p className="mb-2 text-xs text-slate-300">
                     Déco, suivi et atterrissage restent actifs pendant la
                     prévisualisation.
                   </p>
-                  {(['highlight', 'thermal'] as const).map((shot) => (
+                  {(['highlight'] as const).map((shot) => (
                     <label
                       key={shot}
                       className="flex items-center justify-between text-sm py-1"
                     >
-                      <span>
-                        {shot === 'highlight'
-                          ? 'Point fort'
-                          : 'Orbite thermique'}
-                      </span>
+                      <span>Point fort</span>
                       <input
                         type="checkbox"
                         checked={!disabledAutoShots.includes(shot)}
@@ -2165,7 +2217,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                   ))}
                   {editableHighlightProgress !== undefined && (
                     <div className="mt-2">
-                      <label className="block text-xs text-gray-600 dark:text-gray-300 mb-1">
+                      <label className="mb-1 block text-xs text-slate-300">
                         Position du point fort :{' '}
                         {Math.round(editableHighlightProgress * 100)}%
                       </label>
@@ -2189,7 +2241,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                 {flight?.site && (
                   <AccordionSection
                     title={t('flights.viewer.siteCameraSection')}
-                    emoji="🏔️"
                     defaultOpen={false}
                   >
                     {/* Orientation Selector */}
@@ -2201,7 +2252,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         value={flight.site.orientation || ''}
                         onChange={(e) => updateOrientation(e.target.value)}
                         disabled={isUpdatingOrientation}
-                        className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 dark:text-white"
+                        className="w-full rounded-lg border border-white/15 bg-slate-900 px-2 py-1.5 text-sm text-white"
                       >
                         <option value="">{t('flights.notSpecified')}</option>
                         {getOrientationOptions().map((opt) => (
@@ -2210,7 +2261,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           </option>
                         ))}
                       </select>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <p className="mt-1 text-xs text-slate-400">
                         {flight.site.orientation
                           ? t('flights.viewer.directionValue', {
                               value: getOrientationLabel(
@@ -2222,14 +2273,14 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                     </div>
 
                     {/* Camera Position Controls */}
-                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-700">
-                      <label className="block text-sm font-medium mb-2 text-blue-900 dark:text-blue-100">
+                    <div className="rounded-xl border border-sky-300/20 bg-sky-400/10 p-3">
+                      <label className="mb-2 block text-sm font-medium text-sky-100">
                         📷 {t('flights.viewer.cameraPosition')}
                       </label>
 
                       {/* Camera Angle */}
                       <div className="mb-2">
-                        <label className="block text-xs text-gray-600 dark:text-gray-300 mb-1">
+                        <label className="mb-1 block text-xs text-slate-300">
                           {t('editSite.angle')}: {tempCameraAngle}°{' '}
                           {cameraDirectionLabel}
                         </label>
@@ -2245,7 +2296,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           className="w-full"
                           data-testid="camera-angle-slider"
                         />
-                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <div className="mt-1 flex justify-between text-xs text-slate-400">
                           <span>0° (N)</span>
                           <span>90° (E)</span>
                           <span>180° (S)</span>
@@ -2255,7 +2306,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
 
                       {/* Camera Distance */}
                       <div className="mb-2">
-                        <label className="block text-xs text-gray-600 dark:text-gray-300 mb-1">
+                        <label className="mb-1 block text-xs text-slate-300">
                           {t('editSite.distance')}: {tempCameraDistance}m
                         </label>
                         <input
@@ -2270,7 +2321,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           className="w-full"
                           data-testid="camera-distance-slider"
                         />
-                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <div className="mt-1 flex justify-between text-xs text-slate-400">
                           <span>100m</span>
                           <span>2000m</span>
                         </div>
@@ -2279,7 +2330,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                       <div className="mb-2">
                         <label
                           htmlFor="camera-close-zoom-slider"
-                          className="block text-xs text-gray-600 dark:text-gray-300 mb-1"
+                          className="mb-1 block text-xs text-slate-300"
                         >
                           {t('editSite.closeZoom')}:{' '}
                           {tempCameraCloseZoomPercent}%
@@ -2299,7 +2350,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           className="w-full"
                           data-testid="camera-close-zoom-slider"
                         />
-                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <div className="mt-1 flex justify-between text-xs text-slate-400">
                           <span>30%</span>
                           <span>100%</span>
                         </div>
@@ -2308,7 +2359,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                       <div className="mb-2">
                         <label
                           htmlFor="camera-transition-slider"
-                          className="block text-xs text-gray-600 dark:text-gray-300 mb-1"
+                          className="mb-1 block text-xs text-slate-300"
                         >
                           {t('editSite.transition')}:{' '}
                           {tempCameraTransitionPercent}%
@@ -2328,7 +2379,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                           className="w-full"
                           data-testid="camera-transition-slider"
                         />
-                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <div className="mt-1 flex justify-between text-xs text-slate-400">
                           <span>1%</span>
                           <span>40%</span>
                         </div>
@@ -2354,7 +2405,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                             : `💾 ${t('flights.viewer.saveSiteSetting')}`}
                         </Button>
                       </div>
-                      <p className="text-xs text-gray-600 dark:text-gray-300 mt-2">
+                      <p className="mt-2 text-xs text-slate-300">
                         💡 {t('flights.viewer.applyThenSaveHint')}
                       </p>
                     </div>
@@ -2364,7 +2415,6 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                 {/* ========== SECTION 4: RENDU & ÉLÉVATION ========== */}
                 <AccordionSection
                   title={t('flights.viewer.renderElevationSection')}
-                  emoji="🎨"
                   defaultOpen={false}
                 >
                   {/* Elevation Offset */}
@@ -2396,7 +2446,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                       className="w-full"
                     />
                     {autoOffset !== 0 && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <p className="mt-1 text-xs text-slate-400">
                         {t('flights.viewer.autoOffset')}:{' '}
                         {autoOffset.toFixed(1)}m
                       </p>
@@ -2418,7 +2468,7 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
                         onChange={(event) =>
                           applyVisualPreset(event.target.value as VisualPreset)
                         }
-                        className="w-full px-2 py-1 border rounded bg-white dark:bg-gray-700"
+                        className="w-full rounded-lg border border-white/15 bg-slate-900 px-2 py-1.5 text-sm text-white"
                       >
                         <option value="natural">Naturel</option>
                         <option value="cinematic">Cinématique</option>
@@ -2485,6 +2535,125 @@ export const FlightViewer3D: React.FC<FlightViewer3DProps> = ({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {!!gpxData?.coordinates?.length && !exportOnly && (
+        <div className="absolute bottom-12 left-1/2 z-20 w-[calc(100%-2rem)] max-w-4xl -translate-x-1/2 rounded-2xl border border-white/15 bg-slate-950/80 p-3 text-white shadow-2xl backdrop-blur-xl sm:p-4">
+          <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-5">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                  {t('flights.viewer.position')}
+                </p>
+                <p className="truncate text-sm font-semibold tabular-nums sm:text-base">
+                  {formatFlightTime(currentElapsedTime)}
+                  <span className="ml-1 font-normal text-slate-400">
+                    / {formatFlightTime(gpxData.flight_duration_seconds || 0)}
+                  </span>
+                </p>
+              </div>
+              <div className="hidden h-8 w-px bg-white/10 sm:block" />
+              <div className="hidden min-w-0 sm:block">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                  {t('flights.viewer.flightTime')}
+                </p>
+                <p className="text-sm font-semibold tabular-nums">
+                  {formatFlightClock(currentFlightTimestamp)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+              <div className="rounded-xl border border-white/10 bg-white/[0.06] px-2.5 py-1.5 sm:px-3">
+                <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  {t('flights.altitude')}
+                </p>
+                <p className="text-sm font-semibold tabular-nums text-white sm:text-base">
+                  {currentTelemetry?.[0] ?? '—'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.06] px-2.5 py-1.5 sm:px-3">
+                <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  {t('flights.viewer.speed')}
+                </p>
+                <p className="text-sm font-semibold tabular-nums text-white sm:text-base">
+                  {currentTelemetry?.[1] ?? '—'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <label className="sr-only" htmlFor="flight-progress-slider">
+            {t('flights.viewer.position')}
+          </label>
+          <input
+            id="flight-progress-slider"
+            type="range"
+            min="0"
+            max="100"
+            step="0.1"
+            value={currentProgress}
+            onChange={(event) =>
+              handleProgressChange(Number(event.target.value))
+            }
+            className="h-2 w-full cursor-pointer accent-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+            data-testid="flight-progress-slider"
+            aria-valuetext={`${formatFlightTime(currentElapsedTime)} / ${formatFlightTime(gpxData.flight_duration_seconds || 0)}`}
+          />
+
+          <div className="mt-2 flex items-center justify-between gap-3 sm:mt-3">
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={togglePlayPause}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-sky-400 text-slate-950 shadow-lg shadow-sky-950/30 transition-colors hover:bg-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                data-testid="flight-play-toggle"
+                aria-label={
+                  isPlaying
+                    ? t('flights.viewer.pause')
+                    : t('flights.viewer.play')
+                }
+              >
+                {isPlaying ? (
+                  <Pause size={18} fill="currentColor" />
+                ) : (
+                  <Play size={18} fill="currentColor" />
+                )}
+              </Button>
+              <Button
+                onClick={reset}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/[0.06] text-slate-200 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                title={t('common.reset')}
+                aria-label={t('common.reset')}
+              >
+                <RotateCcw size={16} />
+              </Button>
+              <span className="ml-1 hidden text-xs text-slate-400 sm:inline">
+                {currentIndexRef.current + 1}/{allPositionsRef.current.length}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs sm:gap-3 sm:text-sm">
+              <span className="hidden text-slate-400 sm:inline">
+                {t('flights.viewer.speed')}
+              </span>
+              <Button
+                onClick={() => {
+                  const speeds = [1, 2, 5, 10, 16, 32];
+                  const currentSpeedIndex = speeds.indexOf(replaySpeed);
+                  handleSpeedChange(
+                    speeds[(currentSpeedIndex + 1) % speeds.length]
+                  );
+                }}
+                className="inline-flex h-10 min-w-16 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/[0.06] px-3 font-semibold tabular-nums text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                aria-label={`${t('flights.viewer.speed')}: ${replaySpeed}x`}
+                title={t('flights.viewer.speed')}
+              >
+                <Gauge size={14} className="text-sky-300" />
+                {replaySpeed}x
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 

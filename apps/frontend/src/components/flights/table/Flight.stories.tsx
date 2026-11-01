@@ -20,6 +20,7 @@ const mockFlight: FlightSummary = {
   has_gpx: true,
   has_video: true,
   has_camera: true,
+  youtube_telemetry_video_file_exists: false,
   has_youtube_video: false,
   youtube_video_count: 0,
   youtube_upload_status: null,

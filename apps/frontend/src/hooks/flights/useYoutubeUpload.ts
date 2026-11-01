@@ -31,6 +31,8 @@ export interface YoutubeUploadJob {
     | 'youtube_overlay';
   gopro_overlay_job_id?: string | null;
   highlight_video_job_id?: string | null;
+  title?: string | null;
+  privacy_status?: 'private' | 'unlisted' | 'public' | null;
   status:
     | 'preparing'
     | 'queued'
@@ -39,9 +41,12 @@ export interface YoutubeUploadJob {
     | 'failed'
     | 'cancelled';
   progress: number;
+  created_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  updated_at?: string | null;
   youtube_url?: string | null;
   error?: string | null;
-  updated_at?: string | null;
   log_tail: string[];
 }
 
@@ -52,14 +57,24 @@ export type YoutubeUploadSource =
   | { source_type: 'pano' }
   | { source_type: 'face' }
   | { source_type: 'pilote' }
+  | { source_type: 'youtube_telemetry' }
   | { source_type: 'highlight'; highlight_video_job_id: string };
 
 type YoutubeUploadSourceFilter =
   | YoutubeUploadSource
   | { source_type: 'youtube_overlay' };
 
-export type TemporaryFlightMediaSource = 'camera' | 'pano' | 'face' | 'pilote';
+export type TemporaryFlightMediaSource =
+  | 'camera'
+  | 'pano'
+  | 'face'
+  | 'pilote'
+  | 'youtube_telemetry';
 type DeletableFlightMediaSource = 'video' | TemporaryFlightMediaSource;
+
+interface FlightTemporaryMediaDeleteWarnings {
+  warnings: Partial<Record<DeletableFlightMediaSource, boolean>>;
+}
 
 type YoutubeUploadInput = YoutubeUploadSource & {
   title: string;
@@ -73,7 +88,8 @@ export const sourceFromInput = (
   if (
     input.source_type === 'pano' ||
     input.source_type === 'face' ||
-    input.source_type === 'pilote'
+    input.source_type === 'pilote' ||
+    input.source_type === 'youtube_telemetry'
   ) {
     return { source_type: input.source_type };
   }
@@ -174,6 +190,17 @@ export function useYoutubeVideoAssociations(flightId: string) {
       const data = await api.get(`flights/${flightId}/youtube-videos`).json();
       return YoutubeVideoAssociationsSchema.parse(data);
     },
+  });
+}
+
+export function useFlightTemporaryMediaDeleteWarnings(flightId: string) {
+  return useQuery({
+    queryKey: ['temporary-media-delete-warnings', flightId],
+    queryFn: () =>
+      api
+        .get(`flights/${flightId}/temporary-media-delete-warnings`)
+        .json<FlightTemporaryMediaDeleteWarnings>(),
+    staleTime: 60_000,
   });
 }
 

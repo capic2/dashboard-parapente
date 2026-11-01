@@ -1,7 +1,7 @@
 # ============================================
 # Stage 1: Build Frontend with Nx
 # ============================================
-FROM node:24-alpine AS frontend-builder
+FROM node:26-alpine AS frontend-builder
 
 WORKDIR /workspace
 
@@ -9,8 +9,8 @@ ARG VITE_BASE_PATH=/
 ENV VITE_BASE_PATH=${VITE_BASE_PATH}
 ENV NX_NO_CLOUD=true
 
-# Installer pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Node 25+ no longer bundles Corepack; keep pnpm aligned with package.json.
+RUN npm install --global pnpm@12.5.1
 
 # Copier fichiers de configuration Nx et pnpm
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig.base.json ./
@@ -132,11 +132,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Installer GoPro Dashboard Overlay dans un venv créé dans l'image.
 COPY --from=gopro-overlay-src / /app/gopro-overlay
-# Prevent floating-point frame timestamps from repeatedly restarting the PIP decoder.
+# Enable time-bounded transparent GPX overlay renders, and prevent floating-point
+# frame timestamps from repeatedly restarting the PIP decoder.
 COPY docker/gopro-overlay/video-frame-source.patch /tmp/video-frame-source.patch
+COPY docker/gopro-overlay/enable-gpx-overlay-time-ranges.py /tmp/enable-gpx-overlay-time-ranges.py
 RUN rm -rf /app/gopro-overlay/venv && \
     patch -d /app/gopro-overlay -p1 < /tmp/video-frame-source.patch && \
-    rm /tmp/video-frame-source.patch && \
+    python /tmp/enable-gpx-overlay-time-ranges.py /app/gopro-overlay/gopro_overlay/arguments.py && \
+    rm /tmp/video-frame-source.patch /tmp/enable-gpx-overlay-time-ranges.py && \
     python -m venv /app/gopro-overlay/venv && \
     /app/gopro-overlay/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel && \
     /app/gopro-overlay/venv/bin/pip install --no-cache-dir -e /app/gopro-overlay

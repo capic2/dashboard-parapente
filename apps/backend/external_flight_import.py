@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from flight_naming import format_automatic_flight_name
+from flight_file_paths import resolve_flight_file_path
 from flight_storage import ensure_flight_directory, flight_temporary_directory
 from flight_tracks import TrackPoint, calculate_track_stats, normalize_track
 from intervals_icu import ExternalActivity, IntervalsError
@@ -61,8 +62,9 @@ def _local_departure(value: datetime) -> datetime:
 def _update_existing_flight(flight: Flight, activity: ExternalActivity) -> bool:
     name = format_automatic_flight_name(flight.flight_date, flight.departure_time)
     gpx_provider = flight.gpx_provider
-    if gpx_provider is None and flight.gpx_file_path:
-        if Path(flight.gpx_file_path).name.startswith("intervals_"):
+    source_file_path = flight.gpx_source_file_path or flight.gpx_file_path
+    if gpx_provider is None and source_file_path:
+        if Path(source_file_path).name.startswith("intervals_"):
             gpx_provider = activity.source.casefold()
     changed = (
         flight.name != name
@@ -80,10 +82,14 @@ def _update_existing_flight(flight: Flight, activity: ExternalActivity) -> bool:
 def _legacy_track_matches(
     candidate: Flight, points: list[TrackPoint], stats: dict[str, Any]
 ) -> bool:
-    if not candidate.gpx_file_path:
+    source_file_path = candidate.gpx_source_file_path or candidate.gpx_file_path
+    if not source_file_path:
         return False
     try:
-        _, legacy_points = normalize_track(Path(candidate.gpx_file_path).read_bytes(), "gpx")
+        source_path = resolve_flight_file_path(source_file_path)
+        if source_path is None:
+            return False
+        _, legacy_points = normalize_track(source_path.read_bytes(), "gpx")
     except (OSError, ValueError):
         return False
     if (
@@ -234,6 +240,7 @@ async def import_external_activities(
                         temporary_path.write_bytes(gpx)
                         temporary_path.replace(written_path)
                         flight.gpx_file_path = str(written_path)
+                        flight.gpx_source_file_path = str(written_path)
                         db.flush()
                         outcome = "imported"
                         pending_summary = _flight_summary(flight)

@@ -15,13 +15,20 @@ export function hasFlightGoproOverlay(flight: Flight): boolean {
   return (
     flight.gopro_overlays?.some((overlay) => overlay.status === 'completed') ||
     Boolean(
-      flight.gopro_overlay_file_path && flight.gopro_overlay_file_exists === true
+      flight.gopro_overlay_file_path &&
+      flight.gopro_overlay_file_exists === true
     )
   );
 }
 
 export function isGoproOverlayInProgress(status?: string | null): boolean {
   return Boolean(status && GOPRO_OVERLAY_IN_PROGRESS_STATUSES.has(status));
+}
+
+export function isYoutubeUploadProgressVisible(
+  job?: { source_type?: string | null; status?: string | null } | null
+): boolean {
+  return Boolean(job);
 }
 
 export function isUnavailableMediaError(error: unknown): boolean {

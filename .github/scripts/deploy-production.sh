@@ -644,6 +644,15 @@ deploy_from_portainer_volume() {
         exit 1
       fi
       echo "Production backend and all RQ workers are running"
+
+      merged_compose_file="$work_dir/docker-compose.yml.merged.tmp"
+      if ! compose_cmd config --no-interpolate --no-path-resolution > "$merged_compose_file"; then
+        rm -f "$merged_compose_file"
+        echo "Failed to persist the merged production Compose file for Portainer"
+        exit 1
+      fi
+      mv "$merged_compose_file" "$work_dir/docker-compose.yml"
+      echo "Persisted the merged production Compose file for future Portainer redeployments"
     '; then
     print_backend_diagnostics
     return 1

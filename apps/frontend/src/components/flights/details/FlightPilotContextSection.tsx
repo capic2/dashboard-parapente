@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { TextArea, TextField } from 'react-aria-components';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 
 const FLIGHT_TAGS = [
   'vol tranquille',

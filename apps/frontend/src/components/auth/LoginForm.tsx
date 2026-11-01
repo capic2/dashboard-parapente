@@ -1,8 +1,9 @@
 import { useForm } from '@tanstack/react-form';
 import { tv } from 'tailwind-variants';
 import { useTranslation } from 'react-i18next';
-import { TextField, Label, Input, Form } from 'react-aria-components';
-import { Button } from '@dashboard-parapente/design-system';
+import { Form } from 'react-aria-components';
+import { Button } from '@dashboard-parapente/core/Button/Button';
+import { TextField } from '@dashboard-parapente/design-system/form';
 
 type LoginFormProps = {
   onSubmit: (value: { email: string; password: string }) => Promise<void>;
@@ -11,13 +12,12 @@ type LoginFormProps = {
 
 type LoginFieldViewProps = {
   id: 'email' | 'password';
+  name: 'username' | 'password';
   type: 'email' | 'password';
   autoComplete: 'username' | 'current-password';
   label: string;
   value: string;
   onChange: (value: string) => void;
-  inputClassName: string;
-  labelClassName: string;
 };
 
 const styles = tv({
@@ -28,9 +28,6 @@ const styles = tv({
     title:
       'text-2xl font-semibold text-center text-sky-600 dark:text-sky-400 mb-6',
     form: 'space-y-4',
-    label: 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1',
-    input:
-      'w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none',
     error: 'text-sm text-red-500 dark:text-red-400',
     submitButton:
       'w-full py-2.5 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white font-medium rounded-lg transition-colors pressed:bg-sky-800',
@@ -39,24 +36,24 @@ const styles = tv({
 
 function LoginFieldView({
   id,
+  name,
   type,
   autoComplete,
   label,
   value,
   onChange,
-  inputClassName,
-  labelClassName,
 }: LoginFieldViewProps) {
   return (
-    <TextField isRequired value={value} onChange={onChange}>
-      <Label className={labelClassName}>{label}</Label>
-      <Input
-        id={id}
-        type={type}
-        autoComplete={autoComplete}
-        className={inputClassName}
-      />
-    </TextField>
+    <TextField
+      id={id}
+      name={name}
+      isRequired
+      label={label}
+      type={type}
+      autoComplete={autoComplete}
+      value={value}
+      onChange={onChange}
+    />
   );
 }
 
@@ -88,13 +85,12 @@ export function LoginForm({ onSubmit, errorMessage }: LoginFormProps) {
               {(field) => (
                 <LoginFieldView
                   id="email"
+                  name="username"
                   type="email"
                   autoComplete="username"
                   label={t('login.email')}
                   value={String(field.state.value ?? '')}
                   onChange={(value) => field.handleChange(value)}
-                  inputClassName={s.input()}
-                  labelClassName={s.label()}
                 />
               )}
             </form.Field>
@@ -103,13 +99,12 @@ export function LoginForm({ onSubmit, errorMessage }: LoginFormProps) {
               {(field) => (
                 <LoginFieldView
                   id="password"
+                  name="password"
                   type="password"
                   autoComplete="current-password"
                   label={t('login.password')}
                   value={String(field.state.value ?? '')}
                   onChange={(value) => field.handleChange(value)}
-                  inputClassName={s.input()}
-                  labelClassName={s.label()}
                 />
               )}
             </form.Field>

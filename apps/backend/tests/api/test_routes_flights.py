@@ -5,14 +5,16 @@ Tests HTTP endpoints in routes.py related to flight management.
 Coverage: GET, POST, PATCH, DELETE for flights.
 """
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 import json
 from pathlib import Path
 import re
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 import config
 import pytest
+import routes
 from fastapi.testclient import TestClient
 from flight_tracks import calculate_track_stats, normalize_track
 from models import Flight, GoproOverlayJob, HighlightVideoJob, Site, YoutubeUploadJob
@@ -1466,6 +1468,98 @@ class TestUpdateFlightEndpoint:
         db_session.refresh(sample_flight)
         assert sample_flight.notes == "Great thermal conditions!"
 
+    def test_saving_gopro_offset_schedules_gpx_merge_without_camera_video(
+        self,
+        client: TestClient,
+        db_session: Session,
+        sample_flight: Flight,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        gpx_path = tmp_path / "flight.gpx"
+        gpx_path.write_text("<gpx />", encoding="utf-8")
+        input_dir = tmp_path / "20260315" / "01"
+        input_dir.mkdir(parents=True)
+        osv_path = input_dir / "camera.OSV"
+        osv_path.write_text("telemetry", encoding="utf-8")
+        monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+        sample_flight.gpx_file_path = str(gpx_path)
+        db_session.commit()
+
+        with patch("routes._prepare_enriched_gpx_in_background") as prepare:
+            response = client.patch(
+                f"{API_PREFIX}/flights/{sample_flight.id}",
+                json={"gopro_overlay_gpx_offset": 2.5},
+            )
+
+        assert response.status_code == 200
+        prepare.assert_called_once()
+        operation = db_session.query(routes.BackgroundOperationModel).one()
+        assert prepare.call_args.args == ([osv_path], gpx_path, input_dir)
+        assert prepare.call_args.kwargs == {
+            "video_duration": None,
+            "first_gpx_at": None,
+            "flight_id": sample_flight.id,
+            "operation_id": operation.id,
+        }
+        assert operation.operation_type == "gpx_enrichment"
+        assert operation.title_key == "operations.gpxEnrichment"
+        assert operation.status == "queued"
+        assert not (input_dir / "camera.mp4").exists()
+
+    @pytest.mark.parametrize("cache_status", ["ready", "pending"])
+    def test_saving_gopro_offset_does_not_queue_duplicate_gpx_merge(
+        self,
+        client: TestClient,
+        db_session: Session,
+        sample_flight: Flight,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        cache_status: str,
+    ) -> None:
+        gpx_path = tmp_path / "flight.gpx"
+        gpx_path.write_text("<gpx />", encoding="utf-8")
+        input_dir = tmp_path / "20260315" / "01"
+        input_dir.mkdir(parents=True)
+        (input_dir / "camera.OSV").write_text("telemetry", encoding="utf-8")
+        monkeypatch.setattr(config, "GOPRO_OVERLAY_PARAGLIDING_ROOT", str(tmp_path))
+        monkeypatch.setattr(routes, "_enriched_gpx_status", lambda *_args: cache_status)
+        sample_flight.gpx_file_path = str(gpx_path)
+        sample_flight.gpx_source_file_path = str(gpx_path)
+        db_session.commit()
+
+        with patch("routes._prepare_enriched_gpx_in_background") as prepare:
+            response = client.patch(
+                f"{API_PREFIX}/flights/{sample_flight.id}",
+                json={"gopro_overlay_gpx_offset": 3.5},
+            )
+
+        assert response.status_code == 200
+        prepare.assert_not_called()
+        db_session.refresh(sample_flight)
+        assert sample_flight.gopro_overlay_gpx_offset == 3.5
+
+    def test_gpx_merge_scheduling_failure_does_not_fail_saved_offset(
+        self,
+        client: TestClient,
+        db_session: Session,
+        sample_flight: Flight,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        def fail_scheduling(*_args: object) -> None:
+            raise RuntimeError("merge scheduling failed")
+
+        monkeypatch.setattr("routes._schedule_enriched_gpx_for_saved_offset", fail_scheduling)
+
+        response = client.patch(
+            f"{API_PREFIX}/flights/{sample_flight.id}",
+            json={"gopro_overlay_gpx_offset": 0.0},
+        )
+
+        assert response.status_code == 200
+        db_session.refresh(sample_flight)
+        assert sample_flight.gopro_overlay_gpx_offset == 0.0
+
     def test_takeoff_and_landing_markers_set_effective_flight_duration(
         self, client, db_session, sample_flight
     ):
@@ -1563,15 +1657,19 @@ class TestUpdateFlightEndpoint:
         assert sample_flight.distance_km == 20.5
 
     def test_update_gpx_metrics_exclusion_recalculates_vertical_rates(
-        self, client, db_session, sample_flight
+        self, client, db_session, sample_flight, tmp_path, monkeypatch
     ):
-        sample_flight.gpx_file_path = "private/track.gpx"
+        source_path = tmp_path / "recorded-track.gpx"
+        source_path.write_text("<gpx />", encoding="utf-8")
+        sample_flight.gpx_source_file_path = str(source_path)
+        sample_flight.gpx_file_path = str(tmp_path / "merged-gopro-overlay.gpx")
         sample_flight.max_climb_rate_ms = 1.0
         sample_flight.max_sink_rate_ms = 0.5
         db_session.commit()
+        monkeypatch.setattr(routes, "_resolve_flight_file_path", lambda _path: source_path)
 
         with (
-            patch("routes.parse_gpx_file", return_value=[{"timestamp": 1}]),
+            patch("routes.parse_gpx_file", return_value=[{"timestamp": 1}]) as parse_gpx,
             patch(
                 "routes.calculate_track_stats",
                 return_value={"max_climb_rate_ms": 4.2, "max_sink_rate_ms": 3.4},
@@ -1594,6 +1692,7 @@ class TestUpdateFlightEndpoint:
         assert sample_flight.gpx_metrics_excluded is False
         assert sample_flight.max_climb_rate_ms == 4.2
         assert sample_flight.max_sink_rate_ms == 3.4
+        assert all(call.args[0] == source_path for call in parse_gpx.call_args_list)
 
 
 class TestDeleteFlightEndpoint:
@@ -1746,6 +1845,36 @@ class TestFlightGPXEndpoints:
         ]
         assert response.json()["data"]["max_speed_kmh"] == 43.2
 
+    def test_gpx_data_and_download_use_the_recorded_track_after_enrichment(
+        self, client, db_session, sample_flight, tmp_path
+    ):
+        source_path = tmp_path / "source.gpx"
+        source_path.write_text(
+            '<gpx><trk><trkseg><trkpt lat="47.2" lon="6.0"><ele>100</ele>'
+            "<time>2026-07-01T10:00:10Z</time></trkpt></trkseg></trk></gpx>",
+            encoding="utf-8",
+        )
+        enriched_path = tmp_path / "merged-gopro-overlay.gpx"
+        enriched_path.write_text(
+            '<gpx><trk><trkseg><trkpt lat="47.1" lon="5.9"><ele>50</ele>'
+            "<time>2026-07-01T10:00:00Z</time></trkpt>"
+            '<trkpt lat="47.2" lon="6.0"><ele>100</ele>'
+            "<time>2026-07-01T10:00:10Z</time></trkpt></trkseg></trk></gpx>",
+            encoding="utf-8",
+        )
+        sample_flight.gpx_source_file_path = str(source_path)
+        sample_flight.gpx_file_path = str(enriched_path)
+        db_session.commit()
+
+        data_response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/gpx-data")
+        download_response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}/gpx")
+
+        assert data_response.status_code == 200
+        assert len(data_response.json()["data"]["coordinates"]) == 1
+        assert data_response.json()["data"]["takeoff_altitude_m"] == 100
+        assert download_response.status_code == 200
+        assert download_response.content == source_path.read_bytes()
+
     def test_max_speed_uses_geometry_only_for_intervals_without_recorded_speed(self):
         coordinates = [
             {"lat": 47.2, "lon": 6.0, "timestamp": 1_000, "speed_kmh": 0},
@@ -1782,7 +1911,40 @@ class TestFlightGPXEndpoints:
         assert sample_flight.gpx_elevation_gain_m == expected["elevation_gain_m"]
         assert sample_flight.max_climb_rate_ms == expected["max_climb_rate_ms"]
         assert sample_flight.max_sink_rate_ms == expected["max_sink_rate_ms"]
-        assert sample_flight.departure_time == expected["departure_time"].replace(tzinfo=None)
+        expected_departure = expected["departure_time"]
+        if expected_departure.tzinfo is None:
+            expected_departure = expected_departure.replace(tzinfo=ZoneInfo("UTC"))
+        expected_departure = expected_departure.astimezone(ZoneInfo("Europe/Paris"))
+        assert sample_flight.departure_time == expected_departure.replace(tzinfo=None)
+        assert sample_flight.gpx_source_file_path == sample_flight.gpx_file_path
+
+    @pytest.mark.parametrize("departure_time_mode", ["naive", "missing"])
+    def test_upload_gpx_normalizes_naive_or_missing_departure_time(
+        self, client, db_session, sample_flight, sample_gpx, departure_time_mode
+    ):
+        _, points = normalize_track(sample_gpx.encode(), "gpx")
+        stats = calculate_track_stats(points)
+        departure_time = stats["departure_time"]
+        assert departure_time.tzinfo == timezone.utc
+
+        if departure_time_mode == "naive":
+            stats["departure_time"] = datetime(2026, 3, 15, 14, 0)
+            expected_departure = datetime(2026, 3, 15, 15, 0)
+        else:
+            stats["departure_time"] = None
+            expected_departure = None
+
+        files = {"gpx_file": ("test.gpx", sample_gpx.encode(), "application/gpx+xml")}
+        with (
+            patch("routes.write_flight_text_file", return_value=Path("private/track.gpx")),
+            patch("routes.calculate_track_stats", return_value=stats),
+            patch("video_export_manual.trigger_auto_export"),
+        ):
+            response = client.post(f"{API_PREFIX}/flights/flight-test-001/upload-gpx", files=files)
+
+        assert response.status_code == 200
+        db_session.refresh(sample_flight)
+        assert sample_flight.departure_time == expected_departure
 
     def test_upload_gpx_succeeds_when_stat_calculation_fails(
         self, client, db_session, sample_flight, sample_gpx
@@ -2341,7 +2503,7 @@ class TestDeleteFlightTemporaryMedia:
         )
         db_session.commit()
 
-    def test_delete_is_rejected_before_youtube_publication(
+    def test_delete_is_allowed_before_youtube_publication(
         self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
     ) -> None:
         monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
@@ -2358,10 +2520,157 @@ class TestDeleteFlightTemporaryMedia:
 
         response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/pano")
 
+        assert response.status_code == 204
+        assert not pano_path.exists()
+        db_session.refresh(flight)
+        assert flight.pano_video_file_path is None
+
+    def test_delete_is_rejected_while_youtube_upload_is_active(
+        self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+        pano_path = tmp_path / "20260315" / "01" / "pano.mp4"
+        pano_path.parent.mkdir(parents=True)
+        pano_path.write_bytes(b"pano")
+        flight = Flight(
+            id="flight-temp-pano-uploading",
+            flight_date=date(2026, 3, 15),
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        self._completed_upload(db_session, flight, source_type="pano")
+        db_session.add(
+            YoutubeUploadJob(
+                id="youtube-pano-uploading",
+                flight_id=flight.id,
+                user_id=1,
+                source_type="pano",
+                status="uploading",
+                progress=42,
+                title="Pano upload",
+                description="",
+                privacy_status="unlisted",
+            )
+        )
+        db_session.commit()
+        monkeypatch.setattr(
+            "routes.youtube_video_availability",
+            lambda grouped: {
+                video_id: True for video_ids in grouped.values() for video_id in video_ids
+            },
+        )
+
+        response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/pano")
+
         assert response.status_code == 409
         assert pano_path.read_bytes() == b"pano"
 
-    def test_delete_is_rejected_when_youtube_no_longer_has_the_video(
+    def test_old_telemetry_publication_does_not_block_deleting_unpublished_replacement(
+        self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+        monkeypatch.setattr(
+            "routes.youtube_video_availability",
+            lambda grouped: {
+                video_id: True for video_ids in grouped.values() for video_id in video_ids
+            },
+        )
+        old_path = tmp_path / "20261020" / "01" / "youtube-telemetry-old.mp4"
+        current_path = old_path.with_name("youtube-telemetry-current.mp4")
+        old_path.parent.mkdir(parents=True)
+        old_path.write_bytes(b"old export")
+        current_path.write_bytes(b"current export")
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        flight = Flight(
+            id="flight-telemetry-replacement",
+            flight_date=date(2026, 10, 20),
+            youtube_urls=[youtube_url],
+            youtube_telemetry_video_file_path=str(current_path),
+        )
+        db_session.add(flight)
+        db_session.add(
+            YoutubeUploadJob(
+                id="youtube-telemetry-old-publication",
+                flight_id=flight.id,
+                user_id=1,
+                source_type="youtube_telemetry",
+                source_path=str(old_path),
+                status="completed",
+                progress=100,
+                title="Old telemetry export",
+                description="",
+                privacy_status="unlisted",
+                youtube_video_id="dQw4w9WgXcQ",
+                youtube_url=youtube_url,
+            )
+        )
+        db_session.commit()
+
+        response = client.delete(
+            f"{API_PREFIX}/flights/{flight.id}/temporary-media/youtube_telemetry"
+        )
+
+        assert response.status_code == 204
+        assert old_path.read_bytes() == b"old export"
+        assert not current_path.exists()
+        db_session.refresh(flight)
+        assert flight.youtube_telemetry_video_file_path is None
+
+    def test_delete_telemetry_matches_upload_path_through_symlinked_storage_root(
+        self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
+    ) -> None:
+        storage_root = tmp_path / "storage"
+        storage_root.mkdir()
+        storage_alias = tmp_path / "storage-alias"
+        storage_alias.symlink_to(storage_root, target_is_directory=True)
+        monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(storage_alias))
+        monkeypatch.setattr(
+            "routes.youtube_video_availability",
+            lambda grouped: {
+                video_id: True for video_ids in grouped.values() for video_id in video_ids
+            },
+        )
+        flight_dir = storage_root / "20260315" / "01"
+        flight_dir.mkdir(parents=True)
+        canonical_path = flight_dir / "youtube-telemetry-export.mp4"
+        canonical_path.write_bytes(b"telemetry export")
+        alias_path = storage_alias / canonical_path.relative_to(storage_root)
+        youtube_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        flight = Flight(
+            id="flight-telemetry-delete-symlink",
+            flight_date=date(2026, 3, 15),
+            youtube_urls=[youtube_url],
+            youtube_telemetry_video_file_path=str(alias_path),
+        )
+        db_session.add(flight)
+        db_session.add(
+            YoutubeUploadJob(
+                id="youtube-telemetry-symlink-publication",
+                flight_id=flight.id,
+                user_id=1,
+                source_type="youtube_telemetry",
+                source_path=str(canonical_path),
+                status="completed",
+                progress=100,
+                title="Telemetry export",
+                description="",
+                privacy_status="unlisted",
+                youtube_video_id="dQw4w9WgXcQ",
+                youtube_url=youtube_url,
+            )
+        )
+        db_session.commit()
+
+        response = client.delete(
+            f"{API_PREFIX}/flights/{flight.id}/temporary-media/youtube_telemetry"
+        )
+
+        assert response.status_code == 204
+        assert not canonical_path.exists()
+        db_session.refresh(flight)
+        assert flight.youtube_telemetry_video_file_path is None
+
+    def test_delete_is_allowed_when_youtube_no_longer_has_the_video(
         self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
     ) -> None:
         monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
@@ -2385,8 +2694,114 @@ class TestDeleteFlightTemporaryMedia:
 
         response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/pano")
 
-        assert response.status_code == 409
-        assert pano_path.read_bytes() == b"pano"
+        assert response.status_code == 204
+        assert not pano_path.exists()
+        db_session.refresh(flight)
+        assert flight.pano_video_file_path is None
+
+    def test_delete_is_allowed_for_unlinked_upload_missing_from_youtube(
+        self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+        monkeypatch.setattr(
+            "routes.youtube_video_availability",
+            lambda grouped: {
+                video_id: False for video_ids in grouped.values() for video_id in video_ids
+            },
+        )
+        pano_path = tmp_path / "20260315" / "01" / "pano.mp4"
+        pano_path.parent.mkdir(parents=True)
+        pano_path.write_bytes(b"pano")
+        flight = Flight(
+            id="flight-temp-pano-unlinked-unavailable",
+            flight_date=date(2026, 3, 15),
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.flush()
+        self._completed_upload(db_session, flight, source_type="pano")
+        flight.youtube_urls = []
+        db_session.commit()
+
+        response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/pano")
+
+        assert response.status_code == 204
+        assert not pano_path.exists()
+        db_session.refresh(flight)
+        assert flight.pano_video_file_path is None
+
+    def test_delete_is_allowed_when_any_unlinked_upload_is_missing_from_youtube(
+        self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
+        monkeypatch.setattr(
+            "routes.youtube_video_availability",
+            lambda grouped: {
+                video_id: video_id == "dQw4w9WgXcQ"
+                for video_ids in grouped.values()
+                for video_id in video_ids
+            },
+        )
+        pano_path = tmp_path / "20260315" / "01" / "pano.mp4"
+        pano_path.parent.mkdir(parents=True)
+        pano_path.write_bytes(b"new pano")
+        flight = Flight(
+            id="flight-temp-pano-replaced-unavailable",
+            flight_date=date(2026, 3, 15),
+            pano_video_file_path=str(pano_path),
+        )
+        db_session.add(flight)
+        db_session.flush()
+        self._completed_upload(db_session, flight, source_type="pano")
+        db_session.add(
+            YoutubeUploadJob(
+                id="youtube-pano-newer-completed",
+                flight_id=flight.id,
+                user_id=1,
+                source_type="pano",
+                status="completed",
+                progress=100,
+                title="Newer pano upload",
+                description="",
+                privacy_status="unlisted",
+                youtube_video_id="aaaaaaaaaaa",
+                youtube_url="https://www.youtube.com/watch?v=aaaaaaaaaaa",
+            )
+        )
+        flight.youtube_urls = []
+        db_session.commit()
+
+        response = client.delete(f"{API_PREFIX}/flights/{flight.id}/temporary-media/pano")
+
+        assert response.status_code == 204
+        assert not pano_path.exists()
+        db_session.refresh(flight)
+        assert flight.pano_video_file_path is None
+
+    def test_delete_warnings_report_unavailable_youtube_uploads(
+        self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(
+            "routes.youtube_video_availability",
+            lambda grouped: {
+                video_id: False for video_ids in grouped.values() for video_id in video_ids
+            },
+        )
+        flight = Flight(
+            id="flight-temp-pano-unavailable-warning",
+            flight_date=date(2026, 3, 15),
+            pano_video_file_path=str(tmp_path / "20260315" / "01" / "pano.mp4"),
+        )
+        db_session.add(flight)
+        db_session.flush()
+        self._completed_upload(db_session, flight, source_type="pano")
+        flight.youtube_urls = []
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights/{flight.id}/temporary-media-delete-warnings")
+
+        assert response.status_code == 200
+        assert response.json()["warnings"]["pano"] is True
 
     def test_delete_pano_removes_only_the_local_file_and_clears_its_path(
         self, client: TestClient, db_session: Session, tmp_path: Path, monkeypatch

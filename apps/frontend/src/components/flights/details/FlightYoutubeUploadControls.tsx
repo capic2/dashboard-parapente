@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button, Modal } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
+import { Modal } from '@dashboard-parapente/core/Modal';
 import { Clipboard, Tv, Upload, X } from 'lucide-react';
 import type { Flight } from '../../../types';
 import {
@@ -41,10 +42,12 @@ function getDefaultYoutubeTitle(
     role = 'pano';
   } else if (source.source_type === 'pilote') {
     role = 'pilote';
+  } else if (source.source_type === 'youtube_telemetry') {
+    role = 'télémétrie';
   }
   const suffix = ` - ${role}`;
   const titleWithoutRole = baseTitle.replace(
-    /\s*-\s*(face|pilote|pano|vol)$/iu,
+    /\s*-\s*(face|pilote|pano|vol|télémétrie|telemetry)$/iu,
     ''
   );
   return `${titleWithoutRole.slice(0, YOUTUBE_TITLE_MAX_LENGTH - suffix.length).trimEnd()}${suffix}`;

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import {
   CircleAlert,
   Clock3,
@@ -76,7 +76,8 @@ export function FlightMediaBadges({
     hasPanoVideo ||
     hasGoproCameraVideo ||
     hasFaceVideo ||
-    hasPiloteVideo;
+    hasPiloteVideo ||
+    flight.youtube_telemetry_video_file_exists;
   const videoProgress = Math.max(
     0,
     Math.min(100, Math.round(flight.video_export_progress ?? 0))
@@ -300,6 +301,12 @@ export function FlightMediaBadges({
             )}
             {hasPiloteVideo && (
               <FlightTemporaryMediaCard flight={flight} sourceType="pilote" />
+            )}
+            {flight.youtube_telemetry_video_file_exists && (
+              <FlightTemporaryMediaCard
+                flight={flight}
+                sourceType="youtube_telemetry"
+              />
             )}
           </div>
         </section>

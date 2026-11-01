@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { TextArea, TextField } from 'react-aria-components';
-import { Button } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 
 interface FlightNotesSectionProps {
   notes: string | null | undefined;
@@ -76,7 +76,7 @@ export function FlightNotesSection({
           </div>
         </div>
       ) : (
-        <p className="rounded-lg bg-gray-50 p-3 text-sm text-gray-600 dark:bg-gray-900 dark:text-gray-300">
+        <p className="whitespace-pre-wrap rounded-lg bg-gray-50 p-3 text-sm text-gray-600 dark:bg-gray-900 dark:text-gray-300">
           {notes ?? t('flights.noNotes')}
         </p>
       )}

@@ -11,13 +11,8 @@ import { Link } from '@tanstack/react-router';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { Input, Label, TextField } from 'react-aria-components';
 import { Search } from 'lucide-react';
-import {
-  Button,
-  Tab,
-  TabList,
-  TabPanel,
-  Tabs,
-} from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
+import { Tab, TabList, TabPanel, Tabs } from '@dashboard-parapente/core/Tabs';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
 import {
   useWeatherSources,

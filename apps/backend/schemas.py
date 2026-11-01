@@ -188,7 +188,9 @@ class FlightTelemetryResponse(BaseModel):
     source: Literal["gpx", "gpx+osv"]
     has_osv: bool
     enrichment_status: Literal["missing", "pending", "ready", "failed"]
+    enrichment_progress: int | None = None
     enrichment_error: str | None = None
+    metadata_time: datetime | None = None
     start_time: datetime | None = None
     end_time: datetime | None = None
     duration_seconds: float
@@ -213,10 +215,12 @@ class GoproOverlayEnrichmentResponse(BaseModel):
 
 class GoproOverlayPreviewGpx(BaseModel):
     start_time: datetime
+    metadata_time: datetime | None = None
     end_time: datetime
     duration_seconds: float
     coordinates: list[GoproOverlayPreviewCoordinate]
     enrichment_status: Literal["missing", "pending", "ready", "failed"]
+    enrichment_progress: int | None = None
     enrichment_error: str | None = None
 
 
@@ -346,6 +350,8 @@ class BackgroundOperation(BaseModel):
     error_detail: str | None = None
     source_kind: str | None = None
     source_id: str | None = None
+    flight_id: str | None = None
+    flight_name: str | None = None
     can_cancel: bool = False
     can_retry: bool = False
     unread: bool = False
@@ -694,7 +700,14 @@ class YoutubePlaylistPreparationResponse(BaseModel):
 
 class YoutubeUploadCreate(BaseModel):
     source_type: Literal[
-        "gopro_overlay", "camera", "video", "pano", "face", "pilote", "highlight"
+        "gopro_overlay",
+        "camera",
+        "video",
+        "pano",
+        "face",
+        "pilote",
+        "highlight",
+        "youtube_telemetry",
     ] = "gopro_overlay"
     gopro_overlay_job_id: str | None = None
     highlight_video_job_id: str | None = None
@@ -755,12 +768,26 @@ class YoutubeUploadJobResponse(BaseModel):
     job_id: str
     flight_id: str
     source_type: Literal[
-        "gopro_overlay", "camera", "video", "pano", "face", "pilote", "highlight", "youtube_overlay"
+        "gopro_overlay",
+        "camera",
+        "video",
+        "pano",
+        "face",
+        "pilote",
+        "highlight",
+        "youtube_overlay",
+        "youtube_telemetry",
     ]
     gopro_overlay_job_id: str | None = None
     highlight_video_job_id: str | None = None
+    title: str
+    privacy_status: Literal["private", "unlisted", "public"]
     status: Literal["preparing", "queued", "uploading", "completed", "failed", "cancelled"]
     progress: int = Field(ge=0, le=100)
+    created_at: datetime | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    updated_at: datetime | None = None
     youtube_url: str | None = None
     error: str | None = None
     log_tail: list[str] = Field(default_factory=list)
@@ -772,6 +799,10 @@ class YoutubeVideoAssociation(BaseModel):
     can_delete_from_youtube: bool
     exists_on_youtube: bool | None = None
     title: str | None = None
+
+
+class FlightTemporaryMediaDeleteWarnings(BaseModel):
+    warnings: dict[Literal["video", "camera", "pano", "face", "pilote", "youtube_telemetry"], bool]
 
 
 class YoutubeVideoRemoveRequest(BaseModel):
@@ -813,6 +844,8 @@ class Flight(FlightBase):
     video_export_progress: int | None = None
     video_file_path: str | None = None
     video_file_exists: bool = False
+    youtube_telemetry_video_file_path: str | None = None
+    youtube_telemetry_video_file_exists: bool = False
     pano_video_file_exists: bool = False
     pano_video_filename: str | None = None
     face_video_file_exists: bool = False
@@ -869,6 +902,7 @@ class FlightSummary(BaseModel):
     video_export_progress: int | None = None
     has_video: bool
     has_camera: bool
+    youtube_telemetry_video_file_exists: bool = False
     has_youtube_video: bool
     youtube_video_count: int
     youtube_video_types: list[
@@ -881,6 +915,7 @@ class FlightSummary(BaseModel):
             "pilote",
             "highlight",
             "youtube_overlay",
+            "youtube_telemetry",
         ]
     ] = Field(default_factory=list)
     youtube_upload_status: str | None = None
@@ -891,6 +926,8 @@ class FlightSummary(BaseModel):
     has_gopro_overlay: bool
     has_pano_video: bool
     has_osv: bool = False
+    has_gpx_enrichment: bool = False
+    has_gpx_enrichment_mismatch: bool = False
     has_face_video: bool = False
     has_pilote_video: bool = False
     has_highlight_video: bool

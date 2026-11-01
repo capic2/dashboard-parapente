@@ -36,6 +36,11 @@ import {
   X,
   RefreshCw,
   MoreHorizontal,
+  Camera,
+  ExternalLink,
+  FileText,
+  Play,
+  Wand2,
 } from 'lucide-react';
 import { IntervalsSyncModal } from '../components/flights/intervals-sync/IntervalsSyncModal';
 import { CreateFlightModal } from '../components/flights/create-flight/CreateFlightModal';
@@ -43,7 +48,8 @@ import { CreateSiteModal } from '../components/flights/create-site/CreateSiteMod
 import { FlightsTable } from '../components/flights/table/FlightsTable';
 import { FlightDetails } from '../components/flights/details/FlightDetails';
 import { sitesQueryOptions } from '../hooks/sites/useSites';
-import { Modal, Button } from '@dashboard-parapente/design-system';
+import { Modal } from '@dashboard-parapente/core/Modal';
+import { Button } from '@dashboard-parapente/core/Button/Button';
 import { useToast } from '../hooks/useToast';
 import { HTTPError } from 'ky';
 import { api } from '../lib/api';
@@ -224,34 +230,62 @@ function FlightSortMenu({
 }
 
 const FLIGHT_BADGE_FILTERS = [
-  { id: 'gpx', label: 'flights.gpxBadge' },
   { id: 'gpxIcu', label: 'flights.gpxIcuBadge' },
   { id: 'gpxStrava', label: 'flights.gpxStravaBadge' },
   { id: 'gpxZepp', label: 'flights.gpxZeppBadge' },
-  { id: 'gpxNoSync', label: 'flights.gpxNoSyncBadge' },
+  { id: 'gpxMerged', label: 'flights.gpxEnrichedBadge' },
   { id: 'sportstracklive', label: 'flights.sportstrackliveBadge' },
+  { id: 'osvSources', label: 'flights.osvSourcesBadge' },
   { id: 'video', label: 'flights.videoBadge' },
-  { id: 'camera', label: 'flights.cameraBadge' },
   { id: 'pano', label: 'flights.panoBadge' },
   { id: 'face', label: 'flights.faceBadge' },
   { id: 'pilote', label: 'flights.piloteBadge' },
-  { id: 'goproOverlay', label: 'flights.goproOverlayBadge' },
   { id: 'highlightVideo', label: 'flights.highlightVideoBadge' },
-  { id: 'youtube', label: 'flights.youtubeBadge' },
-  { id: 'youtubeOverlay', label: 'flights.youtubeOverlayFilter' },
-  { id: 'youtubeCamera', label: 'flights.youtubeCameraFilter' },
   { id: 'youtubeVideo', label: 'flights.youtubeVideoFilter' },
   { id: 'youtubePano', label: 'flights.youtubePanoFilter' },
   { id: 'youtubeFace', label: 'flights.youtubeFaceFilter' },
   { id: 'youtubePilote', label: 'flights.youtubePiloteFilter' },
+  { id: 'telemetryVideo', label: 'flights.telemetryVideoFilter' },
+  { id: 'youtubeTelemetry', label: 'flights.youtubeTelemetryFilter' },
   { id: 'youtubeHighlight', label: 'flights.youtubeHighlightFilter' },
 ] as const;
-const PRIMARY_FLIGHT_BADGE_FILTERS = FLIGHT_BADGE_FILTERS.filter(
-  ({ id }) => id === 'gpx' || id === 'video'
-);
-const ADVANCED_FLIGHT_BADGE_FILTERS = FLIGHT_BADGE_FILTERS.filter(
-  ({ id }) => id !== 'gpx' && id !== 'video'
-);
+const FLIGHT_BADGE_FILTER_SECTIONS = [
+  {
+    id: 'links',
+    label: 'flights.tagSectionLinks',
+    filterIds: ['sportstracklive'],
+  },
+  {
+    id: 'gpx',
+    label: 'flights.tagSectionGpx',
+    filterIds: ['gpxIcu', 'gpxStrava', 'gpxZepp', 'gpxMerged'],
+  },
+  {
+    id: 'local',
+    label: 'flights.tagSectionLocal',
+    filterIds: [
+      'osvSources',
+      'video',
+      'pano',
+      'face',
+      'pilote',
+      'telemetryVideo',
+      'highlightVideo',
+    ],
+  },
+  {
+    id: 'youtube',
+    label: 'flights.tagSectionYoutube',
+    filterIds: [
+      'youtubeVideo',
+      'youtubePano',
+      'youtubeFace',
+      'youtubePilote',
+      'youtubeTelemetry',
+      'youtubeHighlight',
+    ],
+  },
+] as const;
 
 type FlightBadgeFilter = (typeof FLIGHT_BADGE_FILTERS)[number]['id'];
 type YoutubeVideoType = NonNullable<
@@ -274,8 +308,6 @@ function flightHasBadgeFilter(
   filter: FlightBadgeFilter
 ) {
   switch (filter) {
-    case 'gpx':
-      return flight.has_gpx;
     case 'gpxIcu':
       return flight.has_gpx && getFlightGpxProvider(flight) === 'intervals_icu';
     case 'gpxStrava':
@@ -285,63 +317,37 @@ function flightHasBadgeFilter(
         flight.has_gpx &&
         ['external', 'zepp'].includes(getFlightGpxProvider(flight) ?? '')
       );
-    case 'gpxNoSync':
-      return flight.has_gpx && flight.gopro_overlay_gpx_offset == null;
+    case 'gpxMerged':
+      return flight.has_gpx && flight.has_gpx_enrichment === true;
     case 'sportstracklive':
       return (
         flight.sportstracklive_status === 'uploaded' &&
         flight.sportstracklive_track_id != null
       );
+    case 'osvSources':
+      return flight.has_osv;
     case 'video':
       return (
         flight.has_video ||
-        hasYoutubeVideoType(flight, 'video') ||
         (flight.video_export_status != null &&
           (VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(flight.video_export_status) ||
             flight.video_export_status === 'failed'))
       );
-    case 'camera':
-      return flight.has_camera || hasYoutubeVideoType(flight, 'camera');
     case 'pano':
-      return flight.has_pano_video || hasYoutubeVideoType(flight, 'pano');
+      return flight.has_pano_video;
     case 'face':
-      return (
-        flight.has_face_video === true || hasYoutubeVideoType(flight, 'face')
-      );
+      return flight.has_face_video === true;
     case 'pilote':
-      return (
-        flight.has_pilote_video === true ||
-        hasYoutubeVideoType(flight, 'pilote')
-      );
-    case 'goproOverlay':
-      return (
-        flight.has_gopro_overlay ||
-        hasYoutubeVideoType(flight, 'gopro_overlay', 'youtube_overlay') ||
-        isGoproOverlayInProgress(flight.gopro_overlay_status) ||
-        flight.gopro_overlay_status === 'failed'
-      );
+      return flight.has_pilote_video === true;
     case 'highlightVideo':
       return (
         flight.has_highlight_video ||
-        hasYoutubeVideoType(flight, 'highlight') ||
         (flight.highlight_video_status != null &&
           (VIDEO_EXPORT_IN_PROGRESS_STATUSES.has(
             flight.highlight_video_status
           ) ||
             flight.highlight_video_status === 'failed'))
       );
-    case 'youtube':
-      return (
-        flight.has_youtube_video ||
-        (flight.youtube_video_types?.length ?? 0) > 0 ||
-        flight.youtube_upload_status === 'queued' ||
-        flight.youtube_upload_status === 'uploading' ||
-        flight.youtube_upload_status === 'failed'
-      );
-    case 'youtubeOverlay':
-      return hasYoutubeVideoType(flight, 'gopro_overlay', 'youtube_overlay');
-    case 'youtubeCamera':
-      return hasYoutubeVideoType(flight, 'camera');
     case 'youtubeVideo':
       return hasYoutubeVideoType(flight, 'video');
     case 'youtubePano':
@@ -350,6 +356,20 @@ function flightHasBadgeFilter(
       return hasYoutubeVideoType(flight, 'face');
     case 'youtubePilote':
       return hasYoutubeVideoType(flight, 'pilote');
+    case 'telemetryVideo':
+      return (
+        flight.youtube_telemetry_video_file_exists === true ||
+        flight.has_gopro_overlay ||
+        isGoproOverlayInProgress(flight.gopro_overlay_status) ||
+        flight.gopro_overlay_status === 'failed'
+      );
+    case 'youtubeTelemetry':
+      return hasYoutubeVideoType(
+        flight,
+        'youtube_telemetry',
+        'gopro_overlay',
+        'youtube_overlay'
+      );
     case 'youtubeHighlight':
       return hasYoutubeVideoType(flight, 'highlight');
   }
@@ -364,6 +384,9 @@ export default function FlightHistory() {
   const summariesQuery = useFlightSummaries(search);
   const [selectedBadgeFilters, setSelectedBadgeFilters] =
     useState<BadgeFilterSelection>({ included: [], excluded: [] });
+  const [badgeFilterMatchMode, setBadgeFilterMatchMode] = useState<
+    'or' | 'and'
+  >('or');
   const activeJobsQuery = useActiveFlightMediaJobs();
   const flights = useMemo(
     () =>
@@ -379,20 +402,19 @@ export default function FlightHistory() {
     return flights.filter((flight) => {
       const matchesIncluded =
         included.length === 0 ||
-        included.some((filter) => flightHasBadgeFilter(flight, filter));
+        (badgeFilterMatchMode === 'or'
+          ? included.some((filter) => flightHasBadgeFilter(flight, filter))
+          : included.every((filter) => flightHasBadgeFilter(flight, filter)));
       const matchesExcluded = excluded.every(
         (filter) => !flightHasBadgeFilter(flight, filter)
       );
       return matchesIncluded && matchesExcluded;
     });
-  }, [flights, selectedBadgeFilters]);
+  }, [badgeFilterMatchMode, flights, selectedBadgeFilters]);
   const activeBadgeFilterCount =
     selectedBadgeFilters.included.length + selectedBadgeFilters.excluded.length;
-  const advancedBadgeFilterCount = ADVANCED_FLIGHT_BADGE_FILTERS.filter(
-    ({ id }) =>
-      selectedBadgeFilters.included.includes(id) ||
-      selectedBadgeFilters.excluded.includes(id)
-  ).length;
+  const showBadgeFilterMatchMode =
+    selectedBadgeFilters.included.length > 0 && activeBadgeFilterCount >= 2;
   const totalFlights = summariesQuery.data?.pages[0]?.total ?? 0;
   const { fetchNextPage, hasNextPage, isFetchingNextPage } = summariesQuery;
   let flightCountLabel = t('flights.registered', { count: totalFlights });
@@ -442,18 +464,41 @@ export default function FlightHistory() {
     const isIncluded = selectedBadgeFilters.included.includes(filter.id);
     const isExcluded = selectedBadgeFilters.excluded.includes(filter.id);
     const isSelected = isIncluded || isExcluded;
-    let stateClassName =
-      'border-slate-300 bg-white text-slate-700 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-950 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:hover:text-slate-100';
+    let badgeColorClassName =
+      'border-blue-200 bg-blue-50 text-blue-800 hover:border-blue-300 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-950/70';
+    if (filter.id.startsWith('gpx')) {
+      badgeColorClassName =
+        'border-emerald-200 bg-emerald-50 text-emerald-800 hover:border-emerald-300 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-950/70';
+    } else if (filter.id === 'sportstracklive') {
+      badgeColorClassName =
+        'border-sky-200 bg-sky-50 text-sky-800 hover:border-sky-300 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200 dark:hover:bg-sky-950/70';
+    } else if (filter.id === 'osvSources') {
+      badgeColorClassName =
+        'border-teal-200 bg-teal-50 text-teal-800 hover:border-teal-300 hover:bg-teal-100 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-200 dark:hover:bg-teal-950/70';
+    } else if (filter.id.startsWith('youtube')) {
+      badgeColorClassName =
+        'border-red-200 bg-red-50 text-red-800 hover:border-red-300 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/70';
+    } else if (filter.id === 'highlightVideo') {
+      badgeColorClassName =
+        'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-800 hover:border-fuchsia-300 hover:bg-fuchsia-100 dark:border-fuchsia-800 dark:bg-fuchsia-950/40 dark:text-fuchsia-200 dark:hover:bg-fuchsia-950/70';
+    }
+    let stateClassName = badgeColorClassName;
     let accessibleStateKey = 'flights.tagNotSelected';
     if (isIncluded) {
-      stateClassName =
-        'border-sky-600 bg-sky-100 text-sky-950 dark:border-sky-400 dark:bg-sky-900 dark:text-sky-100';
+      stateClassName = `${badgeColorClassName} ring-2 ring-sky-500 ring-offset-1 dark:ring-offset-slate-900`;
       accessibleStateKey = 'flights.tagIncluded';
     } else if (isExcluded) {
-      stateClassName =
-        'border-rose-600 bg-rose-100 text-rose-950 dark:border-rose-400 dark:bg-rose-900 dark:text-rose-100';
+      stateClassName = `${badgeColorClassName} opacity-60 line-through`;
       accessibleStateKey = 'flights.tagExcluded';
     }
+
+    let BadgeIcon = Camera;
+    if (filter.id.startsWith('gpx')) BadgeIcon = FileText;
+    else if (filter.id === 'sportstracklive') BadgeIcon = ExternalLink;
+    else if (filter.id === 'highlightVideo') {
+      BadgeIcon = Wand2;
+    }
+    const TagIcon = filter.id.startsWith('youtube') ? Play : BadgeIcon;
 
     return (
       <button
@@ -464,6 +509,7 @@ export default function FlightHistory() {
         onClick={() => toggleBadgeFilter(filter.id)}
         className={`min-h-9 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 lg:min-h-8 lg:px-2.5 ${stateClassName}`}
       >
+        <TagIcon className="mr-1 inline h-3.5 w-3.5" />
         {isIncluded && (
           <Check aria-hidden="true" className="mr-1 inline h-3.5 w-3.5" />
         )}
@@ -962,25 +1008,56 @@ export default function FlightHistory() {
                     hidden={!isTagFilterExpanded}
                     className="space-y-2 lg:space-y-1"
                   >
-                    <div className="flex flex-wrap gap-1.5">
-                      {PRIMARY_FLIGHT_BADGE_FILTERS.map(renderBadgeFilter)}
-                    </div>
-                    <details className="group rounded-lg">
-                      <summary className="flex min-h-9 cursor-pointer list-none items-center gap-1 rounded-md text-xs font-medium text-sky-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-sky-300 lg:min-h-8">
-                        {advancedBadgeFilterCount > 0
-                          ? t('flights.moreTagFiltersActive', {
-                              count: advancedBadgeFilterCount,
-                            })
-                          : t('flights.moreTagFilters')}
-                        <ChevronDown
-                          aria-hidden="true"
-                          className="h-3.5 w-3.5 transition-transform group-open:rotate-180"
-                        />
-                      </summary>
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {ADVANCED_FLIGHT_BADGE_FILTERS.map(renderBadgeFilter)}
-                      </div>
-                    </details>
+                    {showBadgeFilterMatchMode && (
+                      <fieldset className="flex min-w-0 flex-wrap items-center gap-2 border-0 p-0">
+                        <legend className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                          {t('flights.tagMatchLogic')}
+                        </legend>
+                        <div className="inline-flex rounded-lg border border-gray-300 p-0.5 dark:border-gray-600">
+                          {(['or', 'and'] as const).map((mode) => {
+                            const isSelected = badgeFilterMatchMode === mode;
+                            return (
+                              <button
+                                key={mode}
+                                type="button"
+                                aria-pressed={isSelected}
+                                aria-label={t(
+                                  mode === 'or'
+                                    ? 'flights.tagMatchAnyAriaLabel'
+                                    : 'flights.tagMatchAllAriaLabel'
+                                )}
+                                onClick={() => setBadgeFilterMatchMode(mode)}
+                                className={`min-h-9 min-w-11 cursor-pointer rounded-md px-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
+                                  isSelected
+                                    ? 'bg-sky-600 text-white dark:bg-sky-500'
+                                    : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700'
+                                }`}
+                              >
+                                {t(
+                                  mode === 'or'
+                                    ? 'flights.tagMatchAny'
+                                    : 'flights.tagMatchAll'
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </fieldset>
+                    )}
+                    {FLIGHT_BADGE_FILTER_SECTIONS.map((section) => (
+                      <section key={section.id} className="space-y-1">
+                        <h3 className="text-xs font-semibold text-sky-700 dark:text-sky-300">
+                          {t(section.label)}
+                        </h3>
+                        <div className="flex flex-wrap gap-1.5">
+                          {FLIGHT_BADGE_FILTERS.filter(({ id }) =>
+                            (section.filterIds as readonly string[]).includes(
+                              id
+                            )
+                          ).map(renderBadgeFilter)}
+                        </div>
+                      </section>
+                    ))}
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       {t('flights.tagFilterInstructions')}
                     </p>

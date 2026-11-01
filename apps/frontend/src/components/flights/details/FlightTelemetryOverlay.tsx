@@ -6,6 +6,7 @@ import {
 } from '../../../hooks/flights/useFlightTelemetry';
 import {
   DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
+  getTelemetryLayoutGroupBounds,
   TELEMETRY_CANVAS_HEIGHT,
   TELEMETRY_CANVAS_WIDTH,
   type TelemetryLayout,
@@ -45,7 +46,7 @@ export function FlightTelemetryOverlay({
   timelineStartTimestamp,
   layout = DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
 }: FlightTelemetryOverlayProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const longPressTimer = useRef<number | null>(null);
   const longPressTriggered = useRef(false);
   const backgroundImage = (layout as TelemetryLayout).backgroundImage;
@@ -92,20 +93,88 @@ export function FlightTelemetryOverlay({
         backgroundPosition: backgroundImage ? 'center' : undefined,
       }}
     >
+      {Array.from(
+        new Set(
+          [
+            ...layout.map((slot) => slot.parentGroupId),
+            ...layout.map((slot) => slot.groupId),
+          ].filter((id): id is string => Boolean(id))
+        )
+      ).map((groupId) => {
+        const group = layout.find((slot) => slot.groupId === groupId);
+        const parentGroup = layout.find(
+          (slot) => slot.parentGroupId === groupId
+        );
+        const bounds = getTelemetryLayoutGroupBounds(layout, groupId);
+        const backgroundColor =
+          group?.groupBackgroundColor ??
+          parentGroup?.parentGroupBackgroundColor;
+        if (!backgroundColor || !bounds) return null;
+        const opacity = Math.max(
+          0,
+          Math.min(
+            1,
+            group?.groupBackgroundOpacity ??
+              parentGroup?.parentGroupBackgroundOpacity ??
+              0.25
+          )
+        );
+        const borderRadius = Math.max(
+          0,
+          Math.min(
+            120,
+            group?.groupBorderRadius ??
+              parentGroup?.parentGroupBorderRadius ??
+              12
+          )
+        );
+        return (
+          <div
+            key={`group-background-${groupId}`}
+            aria-hidden="true"
+            className="pointer-events-none absolute rounded-xl"
+            style={{
+              left: `${(bounds.x / TELEMETRY_CANVAS_WIDTH) * 100}%`,
+              top: `${(bounds.y / TELEMETRY_CANVAS_HEIGHT) * 100}%`,
+              width: `${(bounds.width / TELEMETRY_CANVAS_WIDTH) * 100}%`,
+              height: `${(bounds.height / TELEMETRY_CANVAS_HEIGHT) * 100}%`,
+              borderRadius: `${(borderRadius / TELEMETRY_CANVAS_WIDTH) * 100}cqw`,
+              backgroundColor: `${backgroundColor}${Math.round(opacity * 255)
+                .toString(16)
+                .padStart(2, '0')}`,
+            }}
+          />
+        );
+      })}
       {layout
         .filter((slot) => slot.visible)
         .map((slot) => {
           if (slot.type === 'pip') return null;
+          const customBackground =
+            slot.transparent === false && slot.backgroundColor
+              ? `${slot.backgroundColor}${Math.round(
+                  Math.max(0, Math.min(1, slot.backgroundOpacity ?? 0.85)) * 255
+                )
+                  .toString(16)
+                  .padStart(2, '0')}`
+              : undefined;
+          const backgroundClass =
+            slot.transparent === false
+              ? customBackground
+                ? 'bg-transparent shadow-lg backdrop-blur-sm'
+                : 'bg-slate-950/75 shadow-lg backdrop-blur-sm'
+              : 'bg-transparent';
           if (slot.type === 'icon') {
             return (
               <div
                 key={slot.id}
-                className={`pointer-events-auto absolute flex items-center justify-center rounded-lg border text-white ${slot.transparent === false ? 'bg-slate-950/75 shadow-lg backdrop-blur-sm' : 'bg-transparent'} ${slot.border === true ? 'border-white/25' : 'border-transparent'}`}
+                className={`pointer-events-auto absolute flex items-center justify-center rounded-lg border text-white ${backgroundClass} ${slot.border === true ? 'border-white/25' : 'border-transparent'}`}
                 style={{
                   left: `${(slot.x / TELEMETRY_CANVAS_WIDTH) * 100}%`,
                   top: `${(slot.y / TELEMETRY_CANVAS_HEIGHT) * 100}%`,
                   width: `${(slot.width / TELEMETRY_CANVAS_WIDTH) * 100}%`,
                   height: `${(slot.height / TELEMETRY_CANVAS_HEIGHT) * 100}%`,
+                  backgroundColor: customBackground,
                 }}
               >
                 <TelemetryLayoutIcon name={slot.icon} className="h-1/2 w-1/2" />
@@ -116,7 +185,7 @@ export function FlightTelemetryOverlay({
             return (
               <div
                 key={slot.id}
-                className={`pointer-events-auto absolute flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border px-3 py-2 text-left font-semibold text-white ${slot.transparent === false ? 'bg-slate-950/75 shadow-lg backdrop-blur-sm' : 'bg-transparent'} ${slot.border === true ? 'border-white/25' : 'border-transparent'}`}
+                className={`pointer-events-auto absolute flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border px-3 py-2 text-left font-semibold text-white ${backgroundClass} ${slot.border === true ? 'border-white/25' : 'border-transparent'}`}
                 style={{
                   left: `${(slot.x / TELEMETRY_CANVAS_WIDTH) * 100}%`,
                   top: `${(slot.y / TELEMETRY_CANVAS_HEIGHT) * 100}%`,
@@ -124,6 +193,7 @@ export function FlightTelemetryOverlay({
                   height: `${(slot.height / TELEMETRY_CANVAS_HEIGHT) * 100}%`,
                   fontSize: `${((slot.fontSize ?? 32) / TELEMETRY_CANVAS_WIDTH) * 100}cqw`,
                   textAlign: slot.textAlign ?? 'left',
+                  backgroundColor: customBackground,
                 }}
               >
                 <span className="block truncate" style={{ fontSize: '1em' }}>
@@ -136,7 +206,8 @@ export function FlightTelemetryOverlay({
           const [value, unit] = getTelemetryMetricValue(
             point,
             data,
-            metric
+            metric,
+            i18n?.resolvedLanguage ?? i18n?.language
           ) ?? [null, ''];
           const nextMetric =
             CYCLE_METRICS[
@@ -161,7 +232,7 @@ export function FlightTelemetryOverlay({
               key={slot.id}
               type="button"
               tabIndex={isInteractive ? 0 : -1}
-              className={`pointer-events-auto absolute min-h-0 min-w-0 overflow-hidden ${isInteractive ? 'cursor-pointer' : 'cursor-default'} rounded-lg border px-3 py-2 text-left text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${slot.transparent === false ? 'bg-slate-950/75 shadow-lg backdrop-blur-sm hover:bg-slate-900' : 'bg-transparent'} ${slot.border === true ? 'border-white/25' : 'border-transparent'}`}
+              className={`pointer-events-auto absolute min-h-0 min-w-0 overflow-hidden ${isInteractive ? 'cursor-pointer' : 'cursor-default'} rounded-lg border px-3 py-2 text-left text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${customBackground ? 'bg-transparent shadow-lg backdrop-blur-sm' : slot.transparent === false ? 'bg-slate-950/75 shadow-lg backdrop-blur-sm hover:bg-slate-900' : 'bg-transparent'} ${slot.border === true ? 'border-white/25' : 'border-transparent'}`}
               style={{
                 left: `${(slot.x / TELEMETRY_CANVAS_WIDTH) * 100}%`,
                 top: `${(slot.y / TELEMETRY_CANVAS_HEIGHT) * 100}%`,
@@ -169,6 +240,7 @@ export function FlightTelemetryOverlay({
                 height: `${(slot.height / TELEMETRY_CANVAS_HEIGHT) * 100}%`,
                 fontSize: `${((slot.fontSize ?? 32) / TELEMETRY_CANVAS_WIDTH) * 100}cqw`,
                 textAlign: slot.valueAlign ?? 'left',
+                backgroundColor: customBackground,
               }}
               onPointerDown={() => {
                 longPressTriggered.current = false;
@@ -190,7 +262,7 @@ export function FlightTelemetryOverlay({
                 }
                 if (hasClickAction) cycleMetric();
               }}
-              aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${formatTelemetryValue(value)}${slot.showUnit === false ? '' : ` ${unit}`}. ${t('flights.telemetryChangeMetric')}`}
+              aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${slot.valuePrefix ?? ''}${formatTelemetryValue(value, '—', metric === 'speed')}${slot.showUnit === false ? '' : ` ${unit}`}. ${t('flights.telemetryChangeMetric')}`}
             >
               {slot.variant && slot.variant !== 'value' ? (
                 <TelemetrySpeedometer
@@ -198,6 +270,7 @@ export function FlightTelemetryOverlay({
                   value={value}
                   unit={unit}
                   showUnit={slot.showUnit !== false}
+                  valuePrefix={slot.valuePrefix}
                   variant={slot.variant}
                 />
               ) : null}
@@ -205,7 +278,8 @@ export function FlightTelemetryOverlay({
                 className="mt-0.5 block font-mono font-bold leading-none"
                 style={{ fontSize: '1em' }}
               >
-                {formatTelemetryValue(value)}
+                {slot.valuePrefix ?? ''}
+                {formatTelemetryValue(value, '—', metric === 'speed')}
                 {slot.showUnit !== false && (
                   <span
                     className="ml-1 font-normal text-slate-300"

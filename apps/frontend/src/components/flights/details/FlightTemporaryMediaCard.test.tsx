@@ -3,18 +3,31 @@ import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Flight } from '../../../types';
 
-const { publicationMock, mutateAsyncMock, toastSuccessMock, toastErrorMock } =
-  vi.hoisted(() => ({
-    publicationMock: {
-      upload: { data: null as unknown },
-      isPublished: false,
-    },
-    mutateAsyncMock: vi.fn(),
-    toastSuccessMock: vi.fn(),
-    toastErrorMock: vi.fn(),
-  }));
+const {
+  publicationMock,
+  deleteWarningsMock,
+  refetchDeleteWarningsMock,
+  mutateAsyncMock,
+  toastSuccessMock,
+  toastErrorMock,
+} = vi.hoisted(() => ({
+  publicationMock: {
+    upload: { data: null as unknown },
+    isPublished: false,
+  },
+  deleteWarningsMock: {
+    data: { warnings: {} as Record<string, boolean> },
+    isPending: false,
+    isFetching: false,
+    isError: false,
+  },
+  refetchDeleteWarningsMock: vi.fn(),
+  mutateAsyncMock: vi.fn(),
+  toastSuccessMock: vi.fn(),
+  toastErrorMock: vi.fn(),
+}));
 
-vi.mock('@dashboard-parapente/design-system', () => ({
+vi.mock('@dashboard-parapente/core/Button/Button', () => ({
   Button: ({
     children,
     isDisabled,
@@ -29,6 +42,9 @@ vi.mock('@dashboard-parapente/design-system', () => ({
       {children}
     </button>
   ),
+}));
+
+vi.mock('@dashboard-parapente/core/Modal', () => ({
   Modal: ({
     children,
     isOpen,
@@ -66,10 +82,20 @@ vi.mock('react-i18next', () => ({
         'flights.temporarySourceDeleteDescription': `Delete the local ${options?.title ?? ''} file?`,
         'flights.temporarySourceDeleteYoutubeNote':
           'The video stays on YouTube.',
+        'flights.temporarySourceDeleteLocalNote':
+          'Only the local file will be deleted.',
+        'flights.temporarySourceDeleteUnavailableYoutubeNote':
+          'A previously published video cannot be found on YouTube. Deleting this file means it cannot be recovered. Continue?',
+        'flights.temporarySourceDeleteChecking':
+          'Checking availability of previous YouTube videos…',
+        'flights.temporarySourceDeleteWarningUnavailable':
+          'Could not check previous YouTube videos. Delete only if you accept that an uploaded video might not be recoverable.',
         'flights.temporarySourceDeleting': 'Deleting…',
         'common.cancel': 'Cancel',
         'flights.temporarySourceDeleted': 'Local file deleted',
         'flights.temporarySourceDeleteError': 'Unable to delete local file',
+        'flights.temporarySourceDeleteConflict':
+          'Deletion blocked by YouTube publication safety.',
         'flights.cameraThumbnailAlt': 'Camera thumbnail',
         'flights.panoThumbnailAlt': 'Pano thumbnail',
         'flights.temporaryVideoThumbnailAlt': `${options?.role ?? ''} video thumbnail`,
@@ -81,6 +107,10 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('../../../hooks/flights/useYoutubeUpload', () => ({
   useYoutubeSourcePublicationStatus: () => publicationMock,
+  useFlightTemporaryMediaDeleteWarnings: () => ({
+    ...deleteWarningsMock,
+    refetch: refetchDeleteWarningsMock,
+  }),
   useDeleteFlightTemporaryMedia: () => ({
     isPending: false,
     mutateAsync: mutateAsyncMock,
@@ -92,8 +122,26 @@ vi.mock('../../../hooks/useToast', () => ({
 }));
 
 vi.mock('../../../lib/api', () => ({
-  getApiErrorMessage: vi.fn((_error: unknown, fallback: string) =>
-    Promise.resolve(fallback)
+  getApiErrorMessage: vi.fn(
+    (
+      error: unknown,
+      fallback: string,
+      statusMessages?: Partial<
+        Record<number, { message: string; details: readonly string[] }>
+      >
+    ) => {
+      const status =
+        error instanceof Error &&
+        'response' in error &&
+        error.response instanceof Response
+          ? error.response.status
+          : undefined;
+      return Promise.resolve(
+        (status === undefined
+          ? undefined
+          : statusMessages?.[status]?.message) ?? fallback
+      );
+    }
   ),
 }));
 
@@ -118,12 +166,17 @@ describe('FlightTemporaryMediaCard', () => {
   beforeEach(() => {
     publicationMock.upload = { data: null };
     publicationMock.isPublished = false;
+    deleteWarningsMock.data = { warnings: {} };
+    deleteWarningsMock.isPending = false;
+    deleteWarningsMock.isFetching = false;
+    deleteWarningsMock.isError = false;
+    refetchDeleteWarningsMock.mockReset();
     mutateAsyncMock.mockReset().mockResolvedValue(undefined);
     toastSuccessMock.mockReset();
     toastErrorMock.mockReset();
   });
 
-  it('shows the source role, ready state, and YouTube action without offering deletion', () => {
+  it('shows the source role, ready state, YouTube action, and local deletion', () => {
     render(<FlightTemporaryMediaCard flight={flight} sourceType="pano" />);
 
     expect(screen.getByRole('heading', { name: 'Pano' })).toBeInTheDocument();
@@ -132,8 +185,13 @@ describe('FlightTemporaryMediaCard', () => {
       screen.getByRole('button', { name: 'Publish to YouTube' })
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Delete local file' })
-    ).not.toBeInTheDocument();
+      screen.getByRole('button', { name: 'Delete local file' })
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete local file' }));
+    expect(refetchDeleteWarningsMock).toHaveBeenCalledOnce();
+    expect(
+      screen.getByText('Only the local file will be deleted.')
+    ).toBeInTheDocument();
   });
 
   it('shows upload progress and failure as text statuses', () => {
@@ -186,5 +244,65 @@ describe('FlightTemporaryMediaCard', () => {
     });
     fireEvent.click(deleteButtons[deleteButtons.length - 1]);
     await waitFor(() => expect(mutateAsyncMock).toHaveBeenCalledWith('pano'));
+  });
+
+  it('asks for explicit confirmation when a previous YouTube upload is unavailable', () => {
+    deleteWarningsMock.data = { warnings: { youtube_telemetry: true } };
+    render(
+      <FlightTemporaryMediaCard
+        flight={flight}
+        sourceType="youtube_telemetry"
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete local file' }));
+
+    expect(
+      screen.getByText(
+        'A previously published video cannot be found on YouTube. Deleting this file means it cannot be recovered. Continue?'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('refreshes YouTube availability when opening confirmation and waits for the check', () => {
+    deleteWarningsMock.isFetching = true;
+    render(<FlightTemporaryMediaCard flight={flight} sourceType="pano" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete local file' }));
+
+    expect(refetchDeleteWarningsMock).toHaveBeenCalledOnce();
+    expect(
+      screen.getByText('Checking availability of previous YouTube videos…')
+    ).toBeInTheDocument();
+    const deleteButtons = screen.getAllByRole('button', {
+      name: 'Delete local file',
+    });
+    expect(deleteButtons[deleteButtons.length - 1]).toBeDisabled();
+  });
+
+  it('explains when YouTube safety blocks local deletion', async () => {
+    mutateAsyncMock.mockRejectedValueOnce(
+      Object.assign(new Error('Conflict'), {
+        response: new Response(null, { status: 409 }),
+      })
+    );
+    render(
+      <FlightTemporaryMediaCard
+        flight={flight}
+        sourceType="youtube_telemetry"
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete local file' }));
+    const deleteButtons = screen.getAllByRole('button', {
+      name: 'Delete local file',
+    });
+    fireEvent.click(deleteButtons[deleteButtons.length - 1]);
+
+    await waitFor(() =>
+      expect(toastErrorMock).toHaveBeenCalledWith(
+        'Deletion blocked by YouTube publication safety.'
+      )
+    );
   });
 });

@@ -20,6 +20,8 @@ export type MetricKey =
   | 'power'
   | 'total_gain'
   | 'total_loss'
+  | 'climb_from_takeoff'
+  | 'descent_from_takeoff'
   | 'datetime';
 
 export const METRIC_KEYS: MetricKey[] = [
@@ -39,6 +41,8 @@ export const METRIC_KEYS: MetricKey[] = [
   'power',
   'total_gain',
   'total_loss',
+  'climb_from_takeoff',
+  'descent_from_takeoff',
   'datetime',
 ];
 
@@ -59,6 +63,8 @@ export const METRIC_LABELS: Record<MetricKey, string> = {
   power: 'telemetryPower',
   total_gain: 'telemetryTotalGain',
   total_loss: 'telemetryTotalLoss',
+  climb_from_takeoff: 'telemetryClimbFromTakeoff',
+  descent_from_takeoff: 'telemetryDescentFromTakeoff',
   datetime: 'telemetryDateTime',
 };
 
@@ -74,6 +80,8 @@ const POINT_INDEPENDENT_METRICS = new Set<MetricKey>([
   'heart_rate_max',
   'total_gain',
   'total_loss',
+  'climb_from_takeoff',
+  'descent_from_takeoff',
 ]);
 
 function numericValues(
@@ -108,10 +116,31 @@ function elevationChange(
   return total;
 }
 
+function elevationFromTakeoff(
+  data: FlightTelemetryData | undefined,
+  altitudes: readonly number[],
+  positive: boolean
+) {
+  const takeoffElevation = data?.points[0]?.elevation;
+  const extremeElevation = positive ? maximum(altitudes) : minimum(altitudes);
+  if (
+    takeoffElevation == null ||
+    !Number.isFinite(takeoffElevation) ||
+    extremeElevation == null
+  ) {
+    return null;
+  }
+  const difference = positive
+    ? extremeElevation - takeoffElevation
+    : takeoffElevation - extremeElevation;
+  return Math.max(0, difference);
+}
+
 export function getTelemetryMetricValue(
   point: FlightTelemetryPoint | null,
   data: FlightTelemetryData | undefined,
-  metric: MetricKey
+  metric: MetricKey,
+  locale?: string
 ): [DisplayValue, string] | null {
   if (!point && !POINT_INDEPENDENT_METRICS.has(metric)) {
     return null;
@@ -152,20 +181,29 @@ export function getTelemetryMetricValue(
       return [elevationChange(data, true), 'm'];
     case 'total_loss':
       return [elevationChange(data, false), 'm'];
+    case 'climb_from_takeoff':
+      return [elevationFromTakeoff(data, altitudes, true), 'm'];
+    case 'descent_from_takeoff':
+      return [elevationFromTakeoff(data, altitudes, false), 'm'];
     case 'datetime': {
       if (!point) return null;
       const timestamp =
         point.timestamp < 1_000_000_000_000
           ? point.timestamp * 1000
           : point.timestamp;
-      return [new Date(timestamp).toLocaleString(), ''];
+      return [new Date(timestamp).toLocaleString(locale), ''];
     }
   }
 }
 
-export function formatTelemetryValue(value: DisplayValue, emptyValue = '—') {
+export function formatTelemetryValue(
+  value: DisplayValue,
+  emptyValue = '—',
+  roundToInteger = false
+) {
   if (typeof value === 'string') return value;
   if (value == null || !Number.isFinite(value)) return emptyValue;
+  if (roundToInteger) return Math.round(value).toString();
   return Math.abs(value) >= 100
     ? Math.round(value).toString()
     : value.toFixed(1);

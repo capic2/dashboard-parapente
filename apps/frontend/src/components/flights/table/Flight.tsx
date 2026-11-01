@@ -1,14 +1,15 @@
 import { useTranslation } from 'react-i18next';
-import { Button, Card } from '@dashboard-parapente/design-system';
+import { Button } from '@dashboard-parapente/core/Button/Button';
+import { Card } from '@dashboard-parapente/core/Card/Card';
 import { VIDEO_EXPORT_IN_PROGRESS_STATUSES } from '@dashboard-parapente/shared-types';
 import {
   Camera,
   Clock3,
   ExternalLink,
+  FileWarning,
   FileText,
   MapPin,
   Mountain,
-  Orbit,
   Play,
   Ruler,
   Trash2,
@@ -67,8 +68,8 @@ export function Flight({
   const units = useAppSettingsStore((state) => state.settings.units);
   const isHighlighted = isActive || isSelected;
   const hasGpx = flight.has_gpx;
+  const hasGpxEnrichment = flight.has_gpx_enrichment === true;
   const gpxProvider = getFlightGpxProvider(flight);
-  const isGpxUnsynced = flight.gopro_overlay_gpx_offset == null;
   const gpxProviderBadgeKeys: Record<string, string> = {
     intervals_icu: 'flights.gpxIcuBadge',
     strava: 'flights.gpxStravaBadge',
@@ -76,8 +77,10 @@ export function Flight({
     zepp: 'flights.gpxZeppBadge',
   };
   const gpxProviderBadgeKey = gpxProviderBadgeKeys[gpxProvider ?? ''];
+  const gpxBadgeKey = hasGpxEnrichment
+    ? 'flights.gpxEnrichedBadge'
+    : gpxProviderBadgeKey;
   const hasVideo = flight.has_video;
-  const hasCamera = flight.has_camera;
   const hasYoutubeVideo = flight.has_youtube_video;
   const isYoutubeUploadRunning =
     flight.youtube_upload_status === 'queued' ||
@@ -91,10 +94,9 @@ export function Flight({
     flight.youtube_overlay_export_status === 'failed';
   const hasPanoVideo = flight.has_pano_video;
   const hasOsv = flight.has_osv;
+  const hasGpxEnrichmentMismatch = flight.has_gpx_enrichment_mismatch === true;
   const hasFaceVideo = flight.has_face_video === true;
   const hasPiloteVideo = flight.has_pilote_video === true;
-  const shouldShowGpxUnsyncedBadge =
-    hasGpx && isGpxUnsynced && (hasFaceVideo || hasPiloteVideo);
   const hasHighlightVideo = flight.has_highlight_video;
   const hasSportstrackliveTrack =
     flight.sportstracklive_status === 'uploaded' &&
@@ -145,10 +147,19 @@ export function Flight({
   const youtubeVideoCountLabel =
     flight.youtube_video_count > 1 ? ` x${flight.youtube_video_count}` : '';
   const youtubeVideoTypes = flight.youtube_video_types ?? [];
+  const normalizedYoutubeVideoTypes = [
+    ...new Set(
+      youtubeVideoTypes.map((sourceType) =>
+        ['gopro_overlay', 'youtube_overlay', 'youtube_telemetry'].includes(
+          sourceType
+        )
+          ? 'youtube_telemetry'
+          : sourceType
+      )
+    ),
+  ].filter((sourceType) => sourceType !== 'camera');
   const youtubeTypeLabels: Record<string, string> = {
-    gopro_overlay: 'flights.goproOverlayBadge',
-    youtube_overlay: 'flights.goproOverlayBadge',
-    camera: 'flights.cameraBadge',
+    youtube_telemetry: 'flights.youtubeTelemetryBadge',
     video: 'flights.videoBadge',
     pano: 'flights.panoBadge',
     face: 'flights.faceBadge',
@@ -172,14 +183,15 @@ export function Flight({
   const hasMediaStatus =
     hasGpx ||
     hasVideo ||
-    hasCamera ||
     hasYoutubeVideo ||
+    flight.youtube_telemetry_video_file_exists === true ||
     isYoutubeUploadRunning ||
     isYoutubeUploadFailed ||
     isYoutubeOverlayExportRunning ||
     isYoutubeOverlayExportFailed ||
     hasPanoVideo ||
     hasOsv ||
+    hasGpxEnrichmentMismatch ||
     hasFaceVideo ||
     hasPiloteVideo ||
     hasHighlightVideo ||
@@ -249,16 +261,10 @@ export function Flight({
           </h3>
           {hasMediaStatus && (
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {hasGpx && (
+              {hasGpx && gpxBadgeKey && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
                   <FileText className="h-3 w-3" aria-hidden="true" />
-                  {t(gpxProviderBadgeKey ?? 'flights.gpxBadge')}
-                </span>
-              )}
-              {shouldShowGpxUnsyncedBadge && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-                  <Clock3 className="h-3 w-3" aria-hidden="true" />
-                  {t('flights.gpxNoSyncBadge')}
+                  {t(gpxBadgeKey)}
                 </span>
               )}
               {hasSportstrackliveTrack && (
@@ -268,45 +274,46 @@ export function Flight({
                 </span>
               )}
               {hasVideo && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
-                  <Video className="h-3 w-3" aria-hidden="true" />
+                <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                  <Camera className="h-3 w-3" aria-hidden="true" />
                   {t('flights.videoBadge')}
                 </span>
               )}
-              {hasCamera && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-                  <Camera className="h-3 w-3" aria-hidden="true" />
-                  {t('flights.cameraBadge')}
-                </span>
-              )}
               {hasPanoVideo && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
-                  <Orbit className="h-3 w-3" aria-hidden="true" />
+                <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                  <Camera className="h-3 w-3" aria-hidden="true" />
                   {t('flights.panoBadge')}
                 </span>
               )}
               {hasOsv && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200">
+                <span className="inline-flex items-center gap-1 rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-teal-800 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-200">
                   <Video className="h-3 w-3" aria-hidden="true" />
                   {t('flights.osvSourcesBadge')}
                 </span>
               )}
+              {hasGpxEnrichmentMismatch && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                  <FileWarning className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.gpxEnrichmentMismatchBadge')}
+                </span>
+              )}
               {hasFaceVideo && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
-                  <Video className="h-3 w-3" aria-hidden="true" />
+                <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                  <Camera className="h-3 w-3" aria-hidden="true" />
                   {t('flights.faceBadge')}
                 </span>
               )}
               {hasPiloteVideo && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
-                  <Video className="h-3 w-3" aria-hidden="true" />
+                <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                  <Camera className="h-3 w-3" aria-hidden="true" />
                   {t('flights.piloteBadge')}
                 </span>
               )}
-              {hasCompletedGoproOverlay && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200">
-                  <Wand2 className="h-3 w-3" aria-hidden="true" />
-                  {t('flights.goproOverlayBadge')}
+              {(hasCompletedGoproOverlay ||
+                flight.youtube_telemetry_video_file_exists) && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                  <Camera className="h-3 w-3" aria-hidden="true" />
+                  {t('flights.youtubeTelemetryBadge')}
                 </span>
               )}
               {hasHighlightVideo && (
@@ -315,7 +322,7 @@ export function Flight({
                   {t('flights.highlightVideoBadge')}
                 </span>
               )}
-              {youtubeVideoTypes.map((sourceType, index) => (
+              {normalizedYoutubeVideoTypes.map((sourceType, index) => (
                 <span
                   key={`${sourceType}-${index}`}
                   className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"

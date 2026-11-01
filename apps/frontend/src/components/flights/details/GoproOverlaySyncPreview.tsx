@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Gauge, HeartPulse, MapPin, Mountain, TimerReset } from 'lucide-react';
+import {
+  CalendarClock,
+  Gauge,
+  HeartPulse,
+  MapPin,
+  Mountain,
+  TimerReset,
+} from 'lucide-react';
 import {
   useGenerateGoproPreview,
   useGenerateGoproMerge,
@@ -162,7 +169,7 @@ export function GoproOverlaySyncPreview({
   youtubeUrls = EMPTY_YOUTUBE_URLS,
   onCurrentYoutubePositionChange,
 }: GoproOverlaySyncPreviewProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const token = useAuthStore((state) => state.token);
   const queryClient = useQueryClient();
   const youtubeAssociations = useYoutubeVideoAssociations(flightId);
@@ -290,18 +297,32 @@ export function GoproOverlaySyncPreview({
       preview.data.gpx.coordinates[0]?.timestamp ??
       parseApiUtcDate(preview.data.gpx.start_time).getTime();
   }
-  const telemetry = gpxCoordinates.length
-    ? telemetryAtTimestamp(
-        gpxCoordinates,
-        calibrationTelemetryTimestampAtVideoTime(
+  const gpxTimestampAtPlayback =
+    Number.isFinite(gpxStartTimestamp) && gpxStartTimestamp > 0
+      ? calibrationTelemetryTimestampAtVideoTime(
           gpxStartTimestamp,
           sourceVideoTime,
           automaticOffset,
           displayOffset
         )
-      )
-    : null;
+      : null;
+  const telemetry =
+    gpxCoordinates.length && gpxTimestampAtPlayback !== null
+      ? telemetryAtTimestamp(gpxCoordinates, gpxTimestampAtPlayback)
+      : null;
   const heartRate = telemetry?.heart_rate ?? null;
+  const gpxDateTime =
+    telemetry && Number.isFinite(telemetry.timestamp)
+      ? new Date(telemetry.timestamp).toISOString()
+      : null;
+  const parsedGpxDateTime = gpxDateTime ? parseApiUtcDate(gpxDateTime) : null;
+  const formattedGpxDateTime =
+    parsedGpxDateTime && Number.isFinite(parsedGpxDateTime.getTime())
+      ? new Intl.DateTimeFormat(i18n.language, {
+          dateStyle: 'short',
+          timeStyle: 'medium',
+        }).format(parsedGpxDateTime)
+      : t('flights.goproOverlayTelemetryUnavailable');
   const videoUrl = getApiUrlWithSearchParams(
     `flights/${flightId}/gopro-camera/preview`,
     {
@@ -323,6 +344,21 @@ export function GoproOverlaySyncPreview({
     Math.floor((preview.data?.video.preview_max_duration_seconds ?? 900) / 60)
   );
   const isGenerating = preview.data?.video.preview_status === 'generating';
+  const enrichmentStatus = preview.data?.gpx?.enrichment_status;
+  const enrichmentProgress =
+    preview.data?.gpx?.enrichment_progress ??
+    flightTelemetry.data?.enrichment_progress ??
+    null;
+
+  useEffect(() => {
+    if (enrichmentStatus === 'ready') {
+      // The enrichment finishes after the offset PATCH response. Refresh the
+      // flight after the preview confirms it is ready so clients receive the
+      // newly persisted canonical GPX path.
+      void queryClient.invalidateQueries({ queryKey: ['flights'] });
+    }
+  }, [enrichmentStatus, flightId, queryClient]);
+
   const isMergeMissing = preview.data?.gpx?.enrichment_status === 'missing';
   const isEnrichmentFailed =
     flightTelemetry.data?.enrichment_status === 'failed' ||
@@ -386,6 +422,19 @@ export function GoproOverlaySyncPreview({
     setVideoTime(time);
   };
 
+  const seekBy = (delta: number) => {
+    const isYoutubePlayerActive = Boolean(youtubeId && !youtubeFailed);
+    const playerTime = isYoutubePlayerActive
+      ? (youtubeRef.current?.getCurrentTime() ?? videoTime)
+      : (cameraRef.current?.currentTime ?? videoTime);
+    const duration = isYoutubePlayerActive
+      ? youtubeDuration
+      : (cameraRef.current?.duration ?? previewEndTime);
+    const maxTime =
+      Number.isFinite(duration) && duration > 0 ? duration : previewEndTime;
+    seekToPreviewBoundary(Math.min(maxTime, Math.max(0, playerTime + delta)));
+  };
+
   useEffect(() => {
     if (!youtubeId || youtubeFailed || !youtubeHostElement) return;
     let cancelled = false;
@@ -437,6 +486,8 @@ export function GoproOverlaySyncPreview({
     let frame = 0;
     const update = () => {
       setVideoTime(youtubeRef.current?.getCurrentTime() ?? 0);
+      const duration = youtubeRef.current?.getDuration() ?? 0;
+      if (duration > 0) setYoutubeDuration(duration);
       frame = requestAnimationFrame(update);
     };
     frame = requestAnimationFrame(update);
@@ -488,7 +539,8 @@ export function GoproOverlaySyncPreview({
     (flightTelemetry.isPending ||
       (flightTelemetry.data?.has_osv === true &&
         (flightTelemetry.data.enrichment_status === 'missing' ||
-          flightTelemetry.data.enrichment_status === 'pending')));
+          flightTelemetry.data.enrichment_status === 'pending')) ||
+      preview.data?.gpx?.enrichment_status === 'pending');
   if (isEnrichmentFailed) {
     return (
       <div
@@ -518,8 +570,29 @@ export function GoproOverlaySyncPreview({
       (preview.isPending || preview.data?.gpx?.enrichment_status === 'pending'))
   ) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-        {t('flights.goproOverlayEnrichmentPending')}
+      <div
+        className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+        aria-live="polite"
+      >
+        <p className="text-center">
+          {t('flights.goproOverlayEnrichmentPending')}
+        </p>
+        <div className="mt-4 flex items-center gap-3">
+          <progress
+            aria-label={t('flights.goproOverlayEnrichmentProgressLabel')}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={enrichmentProgress ?? undefined}
+            value={enrichmentProgress ?? undefined}
+            max={100}
+            className="h-2 min-w-0 flex-1 accent-blue-600 dark:accent-blue-400"
+          />
+          {enrichmentProgress != null && (
+            <span className="min-w-10 text-right text-xs font-semibold tabular-nums text-blue-800 dark:text-blue-200">
+              {enrichmentProgress}%
+            </span>
+          )}
+        </div>
       </div>
     );
   }
@@ -552,6 +625,17 @@ export function GoproOverlaySyncPreview({
       </div>
     );
   }
+
+  const seekControls = [
+    { delta: -1, label: t('flights.goproPreviewSeekBackwardSecond') },
+    { delta: -0.1, label: t('flights.goproPreviewSeekBackwardTenthSecond') },
+    { delta: 0.1, label: t('flights.goproPreviewSeekForwardTenthSecond') },
+    { delta: 1, label: t('flights.goproPreviewSeekForwardSecond') },
+  ] as const;
+  const isYoutubePlayerActive = Boolean(youtubeId && !youtubeFailed);
+  const seekControlsDisabled = isYoutubePlayerActive
+    ? youtubeDuration <= 0 || !youtubeReady
+    : !youtubeFailed && previewEndTime <= 0;
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(17rem,1fr)]">
@@ -593,13 +677,31 @@ export function GoproOverlaySyncPreview({
             <span>{t('flights.goproOverlayVideoTime')}</span>
             <span>{formatSeconds(sourceVideoTime)}</span>
           </div>
+          <div className="grid grid-cols-4 border-t border-gray-800 text-center text-xs font-medium text-white">
+            {seekControls.map(({ delta, label }) => (
+              <button
+                key={delta}
+                type="button"
+                onClick={() => seekBy(delta)}
+                disabled={seekControlsDisabled}
+                aria-label={label}
+                className="cursor-pointer px-2 py-2 transition-colors hover:bg-gray-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {delta < 0 ? '−' : '+'}
+                {Math.abs(delta).toLocaleString(i18n.language, {
+                  maximumFractionDigits: 1,
+                })}{' '}
+                s
+              </button>
+            ))}
+          </div>
           {previewSegments.length > 1 && (
-            <div className="grid grid-cols-2 border-t border-gray-800 text-center text-xs font-medium text-gray-400">
+            <div className="grid grid-cols-2 border-t border-gray-800 text-center text-xs font-medium text-white">
               <button
                 type="button"
                 onClick={() => seekToPreviewBoundary(0)}
                 aria-pressed={videoTime <= 0.05}
-                className={`cursor-pointer px-3 py-2 transition-colors hover:bg-gray-900 hover:text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 ${videoTime <= 0.05 ? 'bg-sky-950 text-sky-200' : ''}`}
+                className={`cursor-pointer px-3 py-2 transition-colors hover:bg-gray-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 ${videoTime <= 0.05 ? 'bg-sky-950 text-sky-200' : ''}`}
               >
                 {t('flights.goproPreviewStart')}
               </button>
@@ -611,7 +713,7 @@ export function GoproOverlaySyncPreview({
                   videoTime >= endPreviewStartTime - 0.05
                 }
                 disabled={previewEndTime <= 0}
-                className={`cursor-pointer border-l border-gray-800 px-3 py-2 transition-colors hover:bg-gray-900 hover:text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 ${endPreviewStartTime > 0 && videoTime >= endPreviewStartTime - 0.05 ? 'bg-sky-950 text-sky-200' : ''}`}
+                className={`cursor-pointer border-l border-gray-800 px-3 py-2 transition-colors hover:bg-gray-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 ${endPreviewStartTime > 0 && videoTime >= endPreviewStartTime - 0.05 ? 'bg-sky-950 text-sky-200' : ''}`}
               >
                 {t('flights.goproPreviewEnd')}
               </button>
@@ -734,6 +836,18 @@ export function GoproOverlaySyncPreview({
               ? `${telemetry.lat.toFixed(5)}, ${telemetry.lon.toFixed(5)}`
               : t('flights.goproOverlayTelemetryUnavailable')}
           </div>
+        </div>
+        <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+            <CalendarClock className="h-4 w-4" aria-hidden="true" />
+            {t('flights.goproOverlayGpxDate')}
+          </div>
+          <time
+            className="mt-1 block font-mono text-sm"
+            dateTime={gpxDateTime ?? undefined}
+          >
+            {formattedGpxDateTime}
+          </time>
         </div>
         <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 dark:border-sky-900 dark:bg-sky-950/30">
           <div className="flex items-center justify-between gap-3 text-sm">

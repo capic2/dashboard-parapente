@@ -7,7 +7,7 @@ import type {
   SortingState,
 } from '@tanstack/react-table';
 import type { Selection } from 'react-aria-components';
-import { DataList } from '@dashboard-parapente/design-system';
+import { DataList } from '@dashboard-parapente/core/DataList/DataList';
 import {
   ChevronDown,
   ChevronRight,

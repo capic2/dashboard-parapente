@@ -289,6 +289,7 @@ class Flight(Base):
     conditions_feedback = Column(Text)
     decision_snapshot = Column(Text)
     gpx_file_path = Column(String)
+    gpx_source_file_path = Column(String, nullable=True)
     gpx_provider = Column(String, nullable=True)
     gpx_metrics_excluded = Column(Boolean, nullable=False, default=False)
     gpx_max_altitude_m = Column(Integer)
@@ -303,6 +304,7 @@ class Flight(Base):
     video_export_status = Column(String, nullable=True)  # "processing", "completed", "failed"
     video_file_path = Column(String, nullable=True)  # Path to generated MP4 file
     pano_video_file_path = Column(String, nullable=True)
+    youtube_telemetry_video_file_path = Column(String, nullable=True)
     # GoPro overlay export fields
     gopro_overlay_job_id = Column(String, nullable=True)
     gopro_overlay_status = Column(String, nullable=True)
@@ -387,6 +389,21 @@ class Flight(Base):
         self.tags_json = json.dumps(value or [])
 
 
+class YoutubeFlightPlaylist(Base):
+    """YouTube playlist ID assigned to one flight for one application user."""
+
+    __tablename__ = "youtube_flight_playlists"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    flight_id = Column(String, ForeignKey("flights.id", ondelete="CASCADE"), primary_key=True)
+    playlist_id = Column(String, nullable=False, index=True)
+    created_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        nullable=False,
+    )
+
+
 Index(
     "idx_flights_summary_default",
     Flight.flight_date.desc(),
@@ -424,6 +441,9 @@ class VideoExportJob(Base):
     auth_token = Column(Text)
     video_path = Column(String)
     total_frames = Column(Integer)
+    eta_seconds = Column(Integer)
+    frames_processed = Column(Integer)
+    fps_actual = Column(Float)
     error = Column(Text)
     started_at = Column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
     completed_at = Column(DateTime)
