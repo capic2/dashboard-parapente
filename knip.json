@@ -2,6 +2,6 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignore": ["apps/e2e/**", ".agents/skills/**/scripts/**"],
   "ignoreBinaries": [],
-  "ignoreDependencies": ["chromatic", "lint-staged"],
+  "ignoreDependencies": ["chromatic", "lint-staged", "tailwindcss"],
   "ignoreExportsUsedInFile": true
 }
