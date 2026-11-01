@@ -6,8 +6,11 @@ export type VideoExportPhase =
   | 'queued'
   | 'running'
   | 'initializing'
+  | 'downloading'
+  | 'downloading_source_video'
   | 'capturing'
   | 'encoding'
+  | 'finalizing'
   | 'completed'
   | 'failed'
   | 'cancelled';

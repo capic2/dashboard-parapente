@@ -1184,6 +1184,7 @@ def _refresh_operation_from_source(db: Session, operation: BackgroundOperationMo
         return operation.source_id.split(":", 1)[0] or None
 
     status: str | None = None
+    phase: str | None = None
     progress: int | float | None = None
     detail: str | None = None
     error: str | None = None
@@ -1193,6 +1194,7 @@ def _refresh_operation_from_source(db: Session, operation: BackgroundOperationMo
         if snapshot:
             flight_id = snapshot.get("flight_id")
             status = snapshot.get("internal_status") or snapshot.get("status")
+            phase = snapshot.get("phase")
             progress = snapshot.get("progress")
             detail = snapshot.get("message")
             error = snapshot.get("error")
@@ -1227,6 +1229,7 @@ def _refresh_operation_from_source(db: Session, operation: BackgroundOperationMo
             db,
             operation,
             status=status,
+            phase=phase,
             progress=progress,
             detail=detail,
             error=error,
@@ -8821,6 +8824,7 @@ def get_flight_overlay_layer(flight_id: str, db: Session = Depends(get_db)) -> F
 
 
 @router.post("/flights/{flight_id}/youtube-overlay-export", status_code=202)
+@_map_deployment_drain_rejection
 def create_youtube_overlay_export(
     flight_id: str,
     payload: YoutubeOverlayExportCreate,
@@ -8895,6 +8899,7 @@ def create_youtube_overlay_export(
 
 
 @router.post("/flights/{flight_id}/youtube-telemetry-layout-export", status_code=202)
+@_map_deployment_drain_rejection
 def create_youtube_telemetry_layout_export(
     flight_id: str,
     payload: YoutubeTelemetryLayoutExportCreate,

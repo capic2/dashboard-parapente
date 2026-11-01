@@ -55,8 +55,11 @@ const statusLabelFallbacks: Record<string, string> = {
   queued: 'En attente',
   running: 'Démarrage',
   initializing: 'Initialisation',
+  downloading: 'Téléchargement',
+  downloading_source_video: 'Téléchargement de la vidéo YouTube',
   capturing: 'Capture',
   encoding: 'Encodage',
+  finalizing: 'Finalisation',
   processing: 'En cours',
   completed: 'Terminé',
   failed: 'Erreur',
@@ -103,8 +106,11 @@ const activeStatusLabels = new Set([
   'running',
   'preparing',
   'initializing',
+  'downloading',
+  'downloading_source_video',
   'capturing',
   'encoding',
+  'finalizing',
   'processing',
   'uploading',
 ]);
@@ -119,7 +125,22 @@ type PendingVideoConfirm = {
 };
 
 function getJobPhase(job: VideoExportJob) {
-  return job.phase || job.internal_status || job.status;
+  const phase = job.phase || job.internal_status || job.status;
+  const lastLog = job.log_tail
+    ?.slice()
+    .reverse()
+    .find((line) => line.trim());
+
+  if (
+    phase === 'queued' &&
+    isActiveJob(job) &&
+    lastLog &&
+    /\bCaptured\s+\d+\/\d+\s+frames\b/iu.test(lastLog)
+  ) {
+    return 'capturing';
+  }
+
+  return phase;
 }
 
 function getStatusLabelParts(job: VideoExportJob) {

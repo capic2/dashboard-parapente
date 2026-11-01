@@ -111,6 +111,6 @@ describe('FlightGenerationLogsPanel', () => {
       screen.queryByRole('button', {
         name: /flights\.generationLogs\.youtubeUploadTitle/u,
       })
-    ).not.toBeInTheDocument();
+    ).toBeInTheDocument();
   });
 });

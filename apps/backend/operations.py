@@ -311,6 +311,7 @@ def sync_operation_from_snapshot(
     operation: BackgroundOperation,
     *,
     status: str | None,
+    phase: str | None = None,
     progress: int | float | None,
     detail: str | None = None,
     error: str | None = None,
@@ -325,6 +326,8 @@ def sync_operation_from_snapshot(
         "initializing": "prepare",
         "preparing": "prepare",
         "started": "prepare",
+        "downloading": "prepare",
+        "downloading_source_video": "prepare",
         "selecting": "select",
         "capturing": "render",
         "encoding": "render",
@@ -333,7 +336,11 @@ def sync_operation_from_snapshot(
         "uploading": "upload",
         "finalizing": "finalize",
     }
-    current = phase_by_status.get(normalized_status, operation.current_step_key)
+    normalized_phase = str(phase or "").lower()
+    current = phase_by_status.get(
+        normalized_phase,
+        phase_by_status.get(normalized_status, operation.current_step_key),
+    )
     if current not in step_by_key:
         current = operation.current_step_key
     if current not in step_by_key and steps:
