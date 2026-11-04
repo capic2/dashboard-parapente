@@ -179,9 +179,11 @@ export const WithAssociations = meta.story({
 WithAssociations.test(
   'displays existing landing associations',
   async ({ canvas }) => {
-    await canvas.findByText("Plaine d'Arguel");
+    await canvas.findByText("Arguel — Plaine d'Arguel");
     await expect(canvas.getByText(/1\.34 km/u)).toBeInTheDocument();
-    await expect(canvas.getByText('Terrain de secours')).toBeInTheDocument();
+    await expect(
+      canvas.getByText('Arguel — Terrain de secours')
+    ).toBeInTheDocument();
     await expect(canvas.getByText(/2\.1 km/u)).toBeInTheDocument();
   }
 );
