@@ -37,6 +37,8 @@ vi.mock('react-i18next', () => ({
   withTranslation: () => (Component: unknown) => Component,
 }));
 
+vi.mock('./OperationCenter', () => ({ OperationCenter: () => null }));
+
 vi.mock('@tanstack/react-router', () => ({
   Link: ({
     children,
