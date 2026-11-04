@@ -195,7 +195,7 @@ const SiteSearchMap: React.FC<SiteSearchMapProps> = ({
           sandbox="allow-scripts"
           className="absolute inset-0 h-full w-full border-0"
           loading="lazy"
-          referrerPolicy="no-referrer"
+          referrerPolicy="strict-origin-when-cross-origin"
         />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-gray-200 bg-white px-3 py-2 text-xs dark:border-gray-700 dark:bg-gray-900">
