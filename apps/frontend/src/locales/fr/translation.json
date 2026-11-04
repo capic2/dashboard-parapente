@@ -613,7 +613,7 @@
     "allTypes": "Tous les types",
     "takeoffOnly": "Décollage uniquement",
     "landingOnly": "Atterrissage uniquement",
-    "both": "Déco/Atterro",
+    "both": "Décollage + atterrissage",
     "sortByName": "Trier par nom",
     "sortByRegion": "Trier par localité",
     "noSiteFound": "Aucun site trouvé",

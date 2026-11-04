@@ -58,6 +58,12 @@ interface SiteGroup {
   rows: Row<Site>[];
 }
 
+const SITE_USAGE_GROUPS = [
+  { usageType: 'takeoff', labelKey: 'sites.takeoffOnly' },
+  { usageType: 'both', labelKey: 'sites.both' },
+  { usageType: 'landing', labelKey: 'sites.landingOnly' },
+] as const;
+
 export const Sites: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -323,6 +329,15 @@ export const Sites: React.FC = () => {
           <div className="space-y-8">
             {siteGroups.map((group, index) => {
               const headingId = `site-location-${index}`;
+              const usageGroups = SITE_USAGE_GROUPS.map(
+                ({ usageType, labelKey }) => ({
+                  usageType,
+                  labelKey,
+                  rows: group.rows.filter(
+                    (row) => (row.original.usage_type ?? 'both') === usageType
+                  ),
+                })
+              ).filter((usageGroup) => usageGroup.rows.length > 0);
 
               return (
                 <section key={group.location} aria-labelledby={headingId}>
@@ -339,12 +354,38 @@ export const Sites: React.FC = () => {
                       })}
                     </p>
                   </div>
-                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {group.rows.map((row) => (
-                      <div key={row.id}>
-                        {renderSiteCard(row, { isSelected: false })}
-                      </div>
-                    ))}
+                  <div className="space-y-5">
+                    {usageGroups.map((usageGroup, usageIndex) => {
+                      const usageHeadingId = `${headingId}-usage-${usageIndex}`;
+
+                      return (
+                        <section
+                          key={usageGroup.usageType}
+                          aria-labelledby={usageHeadingId}
+                        >
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <h3
+                              id={usageHeadingId}
+                              className="text-base font-medium text-gray-800 dark:text-gray-100"
+                            >
+                              {t(usageGroup.labelKey)}
+                            </h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">
+                              {t('sites.locationGroupCount', {
+                                count: usageGroup.rows.length,
+                              })}
+                            </p>
+                          </div>
+                          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                            {usageGroup.rows.map((row) => (
+                              <div key={row.id}>
+                                {renderSiteCard(row, { isSelected: false })}
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+                      );
+                    })}
                   </div>
                 </section>
               );
