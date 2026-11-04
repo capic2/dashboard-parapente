@@ -110,36 +110,19 @@ const toMercatorY = (latitude: number) =>
 const fromMercatorY = (y: number) =>
   ((2 * Math.atan(Math.exp(y)) - Math.PI / 2) * 180) / Math.PI;
 
-const getSearchMapBounds = (
-  location: LocationSuggestion,
-  candidates: SearchCandidate[],
-  radiusKm: number,
-  marker: { latitude: number; longitude: number }
-) => {
-  const latRadius = radiusKm / 110.574;
-  const lonRadius =
-    radiusKm /
-    (111.32 * Math.max(Math.cos((location.latitude * Math.PI) / 180), 0.1));
-  const longitudes = [
-    location.longitude - lonRadius,
-    location.longitude + lonRadius,
-    marker.longitude,
-    ...candidates.map(({ spot }) => spot.longitude),
-  ];
-  const mercatorYs = [
-    toMercatorY(Math.max(-85, location.latitude - latRadius)),
-    toMercatorY(Math.min(85, location.latitude + latRadius)),
-    toMercatorY(marker.latitude),
-    ...candidates.map(({ spot }) => toMercatorY(spot.latitude)),
-  ];
-  const padding = 1.15;
-  const centerLongitude =
-    (Math.min(...longitudes) + Math.max(...longitudes)) / 2;
-  const centerY = (Math.min(...mercatorYs) + Math.max(...mercatorYs)) / 2;
-  let longitudeSpan =
-    (Math.max(...longitudes) - Math.min(...longitudes)) * padding;
-  let mercatorSpan =
-    (Math.max(...mercatorYs) - Math.min(...mercatorYs)) * padding;
+const getSiteMapBounds = (marker: { latitude: number; longitude: number }) => {
+  const focusRadiusKm = 0.1;
+  const latitudeRadius = focusRadiusKm / 110.574;
+  const longitudeRadius =
+    focusRadiusKm /
+    (111.32 * Math.max(Math.cos((marker.latitude * Math.PI) / 180), 0.1));
+  const centerLongitude = marker.longitude;
+  const centerY = toMercatorY(marker.latitude);
+  const northY = toMercatorY(Math.min(85, marker.latitude + latitudeRadius));
+  const southY = toMercatorY(Math.max(-85, marker.latitude - latitudeRadius));
+  const padding = 1.1;
+  let longitudeSpan = 2 * longitudeRadius * padding;
+  let mercatorSpan = 2 * Math.max(northY - centerY, centerY - southY) * padding;
   const mapAspectRatio = 2.05;
 
   longitudeSpan = Math.max(
@@ -166,8 +149,6 @@ const getSearchMapBounds = (
 
 interface SiteSearchMapProps {
   location: LocationSuggestion;
-  candidates: SearchCandidate[];
-  radiusKm: number;
   selectedCandidate: SearchCandidate | null;
   mapTitle: string;
   markerLabel: string;
@@ -176,15 +157,13 @@ interface SiteSearchMapProps {
 
 const SiteSearchMap: React.FC<SiteSearchMapProps> = ({
   location,
-  candidates,
-  radiusKm,
   selectedCandidate,
   mapTitle,
   markerLabel,
   openMapLabel,
 }) => {
   const marker = selectedCandidate?.spot ?? location;
-  const bounds = getSearchMapBounds(location, candidates, radiusKm, marker);
+  const bounds = getSiteMapBounds(marker);
 
   return (
     <div className="mt-3 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
@@ -730,8 +709,6 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
 
                 <SiteSearchMap
                   location={selectedLocation}
-                  candidates={searchCandidates}
-                  radiusKm={radiusKm}
                   selectedCandidate={selectedCandidate}
                   mapTitle={t('editSite.mapTitle')}
                   markerLabel={
