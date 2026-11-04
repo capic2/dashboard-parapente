@@ -38,7 +38,9 @@ class TestSpotsEndpoints:
         assert len(data["sites"]) == 1
         assert data["sites"][0]["name"] == "Arguel"
 
-    def test_get_spots_counts_flights_at_associated_landing(self, client, db_session):
+    def test_get_spots_counts_each_flight_at_its_nearest_associated_landing(
+        self, client, db_session, tmp_path
+    ):
         takeoff = Site(
             id="site-takeoff",
             name="Saint-Hilaire",
@@ -53,13 +55,27 @@ class TestSpotsEndpoints:
             longitude=5.9,
             usage_type="landing",
         )
-        db_session.add_all([takeoff, landing])
+        other_landing = Site(
+            id="site-other-landing",
+            name="LZ Lumbin Est",
+            latitude=45.31,
+            longitude=5.9,
+            usage_type="landing",
+        )
+        db_session.add_all([takeoff, landing, other_landing])
         db_session.flush()
         db_session.add(
             SiteLandingAssociation(
                 id="association-takeoff-landing",
                 takeoff_site_id=takeoff.id,
                 landing_site_id=landing.id,
+            )
+        )
+        db_session.add(
+            SiteLandingAssociation(
+                id="association-takeoff-other-landing",
+                takeoff_site_id=takeoff.id,
+                landing_site_id=other_landing.id,
             )
         )
         db_session.add_all(
@@ -70,10 +86,18 @@ class TestSpotsEndpoints:
                     flight_date=date(2026, 3, index),
                     departure_time=datetime(2026, 3, index, 12),
                     site_id=takeoff.id,
+                    gpx_file_path=str(tmp_path / f"flight-{index}.gpx"),
                 )
                 for index in (1, 2)
             ]
         )
+        for index, latitude in ((1, 45.3001), (2, 45.3099)):
+            (tmp_path / f"flight-{index}.gpx").write_text(
+                "<gpx><trk><trkseg>"
+                f'<trkpt lat="{latitude}" lon="5.9"><ele>100</ele></trkpt>'
+                "</trkseg></trk></gpx>",
+                encoding="utf-8",
+            )
         db_session.commit()
 
         response = client.get("/api/spots")
@@ -81,7 +105,8 @@ class TestSpotsEndpoints:
         assert response.status_code == 200
         sites = {site["id"]: site for site in response.json()["sites"]}
         assert sites[takeoff.id]["flight_count"] == 2
-        assert sites[landing.id]["flight_count"] == 2
+        assert sites[landing.id]["flight_count"] == 1
+        assert sites[other_landing.id]["flight_count"] == 1
 
     def test_get_spot_by_id(self, client, db_session):
         """Get a specific spot"""
