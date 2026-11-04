@@ -2731,31 +2731,59 @@ async def suggest_site_practical_info_endpoint(
 @public_router.get("/spots", response_model=SpotsResponse)
 def get_spots(db: Session = Depends(get_db)):
     """Get all user-managed paragliding spots with flight counts"""
-    # Count flights at takeoff sites and at their associated landing sites.
-    # UNION removes duplicate site/flight pairs if a flight is linked both ways.
-    site_flights = (
-        db.query(Flight.site_id.label("site_id"), Flight.id.label("flight_id"))
-        .union(
-            db.query(
-                SiteLandingAssociation.landing_site_id.label("site_id"),
-                Flight.id.label("flight_id"),
-            ).join(Flight, Flight.site_id == SiteLandingAssociation.takeoff_site_id)
-        )
-        .subquery()
-    )
-
-    sites_with_counts = (
-        db.query(Site, func.count(site_flights.c.flight_id).label("flight_count"))
-        .outerjoin(site_flights, Site.id == site_flights.c.site_id)
-        .group_by(Site.id)
+    sites = db.query(Site).all()
+    flight_counts = {site.id: 0 for site in sites}
+    landing_sites_by_takeoff: dict[str, list[Site]] = {}
+    associations = (
+        db.query(SiteLandingAssociation, Site)
+        .join(Site, Site.id == SiteLandingAssociation.landing_site_id)
         .all()
     )
+    for association, landing_site in associations:
+        landing_sites_by_takeoff.setdefault(association.takeoff_site_id, []).append(landing_site)
 
-    # Add flight_count to each site object
-    sites = []
-    for site, flight_count in sites_with_counts:
-        site.flight_count = flight_count
-        sites.append(site)
+    # Flights count toward their takeoff site and exactly one associated landing:
+    # the one closest to the final coordinate in the recorded GPX track.
+    from spots.distance import haversine_distance
+
+    for flight in db.query(Flight).filter(Flight.site_id.is_not(None)).all():
+        if flight.site_id in flight_counts:
+            flight_counts[flight.site_id] += 1
+
+        landing_sites = landing_sites_by_takeoff.get(flight.site_id, [])
+        gpx_path = _flight_source_gpx_path(flight)
+        if not landing_sites or not gpx_path or not gpx_path.is_file():
+            continue
+        try:
+            coordinates = parse_gpx_file(gpx_path)
+        except (OSError, ET.ParseError, ValueError) as exc:
+            logger.warning("Could not read GPX for landing count on flight %s: %s", flight.id, exc)
+            continue
+        if not coordinates:
+            continue
+
+        final_point = coordinates[-1]
+        try:
+            latitude = float(final_point["lat"])
+            longitude = float(final_point["lon"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        nearest_landing = min(
+            (
+                landing_site
+                for landing_site in landing_sites
+                if landing_site.latitude is not None and landing_site.longitude is not None
+            ),
+            key=lambda landing_site: haversine_distance(
+                latitude, longitude, landing_site.latitude, landing_site.longitude
+            ),
+            default=None,
+        )
+        if nearest_landing is not None and nearest_landing.id in flight_counts:
+            flight_counts[nearest_landing.id] += 1
+
+    for site in sites:
+        site.flight_count = flight_counts[site.id]
 
     return SpotsResponse(sites=sites)
 
