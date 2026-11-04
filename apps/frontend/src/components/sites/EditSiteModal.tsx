@@ -189,14 +189,18 @@ const SiteSearchMap: React.FC<SiteSearchMapProps> = ({
   return (
     <div className="mt-3 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
       <div className="relative h-56 bg-gray-100 dark:bg-gray-800 sm:h-64">
-        <iframe
-          title={mapTitle}
-          src={bounds.url}
-          sandbox="allow-scripts"
-          className="absolute inset-0 h-full w-full border-0"
-          loading="lazy"
-          referrerPolicy="strict-origin-when-cross-origin"
-        />
+        {
+          // oxlint-disable react/iframe-missing-sandbox -- The OSM embed needs its real origin so tile requests retain a valid Referer.
+          <iframe
+            title={mapTitle}
+            src={bounds.url}
+            sandbox="allow-scripts allow-same-origin"
+            className="absolute inset-0 h-full w-full border-0"
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+          // oxlint-enable react/iframe-missing-sandbox
+        }
       </div>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-gray-200 bg-white px-3 py-2 text-xs dark:border-gray-700 dark:bg-gray-900">
         <div className="inline-flex items-center gap-1.5 text-gray-700 dark:text-gray-200">
