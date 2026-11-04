@@ -100,6 +100,17 @@ const mockSites = {
       is_active: true,
     },
     {
+      id: 'site-deco-seul',
+      name: 'Déco seul',
+      latitude: 47.22,
+      longitude: 6.02,
+      elevation_m: 410,
+      country: 'FR',
+      usage_type: 'takeoff',
+      flight_count: 0,
+      is_active: true,
+    },
+    {
       id: 'site-secours',
       name: 'Terrain de secours',
       latitude: 47.21,
@@ -179,9 +190,11 @@ export const WithAssociations = meta.story({
 WithAssociations.test(
   'displays existing landing associations',
   async ({ canvas }) => {
-    await canvas.findByText("Plaine d'Arguel");
+    await canvas.findByText("Arguel — Plaine d'Arguel");
     await expect(canvas.getByText(/1\.34 km/u)).toBeInTheDocument();
-    await expect(canvas.getByText('Terrain de secours')).toBeInTheDocument();
+    await expect(
+      canvas.getByText('Arguel — Terrain de secours')
+    ).toBeInTheDocument();
     await expect(canvas.getByText(/2\.1 km/u)).toBeInTheDocument();
   }
 );
@@ -245,6 +258,14 @@ AddingAssociation.test(
     await expect(
       await canvas.findByText('Choisir un site...')
     ).toBeInTheDocument();
+    await expect(
+      canvas.getByRole('option', {
+        name: 'Arguel — Atterrissage Vallee (230m)',
+      })
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole('option', { name: /Déco seul/u })
+    ).not.toBeInTheDocument();
     await expect(
       canvas.getByPlaceholderText(
         /Commentaire \(localité ajoutée automatiquement\)/u
