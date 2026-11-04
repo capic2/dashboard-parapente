@@ -613,7 +613,7 @@
     "allTypes": "All types",
     "takeoffOnly": "Takeoff only",
     "landingOnly": "Landing only",
-    "both": "Takeoff/Landing",
+    "both": "Takeoff + landing",
     "sortByName": "Sort by name",
     "sortByRegion": "Sort by locality",
     "noSiteFound": "No site found",
