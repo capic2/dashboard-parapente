@@ -6,14 +6,9 @@
   "implicitDependencies": ["frontend", "backend"],
   "targets": {
     "e2e": {
-      "executor": "@nx/playwright:playwright",
       "outputs": ["{workspaceRoot}/apps/e2e/test-results"],
-      "options": {
-        "config": "apps/e2e/playwright.config.ts"
-      },
       "configurations": {
         "ci": {
-          "headed": false,
           "workers": 1
         }
       }

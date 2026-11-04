@@ -1,10 +1,11 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 
-const ADMIN_EMAIL = process.env.BACKEND_ADMIN_EMAIL || 'e2e@test.local';
-const ADMIN_PASSWORD = process.env.BACKEND_ADMIN_PASSWORD || 'e2e-test-password';
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || 'e2e@test.local';
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || 'e2e-test-password';
+const API_BASE = `http://localhost:${process.env.E2E_API_PORT || '8001'}/api`;
 
 async function authenticate(page: import('@playwright/test').Page, request: APIRequestContext) {
-  const loginResponse = await request.post('/api/auth/login', {
+  const loginResponse = await request.post(`${API_BASE}/auth/login`, {
     form: {
       username: ADMIN_EMAIL,
       password: ADMIN_PASSWORD,
