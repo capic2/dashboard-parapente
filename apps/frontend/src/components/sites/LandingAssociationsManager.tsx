@@ -41,6 +41,9 @@ export default function LandingAssociationsManager({
   const { data: associations = [], isLoading } =
     useLandingAssociations(takeoffSiteId);
   const { data: allSites = [] } = useSites();
+  const takeoffSiteName = allSites.find(
+    (site) => site.id === takeoffSiteId
+  )?.name;
   const addMutation = useAddLandingAssociation();
   const updateMutation = useUpdateLandingAssociation();
   const removeMutation = useRemoveLandingAssociation();
@@ -136,6 +139,7 @@ export default function LandingAssociationsManager({
                 />
                 <div className="min-w-0">
                   <span className="font-medium truncate block">
+                    {takeoffSiteName ? `${takeoffSiteName} — ` : ''}
                     {assoc.landing_site?.name || assoc.landing_site_id}
                   </span>
                   <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -170,6 +174,7 @@ export default function LandingAssociationsManager({
             <option value="">{t('landings.chooseSite')}</option>
             {availableLandings.map((s) => (
               <option key={s.id} value={s.id}>
+                {takeoffSiteName ? `${takeoffSiteName} — ` : ''}
                 {s.name}
                 {s.elevation_m ? ` (${s.elevation_m}m)` : ''}
               </option>
