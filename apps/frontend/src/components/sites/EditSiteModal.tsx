@@ -590,6 +590,27 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
   } else if (selectedCandidate) {
     mapMarkerLabelKey = 'editSite.mapSelectedSiteLegend';
   }
+  const editMapCoordinates = {
+    latitude: Number(latitudeRaw),
+    longitude: Number(longitudeRaw),
+  };
+  const canShowEditMap =
+    !isCreateMode &&
+    latitudeRaw.trim() !== '' &&
+    longitudeRaw.trim() !== '' &&
+    Number.isFinite(editMapCoordinates.latitude) &&
+    editMapCoordinates.latitude >= -90 &&
+    editMapCoordinates.latitude <= 90 &&
+    Number.isFinite(editMapCoordinates.longitude) &&
+    editMapCoordinates.longitude >= -180 &&
+    editMapCoordinates.longitude <= 180;
+  const editMapLocation: LocationSuggestion = {
+    id: `site-${site?.id ?? 'edit'}`,
+    name: formData.name,
+    display_name: formData.region,
+    ...editMapCoordinates,
+    country: formData.country,
+  };
 
   const handleSuggestPracticalInfo = async () => {
     const requestIdentity = suggestionRequestIdentity;
@@ -1286,6 +1307,32 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
             <Input type="number" className={inputClass} />
           </TextField>
         </div>
+
+        {canShowEditMap && (
+          <SiteSearchMap
+            location={editMapLocation}
+            selectedCandidate={null}
+            pickedCoordinates={pickedCoordinates}
+            mapTitle={t('editSite.mapTitle')}
+            markerLabel={t('editSite.mapCustomCoordinatesLegend', {
+              latitude: (
+                pickedCoordinates?.latitude ?? editMapCoordinates.latitude
+              ).toFixed(5),
+              longitude: (
+                pickedCoordinates?.longitude ?? editMapCoordinates.longitude
+              ).toFixed(5),
+            })}
+            openMapLabel={t('editSite.openMap')}
+            mapPickHelp={t('editSite.mapPickHelp')}
+            onCoordinatesSelected={(latitude, longitude) => {
+              setPickedCoordinates({ latitude, longitude });
+              setLatitudeRaw(latitude.toFixed(6));
+              setLongitudeRaw(longitude.toFixed(6));
+              setFormData((current) => ({ ...current, latitude, longitude }));
+              setErrors({});
+            }}
+          />
+        )}
 
         {/* Locality & Country */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
