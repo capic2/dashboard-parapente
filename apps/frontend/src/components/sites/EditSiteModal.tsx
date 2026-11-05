@@ -11,6 +11,15 @@ import { useTranslation } from 'react-i18next';
 import { TextField, Label, Input } from 'react-aria-components';
 import { Button } from '@dashboard-parapente/core/Button/Button';
 import { Camera, Check, Loader2, MapPin, Save } from 'lucide-react';
+import {
+  CircleMarker,
+  MapContainer,
+  TileLayer,
+  useMap,
+  useMapEvents,
+} from 'react-leaflet';
+// oxlint-disable-next-line import/no-unassigned-import -- Leaflet requires its stylesheet for map tiles and controls.
+import 'leaflet/dist/leaflet.css';
 import type {
   LocationSuggestion,
   ParaglidingSpotSearchResult,
@@ -45,29 +54,25 @@ const labelClass = 'block text-sm font-medium mb-1 dark:text-gray-200';
 const radiusChoices = [10, 30, 50, 100];
 const limitChoices = [3, 5, 10];
 
-const normalizeSiteName = (name: string) =>
-  name
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/gu, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gu, ' ')
-    .trim();
-
 const isCompatibleUsage = (
   siteUsage: Site['usage_type'],
   usage: SiteUsageType
 ) => siteUsage === usage || siteUsage === 'both' || usage === 'both';
 
-const isDuplicateSite = (site: Site, candidate: SearchCandidate): boolean => {
-  const sameName =
-    normalizeSiteName(site.name) === normalizeSiteName(candidate.spot.name);
+const isDuplicateSite = (
+  site: Site,
+  candidate: {
+    latitude: number;
+    longitude: number;
+    usageType: SiteUsageType;
+  }
+): boolean => {
   const sameCoordinates =
-    Math.abs(site.latitude - candidate.spot.latitude) < 0.0001 &&
-    Math.abs(site.longitude - candidate.spot.longitude) < 0.0001;
+    Math.abs(site.latitude - candidate.latitude) < 0.0001 &&
+    Math.abs(site.longitude - candidate.longitude) < 0.0001;
 
   return (
-    (sameName || sameCoordinates) &&
-    isCompatibleUsage(site.usage_type, candidate.usageType)
+    sameCoordinates && isCompatibleUsage(site.usage_type, candidate.usageType)
   );
 };
 
@@ -150,37 +155,94 @@ const getSiteMapBounds = (marker: { latitude: number; longitude: number }) => {
 interface SiteSearchMapProps {
   location: LocationSuggestion;
   selectedCandidate: SearchCandidate | null;
+  pickedCoordinates: { latitude: number; longitude: number } | null;
   mapTitle: string;
   markerLabel: string;
   openMapLabel: string;
+  mapPickHelp: string;
+  onCoordinatesSelected: (latitude: number, longitude: number) => void;
 }
+
+const MapCoordinatePicker: React.FC<{
+  onPick: (latitude: number, longitude: number) => void;
+}> = ({ onPick }) => {
+  useMapEvents({
+    click: ({ latlng }) => {
+      const { lat, lng } = latlng.wrap();
+      onPick(lat, lng);
+    },
+    contextmenu: ({ latlng }) => {
+      const { lat, lng } = latlng.wrap();
+      onPick(lat, lng);
+    },
+  });
+  return null;
+};
+
+const MapMarkerCenter: React.FC<{ latitude: number; longitude: number }> = ({
+  latitude,
+  longitude,
+}) => {
+  const map = useMap();
+  useEffect(() => {
+    map.setView([latitude, longitude]);
+  }, [latitude, longitude, map]);
+  return null;
+};
 
 const SiteSearchMap: React.FC<SiteSearchMapProps> = ({
   location,
   selectedCandidate,
+  pickedCoordinates,
   mapTitle,
   markerLabel,
   openMapLabel,
+  mapPickHelp,
+  onCoordinatesSelected,
 }) => {
-  const marker = selectedCandidate?.spot ?? location;
+  const marker = pickedCoordinates ?? selectedCandidate?.spot ?? location;
   const bounds = getSiteMapBounds(marker);
 
   return (
     <div className="mt-3 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
-      <div className="relative h-56 bg-gray-100 dark:bg-gray-800 sm:h-64">
-        {
-          // oxlint-disable react/iframe-missing-sandbox -- The OSM embed needs its real origin so tile requests retain a valid Referer.
-          <iframe
-            title={mapTitle}
-            src={bounds.url}
-            sandbox="allow-scripts allow-same-origin"
-            className="absolute inset-0 h-full w-full border-0"
-            loading="lazy"
-            referrerPolicy="strict-origin-when-cross-origin"
+      <div
+        className="relative h-56 bg-gray-100 dark:bg-gray-800 sm:h-64"
+        role="application"
+        aria-label={mapTitle}
+      >
+        <MapContainer
+          center={[marker.latitude, marker.longitude]}
+          zoom={14}
+          scrollWheelZoom
+          className="absolute inset-0 h-full w-full"
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          // oxlint-enable react/iframe-missing-sandbox
-        }
+          <MapMarkerCenter
+            latitude={marker.latitude}
+            longitude={marker.longitude}
+          />
+          <CircleMarker
+            center={[marker.latitude, marker.longitude]}
+            radius={8}
+            pathOptions={{
+              color: '#0284c7',
+              fillColor: '#38bdf8',
+              fillOpacity: 0.9,
+            }}
+          />
+          <MapCoordinatePicker
+            onPick={(latitude, longitude) =>
+              onCoordinatesSelected(latitude, longitude)
+            }
+          />
+        </MapContainer>
       </div>
+      <p className="border-t border-gray-200 bg-slate-50 px-3 py-2 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300">
+        {mapPickHelp}
+      </p>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-gray-200 bg-white px-3 py-2 text-xs dark:border-gray-700 dark:bg-gray-900">
         <div className="inline-flex items-center gap-1.5 text-gray-700 dark:text-gray-200">
           <span className="inline-flex items-center gap-1.5">
@@ -265,6 +327,10 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
   const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
   const [selectedCandidate, setSelectedCandidate] =
     useState<SearchCandidate | null>(null);
+  const [pickedCoordinates, setPickedCoordinates] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [suggestionSources, setSuggestionSources] = useState<
     { title: string; url: string }[]
   >([]);
@@ -306,9 +372,22 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
       ),
     [nearbyOptions.data?.landings, nearbyOptions.data?.takeoffs]
   );
-  const duplicateSite = selectedCandidate
-    ? existingSites.find((existingSite) =>
-        isDuplicateSite(existingSite, selectedCandidate)
+  const hasDuplicateRelevantChanges =
+    isCreateMode ||
+    (originalData !== null &&
+      (formData.name !== originalData.name ||
+        Number(latitudeRaw) !== originalData.latitude ||
+        Number(longitudeRaw) !== originalData.longitude ||
+        formData.usage_type !== originalData.usage_type));
+  const duplicateSite = hasDuplicateRelevantChanges
+    ? existingSites.find(
+        (existingSite) =>
+          existingSite.id !== site?.id &&
+          isDuplicateSite(existingSite, {
+            latitude: Number(latitudeRaw),
+            longitude: Number(longitudeRaw),
+            usageType: formData.usage_type,
+          })
       )
     : undefined;
 
@@ -318,6 +397,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
 
     setSelectedSpotId(null);
     setSelectedCandidate(null);
+    setPickedCoordinates(null);
 
     if (site) {
       const initialData = {
@@ -387,8 +467,16 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
     setSelectedLocation(location);
     setSelectedSpotId(null);
     setSelectedCandidate(null);
+    setPickedCoordinates(null);
     setQuery(location.name);
     setActiveSuggestionIndex(0);
+    setLatitudeRaw(String(location.latitude));
+    setLongitudeRaw(String(location.longitude));
+    setFormData((current) => ({
+      ...current,
+      latitude: location.latitude,
+      longitude: location.longitude,
+    }));
   };
 
   const handleSelectCandidate = (candidate: SearchCandidate) => {
@@ -398,6 +486,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
 
     setSelectedSpotId(candidate.spot.id);
     setSelectedCandidate(candidate);
+    setPickedCoordinates(null);
     setFormData((current) => ({
       ...current,
       name: candidate.spot.name,
@@ -415,6 +504,35 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
     setLongitudeRaw(String(candidate.spot.longitude));
     setElevationRaw(elevation ? String(elevation) : '');
     setErrors({});
+  };
+
+  const handleCoordinateInputChange = (
+    coordinate: 'latitude' | 'longitude',
+    value: string
+  ) => {
+    const nextLatitude = coordinate === 'latitude' ? value : latitudeRaw;
+    const nextLongitude = coordinate === 'longitude' ? value : longitudeRaw;
+    if (coordinate === 'latitude') setLatitudeRaw(value);
+    else setLongitudeRaw(value);
+
+    const latitude = Number(nextLatitude);
+    const longitude = Number(nextLongitude);
+    if (
+      nextLatitude.trim() &&
+      nextLongitude.trim() &&
+      Number.isFinite(latitude) &&
+      latitude >= -90 &&
+      latitude <= 90 &&
+      Number.isFinite(longitude) &&
+      longitude >= -180 &&
+      longitude <= 180
+    ) {
+      setPickedCoordinates({ latitude, longitude });
+    } else {
+      setPickedCoordinates(null);
+    }
+    setSelectedCandidate(null);
+    setSelectedSpotId(null);
   };
 
   const parseNumericFields = () => {
@@ -455,6 +573,13 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
 
   const hasCurrentSiteSuggestions =
     suggestionSiteIdentity === suggestionRequestIdentity;
+
+  let mapMarkerLabelKey = 'editSite.mapCityLegend';
+  if (pickedCoordinates) {
+    mapMarkerLabelKey = 'editSite.mapCustomCoordinatesLegend';
+  } else if (selectedCandidate) {
+    mapMarkerLabelKey = 'editSite.mapSelectedSiteLegend';
+  }
 
   const handleSuggestPracticalInfo = async () => {
     const requestIdentity = suggestionRequestIdentity;
@@ -710,11 +835,28 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                 <SiteSearchMap
                   location={selectedLocation}
                   selectedCandidate={selectedCandidate}
+                  pickedCoordinates={pickedCoordinates}
                   mapTitle={t('editSite.mapTitle')}
-                  markerLabel={
-                    selectedCandidate?.spot.name ?? t('editSite.mapCityLegend')
-                  }
+                  markerLabel={t(mapMarkerLabelKey, {
+                    latitude: pickedCoordinates?.latitude.toFixed(5),
+                    longitude: pickedCoordinates?.longitude.toFixed(5),
+                    name: selectedCandidate?.spot.name,
+                  })}
                   openMapLabel={t('editSite.openMap')}
+                  mapPickHelp={t('editSite.mapPickHelp')}
+                  onCoordinatesSelected={(latitude, longitude) => {
+                    setPickedCoordinates({ latitude, longitude });
+                    setSelectedCandidate(null);
+                    setSelectedSpotId(null);
+                    setLatitudeRaw(latitude.toFixed(6));
+                    setLongitudeRaw(longitude.toFixed(6));
+                    setFormData((current) => ({
+                      ...current,
+                      latitude,
+                      longitude,
+                    }));
+                    setErrors({});
+                  }}
                 />
 
                 {nearbyOptions.isError && (
@@ -807,18 +949,18 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                       {t('editSite.noExistingSiteFound')}
                     </div>
                   )}
-
-                {duplicateSite && (
-                  <p
-                    className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
-                    role="alert"
-                  >
-                    {t('editSite.duplicateSite', { name: duplicateSite.name })}
-                  </p>
-                )}
               </div>
             )}
           </div>
+        )}
+
+        {duplicateSite && (
+          <p
+            className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+            role="alert"
+          >
+            {t('editSite.duplicateSite', { name: duplicateSite.name })}
+          </p>
         )}
 
         {/* Nom */}
@@ -1066,11 +1208,13 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           <TextField
             isRequired
             value={latitudeRaw}
-            onChange={setLatitudeRaw}
+            onChange={(value: string) =>
+              handleCoordinateInputChange('latitude', value)
+            }
             className="flex flex-col gap-1"
           >
             <Label className={labelClass}>{t('editSite.latitude')} *</Label>
-            <Input type="number" step={0.0001} className={inputClass} />
+            <Input type="number" step="any" className={inputClass} />
             {errors.latitude && (
               <p className="text-red-500 dark:text-red-400 text-xs mt-1">
                 {errors.latitude}
@@ -1081,11 +1225,13 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
           <TextField
             isRequired
             value={longitudeRaw}
-            onChange={setLongitudeRaw}
+            onChange={(value: string) =>
+              handleCoordinateInputChange('longitude', value)
+            }
             className="flex flex-col gap-1"
           >
             <Label className={labelClass}>{t('editSite.longitude')} *</Label>
-            <Input type="number" step={0.0001} className={inputClass} />
+            <Input type="number" step="any" className={inputClass} />
             {errors.longitude && (
               <p className="text-red-500 dark:text-red-400 text-xs mt-1">
                 {errors.longitude}
