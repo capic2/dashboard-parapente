@@ -1508,6 +1508,7 @@ class TestUpdateFlightEndpoint:
         assert response.json()["data"]["landing_site_id"] == landing_site.id
         db_session.refresh(sample_flight)
         assert sample_flight.landing_site_id == landing_site.id
+        assert sample_flight.landing_site_source == "manual"
 
         detail_response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}")
         assert detail_response.status_code == 200
@@ -1528,6 +1529,7 @@ class TestUpdateFlightEndpoint:
         assert clear_response.json()["data"]["landing_site_id"] is None
         db_session.refresh(sample_flight)
         assert sample_flight.landing_site_id is None
+        assert sample_flight.landing_site_source == "cleared"
 
         invalid_response = client.patch(
             f"{API_PREFIX}/flights/{sample_flight.id}",

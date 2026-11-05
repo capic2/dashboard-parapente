@@ -2755,7 +2755,7 @@ def get_spots(db: Session = Depends(get_db)):
                 flight_counts[flight.landing_site_id] += 1
             continue
 
-        if not flight.site_id:
+        if flight.landing_site_source == "cleared" or not flight.site_id:
             continue
         landing_sites = landing_sites_by_takeoff.get(flight.site_id, [])
         gpx_path = _flight_source_gpx_path(flight)
@@ -5825,6 +5825,9 @@ async def update_flight(
     for field, value in update_data.items():
         setattr(flight, field, value)
 
+    if "landing_site_id" in update_data:
+        flight.landing_site_source = "manual" if update_data["landing_site_id"] else "cleared"
+
     if "video_markers" in update_data:
         flight.real_duration_minutes = calculate_real_flight_duration_minutes(flight.video_markers)
 
@@ -6885,6 +6888,10 @@ async def upload_gpx_to_flight(
         try:
             _, points = normalize_track(gpx_content, "gpx")
             stats = calculate_track_stats(points)
+            if points:
+                from external_flight_import import update_inferred_landing_site
+
+                update_inferred_landing_site(db, flight, points[-1])
             flight.duration_minutes = stats["duration_minutes"]
             flight.max_altitude_m = stats["max_altitude_m"]
             flight.max_speed_kmh = stats["max_speed_kmh"]
@@ -7007,6 +7014,10 @@ async def create_flight_from_gpx(
 
             site_id = match_site(db, first_coord)
 
+        from external_flight_import import match_landing_site, update_inferred_landing_site
+
+        landing_site_id = match_landing_site(db, coordinates[-1])
+
         # 5. Créer le vol
         flight_id = str(uuid.uuid4())
 
@@ -7048,6 +7059,8 @@ async def create_flight_from_gpx(
             .first()
         )
         if existing_flight:
+            if update_inferred_landing_site(db, existing_flight, coordinates[-1]):
+                db.commit()
             return {
                 "success": True,
                 "flight_id": existing_flight.id,
@@ -7067,6 +7080,7 @@ async def create_flight_from_gpx(
                     "elevation_gain_m": existing_flight.elevation_gain_m,
                     "max_speed_kmh": existing_flight.max_speed_kmh,
                     "site_id": existing_flight.site_id,
+                    "landing_site_id": existing_flight.landing_site_id,
                     "gpx_file_path": existing_flight.gpx_file_path,
                 },
             }
@@ -7074,6 +7088,8 @@ async def create_flight_from_gpx(
         flight = Flight(
             id=flight_id,
             site_id=site_id,
+            landing_site_id=landing_site_id,
+            landing_site_source="auto",
             name=flight_name,
             title=flight_name,
             flight_date=flight_date,
@@ -7140,6 +7156,7 @@ async def create_flight_from_gpx(
                 "elevation_gain_m": flight.elevation_gain_m,
                 "max_speed_kmh": flight.max_speed_kmh,
                 "site_id": flight.site_id,
+                "landing_site_id": flight.landing_site_id,
                 "gpx_file_path": flight.gpx_file_path,
             },
         }

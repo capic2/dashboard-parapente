@@ -7,9 +7,11 @@ from external_flight_import import (
     _legacy_track_matches,
     _update_existing_flight,
     import_external_activities,
+    match_landing_site,
+    update_inferred_landing_site,
 )
 from intervals_icu import ExternalActivity
-from models import Flight
+from models import Flight, Site
 from flight_tracks import calculate_track_stats, normalize_track
 
 GPX = b"""<gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>
@@ -25,7 +27,7 @@ class Provider:
 
 @pytest.mark.asyncio
 async def test_import_normalizes_intervals_name_and_repairs_it_on_resync(
-    db_session, arguel_site, tmp_path, monkeypatch
+    db_session, arguel_site, landing_site, tmp_path, monkeypatch
 ):
     monkeypatch.setattr(config, "PARAGLIDING_DATA_ROOT", str(tmp_path))
     activity = ExternalActivity(
@@ -70,8 +72,83 @@ async def test_import_normalizes_intervals_name_and_repairs_it_on_resync(
     assert flight.title == "Vol du 01/07/2026 à 12:00"
     assert "intervals_unsafe_id_" in flight.gpx_file_path
     assert flight.site_id == arguel_site.id
+    assert flight.landing_site_id == landing_site.id
+    assert flight.landing_site_source == "auto"
     assert flight.max_climb_rate_ms == 0.83
     assert flight.max_sink_rate_ms == 0
+
+
+def test_match_landing_site_accepts_landing_and_both_but_excludes_takeoff(
+    db_session, arguel_site, landing_site
+):
+    both_site = Site(
+        id="site-both",
+        code="BOTH",
+        name="Landing and takeoff",
+        latitude=47.201,
+        longitude=6.001,
+        usage_type="both",
+    )
+    db_session.add(both_site)
+    db_session.commit()
+
+    point = {"lat": 47.201, "lon": 6.001}
+
+    assert match_landing_site(db_session, point) == both_site.id
+    assert match_landing_site(db_session, {"lat": 47.19, "lon": 5.99}) == landing_site.id
+    assert arguel_site.id != match_landing_site(db_session, point)
+
+
+def test_match_landing_site_ignores_missing_coordinates_and_sites_beyond_limit(db_session):
+    db_session.add_all(
+        [
+            Site(
+                id="site-missing-coordinates",
+                code="MISS",
+                name="No coordinates",
+                usage_type="landing",
+            ),
+            Site(
+                id="site-too-far",
+                code="FAR",
+                name="Too far",
+                latitude=40.0,
+                longitude=-3.0,
+                usage_type="both",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    assert match_landing_site(db_session, {"lat": 47.2, "lon": 6.0}) is None
+
+
+def test_update_inferred_landing_site_recomputes_only_automatic_assignments(
+    db_session, landing_site
+):
+    automatic_flight = Flight(
+        id="automatic-landing",
+        flight_date=datetime(2026, 7, 1).date(),
+        landing_site_id="old-automatic-site",
+        landing_site_source="auto",
+    )
+    point = {"lat": landing_site.latitude, "lon": landing_site.longitude}
+
+    assert update_inferred_landing_site(db_session, automatic_flight, point)
+    assert automatic_flight.landing_site_id == landing_site.id
+    assert automatic_flight.landing_site_source == "auto"
+
+    for source in ("manual", "cleared"):
+        protected_flight = Flight(
+            id=f"protected-{source}",
+            flight_date=datetime(2026, 7, 1).date(),
+            landing_site_id="user-value",
+            landing_site_source=source,
+        )
+
+        assert not update_inferred_landing_site(db_session, protected_flight, point)
+        assert protected_flight.landing_site_id == "user-value"
+        assert protected_flight.landing_site_source == source
 
 
 @pytest.mark.asyncio
