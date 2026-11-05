@@ -129,14 +129,38 @@ const findSiteCard = (
 };
 
 const getSiteCardHeadings = (canvas: {
-  getAllByRole: typeof screen.getAllByRole;
+  queryAllByRole: typeof screen.queryAllByRole;
 }) =>
   canvas
-    .getAllByRole('heading', { level: 3 })
+    .queryAllByRole('heading', { level: 3 })
     .filter((heading) => heading.closest('div.flex.h-full.flex-col'));
+
+Default.test(
+  'site groups start collapsed and can be expanded and collapsed',
+  async ({ canvas, userEvent }) => {
+    await waitForElementToBeRemoved(canvas.getByText(/Loading.*/iu));
+    const locationToggle = canvas.getByRole('button', {
+      name: 'Déplier les sites de Besançon',
+    });
+
+    await expect(locationToggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(getSiteCardHeadings(canvas)).toHaveLength(0);
+
+    await userEvent.click(locationToggle);
+    await expect(locationToggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(getSiteCardHeadings(canvas)).toHaveLength(3);
+
+    await userEvent.click(locationToggle);
+    await expect(locationToggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(getSiteCardHeadings(canvas)).toHaveLength(0);
+  }
+);
 
 Default.test('filters by landing type', async ({ canvas, userEvent }) => {
   await waitForElementToBeRemoved(canvas.getByText(/Loading.*/iu));
+  await userEvent.click(
+    canvas.getByRole('button', { name: 'Déplier les sites de Besançon' })
+  );
   await expect(getSiteCardHeadings(canvas)).toHaveLength(3);
 
   const typeSelect = await canvas.findByDisplayValue('Tous les types');
@@ -152,6 +176,9 @@ Default.test('filters by landing type', async ({ canvas, userEvent }) => {
 });
 Default.test('filters by name', async ({ canvas, userEvent }) => {
   await waitForElementToBeRemoved(canvas.getByText(/Loading.*/iu));
+  await userEvent.click(
+    canvas.getByRole('button', { name: 'Déplier les sites de Besançon' })
+  );
   await expect(getSiteCardHeadings(canvas)).toHaveLength(3);
   await userEvent.type(
     await canvas.findByPlaceholderText(
@@ -201,7 +228,7 @@ Default.test(
         await expect(screen.queryByRole('dialog')).toBeNull();
       });
       await expect(
-        await canvas.findByRole('heading', { level: 3, name: 'Mont Poupet' })
+        await canvas.findByText('4 sites trouvés')
       ).toBeInTheDocument();
     });
   }
@@ -213,6 +240,9 @@ Default.test(
       await waitForElementToBeRemoved(canvas.getByText(/Loading.*/iu));
     });
     await step('Update a site', async () => {
+      await userEvent.click(
+        canvas.getByRole('button', { name: 'Déplier les sites de Besançon' })
+      );
       await userEvent.click(
         findSiteCard(canvas, 'Besançon - Arguel').getByRole('button', {
           name: /.*Éditer/u,
@@ -253,6 +283,9 @@ Default.test(
       await waitForElementToBeRemoved(canvas.getByText(/Loading.*/iu));
     });
     await step('Delete a site', async () => {
+      await userEvent.click(
+        canvas.getByRole('button', { name: 'Déplier les sites de Besançon' })
+      );
       await userEvent.click(
         findSiteCard(canvas, 'Besançon - Arguel').getByRole('button', {
           name: 'Supprimer le site',
