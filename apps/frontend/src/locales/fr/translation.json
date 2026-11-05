@@ -636,6 +636,8 @@
     "editSite": "Éditer le site",
     "viewFlights": "Voir les vols",
     "locationUnknown": "Sans localité",
+    "collapseLocation": "Replier les sites de {{location}}",
+    "expandLocation": "Déplier les sites de {{location}}",
     "locationGroupCount_one": "{{count}} site",
     "locationGroupCount_other": "{{count}} sites",
     "deleteSite": "Supprimer le site"
