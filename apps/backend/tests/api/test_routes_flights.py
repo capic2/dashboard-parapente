@@ -856,6 +856,43 @@ class TestFlightsListEndpoint:
         assert len(data["flights"]) == 1
         assert data["flights"][0]["id"] == "flight-arguel"
 
+    def test_get_flights_filter_by_site_includes_assigned_landings(
+        self,
+        client: TestClient,
+        db_session: Session,
+        arguel_site: Site,
+        chalais_site: Site,
+    ) -> None:
+        landing_only_flight = Flight(
+            id="flight-landing-only-filter",
+            name="Landing only filter",
+            flight_date=date(2026, 3, 15),
+            site_id=arguel_site.id,
+            landing_site_id=chalais_site.id,
+        )
+        takeoff_flight = Flight(
+            id="flight-takeoff-filter",
+            name="Takeoff filter",
+            flight_date=date(2026, 3, 16),
+            site_id=chalais_site.id,
+        )
+        unrelated_flight = Flight(
+            id="flight-unrelated-filter",
+            name="Unrelated filter",
+            flight_date=date(2026, 3, 17),
+            site_id=arguel_site.id,
+        )
+        db_session.add_all([landing_only_flight, takeoff_flight, unrelated_flight])
+        db_session.commit()
+
+        response = client.get(f"{API_PREFIX}/flights?site_id={chalais_site.id}")
+
+        assert response.status_code == 200
+        assert {flight["id"] for flight in response.json()["flights"]} == {
+            landing_only_flight.id,
+            takeoff_flight.id,
+        }
+
     def test_get_flights_filter_by_date(self, client, db_session, arguel_site):
         """GET /flights?date_from=X&date_to=Y filters by date range"""
         # Create flights in different dates
@@ -1454,6 +1491,49 @@ class TestUpdateFlightEndpoint:
         # Verify in DB
         db_session.refresh(sample_flight)
         assert sample_flight.name == "Updated Flight Name"
+
+    def test_update_flight_landing_site(
+        self: "TestUpdateFlightEndpoint",
+        client: TestClient,
+        db_session: Session,
+        sample_flight: Flight,
+        landing_site: Site,
+    ) -> None:
+        response = client.patch(
+            f"{API_PREFIX}/flights/{sample_flight.id}",
+            json={"landing_site_id": landing_site.id},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["data"]["landing_site_id"] == landing_site.id
+        db_session.refresh(sample_flight)
+        assert sample_flight.landing_site_id == landing_site.id
+
+        detail_response = client.get(f"{API_PREFIX}/flights/{sample_flight.id}")
+        assert detail_response.status_code == 200
+        assert detail_response.json()["landing_site_id"] == landing_site.id
+
+        list_response = client.get(f"{API_PREFIX}/flights")
+        assert list_response.status_code == 200
+        listed_flight = next(
+            flight for flight in list_response.json()["flights"] if flight["id"] == sample_flight.id
+        )
+        assert listed_flight["landing_site_id"] == landing_site.id
+
+        clear_response = client.patch(
+            f"{API_PREFIX}/flights/{sample_flight.id}",
+            json={"landing_site_id": None},
+        )
+        assert clear_response.status_code == 200
+        assert clear_response.json()["data"]["landing_site_id"] is None
+        db_session.refresh(sample_flight)
+        assert sample_flight.landing_site_id is None
+
+        invalid_response = client.patch(
+            f"{API_PREFIX}/flights/{sample_flight.id}",
+            json={"landing_site_id": "missing-landing-site"},
+        )
+        assert invalid_response.status_code == 404
 
     def test_update_flight_notes(self, client, db_session, sample_flight):
         """PATCH /flights/{flight_id} updates notes"""

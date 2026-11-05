@@ -5,9 +5,15 @@ Tests HTTP endpoints in routes.py related to paragliding spots.
 Coverage: GET, POST, PATCH, DELETE for spots/sites.
 """
 
+from datetime import date
+from pathlib import Path
 from unittest.mock import patch
 
-from models import BackgroundOperation, Site
+import pytest
+import routes
+from fastapi.testclient import TestClient
+from models import BackgroundOperation, Flight, Site, SiteLandingAssociation
+from sqlalchemy.orm import Session
 
 # API prefix for all routes
 API_PREFIX = "/api"
@@ -42,6 +48,72 @@ class TestSpotsListEndpoint:
         assert "latitude" in site
         assert "longitude" in site
         assert "elevation_m" in site
+
+    def test_manual_flight_landing_overrides_gpx_nearest_landing(
+        self: "TestSpotsListEndpoint",
+        client: TestClient,
+        db_session: Session,
+        arguel_site: Site,
+        landing_site: Site,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        manually_selected_landing = Site(
+            id="site-manual-landing",
+            name="Manual landing",
+            latitude=48.0,
+            longitude=7.0,
+            usage_type="landing",
+        )
+        gpx_path = tmp_path / "flight.gpx"
+        gpx_path.touch()
+        flight = Flight(
+            id="flight-manual-landing",
+            name="Flight with manual landing",
+            flight_date=date(2026, 3, 15),
+            site_id=arguel_site.id,
+            landing_site_id=manually_selected_landing.id,
+            gpx_file_path=str(gpx_path),
+        )
+        same_site_flight = Flight(
+            id="flight-same-takeoff-landing-site",
+            name="Flight landing at takeoff",
+            flight_date=date(2026, 3, 16),
+            site_id=arguel_site.id,
+            landing_site_id=arguel_site.id,
+        )
+        db_session.add_all(
+            [
+                manually_selected_landing,
+                flight,
+                same_site_flight,
+                SiteLandingAssociation(
+                    id="association-nearest-landing",
+                    takeoff_site_id=arguel_site.id,
+                    landing_site_id=landing_site.id,
+                ),
+                SiteLandingAssociation(
+                    id="association-manual-landing",
+                    takeoff_site_id=arguel_site.id,
+                    landing_site_id=manually_selected_landing.id,
+                ),
+            ]
+        )
+        db_session.commit()
+        monkeypatch.setattr(routes, "_flight_source_gpx_path", lambda _flight: gpx_path)
+        monkeypatch.setattr(
+            routes,
+            "parse_gpx_file",
+            lambda _path: [{"lat": landing_site.latitude, "lon": landing_site.longitude}],
+        )
+
+        response = client.get(f"{API_PREFIX}/spots")
+
+        assert response.status_code == 200
+        counts = {site["id"]: site["flight_count"] for site in response.json()["sites"]}
+        assert counts[arguel_site.id] == 2
+        assert counts[landing_site.id] == 0
+        assert counts[manually_selected_landing.id] == 1
 
 
 class TestSpotsSearchEndpoint:
@@ -343,6 +415,28 @@ class TestDeleteSiteEndpoint:
         response = client.delete(f"{API_PREFIX}/sites/site-arguel")
         # Should fail or cascade delete
         assert response.status_code in [200, 204, 400, 409]
+
+    def test_delete_landing_site_with_assigned_flights_is_blocked(
+        self: "TestDeleteSiteEndpoint",
+        client: TestClient,
+        db_session: Session,
+        landing_site: Site,
+    ) -> None:
+        db_session.add(
+            Flight(
+                id="flight-assigned-landing",
+                name="Flight with assigned landing",
+                flight_date=date(2026, 3, 15),
+                landing_site_id=landing_site.id,
+            )
+        )
+        db_session.commit()
+
+        response = client.delete(f"{API_PREFIX}/sites/{landing_site.id}")
+
+        assert response.status_code == 400
+        assert "use this site as a landing" in response.json()["detail"]
+        assert db_session.query(Site).filter(Site.id == landing_site.id).first() is not None
 
 
 class TestSearchSpotsWithWeather:
