@@ -4,7 +4,14 @@ import { useNavigate } from '@tanstack/react-router';
 import { Input, Label, TextField } from 'react-aria-components';
 import { Button } from '@dashboard-parapente/core/Button/Button';
 import { Modal } from '@dashboard-parapente/core/Modal';
-import { ArrowDown, ArrowUp, Plus, Search, Trash2 } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  Plus,
+  Search,
+  Trash2,
+} from 'lucide-react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import {
   useReactTable,
@@ -78,6 +85,9 @@ export const Sites: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<
     'all' | 'takeoff' | 'landing' | 'both'
   >('all');
+  const [expandedLocations, setExpandedLocations] = useState<Set<string>>(
+    () => new Set()
+  );
 
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'name', desc: false },
@@ -185,6 +195,18 @@ export const Sites: React.FC = () => {
 
   const handleViewFlights = (site: Site) => {
     void navigate({ to: '/flights', search: { siteId: site.id } });
+  };
+
+  const toggleLocation = (location: string) => {
+    setExpandedLocations((current) => {
+      const next = new Set(current);
+      if (next.has(location)) {
+        next.delete(location);
+      } else {
+        next.add(location);
+      }
+      return next;
+    });
   };
 
   const renderSiteCard = (
@@ -329,6 +351,8 @@ export const Sites: React.FC = () => {
           <div className="space-y-8">
             {siteGroups.map((group, index) => {
               const headingId = `site-location-${index}`;
+              const contentId = `${headingId}-sites`;
+              const isExpanded = expandedLocations.has(group.location);
               const usageGroups = SITE_USAGE_GROUPS.map(
                 ({ usageType, labelKey }) => ({
                   usageType,
@@ -341,20 +365,43 @@ export const Sites: React.FC = () => {
 
               return (
                 <section key={group.location} aria-labelledby={headingId}>
-                  <div className="mb-3 flex flex-col gap-1 border-b border-gray-200 pb-2 dark:border-gray-700 sm:flex-row sm:items-end sm:justify-between">
-                    <h2
-                      id={headingId}
-                      className="text-xl font-semibold text-gray-900 dark:text-white"
-                    >
-                      {group.location}
-                    </h2>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      {t('sites.locationGroupCount', {
-                        count: group.rows.length,
-                      })}
-                    </p>
+                  <div className="mb-3 border-b border-gray-200 pb-2 dark:border-gray-700">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                      <h2
+                        id={headingId}
+                        className="text-xl font-semibold text-gray-900 dark:text-white"
+                      >
+                        <Button
+                          onPress={() => toggleLocation(group.location)}
+                          aria-expanded={isExpanded}
+                          aria-controls={contentId}
+                          aria-label={t(
+                            isExpanded
+                              ? 'sites.collapseLocation'
+                              : 'sites.expandLocation',
+                            { location: group.location }
+                          )}
+                          className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md text-left outline-none transition-colors hover:text-sky-700 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 motion-reduce:transition-none dark:hover:text-sky-300 dark:focus-visible:ring-offset-gray-900"
+                        >
+                          <ChevronDown
+                            aria-hidden="true"
+                            className={`h-5 w-5 shrink-0 transition-transform duration-200 ${isExpanded ? '' : '-rotate-90'}`}
+                          />
+                          {group.location}
+                        </Button>
+                      </h2>
+                      <span className="text-sm text-gray-600 dark:text-gray-300">
+                        {t('sites.locationGroupCount', {
+                          count: group.rows.length,
+                        })}
+                      </span>
+                    </div>
                   </div>
-                  <div className="space-y-5">
+                  <div
+                    id={contentId}
+                    hidden={!isExpanded}
+                    className="space-y-5"
+                  >
                     {usageGroups.map((usageGroup, usageIndex) => {
                       const usageHeadingId = `${headingId}-usage-${usageIndex}`;
 
