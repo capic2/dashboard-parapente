@@ -82,11 +82,28 @@ class TestSpotsListEndpoint:
             site_id=arguel_site.id,
             landing_site_id=arguel_site.id,
         )
+        inferred_flight = Flight(
+            id="flight-inferred-landing",
+            name="Flight with inferred landing",
+            flight_date=date(2026, 3, 17),
+            site_id=arguel_site.id,
+            gpx_file_path=str(gpx_path),
+        )
+        cleared_flight = Flight(
+            id="flight-cleared-landing",
+            name="Flight with cleared landing",
+            flight_date=date(2026, 3, 18),
+            site_id=arguel_site.id,
+            gpx_file_path=str(gpx_path),
+            landing_site_source="cleared",
+        )
         db_session.add_all(
             [
                 manually_selected_landing,
                 flight,
                 same_site_flight,
+                inferred_flight,
+                cleared_flight,
                 SiteLandingAssociation(
                     id="association-nearest-landing",
                     takeoff_site_id=arguel_site.id,
@@ -111,8 +128,8 @@ class TestSpotsListEndpoint:
 
         assert response.status_code == 200
         counts = {site["id"]: site["flight_count"] for site in response.json()["sites"]}
-        assert counts[arguel_site.id] == 2
-        assert counts[landing_site.id] == 0
+        assert counts[arguel_site.id] == 4
+        assert counts[landing_site.id] == 1
         assert counts[manually_selected_landing.id] == 1
 
 
