@@ -267,9 +267,9 @@ export function NativeGpxImportHandler() {
   const { t } = useTranslation();
 
   useEffect(() => {
-    let handlingShare = false;
+    const handlingShare = { current: false };
     const timer = window.setInterval(() => {
-      if (handlingShare) return;
+      if (handlingShare.current) return;
 
       const sharedFromPage = window.__pendingNativeGpxShare ?? null;
       if (sharedFromPage) {
@@ -285,7 +285,7 @@ export function NativeGpxImportHandler() {
         if (!serialized) return;
       }
 
-      handlingShare = true;
+      handlingShare.current = true;
       void (async () => {
         try {
           const shared =
@@ -336,7 +336,7 @@ export function NativeGpxImportHandler() {
             title,
           });
         } finally {
-          handlingShare = false;
+          handlingShare.current = false;
         }
       })();
     }, 750);

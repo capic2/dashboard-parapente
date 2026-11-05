@@ -437,10 +437,10 @@ export function GoproOverlaySyncPreview({
 
   useEffect(() => {
     if (!youtubeId || youtubeFailed || !youtubeHostElement) return;
-    let cancelled = false;
+    const cancelled = { current: false };
     void loadYoutubeApi()
       .then((api) => {
-        if (cancelled || !youtubeHostElement) return;
+        if (cancelled.current || !youtubeHostElement) return;
         const host = document.createElement('div');
         youtubeHostElement.replaceChildren(host);
         youtubeRef.current = new api.Player(host, {
@@ -469,7 +469,7 @@ export function GoproOverlaySyncPreview({
         setYoutubeFailed(true);
       });
     return () => {
-      cancelled = true;
+      cancelled.current = true;
       youtubeRef.current?.destroy();
       youtubeRef.current = null;
       setYoutubeReady(false);
@@ -483,15 +483,15 @@ export function GoproOverlaySyncPreview({
 
   useEffect(() => {
     if (!youtubeId || !youtubeReady) return;
-    let frame = 0;
+    const frame = { current: 0 };
     const update = () => {
       setVideoTime(youtubeRef.current?.getCurrentTime() ?? 0);
       const duration = youtubeRef.current?.getDuration() ?? 0;
       if (duration > 0) setYoutubeDuration(duration);
-      frame = requestAnimationFrame(update);
+      frame.current = requestAnimationFrame(update);
     };
-    frame = requestAnimationFrame(update);
-    return () => cancelAnimationFrame(frame);
+    frame.current = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(frame.current);
   }, [youtubeId, youtubeReady]);
 
   useEffect(() => {
