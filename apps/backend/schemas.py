@@ -884,6 +884,8 @@ class FlightSummary(BaseModel):
     site_id: str | None = None
     site_name: str | None = None
     site_region: str | None = None
+    landing_site_id: str | None = None
+    landing_site_name: str | None = None
     name: str | None = None
     title: str | None = None
     tags: list[str] = Field(default_factory=list)

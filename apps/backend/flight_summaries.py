@@ -477,13 +477,20 @@ def list_flight_summaries(
         )
         .label("flight_sequence"),
     ).subquery()
-    page_query = base_query.outerjoin(
+    landing_site = aliased(Site)
+    page_query_base = base_query.outerjoin(
         flight_sequences, flight_sequences.c.flight_id == Flight.id
-    ).with_entities(
+    ).outerjoin(
+        landing_site,
+        Flight.landing_site_id == landing_site.id,
+    )
+    page_query = page_query_base.with_entities(
         Flight.id,
         Flight.site_id,
         Site.name.label("site_name"),
         Site.region.label("site_region"),
+        Flight.landing_site_id,
+        landing_site.name.label("landing_site_name"),
         Flight.name,
         Flight.title,
         Flight.flight_date,
@@ -604,6 +611,8 @@ def list_flight_summaries(
             site_id=row.site_id,
             site_name=row.site_name,
             site_region=row.site_region,
+            landing_site_id=row.landing_site_id,
+            landing_site_name=row.landing_site_name,
             name=row.name,
             title=row.title,
             flight_date=row.flight_date,

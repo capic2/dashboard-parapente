@@ -245,6 +245,8 @@ export const FlightSummarySchema = z.object({
   site_id: z.string().nullable(),
   site_name: z.string().nullable(),
   site_region: z.string().nullable(),
+  landing_site_id: z.string().nullable().optional(),
+  landing_site_name: z.string().nullable().optional(),
   name: z.string().nullable(),
   title: z.string().nullable(),
   tags: z.array(z.string()).default([]),
