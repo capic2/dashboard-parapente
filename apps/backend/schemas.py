@@ -622,6 +622,7 @@ class FlightUpdate(BaseModel):
     name: str | None = None
     title: str | None = None
     site_id: str | None = None
+    landing_site_id: str | None = None
     flight_date: date | None = None
     departure_time: datetime | None = None
     duration_minutes: int | None = None
@@ -829,6 +830,7 @@ class SiteInFlight(BaseModel):
 class Flight(FlightBase):
     id: str
     site_id: str | None = None
+    landing_site_id: str | None = None
     site_name: str | None = None
     name: str | None = None
     external_provider: str | None = None

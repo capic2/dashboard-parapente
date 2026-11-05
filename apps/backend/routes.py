@@ -36,7 +36,7 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy import func, update
+from sqlalchemy import func, or_, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel, Field
@@ -2742,14 +2742,21 @@ def get_spots(db: Session = Depends(get_db)):
     for association, landing_site in associations:
         landing_sites_by_takeoff.setdefault(association.takeoff_site_id, []).append(landing_site)
 
-    # Flights count toward their takeoff site and exactly one associated landing:
-    # the one closest to the final coordinate in the recorded GPX track.
+    # Flights count toward their takeoff site and exactly one landing. A manually
+    # selected landing takes precedence; otherwise infer it from the final GPX point.
     from spots.distance import haversine_distance
 
-    for flight in db.query(Flight).filter(Flight.site_id.is_not(None)).all():
-        if flight.site_id in flight_counts:
+    for flight in db.query(Flight).all():
+        if flight.site_id and flight.site_id in flight_counts:
             flight_counts[flight.site_id] += 1
 
+        if flight.landing_site_id:
+            if flight.landing_site_id != flight.site_id and flight.landing_site_id in flight_counts:
+                flight_counts[flight.landing_site_id] += 1
+            continue
+
+        if not flight.site_id:
+            continue
         landing_sites = landing_sites_by_takeoff.get(flight.site_id, [])
         gpx_path = _flight_source_gpx_path(flight)
         if not landing_sites or not gpx_path or not gpx_path.is_file():
@@ -3080,11 +3087,19 @@ def delete_site(site_id: str, db: Session = Depends(get_db)):
 
     # Check for associated flights
     flight_count = db.query(Flight).filter(Flight.site_id == site_id).count()
+    landing_flight_count = db.query(Flight).filter(Flight.landing_site_id == site_id).count()
 
     if flight_count > 0:
         raise HTTPException(
             status_code=400,
             detail=f"Cannot delete site '{site.name}': {flight_count} flight(s) are linked to this site. "
+            f"Please reassign or unlink these flights before deleting the site.",
+        )
+
+    if landing_flight_count > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete site '{site.name}': {landing_flight_count} flight(s) use this site as a landing. "
             f"Please reassign or unlink these flights before deleting the site.",
         )
 
@@ -4945,7 +4960,7 @@ def get_flights(
 
     # Apply filters
     if site_id:
-        query = query.filter(Flight.site_id == site_id)
+        query = query.filter(or_(Flight.site_id == site_id, Flight.landing_site_id == site_id))
     if date_from:
         try:
             from_date = datetime.strptime(date_from, "%Y-%m-%d").date()
@@ -4997,6 +5012,7 @@ def get_flights(
             "external_activity_id": flight.external_activity_id,
             "gpx_provider": flight.gpx_provider,
             "site_id": flight.site_id,
+            "landing_site_id": flight.landing_site_id,
             "site_name": flight.site.name if flight.site else None,
             "name": flight.name,
             "title": flight.title,
@@ -5655,6 +5671,7 @@ def get_flight(flight_id: str, db: Session = Depends(get_db)):
         "name": flight.name,
         "title": flight.title,
         "site_id": flight.site_id,
+        "landing_site_id": flight.landing_site_id,
         "external_provider": flight.external_provider,
         "external_activity_id": flight.external_activity_id,
         "gpx_provider": flight.gpx_provider,
@@ -5774,6 +5791,14 @@ async def update_flight(
         if not site:
             raise HTTPException(
                 status_code=404, detail=f"Site with ID '{flight_data.site_id}' not found"
+            )
+
+    if flight_data.landing_site_id is not None:
+        landing_site = db.query(Site).filter(Site.id == flight_data.landing_site_id).first()
+        if not landing_site:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Site with ID '{flight_data.landing_site_id}' not found",
             )
 
     # 3. Update only provided fields (exclude_unset skips None values)

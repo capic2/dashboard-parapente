@@ -130,6 +130,11 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
     sites,
     fallback: t('flights.notSpecified'),
   });
+  const landingSiteLabel = formatFlightSiteLabel({
+    siteId: flight.landing_site_id,
+    sites,
+    fallback: t('flights.notSpecified'),
+  });
   const durationLabel =
     flight.duration_minutes == null
       ? t('flights.notAvailable')
@@ -347,7 +352,13 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
           </>
         )}
         <span aria-hidden="true">·</span>
-        <span>{siteLabel}</span>
+        <span>
+          {t('flights.siteLabel')}: {siteLabel}
+        </span>
+        <span aria-hidden="true">·</span>
+        <span>
+          {t('flights.landingSiteLabel')}: {landingSiteLabel}
+        </span>
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">

@@ -1201,6 +1201,7 @@
     "dateLabel": "Date",
     "departureTime": "Departure time",
     "siteLabel": "Site",
+    "landingSiteLabel": "Landing site",
     "notSpecified": "Not specified",
     "createNewSite": "Create a new site",
     "newSiteButton": "+ New",

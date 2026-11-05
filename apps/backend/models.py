@@ -206,7 +206,7 @@ class Site(Base):
         onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
     )
 
-    flights = relationship("Flight", back_populates="site")
+    flights = relationship("Flight", back_populates="site", foreign_keys="Flight.site_id")
     weather_forecasts = relationship("WeatherForecast", back_populates="site")
     linked_spot = relationship("ParaglidingSpot", back_populates="linked_sites")
     landing_associations = relationship(
@@ -273,6 +273,7 @@ class Flight(Base):
     # Legacy persisted compatibility only. Active integrations use the generic identity above.
     strava_id = Column(String, unique=True, nullable=True)
     site_id = Column(String, ForeignKey("sites.id"), nullable=True)
+    landing_site_id = Column(String, ForeignKey("sites.id"), nullable=True)
     name = Column(String)  # Format: "Lieu JJ-MM HHhMM"
     title = Column(String)  # Legacy field
     description = Column(Text)
@@ -322,7 +323,7 @@ class Flight(Base):
         onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
     )
 
-    site = relationship("Site", back_populates="flights")
+    site = relationship("Site", back_populates="flights", foreign_keys=[site_id])
     export_jobs = relationship(
         "VideoExportJob",
         back_populates="flight",
