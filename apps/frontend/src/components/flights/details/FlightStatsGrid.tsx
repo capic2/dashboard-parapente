@@ -130,8 +130,10 @@ export function FlightStatsGrid({ flight, sites }: FlightStatsGridProps) {
     sites,
     fallback: t('flights.notSpecified'),
   });
+  const landingSite = sites.find((site) => site.id === flight.landing_site_id);
   const landingSiteLabel = formatFlightSiteLabel({
     siteId: flight.landing_site_id,
+    siteName: landingSite?.name,
     sites,
     fallback: t('flights.notSpecified'),
   });
