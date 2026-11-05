@@ -37,6 +37,27 @@ def match_site(db: Session, point: TrackPoint, max_distance_km: float = 5.0) -> 
     return closest[1] if closest and closest[0] <= max_distance_km else None
 
 
+def match_landing_site(db: Session, point: TrackPoint, max_distance_km: float = 5.0) -> str | None:
+    """Find the closest site usable for landing near the end of a flight track."""
+    closest: tuple[float, str] | None = None
+    for site in db.query(Site).filter(Site.usage_type.in_(("landing", "both"))).all():
+        if site.latitude is None or site.longitude is None:
+            continue
+        distance = haversine_distance(point["lat"], point["lon"], site.latitude, site.longitude)
+        if closest is None or distance < closest[0]:
+            closest = distance, site.id
+    return closest[1] if closest and closest[0] <= max_distance_km else None
+
+
+def update_inferred_landing_site(db: Session, flight: Flight, point: TrackPoint) -> bool:
+    """Update the landing match unless the user chose or cleared it manually."""
+    if flight.landing_site_source in {"manual", "cleared"}:
+        return False
+    flight.landing_site_id = match_landing_site(db, point)
+    flight.landing_site_source = "auto"
+    return True
+
+
 def _safe_activity_id(activity_id: str) -> str:
     stem = re.sub(r"[^A-Za-z0-9_-]+", "_", activity_id).strip("_")[:48] or "activity"
     digest = hashlib.sha256(activity_id.encode()).hexdigest()[:12]
@@ -220,6 +241,8 @@ async def import_external_activities(
                         flight.flight_date = departure.date()
                         flight.departure_time = departure
                         flight.site_id = match_site(db, points[0])
+                        flight.landing_site_id = match_landing_site(db, points[-1])
+                        flight.landing_site_source = "auto"
                         flight.duration_minutes = int(stats["duration_minutes"])
                         flight.max_altitude_m = int(stats["max_altitude_m"])
                         flight.max_speed_kmh = float(stats["max_speed_kmh"])

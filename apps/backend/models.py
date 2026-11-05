@@ -274,6 +274,7 @@ class Flight(Base):
     strava_id = Column(String, unique=True, nullable=True)
     site_id = Column(String, ForeignKey("sites.id"), nullable=True)
     landing_site_id = Column(String, ForeignKey("sites.id"), nullable=True)
+    landing_site_source = Column(String, nullable=True)
     name = Column(String)  # Format: "Lieu JJ-MM HHhMM"
     title = Column(String)  # Legacy field
     description = Column(Text)
