@@ -119,6 +119,7 @@ Default.test(
           gpx_metrics_excluded: false,
           max_altitude_m: 1850,
           max_speed_kmh: 52.3,
+          landing_site_id: null,
           name: 'Arguel 15-03 14h00 modifié ',
           notes: 'Superbe vol thermique, base cumulus 1800m',
           site_id: 'site-arguel',

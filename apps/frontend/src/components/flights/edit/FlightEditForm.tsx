@@ -122,6 +122,7 @@ export function FlightEditForm({
       name: flight.name ?? '',
       title: flight.title ?? flight.name ?? '',
       site_id: flight.site_id ?? '',
+      landing_site_id: flight.landing_site_id ?? '',
       flight_date: flight.flight_date,
       departure_time: flight.departure_time ?? '',
       duration_minutes: flight.duration_minutes ?? 0,
@@ -144,6 +145,7 @@ export function FlightEditForm({
           name: value.name,
           title: value.title,
           site_id: value.site_id || null,
+          landing_site_id: value.landing_site_id || null,
           flight_date: value.flight_date,
           departure_time: value.departure_time || null,
           duration_minutes: value.duration_minutes,
@@ -204,6 +206,17 @@ export function FlightEditForm({
     id: site.id,
     label: getSiteDisplayName(site),
   }));
+  const landingSiteOptions = sites
+    .filter(
+      (site) =>
+        site.usage_type == null ||
+        site.usage_type === 'landing' ||
+        site.usage_type === 'both'
+    )
+    .map((site) => ({
+      id: site.id,
+      label: getSiteDisplayName(site),
+    }));
 
   const s = styles();
   const md = styles({ size: 'md' });
@@ -345,6 +358,23 @@ export function FlightEditForm({
                   {t('flights.newSiteButton')}
                 </Button>
               </div>
+            )}
+          </form.Field>
+        </div>
+
+        {/* Landing site */}
+        <div className="col-span-2 md:col-span-3">
+          <form.Field name="landing_site_id">
+            {(field) => (
+              <Select
+                label={t('flights.landingSiteLabel')}
+                options={landingSiteOptions}
+                value={field.state.value || null}
+                onChange={(key: Key | null) =>
+                  field.handleChange(key ? String(key) : '')
+                }
+                placeholder={t('flights.notSpecified')}
+              />
             )}
           </form.Field>
         </div>

@@ -154,6 +154,7 @@ export const FlightSchema = z
     external_activity_id: z.string().trim().min(1).nullish(),
     gpx_provider: z.string().trim().min(1).nullish(),
     site_id: z.string().nullish(),
+    landing_site_id: z.string().nullish(),
     site_name: z.string().nullish(),
     name: z.string().nullish(),
     title: z.string().nullish(),

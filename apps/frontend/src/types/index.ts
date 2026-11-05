@@ -116,6 +116,7 @@ export interface FlightFormData {
   name?: string;
   title: string;
   site_id: string | null;
+  landing_site_id?: string | null;
   flight_date: string;
   departure_time?: string | null;
   duration_minutes: number | null;
