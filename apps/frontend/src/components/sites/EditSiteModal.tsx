@@ -43,6 +43,7 @@ import {
 
 type SiteFormData = Required<SiteUpdate>;
 type SiteUsageType = 'takeoff' | 'landing' | 'both';
+type SiteUsageFilter = SiteUsageType | 'all';
 type SearchCandidate = {
   spot: ParaglidingSpotSearchResult;
   usageType: SiteUsageType;
@@ -323,6 +324,8 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
     useState<LocationSuggestion | null>(null);
   const [radiusKm, setRadiusKm] = useState(30);
   const [limit, setLimit] = useState(5);
+  const [siteUsageFilter, setSiteUsageFilter] =
+    useState<SiteUsageFilter>('all');
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
   const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
   const [selectedCandidate, setSelectedCandidate] =
@@ -371,6 +374,15 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         nearbyOptions.data?.landings ?? []
       ),
     [nearbyOptions.data?.landings, nearbyOptions.data?.takeoffs]
+  );
+  const filteredSearchCandidates = useMemo(
+    () =>
+      siteUsageFilter === 'all'
+        ? searchCandidates
+        : searchCandidates.filter(
+            (candidate) => candidate.usageType === siteUsageFilter
+          ),
+    [searchCandidates, siteUsageFilter]
   );
   const hasDuplicateRelevantChanges =
     isCreateMode ||
@@ -707,7 +719,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
               </p>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto] lg:items-end">
+            <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto_auto] lg:items-end">
               <TextField className="relative flex flex-col gap-1">
                 <Label className={labelClass}>{t('weather.search.city')}</Label>
                 <Input
@@ -819,6 +831,26 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                   ))}
                 </select>
               </label>
+
+              <label className="flex flex-col gap-1 text-sm font-medium dark:text-gray-200">
+                {t('editSite.siteTypeFilter')}
+                <select
+                  value={siteUsageFilter}
+                  onChange={(event) =>
+                    setSiteUsageFilter(event.target.value as SiteUsageFilter)
+                  }
+                  className={inputClass}
+                >
+                  <option value="all">{t('editSite.typeAllShort')}</option>
+                  <option value="takeoff">
+                    {t('editSite.typeTakeoffShort')}
+                  </option>
+                  <option value="both">{t('editSite.typeBothShort')}</option>
+                  <option value="landing">
+                    {t('editSite.typeLandingShort')}
+                  </option>
+                </select>
+              </label>
             </div>
 
             {selectedLocation && (
@@ -874,9 +906,9 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                 )}
                 {!nearbyOptions.isError &&
                   !nearbyOptions.isLoading &&
-                  searchCandidates.length > 0 && (
+                  filteredSearchCandidates.length > 0 && (
                     <div className="grid gap-2">
-                      {searchCandidates.map((candidate) => {
+                      {filteredSearchCandidates.map((candidate) => {
                         const isSelected = selectedSpotId === candidate.spot.id;
                         let usageLabel = t('editSite.typeLandingShort');
                         if (candidate.usageType === 'both') {
@@ -947,6 +979,14 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                   searchCandidates.length === 0 && (
                     <div className="rounded-lg border border-gray-200 bg-white/80 p-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-300">
                       {t('editSite.noExistingSiteFound')}
+                    </div>
+                  )}
+                {!nearbyOptions.isError &&
+                  !nearbyOptions.isLoading &&
+                  searchCandidates.length > 0 &&
+                  filteredSearchCandidates.length === 0 && (
+                    <div className="rounded-lg border border-gray-200 bg-white/80 p-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-300">
+                      {t('editSite.noMatchingSiteType')}
                     </div>
                   )}
               </div>
