@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 
-const API_BASE = 'http://localhost:8001/api';
-const ADMIN_EMAIL = process.env.BACKEND_ADMIN_EMAIL || 'e2e@test.local';
-const ADMIN_PASSWORD = process.env.BACKEND_ADMIN_PASSWORD || 'e2e-test-password';
+const API_BASE = `http://localhost:${process.env.E2E_API_PORT || '8001'}/api`;
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || 'e2e@test.local';
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || 'e2e-test-password';
 const ALLOWED_STATUSES = new Set([200, 404]);
 
 let authToken = '';

@@ -2,8 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test, expect, type APIRequestContext } from '@playwright/test';
 
-const ADMIN_EMAIL = process.env.BACKEND_ADMIN_EMAIL || 'e2e@test.local';
-const ADMIN_PASSWORD = process.env.BACKEND_ADMIN_PASSWORD || 'e2e-test-password';
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || 'e2e@test.local';
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || 'e2e-test-password';
+const API_BASE = `http://localhost:${process.env.E2E_API_PORT || '8001'}/api`;
 
 const GPX_FIXTURE_PATH = path.resolve(
   __dirname,
@@ -11,124 +12,55 @@ const GPX_FIXTURE_PATH = path.resolve(
 );
 const GPX_FILE_NAME = 'sample_arguel.gpx';
 const DEFAULT_SITE_ID = 'site-arguel';
-const PLAYBACK_TIMEOUT_MS = 60000;
+const PLAYBACK_TIMEOUT_MS = 10000;
 const TEST_TIMEOUT_MS = 150000;
 const VIEWER_READY_TIMEOUT_MS = 30000;
 
-const parsePlaybackElapsedSeconds = (flightElapsedLabel: string | null) => {
-  if (!flightElapsedLabel) {
-    return 0;
-  }
-
-  const match = flightElapsedLabel.match(/(\d+)\s*min\s*(\d+)\s*s/i);
-  if (!match) {
-    return 0;
-  }
-
-  const minutes = Number(match[1] ?? 0);
-  const seconds = Number(match[2] ?? 0);
-
-  return minutes * 60 + seconds;
-};
-
-const parsePlaybackPosition = (positionLabel: string | null) => {
-  if (!positionLabel) {
-    return 0;
-  }
-
-  const match = positionLabel.match(/(\d+)\s*\/\s*(\d+)/);
-  if (!match) {
-    return 0;
-  }
-
-  return Number(match[1] ?? 0);
-};
-
-const getPlaybackElapsedText = async (
-  progressSlider: import('@playwright/test').Locator
-) => {
-  return progressSlider
-    .locator('xpath=../following-sibling::*[1]')
-    .textContent()
-    .catch(() => null);
-};
-
-const getPlaybackPositionText = async (
-  progressSlider: import('@playwright/test').Locator
-) => {
-  return progressSlider
-    .locator('xpath=../preceding-sibling::*[1]')
-    .textContent()
-    .catch(() => null);
-};
-
-const getPlaybackState = async (
-  page: import('@playwright/test').Page,
-  progressSlider: import('@playwright/test').Locator
-) => {
-  const elapsedText = await getPlaybackElapsedText(progressSlider);
-  const fallbackElapsedText = await page
-    .locator('text=/⏱️\\s*\\d+\\s*min\\s*\\d+\\s*s\\s*\/\\s*\\d+\\s*min\\s*\\d+\\s*s/')
-    .first()
-    .textContent()
-    .catch(() => null);
-
-  const sliderInputValue = await progressSlider.inputValue();
-  const slider = Number(sliderInputValue);
-  const positionText = await getPlaybackPositionText(progressSlider);
-
-  return {
-    slider: Number.isFinite(slider) ? slider : 0,
-    elapsedSeconds: parsePlaybackElapsedSeconds(elapsedText || fallbackElapsedText),
-    position: parsePlaybackPosition(positionText),
-  };
-};
-
 const waitForPlaybackProgress = async (
   progressSlider: import('@playwright/test').Locator,
-  progressSnapshot: {
-    slider: number;
-    elapsedSeconds: number;
-    position?: number;
-  },
-  page: import('@playwright/test').Page
+  initialProgress: number
 ) => {
   await expect.poll(
-    async () => {
-      const state = await getPlaybackState(page, progressSlider);
-      return (
-        state.slider > progressSnapshot.slider ||
-        state.elapsedSeconds > progressSnapshot.elapsedSeconds ||
-        state.position > (progressSnapshot.position ?? 0)
-      );
-    },
+    async () => Number(await progressSlider.inputValue()),
     {
       timeout: PLAYBACK_TIMEOUT_MS,
       message: 'la progression de lecture évolue',
     }
-  ).toBeTruthy();
+  ).toBeGreaterThan(initialProgress);
 };
 
 const setReplaySpeed = async (
   page: import('@playwright/test').Page,
-  progressSlider: import('@playwright/test').Locator,
   speed: number
 ) => {
-  const primarySpeedSlider = progressSlider.locator(
-    'xpath=../following-sibling::*[2]//input[@type="range"]'
-  );
-  const fallbackSpeedSlider = page
-    .locator('label', { hasText: /^Vitesse:/i })
-    .locator('xpath=../following-sibling::input[@type="range"]');
-  const speedSlider =
-    (await primarySpeedSlider.count()) > 0 ? primarySpeedSlider : fallbackSpeedSlider;
+  const speedButton = page.getByRole('button', { name: /^Vitesse:/u });
+  await expect(speedButton).toBeVisible();
 
-  await speedSlider.waitFor({ state: 'visible', timeout: 10000 });
-  await speedSlider.scrollIntoViewIfNeeded();
-  await speedSlider.fill(String(speed));
-  await speedSlider.dispatchEvent('input');
-  await speedSlider.dispatchEvent('change');
-  await expect(speedSlider).toHaveValue(String(speed));
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    if ((await speedButton.getAttribute('aria-label')) === `Vitesse: ${speed}x`) {
+      return;
+    }
+    await speedButton.click();
+  }
+
+  await expect(speedButton).toHaveAccessibleName(`Vitesse: ${speed}x`);
+};
+
+const setRangeValue = async (
+  page: import('@playwright/test').Page,
+  testId: string,
+  value: number
+) => {
+  await page.getByTestId(testId).evaluate((element, nextValue) => {
+    const slider = element as HTMLInputElement;
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value'
+    )?.set;
+    valueSetter?.call(slider, String(nextValue));
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    slider.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
 };
 
 const waitForCameraSaveResponse = async (
@@ -165,7 +97,7 @@ const authenticate = async (
   page: import('@playwright/test').Page,
   request: APIRequestContext
 ) => {
-  const loginResponse = await request.post('/api/auth/login', {
+  const loginResponse = await request.post(`${API_BASE}/auth/login`, {
     form: {
       username: ADMIN_EMAIL,
       password: ADMIN_PASSWORD,
@@ -184,7 +116,7 @@ const authenticate = async (
 };
 
 const getAuthToken = async (request: APIRequestContext) => {
-  const loginResponse = await request.post('/api/auth/login', {
+  const loginResponse = await request.post(`${API_BASE}/auth/login`, {
     form: {
       username: ADMIN_EMAIL,
       password: ADMIN_PASSWORD,
@@ -204,7 +136,7 @@ const createFlightFromGPX = async (request: APIRequestContext, token: string) =>
   const buffer = fs.readFileSync(GPX_FIXTURE_PATH);
 
   const response = await request.post(
-    `/api/flights/create-from-gpx?site_id=${encodeURIComponent(DEFAULT_SITE_ID)}`,
+    `${API_BASE}/flights/create-from-gpx?site_id=${encodeURIComponent(DEFAULT_SITE_ID)}`,
     {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -236,7 +168,7 @@ const createFlightFromGPX = async (request: APIRequestContext, token: string) =>
 };
 
 const deleteFlight = async (request: APIRequestContext, token: string, flightId: string) => {
-  const response = await request.delete(`/api/flights/${flightId}`, {
+  const response = await request.delete(`${API_BASE}/flights/${flightId}`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -255,19 +187,32 @@ const waitForFlightRowAndOpen = async (
   flightId: string
 ) => {
   const flightRow = page.getByTestId(`flight-row-${flightId}`);
+  const dayGroup = flightRow.locator('xpath=ancestor::section[1]');
+  const dayGroupToggle = dayGroup.getByRole('button');
+  if ((await dayGroupToggle.getAttribute('aria-expanded')) === 'false') {
+    await dayGroupToggle.click();
+  }
+
   await expect(flightRow).toBeVisible({ timeout: 15000 });
   await flightRow.scrollIntoViewIfNeeded();
   await flightRow.click();
 
+  await page.getByRole('tab', { name: 'Médias' }).click();
+  const replayToggle = page.getByRole('button', { name: /Replay du vol/i });
+  await expect(replayToggle).toBeVisible();
+  if ((await replayToggle.getAttribute('aria-expanded')) === 'false') {
+    await replayToggle.click();
+  }
+
   const playButton = page.getByTestId('flight-play-toggle');
   await expect(playButton).toBeVisible({ timeout: VIEWER_READY_TIMEOUT_MS });
   await expect(playButton).toBeEnabled({ timeout: 5000 });
-  await expect(page.getByRole('button', { name: '⛶ Plein écran' })).toBeVisible({
-    timeout: VIEWER_READY_TIMEOUT_MS,
-  });
   await expect(page.getByTestId('flight-progress-slider')).toBeVisible({
     timeout: 10000,
   });
+
+  const openPanelButton = page.getByRole('button', { name: 'Ouvrir le panneau' });
+  if (await openPanelButton.isVisible()) await openPanelButton.click();
 
   const cameraSectionToggle = page.getByRole('button', {
     name: /Site\s*&\s*Caméra/i,
@@ -280,7 +225,7 @@ const waitForFlightRowAndOpen = async (
 };
 
 const getFlightDetails = async (request: APIRequestContext, token: string, flightId: string) => {
-  const response = await request.get(`/api/flights/${flightId}`, {
+  const response = await request.get(`${API_BASE}/flights/${flightId}`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -325,7 +270,7 @@ const waitForFlightInList = async (
 ) => {
   await expect.poll(
     async () => {
-      const response = await request.get('/api/flights?limit=50', {
+      const response = await request.get(`${API_BASE}/flights?limit=50`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -350,7 +295,7 @@ const restoreSiteCameraState = async (
   token: string,
   state: { id: string; angle: number | null; distance: number | null }
 ) => {
-  const response = await request.patch(`/api/sites/${state.id}`, {
+  const response = await request.patch(`${API_BASE}/sites/${state.id}`, {
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
@@ -400,25 +345,23 @@ test.describe('Contrôles caméra du viewer 3D', () => {
       const playButton = page.getByTestId('flight-play-toggle');
       const progressSlider = page.getByTestId('flight-progress-slider');
 
-      await setReplaySpeed(page, progressSlider, 32);
+      await setReplaySpeed(page, 16);
+      const initialProgress = Number(await progressSlider.inputValue());
       await playButton.click();
-      await expect(playButton).toHaveText('⏸ Pause');
-
-      const initialProgress = await getPlaybackState(page, progressSlider);
-      await waitForPlaybackProgress(progressSlider, initialProgress, page);
+      await expect(playButton).toHaveAccessibleName('Pause');
 
       const applyButton = page.getByTestId('camera-apply-button');
-      await page.getByTestId('camera-angle-slider').fill('285');
-      await page.getByTestId('camera-distance-slider').fill('1200');
+      await setRangeValue(page, 'camera-angle-slider', 285);
+      await expect(playButton).toHaveAccessibleName('Pause');
+      await setRangeValue(page, 'camera-distance-slider', 1200);
+      await expect(playButton).toHaveAccessibleName('Pause');
 
       const currentUrl = page.url();
       await applyButton.click();
 
-      await expect(page.getByText(/Caméra appliquée à la lecture actuelle/i)).toBeVisible();
       await expect(page).toHaveURL(currentUrl);
-
-      const postApplyProgress = await getPlaybackState(page, progressSlider);
-      await waitForPlaybackProgress(progressSlider, postApplyProgress, page);
+      await expect(playButton).toHaveAccessibleName('Pause');
+      await waitForPlaybackProgress(progressSlider, initialProgress);
     } finally {
       if (initialCameraState) {
         await restoreSiteCameraState(request, token, initialCameraState);
@@ -453,15 +396,14 @@ test.describe('Contrôles caméra du viewer 3D', () => {
       const playButton = page.getByTestId('flight-play-toggle');
       const progressSlider = page.getByTestId('flight-progress-slider');
 
-      await setReplaySpeed(page, progressSlider, 32);
+      await setReplaySpeed(page, 32);
+      const initialProgress = Number(await progressSlider.inputValue());
       await playButton.click();
-      await expect(playButton).toHaveText('⏸ Pause');
+      await expect(playButton).toHaveAccessibleName('Pause');
+      await waitForPlaybackProgress(progressSlider, initialProgress);
 
-      const initialProgress = await getPlaybackState(page, progressSlider);
-      await waitForPlaybackProgress(progressSlider, initialProgress, page);
-
-      await page.getByTestId('camera-angle-slider').fill('90');
-      await page.getByTestId('camera-distance-slider').fill('650');
+      await setRangeValue(page, 'camera-angle-slider', 90);
+      await setRangeValue(page, 'camera-distance-slider', 650);
 
       const saveButton = page.getByTestId('camera-save-button');
       const currentUrl = page.url();

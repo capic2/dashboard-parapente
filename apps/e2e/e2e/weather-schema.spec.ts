@@ -9,7 +9,7 @@ import { BackendWeatherResponseSchema } from '../../../libs/shared-types/src/ind
  * Uses the same shared schema from libs/shared-types to stay in sync.
  */
 
-const API_BASE = 'http://localhost:8001/api';
+const API_BASE = `http://localhost:${process.env.E2E_API_PORT || '8001'}/api`;
 const TEST_SPOT_ID = 'site-arguel';
 
 test.describe('Weather API Schema Validation', () => {

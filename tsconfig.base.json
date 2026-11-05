@@ -27,7 +27,7 @@
     "skipDefaultLibCheck": true,
     "skipLibCheck": true,
     "sourceMap": true,
-    "target": "ES2022",
+    "target": "ES2022"
   },
   "exclude": ["node_modules", "tmp"]
 }

@@ -433,6 +433,9 @@ export const cacheHandlers = [
 ];
 
 export const videoExportHandlers = [
+  http.get('*/api/video-export-gpu-status', () =>
+    HttpResponse.json({ available: false, devices: [] })
+  ),
   http.get('*/api/video-export-jobs', () =>
     HttpResponse.json({
       jobs: mockVideoJobs,

@@ -128,14 +128,21 @@ const findSiteCard = (
   return within(card);
 };
 
+const getSiteCardHeadings = (canvas: {
+  getAllByRole: typeof screen.getAllByRole;
+}) =>
+  canvas
+    .getAllByRole('heading', { level: 3 })
+    .filter((heading) => heading.closest('div.flex.h-full.flex-col'));
+
 Default.test('filters by landing type', async ({ canvas, userEvent }) => {
   await waitForElementToBeRemoved(canvas.getByText(/Loading.*/iu));
-  await expect(canvas.getAllByRole('heading', { level: 3 })).toHaveLength(3);
+  await expect(getSiteCardHeadings(canvas)).toHaveLength(3);
 
   const typeSelect = await canvas.findByDisplayValue('Tous les types');
   await userEvent.selectOptions(typeSelect, 'landing');
 
-  await expect(canvas.getAllByRole('heading', { level: 3 })).toHaveLength(1);
+  await expect(getSiteCardHeadings(canvas)).toHaveLength(1);
   await expect(
     canvas.getByRole('heading', {
       level: 3,
@@ -145,14 +152,14 @@ Default.test('filters by landing type', async ({ canvas, userEvent }) => {
 });
 Default.test('filters by name', async ({ canvas, userEvent }) => {
   await waitForElementToBeRemoved(canvas.getByText(/Loading.*/iu));
-  await expect(canvas.getAllByRole('heading', { level: 3 })).toHaveLength(3);
+  await expect(getSiteCardHeadings(canvas)).toHaveLength(3);
   await userEvent.type(
     await canvas.findByPlaceholderText(
       'Rechercher par nom, code ou localité...'
     ),
     'cha'
   );
-  await expect(canvas.getAllByRole('heading', { level: 3 })).toHaveLength(1);
+  await expect(getSiteCardHeadings(canvas)).toHaveLength(1);
   await expect(
     canvas.getByRole('heading', { level: 3, name: 'Besançon - Chalais' })
   ).toBeInTheDocument();

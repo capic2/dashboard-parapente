@@ -104,6 +104,111 @@ const mergeSearchCandidates = (
   );
 };
 
+const toMercatorY = (latitude: number) =>
+  Math.log(Math.tan(Math.PI / 4 + (latitude * Math.PI) / 360));
+
+const fromMercatorY = (y: number) =>
+  ((2 * Math.atan(Math.exp(y)) - Math.PI / 2) * 180) / Math.PI;
+
+const getSiteMapBounds = (marker: { latitude: number; longitude: number }) => {
+  const focusRadiusKm = 0.1;
+  const latitudeRadius = focusRadiusKm / 110.574;
+  const longitudeRadius =
+    focusRadiusKm /
+    (111.32 * Math.max(Math.cos((marker.latitude * Math.PI) / 180), 0.1));
+  const centerLongitude = marker.longitude;
+  const centerY = toMercatorY(marker.latitude);
+  const northY = toMercatorY(Math.min(85, marker.latitude + latitudeRadius));
+  const southY = toMercatorY(Math.max(-85, marker.latitude - latitudeRadius));
+  const padding = 1.1;
+  let longitudeSpan = 2 * longitudeRadius * padding;
+  let mercatorSpan = 2 * Math.max(northY - centerY, centerY - southY) * padding;
+  const mapAspectRatio = 2.05;
+
+  longitudeSpan = Math.max(
+    longitudeSpan,
+    mercatorSpan * (180 / Math.PI) * mapAspectRatio
+  );
+  mercatorSpan = Math.max(
+    mercatorSpan,
+    (longitudeSpan * Math.PI) / 180 / mapAspectRatio
+  );
+
+  const west = centerLongitude - longitudeSpan / 2;
+  const east = centerLongitude + longitudeSpan / 2;
+  const south = fromMercatorY(centerY - mercatorSpan / 2);
+  const north = fromMercatorY(centerY + mercatorSpan / 2);
+  const embedMarkerQuery = `marker=${marker.latitude},${marker.longitude}`;
+  const fullMapMarkerQuery = `mlat=${marker.latitude}&mlon=${marker.longitude}`;
+
+  return {
+    url: `https://www.openstreetmap.org/export/embed.html?bbox=${west},${south},${east},${north}&layer=mapnik&${embedMarkerQuery}`,
+    fullMapUrl: `https://www.openstreetmap.org/?bbox=${west},${south},${east},${north}&${fullMapMarkerQuery}`,
+  };
+};
+
+interface SiteSearchMapProps {
+  location: LocationSuggestion;
+  selectedCandidate: SearchCandidate | null;
+  mapTitle: string;
+  markerLabel: string;
+  openMapLabel: string;
+}
+
+const SiteSearchMap: React.FC<SiteSearchMapProps> = ({
+  location,
+  selectedCandidate,
+  mapTitle,
+  markerLabel,
+  openMapLabel,
+}) => {
+  const marker = selectedCandidate?.spot ?? location;
+  const bounds = getSiteMapBounds(marker);
+
+  return (
+    <div className="mt-3 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+      <div className="relative h-56 bg-gray-100 dark:bg-gray-800 sm:h-64">
+        {
+          // oxlint-disable react/iframe-missing-sandbox -- The OSM embed needs its real origin so tile requests retain a valid Referer.
+          <iframe
+            title={mapTitle}
+            src={bounds.url}
+            sandbox="allow-scripts allow-same-origin"
+            className="absolute inset-0 h-full w-full border-0"
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+          // oxlint-enable react/iframe-missing-sandbox
+        }
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-gray-200 bg-white px-3 py-2 text-xs dark:border-gray-700 dark:bg-gray-900">
+        <div className="inline-flex items-center gap-1.5 text-gray-700 dark:text-gray-200">
+          <span className="inline-flex items-center gap-1.5">
+            <MapPin className="h-3.5 w-3.5 text-red-600" aria-hidden="true" />
+            {markerLabel}
+          </span>
+        </div>
+        <a
+          href={bounds.fullMapUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="shrink-0 font-medium text-sky-700 underline underline-offset-2 focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-sky-300"
+        >
+          {openMapLabel}
+        </a>
+        <a
+          href="https://www.openstreetmap.org/copyright"
+          target="_blank"
+          rel="noreferrer"
+          className="shrink-0 text-gray-600 underline underline-offset-2 focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-gray-300"
+        >
+          © OpenStreetMap contributors
+        </a>
+      </div>
+    </div>
+  );
+};
+
 interface EditSiteModalProps {
   site: Site | null; // null = create mode, Site = edit mode
   isOpen: boolean;
@@ -158,6 +263,8 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
   const [limit, setLimit] = useState(5);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
   const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
+  const [selectedCandidate, setSelectedCandidate] =
+    useState<SearchCandidate | null>(null);
   const [suggestionSources, setSuggestionSources] = useState<
     { title: string; url: string }[]
   >([]);
@@ -199,10 +306,6 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
       ),
     [nearbyOptions.data?.landings, nearbyOptions.data?.takeoffs]
   );
-  const selectedCandidate =
-    searchCandidates.find(
-      (candidate) => candidate.spot.id === selectedSpotId
-    ) ?? null;
   const duplicateSite = selectedCandidate
     ? existingSites.find((existingSite) =>
         isDuplicateSite(existingSite, selectedCandidate)
@@ -212,6 +315,9 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
   // Initialize form when site changes or modal opens
   useEffect(() => {
     if (!isOpen) return;
+
+    setSelectedSpotId(null);
+    setSelectedCandidate(null);
 
     if (site) {
       const initialData = {
@@ -263,7 +369,6 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
       setDebouncedQuery('');
       setSelectedLocation(null);
       setActiveSuggestionIndex(0);
-      setSelectedSpotId(null);
     }
     setErrors({});
     setSaveError('');
@@ -281,6 +386,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
   const handleSelectLocation = (location: LocationSuggestion) => {
     setSelectedLocation(location);
     setSelectedSpotId(null);
+    setSelectedCandidate(null);
     setQuery(location.name);
     setActiveSuggestionIndex(0);
   };
@@ -291,6 +397,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
       : 0;
 
     setSelectedSpotId(candidate.spot.id);
+    setSelectedCandidate(candidate);
     setFormData((current) => ({
       ...current,
       name: candidate.spot.name,
@@ -484,6 +591,7 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                     setQuery(event.target.value);
                     setSelectedLocation(null);
                     setSelectedSpotId(null);
+                    setSelectedCandidate(null);
                   }}
                   onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
                     if (!isSuggestionsOpen || !suggestions.length) return;
@@ -598,6 +706,16 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
                     {selectedLocation.display_name}
                   </div>
                 </div>
+
+                <SiteSearchMap
+                  location={selectedLocation}
+                  selectedCandidate={selectedCandidate}
+                  mapTitle={t('editSite.mapTitle')}
+                  markerLabel={
+                    selectedCandidate?.spot.name ?? t('editSite.mapCityLegend')
+                  }
+                  openMapLabel={t('editSite.openMap')}
+                />
 
                 {nearbyOptions.isError && (
                   <div

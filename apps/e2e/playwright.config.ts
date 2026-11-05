@@ -2,7 +2,12 @@ import { defineConfig, devices } from '@playwright/test';
 import * as path from 'path';
 
 // Use absolute path for database to ensure consistency between global-setup and webServer
-const backendDir = path.resolve(__dirname, '..', 'backend');
+const backendDir = path.resolve(
+  process.cwd(),
+  path.basename(process.cwd()) === 'e2e' ? '../backend' : 'apps/backend'
+);
+const apiPort = process.env.E2E_API_PORT || '8001';
+const webPort = process.env.E2E_WEB_PORT || '5173';
 const dbPath = path.join(backendDir, 'test.db');
 const absoluteDbUrl = `sqlite:///${dbPath}`;
 const e2eRuntimeDir = path.join(backendDir, 'e2e-runtime');
@@ -20,7 +25,7 @@ export default defineConfig({
   reporter: 'html',
   outputDir: './test-results',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: `http://localhost:${webPort}`,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -58,7 +63,7 @@ export default defineConfig({
   webServer: [
     {
       command: './node_modules/.bin/nx serve backend',
-      url: 'http://localhost:8001/health',
+      url: `http://localhost:${apiPort}/health`,
       reuseExistingServer: !process.env.CI,
       cwd: '../..',
       timeout: 120 * 1000, // 2 minutes for backend startup
@@ -77,20 +82,24 @@ export default defineConfig({
         BACKEND_USE_FAKE_REDIS: 'true',
         // Authentication
         BACKEND_JWT_SECRET: process.env.BACKEND_JWT_SECRET || 'e2e-test-secret',
-        BACKEND_ADMIN_EMAIL: process.env.BACKEND_ADMIN_EMAIL || 'e2e@test.local',
-        BACKEND_ADMIN_PASSWORD: process.env.BACKEND_ADMIN_PASSWORD || 'e2e-test-password',
+        BACKEND_ADMIN_EMAIL: process.env.E2E_ADMIN_EMAIL || 'e2e@test.local',
+        BACKEND_ADMIN_PASSWORD: process.env.E2E_ADMIN_PASSWORD || 'e2e-test-password',
+        E2E_API_PORT: apiPort,
       },
     },
     {
       command:
-        'bash -lc "set -o pipefail; echo [e2e:web] Building frontend; ./node_modules/.bin/nx build frontend --output-style=stream --skip-nx-cache; echo [e2e:web] Starting Vite preview; ./node_modules/.bin/vite preview --config apps/frontend/vite.config.ts --strictPort --host 127.0.0.1 --port 5173"',
-      url: 'http://localhost:5173',
+        `bash -lc "set -o pipefail; echo [e2e:web] Building frontend; ./node_modules/.bin/nx build frontend --output-style=stream --skip-nx-cache; echo [e2e:web] Starting Vite preview; ./node_modules/.bin/vite preview --config apps/frontend/vite.config.ts --strictPort --host 127.0.0.1 --port ${webPort}"`,
+      url: `http://localhost:${webPort}`,
       reuseExistingServer: !process.env.CI,
       cwd: '../..',
       timeout: 120 * 1000, // 2 minutes for build + preview startup
       env: {
         VITE_CESIUM_ION_TOKEN:
           process.env.VITE_CESIUM_ION_TOKEN || 'e2e-ci-placeholder-token',
+        // Ignore inherited deployment URLs so the browser always talks to the
+        // API server started by this Playwright run.
+        VITE_API_URL: `http://localhost:${apiPort}`,
       },
     },
   ],

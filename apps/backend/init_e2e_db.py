@@ -15,6 +15,8 @@ os.environ.setdefault("BACKEND_METEOBLUE_API_KEY", "test_key")
 
 from database import SessionLocal
 from e2e_db_utils import disable_slow_weather_sources
+from auth import hash_password
+from models import User
 
 # Import after setting env vars
 from main import initialize_database, run_migrations
@@ -26,6 +28,30 @@ if __name__ == "__main__":
         if result is False:
             print("❌ Database schema creation failed!")
             sys.exit(1)
+
+        # E2E credentials must be available even when test.db already contains
+        # users from an earlier run or another local test setup.
+        admin_email = os.getenv("BACKEND_ADMIN_EMAIL", "e2e@test.local")
+        admin_password = os.getenv("BACKEND_ADMIN_PASSWORD", "e2e-test-password")
+        if not admin_email or not admin_password:
+            raise RuntimeError("E2E admin credentials must be configured")
+
+        db = SessionLocal()
+        try:
+            admin = db.query(User).filter(User.email == admin_email).first()
+            if admin:
+                admin.hashed_password = hash_password(admin_password)
+                admin.is_active = True
+            else:
+                admin = User(
+                    email=admin_email,
+                    hashed_password=hash_password(admin_password),
+                    is_active=True,
+                )
+                db.add(admin)
+            db.commit()
+        finally:
+            db.close()
 
         run_migrations()
         db = SessionLocal()
