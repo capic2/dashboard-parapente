@@ -69,8 +69,8 @@ const isDuplicateSite = (
   }
 ): boolean => {
   const sameCoordinates =
-    Math.abs(site.latitude - candidate.latitude) < 0.0001 &&
-    Math.abs(site.longitude - candidate.longitude) < 0.0001;
+    Math.abs(site.latitude - candidate.latitude) < 0.00001 &&
+    Math.abs(site.longitude - candidate.longitude) < 0.00001;
 
   return (
     sameCoordinates && isCompatibleUsage(site.usage_type, candidate.usageType)
@@ -391,17 +391,20 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
         Number(latitudeRaw) !== originalData.latitude ||
         Number(longitudeRaw) !== originalData.longitude ||
         formData.usage_type !== originalData.usage_type));
-  const duplicateSite = hasDuplicateRelevantChanges
-    ? existingSites.find(
-        (existingSite) =>
-          existingSite.id !== site?.id &&
-          isDuplicateSite(existingSite, {
-            latitude: Number(latitudeRaw),
-            longitude: Number(longitudeRaw),
-            usageType: formData.usage_type,
-          })
-      )
-    : undefined;
+  const duplicateSite =
+    hasDuplicateRelevantChanges &&
+    latitudeRaw.trim() !== '' &&
+    longitudeRaw.trim() !== ''
+      ? existingSites.find(
+          (existingSite) =>
+            existingSite.id !== site?.id &&
+            isDuplicateSite(existingSite, {
+              latitude: Number(latitudeRaw),
+              longitude: Number(longitudeRaw),
+              usageType: formData.usage_type,
+            })
+        )
+      : undefined;
 
   // Initialize form when site changes or modal opens
   useEffect(() => {
@@ -482,13 +485,8 @@ export const EditSiteModal: React.FC<EditSiteModalProps> = ({
     setPickedCoordinates(null);
     setQuery(location.name);
     setActiveSuggestionIndex(0);
-    setLatitudeRaw(String(location.latitude));
-    setLongitudeRaw(String(location.longitude));
-    setFormData((current) => ({
-      ...current,
-      latitude: location.latitude,
-      longitude: location.longitude,
-    }));
+    setLatitudeRaw('');
+    setLongitudeRaw('');
   };
 
   const handleSelectCandidate = (candidate: SearchCandidate) => {
