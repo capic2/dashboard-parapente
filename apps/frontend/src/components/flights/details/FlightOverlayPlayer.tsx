@@ -743,14 +743,14 @@ export function FlightOverlayPlayer({
   useEffect(() => {
     if (!cameraIsPlaying) return;
 
-    let animationFrame = 0;
+    const animationFrame = { current: 0 };
     const synchronizePlayback = () => {
       syncMediaRef.current?.(true);
-      animationFrame = requestAnimationFrame(synchronizePlayback);
+      animationFrame.current = requestAnimationFrame(synchronizePlayback);
     };
 
-    animationFrame = requestAnimationFrame(synchronizePlayback);
-    return () => cancelAnimationFrame(animationFrame);
+    animationFrame.current = requestAnimationFrame(synchronizePlayback);
+    return () => cancelAnimationFrame(animationFrame.current);
   }, [cameraIsPlaying]);
 
   const playMedia = (video: HTMLVideoElement | null) => {
@@ -782,13 +782,13 @@ export function FlightOverlayPlayer({
     youtubeCuedTimeRef.current = null;
     setYoutubeReady(false);
     setHasStartedMainPlayback(false);
-    let cancelled = false;
-    let player: YoutubePlayer | null = null;
+    const cancelled = new AbortController();
+    const playerHandle: { current: YoutubePlayer | null } = { current: null };
     const load = async () => {
       const api = await loadYoutubeApi();
-      if (cancelled || !youtubeHostRef.current) return;
+      if (cancelled.signal.aborted || !youtubeHostRef.current) return;
       setYoutubeFailed(false);
-      player = new api.Player(youtubeHostRef.current, {
+      playerHandle.current = new api.Player(youtubeHostRef.current, {
         height: '100%',
         width: '100%',
         videoId: youtubeId,
@@ -804,7 +804,8 @@ export function FlightOverlayPlayer({
         },
         events: {
           onReady: () => {
-            if (cancelled || !player) return;
+            const player = playerHandle.current;
+            if (cancelled.signal.aborted || !player) return;
             // cc_load_policy follows the viewer's preference. Passing an
             // empty caption track clears that preference for this player.
             player.setOption('captions', 'track', {});
@@ -823,11 +824,12 @@ export function FlightOverlayPlayer({
             syncMediaRef.current?.(true);
           },
           onApiChange: () => {
-            if (cancelled) return;
-            player?.setOption('captions', 'track', {});
+            if (cancelled.signal.aborted) return;
+            playerHandle.current?.setOption('captions', 'track', {});
           },
           onStateChange: ({ data }: { data: number }) => {
-            if (cancelled || !player) return;
+            const player = playerHandle.current;
+            if (cancelled.signal.aborted || !player) return;
             const duration = player.getDuration();
             if (duration > 0) setCameraDuration(duration);
             if (data === 0 && isInteractive) {
@@ -867,7 +869,7 @@ export function FlightOverlayPlayer({
             }
           },
           onError: () => {
-            if (cancelled) return;
+            if (cancelled.signal.aborted) return;
             playbackRequestedRef.current = false;
             youtubePipPlayersRef.current.forEach((player) =>
               player.pauseVideo()
@@ -878,15 +880,16 @@ export function FlightOverlayPlayer({
           },
         },
       });
-      youtubeRef.current = player;
+      youtubeRef.current = playerHandle.current;
     };
     void load().catch(() => {
-      if (!cancelled) setYoutubeReady(false);
+      if (!cancelled.signal.aborted) setYoutubeReady(false);
     });
     return () => {
-      cancelled = true;
-      player?.destroy();
-      if (youtubeRef.current === player) youtubeRef.current = null;
+      cancelled.abort();
+      playerHandle.current?.destroy();
+      if (youtubeRef.current === playerHandle.current)
+        youtubeRef.current = null;
     };
   }, [
     cueYoutubeAt,
@@ -907,11 +910,11 @@ export function FlightOverlayPlayer({
     if (!pipsRef.current.some((pip) => pip.youtubeUrl)) return;
     const youtubePipPlayers = youtubePipPlayersRef.current;
     const youtubePipHosts = youtubePipHostsRef.current;
-    let cancelled = false;
-    let pipSyncFrame: number | null = null;
+    const cancelled = new AbortController();
+    const pipSyncFrame: { current: number | null } = { current: null };
     const load = async () => {
       const api = await loadYoutubeApi();
-      if (cancelled) return;
+      if (cancelled.signal.aborted) return;
       pipsRef.current.forEach((pip) => {
         const videoId = pip.youtubeUrl
           ? getYoutubeVideoId(pip.youtubeUrl)
@@ -933,7 +936,7 @@ export function FlightOverlayPlayer({
           },
           events: {
             onReady: () => {
-              if (cancelled) return;
+              if (cancelled.signal.aborted) return;
               player.mute();
               const currentPip = pipsRef.current.find(
                 ({ id }) => id === pip.id
@@ -960,10 +963,12 @@ export function FlightOverlayPlayer({
               }
             },
             onStateChange: () => {
-              if (cancelled || pipSyncFrame !== null) return;
-              pipSyncFrame = window.requestAnimationFrame(() => {
-                pipSyncFrame = null;
-                if (!cancelled) syncMediaRef.current?.(true, true);
+              if (cancelled.signal.aborted || pipSyncFrame.current !== null)
+                return;
+              pipSyncFrame.current = window.requestAnimationFrame(() => {
+                pipSyncFrame.current = null;
+                if (!cancelled.signal.aborted)
+                  syncMediaRef.current?.(true, true);
               });
             },
           },
@@ -973,10 +978,10 @@ export function FlightOverlayPlayer({
     };
     void load().catch(() => undefined);
     return () => {
-      cancelled = true;
-      if (pipSyncFrame !== null) {
-        window.cancelAnimationFrame(pipSyncFrame);
-        pipSyncFrame = null;
+      cancelled.abort();
+      if (pipSyncFrame.current !== null) {
+        window.cancelAnimationFrame(pipSyncFrame.current);
+        pipSyncFrame.current = null;
       }
       youtubePipPlayers.forEach((player, id) => {
         player.destroy();
