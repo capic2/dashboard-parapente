@@ -438,6 +438,17 @@ export function Flight({
           <span className="truncate">{siteLabel}</span>
         </div>
       )}
+      {flight.landing_site_name && (
+        <div
+          className={`mt-1 flex items-center gap-1 pl-1.5 text-xs ${metaColor}`}
+        >
+          <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span className="shrink-0 font-medium">
+            {t('flights.landingSiteLabel')}:
+          </span>
+          <span className="truncate">{flight.landing_site_name}</span>
+        </div>
+      )}
     </Card>
   );
 }

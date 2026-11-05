@@ -87,6 +87,41 @@ def test_summaries_paginate_with_exact_total_and_opaque_cursor(client, db_sessio
     assert "summary-003" not in first["next_cursor"]
 
 
+def test_summaries_include_landing_site_when_defined(client, db_session, arguel_site):
+    landing_site = Site(
+        id="site-landing",
+        code="LAND",
+        name="Plaine d'Arguel",
+        usage_type="landing",
+    )
+    db_session.add_all(
+        [
+            landing_site,
+            Flight(
+                id="summary-with-landing",
+                site_id=arguel_site.id,
+                landing_site_id=landing_site.id,
+                flight_date=date(2026, 1, 2),
+            ),
+            Flight(
+                id="summary-without-landing",
+                site_id=arguel_site.id,
+                flight_date=date(2026, 1, 1),
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(API_URL)
+
+    assert response.status_code == 200
+    flights = {flight["id"]: flight for flight in response.json()["flights"]}
+    assert flights["summary-with-landing"]["landing_site_id"] == landing_site.id
+    assert flights["summary-with-landing"]["landing_site_name"] == landing_site.name
+    assert flights["summary-without-landing"]["landing_site_id"] is None
+    assert flights["summary-without-landing"]["landing_site_name"] is None
+
+
 def test_duration_sort_and_cursor_use_marker_derived_duration(client, db_session, arguel_site):
     db_session.add_all(
         [
