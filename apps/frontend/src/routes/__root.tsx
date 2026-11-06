@@ -1,5 +1,6 @@
-import { Suspense, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { createRootRoute, Outlet, useMatchRoute } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Dialog, Heading, Modal, ModalOverlay } from 'react-aria-components';
 import { ExternalLink, X } from 'lucide-react';
@@ -14,6 +15,44 @@ import {
 } from '../hooks/common/useAppVersion';
 import { useVersionUpdates } from '../hooks/common/useVersionUpdates';
 import { getStagingPrNumber } from '../lib/appEnvironment';
+import { compareVersions } from '../lib/version';
+
+const GITHUB_RELEASES_API_URL =
+  'https://api.github.com/repos/capic2/dashboard-parapente/releases?per_page=100';
+const GITHUB_COMPARE_URL =
+  'https://github.com/capic2/dashboard-parapente/compare';
+
+type PublishedRelease = {
+  tag_name: string;
+  draft: boolean;
+  prerelease: boolean;
+};
+
+async function fetchPublishedVersions(signal: AbortSignal): Promise<string[]> {
+  const response = await fetch(GITHUB_RELEASES_API_URL, {
+    signal,
+    headers: { Accept: 'application/vnd.github+json' },
+  });
+  if (!response.ok) {
+    throw new Error('Could not load published versions');
+  }
+
+  const releases: unknown = await response.json();
+  if (!Array.isArray(releases)) {
+    throw new Error('Invalid published versions response');
+  }
+
+  return (releases as PublishedRelease[])
+    .filter(
+      (release) =>
+        release &&
+        typeof release.tag_name === 'string' &&
+        /^\d{4}\.\d{2}\.\d{2}\.\d+$/u.test(release.tag_name) &&
+        release.draft === false &&
+        release.prerelease === false
+    )
+    .map((release) => release.tag_name);
+}
 
 export const Route = createRootRoute({
   loader: ({ location }) => {
@@ -126,6 +165,27 @@ function RootComponent() {
 function VersionBadge({ appVersion }: { appVersion: AppVersionPayload }) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
+  const [selectedBaseVersion, setSelectedBaseVersion] = useState('');
+  const releasesQuery = useQuery({
+    queryKey: ['published-version-tags'],
+    queryFn: ({ signal }) => fetchPublishedVersions(signal),
+    enabled: isOpen,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  const earlierVersions = useMemo(
+    () =>
+      (releasesQuery.data ?? [])
+        .filter((version) => compareVersions(version, appVersion.version) < 0)
+        .sort((left, right) => compareVersions(right, left)),
+    [appVersion.version, releasesQuery.data]
+  );
+  const compareVersion = earlierVersions.includes(selectedBaseVersion)
+    ? selectedBaseVersion
+    : (earlierVersions[0] ?? '');
+  const compareUrl = compareVersion
+    ? `${GITHUB_COMPARE_URL}/${encodeURIComponent(compareVersion)}...${encodeURIComponent(appVersion.version)}`
+    : null;
 
   return (
     <>
@@ -171,7 +231,7 @@ function VersionBadge({ appVersion }: { appVersion: AppVersionPayload }) {
                 <X className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
-            <div className="mt-5 border-t border-gray-200 pt-4 dark:border-gray-700">
+            <div className="mt-5 space-y-5 border-t border-gray-200 pt-4 dark:border-gray-700">
               {appVersion.release_notes_url ? (
                 <a
                   href={appVersion.release_notes_url}
@@ -187,6 +247,62 @@ function VersionBadge({ appVersion }: { appVersion: AppVersionPayload }) {
                   {t('versionInfo.noReleaseNotes')}
                 </p>
               )}
+              <section className="space-y-3 border-t border-gray-200 pt-4 dark:border-gray-700">
+                <div>
+                  <label
+                    htmlFor="version-comparison-base"
+                    className="block text-sm font-medium text-gray-900 dark:text-gray-100"
+                  >
+                    {t('versionInfo.compareLabel')}
+                  </label>
+                  <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                    {t('versionInfo.compareDescription')}
+                  </p>
+                </div>
+                <select
+                  id="version-comparison-base"
+                  value={compareVersion}
+                  onChange={(event) =>
+                    setSelectedBaseVersion(event.target.value)
+                  }
+                  disabled={
+                    releasesQuery.isPending || earlierVersions.length === 0
+                  }
+                  className="min-h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                >
+                  {releasesQuery.isPending && (
+                    <option value="">{t('versionInfo.loadingVersions')}</option>
+                  )}
+                  {!releasesQuery.isPending &&
+                    !releasesQuery.isError &&
+                    earlierVersions.length === 0 && (
+                      <option value="">
+                        {t('versionInfo.noEarlierVersions')}
+                      </option>
+                    )}
+                  {earlierVersions.map((version) => (
+                    <option key={version} value={version}>
+                      {version}
+                    </option>
+                  ))}
+                </select>
+                {releasesQuery.isError && (
+                  <output className="text-sm text-red-700 dark:text-red-300">
+                    {t('versionInfo.versionsLoadError')}
+                  </output>
+                )}
+                {compareUrl && (
+                  <a
+                    href={compareUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-h-10 items-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-800 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-800"
+                  >
+                    {t('versionInfo.viewComparison')}
+                    <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                  </a>
+                )}
+              </section>
             </div>
           </Dialog>
         </Modal>

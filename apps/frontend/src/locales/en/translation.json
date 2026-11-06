@@ -84,6 +84,12 @@
     "buildDetails": "Deployed {{date}} · build {{number}}",
     "viewReleaseNotes": "View release summary",
     "noReleaseNotes": "No release summary is available for this version.",
+    "compareLabel": "Compare with version",
+    "compareDescription": "Choose the starting version for the comparison.",
+    "loadingVersions": "Loading versions…",
+    "noEarlierVersions": "No earlier versions are available",
+    "versionsLoadError": "Could not load available versions.",
+    "viewComparison": "View comparison",
     "close": "Close"
   },
   "videoJobs": {

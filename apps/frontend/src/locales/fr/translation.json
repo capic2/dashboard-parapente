@@ -84,6 +84,12 @@
     "buildDetails": "Déployée le {{date}} · build {{number}}",
     "viewReleaseNotes": "Voir le récapitulatif",
     "noReleaseNotes": "Aucun récapitulatif n’est disponible pour cette version.",
+    "compareLabel": "Comparer avec la version",
+    "compareDescription": "Choisissez la version de départ de la comparaison.",
+    "loadingVersions": "Chargement des versions…",
+    "noEarlierVersions": "Aucune version antérieure disponible",
+    "versionsLoadError": "Impossible de charger les versions disponibles.",
+    "viewComparison": "Voir la comparaison",
     "close": "Fermer"
   },
   "videoJobs": {
