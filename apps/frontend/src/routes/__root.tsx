@@ -47,11 +47,16 @@ async function fetchPublishedVersions(signal: AbortSignal): Promise<string[]> {
       (release) =>
         release &&
         typeof release.tag_name === 'string' &&
-        /^\d{4}\.\d{2}\.\d{2}\.\d+$/u.test(release.tag_name) &&
+        /^deploy\/\d{4}\.\d{2}\.\d{2}\.\d+$/u.test(release.tag_name) &&
         release.draft === false &&
         release.prerelease === false
     )
-    .map((release) => release.tag_name);
+    .flatMap((release) => {
+      const match = /^deploy\/(\d{4}\.\d{2}\.\d{2}\.\d+)$/u.exec(
+        release.tag_name
+      );
+      return match ? [match[1]] : [];
+    });
 }
 
 export const Route = createRootRoute({
@@ -184,7 +189,7 @@ function VersionBadge({ appVersion }: { appVersion: AppVersionPayload }) {
     ? selectedBaseVersion
     : (earlierVersions[0] ?? '');
   const compareUrl = compareVersion
-    ? `${GITHUB_COMPARE_URL}/${encodeURIComponent(compareVersion)}...${encodeURIComponent(appVersion.version)}`
+    ? `${GITHUB_COMPARE_URL}/deploy/${compareVersion}...deploy/${appVersion.version}`
     : null;
 
   return (
