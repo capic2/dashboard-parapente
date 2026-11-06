@@ -27,6 +27,7 @@ type AriaTextFieldProps = Omit<
 
 export interface TextFieldProps extends AriaTextFieldProps {
   label: ReactNode;
+  name?: string;
   placeholder?: string;
   type?: HTMLInputTypeAttribute;
   autoComplete?: HTMLInputAutoCompleteAttribute;
@@ -37,6 +38,7 @@ export interface TextFieldProps extends AriaTextFieldProps {
 
 export function TextField({
   label,
+  name,
   placeholder,
   type,
   autoComplete,
@@ -58,6 +60,7 @@ export function TextField({
       <AriaLabel className={fieldLabelClassName}>{label}</AriaLabel>
       <AriaInput
         type={type}
+        name={name}
         autoComplete={autoComplete}
         placeholder={placeholder}
         className={twMerge(fieldControlClassName, inputClassName)}
