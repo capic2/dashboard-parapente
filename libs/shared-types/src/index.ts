@@ -704,6 +704,7 @@ export const DailySummaryDaySchema = z.object({
   temp_min: z.number(),
   temp_max: z.number(),
   wind_avg: z.number(),
+  precipitation_mm: z.number().nullish(),
 });
 
 export const DailySummarySchema = z.object({

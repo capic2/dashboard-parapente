@@ -273,6 +273,7 @@
     "notCached": "Non mis en cache",
     "cacheTimestampUnavailable": "Heure de mise à jour indisponible",
     "forecast7Days": "Prévisions 7 Jours",
+    "precipitationAmount": "Précipitations : {{amount}}",
     "bestSpotFor": "Meilleur spot pour {{date}}",
     "bestSpotRadius": "Rayon des spots",
     "bestSpotRadiusValue": "{{radius}} km",
