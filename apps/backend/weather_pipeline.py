@@ -857,12 +857,12 @@ async def get_daily_aggregate(
     if not flyable_consensus:
         return None
 
-    # Extract daily aggregates from flyable hours only
+    # Keep the flight score and temperature/wind summary scoped to flyable hours.
     temps = [h.get("temperature") for h in flyable_consensus if h.get("temperature") is not None]
     winds = [h.get("wind_speed") for h in flyable_consensus if h.get("wind_speed") is not None]
-    precips = [
-        h.get("precipitation") for h in flyable_consensus if h.get("precipitation") is not None
-    ]
+    # Precipitation cards describe the whole forecast day, including non-flyable
+    # hours. Preserve None when no source reported precipitation.
+    precips = [h.get("precipitation") for h in consensus if h.get("precipitation") is not None]
 
     wind_dirs = [
         h.get("wind_direction") for h in flyable_consensus if h.get("wind_direction") is not None
@@ -874,7 +874,7 @@ async def get_daily_aggregate(
     temp_min = round(min(temps))
     temp_max = round(max(temps))
     wind_avg = round(sum(winds) / len(winds), 1)
-    precip_total = round(sum(precips), 1) if precips else 0.0
+    precip_total = round(sum(precips), 1) if precips else None
 
     # Average wind direction (use midday hours 10-14 for best representation)
     midday_dirs = [

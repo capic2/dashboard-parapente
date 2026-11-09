@@ -4883,6 +4883,7 @@ async def get_daily_summary(
                         "temp_min": day_result["temp_min"],
                         "temp_max": day_result["temp_max"],
                         "wind_avg": day_result["wind_avg"],
+                        "precipitation_mm": day_result.get("precip_total"),
                     }
                 )
 

@@ -49,6 +49,7 @@ const mockDailySummaryGood = {
       temp_min: 15,
       temp_max: 25,
       wind_avg: 12,
+      precipitation_mm: 0,
     },
     {
       day_index: 1,
@@ -59,6 +60,7 @@ const mockDailySummaryGood = {
       temp_min: 16,
       temp_max: 26,
       wind_avg: 10,
+      precipitation_mm: 2.4,
     },
     {
       day_index: 2,
@@ -69,6 +71,7 @@ const mockDailySummaryGood = {
       temp_min: 14,
       temp_max: 22,
       wind_avg: 18,
+      precipitation_mm: 0.7,
     },
     {
       day_index: 3,
@@ -79,6 +82,7 @@ const mockDailySummaryGood = {
       temp_min: 12,
       temp_max: 20,
       wind_avg: 25,
+      precipitation_mm: 4.2,
     },
     {
       day_index: 4,
@@ -89,6 +93,7 @@ const mockDailySummaryGood = {
       temp_min: 10,
       temp_max: 18,
       wind_avg: 35,
+      precipitation_mm: 6.5,
     },
     {
       day_index: 5,
@@ -99,6 +104,7 @@ const mockDailySummaryGood = {
       temp_min: 13,
       temp_max: 21,
       wind_avg: 20,
+      precipitation_mm: 1.1,
     },
     {
       day_index: 6,
@@ -109,6 +115,7 @@ const mockDailySummaryGood = {
       temp_min: 15,
       temp_max: 24,
       wind_avg: 14,
+      precipitation_mm: 0,
     },
   ],
 };

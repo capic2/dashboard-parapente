@@ -5,7 +5,46 @@ from scrapers import openweathermap
 from scrapers.openweathermap import extract_hourly_forecast
 
 
-def test_extract_openweathermap_hourly_forecast_normalizes_utc_and_precipitation():
+def test_extract_openweathermap_distributes_three_hour_precipitation_and_splits_midnight():
+    result = extract_hourly_forecast(
+        {
+            "success": True,
+            "data": {
+                "list": [
+                    {
+                        "dt_txt": "2026-06-01 00:00:00",
+                        "main": {"temp": 12.0},
+                        "rain": {"3h": 3.0},
+                    },
+                    {
+                        "dt_txt": "2026-06-01 03:00:00",
+                        "main": {"temp": 15.0},
+                        "wind": {"speed": 4.0, "gust": 7.5, "deg": 260},
+                        "clouds": {"all": 35},
+                        "rain": {"3h": 3.0},
+                        "snow": {"3h": 0.6},
+                    },
+                ]
+            },
+        },
+        day_index=0,
+    )
+
+    precipitation_by_hour = {item["hour"]: item["precipitation"] for item in result}
+    assert precipitation_by_hour == {0: 1.0, 1: 1.0, 2: 1.2, 3: 1.2, 4: 1.2, 5: None}
+    assert sum(
+        value for value in precipitation_by_hour.values() if value is not None
+    ) == pytest.approx(5.6)
+    assert all("+02:00" in item["time"] for item in result)
+    forecast_at_five = next(item for item in result if item["hour"] == 5)
+    assert forecast_at_five["temperature"] == 15.0
+    assert forecast_at_five["wind_speed"] == 14.4
+    assert forecast_at_five["wind_gust"] == 27.0
+    assert forecast_at_five["wind_direction"] == 260
+    assert forecast_at_five["cloud_cover"] == 35
+
+
+def test_extract_openweathermap_handles_null_rain_and_snow_values():
     result = extract_hourly_forecast(
         {
             "success": True,
@@ -14,9 +53,8 @@ def test_extract_openweathermap_hourly_forecast_normalizes_utc_and_precipitation
                     {
                         "dt_txt": "2026-06-01 15:00:00",
                         "main": {"temp": 21.2},
-                        "wind": {"speed": 4.0, "gust": 7.5, "deg": 260},
-                        "clouds": {"all": 35},
-                        "rain": {"3h": 0.4},
+                        "rain": None,
+                        "snow": None,
                     }
                 ]
             },
@@ -24,20 +62,37 @@ def test_extract_openweathermap_hourly_forecast_normalizes_utc_and_precipitation
         day_index=0,
     )
 
-    assert result == [
+    assert [item["precipitation"] for item in result] == [0.0, 0.0, 0.0, None]
+
+
+def test_extract_openweathermap_keeps_later_point_for_repeated_dst_hour():
+    result = extract_hourly_forecast(
         {
-            "time": "2026-06-01 15:00:00",
-            "hour": 17,
-            "temperature": 21.2,
-            "wind_speed": 14.4,
-            "wind_gust": 27.0,
-            "wind_direction": 260,
-            "cloud_cover": 35,
-            "precipitation": 0.13,
-            "cape": None,
-            "lifted_index": None,
-        }
-    ]
+            "success": True,
+            "data": {
+                "list": [
+                    {
+                        "dt_txt": "2026-10-25 01:00:00",
+                        "main": {"temp": 15.0},
+                        "wind": {"speed": 4.0},
+                        "rain": {"3h": 3.0},
+                    },
+                    {
+                        "dt_txt": "2026-10-25 00:00:00",
+                        "main": {"temp": 12.0},
+                        "rain": None,
+                        "snow": None,
+                    },
+                ]
+            },
+        },
+        day_index=0,
+    )
+
+    hour_two = next(item for item in result if item["hour"] == 2)
+    assert hour_two["temperature"] == 15.0
+    assert hour_two["wind_speed"] == 14.4
+    assert hour_two["precipitation"] == 1.0
 
 
 def test_extract_openweathermap_returns_empty_when_dt_txt_is_missing():

@@ -9,7 +9,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import CacheTimestamp from '../common/CacheTimestamp';
 import { Button } from '@dashboard-parapente/core/Button/Button';
-import { Wind } from 'lucide-react';
+import { CloudRain, Wind } from 'lucide-react';
 import {
   getVerdictVisual,
   weatherCardClassName,
@@ -123,7 +123,7 @@ export default function Forecast7Day({
               key={day.day_index}
               onClick={() => onSelectDay?.(day.day_index)}
               onMouseEnter={() => handleMouseEnter(day.day_index)}
-              className={`relative min-h-[158px] min-w-[150px] flex-shrink-0 snap-start rounded-2xl border p-3 text-left transition-colors hover:border-sky-500 hover:bg-sky-50/70 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:hover:bg-sky-950/30 sm:min-w-0 sm:flex-shrink ${
+              className={`relative min-h-[178px] min-w-[150px] flex-shrink-0 snap-start rounded-2xl border p-3 text-left transition-colors hover:border-sky-500 hover:bg-sky-50/70 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:hover:bg-sky-950/30 sm:min-w-0 sm:flex-shrink ${
                 isSelected
                   ? 'border-sky-600 bg-sky-50 shadow-lg ring-2 ring-sky-200 dark:bg-sky-900/20 dark:ring-sky-700'
                   : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900'
@@ -155,6 +155,18 @@ export default function Forecast7Day({
                     aria-hidden="true"
                   />
                   {Math.round(day.wind_avg)} km/h
+                </div>
+                <div className="inline-flex items-center gap-1 text-xs font-semibold text-gray-600 dark:text-gray-300">
+                  <CloudRain
+                    className="h-3.5 w-3.5 text-sky-500"
+                    aria-hidden="true"
+                  />
+                  {t('weather.precipitationAmount', {
+                    amount:
+                      day.precipitation_mm == null
+                        ? '—'
+                        : `${day.precipitation_mm.toFixed(1)} mm`,
+                  })}
                 </div>
                 <div className="min-h-8 break-words text-xs leading-tight text-gray-500 dark:text-gray-400">
                   {day.verdict}
