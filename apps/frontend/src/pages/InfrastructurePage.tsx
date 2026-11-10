@@ -7,6 +7,7 @@ import {
 } from 'react';
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { parseApiUtcDate } from '../lib/date';
 import { Checkbox, Input, TextField } from 'react-aria-components';
 import {
@@ -272,7 +273,7 @@ function buildCacheColumns({
   onDeleteKey,
   isPending,
 }: {
-  t: (key: string, options?: Record<string, unknown>) => string;
+  t: TFunction;
   onViewKey: (key: string) => void;
   onDeleteKey: (key: string) => void;
   isPending: boolean;
@@ -320,7 +321,7 @@ function buildCacheColumns({
 // oxlint-disable-next-line max-lines-per-function
 export function getResolvedLabel(
   resolved: CacheKeyInfo['resolved'],
-  t: (key: string, options?: Record<string, unknown>) => string
+  t: TFunction
 ) {
   if (!resolved) {
     return t('cache.noResolution');
