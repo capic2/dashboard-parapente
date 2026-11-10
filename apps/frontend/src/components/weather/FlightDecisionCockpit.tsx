@@ -53,7 +53,7 @@ export default function FlightDecisionCockpit({
   const { t } = useTranslation();
   const activeObjective = objective ?? DEFAULT_FLIGHT_OBJECTIVE;
   const translate = (key: string, params?: Record<string, unknown>) =>
-    String(t(key, params));
+    String(params === undefined ? t(key) : t(key, params));
   const hasStaleDecision = Boolean(
     expectedSiteId && decision && decision.site.id !== expectedSiteId
   );
