@@ -263,6 +263,15 @@
     "statsLoadError": "Unable to load statistics"
   },
   "weather": {
+    "conditions": {
+      "title": "Conditions",
+      "sunny": "Sunny",
+      "partlyCloudy": "Partly cloudy",
+      "cloudy": "Cloudy",
+      "drizzle": "Drizzle",
+      "rain": "Rain",
+      "unknown": "Conditions unavailable"
+    },
     "currentConditions": "Current Conditions",
     "currentConditionsFor": "Current Conditions - {{name}}",
     "loadError": "Unable to load weather data",
