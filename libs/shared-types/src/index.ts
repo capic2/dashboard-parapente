@@ -705,6 +705,7 @@ export const DailySummaryDaySchema = z.object({
   temp_max: z.number(),
   wind_avg: z.number(),
   precipitation_mm: z.number().nullish(),
+  cloud_cover_avg: z.number().nullish(),
 });
 
 export const DailySummarySchema = z.object({
