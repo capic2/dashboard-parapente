@@ -863,6 +863,7 @@ async def get_daily_aggregate(
     # Precipitation cards describe the whole forecast day, including non-flyable
     # hours. Preserve None when no source reported precipitation.
     precips = [h.get("precipitation") for h in consensus if h.get("precipitation") is not None]
+    cloud_covers = [h.get("cloud_cover") for h in consensus if h.get("cloud_cover") is not None]
 
     wind_dirs = [
         h.get("wind_direction") for h in flyable_consensus if h.get("wind_direction") is not None
@@ -875,6 +876,7 @@ async def get_daily_aggregate(
     temp_max = round(max(temps))
     wind_avg = round(sum(winds) / len(winds), 1)
     precip_total = round(sum(precips), 1) if precips else None
+    cloud_cover_avg = round(sum(cloud_covers) / len(cloud_covers), 1) if cloud_covers else None
 
     # Average wind direction (use midday hours 10-14 for best representation)
     midday_dirs = [
@@ -904,6 +906,7 @@ async def get_daily_aggregate(
         "wind_direction_avg": wind_direction_avg,
         "slots": slots,
         "precip_total": precip_total,
+        "cloud_cover_avg": cloud_cover_avg,
         "cached_at": forecast_result.get("cached_at"),
     }
 

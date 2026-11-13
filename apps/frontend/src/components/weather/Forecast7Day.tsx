@@ -15,6 +15,7 @@ import {
   weatherCardClassName,
   weatherSectionTitleClassName,
 } from './weatherUi';
+import WeatherConditionIcon from './WeatherConditionIcon';
 
 interface Forecast7DayProps {
   spotId: string;
@@ -146,7 +147,11 @@ export default function Forecast7Day({
                     <VerdictIcon className="h-4 w-4" aria-hidden="true" />
                   </span>
                 </div>
-                <div className="text-sm font-bold text-gray-800 dark:text-gray-200">
+                <div className="inline-flex items-center gap-2 text-sm font-bold text-gray-800 dark:text-gray-200">
+                  <WeatherConditionIcon
+                    precipitationMm={day.precipitation_mm}
+                    cloudCoverPercent={day.cloud_cover_avg}
+                  />
                   {day.temp_min}° - {day.temp_max}°
                 </div>
                 <div className="inline-flex items-center gap-1 text-xs font-semibold text-gray-600 dark:text-gray-300">

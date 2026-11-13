@@ -263,6 +263,15 @@
     "statsLoadError": "Impossible de charger les statistiques"
   },
   "weather": {
+    "conditions": {
+      "title": "Conditions",
+      "sunny": "Ensoleillé",
+      "partlyCloudy": "Éclaircies",
+      "cloudy": "Nuageux",
+      "drizzle": "Bruine",
+      "rain": "Pluie",
+      "unknown": "Conditions non renseignées"
+    },
     "currentConditions": "Conditions Actuelles",
     "currentConditionsFor": "Conditions Actuelles - {{name}}",
     "loadError": "Impossible de charger les données météo",

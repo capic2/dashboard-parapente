@@ -22,6 +22,7 @@ import type { HourlyForecastItem, WeatherData } from '../../types';
 import { parseApiUtcDate } from '../../lib/date';
 import CacheTimestamp from '../common/CacheTimestamp';
 import WindArrow from './WindArrow';
+import WeatherConditionIcon from './WeatherConditionIcon';
 import {
   getVerdictVisual,
   weatherCardClassName,
@@ -1316,12 +1317,19 @@ export default function HourlyForecast({
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="inline-flex items-center gap-1.5 text-sm font-black text-slate-950 dark:text-white">
-                      <Clock
-                        className="h-4 w-4 text-slate-500"
-                        aria-hidden="true"
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="inline-flex items-center gap-1.5 text-sm font-black text-slate-950 dark:text-white">
+                        <Clock
+                          className="h-4 w-4 text-slate-500"
+                          aria-hidden="true"
+                        />
+                        {hour.hour}
+                      </div>
+                      <WeatherConditionIcon
+                        precipitationMm={hour.precipitation}
+                        cloudCoverPercent={cloudCover}
+                        className="h-5 w-5"
                       />
-                      {hour.hour}
                     </div>
                     <div
                       className={`mt-1 inline-flex items-center gap-1.5 text-sm font-bold ${display.color}`}
@@ -1467,6 +1475,9 @@ export default function HourlyForecast({
                 </span>
               </th>
               <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
+                {t('weather.conditions.title')}
+              </th>
+              <th className="px-2 py-3 text-center font-bold text-gray-800 dark:text-gray-200">
                 <span className="inline-flex items-center justify-center gap-1">
                   <CircleCheck size={14} aria-hidden="true" />{' '}
                   {t('weather.hourly.flyability')}
@@ -1575,6 +1586,12 @@ export default function HourlyForecast({
                   >
                     <td className="py-2.5 px-2 font-medium text-center">
                       {hour.hour}
+                    </td>
+                    <td className="py-2.5 px-2 text-center">
+                      <WeatherConditionIcon
+                        precipitationMm={hour.precipitation}
+                        cloudCoverPercent={cloudCover}
+                      />
                     </td>
 
                     <td className="py-2.5 px-2 text-center">
@@ -1774,7 +1791,7 @@ export default function HourlyForecast({
             ) : (
               <tr>
                 <td
-                  colSpan={12}
+                  colSpan={13}
                   className="py-8 text-center text-gray-500 dark:text-gray-400"
                 >
                   {t('weather.hourly.noData')}
