@@ -17,7 +17,7 @@ sqlalchemy==2.1.8
 # Data Validation & Settings
 # ============================================
 pydantic==2.14.3
-pydantic-settings==2.16.2
+pydantic-settings==2.16.3
 
 # ============================================
 # Configuration Management
