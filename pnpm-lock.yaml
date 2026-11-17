@@ -265,7 +265,7 @@ catalogs:
       version: 27.1.5
     i18next-browser-languagedetector:
       specifier: ^8.2.1
-      version: 8.3.0
+      version: 8.3.1
     knip:
       specifier: ^6.1.0
       version: 6.44.2
@@ -373,7 +373,7 @@ importers:
         version: 27.1.5(typescript@6.0.3)
       i18next-browser-languagedetector:
         specifier: 'catalog:'
-        version: 8.3.0
+        version: 8.3.1
       ky:
         specifier: 'catalog:'
         version: 2.2.0
@@ -512,7 +512,7 @@ importers:
         version: 10.6.7(@types/react@19.3.0)(prettier@3.9.6)(react@19.3.1)
       storybook-react-i18next:
         specifier: 'catalog:'
-        version: 10.1.4(i18next-browser-languagedetector@8.3.0)(i18next-http-backend@3.0.2)(i18next@27.1.5(typescript@6.0.3))(react-i18next@18.0.2(@types/react@19.3.0)(i18next@27.1.5(typescript@6.0.3))(react@19.3.1)(typescript@6.0.3))(react@19.3.1)(storybook@10.6.7(@types/react@19.3.0)(prettier@3.9.6)(react@19.3.1))
+        version: 10.1.4(i18next-browser-languagedetector@8.3.1)(i18next-http-backend@3.0.2)(i18next@27.1.5(typescript@6.0.3))(react-i18next@18.0.2(@types/react@19.3.0)(i18next@27.1.5(typescript@6.0.3))(react@19.3.1)(typescript@6.0.3))(react@19.3.1)(storybook@10.6.7(@types/react@19.3.0)(prettier@3.9.6)(react@19.3.1))
       tailwindcss:
         specifier: 'catalog:'
         version: 4.3.5
@@ -3928,8 +3928,8 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
-  i18next-browser-languagedetector@8.3.0:
-    resolution: {integrity: sha512-t7FtF+VyQ+XSy+GI1O9TXWsMzP4U2u0m27yxJcCbG4LaAbTQa3CXFXgG3LvRivS+ZoYah8yPv5NhMl+Wg6I8Fg==}
+  i18next-browser-languagedetector@8.3.1:
+    resolution: {integrity: sha512-W7dfKWlmaxuy5zsKsu8vKm7SQ0R6T1Tw7XRMKCh3bt98q9m5Q73GKF1PiqtvcwzC+AZvfUCugbfcIYQkDfHeAg==}
 
   i18next-http-backend@3.0.2:
     resolution: {integrity: sha512-PdlvPnvIp4E1sYi46Ik4tBYh/v/NbYfFFgTjkwFl0is8A18s7/bx9aXqsrOax9WUbeNS6mD2oix7Z0yGGf6m5g==}
@@ -8467,7 +8467,7 @@ snapshots:
 
   husky@9.1.7: {}
 
-  i18next-browser-languagedetector@8.3.0:
+  i18next-browser-languagedetector@8.3.1:
     dependencies:
       '@babel/runtime': 7.29.7
 
@@ -9487,10 +9487,10 @@ snapshots:
     transitivePeerDependencies:
       - react
 
-  storybook-react-i18next@10.1.4(i18next-browser-languagedetector@8.3.0)(i18next-http-backend@3.0.2)(i18next@27.1.5(typescript@6.0.3))(react-i18next@18.0.2(@types/react@19.3.0)(i18next@27.1.5(typescript@6.0.3))(react@19.3.1)(typescript@6.0.3))(react@19.3.1)(storybook@10.6.7(@types/react@19.3.0)(prettier@3.9.6)(react@19.3.1)):
+  storybook-react-i18next@10.1.4(i18next-browser-languagedetector@8.3.1)(i18next-http-backend@3.0.2)(i18next@27.1.5(typescript@6.0.3))(react-i18next@18.0.2(@types/react@19.3.0)(i18next@27.1.5(typescript@6.0.3))(react@19.3.1)(typescript@6.0.3))(react@19.3.1)(storybook@10.6.7(@types/react@19.3.0)(prettier@3.9.6)(react@19.3.1)):
     dependencies:
       i18next: 27.1.5(typescript@6.0.3)
-      i18next-browser-languagedetector: 8.3.0
+      i18next-browser-languagedetector: 8.3.1
       i18next-http-backend: 3.0.2
       react-i18next: 18.0.2(@types/react@19.3.0)(i18next@27.1.5(typescript@6.0.3))(react@19.3.1)(typescript@6.0.3)
       storybook: 10.6.7(@types/react@19.3.0)(prettier@3.9.6)(react@19.3.1)
