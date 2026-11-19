@@ -5,15 +5,18 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Maximize2, Minimize2, Pause, Play } from 'lucide-react';
 import type { FlightVideoMarker } from '@dashboard-parapente/shared-types';
-import type {
-  FlightTelemetryPipLayout,
-  TelemetryPipVideoRole,
+import {
+  TELEMETRY_CANVAS_HEIGHT,
+  TELEMETRY_CANVAS_WIDTH,
+  type FlightTelemetryPipLayout,
+  type TelemetryPipVideoRole,
 } from './flightTelemetryLayout';
 import { getYoutubeVideoId } from '../../../lib/youtube';
 
@@ -114,6 +117,30 @@ export function pipSyncOffsetSeconds(
 const EMPTY_PIPS: FlightOverlayPip[] = [];
 const EMPTY_VIDEO_MARKERS: FlightVideoMarker[] = [];
 const CONTROLS_HIDE_DELAY_MS = 2500;
+const PIP_POSITION_GRID_SIZE = 20;
+
+interface PipPosition {
+  x: number;
+  y: number;
+}
+
+interface PipPositionState {
+  signature: string;
+  positions: Record<string, PipPosition>;
+}
+
+interface PipPointerDrag {
+  pointerId: number;
+  pipId: string;
+  layoutSignature: string;
+  startClientX: number;
+  startClientY: number;
+  startX: number;
+  startY: number;
+  stageWidth: number;
+  stageHeight: number;
+  moved: boolean;
+}
 
 // The GoPro layout is authored on a 3840x2160 canvas. Keep the interactive
 // PiP in that same coordinate system instead of tying it to arbitrary Tailwind
@@ -215,7 +242,13 @@ export function FlightOverlayPlayer({
   const flightRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
+  const playerStageRef = useRef<HTMLDivElement>(null);
   const playerMountRef = useRef<HTMLDivElement>(null);
+  const pipPointerDragRef = useRef<PipPointerDrag | null>(null);
+  const suppressPipClickRef = useRef<{
+    pipId: string;
+    pointerId: number;
+  } | null>(null);
   const nativeFullscreenActiveRef = useRef(false);
   const fullscreenPlaybackSnapshotRef =
     useRef<FullscreenPlaybackSnapshot | null>(null);
@@ -258,6 +291,36 @@ export function FlightOverlayPlayer({
   const [youtubeReady, setYoutubeReady] = useState(false);
   const [youtubeFailed, setYoutubeFailed] = useState(false);
   const [activePipId, setActivePipId] = useState<string | null>(null);
+  const pipPositionSignature = pips
+    .map((pip) => `${pip.id}:${pip.x},${pip.y},${pip.width},${pip.height}`)
+    .join('|');
+  const [pipPositionState, setPipPositionState] = useState<PipPositionState>(
+    () => ({
+      signature: pipPositionSignature,
+      positions: Object.fromEntries(
+        pips.map((pip) => [pip.id, { x: pip.x, y: pip.y }])
+      ),
+    })
+  );
+  const pipPositions =
+    pipPositionState.signature === pipPositionSignature
+      ? pipPositionState.positions
+      : Object.fromEntries(pips.map((pip) => [pip.id, { x: pip.x, y: pip.y }]));
+  useLayoutEffect(() => {
+    if (pipPositionState.signature === pipPositionSignature) return;
+    const activeDrag = pipPointerDragRef.current;
+    suppressPipClickRef.current =
+      activeDrag && activeDrag.layoutSignature !== pipPositionSignature
+        ? { pipId: activeDrag.pipId, pointerId: activeDrag.pointerId }
+        : null;
+    pipPointerDragRef.current = null;
+    setPipPositionState({
+      signature: pipPositionSignature,
+      positions: Object.fromEntries(
+        pips.map((pip) => [pip.id, { x: pip.x, y: pip.y }])
+      ),
+    });
+  }, [pips, pipPositionSignature, pipPositionState.signature]);
   const youtubeId = youtubeUrl ? getYoutubeVideoId(youtubeUrl) : null;
   const masterIsYoutube = Boolean(youtubeId) && !youtubeFailed;
   const canSeekVideoMarkers = Boolean(
@@ -1092,12 +1155,123 @@ export function FlightOverlayPlayer({
     }
   };
 
+  const handlePipPointerDown = (
+    event: ReactPointerEvent<HTMLDivElement>,
+    pip: FlightOverlayPip
+  ) => {
+    if (
+      !isInteractive ||
+      activePipId === pip.id ||
+      event.button !== 0 ||
+      event.pointerType !== 'mouse'
+    )
+      return;
+    const stageRect = playerStageRef.current?.getBoundingClientRect();
+    if (!stageRect?.width || !stageRect.height) return;
+
+    const position = pipPositions[pip.id] ?? pip;
+    suppressPipClickRef.current = null;
+    pipPointerDragRef.current = {
+      pointerId: event.pointerId,
+      pipId: pip.id,
+      layoutSignature: pipPositionSignature,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startX: position.x,
+      startY: position.y,
+      stageWidth: stageRect.width,
+      stageHeight: stageRect.height,
+      moved: false,
+    };
+    event.currentTarget
+      .querySelector('button')
+      ?.setPointerCapture?.(event.pointerId);
+  };
+
+  const handlePipPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = pipPointerDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag.layoutSignature !== pipPositionSignature) {
+      suppressPipClickRef.current = {
+        pipId: drag.pipId,
+        pointerId: drag.pointerId,
+      };
+      pipPointerDragRef.current = null;
+      return;
+    }
+
+    const deltaX = event.clientX - drag.startClientX;
+    const deltaY = event.clientY - drag.startClientY;
+    if (!drag.moved && Math.hypot(deltaX, deltaY) < 4) return;
+    drag.moved = true;
+    event.preventDefault();
+
+    const pip = pips.find(({ id }) => id === drag.pipId);
+    if (!pip) return;
+    const snappedX =
+      Math.round(
+        (drag.startX * TELEMETRY_CANVAS_WIDTH +
+          (deltaX * TELEMETRY_CANVAS_WIDTH) / drag.stageWidth) /
+          PIP_POSITION_GRID_SIZE
+      ) * PIP_POSITION_GRID_SIZE;
+    const snappedY =
+      Math.round(
+        (drag.startY * TELEMETRY_CANVAS_HEIGHT +
+          (deltaY * TELEMETRY_CANVAS_HEIGHT) / drag.stageHeight) /
+          PIP_POSITION_GRID_SIZE
+      ) * PIP_POSITION_GRID_SIZE;
+    const x =
+      Math.max(
+        0,
+        Math.min(
+          TELEMETRY_CANVAS_WIDTH - pip.width * TELEMETRY_CANVAS_WIDTH,
+          snappedX
+        )
+      ) / TELEMETRY_CANVAS_WIDTH;
+    const y =
+      Math.max(
+        0,
+        Math.min(
+          TELEMETRY_CANVAS_HEIGHT - pip.height * TELEMETRY_CANVAS_HEIGHT,
+          snappedY
+        )
+      ) / TELEMETRY_CANVAS_HEIGHT;
+
+    setPipPositionState({
+      signature: pipPositionSignature,
+      positions: { ...pipPositions, [pip.id]: { x, y } },
+    });
+  };
+
+  const handlePipPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = pipPointerDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag.layoutSignature !== pipPositionSignature || drag.moved) {
+      suppressPipClickRef.current = {
+        pipId: drag.pipId,
+        pointerId: drag.pointerId,
+      };
+    }
+    event.currentTarget
+      .querySelector('button')
+      ?.releasePointerCapture?.(event.pointerId);
+    pipPointerDragRef.current = null;
+  };
+
+  const handlePipPointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = pipPointerDragRef.current;
+    if (drag?.pointerId === event.pointerId) pipPointerDragRef.current = null;
+    if (suppressPipClickRef.current?.pointerId === event.pointerId) {
+      suppressPipClickRef.current = null;
+    }
+  };
+
   const cameraIsMain = !isInteractive && layout === 'camera-main';
   const flightIsMain = !isInteractive && layout === 'flight-main';
   const activePip = pips.find((pip) => pip.id === activePipId);
   const getPipBoundsStyle = (pip: FlightOverlayPip) => ({
-    left: `${pip.x * 100}%`,
-    top: `${pip.y * 100}%`,
+    left: `${(pipPositions[pip.id]?.x ?? pip.x) * 100}%`,
+    top: `${(pipPositions[pip.id]?.y ?? pip.y) * 100}%`,
     width: `${pip.width * 100}%`,
     height: `${pip.height * 100}%`,
     display: pip.visible ? undefined : 'none',
@@ -1146,6 +1320,7 @@ export function FlightOverlayPlayer({
       onBlurCapture={handlePlayerBlur}
     >
       <div
+        ref={playerStageRef}
         data-testid="flight-overlay-media-stage"
         className={`relative grid min-h-0 bg-black ${isInteractive && !isFullscreen ? 'aspect-video' : ''} ${isInteractive && isFullscreen ? 'flex-1' : ''} ${layout === 'side-by-side' ? 'grid-cols-1 md:grid-cols-2' : ''}`}
       >
@@ -1324,17 +1499,28 @@ export function FlightOverlayPlayer({
               <div
                 key={pip.id}
                 data-testid={`flight-overlay-pip-${pip.id}`}
-                className={`absolute ${isActive ? 'z-10' : 'z-20'} overflow-hidden rounded-lg border-2 border-white/80 bg-black shadow-xl`}
+                className={`absolute ${isActive ? 'z-10' : 'z-20'} overflow-hidden rounded-lg border-2 border-white/80 bg-black shadow-xl ${isActive ? '' : 'cursor-grab active:cursor-grabbing'}`}
                 style={pipStyle}
                 aria-label={pip.label}
+                onPointerDown={(event) => handlePipPointerDown(event, pip)}
+                onPointerMove={handlePipPointerMove}
+                onPointerUp={handlePipPointerUp}
+                onPointerCancel={handlePipPointerCancel}
               >
                 {pipPreview}
                 <button
                   type="button"
-                  className="absolute inset-0 cursor-pointer bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-400"
+                  className="absolute inset-0 cursor-grab bg-transparent active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-400"
                   aria-label={pip.label}
                   aria-pressed={isActive}
-                  onClick={() => setActivePipId(isActive ? null : pip.id)}
+                  onClick={(event) => {
+                    const suppressedClick = suppressPipClickRef.current;
+                    suppressPipClickRef.current = null;
+                    if (suppressedClick?.pipId === pip.id && event.detail > 0) {
+                      return;
+                    }
+                    setActivePipId(isActive ? null : pip.id);
+                  }}
                   disabled={!sourceAvailable}
                 />
               </div>
