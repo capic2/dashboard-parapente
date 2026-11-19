@@ -145,6 +145,358 @@ describe('FlightOverlayPlayer', () => {
     expect(pip.className).toContain('z-20');
   });
 
+  it('drags a PiP onto the 20px canvas grid without activating it', () => {
+    render(
+      <FlightOverlayPlayer
+        mode="interactive"
+        cameraUrl="camera.mp4"
+        cameraLabel="camera"
+        flightLabel="flight"
+        pips={[
+          {
+            id: 'flight-pip',
+            type: 'pip',
+            action: 'switch_video',
+            source: 'file:vol',
+            x: 0.1,
+            y: 0.2,
+            width: 0.3,
+            height: 0.25,
+            visible: true,
+            videoUrl: 'flight.mp4',
+            label: 'flight',
+          },
+        ]}
+      />
+    );
+
+    const stage = screen.getByTestId('flight-overlay-media-stage');
+    vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      right: 960,
+      bottom: 540,
+      width: 960,
+      height: 540,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const pip = screen.getByTestId('flight-overlay-pip-flight-pip');
+    const button = screen.getByRole('button', { name: 'flight' });
+
+    fireEvent.pointerDown(button, {
+      pointerId: 1,
+      pointerType: 'mouse',
+      button: 0,
+      clientX: 10,
+      clientY: 10,
+    });
+    fireEvent.pointerMove(button, {
+      pointerId: 1,
+      clientX: 110,
+      clientY: 65,
+    });
+    fireEvent.pointerUp(button, {
+      pointerId: 1,
+      clientX: 110,
+      clientY: 65,
+    });
+
+    expect(pip.style.left).toBe(`${(400 / 1920) * 100}%`);
+    expect(pip.style.top).toBe(`${(320 / 1080) * 100}%`);
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(button, { detail: 1 });
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(button, { detail: 0 });
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('keeps a dragged PiP inside the stage and resets when its layout changes', () => {
+    const pip = {
+      id: 'flight-pip',
+      type: 'pip' as const,
+      action: 'switch_video' as const,
+      source: 'file:vol' as const,
+      x: 0.65,
+      y: 0.7,
+      width: 0.3,
+      height: 0.25,
+      visible: true,
+      videoUrl: 'flight.mp4',
+      label: 'flight',
+    };
+    const view = render(
+      <FlightOverlayPlayer
+        mode="interactive"
+        cameraUrl="camera.mp4"
+        cameraLabel="camera"
+        flightLabel="flight"
+        pips={[pip]}
+      />
+    );
+
+    const stage = screen.getByTestId('flight-overlay-media-stage');
+    vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      right: 960,
+      bottom: 540,
+      width: 960,
+      height: 540,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const pipElement = screen.getByTestId('flight-overlay-pip-flight-pip');
+    const button = screen.getByRole('button', { name: 'flight' });
+
+    fireEvent.pointerDown(button, {
+      pointerId: 1,
+      pointerType: 'mouse',
+      button: 0,
+      clientX: 10,
+      clientY: 10,
+    });
+    fireEvent.pointerMove(button, {
+      pointerId: 1,
+      clientX: 1010,
+      clientY: 1010,
+    });
+    fireEvent.pointerUp(button, {
+      pointerId: 1,
+      clientX: 1010,
+      clientY: 1010,
+    });
+
+    expect(pipElement.style.left).toBe('70%');
+    expect(pipElement.style.top).toBe('75%');
+
+    view.rerender(
+      <FlightOverlayPlayer
+        mode="interactive"
+        cameraUrl="camera.mp4"
+        cameraLabel="camera"
+        flightLabel="flight"
+        pips={[{ ...pip, x: 0.2, y: 0.3 }]}
+      />
+    );
+
+    expect(pipElement.style.left).toBe('20%');
+    expect(pipElement.style.top).toBe('30%');
+
+    view.rerender(
+      <FlightOverlayPlayer
+        mode="interactive"
+        cameraUrl="camera.mp4"
+        cameraLabel="camera"
+        flightLabel="flight"
+        pips={[pip]}
+      />
+    );
+
+    expect(pipElement.style.left).toBe('65%');
+    expect(pipElement.style.top).toBe('70%');
+  });
+
+  it('cancels a drag when the layout changes away and back before the next pointer event', () => {
+    const firstLayoutPip = {
+      id: 'flight-pip',
+      type: 'pip' as const,
+      action: 'switch_video' as const,
+      source: 'file:vol' as const,
+      x: 0.1,
+      y: 0.2,
+      width: 0.3,
+      height: 0.25,
+      visible: true,
+      videoUrl: 'flight.mp4',
+      label: 'flight',
+    };
+    const view = render(
+      <FlightOverlayPlayer
+        mode="interactive"
+        cameraUrl="camera.mp4"
+        cameraLabel="camera"
+        flightLabel="flight"
+        pips={[firstLayoutPip]}
+      />
+    );
+    const stage = screen.getByTestId('flight-overlay-media-stage');
+    vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      right: 960,
+      bottom: 540,
+      width: 960,
+      height: 540,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const originalButton = screen.getByRole('button', { name: 'flight' });
+
+    fireEvent.pointerDown(originalButton, {
+      pointerId: 2,
+      pointerType: 'mouse',
+      button: 0,
+      clientX: 10,
+      clientY: 10,
+    });
+    view.rerender(
+      <FlightOverlayPlayer
+        mode="interactive"
+        cameraUrl="camera.mp4"
+        cameraLabel="camera"
+        flightLabel="flight"
+        pips={[{ ...firstLayoutPip, x: 0.5, y: 0.5 }]}
+      />
+    );
+    view.rerender(
+      <FlightOverlayPlayer
+        mode="interactive"
+        cameraUrl="camera.mp4"
+        cameraLabel="camera"
+        flightLabel="flight"
+        pips={[firstLayoutPip]}
+      />
+    );
+
+    const newButton = screen.getByRole('button', { name: 'flight' });
+    const pipElement = screen.getByTestId('flight-overlay-pip-flight-pip');
+    fireEvent.pointerMove(newButton, {
+      pointerId: 2,
+      clientX: 310,
+      clientY: 200,
+    });
+    fireEvent.pointerUp(newButton, {
+      pointerId: 2,
+      clientX: 310,
+      clientY: 200,
+    });
+
+    expect(pipElement.style.left).toBe('10%');
+    expect(pipElement.style.top).toBe('20%');
+    expect(newButton).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('allows keyboard activation after a drag is cancelled', () => {
+    render(
+      <FlightOverlayPlayer
+        mode="interactive"
+        cameraUrl="camera.mp4"
+        cameraLabel="camera"
+        flightLabel="flight"
+        pips={[
+          {
+            id: 'flight-pip',
+            type: 'pip',
+            action: 'switch_video',
+            source: 'file:vol',
+            x: 0.1,
+            y: 0.2,
+            width: 0.3,
+            height: 0.25,
+            visible: true,
+            videoUrl: 'flight.mp4',
+            label: 'flight',
+          },
+        ]}
+      />
+    );
+    const stage = screen.getByTestId('flight-overlay-media-stage');
+    vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      right: 960,
+      bottom: 540,
+      width: 960,
+      height: 540,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const button = screen.getByRole('button', { name: 'flight' });
+
+    fireEvent.pointerDown(button, {
+      pointerId: 4,
+      pointerType: 'mouse',
+      button: 0,
+      clientX: 10,
+      clientY: 10,
+    });
+    fireEvent.pointerMove(button, {
+      pointerId: 4,
+      pointerType: 'mouse',
+      clientX: 110,
+      clientY: 65,
+    });
+    fireEvent.pointerCancel(button, {
+      pointerId: 4,
+      pointerType: 'mouse',
+      clientX: 110,
+      clientY: 65,
+    });
+
+    fireEvent.click(button, { detail: 0 });
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('keeps touch input available for page gestures and PiP activation', () => {
+    render(
+      <FlightOverlayPlayer
+        mode="interactive"
+        cameraUrl="camera.mp4"
+        cameraLabel="camera"
+        flightLabel="flight"
+        pips={[
+          {
+            id: 'flight-pip',
+            type: 'pip',
+            action: 'switch_video',
+            source: 'file:vol',
+            x: 0.1,
+            y: 0.2,
+            width: 0.3,
+            height: 0.25,
+            visible: true,
+            videoUrl: 'flight.mp4',
+            label: 'flight',
+          },
+        ]}
+      />
+    );
+    const pip = screen.getByTestId('flight-overlay-pip-flight-pip');
+    const button = screen.getByRole('button', { name: 'flight' });
+
+    fireEvent.pointerDown(button, {
+      pointerId: 3,
+      pointerType: 'touch',
+      button: 0,
+      clientX: 10,
+      clientY: 10,
+    });
+    fireEvent.pointerMove(button, {
+      pointerId: 3,
+      pointerType: 'touch',
+      clientX: 110,
+      clientY: 65,
+    });
+    fireEvent.pointerUp(button, {
+      pointerId: 3,
+      pointerType: 'touch',
+      clientX: 110,
+      clientY: 65,
+    });
+
+    expect(pip.style.left).toBe('10%');
+    expect(pip.style.top).toBe('20%');
+    fireEvent.click(button, { detail: 1 });
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('switches to another PiP and restores the previously active one', () => {
     render(
       <FlightOverlayPlayer
