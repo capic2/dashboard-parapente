@@ -313,7 +313,7 @@ catalogs:
       version: 10.6.8
     storybook-react-i18next:
       specifier: ^10.1.1
-      version: 10.1.4
+      version: 10.1.5
     tailwind-merge:
       specifier: ^3.5.0
       version: 3.7.1
@@ -512,7 +512,7 @@ importers:
         version: 10.6.8(@types/react@19.3.0)(prettier@3.9.6)(react@19.3.1)
       storybook-react-i18next:
         specifier: 'catalog:'
-        version: 10.1.4(i18next-browser-languagedetector@8.3.1)(i18next-http-backend@3.0.2)(i18next@27.2.2(typescript@6.0.3))(react-i18next@18.0.3(@types/react@19.3.0)(i18next@27.2.2(typescript@6.0.3))(react@19.3.1)(typescript@6.0.3))(react@19.3.1)(storybook@10.6.8(@types/react@19.3.0)(prettier@3.9.6)(react@19.3.1))
+        version: 10.1.5(i18next-browser-languagedetector@8.3.1)(i18next-http-backend@3.0.2)(i18next@27.2.2(typescript@6.0.3))(react-i18next@18.0.3(@types/react@19.3.0)(i18next@27.2.2(typescript@6.0.3))(react@19.3.1)(typescript@6.0.3))(react@19.3.1)(storybook@10.6.8(@types/react@19.3.0)(prettier@3.9.6)(react@19.3.1))
       tailwindcss:
         specifier: 'catalog:'
         version: 4.3.5
@@ -4810,13 +4810,13 @@ packages:
     peerDependencies:
       storybook: ^9.0.0 || ^10.0.0
 
-  storybook-react-i18next@10.1.4:
-    resolution: {integrity: sha512-FmwIK8+ap9tYH1w0D3GBbui+3Bh7LkB41VGWR7uEWPxmFZzaBQ4YTcqEPy9dfItlW17XLOFsbxaPfUE1/rU85Q==}
+  storybook-react-i18next@10.1.5:
+    resolution: {integrity: sha512-u73AC6bymCsRCHoq6uNCttsn8UX1gYqshu/g4g7aFLICdZEiCS6iDqudkwFv4SZ1VSWR075dkJSr8AyoI8QyDw==}
     peerDependencies:
-      i18next: ^22.0.0 || ^23.0.0 || ^24.0.0 || ^25.0.0 || ^26.0.0
+      i18next: ^22.0.0 || ^23.0.0 || ^24.0.0 || ^25.0.0 || ^26.0.0 || ^27.0.0
       i18next-browser-languagedetector: ^7.0.0 || ^8.0.0
       i18next-http-backend: ^2.0.0 || ^3.0.0 || ^4.0.0
-      react-i18next: ^12.0.0 || ^13.0.0 || ^14.0.0 || ^15.0.0 || ^16.0.0 || ^17.0.0
+      react-i18next: ^12.0.0 || ^13.0.0 || ^14.0.0 || ^15.0.0 || ^16.0.0 || ^17.1.13 || ^18.0.0
       storybook: ^9.0.0 || ^10.0.0
 
   storybook@10.6.8:
@@ -9495,7 +9495,7 @@ snapshots:
     transitivePeerDependencies:
       - react
 
-  storybook-react-i18next@10.1.4(i18next-browser-languagedetector@8.3.1)(i18next-http-backend@3.0.2)(i18next@27.2.2(typescript@6.0.3))(react-i18next@18.0.3(@types/react@19.3.0)(i18next@27.2.2(typescript@6.0.3))(react@19.3.1)(typescript@6.0.3))(react@19.3.1)(storybook@10.6.8(@types/react@19.3.0)(prettier@3.9.6)(react@19.3.1)):
+  storybook-react-i18next@10.1.5(i18next-browser-languagedetector@8.3.1)(i18next-http-backend@3.0.2)(i18next@27.2.2(typescript@6.0.3))(react-i18next@18.0.3(@types/react@19.3.0)(i18next@27.2.2(typescript@6.0.3))(react@19.3.1)(typescript@6.0.3))(react@19.3.1)(storybook@10.6.8(@types/react@19.3.0)(prettier@3.9.6)(react@19.3.1)):
     dependencies:
       i18next: 27.2.2(typescript@6.0.3)
       i18next-browser-languagedetector: 8.3.1
