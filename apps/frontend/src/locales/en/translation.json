@@ -1219,6 +1219,8 @@
     "dateLabel": "Date",
     "departureTime": "Departure time",
     "siteLabel": "Site",
+    "takeoffLabel": "Takeoff",
+    "landingLabel": "Landing",
     "landingSiteLabel": "Landing site",
     "notSpecified": "Not specified",
     "createNewSite": "Create a new site",

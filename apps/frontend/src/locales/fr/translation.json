@@ -1223,6 +1223,8 @@
     "dateLabel": "Date",
     "departureTime": "Heure de départ",
     "siteLabel": "Site",
+    "takeoffLabel": "Décollage",
+    "landingLabel": "Atterrissage",
     "landingSiteLabel": "Site d’atterrissage",
     "notSpecified": "Non spécifié",
     "createNewSite": "Créer un nouveau site",
