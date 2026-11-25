@@ -14,6 +14,8 @@ export function FlightSportstrackliveCard({
   return (
     <a
       href={url}
+      target="_blank"
+      rel="noopener noreferrer"
       aria-label={t('flights.openSportstrackliveFlight')}
       className="group flex items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50/70 p-4 text-sky-950 transition-colors hover:bg-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100 dark:hover:bg-sky-950/60"
     >
