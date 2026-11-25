@@ -435,6 +435,9 @@ export function Flight({
           className={`mt-2 flex items-center gap-1 pl-1.5 text-xs ${metaColor}`}
         >
           <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span className="shrink-0 font-medium">
+            {t('flights.takeoffLabel')}:
+          </span>
           <span className="truncate">{siteLabel}</span>
         </div>
       )}
@@ -444,7 +447,7 @@ export function Flight({
         >
           <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span className="shrink-0 font-medium">
-            {t('flights.landingSiteLabel')}:
+            {t('flights.landingLabel')}:
           </span>
           <span className="truncate">{flight.landing_site_name}</span>
         </div>
