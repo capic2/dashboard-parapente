@@ -77,6 +77,30 @@ def test_normalizes_gzipped_gpx_and_calculates_stats():
     assert stats["duration_minutes"] == 1
 
 
+def test_normalizes_gpx_acceleration_axes_and_g_force():
+    gpx = b"""<gpx xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxpx="https://example.com/gpxpx"><trk><trkseg>
+    <trkpt lat="47.2" lon="6.0"><time>2026-07-01T10:00:00Z</time><extensions><gpxpx:Acceleration><gpxpx:X>0</gpxpx:X><gpxpx:Y>0</gpxpx:Y><gpxpx:Z>1</gpxpx:Z></gpxpx:Acceleration></extensions></trkpt>
+    </trkseg></trk></gpx>"""
+
+    _, points = normalize_track(gpx, "gpx")
+
+    assert points[0]["acceleration_x_g"] == 0
+    assert points[0]["acceleration_y_g"] == 0
+    assert points[0]["acceleration_z_g"] == 1
+    assert points[0]["g_force"] == pytest.approx(1)
+
+
+def test_ignores_overflowing_gpx_acceleration_magnitude():
+    gpx = b"""<gpx xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxpx="https://example.com/gpxpx"><trk><trkseg>
+    <trkpt lat="47.2" lon="6.0"><time>2026-07-01T10:00:00Z</time><extensions><gpxpx:Acceleration><gpxpx:X>1.7e308</gpxpx:X><gpxpx:Y>1.7e308</gpxpx:Y><gpxpx:Z>0</gpxpx:Z></gpxpx:Acceleration></extensions></trkpt>
+    </trkseg></trk></gpx>"""
+
+    _, points = normalize_track(gpx, "gpx")
+
+    assert "g_force" not in points[0]
+    assert "acceleration_x_g" not in points[0]
+
+
 def test_smooths_short_vertical_rate_spikes() -> None:
     gpx = b"""<gpx xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>
     <trkpt lat="47.2" lon="6.0"><ele>500</ele><time>2026-07-01T10:00:00Z</time></trkpt>

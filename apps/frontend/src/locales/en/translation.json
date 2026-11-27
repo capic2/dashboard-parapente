@@ -1548,6 +1548,7 @@
     "telemetryHeading": "Heading",
     "telemetryHeartRate": "Heart rate",
     "telemetryPower": "Power",
+    "telemetryGForce": "G-force",
     "telemetryAltitudeMin": "Minimum altitude",
     "telemetryAltitudeMax": "Maximum altitude",
     "telemetryStartAltitude": "Start altitude",
@@ -2173,7 +2174,8 @@
       "compass": "Compass",
       "bar": "Progress bar",
       "chart": "History chart",
-      "asi": "Airspeed indicator"
+      "asi": "Airspeed indicator",
+      "force_rose": "G-force rose"
     },
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",

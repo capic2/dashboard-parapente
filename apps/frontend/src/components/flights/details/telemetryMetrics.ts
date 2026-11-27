@@ -18,6 +18,7 @@ export type MetricKey =
   | 'heart_rate_min'
   | 'heart_rate_max'
   | 'power'
+  | 'g_force'
   | 'total_gain'
   | 'total_loss'
   | 'climb_from_takeoff'
@@ -39,6 +40,7 @@ export const METRIC_KEYS: MetricKey[] = [
   'heart_rate_min',
   'heart_rate_max',
   'power',
+  'g_force',
   'total_gain',
   'total_loss',
   'climb_from_takeoff',
@@ -61,6 +63,7 @@ export const METRIC_LABELS: Record<MetricKey, string> = {
   heart_rate_min: 'telemetryHeartRateMin',
   heart_rate_max: 'telemetryHeartRateMax',
   power: 'telemetryPower',
+  g_force: 'telemetryGForce',
   total_gain: 'telemetryTotalGain',
   total_loss: 'telemetryTotalLoss',
   climb_from_takeoff: 'telemetryClimbFromTakeoff',
@@ -177,6 +180,8 @@ export function getTelemetryMetricValue(
       return [maximum(heartRates), 'bpm'];
     case 'power':
       return [point?.power, 'W'];
+    case 'g_force':
+      return [point?.g_force, 'G'];
     case 'total_gain':
       return [elevationChange(data, true), 'm'];
     case 'total_loss':
