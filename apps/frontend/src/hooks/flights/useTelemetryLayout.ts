@@ -68,11 +68,18 @@ export function useSaveTelemetryLayout(flightId?: string) {
         )
         .json<TelemetryLayoutResponse>();
     },
-    onSuccess: (response) => {
+    onSuccess: async (response) => {
       queryClient.setQueryData(telemetryLayoutQueryKey(flightId), {
         ...response,
         layout: parseTelemetryLayoutXml(response.xml_content),
       });
+      if (!flightId) {
+        await queryClient.invalidateQueries({
+          predicate: (query) =>
+            query.queryKey[0] === 'telemetry-layout' &&
+            query.queryKey[1] !== 'default',
+        });
+      }
     },
   });
 }
