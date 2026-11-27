@@ -181,6 +181,10 @@ class FlightTelemetryPoint(BaseModel):
     altitude_relative_m: float | None = None
     heart_rate: int | None = None
     power: int | None = None
+    acceleration_x_g: float | None = None
+    acceleration_y_g: float | None = None
+    acceleration_z_g: float | None = None
+    g_force: float | None = None
 
 
 class FlightTelemetryResponse(BaseModel):

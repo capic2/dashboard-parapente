@@ -15,6 +15,10 @@ export interface FlightTelemetryPoint {
   altitude_relative_m?: number | null;
   heart_rate?: number | null;
   power?: number | null;
+  acceleration_x_g?: number | null;
+  acceleration_y_g?: number | null;
+  acceleration_z_g?: number | null;
+  g_force?: number | null;
 }
 
 export interface FlightTelemetryData {
@@ -166,5 +170,21 @@ export function interpolateTelemetryAtVideoTime(
       ratio
     ),
     power: interpolateOptional(previous.power, next.power, ratio),
+    acceleration_x_g: interpolateOptional(
+      previous.acceleration_x_g,
+      next.acceleration_x_g,
+      ratio
+    ),
+    acceleration_y_g: interpolateOptional(
+      previous.acceleration_y_g,
+      next.acceleration_y_g,
+      ratio
+    ),
+    acceleration_z_g: interpolateOptional(
+      previous.acceleration_z_g,
+      next.acceleration_z_g,
+      ratio
+    ),
+    g_force: interpolateOptional(previous.g_force, next.g_force, ratio),
   };
 }

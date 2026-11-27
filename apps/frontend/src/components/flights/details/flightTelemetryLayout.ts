@@ -40,7 +40,8 @@ export type TelemetryWidgetVariant =
   | 'compass'
   | 'bar'
   | 'chart'
-  | 'asi';
+  | 'asi'
+  | 'force_rose';
 export type TelemetryValueAlignment = 'left' | 'center' | 'right';
 
 export type TelemetryLayout = FlightTelemetryLayoutItem[] & {
@@ -485,6 +486,7 @@ const WIDGET_VARIANTS: TelemetryWidgetVariant[] = [
   'bar',
   'chart',
   'asi',
+  'force_rose',
 ];
 const VALUE_ALIGNMENTS: TelemetryValueAlignment[] = ['left', 'center', 'right'];
 

@@ -30,6 +30,7 @@ VALID_METRICS = {
     "heart_rate_min",
     "heart_rate_max",
     "power",
+    "g_force",
     "total_gain",
     "total_loss",
     "climb_from_takeoff",
@@ -60,6 +61,7 @@ VALID_WIDGET_VARIANTS = {
     "bar",
     "chart",
     "asi",
+    "force_rose",
 }
 VALID_VALUE_ALIGNMENTS = {"left", "center", "right"}
 
@@ -102,6 +104,12 @@ def validate_telemetry_layout_xml(xml_content: str) -> str:
         ids.add(widget_id)
         if widget.tag == "widget" and widget.attrib.get("metric") not in VALID_METRICS:
             raise ValueError("Telemetry widget metric is not supported")
+        if (
+            widget.tag == "widget"
+            and widget.attrib.get("variant") == "force_rose"
+            and widget.attrib.get("metric") != "g_force"
+        ):
+            raise ValueError("The force rose must use the g_force metric")
         if widget.tag == "icon" and widget.attrib.get("name") not in VALID_ICONS:
             raise ValueError("Telemetry icon is not supported")
         if widget.tag == "text":

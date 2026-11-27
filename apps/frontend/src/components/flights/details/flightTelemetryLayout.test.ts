@@ -70,6 +70,26 @@ describe('flight telemetry layout XML', () => {
     ).toEqual(layout);
   });
 
+  it('round-trips the force rose metric and variant', () => {
+    const layout: FlightTelemetryWidgetLayout[] = [
+      {
+        id: 'force-rose',
+        type: 'widget',
+        metric: 'g_force',
+        variant: 'force_rose',
+        x: 240,
+        y: 160,
+        width: 360,
+        height: 240,
+        visible: true,
+      },
+    ];
+
+    expect(
+      parseTelemetryLayoutXml(serializeTelemetryLayoutXml(layout))
+    ).toEqual(layout);
+  });
+
   it('loads layouts containing more than sixteen elements', () => {
     const layout = Array.from({ length: 22 }, (_, index) => ({
       ...DEFAULT_FLIGHT_TELEMETRY_LAYOUT[index % 4],

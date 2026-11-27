@@ -29,6 +29,7 @@ const CYCLE_METRICS: MetricKey[] = [
   'heading',
   'heart_rate',
   'power',
+  'g_force',
 ];
 
 interface FlightTelemetryOverlayProps {
@@ -202,7 +203,10 @@ export function FlightTelemetryOverlay({
               </div>
             );
           }
-          const metric = selectedMetrics[slot.id] ?? slot.metric;
+          const metric =
+            slot.variant === 'force_rose'
+              ? 'g_force'
+              : (selectedMetrics[slot.id] ?? slot.metric);
           const [value, unit] = getTelemetryMetricValue(
             point,
             data,
@@ -218,8 +222,12 @@ export function FlightTelemetryOverlay({
               ...current,
               [slot.id]: nextMetric,
             }));
-          const hasClickAction = slot.clickAction === 'cycle_metric';
-          const hasLongPressAction = slot.longPressAction === 'cycle_metric';
+          const hasClickAction =
+            slot.variant !== 'force_rose' &&
+            slot.clickAction === 'cycle_metric';
+          const hasLongPressAction =
+            slot.variant !== 'force_rose' &&
+            slot.longPressAction === 'cycle_metric';
           const isInteractive = hasClickAction || hasLongPressAction;
           const clearLongPressTimer = () => {
             if (longPressTimer.current !== null) {
@@ -262,7 +270,7 @@ export function FlightTelemetryOverlay({
                 }
                 if (hasClickAction) cycleMetric();
               }}
-              aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${slot.valuePrefix ?? ''}${formatTelemetryValue(value, '—', metric === 'speed')}${slot.showUnit === false ? '' : ` ${unit}`}. ${t('flights.telemetryChangeMetric')}`}
+              aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${slot.valuePrefix ?? ''}${formatTelemetryValue(value, '—', metric === 'speed')}${slot.showUnit === false ? '' : ` ${unit}`}${isInteractive ? `. ${t('flights.telemetryChangeMetric')}` : ''}`}
             >
               {slot.variant && slot.variant !== 'value' ? (
                 <TelemetrySpeedometer
@@ -272,23 +280,28 @@ export function FlightTelemetryOverlay({
                   showUnit={slot.showUnit !== false}
                   valuePrefix={slot.valuePrefix}
                   variant={slot.variant}
+                  accelerationX={point?.acceleration_x_g}
+                  accelerationY={point?.acceleration_y_g}
+                  accelerationZ={point?.acceleration_z_g}
                 />
               ) : null}
-              <span
-                className="mt-0.5 block font-mono font-bold leading-none"
-                style={{ fontSize: '1em' }}
-              >
-                {slot.valuePrefix ?? ''}
-                {formatTelemetryValue(value, '—', metric === 'speed')}
-                {slot.showUnit !== false && (
-                  <span
-                    className="ml-1 font-normal text-slate-300"
-                    style={{ fontSize: '0.45em' }}
-                  >
-                    {unit}
-                  </span>
-                )}
-              </span>
+              {slot.variant !== 'force_rose' ? (
+                <span
+                  className="mt-0.5 block font-mono font-bold leading-none"
+                  style={{ fontSize: '1em' }}
+                >
+                  {slot.valuePrefix ?? ''}
+                  {formatTelemetryValue(value, '—', metric === 'speed')}
+                  {slot.showUnit !== false && (
+                    <span
+                      className="ml-1 font-normal text-slate-300"
+                      style={{ fontSize: '0.45em' }}
+                    >
+                      {unit}
+                    </span>
+                  )}
+                </span>
+              ) : null}
             </button>
           );
         })}

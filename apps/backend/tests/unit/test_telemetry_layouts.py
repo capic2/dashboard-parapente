@@ -148,15 +148,35 @@ def test_layout_accepts_graphical_widget_variant() -> None:
 
 
 @pytest.mark.parametrize(
-    "variant",
-    ["arc", "radial", "digital", "compass", "bar", "chart", "asi"],
+    ("variant", "metric"),
+    [
+        ("arc", "speed"),
+        ("radial", "speed"),
+        ("digital", "speed"),
+        ("compass", "speed"),
+        ("bar", "speed"),
+        ("chart", "speed"),
+        ("asi", "speed"),
+        ("force_rose", "g_force"),
+    ],
 )
-def test_layout_accepts_additional_gauge_variants(variant: str) -> None:
+def test_layout_accepts_additional_gauge_variants(variant: str, metric: str) -> None:
     xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
-        'metric="speed"', f'metric="speed" variant="{variant}"', 1
+        'metric="speed"', f'metric="{metric}" variant="{variant}"', 1
     )
 
-    assert f'variant="{variant}"' in validate_telemetry_layout_xml(xml)
+    validated = validate_telemetry_layout_xml(xml)
+    assert f'variant="{variant}"' in validated
+    assert f'metric="{metric}"' in validated
+
+
+def test_layout_rejects_force_rose_with_non_g_force_metric() -> None:
+    xml = DEFAULT_TELEMETRY_LAYOUT_XML.replace(
+        'metric="speed"', 'metric="altitude" variant="force_rose"', 1
+    )
+
+    with pytest.raises(ValueError, match="force rose must use the g_force metric"):
+        validate_telemetry_layout_xml(xml)
 
 
 def test_layout_accepts_widget_value_alignment() -> None:
