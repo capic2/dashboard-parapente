@@ -32,6 +32,25 @@ function maximumForMetric(metric: MetricKey) {
   return 100;
 }
 
+export function getForceRoseAccessibleLabel(
+  accelerationX?: number | null,
+  accelerationY?: number | null,
+  accelerationZ?: number | null,
+  forceValue?: number | string | null
+) {
+  const formatAxis = (value?: number | null) =>
+    typeof value === 'number' && Number.isFinite(value)
+      ? `${value.toFixed(2)} G`
+      : '—';
+  const total =
+    typeof forceValue === 'number' && Number.isFinite(forceValue)
+      ? `${forceValue.toFixed(2)} G`
+      : typeof forceValue === 'string' && forceValue.trim()
+        ? `${forceValue} G`
+        : '—';
+  return `Rose des forces. Force totale : ${total}. Axe X : ${formatAxis(accelerationX)}, axe Y : ${formatAxis(accelerationY)}, axe Z : ${formatAxis(accelerationZ)}.`;
+}
+
 export function TelemetrySpeedometer({
   metric,
   value,
@@ -39,6 +58,9 @@ export function TelemetrySpeedometer({
   showUnit = true,
   valuePrefix = '',
   variant = 'speedometer',
+  accelerationX,
+  accelerationY,
+  accelerationZ,
 }: {
   metric: MetricKey;
   value: number | string | null | undefined;
@@ -46,6 +68,9 @@ export function TelemetrySpeedometer({
   showUnit?: boolean;
   valuePrefix?: string;
   variant?: TelemetryWidgetVariant;
+  accelerationX?: number | null;
+  accelerationY?: number | null;
+  accelerationZ?: number | null;
 }) {
   const maximum = maximumForMetric(metric);
   const numericValue =
@@ -66,6 +91,129 @@ export function TelemetrySpeedometer({
       y: point.y,
     };
   });
+
+  if (variant === 'force_rose') {
+    const x = typeof accelerationX === 'number' ? accelerationX : null;
+    const y = typeof accelerationY === 'number' ? accelerationY : null;
+    const hasAxes =
+      x != null && y != null && Number.isFinite(x) && Number.isFinite(y);
+    const vectorMagnitude = hasAxes ? Math.hypot(x, y) : 0;
+    const scale = vectorMagnitude > 3 ? 3 / vectorMagnitude : 1;
+    const markerX = 50 + (hasAxes ? (x ?? 0) * scale * (34 / 3) : 0);
+    const markerY = 50 - (hasAxes ? (y ?? 0) * scale * (34 / 3) : 0);
+    return (
+      <div className="relative h-full w-full min-h-0 min-w-0 text-white">
+        <svg
+          viewBox="0 0 100 100"
+          className="absolute inset-0 h-full w-full"
+          aria-hidden="true"
+        >
+          <circle
+            cx="50"
+            cy="50"
+            r="43"
+            fill="rgba(2,6,23,.82)"
+            stroke="rgba(255,255,255,.28)"
+          />
+          {[1, 2, 3].map((g) => (
+            <g key={g}>
+              <circle
+                cx="50"
+                cy="50"
+                r={(34 * g) / 3}
+                fill="none"
+                stroke={
+                  g === 3 ? 'rgba(255,255,255,.4)' : 'rgba(255,255,255,.2)'
+                }
+                strokeWidth="0.8"
+              />
+              <text
+                x="52"
+                y={50 - (34 * g) / 3 + 3}
+                fill="#cbd5e1"
+                fontSize="5"
+              >
+                {g}G
+              </text>
+            </g>
+          ))}
+          <line
+            x1="16"
+            y1="50"
+            x2="84"
+            y2="50"
+            stroke="rgba(255,255,255,.28)"
+            strokeWidth="0.7"
+          />
+          <line
+            x1="50"
+            y1="16"
+            x2="50"
+            y2="84"
+            stroke="rgba(255,255,255,.28)"
+            strokeWidth="0.7"
+          />
+          <text x="88" y="52" textAnchor="middle" fill="#cbd5e1" fontSize="7">
+            +X
+          </text>
+          <text x="12" y="52" textAnchor="middle" fill="#cbd5e1" fontSize="7">
+            −X
+          </text>
+          <text x="50" y="12" textAnchor="middle" fill="#cbd5e1" fontSize="7">
+            +Y
+          </text>
+          <text x="50" y="92" textAnchor="middle" fill="#cbd5e1" fontSize="7">
+            −Y
+          </text>
+          <text
+            x="50"
+            y="8"
+            textAnchor="middle"
+            fill="#cbd5e1"
+            fontSize="6"
+            fontFamily="monospace"
+          >
+            Z{' '}
+            {accelerationZ != null && Number.isFinite(accelerationZ)
+              ? `${accelerationZ >= 0 ? '+' : ''}${accelerationZ.toFixed(2)} G`
+              : '—'}
+          </text>
+          {hasAxes ? (
+            <>
+              <line
+                x1="50"
+                y1="50"
+                x2={markerX}
+                y2={markerY}
+                stroke="#67e8f9"
+                strokeWidth="1.8"
+              />
+              <circle
+                cx={markerX}
+                cy={markerY}
+                r="3.5"
+                fill="#f43f5e"
+                stroke="#fff"
+                strokeWidth="1"
+              />
+            </>
+          ) : null}
+          <text
+            x="50"
+            y="98"
+            textAnchor="middle"
+            fill="#f8fafc"
+            fontSize="8"
+            fontWeight="700"
+            fontFamily="monospace"
+          >
+            {valueLabel}
+            {showUnit ? ` ${unit}` : ''}
+          </text>
+        </svg>
+      </div>
+    );
+  }
 
   if (variant === 'digital') {
     return (

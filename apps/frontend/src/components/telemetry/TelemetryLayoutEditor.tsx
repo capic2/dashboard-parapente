@@ -65,6 +65,7 @@ import {
   TELEMETRY_PIP_VIDEO_SOURCES,
   TELEMETRY_CANVAS_HEIGHT,
   TELEMETRY_CANVAS_WIDTH,
+  getTelemetryLayoutInsertionPosition,
   type FlightTelemetryIconLayout,
   type FlightTelemetryLayoutItem,
   type FlightTelemetryPipLayout,
@@ -75,7 +76,10 @@ import {
   type TelemetryWidgetVariant,
 } from '../flights/details/flightTelemetryLayout';
 import { TelemetryLayoutIcon } from './TelemetryLayoutIcon';
-import { TelemetrySpeedometer } from './TelemetrySpeedometer';
+import {
+  getForceRoseAccessibleLabel,
+  TelemetrySpeedometer,
+} from './TelemetrySpeedometer';
 import {
   METRIC_KEYS as METRICS,
   METRIC_LABELS,
@@ -548,15 +552,18 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           (widget) => widget.type !== 'widget' || widget.metric !== candidate
         )
       ) ?? METRICS[0];
-    const column = layout.length % 4;
-    const row = Math.floor(layout.length / 4);
+    const { x, y } = getTelemetryLayoutInsertionPosition(
+      layout.length,
+      307.2,
+      108
+    );
     const widget: FlightTelemetryLayoutItem = {
       id,
       type: 'widget',
       name: metric,
       metric,
-      x: 38.4 + column * 460.8,
-      y: 21.6 + row * 216,
+      x,
+      y,
       width: 307.2,
       height: 108,
       visible: true,
@@ -567,15 +574,18 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
 
   const addIcon = () => {
     const id = `icon-${Date.now()}-${widgetIdCounter.current++}`;
-    const column = layout.length % 4;
-    const row = Math.floor(layout.length / 4);
+    const { x, y } = getTelemetryLayoutInsertionPosition(
+      layout.length,
+      192,
+      108
+    );
     const icon: FlightTelemetryIconLayout = {
       id,
       name: 'Gauge',
       type: 'icon',
       icon: 'gauge',
-      x: 38.4 + column * 460.8,
-      y: 21.6 + row * 216,
+      x,
+      y,
       width: 192,
       height: 108,
       visible: true,
@@ -588,16 +598,24 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     variant: Exclude<TelemetryWidgetVariant, 'value'>
   ) => {
     const id = `${variant}-${Date.now()}-${widgetIdCounter.current++}`;
-    const column = layout.length % 4;
-    const row = Math.floor(layout.length / 4);
+    const { x, y } = getTelemetryLayoutInsertionPosition(
+      layout.length,
+      345.6,
+      194.4
+    );
     const widget: FlightTelemetryLayoutItem = {
       id,
       type: 'widget',
       name: variant,
-      metric: variant === 'compass' ? 'heading' : 'speed',
+      metric:
+        variant === 'compass'
+          ? 'heading'
+          : variant === 'force_rose'
+            ? 'g_force'
+            : 'speed',
       variant,
-      x: 38.4 + column * 460.8,
-      y: 21.6 + row * 216,
+      x,
+      y,
       width: 345.6,
       height: 194.4,
       visible: true,
@@ -610,15 +628,18 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
 
   const addText = () => {
     const id = `text-${Date.now()}-${widgetIdCounter.current++}`;
-    const column = layout.length % 4;
-    const row = Math.floor(layout.length / 4);
+    const { x, y } = getTelemetryLayoutInsertionPosition(
+      layout.length,
+      384,
+      86.4
+    );
     const text: FlightTelemetryTextLayout = {
       id,
       type: 'text',
       name: 'Text',
       content: 'Votre texte',
-      x: 38.4 + column * 460.8,
-      y: 21.6 + row * 216,
+      x,
+      y,
       width: 384,
       height: 86.4,
       visible: true,
@@ -1370,18 +1391,18 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                   <Gauge className="h-4 w-4" />
                   {t('telemetryLayout.addSpeedometer')}
                 </MenuItem>
-                {(['compass', 'bar', 'chart', 'asi'] as const).map(
-                  (variant) => (
-                    <MenuItem
-                      key={variant}
-                      onAction={() => addGraphicalWidget(variant)}
-                      className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none hover:bg-slate-100 focus:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100 dark:hover:bg-slate-700 dark:focus:bg-slate-700"
-                    >
-                      <Gauge className="h-4 w-4" />
-                      {t(`telemetryLayout.widgetModels.${variant}`)}
-                    </MenuItem>
-                  )
-                )}
+                {(
+                  ['compass', 'bar', 'chart', 'asi', 'force_rose'] as const
+                ).map((variant) => (
+                  <MenuItem
+                    key={variant}
+                    onAction={() => addGraphicalWidget(variant)}
+                    className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none hover:bg-slate-100 focus:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100 dark:hover:bg-slate-700 dark:focus:bg-slate-700"
+                  >
+                    <Gauge className="h-4 w-4" />
+                    {t(`telemetryLayout.widgetModels.${variant}`)}
+                  </MenuItem>
+                ))}
                 <MenuItem
                   isDisabled
                   className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
@@ -1653,6 +1674,9 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                         showUnit={item.showUnit !== false}
                         valuePrefix={item.valuePrefix}
                         variant={item.variant}
+                        accelerationX={previewPoint?.acceleration_x_g}
+                        accelerationY={previewPoint?.acceleration_y_g}
+                        accelerationZ={previewPoint?.acceleration_z_g}
                       />
                     );
                   } else {
@@ -1688,6 +1712,16 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                     <button
                       type="button"
                       key={item.id}
+                      aria-label={
+                        item.type === 'widget' && item.variant === 'force_rose'
+                          ? getForceRoseAccessibleLabel(
+                              previewPoint?.acceleration_x_g,
+                              previewPoint?.acceleration_y_g,
+                              previewPoint?.acceleration_z_g,
+                              value
+                            )
+                          : undefined
+                      }
                       onPointerDown={(event) => beginDrag(event, item, 'move')}
                       onKeyDown={(event) => {
                         const stepX =
@@ -2315,7 +2349,10 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                           })
                         }
                       >
-                        {METRICS.map((metric) => (
+                        {(selected.variant === 'force_rose'
+                          ? (['g_force'] as const)
+                          : METRICS
+                        ).map((metric) => (
                           <option key={metric} value={metric}>
                             {t(`flights.${METRIC_LABELS[metric]}`)}
                           </option>
@@ -2355,6 +2392,13 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                           updateItem(selected.id, {
                             variant: event.target
                               .value as TelemetryWidgetVariant,
+                            ...(event.target.value === 'force_rose'
+                              ? {
+                                  metric: 'g_force' as const,
+                                  clickAction: 'none' as const,
+                                  longPressAction: 'none' as const,
+                                }
+                              : {}),
                           })
                         }
                       >
@@ -2369,6 +2413,7 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                             'bar',
                             'chart',
                             'asi',
+                            'force_rose',
                           ] as const
                         ).map((variant) => (
                           <option key={variant} value={variant}>
@@ -2518,7 +2563,12 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       </span>
                       <select
                         className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                        value={selected.clickAction ?? 'cycle_metric'}
+                        disabled={selected.variant === 'force_rose'}
+                        value={
+                          selected.variant === 'force_rose'
+                            ? 'none'
+                            : (selected.clickAction ?? 'cycle_metric')
+                        }
                         onChange={(event) =>
                           updateItem(selected.id, {
                             clickAction: event.target.value as
@@ -2541,7 +2591,12 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                       </span>
                       <select
                         className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                        value={selected.longPressAction ?? 'none'}
+                        disabled={selected.variant === 'force_rose'}
+                        value={
+                          selected.variant === 'force_rose'
+                            ? 'none'
+                            : (selected.longPressAction ?? 'none')
+                        }
                         onChange={(event) =>
                           updateItem(selected.id, {
                             longPressAction: event.target.value as

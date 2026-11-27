@@ -1553,6 +1553,7 @@
     "telemetryHeading": "Cap",
     "telemetryHeartRate": "Fréquence cardiaque",
     "telemetryPower": "Puissance",
+    "telemetryGForce": "Force G",
     "telemetryAltitudeMin": "Altitude min.",
     "telemetryAltitudeMax": "Altitude max.",
     "telemetryStartAltitude": "Altitude de départ",
@@ -2178,7 +2179,8 @@
       "compass": "Compas",
       "bar": "Barre de progression",
       "chart": "Courbe historique",
-      "asi": "Indicateur de vitesse"
+      "asi": "Indicateur de vitesse",
+      "force_rose": "Rose des forces"
     },
     "zoomIn": "Augmenter le zoom",
     "zoomOut": "Réduire le zoom",

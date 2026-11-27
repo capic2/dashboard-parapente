@@ -20,6 +20,10 @@ class TrackPoint(TypedDict, total=False):
     heading_deg: float
     distance_km: float
     altitude_relative_m: float
+    acceleration_x_g: float
+    acceleration_y_g: float
+    acceleration_z_g: float
+    g_force: float
     segment: int
 
 
@@ -91,6 +95,14 @@ def _child_text_any(element: ET.Element, names: tuple[str, ...]) -> str | None:
         value = _child_text(element, name)
         if value is not None:
             return value
+    return None
+
+
+def _child_text_any_case_insensitive(element: ET.Element, names: tuple[str, ...]) -> str | None:
+    accepted_names = {name.lower() for name in names}
+    for child in element.iter():
+        if _local_name(child).lower() in accepted_names and child.text:
+            return child.text
     return None
 
 
@@ -193,6 +205,51 @@ def _parse_gpx(content: bytes) -> list[TrackPoint]:
             heading = _child_text_any(element, ("heading", "course", "track"))
             if heading:
                 point["heading_deg"] = float(heading)
+            acceleration = next(
+                (
+                    child
+                    for child in element.iter()
+                    if _local_name(child).lower() in {"acceleration", "accelerometer"}
+                ),
+                None,
+            )
+            if acceleration is not None:
+                axis_values: dict[str, float] = {}
+                for axis, names in {
+                    "x": ("x", "accelerometerx", "accelerationx"),
+                    "y": ("y", "accelerometery", "accelerationy"),
+                    "z": ("z", "accelerometerz", "accelerationz"),
+                }.items():
+                    raw_value = _child_text_any_case_insensitive(acceleration, names)
+                    if raw_value is not None:
+                        try:
+                            value = float(raw_value)
+                        except ValueError:
+                            continue
+                        if math.isfinite(value):
+                            axis_values[axis] = value
+            else:
+                axis_values = {}
+                for axis, names in {
+                    "x": ("accel_x", "acceleration_x", "accelerometerx", "accelerationx"),
+                    "y": ("accel_y", "acceleration_y", "accelerometery", "accelerationy"),
+                    "z": ("accel_z", "acceleration_z", "accelerometerz", "accelerationz"),
+                }.items():
+                    raw_value = _child_text_any_case_insensitive(element, names)
+                    if raw_value is not None:
+                        try:
+                            value = float(raw_value)
+                        except ValueError:
+                            continue
+                        if math.isfinite(value):
+                            axis_values[axis] = value
+            if len(axis_values) == 3:
+                g_force = math.hypot(*axis_values.values())
+                if math.isfinite(g_force):
+                    point["acceleration_x_g"] = axis_values["x"]
+                    point["acceleration_y_g"] = axis_values["y"]
+                    point["acceleration_z_g"] = axis_values["z"]
+                    point["g_force"] = g_force
             _append_point(points, point)
     return points
 

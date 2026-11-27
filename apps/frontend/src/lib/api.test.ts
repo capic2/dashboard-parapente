@@ -64,4 +64,25 @@ describe('getApiErrorMessage', () => {
       })
     ).resolves.toBe('Video is outside flight storage');
   });
+
+  it('shows FastAPI validation details when the API returns an error list', async () => {
+    const error = Object.assign(new Error('Unprocessable Content'), {
+      response: new Response(
+        JSON.stringify({
+          detail: [
+            {
+              loc: ['body', 'xml_content'],
+              msg: 'Field required',
+              type: 'missing',
+            },
+          ],
+        }),
+        { status: 422, headers: { 'Content-Type': 'application/json' } }
+      ),
+    });
+
+    await expect(
+      getApiErrorMessage(error, 'Error saving the layout')
+    ).resolves.toBe('body.xml_content: Field required');
+  });
 });

@@ -5,6 +5,11 @@ type ApiErrorPayload = {
   detail?: unknown;
 };
 
+type ApiValidationError = {
+  loc?: unknown;
+  msg?: unknown;
+};
+
 type ApiErrorStatusMessage = {
   message: string;
   details: readonly string[];
@@ -104,6 +109,25 @@ export async function getApiErrorMessage(
         return statusMessage.message;
       }
       return payload.detail;
+    }
+    if (Array.isArray(payload.detail)) {
+      const details = payload.detail
+        .map((detail: ApiValidationError) => {
+          if (typeof detail?.msg !== 'string' || !detail.msg.trim()) {
+            return undefined;
+          }
+          const location = Array.isArray(detail.loc)
+            ? detail.loc
+                .filter(
+                  (part): part is string | number =>
+                    typeof part === 'string' || typeof part === 'number'
+                )
+                .join('.')
+            : '';
+          return location ? `${location}: ${detail.msg}` : detail.msg;
+        })
+        .filter((detail): detail is string => Boolean(detail));
+      if (details.length) return details.join('; ');
     }
   } catch {
     // Keep the fallback and HTTP status when the response is not JSON.
