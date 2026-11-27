@@ -33,6 +33,48 @@ const telemetry: FlightTelemetryData = {
 };
 
 describe('FlightTelemetryOverlay', () => {
+  it('renders the force rose configured in the dynamic overlay layout', () => {
+    const forceTelemetry: FlightTelemetryData = {
+      ...telemetry,
+      points: [
+        {
+          ...telemetry.points[0],
+          g_force: 1.23,
+          acceleration_x_g: 0.25,
+          acceleration_y_g: -1,
+          acceleration_z_g: 1.1,
+        },
+      ],
+    };
+    const { container } = render(
+      <FlightTelemetryOverlay
+        data={forceTelemetry}
+        videoTimeSeconds={0}
+        offsetSeconds={0}
+        layout={[
+          {
+            id: 'force-rose',
+            type: 'widget',
+            metric: 'g_force',
+            variant: 'force_rose',
+            x: 0,
+            y: 0,
+            width: 384,
+            height: 216,
+            visible: true,
+          },
+        ]}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: /Force totale : 1\.23 G/u })
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('svg[viewBox="0 0 100 100"]')
+    ).toBeInTheDocument();
+  });
+
   it('renders every configured widget with the interpolated values', () => {
     render(
       <FlightTelemetryOverlay
