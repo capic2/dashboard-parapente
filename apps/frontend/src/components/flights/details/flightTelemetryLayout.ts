@@ -52,6 +52,19 @@ export type TelemetryLayout = FlightTelemetryLayoutItem[] & {
 export const TELEMETRY_CANVAS_WIDTH = 1920;
 export const TELEMETRY_CANVAS_HEIGHT = 1080;
 
+export function getTelemetryLayoutInsertionPosition(
+  index: number,
+  width: number,
+  height: number
+) {
+  const column = index % 4;
+  const row = Math.floor(index / 4);
+  return {
+    x: Math.min(38.4 + column * 460.8, TELEMETRY_CANVAS_WIDTH - width),
+    y: Math.min(21.6 + row * 216, TELEMETRY_CANVAS_HEIGHT - height),
+  };
+}
+
 export type TelemetryIconName =
   | 'mountain'
   | 'wind'

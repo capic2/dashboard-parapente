@@ -19,7 +19,10 @@ import {
   type MetricKey,
 } from './telemetryMetrics';
 import { TelemetryLayoutIcon } from '../../telemetry/TelemetryLayoutIcon';
-import { TelemetrySpeedometer } from '../../telemetry/TelemetrySpeedometer';
+import {
+  getForceRoseAccessibleLabel,
+  TelemetrySpeedometer,
+} from '../../telemetry/TelemetrySpeedometer';
 
 const CYCLE_METRICS: MetricKey[] = [
   'altitude',
@@ -270,7 +273,16 @@ export function FlightTelemetryOverlay({
                 }
                 if (hasClickAction) cycleMetric();
               }}
-              aria-label={`${t(`flights.${METRIC_LABELS[metric]}`)} ${slot.valuePrefix ?? ''}${formatTelemetryValue(value, '—', metric === 'speed')}${slot.showUnit === false ? '' : ` ${unit}`}${isInteractive ? `. ${t('flights.telemetryChangeMetric')}` : ''}`}
+              aria-label={
+                slot.variant === 'force_rose'
+                  ? getForceRoseAccessibleLabel(
+                      point?.acceleration_x_g,
+                      point?.acceleration_y_g,
+                      point?.acceleration_z_g,
+                      value
+                    )
+                  : `${t(`flights.${METRIC_LABELS[metric]}`)} ${slot.valuePrefix ?? ''}${formatTelemetryValue(value, '—', metric === 'speed')}${slot.showUnit === false ? '' : ` ${unit}`}${isInteractive ? `. ${t('flights.telemetryChangeMetric')}` : ''}`
+              }
             >
               {slot.variant && slot.variant !== 'value' ? (
                 <TelemetrySpeedometer

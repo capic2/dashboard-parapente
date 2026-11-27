@@ -32,6 +32,25 @@ function maximumForMetric(metric: MetricKey) {
   return 100;
 }
 
+export function getForceRoseAccessibleLabel(
+  accelerationX?: number | null,
+  accelerationY?: number | null,
+  accelerationZ?: number | null,
+  forceValue?: number | string | null
+) {
+  const formatAxis = (value?: number | null) =>
+    typeof value === 'number' && Number.isFinite(value)
+      ? `${value.toFixed(2)} G`
+      : '—';
+  const total =
+    typeof forceValue === 'number' && Number.isFinite(forceValue)
+      ? `${forceValue.toFixed(2)} G`
+      : typeof forceValue === 'string' && forceValue.trim()
+        ? `${forceValue} G`
+        : '—';
+  return `Rose des forces. Force totale : ${total}. Axe X : ${formatAxis(accelerationX)}, axe Y : ${formatAxis(accelerationY)}, axe Z : ${formatAxis(accelerationZ)}.`;
+}
+
 export function TelemetrySpeedometer({
   metric,
   value,

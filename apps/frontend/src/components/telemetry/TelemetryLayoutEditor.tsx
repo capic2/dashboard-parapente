@@ -65,6 +65,7 @@ import {
   TELEMETRY_PIP_VIDEO_SOURCES,
   TELEMETRY_CANVAS_HEIGHT,
   TELEMETRY_CANVAS_WIDTH,
+  getTelemetryLayoutInsertionPosition,
   type FlightTelemetryIconLayout,
   type FlightTelemetryLayoutItem,
   type FlightTelemetryPipLayout,
@@ -75,7 +76,10 @@ import {
   type TelemetryWidgetVariant,
 } from '../flights/details/flightTelemetryLayout';
 import { TelemetryLayoutIcon } from './TelemetryLayoutIcon';
-import { TelemetrySpeedometer } from './TelemetrySpeedometer';
+import {
+  getForceRoseAccessibleLabel,
+  TelemetrySpeedometer,
+} from './TelemetrySpeedometer';
 import {
   METRIC_KEYS as METRICS,
   METRIC_LABELS,
@@ -548,15 +552,18 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
           (widget) => widget.type !== 'widget' || widget.metric !== candidate
         )
       ) ?? METRICS[0];
-    const column = layout.length % 4;
-    const row = Math.floor(layout.length / 4);
+    const { x, y } = getTelemetryLayoutInsertionPosition(
+      layout.length,
+      307.2,
+      108
+    );
     const widget: FlightTelemetryLayoutItem = {
       id,
       type: 'widget',
       name: metric,
       metric,
-      x: 38.4 + column * 460.8,
-      y: 21.6 + row * 216,
+      x,
+      y,
       width: 307.2,
       height: 108,
       visible: true,
@@ -567,15 +574,18 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
 
   const addIcon = () => {
     const id = `icon-${Date.now()}-${widgetIdCounter.current++}`;
-    const column = layout.length % 4;
-    const row = Math.floor(layout.length / 4);
+    const { x, y } = getTelemetryLayoutInsertionPosition(
+      layout.length,
+      192,
+      108
+    );
     const icon: FlightTelemetryIconLayout = {
       id,
       name: 'Gauge',
       type: 'icon',
       icon: 'gauge',
-      x: 38.4 + column * 460.8,
-      y: 21.6 + row * 216,
+      x,
+      y,
       width: 192,
       height: 108,
       visible: true,
@@ -588,8 +598,11 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
     variant: Exclude<TelemetryWidgetVariant, 'value'>
   ) => {
     const id = `${variant}-${Date.now()}-${widgetIdCounter.current++}`;
-    const column = layout.length % 4;
-    const row = Math.floor(layout.length / 4);
+    const { x, y } = getTelemetryLayoutInsertionPosition(
+      layout.length,
+      345.6,
+      194.4
+    );
     const widget: FlightTelemetryLayoutItem = {
       id,
       type: 'widget',
@@ -601,8 +614,8 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
             ? 'g_force'
             : 'speed',
       variant,
-      x: 38.4 + column * 460.8,
-      y: 21.6 + row * 216,
+      x,
+      y,
       width: 345.6,
       height: 194.4,
       visible: true,
@@ -615,15 +628,18 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
 
   const addText = () => {
     const id = `text-${Date.now()}-${widgetIdCounter.current++}`;
-    const column = layout.length % 4;
-    const row = Math.floor(layout.length / 4);
+    const { x, y } = getTelemetryLayoutInsertionPosition(
+      layout.length,
+      384,
+      86.4
+    );
     const text: FlightTelemetryTextLayout = {
       id,
       type: 'text',
       name: 'Text',
       content: 'Votre texte',
-      x: 38.4 + column * 460.8,
-      y: 21.6 + row * 216,
+      x,
+      y,
       width: 384,
       height: 86.4,
       visible: true,
@@ -1696,6 +1712,16 @@ export function TelemetryLayoutEditor({ flightId }: { flightId?: string }) {
                     <button
                       type="button"
                       key={item.id}
+                      aria-label={
+                        item.type === 'widget' && item.variant === 'force_rose'
+                          ? getForceRoseAccessibleLabel(
+                              previewPoint?.acceleration_x_g,
+                              previewPoint?.acceleration_y_g,
+                              previewPoint?.acceleration_z_g,
+                              value
+                            )
+                          : undefined
+                      }
                       onPointerDown={(event) => beginDrag(event, item, 'move')}
                       onKeyDown={(event) => {
                         const stepX =

@@ -3,7 +3,10 @@ import {
   DEFAULT_FLIGHT_TELEMETRY_LAYOUT,
   DEFAULT_TELEMETRY_PIP_VIDEO_SOURCE,
   TELEMETRY_PIP_VIDEO_SOURCES,
+  TELEMETRY_CANVAS_HEIGHT,
+  TELEMETRY_CANVAS_WIDTH,
   alignTelemetryLayoutItems,
+  getTelemetryLayoutInsertionPosition,
   groupTelemetryLayoutSelection,
   getYoutubeVideoRoleFromTitle,
   parseTelemetryLayoutXml,
@@ -14,6 +17,17 @@ import { getTelemetryMetricValue } from './telemetryMetrics';
 import type { FlightTelemetryData } from '../../../hooks/flights/useFlightTelemetry';
 
 describe('flight telemetry layout XML', () => {
+  it('keeps newly added elements inside the canvas for large layouts', () => {
+    for (const index of [20, 24, 40, 100]) {
+      const { x, y } = getTelemetryLayoutInsertionPosition(index, 345.6, 194.4);
+
+      expect(x).toBeGreaterThanOrEqual(0);
+      expect(y).toBeGreaterThanOrEqual(0);
+      expect(x + 345.6).toBeLessThanOrEqual(TELEMETRY_CANVAS_WIDTH);
+      expect(y + 194.4).toBeLessThanOrEqual(TELEMETRY_CANVAS_HEIGHT);
+    }
+  });
+
   it('round-trips pixel widget positions and metrics', () => {
     const layout: FlightTelemetryWidgetLayout[] =
       DEFAULT_FLIGHT_TELEMETRY_LAYOUT.map((widget, index) => ({
