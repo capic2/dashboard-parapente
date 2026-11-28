@@ -915,28 +915,6 @@ export function GoproOverlaySyncPreview({
               : 'flights.goproOverlayAlignGpxEnd'
           )}
         </button>
-        {preview.data?.gpx.has_osv && enrichmentStatus === 'ready' && (
-          <div className="space-y-2 border-t border-gray-200 pt-3 dark:border-gray-700">
-            <button
-              type="button"
-              disabled={generateMerge.isPending}
-              onClick={() => void generateMerge.mutateAsync(true)}
-              className="min-h-10 w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
-            >
-              {generateMerge.isPending
-                ? t('flights.goproOverlayMergeGenerating')
-                : t('flights.goproOverlayMergeRegenerate')}
-            </button>
-            {generateMerge.isError && (
-              <p
-                role="alert"
-                className="text-xs text-red-600 dark:text-red-300"
-              >
-                {t('flights.goproOverlayPreviewError')}
-              </p>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );
