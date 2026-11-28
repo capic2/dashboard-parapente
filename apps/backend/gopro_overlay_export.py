@@ -412,6 +412,7 @@ def ensure_enriched_gpx(
     *,
     video_duration: float | None = None,
     first_gpx_at: float | None = None,
+    force: bool = False,
     progress_callback: Callable[[int], None] | None = None,
     cancellation_check: Callable[[], bool] | None = None,
 ) -> Path:
@@ -460,7 +461,7 @@ def ensure_enriched_gpx(
                 else:
                     legacy_metadata_path.unlink(missing_ok=True)
 
-            if merged_gpx_path.is_file() and metadata_path.is_file():
+            if not force and merged_gpx_path.is_file() and metadata_path.is_file():
                 try:
                     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
                 except (OSError, json.JSONDecodeError):

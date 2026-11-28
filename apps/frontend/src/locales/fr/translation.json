@@ -1513,6 +1513,7 @@
     "goproOverlayMergeRequired": "Fusionnez d’abord le GPX avec les données OSV pour lancer la prévisualisation.",
     "goproOverlayMergeGenerating": "Fusion en cours…",
     "goproOverlayMergeGenerate": "Générer le GPX fusionné",
+    "goproOverlayMergeRegenerate": "Régénérer le GPX enrichi",
     "goproOverlayGeneratingInteractive": "Génération de l’overlay en cours…",
     "goproOverlayInteractiveUnavailable": "L’overlay interactif n’est pas disponible.",
     "goproOverlayCameraPreview": "Prévisualisation de la vidéo GoPro",
