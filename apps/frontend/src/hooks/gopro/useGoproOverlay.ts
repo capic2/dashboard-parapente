@@ -31,6 +31,7 @@ export type GoproOverlayPreview = {
     enrichment_status?: 'missing' | 'pending' | 'ready' | 'failed';
     enrichment_progress?: number | null;
     enrichment_error?: string | null;
+    has_osv?: boolean;
   };
   alignment: {
     automatic_offset_seconds: number;
@@ -114,9 +115,11 @@ export function useGenerateGoproPreview(flightId: string) {
 export function useGenerateGoproMerge(flightId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () =>
+    mutationFn: (force: boolean | undefined) =>
       api
-        .post(`flights/${flightId}/gopro-overlay/merge`)
+        .post(`flights/${flightId}/gopro-overlay/merge`, {
+          ...(force ? { searchParams: { force: 'true' } } : {}),
+        })
         .json<{ status: 'missing' | 'pending' | 'ready' }>(),
     onSuccess: () =>
       Promise.all([

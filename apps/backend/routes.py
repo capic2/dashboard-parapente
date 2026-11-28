@@ -8466,6 +8466,7 @@ def _prepare_enriched_gpx_in_background(
     *,
     video_duration: float | None = None,
     first_gpx_at: float | None = None,
+    force: bool = False,
     flight_id: str | None = None,
     operation_id: str | None = None,
 ) -> None:
@@ -8511,6 +8512,7 @@ def _prepare_enriched_gpx_in_background(
             input_dir,
             video_duration=video_duration,
             first_gpx_at=first_gpx_at,
+            force=force,
             progress_callback=report_progress,
             cancellation_check=cancellation_requested,
         )
@@ -8726,11 +8728,6 @@ def _enriched_gpx_error_path(input_dir: Path) -> Path:
 
 
 def _enriched_gpx_status(input_dir: Path, source_path: Path | None = None) -> str:
-    cached_path = enriched_gpx_path(input_dir)
-    if cached_path.is_file() and (
-        source_path is None or enriched_gpx_matches_source(cached_path, source_path)
-    ):
-        return "ready"
     lock_path = input_dir / "merged-gopro-overlay.lock"
     try:
         with lock_path.open("a+") as lock_file:
@@ -8747,6 +8744,11 @@ def _enriched_gpx_status(input_dir: Path, source_path: Path | None = None) -> st
         return "missing"
     if _enriched_gpx_error_path(input_dir).is_file():
         return "failed"
+    cached_path = enriched_gpx_path(input_dir)
+    if cached_path.is_file() and (
+        source_path is None or enriched_gpx_matches_source(cached_path, source_path)
+    ):
+        return "ready"
     return "missing"
 
 
@@ -9117,6 +9119,7 @@ async def create_flight_overlay_layer(
 def start_flight_gopro_overlay_merge(
     flight_id: str,
     background_tasks: BackgroundTasks,
+    force: bool = Query(False),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> GoproOverlayEnrichmentResponse:
@@ -9132,9 +9135,12 @@ def start_flight_gopro_overlay_merge(
 
     status = _enriched_gpx_status(camera_path.parent, source_gpx_path)
     if status == "failed":
+        # A failed forced regeneration can leave the previous valid cache in
+        # place. The retry action must bypass that cache as well.
+        force = True
         _clear_enriched_gpx_error(camera_path.parent)
         status = "missing"
-    if status == "ready":
+    if status == "ready" and not force:
         _persist_enriched_gpx_for_flight(
             flight_id,
             source_gpx_path,
@@ -9161,6 +9167,7 @@ def start_flight_gopro_overlay_merge(
         camera_path.parent,
         video_duration=video_duration,
         first_gpx_at=_first_gpx_at_for_camera_timeline(gpx_start, aligned_video_start, 0.0),
+        force=force,
         flight_id=flight_id,
         operation_id=operation_id,
     )
@@ -9301,6 +9308,7 @@ def get_flight_gopro_overlay_preview(
             "enrichment_error": (
                 "Unable to generate enriched GPX" if enrichment_status == "failed" else None
             ),
+            "has_osv": bool(osv_paths),
         },
         alignment={
             "automatic_offset_seconds": automatic_offset,

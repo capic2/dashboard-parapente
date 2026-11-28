@@ -226,6 +226,7 @@ class GoproOverlayPreviewGpx(BaseModel):
     enrichment_status: Literal["missing", "pending", "ready", "failed"]
     enrichment_progress: int | None = None
     enrichment_error: str | None = None
+    has_osv: bool = False
 
 
 class GoproOverlayPreviewAlignment(BaseModel):
