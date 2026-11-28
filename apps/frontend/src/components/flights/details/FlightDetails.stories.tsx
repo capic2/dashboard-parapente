@@ -6,6 +6,7 @@ import { useToastStore } from '../../../hooks/useToast';
 import type { Flight, Site } from '../../../types';
 import { defaultHandlers, fullFlight } from './FlightDetails.story-mocks';
 import i18n from 'i18next';
+import { http, HttpResponse } from 'msw';
 
 const mockSites: Site[] = [
   {
@@ -158,6 +159,53 @@ export const Default = meta.story({
     msw.use(...defaultHandlers);
   },
 });
+
+const enrichedGpxFlight: Flight = {
+  ...fullFlight,
+  id: 'flight-enriched-gpx',
+  gopro_camera_file_exists: true,
+};
+
+export const EnrichedGpxWithCameraVideo = meta.story({
+  name: 'Enriched GPX with GoPro video',
+  args: { flight: enrichedGpxFlight },
+  beforeEach: ({ msw }) => {
+    msw.use(
+      http.get('*/api/flights/flight-enriched-gpx/telemetry', () =>
+        HttpResponse.json({
+          points: [],
+          source: 'gpx+osv',
+          has_osv: true,
+          enrichment_status: 'ready',
+          enrichment_progress: null,
+          enrichment_error: null,
+          start_time: '2026-03-18T10:00:00Z',
+          end_time: '2026-03-18T11:00:00Z',
+          duration_seconds: 3600,
+        })
+      ),
+      ...defaultHandlers
+    );
+  },
+});
+
+EnrichedGpxWithCameraVideo.test(
+  'shows GPX regeneration beside the GPX file controls',
+  async ({ canvas }) => {
+    const regenerateButton = await canvas.findByRole('button', {
+      name: i18n.t('flights.goproOverlayMergeRegenerate'),
+    });
+    const replaceGpxButton = canvas.getByRole('button', {
+      name: i18n.t('flights.replaceGpx'),
+    });
+
+    await expect(regenerateButton).toBeVisible();
+    await expect(regenerateButton.parentElement?.parentElement).toBe(
+      replaceGpxButton.parentElement
+    );
+  }
+);
+
 Default.test('The stored track file name is displayed', async ({ canvas }) => {
   await expect(canvas.getByText('arguel-001.gpx')).toBeInTheDocument();
   await expect(
