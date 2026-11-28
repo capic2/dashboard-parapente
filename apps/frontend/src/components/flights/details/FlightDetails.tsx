@@ -65,6 +65,7 @@ import { FlightOverlayWorkspace } from './FlightOverlayWorkspace';
 import { FlightTelemetryInteractivePreview } from './FlightTelemetryInteractivePreview';
 import { FlightVideoMarkersEditor } from '../edit/FlightVideoMarkersEditor';
 import { flightQueryOptions } from '../../../hooks/flights/useFlight';
+import { FlightGpxEnrichmentAction } from './FlightGpxEnrichmentAction';
 import type { FlightDetailsTab } from '../../../routes/-flightSearch';
 
 interface FlightDetailsProps {
@@ -683,6 +684,9 @@ export function FlightDetails({
                 <FileUp className="h-4 w-4" aria-hidden="true" />
                 {gpxUploadLabel}
               </Button>
+              {hasGpx && hasGoproCameraVideo && (
+                <FlightGpxEnrichmentAction flightId={flight.id} />
+              )}
               {hasGpx && (
                 <FlightSportstrackliveUploadButton
                   flightId={flight.id}
